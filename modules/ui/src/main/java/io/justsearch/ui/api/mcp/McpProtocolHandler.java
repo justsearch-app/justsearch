@@ -48,6 +48,25 @@ public final class McpProtocolHandler {
   private static final Duration SESSION_TTL = Duration.ofMinutes(30);
 
   /**
+   * The activity role of each method this server answers, other than tools/call (each tool
+   * declares its own) and resources/read (each resource declares its own): true for a person's
+   * deliberate request, false for an observation. An unanswered method is refused and is not
+   * activity; a notification is never activity.
+   */
+  static final Map<String, Boolean> METHOD_USER_ACTIVITY = Map.of(
+      "initialize", false,
+      "tools/list", false,
+      "resources/list", false,
+      "prompts/list", false,
+      "ping", false,
+      "prompts/get", true);
+
+  static {
+    io.justsearch.ui.api.ObservationJustifications.validateMcpProtocol(
+        METHOD_USER_ACTIVITY, McpToolSurface.RESOURCE_USER_ACTIVITY);
+  }
+
+  /**
    * MCP {@code serverInfo.version} — the version of the SERVER IMPLEMENTATION, i.e. this build
    * (tempdoc 804 §B9 / round-10 F12: it reported the curated tool-surface version {@code 0.5.0} on a
    * {@code 0.2.0} build, so an MCP host that logs or gates on server version saw a version this
@@ -218,8 +237,9 @@ public final class McpProtocolHandler {
     if (notification) return false;
     return switch (method) {
       case "tools/call" -> McpToolSurface.isUserActivity(params.path("name").asText());
-      case "resources/read", "prompts/get" -> true;
-      default -> false;
+      case "resources/read" -> McpToolSurface.isResourceReadUserActivity(
+          params.path("uri").isString() ? params.path("uri").asText() : null);
+      default -> METHOD_USER_ACTIVITY.getOrDefault(method, false);
     };
   }
 

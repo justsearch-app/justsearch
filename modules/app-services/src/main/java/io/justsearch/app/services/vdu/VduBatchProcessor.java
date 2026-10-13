@@ -246,9 +246,16 @@ public class VduBatchProcessor {
                     checkInterrupted();
                     if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {
                         // Chat is draining, starting or stopping: the same outcome as AI being
-                        // offline. Not this document's failure; the selected unit stays remaining
-                        // and the next pass recovers and retries it.
+                        // offline. Not this document's failure; the selected unit stays remaining.
+                        // It goes back to PENDING with its attempt returned, so idle scheduling,
+                        // which looks only at PENDING, starts the next pass for it and refusals
+                        // never spend the retries kept for documents that really fail.
                         LOG.info("VDU pass deferred at {}: generation unavailable", docId);
+                        try { knowledgeClient.releaseVduProcessing(docId, engineContext); }
+                        catch (RuntimeException | Error writeFailure) {
+                            if (writeFailure != failure) writeFailure.addSuppressed(failure);
+                            throw writeFailure;
+                        }
                         vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
                         blocked = BlockReason.AI_OFFLINE;
                         break;

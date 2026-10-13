@@ -1781,6 +1781,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return vduOps.markVduProcessing(docId, maxRetries, engineContext);
     }
 
+    /**
+     * Returns a document this pass marked PROCESSING but could not attempt to PENDING, giving back
+     * the attempt the mark counted. False when it is absent or no longer PROCESSING.
+     */
+    public boolean releaseVduProcessing(String docId, EngineContext engineContext) {
+        return vduOps.releaseVduProcessing(docId, engineContext);
+    }
+
     public int recoverVduProcessing(EngineContext engineContext) {
         return vduOps.recoverVduProcessing(engineContext);
     }

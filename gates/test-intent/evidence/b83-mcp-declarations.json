@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-13T10:32:20.405Z",
+  "revision": "0a79303bb10f7a1194c7d04f6f7bc9b4fe3bee7b",
+  "tree": "841c97369ff313c87eec7798cb4d0763361ccf5e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpActivityDeclarationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20820
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpActivityDeclarationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpActivityDeclarationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85e1a4813d7b45966c114dcdc734d0d03f791cdcef61ba4eb99ec53eb4f9e03f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyReadableResourceDeclaresOneRole()",
+          "status": "passed"
+        },
+        {
+          "name": "anUndeclaredReadIsDeliberate()",
+          "status": "passed"
+        },
+        {
+          "name": "observationNeedsAReasonAndAReasonNeedsAnObservation()",
+          "status": "passed"
+        },
+        {
+          "name": "everyAnsweredMethodDeclaresOneRole()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:7f88d5af5363b5bfbd7f19101fc0cbe5f834a3c14ab484cff6f4de9f3ee2e756"
+}

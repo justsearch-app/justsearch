@@ -1,0 +1,157 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-13T10:29:37.923Z",
+  "revision": "0a79303bb10f7a1194c7d04f6f7bc9b4fe3bee7b",
+  "tree": "cb42e73a4645e17bbdb5fe2ddf158e0383fbe2e9",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.VduDeferredRetryTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22941
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest.earlierRequestDoesNotInterruptAndObserversDoNotResetIdle\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24584
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationListStore.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b83-evtmp\\\\test-intent-vitest-35224-1791887253289.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 38346
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/VduDeferredRetryTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/VduDeferredRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66af725f17ebad76401241589a4a79a02395d2cc093c40a953a5d17dc41eb27f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deferralsDoNotSpendTheRetryBudget()",
+          "status": "passed"
+        },
+        {
+          "name": "1 refused vision call(s), then admission reopens",
+          "status": "passed"
+        },
+        {
+          "name": "3 refused vision call(s), then admission reopens",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java#earlierRequestDoesNotInterruptAndObserversDoNotResetIdle",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4366dceb0455b37763aefd2eb321de38a4726ca7ecc47ef8601ae13ec09a4df6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "earlierRequestDoesNotInterruptAndObserversDoNotResetIdle()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#recentPendingAutoTitleResumesAfterReloadWithoutFurtherInput",
+      "file": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323d7e3b5e6842c00268df2b3f0508b0af2f8eca262cb751d247c16d621425a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tempdoc 835 §10f — auto-title generation is plumbing, not an answer recentPendingAutoTitleResumesAfterReloadWithoutFurtherInput",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts#a late automatic title never writes this window's rename over a newer rename from another tab",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0318f0989afe9ffb513ee86c0692187c9411b1afdc8d8880798fec5ea03f491c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it a late automatic title never writes this window's rename over a newer rename from another tab",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0a79303bb",
+    "revision": "0a79303bb10f7a1194c7d04f6f7bc9b4fe3bee7b",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.VduDeferredRetryTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 34035
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest.earlierRequestDoesNotInterruptAndObserversDoNotResetIdle\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 19607
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/state/conversationListStore.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b83-evtmp\\\\test-intent-vitest-35224-1791887351549.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 23272
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/VduDeferredRetryTest.java",
+        "classification": "assertion",
+        "detail": "deferralsDoNotSpendTheRetryBudget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the first admitted attempt reads the document ==> expected: <1> but was: <0> | 1 refused vision call(s), then admission reopens: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a refused vision call leaves the document waiting for a later pass, not stuck mid-processing ==> expected: <PENDING> but was: <PROCESSING> | 3 refused vision call(s), then admission reopen"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java#earlierRequestDoesNotInterruptAndObserversDoNotResetIdle",
+        "classification": "assertion",
+        "detail": "earlierRequestDoesNotInterruptAndObserversDoNotResetIdle(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: MCP observation must not interrupt: {\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/read\",\"params\":{\"uri\":\"justsearch://index/summary\"}} ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#recentPendingAutoTitleResumesAfterReloadWithoutFurtherInput",
+        "classification": "assertion",
+        "detail": "tempdoc 835 §10f — auto-title generation is plumbing, not an answer recentPendingAutoTitleResumesAfterReloadWithoutFurtherInput:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at F:/justsearch-public/.claude/worktrees/b83-evtmp/test-intent-before-BfitAJ/modules/ui-web/src/shell-v0/state/conversationListStore.test.ts:857:23\n    at file:///C:/agent-sandbox-tmp/b83/ui-web-deps/node_modules/@vitest/runner/dist/chunk"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts#a late automatic title never writes this window's rename over a newer rename from another tab",
+        "classification": "assertion",
+        "detail": "a conversation gets a model-generated name, and a rename beats it a late automatic title never writes this window's rename over a newer rename from another tab:  AssertionError: expected { title: 'Renewal postmortem', …(1) } to deeply equal { title: 'Lock incident review', …(1) }\n    at F:/justsearch-public/.claude/worktrees/b83-evtmp/test-intent-before-BfitAJ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts:1103:20\n    at file:///C:/"
+      }
+    ]
+  },
+  "digest": "sha256:02037a88cd1e0ccdca9b1dabe440edbb2705af352f33c0c89700025d5f21c7df"
+}

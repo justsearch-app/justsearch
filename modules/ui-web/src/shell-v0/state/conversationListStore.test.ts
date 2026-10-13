@@ -823,6 +823,50 @@ describe('tempdoc 835 §10f — auto-title generation is plumbing, not an answer
     expect(JSON.parse(localStorage.getItem(PENDING) ?? '{}')).toEqual({ 'uc-busy': expect.any(Number) });
   });
 
+  it('recentPendingAutoTitleResumesAfterReloadWithoutFurtherInput', async () => {
+    vi.useFakeTimers();
+    const PENDING = 'jf-conversation-autotitle-pending';
+    try {
+      // The window asking for uc-left was refused as busy and reloaded 10 s after that request, so
+      // its retry loop is gone. uc-owned was last asked for by another window that is still open.
+      // This is the new window, and nobody touches it after it loads the list once.
+      localStorage.setItem(PENDING, JSON.stringify({ 'uc-left': Date.now() - 10_000, 'uc-owned': Date.now() - 10_000 }));
+      let named = false;
+      const calls = mockFetch((url) => {
+        if (url.endsWith('/auto-title')) {
+          named = true;
+          return jsonResponse({ ok: true, generated: true, title: 'Lease terms', titleSource: 'auto' });
+        }
+        return jsonResponse({ sessions: [
+          wireRow('uc-left', named ? { title: 'Lease terms', titleSource: 'auto' } : {}), wireRow('uc-owned')] });
+      });
+      const asked = () => calls.filter((c) => c.url.endsWith('/auto-title')).map((c) => c.url);
+      await loadConversations();
+      await vi.advanceTimersByTimeAsync(0);
+      // Within the asking window's own retry interval the entry is still its to ask about.
+      expect(asked()).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      // The other window asks again for uc-owned, as its retry loop does at least once a minute.
+      localStorage.setItem(PENDING, JSON.stringify({
+        ...JSON.parse(localStorage.getItem(PENDING) ?? '{}'), 'uc-owned': Date.now() }));
+      expect(asked()).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      // uc-left's asker is gone (no newer request), so this window asks, once; uc-owned's is alive.
+      expect(asked()).toEqual(['/api/chat/conversations/uc-left/auto-title']);
+      expect(getConversationListState().conversations.find((c) => c.id === 'uc-left')?.title).toBe('Lease terms');
+      expect(JSON.parse(localStorage.getItem(PENDING) ?? '{}')).toEqual({ 'uc-owned': expect.any(Number) });
+      // Nothing the untouched window sent counts as a person acting: the list read and the
+      // automatic-title request are both observations.
+      expect(calls.filter((c) => !(c.method === 'GET' && c.url.includes('/api/chat/conversations?'))
+        && !(c.method === 'POST' && c.url.endsWith('/auto-title')))).toEqual([]);
+    } finally {
+      localStorage.removeItem(PENDING);
+      vi.useRealTimers();
+    }
+  });
+
   it('stops on an answer waiting cannot change, and never overrides a name the server kept', async () => {
     const conflict = mockFetch((url) =>
       url.endsWith('/auto-title')

@@ -107,7 +107,7 @@ final class BackgroundDemandYieldTest {
 
   @Test
   void aSelfTestIsNeverAgedPast() throws Exception {
-    try (var session = controller.beginSelfTest("activation")) {
+    try (var _ = controller.beginSelfTest("activation")) {
       assertEquals(RefusalReason.SELF_TEST, refused().reason());
       advance(ChatServerControllerImpl.BACKGROUND_AGING.multipliedBy(3));
       ChatRefusal later = refused();

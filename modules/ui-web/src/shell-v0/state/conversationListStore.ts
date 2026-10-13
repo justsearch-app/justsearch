@@ -751,9 +751,38 @@ function resumeAutoTitles(conversations: readonly Conversation[]): void {
     const row = conversations.find((c) => c.id === id);
     if (row === undefined) continue;
     if (row.titleSource !== null) { settleAutoTitle(id); continue; }
-    if (autoTitlesAsking.has(id) || Date.now() - at < AUTO_TITLE_RESUME_AFTER_MS) continue;
+    if (autoTitlesAsking.has(id)) continue;
+    if (Date.now() - at < AUTO_TITLE_RESUME_AFTER_MS) { resumeAutoTitleIfAbandoned(id, at); continue; }
     void askAutoTitle(id);
   }
+}
+
+/** Entries this window will look at again once their asker has had time to ask again. */
+const autoTitleResumeChecks = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * An entry asked for recently belongs to the window asking, which renews it on every request (at
+ * most {@link AUTO_TITLE_MAX_RETRY_MS} apart). That window may be the one a reload just replaced, so
+ * look again once the entry would be stale: still unsettled and not renewed means nobody is asking,
+ * and this window asks, an observation, without waiting for another list load. Each window looks
+ * at its own random moment within the first retry interval, so when several windows wait for the
+ * same entry the first to ask renews it and the others find it owned again.
+ */
+function resumeAutoTitleIfAbandoned(id: string, at: number): void {
+  if (autoTitleResumeChecks.has(id)) return;
+  const epoch = autoTitleEpoch;
+  autoTitleResumeChecks.set(id, setTimeout(() => {
+    autoTitleResumeChecks.delete(id);
+    if (epoch !== autoTitleEpoch || autoTitlesAsking.has(id)) return;
+    const renewed = loadAutoTitlesPending()[id];
+    if (renewed === undefined) return;
+    const row = state.conversations.find((c) => c.id === id);
+    if (row === undefined) return;
+    if (row.titleSource !== null) { settleAutoTitle(id); return; }
+    if (Date.now() - renewed < AUTO_TITLE_RESUME_AFTER_MS) { resumeAutoTitleIfAbandoned(id, renewed); return; }
+    void askAutoTitle(id);
+  }, Math.max(0, at + AUTO_TITLE_RESUME_AFTER_MS - Date.now())
+    + Math.floor(Math.random() * AUTO_TITLE_FIRST_RETRY_MS)));
 }
 
 /**
@@ -1317,6 +1346,8 @@ export function __resetConversationListForTest(): void {
   listShown = 0;
   autoTitleEpoch += 1;
   autoTitlesAsking.clear();
+  for (const check of autoTitleResumeChecks.values()) clearTimeout(check);
+  autoTitleResumeChecks.clear();
   stopAdoptionWatch?.();
   stopAdoptionWatch = null;
   stopLegacyWatch?.();

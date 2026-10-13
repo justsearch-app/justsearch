@@ -1883,6 +1883,38 @@ public final class WorkerIngestService {
     return markVduErrorResponse("Document not found: " + docId);
   }
 
+  /**
+   * Returns a document a pass marked PROCESSING but could not attempt (the model refused generation
+   * admission) to PENDING and gives back the attempt its mark counted, so temporary refusals neither
+   * strand it nor spend the retries that stop a document that really fails. False when the document
+   * is absent or no longer PROCESSING; nothing is changed then.
+   */
+  public boolean releaseVduProcessing(String docId, CallContext ctx) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
+      if (docId == null || docId.isBlank()) {
+        throw new WorkerServiceException(WorkerServiceException.Status.INVALID_ARGUMENT, "doc_id is required");
+      }
+      requireEnrichmentReader(ctx);
+      requireServingVduTarget();
+      try {
+        String status = ingestLifecycle.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.VDU_STATUS);
+        if (!SchemaFields.VDU_STATUS_PROCESSING.equals(status)) return false;
+        Map<String, Object> updates = new HashMap<>();
+        updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
+        updates.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(Math.max(0, readVduRetryCount(docId) - 1)));
+        if (!ingestLifecycle.indexingCoordinator().updateDocument(docId, updates)) return false;
+        ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+        ingestLifecycle.commitOps().maybeRefreshBlocking();
+        requireServingVduTarget();
+        return true;
+      } catch (WorkerServiceException failure) {
+        throw failure;
+      } catch (Exception e) {
+        throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL, "VDU release failed", e);
+      }
+    }
+  }
+
   private List<String> processingDocIdsForRecovery() throws IOException {
     return ingestLifecycle.documentFieldOps().queryDocIdsByFieldOrThrow(
         SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, RECOVER_VDU_QUERY_LIMIT);
