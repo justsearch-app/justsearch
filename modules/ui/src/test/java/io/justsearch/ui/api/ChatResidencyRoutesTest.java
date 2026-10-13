@@ -276,6 +276,23 @@ final class ChatResidencyRoutesTest {
     assertEquals(Optional.of(StopDetail.GAME_MODE), controller.unloaded());
   }
 
+  @Test
+  void combinedPressureIsAcceptedRoundTrippedAndListedInValidation() throws Exception {
+    System.setProperty("justsearch.eval.mode", "true");
+    var combined = new Exchange("/api/debug/chat-pressure",
+        "{\"signal\":\"game_and_external_memory\",\"profile\":\"P16_PLUS\"}", null);
+    routes.handleDevPressure(combined.ctx);
+    assertEquals(200, combined.status.get());
+    assertEquals("GAME_AND_EXTERNAL_MEMORY", combined.body().get("signal"));
+    assertEquals(PressureSignal.GAME_AND_EXTERNAL_MEMORY, controller.reportedPressure());
+    assertEquals("P16_PLUS", combined.body().get("profile"));
+    var invalid = new Exchange("/api/debug/chat-pressure", "{\"signal\":\"LOUD\"}", null);
+    routes.handleDevPressure(invalid.ctx);
+    assertEquals(400, invalid.status.get());
+    assertEquals("signal must be NONE | EXTERNAL_MEMORY | GAME | GAME_AND_EXTERNAL_MEMORY",
+        invalid.body().get("error"), "validation lists every accepted signal");
+  }
+
   // ==================== helpers ====================
 
   private static EngineContext mcpContext() {

@@ -60,6 +60,15 @@ public final class GenerationTracker implements GenerationActivity {
     AUX
   }
 
+  /** An IF_IDLE drain refused specifically because an exchange still holds a lease. */
+  public static final class LeaseOpenException extends IllegalStateException {
+    private static final long serialVersionUID = 1L;
+
+    private LeaseOpenException(String message) {
+      super(message);
+    }
+  }
+
   private record Edge(boolean generating, long epoch) {}
 
   private final Function<EngineWorkHandle, Runnable> generationLifetime;
@@ -140,7 +149,7 @@ public final class GenerationTracker implements GenerationActivity {
     return () -> listeners.remove(listener);
   }
 
-  /** Runs on the edge delivery executor, once no GENERATE, ASSIST, VDU or AUX lease is open. */
+  /** Notifies once no GENERATE, ASSIST, VDU or AUX lease is open; see the delivery fallback contract. */
   @Override
   public void whenNoLeaseOpen(Runnable task) {
     Objects.requireNonNull(task, "task");
@@ -155,16 +164,20 @@ public final class GenerationTracker implements GenerationActivity {
 
   private void deliverNoLease(List<Runnable> tasks) {
     for (Runnable task : tasks) {
+      Runnable notification = () -> {
+        try {
+          task.run();
+        } catch (RuntimeException failure) {
+          LOG.warn("A no-lease-open call failed", failure);
+        }
+      };
       try {
-        edgeDelivery.execute(() -> {
-          try {
-            task.run();
-          } catch (RuntimeException failure) {
-            LOG.warn("A no-lease-open call failed", failure);
-          }
-        });
+        edgeDelivery.execute(notification);
       } catch (RejectedExecutionException rejected) {
-        LOG.warn("No-lease-open delivery refused; the waiting step is not resumed", rejected);
+        // This one-shot notification has already left the waiters list. Losing it would leave
+        // stable pressure resident forever. It only signals work; never perform the drain here.
+        LOG.debug("No-lease-open delivery refused; notifying on the closing thread", rejected);
+        notification.run();
       }
     }
   }
@@ -251,7 +264,7 @@ public final class GenerationTracker implements GenerationActivity {
       case IF_IDLE -> {
         ChatActuator.DrainHold hold = closeIfIdle();
         if (hold == null) {
-          throw new IllegalStateException(
+          throw new LeaseOpenException(
               "Generation in flight; " + policy.reason() + " waits for the next idle edge");
         }
         yield hold;

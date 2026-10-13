@@ -197,6 +197,9 @@ public final class ChatServerControllerImpl
   /** A one-shot "no lease open" call is registered for the deferred unload (monitor). */
   private boolean leaseWatch;
 
+  /** A no-lease notification asks the controller loop to recheck residency (monitor). */
+  private boolean residencyRecheckPending;
+
   /**
    * The pressure a person loaded chat anyway under, or null (monitor). While the reported pressure
    * stays this signal nothing unloads again; a new pressure edge clears it (reconciliation v2).
@@ -485,9 +488,10 @@ public final class ChatServerControllerImpl
         Runnable replay = null;
         DeviceLostEvidence lost = null;
         boolean probe = false;
+        boolean recheckResidency = false;
         synchronized (monitor) {
           while (queue.isEmpty() && desired.terminal() == null && replay == null
-              && deviceLost == null && !resumeProbePending) {
+              && deviceLost == null && !resumeProbePending && !residencyRecheckPending) {
             if (bootGate != BootGate.CLOSED) {
               monitor.wait();
               continue;
@@ -507,11 +511,23 @@ public final class ChatServerControllerImpl
           } else if (replay == null && desired.terminal() == null && resumeProbePending) {
             resumeProbePending = false;
             probe = true;
+          } else if (replay == null && desired.terminal() == null && residencyRecheckPending) {
+            residencyRecheckPending = false;
+            recheckResidency = true;
           } else if (replay == null) {
             next = queue.poll();
             if (next == null) return;
             current = next;
           }
+        }
+        if (recheckResidency) {
+          try {
+            evaluateResidency();
+          } catch (RuntimeException | Error failure) {
+            survive(failure);
+            LOG.warn("Chat residency recheck failed; the controller keeps serving", failure);
+          }
+          continue;
         }
         if (lost != null) {
           next = deviceLostStep(lost);
@@ -1203,7 +1219,8 @@ public final class ChatServerControllerImpl
   private void evaluateResidency() {
     PressureSignal signal = effectivePressure();
     if (signal == PressureSignal.NONE) return;
-    if (Thread.currentThread() == controllerThread) return;
+    // The loop also evaluates a deferred no-lease notification here. It queues the unload as
+    // usual, so every drain and stop still runs through the controller's actuation queue.
     boolean running = observeRunning();
     boolean gpu = running && actuator.gpuChat();
     GenerationActivity activity = actuator.generationActivity();
@@ -1282,8 +1299,12 @@ public final class ChatServerControllerImpl
     activity.whenNoLeaseOpen(() -> {
       synchronized (monitor) {
         leaseWatch = false;
+        // Delivery can fall back to the closing thread under callback queue pressure. Only
+        // wake our loop here: never inspect the actuator or perform a drain on that thread.
+        if (!deferred || desired.terminal() != null || loopEnded) return;
+        residencyRecheckPending = true;
+        monitor.notifyAll();
       }
-      onGenerationEdge(false);
     });
   }
 

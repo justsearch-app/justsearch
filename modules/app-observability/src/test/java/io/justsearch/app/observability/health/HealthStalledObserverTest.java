@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -134,6 +135,63 @@ final class HealthStalledObserverTest {
       }
     } finally {
       for (CountDownLatch latch : release) latch.countDown();
+      changes.channel().close();
+    }
+  }
+
+  @Test
+  void observerWaitResumesAfterBacklogDrainsAndSecondStallIsBounded() throws Exception {
+    var delivery = Executors.newSingleThreadExecutor();
+    var changes = new HealthEventChangeRegistry(delivery);
+    List<CountDownLatch> entered = new ArrayList<>();
+    List<CountDownLatch> release = new ArrayList<>();
+    for (int i = 0; i < 4; i++) {
+      entered.add(new CountDownLatch(1));
+      release.add(new CountDownLatch(1));
+    }
+    var seen = new CopyOnWriteArrayList<Long>();
+    changes.subscribe(envelope -> {
+      int index = seen.size();
+      seen.add(envelope.seq());
+      entered.get(index).countDown();
+      await(release.get(index));
+    });
+    try {
+      Outcome first = publish(changes, 1);
+      assertTrue(first.heldMillis() >= PROMPT_MS && first.heldMillis() < 3_000);
+      assertTrue(publish(changes, 2).heldMillis() < PROMPT_MS);
+      release.get(0).countDown();
+      assertTrue(entered.get(1).await(5, TimeUnit.SECONDS));
+      release.get(1).countDown();
+      // The single delivery executor's barrier completes only after the backlog's drain task
+      // exits, including its final delivered-sequence / stall-state update.
+      delivery.submit(() -> {}).get(5, TimeUnit.SECONDS);
+      assertEquals(2, seen.size());
+
+      var secondStall = new java.util.concurrent.FutureTask<Outcome>(() -> publish(changes, 3));
+      Thread producer = Thread.ofPlatform().name("b84-second-stall").start(secondStall);
+      assertTrue(entered.get(2).await(5, TimeUnit.SECONDS));
+      assertThrows(java.util.concurrent.TimeoutException.class,
+          () -> secondStall.get(150, TimeUnit.MILLISECONDS),
+          "a caught-up observer must be waited for again while its next frame is held");
+      Outcome resumed = secondStall.get(5, TimeUnit.SECONDS);
+      producer.join(5_000);
+      assertFalse(producer.isAlive());
+      assertTrue(resumed.heldMillis() >= PROMPT_MS && resumed.heldMillis() < 3_000,
+          "the second stall receives one fresh bounded wait: " + resumed.heldMillis());
+      assertFalse(resumed.interrupted());
+      assertNull(resumed.thrown());
+      Outcome skipped = publish(changes, 4);
+      assertTrue(skipped.heldMillis() < PROMPT_MS, "later frames skip the second stall");
+      assertFalse(skipped.interrupted());
+      assertNull(skipped.thrown());
+      release.get(2).countDown();
+      assertTrue(entered.get(3).await(5, TimeUnit.SECONDS));
+      release.get(3).countDown();
+      delivery.submit(() -> {}).get(5, TimeUnit.SECONDS);
+      assertEquals(List.of(1L, 2L, 3L, 4L), seen);
+    } finally {
+      release.forEach(CountDownLatch::countDown);
       changes.channel().close();
     }
   }

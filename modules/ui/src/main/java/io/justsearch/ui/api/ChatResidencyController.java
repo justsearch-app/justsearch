@@ -25,7 +25,7 @@ import tools.jackson.databind.ObjectMapper;
  *       the same evidence as a person's chat (reconciliation F8/CH1): a body with {@code allowLoad:
  *       true} from the app's own client. It answers at once; the status surface shows the load.
  *   <li>{@code POST /api/debug/chat-pressure} — the dev-only pressure trigger, {@code {"signal":
- *       "EXTERNAL_MEMORY" | "GAME" | "NONE", "profile"?: "P16_PLUS" | "P12" | ...}} (the profile is
+ *       "EXTERNAL_MEMORY" | "GAME" | "GAME_AND_EXTERNAL_MEMORY" | "NONE", "profile"?: "P16_PLUS" | "P12" | ...}} (the profile is
  *       optional; the game rule depends on it). Available only with {@code -Djustsearch.eval.mode=true}
  *       (the dev run sets it); otherwise 404, as the other synthetic debug routes.
  * </ul>
@@ -95,7 +95,7 @@ public final class ChatResidencyController {
     try {
       signal = PressureSignal.valueOf(String.valueOf(raw).trim().toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException invalid) {
-      ctx.status(400).json(Map.of("error", "signal must be NONE | EXTERNAL_MEMORY | GAME"));
+      ctx.status(400).json(Map.of("error", "signal must be NONE | EXTERNAL_MEMORY | GAME | GAME_AND_EXTERNAL_MEMORY"));
       return;
     }
     Profile profile = null;
