@@ -309,6 +309,18 @@ const tests = [
       const rows = interferenceRows();
       assert.equal(rows.length, before, `${label}: deny causes no interference`);
     }
+    // Preservation: an explicit takeover of the same ownership is still a stale reclaim, logged.
+    for (const [label, setup] of cases) {
+      const before = interferenceRows().length;
+      setup();
+      const r = await acquireAdmission({ takeover: 'warn' });
+      assert.equal(r.action, 'proceed', `${label} (warn): ${JSON.stringify(r)}`);
+      assert.equal(r.disposition, 'stale_reclaim', label);
+      assert.equal(stopReportDisposition(), 'stale_reclaim', label);
+      const rows = interferenceRows();
+      assert.equal(rows.length, before + 1, `${label}: a stale reclaim is still logged`);
+      assert.equal(rows.at(-1).disposition, 'stale_reclaim', label);
+    }
   }],
   ['S3 parity: quick_health (cheap), acquire_when_free (full) and the gate give the same late-abandoned verdict', async () => {
     const { buildOwnershipProjection } = await import(pathToFileURL(path.join(__dirname, 'justsearch-dev-mcp', 'server.mjs')).href);

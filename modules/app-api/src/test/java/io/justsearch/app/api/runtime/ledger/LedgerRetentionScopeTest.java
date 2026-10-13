@@ -64,6 +64,31 @@ class LedgerRetentionScopeTest {
         "an unreadable evicted line has unknown scope");
   }
 
+  @Test void compactedUnknownRangeKeepsNewestEvictionTime() throws Exception {
+    // Summaries written before scope fields existed leave the merged range unknown; the compacted
+    // row's `at` must then be the newest eviction time, the bound a reader uses instead.
+    Path current = LedgerFamily.ENGINE.current(dir), rotated = LedgerFamily.ENGINE.rotated(dir);
+    String unscoped = """
+        {"schemaVersion":1,"type":"ledger-gap","seq":1,"at":"2026-09-30T10:00:00Z",
+         "writer":{"role":"engine","pid":100,"startedAt":"2026-09-30T09:00:00Z"},
+         "since":"2026-09-30T10:00:00Z","reason":"EVIDENCE_LOST","count":1,
+         "droppedFile":"engine.v1.9.jsonl","droppedBytes":512,"detail":"archive dropped at retention bound"}
+        """.replace("\n", "") + "\n";
+    Files.writeString(LedgerRetention.lossPath(current), unscoped.repeat(3000), StandardCharsets.UTF_8);
+    Files.writeString(rotated, ROW, StandardCharsets.UTF_8);
+    Files.writeString(current, ROW, StandardCharsets.UTF_8);
+    var started = java.time.Instant.now().minusSeconds(1);
+    LedgerRetention.rotate(current, rotated, 0);
+    var losses = ExitLedgerReader.read(dir, LedgerFamily.ENGINE).ofType(LedgerRecordType.LEDGER_GAP);
+    assertEquals(1, losses.size(), "the journal compacted to one row");
+    var compacted = losses.getFirst();
+    assertFalse(compacted.line().path("evidenceRangeComplete").asBoolean(true), "the merged range is unknown");
+    assertTrue(compacted.text("evidenceFrom").isEmpty() && compacted.text("evidenceThrough").isEmpty(),
+        "an unknown merged range keeps no bound");
+    var at = java.time.Instant.parse(compacted.text("at").orElseThrow());
+    assertFalse(at.isBefore(started), "the compacted row keeps the newest eviction time, not " + at);
+  }
+
   @Test void retentionLossKeepsOriginalSessionAndEvidenceRange() throws Exception { evict(false); }
   @Test void compactedLossKeepsOriginalSessionAndEvidenceRange() throws Exception { evict(true); }
 }

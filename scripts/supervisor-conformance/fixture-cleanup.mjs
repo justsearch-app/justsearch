@@ -5,7 +5,33 @@ import actuator from '../dev/lib/engine-actuator.cjs';
 export function fixtureIdentities(dir) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter(name => /^\d+-\d+\.json$/.test(name))
-    .map(name => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')));
+    .map(name => ({ ...JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')), file: path.join(dir, name) }));
+}
+
+/**
+ * A process creation time may trail the precise clock the fixture read by up to one system clock
+ * tick (15.6 ms by default), so a birth this close below the held-at bound is not attributed.
+ */
+const HELD_AT_MARGIN_TICKS = 200000n; // 20 ms
+
+/**
+ * The fixture recorded its PID at a moment it held it. A live process under that PID born
+ * before that moment is the fixture (no two processes hold one PID at once); one born after it
+ * reuses the PID. A birth within the clock margin is unknown and never authorizes a stop.
+ */
+function resolveBirth(identity, row) {
+  if (identity.creationFileTimeUtc) return actuator.sameBirth(identity.creationFileTimeUtc, row.creationFileTime) ? 'owned' : 'other';
+  if (!/^[1-9][0-9]*$/.test(identity.heldAtFileTimeUtc ?? '')) return 'unknown';
+  const birth = BigInt(row.creationFileTime), heldAt = BigInt(identity.heldAtFileTimeUtc);
+  if (birth > heldAt) return 'other';
+  return birth < heldAt - HELD_AT_MARGIN_TICKS ? 'resolved' : 'unknown';
+}
+
+/** The resolved birth is durable before any stop can use it, written aside and renamed. */
+function recordBirth(identity, birth) {
+  const { file, ...fields } = identity;
+  fs.writeFileSync(`${file}.tmp`, JSON.stringify({ ...fields, creationFileTimeUtc: birth }));
+  fs.renameSync(`${file}.tmp`, file);
 }
 
 /**
@@ -22,7 +48,14 @@ export async function awaitFixtureExit(dir, { sleep, graceMs = 5000, timeoutMs =
     const live = identities.filter(i => {
       const row = observed.get(i.pid);
       if (!row || (row.present && !row.creationFileTime)) throw new Error('fixture identity unknown; artifacts retained');
-      return row.present && actuator.sameBirth(i.creationFileTimeUtc, row.creationFileTime);
+      if (!row.present) return false;
+      const verdict = resolveBirth(i, row);
+      if (verdict === 'unknown') throw new Error('fixture identity unknown; artifacts retained');
+      if (verdict === 'resolved') {
+        recordBirth(i, row.creationFileTime);
+        i.creationFileTimeUtc = row.creationFileTime;
+      }
+      return verdict !== 'other';
     });
     if (!live.length) return;
     const elapsed = Date.now() - started;

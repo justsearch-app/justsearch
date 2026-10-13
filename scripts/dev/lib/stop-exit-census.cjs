@@ -588,9 +588,13 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     if (loss.incarnation?.session) return loss.incarnation.session === run?.runId;
     if (loss.scopeComplete === true) return loss.affectedSessions?.includes(run?.runId) === true;
     if (observed.some(p => pidOf(p) === loss.pid && sameBirth(birthOf(p), loss.creationFileTime))) return true;
+    // Evicted evidence was written before its eviction, so a row's `at` (the eviction time for
+    // summaries and compacted rows, the evidence time for identity rows) bounds a range that is
+    // unknown, including rows written before scope fields existed.
     const start = ledgerLib.knownTimestamp(run?.startedAt);
-    const through = ledgerLib.knownTimestamp(loss.evidenceThrough);
-    return !(loss.evidenceRangeComplete === true && start != null && through != null && through < start);
+    const through = loss.evidenceRangeComplete === true ? ledgerLib.knownTimestamp(loss.evidenceThrough) : null;
+    const bound = through ?? ledgerLib.knownTimestamp(loss.at);
+    return !(start != null && bound != null && bound < start);
   };
   const losses = allLosses.filter(relevantLoss);
   const historicalEvidenceLoss = allLosses.filter(loss => !relevantLoss(loss));

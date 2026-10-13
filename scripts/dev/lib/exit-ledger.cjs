@@ -386,8 +386,9 @@ function summarizeLedger(ledgerDir, family) {
 /** Historical evidence is bounded at 128 MiB per family, plus current (2 MiB) and loss (1 MiB). */
 const RETAIN_BYTES = 128 * 1024 * 1024;
 const LOSS_BYTES = 1024 * 1024;
-// Original evidence bounds survive journal compaction. The eviction time is never a bound
-// on the evidence that was lost. Unknown legacy scope remains explicitly unknown.
+// Original evidence bounds survive journal compaction. An unknown range stays explicitly
+// unknown; the row's `at` (its latest eviction time) remains its upper bound, so compaction
+// keeps the newest eviction time there.
 function lossScope(rows) {
   const sessions = [...new Set(rows.flatMap(r => r.affectedSessions ?? [r.incarnation?.session]).filter(Boolean))];
   const bounded = sessions.length <= 128 && sessions.join('').length <= 2048;

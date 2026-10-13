@@ -145,14 +145,32 @@ for (const compacted of [false, true]) {
         evidenceThrough: '2026-10-01T10:00:00Z', scopeComplete: true, affectedSessions: ['old'] };
       fs.writeFileSync(path.join(dir, 'engine.v1.lost.jsonl'), (JSON.stringify(loss) + '\n').repeat(2000));
     }
-    for (let i = 0; i < 30; i++) writer.append('engine-start', { incarnation: { session: 'old', n: i + 1 },
-      pid: 200 + i, creationFileTime: census.fileTimeFromInstant('2026-10-01T10:00:00Z'), executable: process.execPath });
+    // A summary written by the base revision carries no scope fields; its `at` is the eviction time.
+    const unscoped = { schemaVersion: 1, type: 'ledger-gap', seq: 1, at: '2026-10-02T10:00:00Z',
+      since: '2026-10-02T10:00:00Z', writer: { role: 'engine', pid: 100, startedAt: '2026-10-01T10:00:00Z' },
+      reason: 'EVIDENCE_LOST', count: 1, droppedFile: 'engine.v1.9.jsonl', droppedBytes: 512,
+      detail: 'archive dropped at retention bound' };
+    fs.appendFileSync(path.join(dir, 'engine.v1.lost.jsonl'), JSON.stringify(unscoped) + '\n');
+    for (let i = 0; i < 30; i++) {
+      writer.append('engine-start', { incarnation: { session: 'old', n: i + 1 },
+        pid: 200 + i, creationFileTime: census.fileTimeFromInstant('2026-10-01T10:00:00Z'), executable: process.execPath });
+      // A torn line in the oldest archive leaves the evicted range unknown.
+      if (i === 0) fs.appendFileSync(path.join(dir, 'engine.v1.jsonl'), '{torn\n');
+    }
     const records = ledger.readLedger(dir, 'engine').records;
+    const losses = records.filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST').map(r => r.line);
+    assert.ok(losses.some(l => l.evidenceRangeComplete !== true), 'fixture holds a loss with an unknown range');
     const view = { engine: { present: true, records }, children: { present: true, records: [] } };
-    const current = census.exitTargets({ runId: 'new', startedAt: stamp, pids: {} }, null, [], view);
+    const evicted = Math.max(...losses.map(l => ledger.knownTimestamp(l.at)));
+    const current = census.exitTargets({ runId: 'new', startedAt: ledger.formatTimestamp(evicted + 1000), pids: {} },
+      null, [], view);
     assert.equal(current.gaps.some(g => g.reason === 'evidence_lost'), false,
       'loss of disjoint old evidence must not create a current-run accounting gap');
     const affected = census.exitTargets({ runId: 'old', startedAt: '2026-10-01T10:00:00Z', pids: {} }, null, [], view);
     assert.ok(affected.gaps.some(g => g.reason === 'evidence_lost'), 'affected run remains incomplete');
+    // An unknown range is still relevant to a run that started before its eviction time.
+    const during = census.exitTargets({ runId: 'during', startedAt: ledger.formatTimestamp(evicted - 1000), pids: {} },
+      null, [], view);
+    assert.ok(during.gaps.some(g => g.reason === 'evidence_lost'), 'a run older than the eviction stays incomplete');
   });
 }

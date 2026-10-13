@@ -81,6 +81,13 @@ export async function watchSupervisor({ statePath, predicate, timeoutMs, io, see
   }
 }
 
+/** Settles with `promise`, or `false` after `ms`; the timer is cleared so it never holds the process open. */
+function within(promise, ms) {
+  let timer;
+  const expired = new Promise(resolve => { timer = setTimeout(() => resolve(false), ms); });
+  return Promise.race([promise, expired]).finally(() => clearTimeout(timer));
+}
+
 export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir(testCase.id), keepWorkDir = false }) {
   // One identity directory per launch: a case that drives two runs never stops one run's
   // fixtures on behalf of the other's teardown.
@@ -158,22 +165,34 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
 
   const cleanup = async () => {
-    // Ask the runner to close its own Engine first. Every fixture has recorded its birth before
-    // running application code; a failed orderly stop can only target those retained identities.
+    // Ask the runner to close its own Engine first. Every fixture has recorded its PID and a
+    // moment it held it before running application code; a failed orderly stop can only target
+    // births resolved from those retained identities and recorded before the stop.
     if (child.exitCode === null && child.signalCode === null) {
+      // The stop speaks for the session that started the run, with the same harness settings;
+      // any other caller is refused as an owner conflict.
       const stop = spawn(process.execPath, [...preload,
-        path.join(io.repoRoot, 'scripts/dev/dev-runner.cjs'), 'stop', '--json'], {
+        path.join(io.repoRoot, 'scripts/dev/dev-runner.cjs'), 'stop', '--json',
+        '--session-id', `supervisor-conformance-${testCase.id}`], {
         cwd: io.repoRoot, windowsHide: true, stdio: 'ignore',
-        env: { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
+        env: { ...process.env, ...io.harnessOverrides, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
           JUSTSEARCH_CONFORMANCE_IDENTITIES: identities },
       });
-      await Promise.race([
-        new Promise((resolve, reject) => { stop.once('exit', resolve); stop.once('error', reject); }),
-        io.sleep(20000),
-      ]);
+      await within(new Promise((resolve, reject) => { stop.once('exit', resolve); stop.once('error', reject); }), 20000);
     }
     if (process.platform === 'win32') await awaitFixtureExit(identities, { sleep: io.sleep });
-    const ended = await Promise.race([exited.then(() => true), io.sleep(5000).then(() => false)]);
+    const runnerEnded = ms => within(exited.then(() => true), ms);
+    let ended = await runnerEnded(5000);
+    if (!ended && process.platform !== 'win32') {
+      // Off Windows the runner is this process's own unreaped child while its exit is unseen, so
+      // its handle cannot name a reused PID: a failed orderly stop falls back to that handle.
+      try { child.kill('SIGTERM'); } catch { /* already gone */ }
+      ended = await runnerEnded(3000);
+      if (!ended) {
+        try { child.kill('SIGKILL'); } catch { /* already gone */ }
+        ended = await runnerEnded(2000);
+      }
+    }
     if (!ended) throw new Error('fixture runner exit unconfirmed; artifacts retained');
     if (keepWorkDir) return;
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {

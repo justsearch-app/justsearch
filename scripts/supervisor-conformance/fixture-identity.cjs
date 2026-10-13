@@ -1,21 +1,21 @@
 'use strict';
-// Loaded before each fixture program. A cleanup owns exactly these births, never a PID tree.
+// Loaded before each fixture program. A cleanup owns exactly these identities, never a PID tree.
+// The preload starts no process and makes no identity query, so a fixture's own start (its port
+// deadline included) is not delayed: it records its PID and a moment it certainly held that PID.
+// The teardown resolves the birth from that bound and records it before any stop
+// (fixture-cleanup.mjs).
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
 const dir = process.env.JUSTSEARCH_CONFORMANCE_IDENTITIES;
 if (dir) {
-  if (process.platform !== 'win32') throw new Error('fixture birth capture requires Windows');
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    `(Get-Process -Id ${process.pid} -ErrorAction Stop).StartTime.ToFileTimeUtc().ToString()`],
-  { encoding: 'utf8', windowsHide: true, timeout: 10000 });
-  const birth = result.stdout?.trim();
-  if (result.status !== 0 || !/^[1-9][0-9]+$/.test(birth ?? '')) throw new Error('fixture identity unavailable');
+  if (process.platform !== 'win32') throw new Error('fixture identity capture requires Windows');
+  // This process is running, so it holds its PID now: any process born later is not this one.
+  const heldAt = (BigInt(Date.now()) * 10000n + 116444736000000000n).toString();
   fs.mkdirSync(dir, { recursive: true });
   // Written aside and renamed, so a teardown never reads a half-written identity.
-  const file = path.join(dir, `${process.pid}-${birth}.json`);
+  const file = path.join(dir, `${process.pid}-${heldAt}.json`);
   fs.writeFileSync(`${file}.tmp`, JSON.stringify({
-    pid: process.pid, creationFileTimeUtc: birth, executable: process.execPath,
+    pid: process.pid, heldAtFileTimeUtc: heldAt, executable: process.execPath,
   }), { flag: 'wx' });
   fs.renameSync(`${file}.tmp`, file);
 }

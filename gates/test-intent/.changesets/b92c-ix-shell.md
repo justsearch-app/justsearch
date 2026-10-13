@@ -20,6 +20,17 @@ choice; their positive reclaim checks now use an explicit warn takeover. R04-lif
 changed. Raw before and after logs are in F:/agent-sandbox/design-b6d536/codex/b92c-ix-shell/.
 Independent acceptance is left to the verifier.
 
+Review repairs (starting revision b366c0500; 61ff9b955 stays the start of the whole change): a
+loss row whose evidence range is unknown, including a summary written before scope fields
+existed, is relevant only to runs that started before its eviction time (the row's at), in the
+census; Java, Node and Rust compaction keep the newest eviction time there and drop stale bounds.
+The conformance fixture preload records PID plus a held-at time without starting a process; the
+teardown resolves the birth from one identity query and records it before any stop, and its
+orderly stop now speaks for the run's own session. Off Windows a failed orderly stop falls back
+to the runner's own child handle. Explicit warn takeovers of dead, legacy and expired ownership
+are still logged as stale-reclaim interference. Node checks for these are outside this gate's
+scope; their before and after logs are in the run folder.
+
 ```json
 {
   "entries": [
@@ -67,6 +78,28 @@ Independent acceptance is left to the verifier.
         "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::all_five_incarnations_survive_per_file_rotation",
         "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::failed_rotation_preserves_previous_archive",
         "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/exit_ledger.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "When loss-journal compaction merges rows whose evidence range is unknown (such as summaries written before scope fields existed), the compacted row keeps no evidenceFrom or evidenceThrough left over from the newest eviction, and its at is the newest eviction time, the upper bound a reader uses for an unknown range (review findings L4 and M1; starting revision b366c0500).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
+          "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
+          "label": "agent choice",
+          "choice": "The eviction time bounds everything evicted, so an unknown range is relevant only to runs that started before it; a merged range that is unknown keeps no bound, as the Java compactor already does."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b92c-ix-shell-r2-rust.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time"
       ],
       "repaired": true
     },
@@ -139,6 +172,28 @@ Independent acceptance is left to the verifier.
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#retentionLossKeepsOriginalSessionAndEvidenceRange",
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#compactedLossKeepsOriginalSessionAndEvidenceRange",
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#unreadableEvictedLineLeavesLossScopeIncomplete"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Java loss-journal compaction over rows whose evidence range is unknown keeps no evidence bound and records the newest eviction time as the compacted row's at, not the oldest row's time (review finding M1; starting revision b366c0500).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
+          "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
+          "label": "agent choice",
+          "choice": "The eviction time bounds everything evicted, so the compacted row's at must be the newest eviction; Node and Rust already write it so, and the census reads it when the range is unknown."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b92c-ix-shell-r2-java.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#compactedUnknownRangeKeepsNewestEvictionTime"
       ],
       "repaired": true
     }

@@ -423,10 +423,12 @@ fn retain_and_rename(
                 .flatten()
                 .filter_map(|v| v.as_str()?.parse().ok())
                 .collect();
-            summary
-                .as_object_mut()
-                .unwrap()
-                .extend(evidence_scope(&losses).as_object().unwrap().clone());
+            // The merged range replaces the newest eviction's range; an unknown merged range
+            // keeps no bound, and `at` stays the newest eviction time, its upper bound.
+            let fields = summary.as_object_mut().unwrap();
+            fields.remove("evidenceFrom");
+            fields.remove("evidenceThrough");
+            fields.extend(evidence_scope(&losses).as_object().unwrap().clone());
             summary["count"] = json!(losses
                 .iter()
                 .map(|r| r["count"].as_u64().unwrap_or(1))
@@ -863,14 +865,21 @@ mod tests {
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect();
         let identity: Vec<_> = losses.iter().filter(|r| r["pid"] == 7).collect();
-        assert_eq!(identity.len(), 1, "the evicted identity has a loss receipt: {losses:?}");
+        assert_eq!(
+            identity.len(),
+            1,
+            "the evicted identity has a loss receipt: {losses:?}"
+        );
         assert_eq!(identity[0]["reason"], "EVIDENCE_LOST");
         assert_eq!(identity[0]["affectedSessions"], json!(["old"]));
         assert_eq!(identity[0]["evidenceThrough"], "2026-10-01T10:00:00Z");
         let summary: Vec<_> = losses.iter().filter(|r| r["pid"].is_null()).collect();
         assert_eq!(summary.len(), 1, "{losses:?}");
         assert_eq!(summary[0]["droppedFile"], "engine.v1.2.jsonl");
-        assert!(!old.exists(), "the archive above the retention bound is evicted");
+        assert!(
+            !old.exists(),
+            "the archive above the retention bound is evicted"
+        );
         assert_eq!(
             summary[0]["scopeComplete"], false,
             "an unreadable evicted line has unknown scope"
@@ -884,6 +893,61 @@ mod tests {
                 .count(),
             1,
             "the retained generation stays readable"
+        );
+    }
+    #[test]
+    fn compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time() {
+        // The journal holds summaries written before scope fields existed, so the compacted
+        // range is unknown: no bound from the newest eviction may survive in it, and its `at`
+        // is the newest eviction time, the upper bound a reader may use instead.
+        let dir = tempfile::tempdir().unwrap();
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        let unscoped = r#"{"schemaVersion":1,"type":"ledger-gap","seq":1,"at":"2026-09-30T10:00:00Z","since":"2026-09-30T10:00:00Z","reason":"EVIDENCE_LOST","count":1,"droppedFile":"engine.v1.9.jsonl","droppedBytes":512,"detail":"archive dropped at retention bound"}"#;
+        fs::write(
+            dir.path().join("engine.v1.lost.jsonl"),
+            format!("{unscoped}\n").repeat(3000),
+        )
+        .unwrap();
+        // A readable archive above the real 128 MiB bound: its own range is known, so only the
+        // merge with the journal makes the compacted range unknown.
+        let old = dir.path().join("engine.v1.2.jsonl");
+        let head = format!("{row}\n");
+        let pad = 128 * 1024 * 1024 + 1 - head.len();
+        fs::write(&old, head + &"\n".repeat(pad)).unwrap();
+        let started = now_ms();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        let losses: Vec<Value> = fs::read_to_string(dir.path().join("engine.v1.lost.jsonl"))
+            .unwrap()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        assert!(
+            !old.exists(),
+            "the archive above the retention bound is evicted"
+        );
+        assert_eq!(
+            losses.len(),
+            1,
+            "the journal compacted to one row: {}",
+            losses.len()
+        );
+        let compacted = &losses[0];
+        assert_eq!(compacted["evidenceRangeComplete"], false, "{compacted}");
+        assert_eq!(
+            compacted.get("evidenceFrom"),
+            None,
+            "an unknown merged range keeps no stale lower bound: {compacted}"
+        );
+        assert_eq!(
+            compacted.get("evidenceThrough"),
+            None,
+            "an unknown merged range keeps no stale upper bound: {compacted}"
+        );
+        assert!(
+            known_timestamp(&compacted["at"]).is_some_and(|at| at >= started - 1000),
+            "the compacted row keeps the newest eviction time: {compacted}"
         );
     }
     #[test]

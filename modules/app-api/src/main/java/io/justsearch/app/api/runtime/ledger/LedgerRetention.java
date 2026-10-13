@@ -69,7 +69,10 @@ final class LedgerRetention {
     }
   }
 
-  /** Bounds describe the original evidence, never the later time it was evicted. */
+  /**
+   * Bounds describe the original evidence, not the later time it was evicted; an unknown range
+   * keeps no bound, and the row's {@code at} (its eviction time) remains its upper bound.
+   */
   private static void scope(List<ObjectNode> records, ObjectNode target) {
     var sessions = new java.util.TreeSet<String>();
     boolean complete = !records.isEmpty(), rangeComplete = !records.isEmpty();
@@ -156,6 +159,9 @@ final class LedgerRetention {
         first.remove("pid"); first.remove("creationFileTime"); first.remove("owner"); first.remove("incarnation");
         if (low != null) { first.put("birthFrom", low.toString()); first.put("birthThrough", high.toString()); }
         scope(losses, first);
+        // `at` stays the newest eviction time: the upper bound of everything evicted, which a
+        // reader uses when the merged range is unknown.
+        first.put("at", now); first.put("since", now);
         first.put("count", count); first.put("detail", "loss journal compacted; identity detail and membership unknown");
         lines = new StringBuilder(JSON.writeValueAsString(first)).append('\n');
       }
