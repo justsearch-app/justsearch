@@ -25,6 +25,10 @@ public interface ChildControl extends AutoCloseable {
    * <p>A chat server ({@code LLAMA_SERVER}, {@code LLAMA_SELF_TEST}) whose stop failed and that
    * may still be alive blocks the start of every chat server: start retries its stop first and
    * throws, starting nothing, while it is not confirmed gone.
+   * What an exited chat root left running in its own Windows job is ended first ({@link
+   * #endRemaining}); elsewhere it keeps that barrier until it exits. Unreadable enumeration
+   * refuses a start. A GPU start waits for every pending release poll to finish, released or
+   * timed out, and is refused only when one still runs past the poll's own bound plus a margin.
    *
    * @param manifest what the manifest entry carries beyond the OS identity
    */
@@ -51,6 +55,21 @@ public interface ChildControl extends AutoCloseable {
   default CompletionStage<List<ExitOutcome>> stopAll(
       Collection<ChildHandle> children, StopReason reason, StopMode mode) {
     return stopAll(children, StopRequest.of(reason, mode));
+  }
+
+  /**
+   * Ends what a chat child whose root has exited left running in its own containment: on Windows
+   * the child's nested job, ended through the job handle the control holds, never by PID, image
+   * name or parent. Each member is first recorded in the exit ledger as an intended cleanup with
+   * {@code request}'s reason; the call returns once every recorded member has exited.
+   *
+   * @return how many processes were ended (0 when nothing remained)
+   * @throws IOException when something remains that cannot be ended here (off Windows, a named
+   *     limit: the next chat start keeps refusing beside it) or the membership cannot be read
+   * @throws IllegalStateException when the child's root is still running
+   */
+  default int endRemaining(ChildHandle child, StopRequest request) throws IOException {
+    throw new IOException("this control cannot end what a child left running");
   }
 
   /**

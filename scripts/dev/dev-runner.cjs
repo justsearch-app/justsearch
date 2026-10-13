@@ -1282,7 +1282,9 @@ async function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectPr
       continue;
     }
     let killAccepted = false;
-    try { killAccepted = terminate(child.pid); } catch { /* verification still owns the outcome */ }
+    try {
+      killAccepted = await terminate(child.pid, { startedAtMs: actualStart });
+    } catch { /* verification still owns the outcome */ }
     const deadline = Date.now() + timeoutMs;
     let after;
     for (;;) {
@@ -1339,12 +1341,17 @@ function inspectProcessIdentity(pid, { platform = process.platform, spawnSync: q
   try { return JSON.parse(result.stdout); } catch { return null; }
 }
 
-function terminatePid(pid) {
-  if (process.platform !== 'win32') return false;
-  const result = spawnSync('taskkill', ['/PID', String(pid), '/F'], {
-    stdio: 'ignore', windowsHide: true, timeout: 5000,
-  });
-  return result.status === 0;
+/**
+ * Ends a registered child only through a handle on which its recorded start (milliseconds, as the
+ * manifest records it) is checked again (Spec F §5.3): the inspection before it never licenses a
+ * kill by pid alone.
+ */
+async function terminatePid(pid, { startedAtMs } = {}, { terminate = engineActuator.terminateWithCode } = {}) {
+  if (process.platform !== 'win32' || !Number.isFinite(startedAtMs)) return false;
+  const creationFileTime = String((BigInt(Math.trunc(startedAtMs)) + 11_644_473_600_000n) * 10_000n);
+  const result = await terminate(pid, creationFileTime, engineActuator.NON_DISTINCTIVE_KILL_CODE,
+    { birthTick: ledgerLib.BIRTH_TICKS.MILLISECOND });
+  return result?.ok === true;
 }
 
 // Tempdoc 606 Piece 2 (provenance): capture, at spawn, WHICH code the launched
@@ -3369,9 +3376,10 @@ async function askRunnerToStop({
 
 /**
  * The processes a run recorded, with the identity a stop verifies before acting on any of them
- * (Spec F §5.3, X09-F3): pid + creation FILETIME + executable, recorded at spawn. A record written
- * by an older dev-runner has no identities; its processes can still be bounded: each was born
- * before the record that names it was last written, so a later birth under the same pid is a reuse.
+ * (Spec F §5.3, X09-F3): pid + creation FILETIME + executable, recorded at spawn. A record without
+ * an identity (an older dev-runner's, or one written before the birth was read) only bounds its
+ * processes: each was born before the record that names it was last written, so a later birth
+ * under the same pid is a reuse; an earlier one is not proof of ownership (S17).
  */
 function recordedProcesses(run, recordWrittenMs) {
   return [['runner', run?.pids?.runnerPid], ['backend', run?.pids?.backendRootPid],
@@ -3407,9 +3415,11 @@ function checkRecordedProcess(recorded, seen) {
     const got = normalizeExecutable(seen.executable);
     return want && got && want !== got ? 'reused' : 'match';
   }
+  // Without a recorded birth nothing proves the pid still names the run's process: a birth before
+  // the record is consistent with a reuse that happened before it was written.
   const bornMs = engineActuator.fileTimeToMs(String(seen.creationFileTime));
   if (bornMs === null || !Number.isFinite(recorded.bornNotAfterMs)) return 'unknown';
-  return bornMs <= recorded.bornNotAfterMs ? 'match' : 'reused';
+  return bornMs <= recorded.bornNotAfterMs ? 'unknown' : 'reused';
 }
 
 /**
@@ -3479,6 +3489,7 @@ async function stopRun(opts, {
   askRunner = askRunnerToStop,
   lookupIdentities = engineActuator.lookupProcessIdentities,
   terminateEngine = engineActuator.terminateWithCode,
+  terminateProcess = engineActuator.terminateWithCode,
   portOwner = portOwnerOf,
   cliEngineRecorder = engineActuator.createCliEngineRecorder,
   portWaitMs = 10_000,
@@ -3506,27 +3517,28 @@ async function stopRun(opts, {
   // Each entry now also carries the identity verdict the kill decision was made on.
   const pidLiveness = [];
 
-  /** Only ever called on a process whose identity was just verified. */
-  const taskkill = async (pid, { tree = false } = {}) => {
+  /**
+   * Ends a recorded process (and with `tree` its verified descendants) with the non-distinctive
+   * code `taskkill /F` gives, through a handle on which its recorded birth is checked again: an
+   * inspection before it never licenses a kill by pid alone (Spec F §5.3). `row` is its
+   * fallback.processes entry, marked when the pid names another process by then.
+   */
+  const terminateRecorded = async (p, row, { tree = false } = {}) => {
     if (process.platform !== 'win32') {
       try {
-        process.kill(pid, 'SIGKILL');
-        killedPids.push(pid);
+        process.kill(p.pid, 'SIGKILL');
+        killedPids.push(p.pid);
       } catch (_) { }
       return;
     }
-    await new Promise((resolve) => {
-      const args = tree ? ['/PID', String(pid), '/T', '/F'] : ['/PID', String(pid), '/F'];
-      const p = spawn('taskkill', args, { windowsHide: true });
-      let stderr = '';
-      if (p.stderr) p.stderr.on('data', (b) => { stderr += b.toString('utf8'); });
-      p.on('error', () => resolve());
-      p.on('close', (code) => {
-        if (code === 0) killedPids.push(pid);
-        else errors.push(`taskkill pid ${pid} exited ${code}: ${stderr.trim().split(/\r?\n/).slice(-3).join(' | ')}`);
-        resolve();
-      });
-    });
+    const result = await Promise.resolve(terminateProcess(p.pid, p.creationFileTimeUtc,
+      engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree }))
+      .catch(() => ({ ok: false, outcome: 'failed', status: null }));
+    if (result?.ok || result?.outcome === 'partial') killedPids.push(p.pid);
+    if (result?.outcome === 'mismatch' && row) row.pidReused = true;
+    if (!result?.ok && !['mismatch', 'gone'].includes(result?.outcome)) {
+      errors.push(`${p.role} pid ${p.pid}: termination ${result?.outcome ?? 'failed'} (status ${result?.status ?? 'none'})`);
+    }
   };
 
   const exitCensus = await census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
@@ -3612,12 +3624,13 @@ async function stopRun(opts, {
       const verdict = await lookupOne(p);
       pidLiveness.push({ role, pid: p.pid, aliveBeforeKill: verdict === 'match' ? true : verdict === 'unknown' ? null : false,
         identity: verdict });
-      fallback.processes.push({ role, pid: p.pid, basis: p.basis, identity: verdict,
-        ...(verdict === 'reused' ? { pidReused: true } : {}) });
+      const row = { role, pid: p.pid, basis: p.basis, identity: verdict,
+        ...(verdict === 'reused' ? { pidReused: true } : {}) };
+      fallback.processes.push(row);
       if (verdict === 'unknown') errors.push(`${role} pid ${p.pid}: identity could not be verified; not killed`);
       if (verdict !== 'match') return false;
-      await taskkill(p.pid, { tree });
-      return true;
+      await terminateRecorded(p, row, { tree });
+      return killedPids.includes(p.pid);
     };
 
     // 2. The runner (never this process). An older runner's frontend broke away from its job, so
@@ -3644,19 +3657,20 @@ async function stopRun(opts, {
       const verdict = checkRecordedProcess(p, row);
       pidLiveness.push({ role: 'backend', pid: p.pid, aliveBeforeKill: verdict === 'match' ? true
         : verdict === 'unknown' ? null : false, identity: verdict });
-      fallback.processes.push({ role: 'backend', pid: p.pid, basis: p.basis, identity: verdict,
-        ...(verdict === 'reused' ? { pidReused: true } : {}) });
+      const backendRow = { role: 'backend', pid: p.pid, basis: p.basis, identity: verdict,
+        ...(verdict === 'reused' ? { pidReused: true } : {}) };
+      fallback.processes.push(backendRow);
       if (verdict === 'unknown') errors.push(`backend pid ${p.pid}: identity could not be verified; not killed`);
       const endedWithRunner = runnerKilled ? { endedBy: 'runner', terminateCalledAt: runnerKillAt } : null;
       if (verdict === 'match') {
-        const birth = p.creationFileTimeUtc ?? String(row.creationFileTime);
+        // 'match' needs a recorded birth (checkRecordedProcess); both kills re-check it on their handle.
         const terminateCalledAt = Date.now();
-        const result = await terminateEngine(p.pid, birth, ledgerLib.JS_ENGINE_STOP);
+        const result = await terminateEngine(p.pid, p.creationFileTimeUtc, ledgerLib.JS_ENGINE_STOP);
         if (result?.ok) {
           killedPids.push(p.pid);
           engineEnding = { endedBy: 'terminate', terminateCalledAt };
         } else if (!['mismatch', 'gone'].includes(result?.outcome)) {
-          await taskkill(p.pid);
+          await terminateRecorded(p, backendRow);
           if (killedPids.includes(p.pid)) engineEnding = { endedBy: 'taskkill', terminateCalledAt };
         } else {
           engineEnding = endedWithRunner;
@@ -3730,7 +3744,9 @@ async function stopRun(opts, {
   const foreignPortOwner = foreign ? { port: foreign.port, ...foreign.portOwner } : null;
   const portsClosed = apiInfo.closed && uiInfo.closed;
   const portsFreeOfRun = [apiInfo, uiInfo].every((info) => info.closed || info.portOwner?.ownedByRun === false);
-  const stackGone = runnerStopped || (survivors.length === 0 && portsFreeOfRun);
+  // A registered helper left running, or whose exit could not be verified, is part of the stack.
+  const helpersUnresolved = childCleanup.filter((c) => !['dead', 'terminated', 'identity-mismatch'].includes(c.outcome));
+  const stackGone = (runnerStopped || (survivors.length === 0 && portsFreeOfRun)) && helpersUnresolved.length === 0;
   const outcome = stackGone && portsClosed ? STOP_OUTCOME.STOPPED : STOP_OUTCOME.STOP_INCOMPLETE;
 
   // Tempdoc 730 B1, re-homed at item A16: snapshot the engine log into this run's own dir, so a
@@ -3807,7 +3823,9 @@ async function stopRun(opts, {
       await fsp.rm(activePath, { force: true }).catch(() => { });
     } else {
       await writeJsonAtomic(activePath, { ...active, stopFailed: { at: nowIso(), outcome,
-        reason: survivors.length ? `${survivors.map((s) => s.role).join(', ')} not verified gone` : 'ports still held by the run' } })
+        reason: survivors.length || helpersUnresolved.length
+          ? `${[...survivors.map((s) => s.role), ...helpersUnresolved.map((c) => `helper ${c.id}`)].join(', ')} not verified gone`
+          : 'ports still held by the run' } })
         .catch(() => { });
     }
   }

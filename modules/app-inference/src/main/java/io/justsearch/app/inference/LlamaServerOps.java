@@ -128,6 +128,9 @@ final class LlamaServerOps {
   private static final Duration STOP_WAIT = Duration.ofSeconds(12);
   /** The GPU barrier's bound: one release poll's maximum (Spec B §2.6). */
   private static final Duration GPU_RELEASE_WAIT = Duration.ofSeconds(5);
+  /** A confirmed root exit whose descendants could not be listed; never reported as survival. */
+  private static final String EXITED_UNVERIFIED =
+      "Managed llama-server exited, descendants unverified; retry cleanup";
   /** Retries a survivor's stop; ChildControl keeps the survivor's first intent and reason. */
   private static final StopRequest SURVIVOR_RETRY = StopRequest.of(
       io.justsearch.app.api.runtime.child.StopReason.ROLLBACK,
@@ -144,6 +147,8 @@ final class LlamaServerOps {
    * so every stop is a recorded intent and every exit is classified in the exit ledger.
    */
   private volatile ChildHandle child;
+  /** A launched server whose exit was confirmed while its descendants could not be listed. */
+  private volatile ChildHandle unverifiedExit;
   private volatile CompletableFuture<?> crashMonitor;
   /** The owner a planned stop is ending; its exit, whatever its class, is not a crash. */
   private volatile ActiveServer stoppingOwner;
@@ -874,11 +879,28 @@ final class LlamaServerOps {
     ChildHandle held = child;
     if (held == null) return;
     ChildHandle.State state = held.state();
+    if (state == ChildHandle.State.EXITED) {
+      if (held == unverifiedExit) verifyExitedDescendants(held);
+      return;
+    }
     if (state != ChildHandle.State.SURVIVED && state != ChildHandle.State.STOPPING) return;
     LOG.warn("llama-server PID {} survived its stop; retrying before a new start", held.pid());
     if (awaitStop(childControl.stop(held, SURVIVOR_RETRY), held) == null) {
       throw new IllegalStateException("Managed llama-server survived terminal cleanup");
     }
+    if (child == held) child = null;
+  }
+
+  /** Retries the descendant listing of a server whose exit was confirmed but not its scope. */
+  private void verifyExitedDescendants(ChildHandle held) {
+    List<ProcessHandle> started;
+    try {
+      started = io.justsearch.app.inference.chat.StartedProcesses.of(held);
+    } catch (RuntimeException unreadable) {
+      throw new IllegalStateException(EXITED_UNVERIFIED, unreadable);
+    }
+    endLeftRunning(held, started, SURVIVOR_RETRY);
+    if (unverifiedExit == held) unverifiedExit = null;
     if (child == held) child = null;
   }
 
@@ -911,18 +933,35 @@ final class LlamaServerOps {
     if (wasAlive) {
       LOG.info("Stopping llama-server (PID: {}, reason {})...", launched.pid(), request.reason());
     }
-    List<ProcessHandle> started =
-        io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    List<ProcessHandle> started;
+    try {
+      started = io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    } catch (RuntimeException unreadable) {
+      started = null;
+      LOG.warn("Cannot verify llama-server descendants: {}", unreadable.getMessage());
+    }
     ExitOutcome outcome = awaitStop(childControl.stop(launched, request), launched);
     if (outcome == null) {
       LOG.error("llama-server PID {} remains alive; retaining its handle and ownership",
           launched.pid());
       return false;
     }
-    // I6: what the server started (a wrapper's server) ends with it before the next launch.
-    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
-      LOG.warn("A process llama-server PID {} started is still running", launched.pid());
+    // The root may have forked during its stop: list its retained scope again after its exit. A
+    // listing that fails leaves the exit confirmed and the descendants unverified; the next stop or
+    // start retries the listing instead of reporting a survivor.
+    List<ProcessHandle> latest;
+    try {
+      latest = io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    } catch (RuntimeException unreadable) {
+      unverifiedExit = launched;
+      clearActive(stopping);
+      throw new IllegalStateException(EXITED_UNVERIFIED, unreadable);
     }
+    if (started != null) {
+      latest = java.util.stream.Stream.concat(started.stream(), latest.stream()).distinct().toList();
+    }
+    endLeftRunning(launched, latest, request);
+    if (unverifiedExit == launched) unverifiedExit = null;
     if (child == launched) child = null;
     clearActive(stopping);
     if (wasAlive) {
@@ -930,6 +969,30 @@ final class LlamaServerOps {
           outcome.code().isPresent() ? outcome.code().getAsInt() : "unknown");
     }
     return true;
+  }
+
+  /**
+   * I6: what the exited server started (a wrapper's server, a crash reporter in its job) ends
+   * before the next launch. ChildControl ends the server's own job, recording each member as an
+   * intended cleanup with {@code request}'s reason, so a crash-recovery restart does not wait on
+   * it. Where nothing can be ended (off Windows) the processes are awaited, and ChildControl
+   * refuses the next chat start beside any still running.
+   */
+  private void endLeftRunning(
+      ChildHandle exited, List<ProcessHandle> started, StopRequest request) {
+    if (started.stream().noneMatch(ProcessHandle::isAlive)) return;
+    try {
+      int ended = childControl.endRemaining(exited, request);
+      LOG.info("Ended {} process(es) llama-server PID {} left running ({})", ended, exited.pid(),
+          request.reason());
+      return;
+    } catch (IOException | RuntimeException notEnded) {
+      LOG.warn("Cannot end what llama-server PID {} left running: {}", exited.pid(),
+          notEnded.getMessage());
+    }
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
+      LOG.warn("A process llama-server PID {} started is still running", exited.pid());
+    }
   }
 
   /**

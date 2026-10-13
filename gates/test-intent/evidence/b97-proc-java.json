@@ -1,0 +1,90 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T20:23:54.474Z",
+  "revision": "f40ba7da82543cb0755f101eb0d2797b2caff4d9",
+  "tree": "a7dfc14e6c7715fdfe024e701e41a54705e15dc7",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.synchronousExitContinuationStartsReplacementAfterGpuRelease\" --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 35335
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#synchronousExitContinuationStartsReplacementAfterGpuRelease",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3658bc56401ab3cd437b9d5325ec6221ee6573c100a9c8a4e3b3bcf2131ff35",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "synchronousExitContinuationStartsReplacementAfterGpuRelease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3658bc56401ab3cd437b9d5325ec6221ee6573c100a9c8a4e3b3bcf2131ff35",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a164833f5",
+    "revision": "a164833f5275f02496c74a3422cad0bf66ec87e1",
+    "overlays": [
+      "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.synchronousExitContinuationStartsReplacementAfterGpuRelease\" --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 35024
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#synchronousExitContinuationStartsReplacementAfterGpuRelease",
+        "classification": "assertion",
+        "detail": "synchronousExitContinuationStartsReplacementAfterGpuRelease(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU recovery must be recorded before a synchronous exit continuation spawns again ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease",
+        "classification": "assertion",
+        "detail": "pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected java.io.IOException to be thrown, but nothing was thrown."
+      }
+    ]
+  },
+  "digest": "sha256:556fc3da41306173e688410d3a061252cedf00bd1af424adf2378b4d8c45bddc"
+}

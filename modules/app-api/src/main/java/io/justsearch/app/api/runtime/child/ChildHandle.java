@@ -19,6 +19,22 @@ public interface ChildHandle {
 
   Instant processStartedAt();
 
+  /**
+   * Descendants retained across this child's exit. Windows chat handles query their native job;
+   * other Engine handles retain identities observed on demand. An unreadable membership query
+   * throws: it is never a successful empty snapshot.
+   */
+  default java.util.List<ProcessHandle> descendants() {
+    var root = ProcessHandle.of(pid());
+    if (root.isEmpty() || !root.get().isAlive()) return java.util.List.of();
+    var birth = root.get().info().startInstant().orElseThrow(
+        () -> new IllegalStateException("child identity unavailable while enumerating descendants"));
+    if (!birth.equals(processStartedAt())) return java.util.List.of();
+    try (var descendants = root.get().descendants()) {
+      return descendants.toList();
+    }
+  }
+
   /** The child's stdin. Only for {@link ChildSpec.Stdio.Pipes}. */
   OutputStream stdin();
 

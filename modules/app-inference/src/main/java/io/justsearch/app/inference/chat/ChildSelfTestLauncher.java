@@ -13,10 +13,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -62,9 +64,25 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     } catch (IOException | RuntimeException failure) {
       return SelfTestRun.failed("llama-server could not start: " + message(failure));
     }
+    Set<ProcessHandle> started = new LinkedHashSet<>();
+    SelfTestRun outcome;
+    String survived;
     try {
-      String unhealthy = awaitHealthy(candidate, spec);
+      outcome = exercise(candidate, spec, started);
+    } finally {
+      survived = stopAndRelease(candidate, started);
+    }
+    // A candidate that may still run (and hold the GPU) is not a passed self-test (S19).
+    if (survived == null) return outcome;
+    return SelfTestRun.failed(outcome.exercised() ? survived : outcome.failure() + "; " + survived);
+  }
+
+  private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec, Set<ProcessHandle> started) {
+    try {
+      String unhealthy = awaitHealthy(candidate, spec, started);
       if (unhealthy != null) return SelfTestRun.failed(unhealthy);
+      // Capture the serving processes before the probe can let its wrapper exit.
+      started.addAll(StartedProcesses.of(candidate));
       spec.probe().exercise(spec.port());
       return SelfTestRun.passed();
     } catch (InterruptedException interrupted) {
@@ -72,8 +90,6 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
       return SelfTestRun.failed("Self-test interrupted");
     } catch (Exception failure) {
       return SelfTestRun.failed(message(failure));
-    } finally {
-      stopAndRelease(candidate);
     }
   }
 
@@ -100,10 +116,11 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
   }
 
   /** Null when healthy, otherwise why not. */
-  private String awaitHealthy(ChildHandle candidate, SelfTestSpec spec)
+  private String awaitHealthy(ChildHandle candidate, SelfTestSpec spec, Set<ProcessHandle> started)
       throws InterruptedException {
     long deadline = System.nanoTime() + spec.healthTimeout().toNanos();
     while (System.nanoTime() < deadline) {
+      started.addAll(StartedProcesses.of(candidate));
       ExitOutcome exited = candidate.exit().toCompletableFuture().getNow(null);
       if (exited != null) {
         int exitCode = exited.code().isPresent() ? exited.code().getAsInt() : -1;
@@ -124,12 +141,18 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
   /**
    * Stops the candidate ({@code SELF_TEST}), waits for its recorded exit, for every process it
    * started and then for its GPU release, also when this thread is interrupted (the controller's
-   * shutdown): the next launch must not overlap it.
+   * shutdown): the next launch must not overlap it. Returns null when the candidate and every
+   * process it started exited, otherwise why the stop is incomplete.
    */
-  private void stopAndRelease(ChildHandle candidate) {
+  private String stopAndRelease(ChildHandle candidate, Set<ProcessHandle> started) {
     boolean interrupted = Thread.interrupted();
     try {
-      List<ProcessHandle> started = StartedProcesses.of(candidate);
+      String enumerationFailure = null;
+      try {
+        started.addAll(StartedProcesses.of(candidate));
+      } catch (RuntimeException unreadable) {
+        enumerationFailure = "Self-test cleanup unverified: " + message(unreadable);
+      }
       CompletableFuture<ExitOutcome> stop = control.stop(candidate,
           StopRequest.of(StopReason.SELF_TEST, StopMode.NOW, REQUESTED_BY)).toCompletableFuture();
       long deadline = System.nanoTime() + STOP_WAIT.toNanos();
@@ -142,12 +165,26 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         } catch (ExecutionException | TimeoutException survived) {
           LOG.warn("Self-test llama-server (pid {}) did not exit after a forced stop",
               candidate.pid());
-          return;
+          return "Self-test llama-server (pid " + candidate.pid()
+              + ") did not exit after a forced stop";
         }
       }
-      if (!StartedProcesses.awaitExit(started, STOP_WAIT)) {
-        LOG.warn("A process the self-test llama-server (pid {}) started is still running",
-            candidate.pid());
+      if (enumerationFailure != null) return enumerationFailure;
+      try {
+        // Include descendants observed during the stop, not only the pre-stop snapshot.
+        started.addAll(StartedProcesses.of(candidate));
+      } catch (RuntimeException unreadable) {
+        return "Self-test cleanup unverified: " + message(unreadable);
+      }
+      if (!StartedProcesses.awaitExit(List.copyOf(started), STOP_WAIT)) {
+        return endLeftRunning(candidate);
+      }
+      try {
+        // A descendant can fork while the earlier snapshot drains. Read the retained scope once
+        // more before certifying cleanup, rather than declaring success from an obsolete list.
+        if (!StartedProcesses.of(candidate).isEmpty()) return endLeftRunning(candidate);
+      } catch (RuntimeException unreadable) {
+        return "Self-test cleanup unverified: " + message(unreadable);
       }
       while (true) {
         try {
@@ -160,8 +197,28 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
           interrupted = true;
         }
       }
+      return null;
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
+  /**
+   * A process the candidate started outlived it: the self-test fails (S19), and ChildControl ends
+   * what was left in the candidate's own job, recording each as an intended cleanup, so the main
+   * server can load without an Engine restart. Off Windows it cannot be ended and stays the next
+   * chat start's barrier.
+   */
+  private String endLeftRunning(ChildHandle candidate) {
+    String failure = "A process the self-test llama-server (pid " + candidate.pid()
+        + ") started is still running";
+    LOG.warn("{}", failure);
+    try {
+      int ended = control.endRemaining(candidate,
+          StopRequest.of(StopReason.SELF_TEST, StopMode.NOW, REQUESTED_BY));
+      return failure + " after it exited; ended " + ended + " left running";
+    } catch (IOException | RuntimeException notEnded) {
+      return failure + " and could not be ended: " + message(notEnded);
     }
   }
 

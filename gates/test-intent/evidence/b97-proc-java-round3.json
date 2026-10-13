@@ -1,0 +1,200 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T17:49:18.223Z",
+  "revision": "d7bbe9600230dc9a42bcbb9f9f25bf7fb38409c3",
+  "tree": "8d423e994fe724cab092064e59bae9eb36f06f4f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.GpuSwitchBarrierTest.aSwitchStartWaitsForTheReleasePollEveryTime\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.exitedSelfTestWrapperWithLiveDescendantCannotPass\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.selfTestDescendantSurvivalBlocksMainReload\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.membershipSettlesWhileTheJobCountLagsAnExit\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.embeddedQuotesReachAnExecutableAsUnderTheJdk\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 147425
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatCrashLeftoverTest.aCrashRestartEndsWhatTheCrashedServerLeftInItsJob\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24226
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/GpuSwitchBarrierTest.java#aSwitchStartWaitsForTheReleasePollEveryTime",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/GpuSwitchBarrierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4444ed3bcdfa6d186e379f06f1541ae0db2b20cfe067138b5f3b251a3de35ed4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSwitchStartWaitsForTheReleasePollEveryTime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#exitedSelfTestWrapperWithLiveDescendantCannotPass",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d428961b823384047b8ded92f661bcf8a16ffac80859e8599d289eaa860b214e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exitedSelfTestWrapperWithLiveDescendantCannotPass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#selfTestDescendantSurvivalBlocksMainReload",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d428961b823384047b8ded92f661bcf8a16ffac80859e8599d289eaa860b214e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selfTestDescendantSurvivalBlocksMainReload()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLeftoverTest.java#aCrashRestartEndsWhatTheCrashedServerLeftInItsJob",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLeftoverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e6dfdb876dbcd3b8af7f6e9b55c5312aa3e69dae2c236c95131e0f3d69e0469b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCrashRestartEndsWhatTheCrashedServerLeftInItsJob()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#membershipSettlesWhileTheJobCountLagsAnExit",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c1edf64c127217b293af3826ebb80ef2c6725c04d9bc011b7780489682a01920",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "membershipSettlesWhileTheJobCountLagsAnExit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1c83a39c367701e40d2ad26fc94f054fa7599f081cc183dacddd5c3da5c5557",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#embeddedQuotesReachAnExecutableAsUnderTheJdk",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1c83a39c367701e40d2ad26fc94f054fa7599f081cc183dacddd5c3da5c5557",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "embeddedQuotesReachAnExecutableAsUnderTheJdk()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d7bbe9600",
+    "revision": "d7bbe9600230dc9a42bcbb9f9f25bf7fb38409c3",
+    "overlays": [
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.GpuSwitchBarrierTest.aSwitchStartWaitsForTheReleasePollEveryTime\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.exitedSelfTestWrapperWithLiveDescendantCannotPass\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.selfTestDescendantSurvivalBlocksMainReload\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.membershipSettlesWhileTheJobCountLagsAnExit\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.embeddedQuotesReachAnExecutableAsUnderTheJdk\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 156028
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatCrashLeftoverTest.aCrashRestartEndsWhatTheCrashedServerLeftInItsJob\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 26674
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/GpuSwitchBarrierTest.java#aSwitchStartWaitsForTheReleasePollEveryTime",
+        "classification": "assertion",
+        "detail": "aSwitchStartWaitsForTheReleasePollEveryTime(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a switch start is refused while its release poll ends ==> expected: <[]> but was: <[round 0: GPU release still pending; retry after the release poll finishes, round 1: GPU release still pending; retry after the release poll finishes, round 2: GPU release still pe"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#exitedSelfTestWrapperWithLiveDescendantCannotPass",
+        "classification": "assertion",
+        "detail": "exitedSelfTestWrapperWithLiveDescendantCannotPass(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the survivor in the candidate's job is ended ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#selfTestDescendantSurvivalBlocksMainReload",
+        "classification": "assertion",
+        "detail": "selfTestDescendantSurvivalBlocksMainReload(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the survivor in the candidate's job is ended ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLeftoverTest.java#aCrashRestartEndsWhatTheCrashedServerLeftInItsJob",
+        "classification": "assertion",
+        "detail": "aCrashRestartEndsWhatTheCrashedServerLeftInItsJob(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the crash-recovery restart is not held by what the crash left; launches=1 online=false after 8027 ms ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#membershipSettlesWhileTheJobCountLagsAnExit",
+        "classification": "assertion",
+        "detail": "membershipSettlesWhileTheJobCountLagsAnExit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: membership read failed while the job count lagged an exit: chat descendants unverified: job membership query unavailable / java.io.IOException: Job membership changed during verification (active=2, represented=0)"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk",
+        "classification": "assertion",
+        "detail": "aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a .cmd sees what it sees under the JDK for [plain, with space, trail\\, a\"b, \"pre quoted\", , tab&#9;here, x\\\"y, spaced trail\\, 100%, =equals, comma,semi;colon] ==> expected: <ONE=[plain]&#13;&#10;ALL=[plain \"with space\" trail\\ a\"b \"pre quoted\" \"\" \"tab&#9;here\" x\\\""
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#embeddedQuotesReachAnExecutableAsUnderTheJdk",
+        "classification": "assertion",
+        "detail": "embeddedQuotesReachAnExecutableAsUnderTheJdk(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an executable sees what it sees under the JDK ==> expected: <ARGC=7&#13;&#10;[plain]&#13;&#10;[with space]&#13;&#10;[trail\\]&#13;&#10;[ab pre]&#13;&#10;[quoted \" tab]&#13;&#10;[here x\"y spaced]&#13;&#10;[trail\\ 100% =equals comma,semi;colon]&#13;&#10;> but was: <"
+      }
+    ]
+  },
+  "digest": "sha256:ed78075fbc88e6ced998cc81b6c38e54d2114ddeeeefe7cf24ab981b58d9c8fb"
+}

@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T17:53:56.781Z",
+  "revision": "d7bbe9600230dc9a42bcbb9f9f25bf7fb38409c3",
+  "tree": "3cbf8db00afb0c8bc653a0846e31cb66f0f7bee9",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureBeforeResumeLeavesNoProcessBehind\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureJoiningTheJobLeavesNoProcessBehind\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 34057
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1c83a39c367701e40d2ad26fc94f054fa7599f081cc183dacddd5c3da5c5557",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aFailureBeforeResumeLeavesNoProcessBehind",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1c83a39c367701e40d2ad26fc94f054fa7599f081cc183dacddd5c3da5c5557",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailureBeforeResumeLeavesNoProcessBehind()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aFailureJoiningTheJobLeavesNoProcessBehind",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1c83a39c367701e40d2ad26fc94f054fa7599f081cc183dacddd5c3da5c5557",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailureJoiningTheJobLeavesNoProcessBehind()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:56d6be41f9c22745181bec55e49aa51f3b84fbcbd9480739d62adaa8032a50c7"
+}

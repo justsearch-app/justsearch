@@ -190,6 +190,7 @@ final class ChildControlHarness implements AutoCloseable {
   final class HookedTerminator implements ProcessTerminator {
     final ProcessTerminator real;
     final List<Process> processes = Collections.synchronizedList(new ArrayList<>());
+    final Map<Process, Instant> births = new java.util.concurrent.ConcurrentHashMap<>();
     final AtomicLong virtualWaitMs = new AtomicLong();
     volatile TerminateHook beforeTerminate;
     /** Terminate reports OK but kills nothing, and waits on a survivor return at once. */
@@ -202,6 +203,7 @@ final class ChildControlHarness implements AutoCloseable {
     @Override
     public OsProcess open(Process process) throws IOException {
       processes.add(process);
+      process.info().startInstant().ifPresent(birth -> births.put(process, birth));
       OsProcess os = real.open(process);
       return new OsProcess() {
         @Override
@@ -267,7 +269,13 @@ final class ChildControlHarness implements AutoCloseable {
 
     void killAll() {
       synchronized (processes) {
-        for (Process process : processes) process.destroyForcibly();
+        for (Process process : processes) {
+          Instant birth = births.get(process);
+          if (process.isAlive() && birth != null
+              && process.info().startInstant().filter(birth::equals).isPresent()) {
+            process.destroyForcibly();
+          }
+        }
       }
     }
   }

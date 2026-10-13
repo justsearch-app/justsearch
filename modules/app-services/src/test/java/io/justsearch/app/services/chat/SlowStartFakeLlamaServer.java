@@ -29,7 +29,7 @@ public final class SlowStartFakeLlamaServer {
   private SlowStartFakeLlamaServer() {}
 
   /** One recorded launch: the file name of the {@code -m} model it was started with. */
-  public record Launch(String model, long pid) {}
+  public record Launch(String model, long pid, java.time.Instant birth) {}
 
   /** Every launch made from {@code dir}, in order. */
   public static List<Launch> launches(Path dir) throws IOException {
@@ -39,7 +39,7 @@ public final class SlowStartFakeLlamaServer {
     for (String line : Files.readAllLines(file, StandardCharsets.US_ASCII)) {
       if (line.isBlank()) continue;
       String[] fields = line.trim().split(" ");
-      launches.add(new Launch(fields[0], Long.parseLong(fields[1])));
+      launches.add(new Launch(fields[0], Long.parseLong(fields[1]), java.time.Instant.parse(fields[2])));
     }
     return launches;
   }
@@ -47,7 +47,9 @@ public final class SlowStartFakeLlamaServer {
   /** True when no server launched from {@code dir} is still alive. */
   public static boolean noneAlive(Path dir) throws IOException {
     for (Launch launch : launches(dir)) {
-      if (ProcessHandle.of(launch.pid()).map(ProcessHandle::isAlive).orElse(false)) return false;
+      if (ProcessHandle.of(launch.pid())
+          .filter(server -> server.info().startInstant().filter(launch.birth()::equals).isPresent())
+          .map(ProcessHandle::isAlive).orElse(false)) return false;
     }
     return true;
   }
@@ -98,7 +100,8 @@ public final class SlowStartFakeLlamaServer {
       recordIdentity(Path.of(home));
       String modelName = model.substring(model.lastIndexOf('/') + 1);
       Files.writeString(Path.of(home, LAUNCHES),
-          modelName + " " + ProcessHandle.current().pid() + "\n",
+          modelName + " " + ProcessHandle.current().pid() + " "
+              + ProcessHandle.current().info().startInstant().orElseThrow() + "\n",
           StandardCharsets.US_ASCII, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
     ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);

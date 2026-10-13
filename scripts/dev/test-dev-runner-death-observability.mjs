@@ -337,12 +337,21 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identity
           return { status: 0, stdout: JSON.stringify({ alive: !terminated.has(inspectedPid), executable: process.execPath,
             startedAt: inspectedPid === 101 ? '2026-10-01T00:00:00.123Z' : '2026-10-01T00:00:00.124Z' }) };
         }
-        if (command === 'taskkill' && ['101', '102'].includes(args[1])) {
-          terminated.add(Number(args[1]));
-          fs.writeFileSync(${JSON.stringify(cleanupReceipt)}, JSON.stringify({ killedPid: Number(args[1]) }));
-          return { status: 0 };
-        }
         return spawnSync(command, args, options);
+      };
+      // The registered child's kill: terminate-process.ps1, which re-checks the birth on its handle.
+      const execFile = cp.execFile;
+      cp.execFile = function(command, args, options, callback) {
+        const killedPid = command === 'powershell.exe' && Array.isArray(args)
+          && args.some(a => /terminate-process\\.ps1$/.test(String(a))) ? Number(args[args.indexOf('-Pid') + 1]) : null;
+        if ([101, 102].includes(killedPid)) {
+          terminated.add(killedPid);
+          fs.writeFileSync(${JSON.stringify(cleanupReceipt)}, JSON.stringify({ killedPid }));
+          const done = typeof options === 'function' ? options : callback;
+          process.nextTick(() => done(null, JSON.stringify({ outcome: 'terminated', pid: killedPid }) + '\\n', ''));
+          return null;
+        }
+        return execFile.apply(this, arguments);
       };
     }
     const identity = require(${JSON.stringify(path.join(__dirname, 'lib/process-identity.cjs'))});

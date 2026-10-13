@@ -18,16 +18,9 @@ public final class StartedProcesses {
 
   private StartedProcesses() {}
 
-  /** What {@code child} has started, taken while it is alive (a dead pid has no descendants). */
+  /** The owner's retained scope, including Windows job members after the root exits. */
   public static List<ProcessHandle> of(ChildHandle child) {
-    if (child == null || child.exit().toCompletableFuture().isDone()) return List.of();
-    try {
-      return ProcessHandle.of(child.pid())
-          .map(root -> root.descendants().toList())
-          .orElse(List.of());
-    } catch (RuntimeException unreadable) {
-      return List.of();
-    }
+    return child == null ? List.of() : child.descendants();
   }
 
   /**

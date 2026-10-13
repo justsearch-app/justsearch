@@ -1,0 +1,138 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T20:13:59.699Z",
+  "revision": "f40ba7da82543cb0755f101eb0d2797b2caff4d9",
+  "tree": "826c24a6498f97e89865aae5fac1a2155cc1c5b3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.GpuReadBoundTest.aReadThatNeverReturnsEndsThePollUnmeasuredAndGpuStartsProceed\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 349215
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatJobEndFailureTest.aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchFailureTextTest.aMissingExecutableFailsWithTheJdksText\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchFailureTextTest.strictModeLaunchesAndRefusesAsTheJdkDoes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15863
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/GpuReadBoundTest.java#aReadThatNeverReturnsEndsThePollUnmeasuredAndGpuStartsProceed",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/GpuReadBoundTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b2ffd31b87564de94f73eed6569c41bd53cc1318e2663ebde779d53f8a9e1bc6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReadThatNeverReturnsEndsThePollUnmeasuredAndGpuStartsProceed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobEndFailureTest.java#aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobEndFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b4419f5c8e8429271a4da8228b3260b8c9535ee6a5c5802e686ce17d060f8b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java#aMissingExecutableFailsWithTheJdksText",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:36efe0de448203193aa6a55e9a4f1b81a7a6cf172febe6c8943a24e66940b419",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aMissingExecutableFailsWithTheJdksText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java#strictModeLaunchesAndRefusesAsTheJdkDoes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:36efe0de448203193aa6a55e9a4f1b81a7a6cf172febe6c8943a24e66940b419",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "strictModeLaunchesAndRefusesAsTheJdkDoes()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f40ba7da8",
+    "revision": "f40ba7da82543cb0755f101eb0d2797b2caff4d9",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.GpuReadBoundTest.aReadThatNeverReturnsEndsThePollUnmeasuredAndGpuStartsProceed\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 25727
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatJobEndFailureTest.aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchFailureTextTest.aMissingExecutableFailsWithTheJdksText\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchFailureTextTest.strictModeLaunchesAndRefusesAsTheJdkDoes\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 20874
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/GpuReadBoundTest.java#aReadThatNeverReturnsEndsThePollUnmeasuredAndGpuStartsProceed",
+        "classification": "assertion",
+        "detail": "aReadThatNeverReturnsEndsThePollUnmeasuredAndGpuStartsProceed(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the GPU start proceeds once the hung reading's bound has passed ==> Unexpected exception thrown: java.io.IOException: GPU release still pending after 6250 ms; retry after the release poll finishes"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobEndFailureTest.java#aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded",
+        "classification": "assertion",
+        "detail": "aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <chat start blocked: could not end leftover chat processes (SetInformationJobObject failed: 5)> but was: <SetInformationJobObject failed: 5>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java#aMissingExecutableFailsWithTheJdksText",
+        "classification": "assertion",
+        "detail": "aMissingExecutableFailsWithTheJdksText(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the contained launch fails with the JDK's text ==> expected: <Cannot run program \"C:\\agent-sandbox-tmp\\b97d-proc-java\\test-tmp\\junit-12701748414706270269\\not here\\no-such-server.exe\": CreateProcess error=2, The system cannot find the file specified> but was: <Cre"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java#strictModeLaunchesAndRefusesAsTheJdkDoes",
+        "classification": "assertion",
+        "detail": "strictModeLaunchesAndRefusesAsTheJdkDoes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: strict mode treats a\"b as the JDK does ==> expected: <FAILED:Cannot run program \"C:\\agent-sandbox-tmp\\b97d-proc-java\\test-tmp\\junit-10020457830963445634\\launcher dir\\echo-args.cmd\": Argument has embedded quote, use the explicit CMD.EXE call.> but was: <FAILED:Can"
+      }
+    ]
+  },
+  "digest": "sha256:1c4eb0f6444739bc8e619e8187808f1b86f18b75976fac196a656b319d4387e7"
+}

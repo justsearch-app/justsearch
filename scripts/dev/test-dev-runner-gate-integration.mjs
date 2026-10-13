@@ -89,6 +89,20 @@ function spawnAliveProc() {
   return p.pid;
 }
 
+/**
+ * The runner identity a current dev-runner records at spawn (pid + creation FILETIME + executable):
+ * a stop kills a recorded process only on that identity (Spec F §5.3, S17). Null when the pid names
+ * no process.
+ */
+function recordedIdentity(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { $p.CreationDate.ToFileTimeUtc().ToString() + '|' + $p.ExecutablePath }`],
+  { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+  const [creation, executable] = String(res.stdout || '').trim().split('|');
+  return /^[1-9]\d*$/.test(creation ?? '') ? { pid, creationFileTimeUtc: creation, executable: executable || null } : null;
+}
+
 function writeTable({ holderAlive }) {
   const rows = [{ ProcessId: 4, ParentProcessId: 0, Name: 'System', CommandLine: '', CreationFileTimeUtc: '133000000000000000' }];
   if (holderAlive) rows.push({ ProcessId: HOLDER_OWNER.pid, ParentProcessId: 4, Name: 'claude.exe', CommandLine: 'claude.exe', CreationFileTimeUtc: HOLDER_OWNER.creationTime });
@@ -110,7 +124,8 @@ function craft({ runnerPid, leaseMsAhead = 30_000, owner = 'alive', touchAgoMs =
   fs.mkdirSync(runDir, { recursive: true });
   const runFile = path.join(runDir, 'run.json');
   fs.rmSync(path.join(runDir, 'stop-report.json'), { force: true }); // no report left over from an earlier case
-  fs.writeFileSync(runFile, JSON.stringify({ runId, pids: { runnerPid, backend: 999999, frontend: 999998 } }));
+  fs.writeFileSync(runFile, JSON.stringify({ runId, pids: { runnerPid, backend: 999999, frontend: 999998 },
+    identities: { runner: recordedIdentity(runnerPid) } }));
   fs.writeFileSync(activePath, JSON.stringify({
     kind: 'backend-shared-lease.v1', schemaVersion: 1, runId,
     // runPath is resolved by acquireAdmission via path.join(mainRepoRoot, runPath).

@@ -16,6 +16,7 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.containment.WindowsEngineJob;
 import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -39,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import tools.jackson.databind.ObjectMapper;
 
@@ -167,12 +169,15 @@ final class LlamaServerCandidateContextTest {
         Mode.ONLINE, new RecordingObserver(), ignored -> {}, registry, null);
     try {
       try (MockedConstruction<ProcessBuilder> construction =
-          Mockito.mockConstruction(
-              ProcessBuilder.class,
-              (builder, ignored) -> {
-                Mockito.when(builder.environment()).thenReturn(new HashMap<>());
-                Mockito.when(builder.start()).thenReturn(child);
-              })) {
+              Mockito.mockConstruction(
+                  ProcessBuilder.class,
+                  (builder, ignored) -> {
+                    Mockito.when(builder.environment()).thenReturn(new HashMap<>());
+                    Mockito.when(builder.start()).thenReturn(child);
+                  });
+          // On Windows a chat launch starts through its contained native launch instead of
+          // ProcessBuilder.start(); that launch hands back the same physical child.
+          MockedStatic<WindowsEngineJob> _ = containedLaunchOf(child)) {
         LlamaServerOps.StartResult started = ops.startLlamaServer(request);
 
         ModeTransitionException failure = assertThrows(
@@ -509,6 +514,27 @@ final class LlamaServerCandidateContextTest {
     }));
     server.start();
     return server;
+  }
+
+  /** Answers a contained chat launch with {@code child}, forwarding every Process method to it. */
+  private static MockedStatic<WindowsEngineJob> containedLaunchOf(Process child) {
+    WindowsEngineJob.ChatProcess contained = Mockito.mock(WindowsEngineJob.ChatProcess.class,
+        invocation -> {
+          java.lang.reflect.Method method = invocation.getMethod();
+          try {
+            return Process.class.getMethod(method.getName(), method.getParameterTypes())
+                .invoke(child, invocation.getArguments());
+          } catch (NoSuchMethodException containmentOnly) {
+            // resume() and releaseScope() have nothing to do; the scope has no descendants.
+            return method.getName().equals("scopeDescendants") ? List.of() : null;
+          } catch (java.lang.reflect.InvocationTargetException thrown) {
+            throw thrown.getCause();
+          }
+        });
+    MockedStatic<WindowsEngineJob> launch =
+        Mockito.mockStatic(WindowsEngineJob.class, Mockito.CALLS_REAL_METHODS);
+    launch.when(() -> WindowsEngineJob.createChat(Mockito.any())).thenReturn(contained);
+    return launch;
   }
 
   private static LlamaServerOps newOps(
