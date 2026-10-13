@@ -13,11 +13,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -63,22 +65,25 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     } catch (IOException | RuntimeException failure) {
       return SelfTestRun.failed("llama-server could not start: " + message(failure));
     }
+    Set<ProcessHandle> started = new LinkedHashSet<>();
     SelfTestRun outcome;
     String survived;
     try {
-      outcome = exercise(candidate, spec);
+      outcome = exercise(candidate, spec, started);
     } finally {
-      survived = stopAndRelease(candidate);
+      survived = stopAndRelease(candidate, started);
     }
     // A candidate that may still run (and hold the GPU) is not a passed self-test (S19).
     if (survived == null) return outcome;
     return SelfTestRun.failed(outcome.exercised() ? survived : outcome.failure() + "; " + survived);
   }
 
-  private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec) {
+  private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec, Set<ProcessHandle> started) {
     try {
-      String unhealthy = awaitHealthy(candidate, spec);
+      String unhealthy = awaitHealthy(candidate, spec, started);
       if (unhealthy != null) return SelfTestRun.failed(unhealthy);
+      // Capture the serving processes before the probe can let its wrapper exit.
+      started.addAll(StartedProcesses.of(candidate));
       spec.probe().exercise(spec.port());
       return SelfTestRun.passed();
     } catch (InterruptedException interrupted) {
@@ -112,10 +117,11 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
   }
 
   /** Null when healthy, otherwise why not. */
-  private String awaitHealthy(ChildHandle candidate, SelfTestSpec spec)
+  private String awaitHealthy(ChildHandle candidate, SelfTestSpec spec, Set<ProcessHandle> started)
       throws InterruptedException {
     long deadline = System.nanoTime() + spec.healthTimeout().toNanos();
     while (System.nanoTime() < deadline) {
+      started.addAll(StartedProcesses.of(candidate));
       ExitOutcome exited = candidate.exit().toCompletableFuture().getNow(null);
       if (exited != null) {
         int exitCode = exited.code().isPresent() ? exited.code().getAsInt() : -1;
@@ -139,10 +145,15 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
    * shutdown): the next launch must not overlap it. Returns null when the candidate and every
    * process it started exited, otherwise why the stop is incomplete.
    */
-  private String stopAndRelease(ChildHandle candidate) {
+  private String stopAndRelease(ChildHandle candidate, Set<ProcessHandle> started) {
     boolean interrupted = Thread.interrupted();
     try {
-      List<ProcessHandle> started = StartedProcesses.of(candidate);
+      String enumerationFailure = null;
+      try {
+        started.addAll(StartedProcesses.of(candidate));
+      } catch (RuntimeException unreadable) {
+        enumerationFailure = "Self-test cleanup unverified: " + message(unreadable);
+      }
       CompletableFuture<ExitOutcome> stop = control.stop(candidate,
           StopRequest.of(StopReason.SELF_TEST, StopMode.NOW, REQUESTED_BY)).toCompletableFuture();
       long deadline = System.nanoTime() + STOP_WAIT.toNanos();
@@ -159,7 +170,14 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
               + ") did not exit after a forced stop";
         }
       }
-      if (!StartedProcesses.awaitExit(started, STOP_WAIT)) {
+      if (enumerationFailure != null) return enumerationFailure;
+      try {
+        // Include descendants observed during the stop, not only the pre-stop snapshot.
+        started.addAll(StartedProcesses.of(candidate));
+      } catch (RuntimeException unreadable) {
+        return "Self-test cleanup unverified: " + message(unreadable);
+      }
+      if (!StartedProcesses.awaitExit(List.copyOf(started), STOP_WAIT)) {
         LOG.warn("A process the self-test llama-server (pid {}) started is still running",
             candidate.pid());
         return "A process the self-test llama-server (pid " + candidate.pid()

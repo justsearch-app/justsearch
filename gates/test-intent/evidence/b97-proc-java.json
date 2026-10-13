@@ -1,0 +1,162 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T10:31:55.440Z",
+  "revision": "a164833f5275f02496c74a3422cad0bf66ec87e1",
+  "tree": "a371cbf6020d7dea62df30b2ecc6dc99f3ab1fdb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.synchronousExitContinuationStartsReplacementAfterGpuRelease\" --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 35007
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.exitedSelfTestWrapperWithLiveDescendantCannotPass\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.selfTestDescendantSurvivalBlocksMainReload\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.unreadableDescendantsAreNotAnEmptySuccessfulSnapshot\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 56529
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#synchronousExitContinuationStartsReplacementAfterGpuRelease",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1b0a087ed29be952e3e0c44e1c2066fe13776557795bd48d7623c7015fb2c84",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "synchronousExitContinuationStartsReplacementAfterGpuRelease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1b0a087ed29be952e3e0c44e1c2066fe13776557795bd48d7623c7015fb2c84",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#exitedSelfTestWrapperWithLiveDescendantCannotPass",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15ea090ae344d0fe5dc1a42c32357e98a196d5a58b24ea2751dfc6e1ae5d2db0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exitedSelfTestWrapperWithLiveDescendantCannotPass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#selfTestDescendantSurvivalBlocksMainReload",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15ea090ae344d0fe5dc1a42c32357e98a196d5a58b24ea2751dfc6e1ae5d2db0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selfTestDescendantSurvivalBlocksMainReload()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#unreadableDescendantsAreNotAnEmptySuccessfulSnapshot",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15ea090ae344d0fe5dc1a42c32357e98a196d5a58b24ea2751dfc6e1ae5d2db0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadableDescendantsAreNotAnEmptySuccessfulSnapshot()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a164833f5",
+    "revision": "a164833f5275f02496c74a3422cad0bf66ec87e1",
+    "overlays": [
+      "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.synchronousExitContinuationStartsReplacementAfterGpuRelease\" --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 62564
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.exitedSelfTestWrapperWithLiveDescendantCannotPass\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.selfTestDescendantSurvivalBlocksMainReload\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.unreadableDescendantsAreNotAnEmptySuccessfulSnapshot\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 82106
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#synchronousExitContinuationStartsReplacementAfterGpuRelease",
+        "classification": "assertion",
+        "detail": "synchronousExitContinuationStartsReplacementAfterGpuRelease(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU recovery must be recorded before a synchronous exit continuation spawns again ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease",
+        "classification": "assertion",
+        "detail": "pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected java.io.IOException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#exitedSelfTestWrapperWithLiveDescendantCannotPass",
+        "classification": "assertion",
+        "detail": "exitedSelfTestWrapperWithLiveDescendantCannotPass(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a live descendant must make cleanup fail ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#selfTestDescendantSurvivalBlocksMainReload",
+        "classification": "assertion",
+        "detail": "selfTestDescendantSurvivalBlocksMainReload(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: closing the self-test session must not spawn main beside its surviving descendant ==> expected: <[]> but was: <[model.gguf]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#unreadableDescendantsAreNotAnEmptySuccessfulSnapshot",
+        "classification": "assertion",
+        "detail": "unreadableDescendantsAreNotAnEmptySuccessfulSnapshot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: enumeration failure cannot certify that cleanup has no descendants to wait for ==> Expected java.lang.IllegalStateException to be thrown, but nothing was thrown."
+      }
+    ]
+  },
+  "digest": "sha256:7c389c35ed0b370101b0a843207b2e08c90dc9949d1642366a1b27d8babb9573"
+}

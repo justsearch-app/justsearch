@@ -25,6 +25,9 @@ public interface ChildControl extends AutoCloseable {
    * <p>A chat server ({@code LLAMA_SERVER}, {@code LLAMA_SELF_TEST}) whose stop failed and that
    * may still be alive blocks the start of every chat server: start retries its stop first and
    * throws, starting nothing, while it is not confirmed gone.
+   * Observed descendants keep that barrier after their root exits; unreadable enumeration also
+   * refuses a start. GPU starts refuse while a release poll is still pending after the bounded
+   * wait. A completed poll may report timeout or unmeasured in the ledger and permits a retry.
    *
    * @param manifest what the manifest entry carries beyond the OS identity
    */

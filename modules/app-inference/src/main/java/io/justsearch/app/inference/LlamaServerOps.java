@@ -914,14 +914,20 @@ final class LlamaServerOps {
     if (wasAlive) {
       LOG.info("Stopping llama-server (PID: {}, reason {})...", launched.pid(), request.reason());
     }
-    List<ProcessHandle> started =
-        io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    List<ProcessHandle> started;
+    try {
+      started = io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    } catch (RuntimeException unreadable) {
+      started = null;
+      LOG.warn("Cannot verify llama-server descendants: {}", unreadable.getMessage());
+    }
     ExitOutcome outcome = awaitStop(childControl.stop(launched, request), launched);
     if (outcome == null) {
       LOG.error("llama-server PID {} remains alive; retaining its handle and ownership",
           launched.pid());
       return false;
     }
+    if (started == null) return false;
     // I6: what the server started (a wrapper's server) ends with it before the next launch.
     if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
       LOG.warn("A process llama-server PID {} started is still running", launched.pid());

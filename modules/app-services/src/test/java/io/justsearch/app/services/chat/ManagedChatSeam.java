@@ -38,6 +38,11 @@ public final class ManagedChatSeam implements AutoCloseable {
   private InferenceLifecycleManager manager;
 
   public ManagedChatSeam(Path directory, long startDelayMs) throws Exception {
+    this(directory, startDelayMs, null);
+  }
+
+  ManagedChatSeam(Path directory, long startDelayMs,
+      io.justsearch.app.api.runtime.child.ChildControl control) throws Exception {
     this.directory = directory;
     previousStore = ConfigStore.globalOrNull();
     previousLite = System.getProperty("justsearch.lite.mode");
@@ -48,9 +53,11 @@ public final class ManagedChatSeam implements AutoCloseable {
     ResolvedConfig resolved = snapshot(model, freePort());
     ConfigStore.setGlobal(new ConfigStore(resolved));
     executors = new TestEngineExecutors();
-    manager = BootstrapInferenceFactory.createInferenceManager(executors, true, resolved,
+    manager = control == null ? BootstrapInferenceFactory.createInferenceManager(executors, true, resolved,
         directory.toString(), null, LoggerFactory.getLogger(getClass()),
-        ManagedChildRegistry.noop());
+        ManagedChildRegistry.noop()) : BootstrapInferenceFactory.createInferenceManager(
+            executors, true, resolved, directory.toString(), null,
+            LoggerFactory.getLogger(getClass()), control);
     assertNotNull(manager, "the composition root builds the manager");
     base = manager.currentConfig();
   }

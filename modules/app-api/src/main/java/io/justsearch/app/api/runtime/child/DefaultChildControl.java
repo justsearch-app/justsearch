@@ -137,6 +137,8 @@ public final class DefaultChildControl implements ChildControl {
   private final JobMembership job;
 
   private final Map<String, Held> live = new ConcurrentHashMap<>();
+  /** A root exit does not release the chat role while its observed descendants still run. */
+  private final Map<String, Held> chatScopes = new ConcurrentHashMap<>();
   private final Deque<ExitOutcome> recent = new ArrayDeque<>();
   private final Map<String, CompletableFuture<Void>> gpuPolls = new ConcurrentHashMap<>();
   private volatile boolean closed;
@@ -232,7 +234,9 @@ public final class DefaultChildControl implements ChildControl {
     if (CHAT_SERVER_KINDS.contains(spec.kind())) requireNoChatServerSurvivor(spec.kind());
     if (spec.gpu()) {
       try {
-        awaitGpuRelease(GPU_POLL_MAX);
+        if (!awaitGpuRelease(GPU_POLL_MAX)) {
+          throw new IOException("GPU release still pending; retry after the release poll finishes");
+        }
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
         throw new InterruptedIOException("interrupted waiting for a GPU release");
@@ -270,6 +274,10 @@ public final class DefaultChildControl implements ChildControl {
 
     Optional<Instant> startedAt = process.info().startInstant();
     Held held = new Held(childId, spec, process, os, startedAt.orElse(clock.instant()));
+    if (held.descendants != null) {
+      chatScopes.put(childId, held);
+      observeChatScope(held);
+    }
     held.ledgerDurable = spawnDurable;
     var _ = process.onExit().whenComplete((ignored, failure) -> onProcessExit(held));
     boolean startDurable = append(LedgerRecordType.CHILD_START, startFields(held, startedAt));
@@ -319,6 +327,39 @@ public final class DefaultChildControl implements ChildControl {
             + ") survived its stop; no " + starting + " starts beside it",
             survived.getCause() != null ? survived.getCause() : survived);
       }
+    }
+    for (Held held : List.copyOf(chatScopes.values())) {
+      if (held.state() != ChildHandle.State.EXITED) continue;
+      try {
+        if (!held.descendants.snapshot().isEmpty()) {
+          throw new IOException("a " + held.spec.kind() + " descendant is still running (root pid "
+              + held.pid() + "); no " + starting + " starts beside it");
+        }
+        chatScopes.remove(held.childId, held);
+      } catch (IllegalStateException unknown) {
+        throw new IOException("chat start blocked: " + unknown.getMessage(), unknown);
+      }
+    }
+  }
+
+  private void observeChatScope(Held held) {
+    try {
+      threads.newThread(() -> {
+        try {
+          while (!closed) {
+            List<ProcessHandle> remaining = held.descendants.snapshot();
+            if (!held.process.isAlive() && remaining.isEmpty()) return;
+            TimeUnit.MILLISECONDS.sleep(50);
+          }
+        } catch (InterruptedException interrupted) {
+          held.descendants.trackingUnavailable();
+          Thread.currentThread().interrupt();
+        } catch (IllegalStateException unreadable) {
+          // The scope retains the unknown enumeration and refuses subsequent chat starts.
+        }
+      }).start();
+    } catch (RuntimeException unavailable) {
+      held.descendants.trackingUnavailable();
     }
   }
 
@@ -658,9 +699,11 @@ public final class DefaultChildControl implements ChildControl {
     CompletableFuture<Void> release =
         intent != null && held.spec.gpu() && !intent.request().reason().endsEngine()
             ? registerGpuPoll(held) : null;
+    // Completing a future invokes synchronous continuations on this thread. The producer must
+    // already run before such a continuation can call start() and wait on its release barrier.
+    if (release != null) startGpuPoll(held, release);
     held.exit.complete(recorded);
     if (stopFuture != null) stopFuture.complete(recorded);
-    if (release != null) startGpuPoll(held, release);
   }
 
   /** Spec B §3.1 R1-R5, decided by the kernel's exit code and our own calls, never by a clock. */
@@ -1018,6 +1061,7 @@ public final class DefaultChildControl implements ChildControl {
     final ProcessTerminator.OsProcess os;
     final long pid;
     final Instant processStartedAt;
+    final ChildDescendants descendants;
     final CompletableFuture<ExitOutcome> exit = new CompletableFuture<>();
 
     State state = State.STARTING;
@@ -1041,6 +1085,8 @@ public final class DefaultChildControl implements ChildControl {
       this.os = os;
       this.pid = process.pid();
       this.processStartedAt = processStartedAt;
+      this.descendants = CHAT_SERVER_KINDS.contains(spec.kind())
+          ? new ChildDescendants(process.toHandle()) : null;
     }
 
     DefaultChildControl control() {
@@ -1070,6 +1116,11 @@ public final class DefaultChildControl implements ChildControl {
     @Override
     public Instant processStartedAt() {
       return processStartedAt;
+    }
+
+    @Override
+    public List<ProcessHandle> descendants() {
+      return descendants == null ? ChildHandle.super.descendants() : descendants.snapshot();
     }
 
     @Override

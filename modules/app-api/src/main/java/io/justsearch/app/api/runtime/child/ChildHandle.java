@@ -19,6 +19,21 @@ public interface ChildHandle {
 
   Instant processStartedAt();
 
+  /**
+   * Descendants observed while this child was alive. Engine handles retain these identities after
+   * the child's exit. An unreadable enumeration throws: it is never a successful empty snapshot.
+   */
+  default java.util.List<ProcessHandle> descendants() {
+    var root = ProcessHandle.of(pid());
+    if (root.isEmpty() || !root.get().isAlive()) return java.util.List.of();
+    var birth = root.get().info().startInstant().orElseThrow(
+        () -> new IllegalStateException("child identity unavailable while enumerating descendants"));
+    if (!birth.equals(processStartedAt())) return java.util.List.of();
+    try (var descendants = root.get().descendants()) {
+      return descendants.toList();
+    }
+  }
+
   /** The child's stdin. Only for {@link ChildSpec.Stdio.Pipes}. */
   OutputStream stdin();
 
