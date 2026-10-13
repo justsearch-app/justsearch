@@ -250,6 +250,225 @@ Independent test-intent acceptance is pending; the builder does not accept its o
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java#ledgerWriteFailureIsVisibleUntilDurableRecovery"
       ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Reserve 150 ms inside the total witness allowance for an in-flight append; the 500-append measured p99 ranges from 3.39 to 9.79 ms and the reserve also covers a 100 ms injected stall.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "Reserve 150 ms inside the total witness allowance for an in-flight append; the 500-append measured p99 ranges from 3.39 to 9.79 ms and the reserve also covers a 100 ms injected stall.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-app-api.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java#anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Both ownership rollback and boot-buffer overflow gap records conform to the existing ledger schema, including the since field.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "Both ownership rollback and boot-buffer overflow gap records conform to the existing ledger schema, including the since field.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-app-api.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java#rollbackGapConformsToTheLedgerSchema",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java#bootBufferGapConformsToTheLedgerSchema"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerCauseWarningTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Every distinct I/O cause within a ledger failure episode emits a warning naming its cause; repeats of that cause stay suppressed.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "Every distinct I/O cause within a ledger failure episode emits a warning naming its cause; repeats of that cause stay suppressed.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-app-api.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerCauseWarningTest.java#distinctWriteFailuresWarnOncePerCauseWithinAnEpisode"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "An unused device-loss reservation consumes no persistent restart budget; before writer readiness a restart remains permitted, counted in memory, with an explicit unpersisted-count status cause.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "An unused device-loss reservation consumes no persistent restart budget; before writer readiness a restart remains permitted, counted in memory, with an explicit unpersisted-count status cause.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-ui.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aQuitWinningAfterReservationDoesNotSpendTheRestartBudget",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Failure to fence witness recording inside main finally remains an unclean exit with its reason and retained instance lock, and reaches the normal fatal startup exit.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "Failure to fence witness recording inside main finally remains an unclean exit with its reason and retained instance lock, and reaches the normal fatal startup exit.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-ui.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureTest.java#aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProgressTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A real single-slot GENERATE stream that produces tokens after resume is health proof, stays open beyond the grace period, and is never probed or relaunched while progressing.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "A real single-slot GENERATE stream that produces tokens after resume is health proof, stays open beyond the grace period, and is never probed or relaunched while progressing.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-app-inference.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProgressTest.java#aSingleSlotReplyProgressingAfterResumePassesWithoutAProbeOrRelaunch"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatTokenProgressTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The OpenAI proxy forwards token progress to its held generation lease, including reasoning tokens, while heartbeats and empty deltas give no proof of token work.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "The OpenAI proxy forwards token progress to its held generation lease, including reasoning tokens, while heartbeats and empty deltas give no proof of token work.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-ui.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatTokenProgressTest.java#proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas"
+      ]
+    },
+    {
+      "items": [
+        "scripts/dev/test-dev-runner-stop-ownership.mjs"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The repaired unknown-observation contract records UNKNOWN and no code for unobserved terminate/taskkill, and records attemptedEnding separately. The orchestrator expressly directed this adaptation in round 2. Every census-observed case, forced flag, observed exit time and one-exit-per-incarnation check stays unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "Adapt the existing stop-ownership oracle to UNKNOWN/null when no exit was observed, with the attempted ending recorded separately; retain all census-observed and uniqueness cases.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureProbe.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Add opt-in single-slot streaming instrumentation to the existing fake server, preserving all existing behaviors, and an isolated main-entry probe that injects startup and witness-fence failures before any live stack starts. Fixture cleanup retains PID plus recorded creation-time ownership.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
+          "choice": "Exercise progressing single-slot replies and fatal startup finally through the real Java components using safe disposable fixtures.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "Preservation: a failed reservation write is refused before chat becomes terminal; this passes on 32d00dda8 and the final candidate.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting, while preserving the existing durable refusal before chat enters terminal shutdown.",
+          "choice": "Keep the existing refusal of a device-loss reservation when its persistence fails before terminal chat shutdown. A durable pending ordinary-restart intent marked reservedFor DEVICE_LOST proves storage readiness; only the committed DEVICE_LOST self-intent spends the budget.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-preservation-ui.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#reservationPersistenceFailureStillRefusesBeforeTerminalShutdown"
+      ]
     }
   ]
 }

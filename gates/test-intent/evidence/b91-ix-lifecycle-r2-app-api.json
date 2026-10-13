@@ -1,0 +1,126 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T18:32:51.686Z",
+  "revision": "32d00dda8bf9f5f03951fc6f6618a9f1380e852c",
+  "tree": "9c78ddf018714208c775e311c24d6cf36b963360",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessReserveTest.anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerCauseWarningTest.distinctWriteFailuresWarnOncePerCauseWithinAnEpisode\" --tests \"io.justsearch.app.api.runtime.ledger.HelperGapSchemaTest.rollbackGapConformsToTheLedgerSchema\" --tests \"io.justsearch.app.api.runtime.ledger.HelperGapSchemaTest.bootBufferGapConformsToTheLedgerSchema\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17934
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java#anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac96873a5986e0e96094dcdca1f3f2bcbfa56042ac9854449ad02ea5294b7c50",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerCauseWarningTest.java#distinctWriteFailuresWarnOncePerCauseWithinAnEpisode",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerCauseWarningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a9af8a2de9e9c1e4a9759161c38835cf1e7515199b6c37b40dbdd817ce79c4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "distinctWriteFailuresWarnOncePerCauseWithinAnEpisode(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java#rollbackGapConformsToTheLedgerSchema",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8539c79870f79b85aac31fc7e95bbba9e9166b35ee3b943054b5f26d2024a19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rollbackGapConformsToTheLedgerSchema()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java#bootBufferGapConformsToTheLedgerSchema",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8539c79870f79b85aac31fc7e95bbba9e9166b35ee3b943054b5f26d2024a19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootBufferGapConformsToTheLedgerSchema()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "32d00dda8",
+    "revision": "32d00dda8bf9f5f03951fc6f6618a9f1380e852c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessReserveTest.anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerCauseWarningTest.distinctWriteFailuresWarnOncePerCauseWithinAnEpisode\" --tests \"io.justsearch.app.api.runtime.ledger.HelperGapSchemaTest.rollbackGapConformsToTheLedgerSchema\" --tests \"io.justsearch.app.api.runtime.ledger.HelperGapSchemaTest.bootBufferGapConformsToTheLedgerSchema\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21849
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java#anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve",
+        "classification": "assertion",
+        "detail": "anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a 100 ms append already in flight gets the reserved fence time; pending writes stop ==> Unexpected exception thrown: java.lang.IllegalStateException: Exit witness storage is still active; retain the instance lock"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerCauseWarningTest.java#distinctWriteFailuresWarnOncePerCauseWithinAnEpisode",
+        "classification": "assertion",
+        "detail": "distinctWriteFailuresWarnOncePerCauseWithinAnEpisode(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a different I/O cause must not be hidden by the episode's first warning ==> expected: <2> but was: <1>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java#rollbackGapConformsToTheLedgerSchema",
+        "classification": "assertion",
+        "detail": "rollbackGapConformsToTheLedgerSchema(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: helper gap lines must include the schema-required since timestamp ==> Unexpected exception thrown: java.lang.reflect.InvocationTargetException"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/HelperGapSchemaTest.java#bootBufferGapConformsToTheLedgerSchema",
+        "classification": "assertion",
+        "detail": "bootBufferGapConformsToTheLedgerSchema(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: helper gap lines must include the schema-required since timestamp ==> Unexpected exception thrown: java.lang.reflect.InvocationTargetException"
+      }
+    ]
+  },
+  "digest": "sha256:65c195fe49c8dc3181357fc1f3b79d9c5fd93ba06a35a3473e51cbc721e5f77c"
+}

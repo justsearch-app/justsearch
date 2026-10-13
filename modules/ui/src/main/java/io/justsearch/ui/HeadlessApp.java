@@ -1196,7 +1196,7 @@ public class HeadlessApp {
         io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
             io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE,
             self.info().startInstant().orElse(java.time.Instant.now())),
-        java.time.Clock.systemUTC()));
+        java.time.Clock.systemUTC()), dataDir);
   }
 
   /**
@@ -1205,37 +1205,64 @@ public class HeadlessApp {
    */
   static final class LedgerSelfIntent
       implements io.justsearch.app.engine.EngineShutdownSequence.SelfIntent {
-    private final io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer;
-    private boolean deviceLostReserved;
+    private io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer;
+    private final Path dataDir;
+    private java.time.Instant deviceLostReserved;
+    private final List<java.time.Instant> unpersistedRestarts = new java.util.ArrayList<>();
 
-    LedgerSelfIntent(io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer) {
-      this.writer = java.util.Objects.requireNonNull(writer, "writer");
+    LedgerSelfIntent(io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer, Path dataDir) {
+      this.writer = writer;
+      this.dataDir = java.util.Objects.requireNonNull(dataDir, "dataDir");
     }
+
+    synchronized void attach(LedgerSelfIntent ready) { writer = ready.writer; }
 
     @Override
     public synchronized void record(io.justsearch.app.api.runtime.child.StopReason reason,
         Optional<io.justsearch.app.api.runtime.child.StopDetail> detail, int expectedCode) {
-      if (reason == io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST && deviceLostReserved) {
-        deviceLostReserved = false; // consume the reservation without duplicating its record
+      if (reason == io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST && writer == null) {
+        unpersistedRestarts.add(deviceLostReserved == null ? java.time.Instant.now() : deviceLostReserved);
+        if (deviceLostReserved == null) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.unpersistedDeviceLostRestart(
+            io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+        deviceLostReserved = null;
+        return; // Boot still restarts; this incarnation's memory keeps the budget honest.
+      }
+      deviceLostReserved = null; // A different exit abandons the unused reservation.
+      if (writer == null) {
+        if (unpersistedRestarts.isEmpty()) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.deviceLostRestartCountPersisted(
+            io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
         return;
       }
       boolean durable = writer.record(reason, detail, expectedCode);
+      if (durable && unpersistedRestarts.isEmpty()) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.deviceLostRestartCountPersisted(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
       if (!durable && reason == io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST) {
         throw new IllegalStateException("Device-loss restart reservation could not be persisted");
       }
     }
 
     synchronized void reserveDeviceLost() {
-      if (deviceLostReserved) return;
-      if (!writer.record(io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST,
-          Optional.empty(), io.justsearch.app.engine.EngineExit.REQUESTED_RESTART)) {
+      if (deviceLostReserved != null) return;
+      if (!healthy()) throw new IllegalStateException("Device-loss restart accounting is not durable");
+      if (writer != null && !writer.reserveDeviceLostRestart(io.justsearch.app.engine.EngineExit.REQUESTED_RESTART)) {
         throw new IllegalStateException("Device-loss restart reservation could not be persisted");
       }
-      deviceLostReserved = true;
+      deviceLostReserved = java.time.Instant.now();
+      if (writer == null) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.unpersistedDeviceLostRestart(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+      // Write DEVICE_LOST only when the shutdown sequence accepts the restart under exit authority.
+      // Until then a quit may win, so this reservation must not spend the persistent budget.
     }
 
-    boolean healthy() {
-      return writer.healthy();
+    synchronized boolean healthy() { return writer == null || writer.healthy(); }
+
+    synchronized List<java.time.Instant> priorRestarts(Path directory) throws java.io.IOException {
+      if (!healthy()) throw new java.io.IOException("an Engine self-intent write failed in this incarnation");
+      var history = new java.util.ArrayList<>(io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistory.read(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(directory)));
+      history.addAll(unpersistedRestarts);
+      if (deviceLostReserved != null) history.add(deviceLostReserved);
+      return List.copyOf(history);
     }
   }
 
@@ -1455,14 +1482,9 @@ public class HeadlessApp {
       processRoot = engineRoot;
       // Spec A step 10: the chat controller restarts the Engine after a lost GPU, within the limit
       // its own self-intent records allow.
-      engineRoot.bindDeviceLostRecovery(deviceLostRecovery(configPhase.dataDir(), () -> {
-        var writer = selfIntentWriter.get();
-        return writer == null || writer.healthy();
-      }, () -> {
-        var writer = selfIntentWriter.get();
-        if (writer == null) throw new IllegalStateException("Engine self-intent writer is not ready");
-        writer.reserveDeviceLost();
-      }, deviceLostRestart));
+      selfIntentWriter.set(new LedgerSelfIntent(null, configPhase.dataDir()));
+      engineRoot.bindDeviceLostRecovery(deviceLostRecovery(
+          configPhase.dataDir(), selfIntentWriter.get(), deviceLostRestart));
       // Spec A §7.4: the machine's resumes reach the chat controller (timers reset, a probe).
       engineRoot.bindPowerEvents(powerEvents);
       // Spec E step E3: the Engine owns the one GPU memory reader and its residency sampler (the
@@ -1688,9 +1710,8 @@ public class HeadlessApp {
               io.justsearch.app.engine.ShutdownRequestWatcher>
           shutdownRequestWatcherRef = new java.util.concurrent.atomic.AtomicReference<>();
       // Spec B §6.1 self-intents; kept for the writer's health (Spec A step 10, F10).
-      final LedgerSelfIntent selfIntent =
-          engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId());
-      selfIntentWriter.set(selfIntent);
+      final LedgerSelfIntent selfIntent = selfIntentWriter.get();
+      selfIntent.attach(engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId()));
       // Item B4: the ordered close is the composition root's (design 7.3). What is bound here is
       // each step to the object it closes â€” those objects live in this module and app-services, so
       // they cannot move into the root without inverting the ui -> app-engine edge.
@@ -1846,9 +1867,19 @@ public class HeadlessApp {
         }
         // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
         // (AppInstanceLock.close() returns silently if already closed).
-        containment.finishProcessRecording(java.time.Duration.ofSeconds(2));
+        boolean processRecordingComplete = false;
+        try {
+          containment.finishProcessRecording(java.time.Duration.ofSeconds(2));
+          processRecordingComplete = true;
+        } catch (RuntimeException recordingFailure) {
+          fatalStartup = true;
+          log.error("Unclean Engine exit: process witness recording failed; retaining instance lock", recordingFailure);
+          System.err.println("JUSTSEARCH_ENGINE_EXIT_UNCLEAN: exit_witness_recording_failed");
+          recordingFailure.printStackTrace(System.err);
+        }
         closeStartupResourcesAndInstanceLock(processResources, appInstanceLock,
-            workCleanupComplete && headCleanupComplete && indexCleanupComplete && operationsCleanupComplete);
+            processRecordingComplete && workCleanupComplete && headCleanupComplete
+                && indexCleanupComplete && operationsCleanupComplete);
       }
       // Tempdoc 501 Phase 18: api-port.txt is gone; the ordered sequence or fallback manifest
       // close above owns the remaining file cleanup.
@@ -2527,6 +2558,20 @@ public class HeadlessApp {
     java.util.Objects.requireNonNull(dataDir, "dataDir");
     java.util.Objects.requireNonNull(ledgerWritesHealthy, "ledgerWritesHealthy");
     return deviceLostRecovery(dataDir, ledgerWritesHealthy, () -> {}, restart);
+  }
+
+  static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(
+      Path dataDir, LedgerSelfIntent intent, Runnable restart) {
+    return new io.justsearch.app.api.chat.DeviceLostRecovery() {
+      @Override public List<java.time.Instant> priorRestarts() throws java.io.IOException {
+        return intent.priorRestarts(dataDir);
+      }
+      @Override public void reserveRestart() throws java.io.IOException {
+        try { intent.reserveDeviceLost(); }
+        catch (RuntimeException failure) { throw new java.io.IOException("Restart reservation failed", failure); }
+      }
+      @Override public void requestRestart() { restart.run(); }
+    };
   }
 
   static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(Path dataDir,

@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class OpenAiCompatController implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(OpenAiCompatController.class);
+  private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
 
   /**
    * Headers we explicitly do not forward upstream. {@code Host} and
@@ -352,7 +353,38 @@ public final class OpenAiCompatController implements AutoCloseable {
         awaitingHeaders = null;
       }
       checkCancelled();
+      GenerationLease observing = lease;
       return new FilterInputStream(stream) {
+        private final java.io.ByteArrayOutputStream line = new java.io.ByteArrayOutputStream();
+        private boolean oversized;
+        @Override public int read() throws IOException {
+          int next = in.read();
+          if (next >= 0) observe(next);
+          return next;
+        }
+        @Override public int read(byte[] bytes, int offset, int length) throws IOException {
+          int count = in.read(bytes, offset, length);
+          for (int i = 0; i < count; i++) observe(bytes[offset + i] & 0xff);
+          return count;
+        }
+        private void observe(int next) {
+          if (next != 10) {
+            if (!oversized && line.size() < 65536) line.write(next);
+            else oversized = true;
+            return;
+          }
+          if (!oversized) {
+            String text = line.toString(java.nio.charset.StandardCharsets.UTF_8);
+            if (text.startsWith("data: ")) {
+              try {
+                if (io.justsearch.app.inference.chat.CompletionTokenProgress.hasToken(JSON.readTree(text.substring(6)))) {
+                  observing.tokenProduced();
+                }
+              } catch (RuntimeException malformed) { /* A heartbeat or malformed chunk proves no token progress. */ }
+            }
+          }
+          line.reset(); oversized = false;
+        }
         @Override public void close() { ProxyExchange.this.close(); }
       };
     }

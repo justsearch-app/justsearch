@@ -209,7 +209,36 @@ public final class HealthyFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
+    var slots = new java.util.concurrent.Semaphore(Integer.parseInt(value(args, "-np", "1")));
+    if (behaviour.contains("--single-slot-stream")) {
+      server.setExecutor(command -> Thread.ofPlatform().daemon().start(command));
+      server.createContext("/v1/chat/completions", exchange -> {
+        exchange.getRequestBody().readAllBytes();
+        boolean acquired = false;
+        try {
+          slots.acquire(); acquired = true;
+          exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+          exchange.sendResponseHeaders(200, 0);
+          long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
+          while (System.nanoTime() < end && !Files.exists(Path.of(home, "stream-finish"))) {
+            exchange.getResponseBody().write(("data: {\"choices\":[{\"delta\":{\"content\":\"token\"}}]}\n\n")
+                .getBytes(StandardCharsets.UTF_8));
+            exchange.getResponseBody().flush();
+            Thread.sleep(100);
+          }
+          exchange.getResponseBody().write("data: [DONE]\n\n".getBytes(StandardCharsets.UTF_8));
+        } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+        catch (IOException ended) { /* Client cancellation ends the exchange. */ }
+        finally { exchange.close(); if (acquired) slots.release(); }
+      });
+    }
     server.createContext("/completion", exchange -> {
+      if (behaviour.contains("--single-slot-stream")) {
+        Files.writeString(Path.of(home, "probe-attempts"), "probe\n", StandardCharsets.US_ASCII,
+            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        try { slots.acquire(); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); exchange.close(); return; }
+      }
       exchange.getRequestBody().readAllBytes();
       int status = 200;
       String answer = "{\"content\":\"ok\",\"stop\":true}";
@@ -230,6 +259,7 @@ public final class HealthyFakeLlamaServer {
       exchange.sendResponseHeaders(status, body.length);
       exchange.getResponseBody().write(body);
       exchange.close();
+      if (behaviour.contains("--single-slot-stream")) slots.release();
     });
     server.createContext("/props", exchange -> {
       byte[] body = ("{\"model_path\":\"" + model + "\",\"n_ctx\":" + window + "}")

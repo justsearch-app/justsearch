@@ -205,7 +205,7 @@ final class OperatingStateAssembler {
         io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(
             io.justsearch.configuration.PlatformPaths.resolveDataDir())).ifPresent(f ->
         out.add(new OperatingDegradationView(DegradationCode.EXIT_LEDGER_UNWRITABLE,
-            "write_failed", DegradationScope.RUNTIME, "runtime.exit_ledger_unwritable",
+            f.cause(), DegradationScope.RUNTIME, "runtime.exit_ledger_unwritable",
             f.since().toString(), f.lastSeen().toString(), f.count())));
 
     String unmetCause = plan == null || plan.unmetSettings().isEmpty()

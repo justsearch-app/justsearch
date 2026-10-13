@@ -32,6 +32,7 @@ public final class OwnedHelper extends Process {
   private record Pending(LedgerRecordType type, Map<String, Object> fields) {}
   private static final java.util.ArrayDeque<Pending> beforeRecorder = new java.util.ArrayDeque<>();
   private static int pendingLost;
+  private static Instant pendingLostSince;
   private final Process process;
   private final ProcessTerminator terminator;
   private final ProcessTerminator.OsProcess held;
@@ -59,8 +60,10 @@ public final class OwnedHelper extends Process {
     }
     if (pendingLost > 0) {
       recorder.append(LedgerRecordType.LEDGER_GAP, new LinkedHashMap<>(Map.of(
-          "reason", "EVIDENCE_LOST", "count", pendingLost, "source", "helper_boot_buffer")));
+          "reason", "EVIDENCE_LOST", "count", pendingLost, "since", pendingLostSince,
+          "source", "helper_boot_buffer")));
       pendingLost = 0;
+      pendingLostSince = null;
     }
   }
 
@@ -113,6 +116,7 @@ public final class OwnedHelper extends Process {
   private static Process acquire(Process process, String purpose) throws IOException {
     try { return new OwnedHelper(process, purpose); }
     catch (IOException | RuntimeException failure) {
+      Instant failureAt = Instant.now();
       boolean interrupted = Thread.interrupted();
       boolean ended = false;
       try {
@@ -134,6 +138,7 @@ public final class OwnedHelper extends Process {
       Map<String, Object> fields = new LinkedHashMap<>();
       fields.put("reason", "WRITE_FAILED");
       fields.put("source", "helper_ownership_failed");
+      fields.put("since", failureAt);
       fields.put("purpose", purpose);
       fields.put("pid", process.pid());
       fields.put("count", 1);
@@ -255,7 +260,9 @@ public final class OwnedHelper extends Process {
     Recorder target = selected == null ? recorder : selected;
     if (target != null) target.append(type, fields);
     else if (beforeRecorder.size() < 4096) beforeRecorder.addLast(new Pending(type, fields));
-    else pendingLost++;
+    else {
+      if (pendingLost++ == 0) pendingLostSince = Instant.now();
+    }
   }
 
   /** Third-party helper admission is limited to the declared image and this closed time window. */
