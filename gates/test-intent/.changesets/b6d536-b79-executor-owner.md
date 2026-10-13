@@ -104,3 +104,14 @@ Known side effect: several of the adapted files are new checks of earlier change
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch7-20261013",
+  "verdict": "accept",
+  "digest": "sha256:a788d63f0a9636aa95b19a8f16fcc4770e9d668464f720063139e56bc9cf1123",
+  "note": "verify-batch7 on ee3c86b19: every Architecture/ArchUnit test class (9 classes, plus UnreferencedCodeTest and dead-code-audit) passes on the candidate; on 2e1196050 only ExecutorArchitectureTest fails, 2/4, naming SseStreamChannel calling Executors.newVirtualThreadPerTaskExecutor; the rule, its allowlist and archunit stores are unchanged since 2f42b4d50. SseStreamChannelDeliveryOwnerTest: 2 refusal checks fail on 2e1196050 by assertion (no IllegalStateException), owner-thread/close check passes on both; all 3 pass on the candidate. The 31 modified tests differ from 2e1196050 only by the constructor argument. Production wiring (HealthSubstrateInit on DefaultEngineExecutorRegistry: virtual thread per task, no concurrency limit, maxInstances=1 instance cap): previous cases H1-H3, O1, O8, O10, V1, V2, V5, V6, B5-H1, B5-H2, B6-P 48/48, B6-D, B6-Q pass on both revisions with the production-wired channel (H4 fails on both, probe design); own B7-W 16/16 (drainers named head.health-event-delivery-N, no publisher interrupt in 300 unsubscribe/close races, registration and threads gone after channel close and registry close, 2,000 subscribers with 500 stalled). Suites app-observability 642, app-services 3655, app-engine 606, ui 1624 pass (48 process fixtures excluded); PMD 1 vs 1 against 2f42b4d50, none added; governance: same 6 failing gates, test-intent differences are this acceptance and earlier changesets made stale by the constructor change. Live: ee3c86b19 stopped normally with 3 Health SSE + 2 other streams open and a walk in flight: Engine exit 0, clean ordered shutdown, no kills, ports closed."
+}
+```
