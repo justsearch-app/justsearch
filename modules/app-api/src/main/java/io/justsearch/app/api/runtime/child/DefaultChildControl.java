@@ -6,6 +6,7 @@ import io.justsearch.app.api.gpu.GpuMemorySource;
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.api.runtime.containment.EngineContainment;
+import io.justsearch.app.api.runtime.containment.WindowsEngineJob;
 import io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity;
 import io.justsearch.app.api.runtime.ledger.ExitLedgerWriter;
 import io.justsearch.app.api.runtime.ledger.LedgerFamily;
@@ -255,7 +256,8 @@ public final class DefaultChildControl implements ChildControl {
     }
     Process process;
     try {
-      process = builder.start();
+      process = CHAT_SERVER_KINDS.contains(spec.kind()) && java.io.File.separatorChar == '\\'
+          ? WindowsEngineJob.createChat(builder) : builder.start();
     } catch (IOException | RuntimeException failure) {
       recordStartFailure(childId, spec.kind(), "spawn_failed");
       throw failure;
@@ -267,6 +269,7 @@ public final class DefaultChildControl implements ChildControl {
       // Without our handle there is no recorded terminate: end it with the JDK and say so.
       process.destroyForcibly();
       awaitQuietly(process);
+      if (process instanceof WindowsEngineJob.ChatProcess chat) chat.releaseScope();
       recordStartFailure(childId, spec.kind(), "handle_unavailable");
       throw failure instanceof IOException io ? io : new IOException(failure);
     }
@@ -276,7 +279,6 @@ public final class DefaultChildControl implements ChildControl {
     Held held = new Held(childId, spec, process, os, startedAt.orElse(clock.instant()));
     if (held.descendants != null) {
       chatScopes.put(childId, held);
-      observeChatScope(held);
     }
     held.ledgerDurable = spawnDurable;
     var _ = process.onExit().whenComplete((ignored, failure) -> onProcessExit(held));
@@ -293,6 +295,14 @@ public final class DefaultChildControl implements ChildControl {
       return held;
     }
     register(held, manifest);
+    if (process instanceof WindowsEngineJob.ChatProcess chat) {
+      try {
+        chat.resume();
+      } catch (IOException failure) {
+        var _ = beginStop(held, SURVIVOR_RETRY, Optional.empty());
+        throw failure;
+      }
+    }
     return held;
   }
 
@@ -335,31 +345,10 @@ public final class DefaultChildControl implements ChildControl {
           throw new IOException("a " + held.spec.kind() + " descendant is still running (root pid "
               + held.pid() + "); no " + starting + " starts beside it");
         }
-        chatScopes.remove(held.childId, held);
+        if (chatScopes.remove(held.childId, held)) held.descendants.close();
       } catch (IllegalStateException unknown) {
         throw new IOException("chat start blocked: " + unknown.getMessage(), unknown);
       }
-    }
-  }
-
-  private void observeChatScope(Held held) {
-    try {
-      threads.newThread(() -> {
-        try {
-          while (!closed) {
-            List<ProcessHandle> remaining = held.descendants.snapshot();
-            if (!held.process.isAlive() && remaining.isEmpty()) return;
-            TimeUnit.MILLISECONDS.sleep(50);
-          }
-        } catch (InterruptedException interrupted) {
-          held.descendants.trackingUnavailable();
-          Thread.currentThread().interrupt();
-        } catch (IllegalStateException unreadable) {
-          // The scope retains the unknown enumeration and refuses subsequent chat starts.
-        }
-      }).start();
-    } catch (RuntimeException unavailable) {
-      held.descendants.trackingUnavailable();
     }
   }
 
@@ -879,14 +868,18 @@ public final class DefaultChildControl implements ChildControl {
   public void close() {
     closed = true;
     List<ChildHandle> remaining = List.copyOf(live.values());
-    if (remaining.isEmpty()) return;
     try {
-      stopAll(remaining, StopRequest.of(StopReason.QUIT, StopMode.NOW, REQUESTED_BY))
-          .toCompletableFuture().get(CLOSE_WAIT.toMillis(), TimeUnit.MILLISECONDS);
+      if (!remaining.isEmpty()) {
+        stopAll(remaining, StopRequest.of(StopReason.QUIT, StopMode.NOW, REQUESTED_BY))
+            .toCompletableFuture().get(CLOSE_WAIT.toMillis(), TimeUnit.MILLISECONDS);
+      }
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
     } catch (ExecutionException | TimeoutException survivors) {
       // Survivors stay held and recorded; the Engine's job ends them with the Engine.
+    } finally {
+      for (Held scope : chatScopes.values()) scope.descendants.close();
+      chatScopes.clear();
     }
   }
 
@@ -1086,7 +1079,7 @@ public final class DefaultChildControl implements ChildControl {
       this.pid = process.pid();
       this.processStartedAt = processStartedAt;
       this.descendants = CHAT_SERVER_KINDS.contains(spec.kind())
-          ? new ChildDescendants(process.toHandle()) : null;
+          ? new ChildDescendants(process) : null;
     }
 
     DefaultChildControl control() {

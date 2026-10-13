@@ -18,7 +18,7 @@ public final class StartedProcesses {
 
   private StartedProcesses() {}
 
-  /** What the owner observed while the child was alive, retained across its exit. */
+  /** The owner's retained scope, including Windows job members after the root exits. */
   public static List<ProcessHandle> of(ChildHandle child) {
     return child == null ? List.of() : child.descendants();
   }

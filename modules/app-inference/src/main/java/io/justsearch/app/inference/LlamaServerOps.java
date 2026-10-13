@@ -128,6 +128,9 @@ final class LlamaServerOps {
   private static final Duration STOP_WAIT = Duration.ofSeconds(12);
   /** The GPU barrier's bound: one release poll's maximum (Spec B §2.6). */
   private static final Duration GPU_RELEASE_WAIT = Duration.ofSeconds(5);
+  /** A confirmed root exit whose descendants could not be listed; never reported as survival. */
+  private static final String EXITED_UNVERIFIED =
+      "Managed llama-server exited, descendants unverified; retry cleanup";
   /** Retries a survivor's stop; ChildControl keeps the survivor's first intent and reason. */
   private static final StopRequest SURVIVOR_RETRY = StopRequest.of(
       io.justsearch.app.api.runtime.child.StopReason.ROLLBACK,
@@ -144,6 +147,8 @@ final class LlamaServerOps {
    * so every stop is a recorded intent and every exit is classified in the exit ledger.
    */
   private volatile ChildHandle child;
+  /** A launched server whose exit was confirmed while its descendants could not be listed. */
+  private volatile ChildHandle unverifiedExit;
   private volatile CompletableFuture<?> crashMonitor;
   /** The owner a planned stop is ending; its exit, whatever its class, is not a crash. */
   private volatile ActiveServer stoppingOwner;
@@ -877,11 +882,30 @@ final class LlamaServerOps {
     ChildHandle held = child;
     if (held == null) return;
     ChildHandle.State state = held.state();
+    if (state == ChildHandle.State.EXITED) {
+      if (held == unverifiedExit) verifyExitedDescendants(held);
+      return;
+    }
     if (state != ChildHandle.State.SURVIVED && state != ChildHandle.State.STOPPING) return;
     LOG.warn("llama-server PID {} survived its stop; retrying before a new start", held.pid());
     if (awaitStop(childControl.stop(held, SURVIVOR_RETRY), held) == null) {
       throw new IllegalStateException("Managed llama-server survived terminal cleanup");
     }
+    if (child == held) child = null;
+  }
+
+  /** Retries the descendant listing of a server whose exit was confirmed but not its scope. */
+  private void verifyExitedDescendants(ChildHandle held) {
+    List<ProcessHandle> started;
+    try {
+      started = io.justsearch.app.inference.chat.StartedProcesses.of(held);
+    } catch (RuntimeException unreadable) {
+      throw new IllegalStateException(EXITED_UNVERIFIED, unreadable);
+    }
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
+      LOG.warn("A process llama-server PID {} started is still running", held.pid());
+    }
+    if (unverifiedExit == held) unverifiedExit = null;
     if (child == held) child = null;
   }
 
@@ -927,11 +951,26 @@ final class LlamaServerOps {
           launched.pid());
       return false;
     }
-    if (started == null) return false;
+    // The root may have forked during its stop: list its retained scope again after its exit. A
+    // listing that fails leaves the exit confirmed and the descendants unverified; the next stop or
+    // start retries the listing instead of reporting a survivor.
+    List<ProcessHandle> latest;
+    try {
+      latest = io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    } catch (RuntimeException unreadable) {
+      unverifiedExit = launched;
+      clearActive(stopping);
+      throw new IllegalStateException(EXITED_UNVERIFIED, unreadable);
+    }
+    if (started != null) {
+      latest = java.util.stream.Stream.concat(started.stream(), latest.stream()).distinct().toList();
+    }
     // I6: what the server started (a wrapper's server) ends with it before the next launch.
-    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(latest, STOP_WAIT)) {
+      // ChildControl keeps the exited root's scope and refuses the next chat start beside it.
       LOG.warn("A process llama-server PID {} started is still running", launched.pid());
     }
+    if (unverifiedExit == launched) unverifiedExit = null;
     if (child == launched) child = null;
     clearActive(stopping);
     if (wasAlive) {

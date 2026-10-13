@@ -20,8 +20,9 @@ public interface ChildHandle {
   Instant processStartedAt();
 
   /**
-   * Descendants observed while this child was alive. Engine handles retain these identities after
-   * the child's exit. An unreadable enumeration throws: it is never a successful empty snapshot.
+   * Descendants retained across this child's exit. Windows chat handles query their native job;
+   * other Engine handles retain identities observed on demand. An unreadable membership query
+   * throws: it is never a successful empty snapshot.
    */
   default java.util.List<ProcessHandle> descendants() {
     var root = ProcessHandle.of(pid());

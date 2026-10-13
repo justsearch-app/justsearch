@@ -183,6 +183,16 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         return "A process the self-test llama-server (pid " + candidate.pid()
             + ") started is still running";
       }
+      try {
+        // A descendant can fork while the earlier snapshot drains. Read the retained scope once
+        // more before certifying cleanup, rather than declaring success from an obsolete list.
+        if (!StartedProcesses.of(candidate).isEmpty()) {
+          return "A process the self-test llama-server (pid " + candidate.pid()
+              + ") started is still running";
+        }
+      } catch (RuntimeException unreadable) {
+        return "Self-test cleanup unverified: " + message(unreadable);
+      }
       while (true) {
         try {
           if (!control.awaitGpuRelease(GPU_RELEASE_WAIT)) {
