@@ -7,6 +7,8 @@ author-session: b64-status-counter
 
 Server-owned publication metadata replaces the completion inventory. Independent acceptance is pending.
 
+Refreshed after b82 (run b82g-status-records). Entry 2's evidence was re-run on the current checks. That entry is not marked repaired, so it has a candidate run only and no fail-before. Both checks pass with the same cases as the first record: 11 and 5. statusOwner-extra.test.ts is unchanged. statusCounterSignal.test.ts changed once, in b73 (6f177f241), and not because of b82's decision (a) or (b). In its 'does not acknowledge a current header when the snapshot reflects an older revision' case, the expectation 'a later request may retry the pending publication' became: the same counter value is not read again, and a later value is. b73's changeset entry for statusStorm.test.ts and statusCounterSignal.test.ts records that replacement and its source. verify-status7 and verify-status8 each found the changed expectation justified. Entry 2's behaviour text still says the client 'retries stale observations only on another request'. That describes the replaced expectation, and it is left unchanged here for the acceptor.
+
 ```json
 {
   "entries": [

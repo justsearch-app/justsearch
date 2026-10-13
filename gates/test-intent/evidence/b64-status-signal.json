@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:d6365732a21827c41b0aed4b763fad01ff0383a5f7bddf14e2973868ad16dff8"
   },
-  "createdAt": "2026-10-11T08:46:23.555Z",
-  "revision": "23b8679eed760201748c485c2f5914a41f7ecf35",
-  "tree": "259182e65125067e3247faebaf8a9f7c642fa692",
+  "createdAt": "2026-10-13T22:54:11.731Z",
+  "revision": "19f230c5f3420348cd8042745c154017303084b0",
+  "tree": "8f157c1a92a053864d99665658c12271f20034d9",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/api/statusCounterSignal.test.ts\" \"src/api/statusOwner-extra.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-20540-1791708374158.json\"",
+      "command": "npx vitest run \"src/api/statusCounterSignal.test.ts\" \"src/api/statusOwner-extra.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-45276-1791932050279.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9397
+      "durationMs": 1451
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/api/statusCounterSignal.test.ts",
       "file": "modules/ui-web/src/api/statusCounterSignal.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:3fda59f86d97489c542732eed1a96543d66236dac9621510dade37a43f9353e3",
+      "contentDigest": "sha256:b66585de119cd7c924cedef6ed729369bd2474cf10149f153a910ed94991cb7e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -113,5 +113,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:5a7f76cd7c1907402c68725fbd6609d02c3b7e06bb2cd043641cbea1847b7912"
+  "digest": "sha256:f35bd487ebab5e958491a8042dcc497429658fafa13768ebd4ac7259c32faf10"
 }

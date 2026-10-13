@@ -11,6 +11,11 @@ asynchronous fresh requests, failed observations and recovery. The one-second as
 deliberately tighter server budget; no request retry or client-timeout increase is introduced.
 The before-state is f6d579a86. Independent intent acceptance remains pending.
 
+Refreshed after b82 (run b82g-status-records). Entry 1's evidence was re-run on the current checks, with the fail-before again at f6d579a86, no overlays and no compatibility patch. Both fail-before details are identical to the first record. StatusNonBlockingHttpTest changed twice since then; WorkerStatusSamplerTest did not:
+
+- In b53 (971b55573), StatusNonBlockingHttpTest became a b53 check too. b53 added the failure-stays-local cases and the power, resume and vision sources. It replaced several expectations: a failed producer no longer aborts publication, and a held producer now marks only its own part stale. b53's entry 1 records those expectations and their sources. The case count rose from 26 to 46; no case was removed.
+- In b82, the blocked-dependency case changed because of b82's decision (a). Entry 3 records that adaptation.
+
 ```json
 {
   "entries": [
@@ -57,6 +62,16 @@ The before-state is f6d579a86. Independent intent acceptance remains pending.
           "location": "task t-20261005-b6d536 request"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "b82 decision (a): a hung lane is reported stale only after 3 of its own update intervals, so detection is later when idle, about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown under load. Under the old rule, a refresh in flight for more than 1 s made its lane stale, so the blocked-dependency case advanced its clock 1001 ms for non-lock sources. It now advances 31001 ms for every source, as the lock sources already did, and then runs one more sampler pass for non-lock sources, with an added assertion that this pass finishes within 10 s while the dependency is held. Each case still holds the same dependency. It asserts the same budget of under one second against the unchanged five-second client deadline, the same stale or unknown marker on the held part, the same fresh=true response and the same recovery after release."
     }
   ]
 }
