@@ -9,9 +9,10 @@ import java.util.Map;
 
 /**
  * Queries exact Windows job membership across a wrapper's exit. Other platforms retain identities
- * observed on demand. This is a waiting barrier,
- * never permission to terminate a process. The Engine's containment owns orphan termination.
- * An unreadable query blocks this attempt; later callers retry rather than latching a failure.
+ * observed on demand, as a waiting barrier only: there nothing a root left running can be ended
+ * ({@link #endable}), and the next chat start keeps refusing beside it. On Windows {@link #end}
+ * ends the root's own nested job. An unreadable query blocks this attempt; later callers retry
+ * rather than latching a failure.
  */
 final class ChildDescendants implements AutoCloseable {
   private final ProcessHandle root;
@@ -65,6 +66,17 @@ final class ChildDescendants implements AutoCloseable {
       failure = "descendant identity unavailable for pid " + root.pid();
       throw new IllegalStateException(failure, unreadable);
     }
+  }
+
+  /** Whether {@link #end} can end what the root left running: only its own Windows job can. */
+  boolean endable() {
+    return contained != null;
+  }
+
+  /** Ends every member of the root's own job through that job's handle ({@link #endable}). */
+  synchronized void end() throws java.io.IOException {
+    if (contained == null) throw new IllegalStateException("no job to end on this platform");
+    contained.endScope();
   }
 
   @Override

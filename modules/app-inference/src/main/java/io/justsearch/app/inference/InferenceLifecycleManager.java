@@ -1823,7 +1823,8 @@ public class InferenceLifecycleManager
           // while a stopped server's (or self-test candidate's) adapter memory is still pending
           // release, at most 5 s, and returns at once otherwise.
           if (!serverOps.awaitGpuRelease()) {
-            LOG.debug("GPU release of the previous llama-server still pending; starting anyway");
+            LOG.debug("GPU release of the previous llama-server still pending after 5 s; the start"
+                + " waits for its release poll to finish");
           }
           // Tempdoc 518 fix A: wipe any stale /props observations from the prior server
           // instance before starting a new one. The new server's /props observation (if it

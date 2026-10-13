@@ -118,6 +118,70 @@ final class ChatJobAccountingTest {
     assertEquals(20, captured, "capture must identify the actual server in every round, not just conhost");
   }
 
+  /**
+   * Windows can publish a member's exit before the job stops counting it, longer the more memory
+   * the process frees. A chat root that leaves a short-lived process in its job (it exits about a
+   * second after the root) is read while the job's count lags each exit by a second: membership
+   * settles to empty, bounded in time, instead of failing as a changed membership after a fixed
+   * number of quick retries. The lag is injected at the job-accounting call only; the processes
+   * and their job are real.
+   */
+  @Test @Timeout(60)
+  void membershipSettlesWhileTheJobCountLagsAnExit() throws Exception {
+    Class<?> kernel = Class.forName(
+        io.justsearch.app.api.runtime.containment.WindowsEngineJob.class.getName() + "$Kernel");
+    var lastCounted = new java.util.concurrent.atomic.AtomicInteger(-1);
+    var laggedCount = new java.util.concurrent.atomic.AtomicInteger();
+    var lagUntil = new java.util.concurrent.atomic.AtomicLong();
+    var lagged = new java.util.concurrent.atomic.AtomicInteger();
+    try (var _ = Mockito.mockStatic(kernel, invocation -> {
+      Object result = invocation.callRealMethod();
+      Object[] raw = invocation.getRawArguments();
+      if ("call".equals(invocation.getMethod().getName()) && raw.length == 2
+          && "QueryInformationJobObject".equals(raw[0])
+          && Integer.valueOf(1).equals(((Object[]) raw[1])[1])) {
+        var accounting = (java.lang.foreign.MemorySegment) ((Object[]) raw[1])[2];
+        int counted = accounting.get(java.lang.foreign.ValueLayout.JAVA_INT, 40);
+        int previous = lastCounted.getAndSet(counted);
+        long now = System.nanoTime();
+        if (previous > counted) {
+          laggedCount.set(previous);
+          lagUntil.set(now + TimeUnit.SECONDS.toNanos(1));
+        }
+        if (now - lagUntil.get() < 0 && counted < laggedCount.get()) {
+          accounting.set(java.lang.foreign.ValueLayout.JAVA_INT, 40, laggedCount.get());
+          lagged.incrementAndGet();
+        }
+      }
+      return result;
+    }); var control = DefaultChildControl.unrecorded(ManagedChildRegistry.noop())) {
+      ChildHandle root = control.start(spec(ChildKind.LLAMA_SERVER, Fixture.argv("leave", directory),
+          null, Map.of()));
+      root.stdin().close();
+      root.exit().toCompletableFuture().get(15, TimeUnit.SECONDS);
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      List<ProcessHandle> members = read(root);
+      int reads = 1;
+      while (!members.isEmpty() && System.nanoTime() < deadline) {
+        Thread.sleep(50);
+        members = read(root);
+        reads++;
+      }
+      System.out.println("membership reads=" + reads + " lagged count reads=" + lagged.get());
+      assertEquals(List.of(), members, "the short-lived member exits and membership reads empty");
+      assertTrue(lagged.get() > 0, "the job count lagged an exit during the reads");
+    }
+  }
+
+  private static List<ProcessHandle> read(ChildHandle root) {
+    try {
+      return root.descendants();
+    } catch (IllegalStateException unsettled) {
+      return fail("membership read failed while the job count lagged an exit: "
+          + unsettled.getMessage() + " / " + unsettled.getCause());
+    }
+  }
+
   private static ChildSpec spec(ChildKind kind, List<String> argv, Path cwd, Map<String, String> env) {
     return new ChildSpec(kind, argv, cwd, env, new ChildSpec.Stdio.Pipes(), false,
         OptionalLong.empty(), Optional.empty(), ChildSpec.CooperativeStop.NONE, "accounting-check");
@@ -190,6 +254,13 @@ final class ChatJobAccountingTest {
         Runtime.getRuntime().halt(0);
       }
       if (args[0].equals("idle")) { System.in.readAllBytes(); return; }
+      if (args[0].equals("leave")) {
+        // Leave one short-lived process in the job, then exit at once.
+        new ProcessBuilder(argv("linger", home)).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD).start();
+        Runtime.getRuntime().halt(0);
+      }
+      if (args[0].equals("linger")) { Thread.sleep(1_500); return; }
       var self = ProcessHandle.current();
       Instant birth = self.info().startInstant().orElseThrow();
       var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);

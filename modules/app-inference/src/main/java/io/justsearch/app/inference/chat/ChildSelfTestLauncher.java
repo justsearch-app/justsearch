@@ -178,18 +178,12 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         return "Self-test cleanup unverified: " + message(unreadable);
       }
       if (!StartedProcesses.awaitExit(List.copyOf(started), STOP_WAIT)) {
-        LOG.warn("A process the self-test llama-server (pid {}) started is still running",
-            candidate.pid());
-        return "A process the self-test llama-server (pid " + candidate.pid()
-            + ") started is still running";
+        return endLeftRunning(candidate);
       }
       try {
         // A descendant can fork while the earlier snapshot drains. Read the retained scope once
         // more before certifying cleanup, rather than declaring success from an obsolete list.
-        if (!StartedProcesses.of(candidate).isEmpty()) {
-          return "A process the self-test llama-server (pid " + candidate.pid()
-              + ") started is still running";
-        }
+        if (!StartedProcesses.of(candidate).isEmpty()) return endLeftRunning(candidate);
       } catch (RuntimeException unreadable) {
         return "Self-test cleanup unverified: " + message(unreadable);
       }
@@ -207,6 +201,25 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
       return null;
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
+  /**
+   * A process the candidate started outlived it: the self-test fails (S19), and ChildControl ends
+   * what was left in the candidate's own job, recording each as an intended cleanup, so the main
+   * server can load without an Engine restart. Off Windows it cannot be ended and stays the next
+   * chat start's barrier.
+   */
+  private String endLeftRunning(ChildHandle candidate) {
+    String failure = "A process the self-test llama-server (pid " + candidate.pid()
+        + ") started is still running";
+    LOG.warn("{}", failure);
+    try {
+      int ended = control.endRemaining(candidate,
+          StopRequest.of(StopReason.SELF_TEST, StopMode.NOW, REQUESTED_BY));
+      return failure + " after it exited; ended " + ended + " left running";
+    } catch (IOException | RuntimeException notEnded) {
+      return failure + " and could not be ended: " + message(notEnded);
     }
   }
 

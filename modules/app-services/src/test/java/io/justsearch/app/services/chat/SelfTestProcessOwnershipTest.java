@@ -12,6 +12,9 @@ import com.sun.net.httpserver.HttpServer;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.api.runtime.child.ChildHandle;
 import io.justsearch.app.api.runtime.child.DefaultChildControl;
+import io.justsearch.app.api.runtime.child.LedgerSink;
+import io.justsearch.app.api.runtime.child.ProcessTerminator;
+import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import io.justsearch.app.inference.chat.ChildSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
@@ -26,6 +29,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -34,23 +39,67 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 final class SelfTestProcessOwnershipTest {
-  @TempDir Path directory;
+  private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
 
+  @TempDir Path directory;
+  private final List<String> notes = Collections.synchronizedList(new ArrayList<>());
+
+  /** A control whose exit ledger keeps every {@code child-note} token this test can read. */
+  private DefaultChildControl recordingControl() {
+    LedgerSink sink = (type, fields) -> {
+      if (type == LedgerRecordType.CHILD_NOTE) notes.add(String.valueOf(fields.get("token")));
+      return true;
+    };
+    return DefaultChildControl.of(sink, ProcessTerminator.forCurrentOs(), ManagedChildRegistry.noop());
+  }
+
+  /**
+   * The self-test still fails when its server outlives the wrapper. On Windows that survivor, in
+   * the candidate's own job, is then ended and recorded as an intended cleanup; elsewhere it cannot
+   * be ended and keeps running (the named limit).
+   */
   @Test
   void exitedSelfTestWrapperWithLiveDescendantCannotPass() throws Exception {
-    try (var fixture = new Candidate(directory);
-        var control = DefaultChildControl.unrecorded(ManagedChildRegistry.noop())) {
+    try (var fixture = new Candidate(directory); var control = recordingControl()) {
       SelfTestRun result = new ChildSelfTestLauncher(control).run(fixture.spec(control, true));
-      assertTrue(fixture.descendantAlive(), "the serving descendant outlived its wrapper");
       assertFalse(result.exercised(), "a live descendant must make cleanup fail");
       assertTrue(result.failure().contains("still running"), result.failure());
+      if (WINDOWS) {
+        assertFalse(fixture.descendantAlive(), "the survivor in the candidate's job is ended");
+        assertSurvivorRecorded(fixture);
+      } else {
+        assertTrue(fixture.descendantAlive(), "the serving descendant outlived its wrapper");
+      }
     }
   }
 
+  /**
+   * The serving survivor is among the ended members recorded as intended cleanups of the
+   * self-test, and every such record is one (the job may also hold the survivor's console host).
+   */
+  private void assertSurvivorRecorded(Candidate fixture) throws Exception {
+    List<String> recorded = cleanups();
+    assertTrue(recorded.contains("intended_cleanup:SELF_TEST:job_member:" + fixture.serverIdentity()),
+        "the ended survivor is recorded as an intended cleanup: " + recorded);
+    assertTrue(recorded.stream().allMatch(note -> note.startsWith("intended_cleanup:SELF_TEST:job_member:")),
+        "each record names the self-test as the reason: " + recorded);
+  }
+
+  private List<String> cleanups() {
+    synchronized (notes) {
+      return notes.stream().filter(note -> note.startsWith("intended_cleanup:")).toList();
+    }
+  }
+
+  /**
+   * After a self-test whose server survived the forced wrapper stop, the main server loads without
+   * an Engine restart on Windows, the survivor ended and recorded. Elsewhere the main start is
+   * refused beside the survivor until it exits.
+   */
   @Test
   void selfTestDescendantSurvivalBlocksMainReload() throws Exception {
     try (var fixture = new Candidate(directory);
-        var control = DefaultChildControl.unrecorded(ManagedChildRegistry.noop());
+        var control = recordingControl();
         var seam = new ManagedChatSeam(directory, 0, control);
         var intent = new RuntimeIntentTestFixture(directory.resolve("intent"), true)) {
       var manager = seam.manager();
@@ -66,9 +115,19 @@ final class SelfTestProcessOwnershipTest {
           assertTrue(reconciler.awaitQuiescent(30_000));
           assertFalse(session.run(fixture.spec(control, false)).exercised(),
               "the descendant survives the forced wrapper stop");
-          assertTrue(fixture.descendantAlive());
+          if (WINDOWS) {
+            assertFalse(fixture.descendantAlive(), "the survivor in the candidate's job is ended");
+            assertSurvivorRecorded(fixture);
+          } else {
+            assertTrue(fixture.descendantAlive());
+          }
         }
         reconciler.specChanged();
+        if (WINDOWS) {
+          await(manager::isOnline, "main chat load after the self-test, without an Engine restart");
+          assertEquals(1, seam.models().size());
+          return;
+        }
         assertTrue(reconciler.awaitQuiescent(30_000));
         assertEquals(List.of(), seam.models(),
             "closing the self-test session must not spawn main beside its surviving descendant");
@@ -139,6 +198,12 @@ final class SelfTestProcessOwnershipTest {
               assertTrue(descendantAlive());
             }
           });
+    }
+
+    /** The serving descendant's {@code pid@creation} as it recorded them itself. */
+    String serverIdentity() throws Exception {
+      String[] fields = Files.readString(home.resolve("server.identity")).trim().split(" ");
+      return fields[0] + "@" + fields[1];
     }
 
     boolean descendantAlive() throws Exception {

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T14:42:54.670Z",
-  "revision": "04e49405b55d442a6b4b3c991c7c102d16c90249",
-  "tree": "97a59e691bb20d9c0f5b1d2de669365e19817b92",
+  "createdAt": "2026-10-13T17:51:48.423Z",
+  "revision": "d7bbe9600230dc9a42bcbb9f9f25bf7fb38409c3",
+  "tree": "41d4238af6ccb0c223c35d0a864161d671727a11",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.idleChatControlAddsLessThanOnePercentOfACore\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.laterAdmissionRetriesAListingFailureAndClearsTheBlock\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.immediateWrapperExitRetainsTheActualSurvivorEveryTime\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.selfTestChecksMembershipAfterObservedDescendantsDrain\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 83629
+      "durationMs": 42197
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaStopVerificationTest.exitedRootWithUnreadableDescendantsIsUnverifiedAndLaterStopRecovers\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 19640
+      "durationMs": 15959
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#idleChatControlAddsLessThanOnePercentOfACore",
       "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ea15e4547557c4b81ee86b11eed41da4f24f6d8cc1bed3372c719d6514362f17",
+      "contentDigest": "sha256:c1edf64c127217b293af3826ebb80ef2c6725c04d9bc011b7780489682a01920",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#laterAdmissionRetriesAListingFailureAndClearsTheBlock",
       "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ea15e4547557c4b81ee86b11eed41da4f24f6d8cc1bed3372c719d6514362f17",
+      "contentDigest": "sha256:c1edf64c127217b293af3826ebb80ef2c6725c04d9bc011b7780489682a01920",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#immediateWrapperExitRetainsTheActualSurvivorEveryTime",
       "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ea15e4547557c4b81ee86b11eed41da4f24f6d8cc1bed3372c719d6514362f17",
+      "contentDigest": "sha256:c1edf64c127217b293af3826ebb80ef2c6725c04d9bc011b7780489682a01920",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#selfTestChecksMembershipAfterObservedDescendantsDrain",
       "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ea15e4547557c4b81ee86b11eed41da4f24f6d8cc1bed3372c719d6514362f17",
+      "contentDigest": "sha256:c1edf64c127217b293af3826ebb80ef2c6725c04d9bc011b7780489682a01920",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -117,30 +117,30 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.idleChatControlAddsLessThanOnePercentOfACore\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.laterAdmissionRetriesAListingFailureAndClearsTheBlock\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.immediateWrapperExitRetainsTheActualSurvivorEveryTime\" --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.selfTestChecksMembershipAfterObservedDescendantsDrain\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 171021
+        "durationMs": 64016
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaStopVerificationTest.exitedRootWithUnreadableDescendantsIsUnverifiedAndLaterStopRecovers\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 28985
+        "durationMs": 13793
       }
     ],
     "checks": [
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#idleChatControlAddsLessThanOnePercentOfACore",
         "classification": "assertion",
-        "detail": "idleChatControlAddsLessThanOnePercentOfACore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: idle chat adds over 1% of a core: baseline=15625000 ns, chat=4750000000 ns over 10 s ==> expected: <true> but was: <false>"
+        "detail": "idleChatControlAddsLessThanOnePercentOfACore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: idle chat adds over 1% of a core: baseline=15625000 ns, chat=3203125000 ns over 10 s ==> expected: <true> but was: <false>"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#laterAdmissionRetriesAListingFailureAndClearsTheBlock",
         "classification": "assertion",
-        "detail": "laterAdmissionRetriesAListingFailureAndClearsTheBlock(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: verified empty membership must clear the block without restarting the control ==> Unexpected exception thrown: java.io.IOException: chat start blocked: descendant enumeration unavailable for pid 8956"
+        "detail": "laterAdmissionRetriesAListingFailureAndClearsTheBlock(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: verified empty membership must clear the block without restarting the control ==> Unexpected exception thrown: java.io.IOException: chat start blocked: descendant enumeration unavailable for pid 31888"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#immediateWrapperExitRetainsTheActualSurvivorEveryTime",
         "classification": "assertion",
-        "detail": "immediateWrapperExitRetainsTheActualSurvivorEveryTime(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: capture must identify the actual server in every round, not just conhost ==> expected: <20> but was: <14>"
+        "detail": "immediateWrapperExitRetainsTheActualSurvivorEveryTime(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: capture must identify the actual server in every round, not just conhost ==> expected: <20> but was: <3>"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#selfTestChecksMembershipAfterObservedDescendantsDrain",
@@ -154,5 +154,5 @@
       }
     ]
   },
-  "digest": "sha256:74d5215d3054104d47c736f3b81badd92968ad4eef3303de4f440939c463da10"
+  "digest": "sha256:4a121f94a3f59183a89710b8d569313c7eedea86418a501f1ed2d02eb1f6a5ee"
 }

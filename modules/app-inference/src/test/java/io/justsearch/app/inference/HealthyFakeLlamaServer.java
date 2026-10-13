@@ -23,7 +23,9 @@ import java.util.concurrent.TimeUnit;
  * <p>It also answers a one-token {@code /completion} (Spec A §7.4's resume probe). Behaviours for
  * step 10: {@code --completion-fails} answers it 500; {@code --completion-cuda-failure} prints a
  * device-lost CUDA error and answers 500; {@code --loading-until-signal} answers {@code /health}
- * 503 until {@link #signalReady}.
+ * 503 until {@link #signalReady}. {@code --spawn-lingerer} starts one more process once serving,
+ * which outlives the server (as a crash reporter or a wrapper's child can) until {@link
+ * #releaseLingerers}, or 90 s.
  */
 public final class HealthyFakeLlamaServer {
   private static final String HOME_PROPERTY = "fake.llama.home";
@@ -33,6 +35,8 @@ public final class HealthyFakeLlamaServer {
   private static final String BEHAVIOUR = "behaviour.txt";
   private static final String OOM_SIGNAL = "oom-signal";
   private static final String READY_SIGNAL = "ready-signal";
+  private static final String LINGERERS = "lingerers.txt";
+  private static final String LINGERER_EXIT = "lingerer-exit";
 
   /**
    * With {@code --loading-until-signal} installed, ends the model load: {@code /health} answers
@@ -151,6 +155,46 @@ public final class HealthyFakeLlamaServer {
             .orElse(false);
   }
 
+  /**
+   * The lingering processes launches from {@code dir} started, as each recorded its own PID and
+   * creation instant; a handle only for an identity that still matches.
+   */
+  static List<ProcessHandle> lingerers(Path dir) throws IOException {
+    Path file = dir.resolve(LINGERERS);
+    if (!Files.exists(file)) return List.of();
+    List<ProcessHandle> found = new ArrayList<>();
+    for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+      if (line.isBlank()) continue;
+      ProcessHandle owned = ownedHandle(line.trim());
+      if (owned != null) found.add(owned);
+    }
+    return found;
+  }
+
+  /** Asks every lingerer from {@code dir} to exit and waits for each (test cleanup; no kill). */
+  static void releaseLingerers(Path dir) throws Exception {
+    if (!Files.isDirectory(dir)) return;
+    Files.writeString(dir.resolve(LINGERER_EXIT), "exit", StandardCharsets.US_ASCII);
+    for (ProcessHandle lingerer : lingerers(dir)) lingerer.onExit().get(10, TimeUnit.SECONDS);
+  }
+
+  /** The lingering process: records its identity, then waits for its exit signal. */
+  public static final class Lingerer {
+    private Lingerer() {}
+
+    public static void main(String[] args) throws Exception {
+      Path home = Path.of(args[0]);
+      var self = ProcessHandle.current();
+      Files.writeString(home.resolve(LINGERERS), self.pid() + " "
+          + self.info().startInstant().orElseThrow() + "\n", StandardCharsets.UTF_8,
+          java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
+      while (!Files.exists(home.resolve(LINGERER_EXIT)) && System.nanoTime() < deadline) {
+        Thread.sleep(50);
+      }
+    }
+  }
+
   /** Every launch's argv, in order, as the fake recorded them. */
   static List<List<String>> launches(Path dir) throws IOException {
     Path launches = dir.resolve(LAUNCHES);
@@ -224,6 +268,13 @@ public final class HealthyFakeLlamaServer {
       exchange.close();
     });
     server.start();
+    if (home != null && behaviour.contains("--spawn-lingerer")) {
+      new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp",
+          System.getProperty("java.class.path"), Lingerer.class.getName(), home)
+          .directory(new java.io.File(System.getProperty("java.io.tmpdir")))
+          .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+          .redirectError(ProcessBuilder.Redirect.DISCARD).start();
+    }
     if (home != null) {
       Files.writeString(Path.of(home, PIDS), ProcessHandle.current().pid() + "\n",
           StandardCharsets.US_ASCII, java.nio.file.StandardOpenOption.CREATE,

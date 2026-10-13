@@ -1,0 +1,70 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T17:53:04.752Z",
+  "revision": "d7bbe9600230dc9a42bcbb9f9f25bf7fb38409c3",
+  "tree": "7de00fd963011386e073db6d75a674702c2fafc5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.unreadableDescendantsAreNotAnEmptySuccessfulSnapshot\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23619
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#unreadableDescendantsAreNotAnEmptySuccessfulSnapshot",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d428961b823384047b8ded92f661bcf8a16ffac80859e8599d289eaa860b214e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadableDescendantsAreNotAnEmptySuccessfulSnapshot()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a164833f5",
+    "revision": "a164833f5275f02496c74a3422cad0bf66ec87e1",
+    "overlays": [
+      "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.unreadableDescendantsAreNotAnEmptySuccessfulSnapshot\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 38807
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#unreadableDescendantsAreNotAnEmptySuccessfulSnapshot",
+        "classification": "assertion",
+        "detail": "unreadableDescendantsAreNotAnEmptySuccessfulSnapshot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: enumeration failure cannot certify that cleanup has no descendants to wait for ==> Expected java.lang.IllegalStateException to be thrown, but nothing was thrown."
+      }
+    ]
+  },
+  "digest": "sha256:7e7b5eb166f96be1c971b7638dbca8d483f66a2ae2d5aff9ef6103ee186ef853"
+}

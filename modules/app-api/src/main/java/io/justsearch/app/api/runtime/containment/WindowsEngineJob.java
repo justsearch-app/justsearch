@@ -37,6 +37,10 @@ import java.util.concurrent.TimeUnit;
  *       is what ends the children. The handle is not inheritable (no security attributes), because
  *       an inherited copy in a child would keep the job open after the Engine dies. No API exposes
  *       it, and Engine code never calls {@code TerminateJobObject} on it.
+ *   <li><b>Each chat server has its own nested job</b> ({@link #createChat}). What an exited chat
+ *       root leaves running there is ended through that nested job's handle alone ({@link
+ *       ChatProcess#endScope}): kill-on-close is set on it and the handle is closed. The Engine's
+ *       job is never touched.
  *   <li><b>{@code GetLastError} is captured by the downcall</b> ({@code captureCallState}), so the
  *       JVM cannot overwrite it between the failing call and the read.
  * </ul>
@@ -210,7 +214,10 @@ public final class WindowsEngineJob implements EngineContainment {
   /**
    * Creates a chat root suspended, joins its own nested job, and leaves resumption to the control
    * after it has recorded and registered the root. No instruction can execute outside that job.
-   * This job sets no kill-on-close or breakaway limit: the Engine job still owns termination.
+   * The command line is the one {@code java.lang.ProcessImpl} builds for the same argv, and like
+   * the JDK it names no application, so Windows itself runs a {@code .cmd} or {@code .bat} through
+   * {@code cmd.exe}. The nested job sets no limit until {@link ChatProcess#endScope}; the Engine's
+   * job still contains it.
    */
   public static ChatProcess createChat(ProcessBuilder builder) throws IOException {
     try {
@@ -227,10 +234,18 @@ public final class WindowsEngineJob implements EngineContainment {
     private static final Cleaner CLEANER = Cleaner.create();
     /** NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT | UNICODE_ENVIRONMENT | SUSPENDED. */
     private static final int CREATION_FLAGS = 0x08080404;
+    /**
+     * How long a membership read retries while the job's active count disagrees with its listed
+     * live members. Windows reports a process exited before its job stops counting it, longer
+     * the more memory it frees.
+     */
+    private static final long SETTLE_NANOS = TimeUnit.SECONDS.toNanos(2);
     private final MemorySegment process;
     private MemorySegment primaryThread;
     private MemorySegment group;
     private boolean verifiedEmpty;
+    /** The nested job was closed with kill-on-close set: Windows ends every member. */
+    private boolean ended;
     private final ProcessHandle identity;
     private final InputStream stdout;
     private final InputStream stderr;
@@ -345,30 +360,127 @@ public final class WindowsEngineJob implements EngineContainment {
       }
     }
 
-    private static String commandLine(List<String> arguments) {
-      if (arguments.stream().anyMatch(argument -> argument.indexOf('\0') >= 0)) {
-        throw new IllegalArgumentException("NUL character in chat command");
+    /**
+     * The command line {@code java.lang.ProcessImpl} builds on Windows for {@code arguments}, by the
+     * same rules: by default ({@code jdk.lang.Process.allowAmbiguousCommands} not {@code false}) an
+     * argument is quoted only when it is empty or holds white space, its text is kept as it is, and
+     * the backslashes before the closing quote are doubled; the executable path is normalised and
+     * quoted only when it needs it. With the property {@code false} the executable is always quoted
+     * and arguments are checked as the JDK checks them, {@code .cmd} and {@code .bat} strictest.
+     */
+    static String commandLine(List<String> arguments) {
+      for (String argument : arguments) {
+        if (argument.indexOf('\0') >= 0) throw new IllegalArgumentException("NUL character in chat command");
       }
-      String encoded = arguments.stream().map(ChatProcess::quote).collect(java.util.stream.Collectors.joining(" "));
-      String executable = arguments.getFirst().toLowerCase(java.util.Locale.ROOT);
-      if (executable.endsWith(".cmd") || executable.endsWith(".bat")) {
-        return quote(io.justsearch.configuration.SystemAccess.envVar("SystemRoot")
-            + "\\System32\\cmd.exe") + " /d /s /c \"" + encoded + "\"";
+      boolean ambiguousAllowed = !"false".equalsIgnoreCase(
+          System.getProperty("jdk.lang.Process.allowAmbiguousCommands", "true"));
+      if (ambiguousAllowed) {
+        String executable = new java.io.File(arguments.getFirst()).getPath();
+        if (quoted(Rules.LEGACY, executable)) executable = '"' + executable + '"';
+        return join(Rules.LEGACY, executable, arguments);
       }
-      return encoded;
+      List<String> argv = arguments;
+      String executable = Rules.unquote(argv.getFirst());
+      if (executable.indexOf('"') >= 0) {
+        // As the JDK does, rejoin the argv and split it again at white space outside quotes.
+        List<String> tokens = new ArrayList<>();
+        java.util.regex.Matcher token = TOKEN.matcher(String.join(" ", arguments) + " ");
+        while (token.find()) tokens.add(token.group());
+        argv = tokens;
+        executable = Rules.unquote(argv.getFirst());
+        if (executable.indexOf('"') >= 0) {
+          throw new IllegalArgumentException(
+              "Executable name has embedded quote, split the arguments: " + executable);
+        }
+      }
+      executable = new java.io.File(executable).getPath();
+      String name = new java.io.File(executable).getName().toUpperCase(java.util.Locale.ROOT);
+      Rules rules = name.endsWith(".EXE") || name.indexOf('.') < 0 ? Rules.WIN32_SAFE : Rules.CMD_BAT;
+      return join(rules, '"' + executable + '"', argv);
     }
 
-    private static String quote(String argument) {
-      StringBuilder result = new StringBuilder("\"");
-      int slashes = 0;
+    private static final java.util.regex.Pattern TOKEN =
+        java.util.regex.Pattern.compile("[^\\s\"]+|\"[^\"]*\"");
+
+    /** The JDK's argument checks, from the strictest (an implicit {@code cmd.exe} run) to legacy. */
+    private enum Rules {
+      CMD_BAT("\"<>&|^"), WIN32_SAFE("\"<>"), LEGACY("");
+
+      final String special;
+
+      Rules(String special) {
+        this.special = special;
+      }
+
+      static String unquote(String text) {
+        return text.length() >= 2 && text.startsWith("\"") && text.endsWith("\"")
+            ? text.substring(1, text.length() - 1) : text;
+      }
+    }
+
+    private static String join(Rules rules, String executable, List<String> argv) {
+      StringBuilder line = new StringBuilder(executable);
+      for (String argument : argv.subList(1, argv.size())) {
+        line.append(' ');
+        if (quoted(rules, argument)) {
+          line.append('"');
+          if (rules == Rules.WIN32_SAFE) {
+            for (int index = 0; index < argument.length(); index++) {
+              char character = argument.charAt(index);
+              if (character == '"') {
+                line.append("\\".repeat(trailingBackslashes(rules, argument, index) + 1));
+              }
+              line.append(character);
+            }
+          } else {
+            line.append(argument);
+          }
+          if (rules != Rules.CMD_BAT) {
+            line.append("\\".repeat(trailingBackslashes(rules, argument, argument.length())));
+          }
+          line.append('"');
+        } else if (rules == Rules.WIN32_SAFE && argument.length() > 2
+            && argument.startsWith("\"") && argument.endsWith("\"")) {
+          line.append(argument);
+          line.insert(line.length() - 1,
+              "\\".repeat(trailingBackslashes(rules, argument, argument.length() - 1)));
+        } else {
+          line.append(argument);
+        }
+      }
+      return line.toString();
+    }
+
+    /** Whether the JDK quotes {@code argument}; throws where the JDK refuses it. */
+    private static boolean quoted(Rules rules, String argument) {
+      if (argument.isEmpty()) return true;
+      String inner = Rules.unquote(argument);
+      boolean alreadyQuoted = !inner.equals(argument);
+      boolean innerQuote = inner.indexOf('"') >= 0;
+      if (rules == Rules.CMD_BAT && innerQuote) {
+        throw new IllegalArgumentException("Argument has embedded quote, use the explicit CMD.EXE call.");
+      }
+      if (rules == Rules.WIN32_SAFE && alreadyQuoted && innerQuote) {
+        throw new IllegalArgumentException("Malformed argument has embedded quote: " + inner);
+      }
+      if (alreadyQuoted) return false;
       for (int index = 0; index < argument.length(); index++) {
         char character = argument.charAt(index);
-        if (character == '\\') { slashes++; continue; }
-        result.append("\\".repeat(character == '"' ? slashes * 2 + 1 : slashes));
-        result.append(character);
-        slashes = 0;
+        if (Character.isLetterOrDigit(character)) continue;
+        if (Character.isSpaceChar(character) || Character.isWhitespace(character)
+            || rules.special.indexOf(character) >= 0) {
+          return true;
+        }
       }
-      return result.append("\\".repeat(slashes * 2)).append('"').toString();
+      return false;
+    }
+
+    /** The backslashes just before {@code end}; a batch file does not treat them as escapes. */
+    private static int trailingBackslashes(Rules rules, CharSequence text, int end) {
+      if (rules == Rules.CMD_BAT) return 0;
+      int start = end;
+      while (start > 0 && text.charAt(start - 1) == '\\') start--;
+      return end - start;
     }
 
     /** Resumes only after the control has retained the job and root identity. */
@@ -388,11 +500,11 @@ public final class WindowsEngineJob implements EngineContainment {
       boolean interrupted = false;
       try (Arena arena = Arena.ofConfined()) {
         if (group.address() == 0) {
-          if (verifiedEmpty) return List.of();
+          if (verifiedEmpty || ended) return List.of();
           throw new IOException("Chat membership handle closed before empty scope was verified");
         }
         int capacity = 16;
-        int races = 0;
+        long settleStarted = System.nanoTime();
         while (capacity <= 1_048_576) {
           MemorySegment ids = arena.allocate(8L + 8L * capacity, 8);
           int success = (int) Kernel.call("QueryInformationJobObject", group, 3, ids,
@@ -423,12 +535,12 @@ public final class WindowsEngineJob implements EngineContainment {
             return List.copyOf(descendants);
           }
           // A member exited or forked during mapping. Never turn that race into an empty scope.
-          if (++races >= 50) {
+          if (System.nanoTime() - settleStarted >= SETTLE_NANOS) {
             throw new IOException("Job membership changed during verification (active=" + active
                 + ", represented=" + represented + ")");
           }
-          // Windows can publish process exit just before removing its job membership. Retry this
-          // on-demand verification briefly; there is no background polling while chat is loaded.
+          // Windows publishes a process exit before its job stops counting it. Retry this
+          // on-demand verification, bounded in time; there is no background polling.
           try { TimeUnit.MILLISECONDS.sleep(5); }
           catch (InterruptedException interrupt) { interrupted = true; }
         }
@@ -439,6 +551,32 @@ public final class WindowsEngineJob implements EngineContainment {
         throw new IllegalStateException("chat descendants unverified: job membership query unavailable", failure);
       } finally {
         if (interrupted) Thread.currentThread().interrupt();
+      }
+    }
+
+    /**
+     * Ends every process still in this root's own job: kill-on-close is set on the nested job and
+     * its only handle, which this process holds, is closed, so Windows terminates each member. The
+     * job is the identity; no PID, image name or parent is used. The control calls this only after
+     * the root has exited and each member has been recorded. Membership reads empty afterwards.
+     */
+    public synchronized void endScope() throws IOException {
+      if (group.address() == 0) {
+        if (verifiedEmpty || ended) return;
+        throw new IOException("Chat membership handle closed before its scope was ended");
+      }
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment limits = arena.allocate(EXTENDED_LIMIT_INFORMATION_SIZE, 8);
+        limits.set(ValueLayout.JAVA_INT, LIMIT_FLAGS_OFFSET, KILL_ON_JOB_CLOSE);
+        Kernel.integer("SetInformationJobObject", group, EXTENDED_LIMIT_INFORMATION_CLASS, limits,
+            EXTENDED_LIMIT_INFORMATION_SIZE);
+        Kernel.integer("CloseHandle", group);
+        group = MemorySegment.NULL;
+        ended = true;
+      } catch (VirtualMachineError fatal) {
+        throw fatal;
+      } catch (Throwable failure) {
+        throw failure instanceof IOException io ? io : new IOException("Cannot end chat scope", failure);
       }
     }
 
@@ -573,6 +711,7 @@ public final class WindowsEngineJob implements EngineContainment {
         Map.entry("DeleteProcThreadAttributeList", FunctionDescriptor.ofVoid(A)),
         Map.entry("CreateProcessW", FunctionDescriptor.of(I, A, A, A, A, I, I, A, A, A, A)),
         Map.entry("AssignProcessToJobObject", FunctionDescriptor.of(I, A, A)),
+        Map.entry("SetInformationJobObject", FunctionDescriptor.of(I, A, I, A, I)),
         Map.entry("ResumeThread", FunctionDescriptor.of(I, A)),
         Map.entry("QueryInformationJobObject", FunctionDescriptor.of(I, A, I, A, I, A)),
         Map.entry("WaitForSingleObject", FunctionDescriptor.of(I, A, I)),

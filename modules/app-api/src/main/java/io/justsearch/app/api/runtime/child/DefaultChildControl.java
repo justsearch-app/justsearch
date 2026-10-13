@@ -81,7 +81,13 @@ import java.util.concurrent.TimeoutException;
  * The ledger never blocks anything.
  *
  * <p>A chat server ({@code LLAMA_SERVER} or {@code LLAMA_SELF_TEST}) whose stop failed blocks the
- * start of every chat server until a retry of its stop confirms it gone.
+ * start of every chat server until a retry of its stop confirms it gone. What an exited chat root
+ * left running in its own Windows job is ended through that job ({@link #endRemaining}, and before
+ * the next chat start), each member recorded first as an intended cleanup; elsewhere it blocks
+ * the next chat start until it exits.
+ *
+ * <p>A GPU start waits for every pending release poll to finish ({@link #GPU_RELEASE_BOUND}) and
+ * is refused only when one is still running after that.
  */
 public final class DefaultChildControl implements ChildControl {
   static final Duration TERMINATE_WAIT = Duration.ofSeconds(5);
@@ -90,6 +96,12 @@ public final class DefaultChildControl implements ChildControl {
   static final Duration GPU_POLL_MAX = Duration.ofSeconds(5);
   static final long GPU_STABLE_BYTES = 64L * 1024 * 1024;
   static final double GPU_RELEASE_FRACTION = 0.75;
+  /**
+   * How long a GPU start waits for pending release polls: one poll's maximum, the sample interval
+   * it may overrun by, and a margin for its ledger record. A poll that ran before the start was
+   * asked for ends sooner.
+   */
+  static final Duration GPU_RELEASE_BOUND = GPU_POLL_MAX.plus(GPU_POLL_INTERVAL).plusSeconds(1);
   static final int RECENT_EXITS = 32;
   private static final Duration GRACE_SLICE = Duration.ofMillis(50);
   private static final Duration CLOSE_WAIT = Duration.ofSeconds(12);
@@ -235,8 +247,11 @@ public final class DefaultChildControl implements ChildControl {
     if (CHAT_SERVER_KINDS.contains(spec.kind())) requireNoChatServerSurvivor(spec.kind());
     if (spec.gpu()) {
       try {
-        if (!awaitGpuRelease(GPU_POLL_MAX)) {
-          throw new IOException("GPU release still pending; retry after the release poll finishes");
+        // The start waits for the release poll itself to end (released or timed out), so how slow
+        // the adapter is decides nothing; only a poll still running past its bound refuses.
+        if (!awaitGpuRelease(GPU_RELEASE_BOUND)) {
+          throw new IOException("GPU release still pending after " + GPU_RELEASE_BOUND.toMillis()
+              + " ms; retry after the release poll finishes");
         }
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
@@ -340,16 +355,80 @@ public final class DefaultChildControl implements ChildControl {
     }
     for (Held held : List.copyOf(chatScopes.values())) {
       if (held.state() != ChildHandle.State.EXITED) continue;
+      endScope(held, "before_" + starting + "_start", starting);
+      if (chatScopes.remove(held.childId, held)) held.descendants.close();
+    }
+  }
+
+  @Override
+  public int endRemaining(ChildHandle child, StopRequest request) throws IOException {
+    Objects.requireNonNull(request, "request");
+    Held held = own(child);
+    if (held.state() != ChildHandle.State.EXITED) {
+      throw new IllegalStateException("child " + held.childId + " has not exited");
+    }
+    if (held.descendants == null) return 0;
+    return endScope(held, request.reason().name(), held.spec.kind());
+  }
+
+  /**
+   * Ends what an exited chat root left running in its own job: each member is recorded first
+   * ({@code child-note} {@code intended_cleanup:<reason>:job_member:<pid>@<start>}), then the job is
+   * ended through its handle and every recorded member awaited. A GPU child's memory is sampled
+   * before and its release polled after (unless its stop ended the Engine), so the next GPU start
+   * waits for it. Off Windows nothing can be ended: a running member refuses the chat start beside
+   * it, as before.
+   *
+   * @return how many members were ended
+   */
+  private int endScope(Held held, String reason, ChildKind starting) throws IOException {
+    List<ProcessHandle> members;
+    try {
+      members = held.descendants.snapshot();
+    } catch (IllegalStateException unknown) {
+      throw new IOException("chat start blocked: " + unknown.getMessage(), unknown);
+    }
+    if (members.isEmpty()) return 0;
+    if (!held.descendants.endable()) {
+      throw new IOException("a " + held.spec.kind() + " descendant is still running (root pid "
+          + held.pid() + "); no " + starting + " starts beside it");
+    }
+    Intent stopped;
+    synchronized (held) {
+      stopped = held.intent;
+    }
+    // As for the root's own exit, an Engine-ending stop polls no release (T13).
+    boolean measured =
+        held.spec.gpu() && (stopped == null || !stopped.request().reason().endsEngine());
+    OptionalLong before = measured ? readVram(held.spec.gpuDevice()) : OptionalLong.empty();
+    for (ProcessHandle member : members) {
+      String birth = member.info().startInstant().map(Instant::toString).orElse("unknown");
+      noteDurability(held, append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
+          "intended_cleanup:" + reason + ":job_member:" + member.pid() + "@" + birth)));
+    }
+    held.descendants.end();
+    long deadline = System.nanoTime() + TERMINATE_WAIT.toNanos();
+    for (ProcessHandle member : members) {
       try {
-        if (!held.descendants.snapshot().isEmpty()) {
-          throw new IOException("a " + held.spec.kind() + " descendant is still running (root pid "
-              + held.pid() + "); no " + starting + " starts beside it");
-        }
-        if (chatScopes.remove(held.childId, held)) held.descendants.close();
-      } catch (IllegalStateException unknown) {
-        throw new IOException("chat start blocked: " + unknown.getMessage(), unknown);
+        member.onExit().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new InterruptedIOException("interrupted ending what a " + held.spec.kind()
+            + " child (root pid " + held.pid() + ") left running");
+      } catch (ExecutionException | TimeoutException survived) {
+        throw new IOException("a " + held.spec.kind() + " descendant (pid " + member.pid()
+            + ") outlived the end of its job; no " + starting + " starts beside it", survived);
       }
     }
+    if (before.isPresent()) {
+      synchronized (held) {
+        held.usedBefore = before;
+      }
+      String poll = held.childId + "/scope";
+      CompletableFuture<Void> release = registerGpuPoll(poll);
+      startGpuPoll(held, poll, release);
+    }
+    return members.size();
   }
 
   /** Registers the manifest entry; on failure stops the child (ROLLBACK) and throws. */
@@ -687,10 +766,10 @@ public final class DefaultChildControl implements ChildControl {
     // exit (a model switch starting the replacement) already sees it in awaitGpuRelease.
     CompletableFuture<Void> release =
         intent != null && held.spec.gpu() && !intent.request().reason().endsEngine()
-            ? registerGpuPoll(held) : null;
+            ? registerGpuPoll(held.childId) : null;
     // Completing a future invokes synchronous continuations on this thread. The producer must
     // already run before such a continuation can call start() and wait on its release barrier.
-    if (release != null) startGpuPoll(held, release);
+    if (release != null) startGpuPoll(held, held.childId, release);
     held.exit.complete(recorded);
     if (stopFuture != null) stopFuture.complete(recorded);
   }
@@ -724,25 +803,26 @@ public final class DefaultChildControl implements ChildControl {
 
   // ------------------------------------------------------------------------------------- GPU
 
-  private CompletableFuture<Void> registerGpuPoll(Held held) {
+  /** One poll per key: a child's exit, and the end of what it left running, are each once. */
+  private CompletableFuture<Void> registerGpuPoll(String key) {
     CompletableFuture<Void> done = new CompletableFuture<>();
-    gpuPolls.put(held.childId, done); // one poll per child: its exit is recorded once
+    gpuPolls.put(key, done);
     return done;
   }
 
-  private void startGpuPoll(Held held, CompletableFuture<Void> done) {
+  private void startGpuPoll(Held held, String key, CompletableFuture<Void> done) {
     Thread poll = threads.newThread(() -> {
       try {
         pollGpu(held);
       } finally {
-        gpuPolls.remove(held.childId);
+        gpuPolls.remove(key, done);
         done.complete(null);
       }
     });
     try {
       poll.start();
     } catch (RuntimeException | Error failure) {
-      gpuPolls.remove(held.childId);
+      gpuPolls.remove(key, done);
       done.complete(null);
     }
   }
