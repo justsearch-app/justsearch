@@ -3,6 +3,8 @@ package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -152,6 +154,63 @@ final class ChatResidencyRoutesTest {
       assertEquals("READY", chat.path("state").asText());
       assertTrue(chat.path("nextReloadNotBefore").isNull(), "a loaded chat has no stale wait");
     }
+  }
+
+  @Test
+  void consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq()
+      throws Exception {
+    // CH7: the start was refused into UNLOADED with no dwell, so the wait is the pressure back-off.
+    startRefusedUnder(PressureSignal.EXTERNAL_MEMORY);
+    try (var components = new StatusComponentFixture()) {
+      var before = java.time.Instant.now();
+      var status = unloadedStatus(components);
+      var first = status.sampleAndBuildStatusSnapshot().operating();
+      var after = java.time.Instant.now();
+      var second = status.sampleAndBuildStatusSnapshot().operating();
+      assertEquals(io.justsearch.app.api.chat.ChatState.UNLOADED, first.chat().state());
+      assertEquals(Boolean.FALSE, first.chat().reloadAllowed());
+      assertNotNull(first.chat().nextReloadNotBefore(), "the pressure wait has a reload instant");
+      assertEquals(first.chat().nextReloadNotBefore(), second.chat().nextReloadNotBefore(),
+          "a pass that only re-reads the same wait publishes the same reload instant");
+      assertEquals(first.seq(), second.seq(), "nothing else changed, so seq stays");
+      var notBefore = java.time.Instant.parse(first.chat().nextReloadNotBefore());
+      assertEquals(0, notBefore.getNano(), "the reload instant is published in whole seconds");
+      assertFalse(notBefore.isBefore(before.plus(ChatServerControllerImpl.PRESSURE_RETRY_AFTER)),
+          "the published instant never says earlier than the pressure retry bound");
+      assertFalse(notBefore.isAfter(
+          after.plus(ChatServerControllerImpl.PRESSURE_RETRY_AFTER).plusSeconds(1)));
+    }
+  }
+
+  @Test
+  void clearedPressureEndsThePublishedReloadWaitAndRaisesSeq() throws Exception {
+    startRefusedUnder(PressureSignal.EXTERNAL_MEMORY);
+    try (var components = new StatusComponentFixture()) {
+      var status = unloadedStatus(components);
+      var waiting = status.sampleAndBuildStatusSnapshot().operating();
+      assertEquals(Boolean.FALSE, waiting.chat().reloadAllowed());
+      assertNotNull(waiting.chat().nextReloadNotBefore());
+      controller.reportPressure(PressureSignal.NONE);
+      var cleared = status.sampleAndBuildStatusSnapshot().operating();
+      assertEquals(io.justsearch.app.api.chat.ChatState.UNLOADED, cleared.chat().state());
+      assertEquals(Boolean.TRUE, cleared.chat().reloadAllowed(), "nothing blocks a reload now");
+      assertNull(cleared.chat().nextReloadNotBefore(), "a cleared wait publishes no instant");
+      assertTrue(cleared.seq() > waiting.seq(), "the ended wait is a content change");
+    }
+  }
+
+  /** The real status handler, reading the controller, with chat unloaded for GPU pressure. */
+  private StatusLifecycleHandler unloadedStatus(StatusComponentFixture components) {
+    components.transition("generative", io.justsearch.core.component.ComponentState.UNAVAILABLE,
+        io.justsearch.app.api.chat.ChatReasonCodes.forResidencyUnload(StopDetail.GPU_BUSY).code(),
+        "chat unloaded for residency pressure");
+    var graph = components.capabilities();
+    var status = new StatusLifecycleHandler(mock(io.justsearch.app.api.OnlineAiService.class),
+        mock(io.justsearch.agent.api.AgentService.class), () -> null, null, null, null,
+        java.time.Instant.now(), () -> "OK", null, null, null, graph.worker(), graph.inference());
+    components.attach(status);
+    status.setChatResidency(() -> controller);
+    return status;
   }
 
   @Test

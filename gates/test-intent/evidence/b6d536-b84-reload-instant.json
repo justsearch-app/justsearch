@@ -1,0 +1,98 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T20:58:19.064Z",
+  "revision": "b48ef2fcc8e74753777e6b4c8ff6402eb2977c2f",
+  "tree": "91a76c5eaf8c919d8a4e79edbb3b322820d719aa",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13918
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 21339
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b48ef2fcc",
+    "revision": "b48ef2fcc8e74753777e6b4c8ff6402eb2977c2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 51698
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 32524
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq",
+        "classification": "assertion",
+        "detail": "consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a pass that only re-reads the same wait publishes the same reload instant ==> expected: <2026-10-13T20:58:08.129448600Z> but was: <2026-10-13T20:58:08.176774300Z>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt",
+        "classification": "assertion",
+        "detail": "underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a refusal within the running wait says the seconds left of that wait ==> expected: <Optional[PT20S]> but was: <Optional[PT30S]>"
+      }
+    ]
+  },
+  "digest": "sha256:1d0175ccf168a5061fbfe55edb94b539e53d9302a84cf880bf75506109644f0c"
+}

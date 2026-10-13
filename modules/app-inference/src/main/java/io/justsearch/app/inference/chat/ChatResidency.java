@@ -8,7 +8,7 @@ import io.justsearch.app.api.chat.PressureSignal;
 import io.justsearch.app.api.runtime.child.StopDetail;
 import io.justsearch.app.api.status.operating.Profile;
 import io.justsearch.core.context.EngineContext;
-import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
@@ -42,8 +42,11 @@ public interface ChatResidency {
   /** Why chat is unloaded for another GPU user, or empty while it is not. */
   Optional<StopDetail> unloaded();
 
-  /** The ordinary reload's permission and retry bound, from the same state as demand refusals. */
-  record ReloadStatus(boolean allowed, Optional<Duration> retryAfter) {}
+  /**
+   * The ordinary reload's permission and the instant before which it may not start, from the same
+   * state as demand refusals. The instant is absolute and stays the same for a given wait.
+   */
+  record ReloadStatus(boolean allowed, Optional<Instant> notBefore) {}
 
   /** Empty outside a residency unload, or when this implementation has no status producer. */
   default Optional<ReloadStatus> reloadStatus() {

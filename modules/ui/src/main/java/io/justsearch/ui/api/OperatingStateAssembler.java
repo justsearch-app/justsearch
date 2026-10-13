@@ -145,7 +145,7 @@ final class OperatingStateAssembler {
     Objects.requireNonNull(now, "now");
     String assembledAt = lifecycle.observed_at();
 
-    OperatingChatView chat = withReload(chat(lifecycle, inference, assembledAt), now);
+    OperatingChatView chat = withReload(chat(lifecycle, inference, assembledAt));
     OperatingIndexingView indexing = indexing(power, worker, workerSampledAtMs, now);
     if (gpu == null) gpu = OperatingGpuView.unknown();
     GpuProfileResolver.Resolution plan = readDevicePlan();
@@ -320,10 +320,12 @@ final class OperatingStateAssembler {
   }
 
   /**
-   * An UNLOADED chat with the controller's reload permission and retry time, the same bound its
-   * demand refusals use. The supplier is read on the operating lane, never on a request thread.
+   * An UNLOADED chat with the controller's reload permission and its absolute reload instant, the
+   * same wait its demand refusals use; the instant stays the same for a given wait, so a pass that
+   * only re-reads it does not move seq. The supplier is read on the operating lane, never on a
+   * request thread.
    */
-  private OperatingChatView withReload(OperatingChatView chat, Instant now) {
+  private OperatingChatView withReload(OperatingChatView chat) {
     Supplier<ChatResidency> source = chatResidency;
     if (chat == null || chat.state() != ChatState.UNLOADED || source == null) return chat;
     ChatResidency residency = source.get();
@@ -331,7 +333,7 @@ final class OperatingStateAssembler {
         ? null : residency.reloadStatus().orElse(null);
     if (reload == null) return chat;
     return withReloadFields(chat, reload.allowed(),
-        reload.retryAfter().map(now::plus).map(Instant::toString).orElse(null));
+        reload.notBefore().map(Instant::toString).orElse(null));
   }
 
   /**

@@ -360,6 +360,25 @@ final class ChatResidencyTest {
   }
 
   @Test
+  void underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt() throws Exception {
+    var c = unloadedFor(PressureSignal.EXTERNAL_MEMORY);
+    advance(DWELL.plusSeconds(1));
+    var agent = demand(DemandKind.AGENT_CHAT, EngineContext.ClientKind.MCP_CLIENT);
+
+    assertEquals(Optional.of(ChatServerControllerImpl.PRESSURE_RETRY_AFTER),
+        refused(c, agent).retryAfter(), "pressure with no wait set yet keeps today's value");
+    advance(Duration.ofSeconds(10));
+    assertEquals(Optional.of(Duration.ofSeconds(20)), refused(c, agent).retryAfter(),
+        "a refusal within the running wait says the seconds left of that wait");
+    advance(Duration.ofMillis(19_500));
+    assertEquals(Optional.of(Duration.ofSeconds(1)), refused(c, agent).retryAfter(),
+        "the seconds left are rounded up and at least one");
+    advance(Duration.ofMillis(500));
+    assertEquals(Optional.of(ChatServerControllerImpl.PRESSURE_RETRY_AFTER),
+        refused(c, agent).retryAfter(), "pressure that outlasts the wait starts the next one");
+  }
+
+  @Test
   void u17AssistAndAuxNeverLoadEvenWithThePressureGone() throws Exception {
     var c = unloadedFor(PressureSignal.EXTERNAL_MEMORY);
     c.reportPressure(PressureSignal.NONE);

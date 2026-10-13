@@ -188,6 +188,21 @@ public final class ChatServerControllerImpl
   /** The unloaded residency episode owns a dwell; cleared when its latch clears (monitor). */
   private boolean dwellSet;
 
+  /** The dwell's end on the wall clock, converted once whenever the dwell (re)starts (monitor). */
+  private Instant dwellUntilWall;
+
+  /**
+   * The effective pressure whose reload wait status publishes, or null while there is none; its
+   * deadline is taken once when that wait begins and renewed only once it has passed (monitor).
+   */
+  private PressureSignal pressureWaitSignal;
+
+  /** The pressure wait's deadline on {@link #nanoTime} (monitor). */
+  private long pressureWaitUntilNanos;
+
+  /** The same deadline on the wall clock, converted once when the wait begins (monitor). */
+  private Instant pressureWaitUntilWall;
+
   /** An unload step is queued or running (monitor). */
   private boolean unloadInFlight;
 
@@ -1131,6 +1146,8 @@ public final class ChatServerControllerImpl
       previous = pressure;
       PressureSignal previousEffective = effectivePressure();
       pressure = signal;
+      // A pressure change ends the published pressure wait; the next one takes a new deadline.
+      if (previous != signal) pressureWaitSignal = null;
       if (effectivePressure() == PressureSignal.NONE
           && (previousEffective != PressureSignal.NONE
               || signal == PressureSignal.NONE && previous != PressureSignal.NONE)) {
@@ -1259,6 +1276,7 @@ public final class ChatServerControllerImpl
     var before = unloadedDetail;
     unloadedDetail = null;
     dwellSet = false;
+    pressureWaitSignal = null;
     io.justsearch.core.status.StatusChangeCounter.process().changed(before, unloadedDetail);
     latchEpoch++;
     CompletableFuture<Void> waiters = nextLoad;
@@ -1274,8 +1292,10 @@ public final class ChatServerControllerImpl
     latchEpoch++;
     deferred = false;
     clearOverrideLocked();
+    pressureWaitSignal = null;
     if (dwell) {
       dwellUntilNanos = nanoTime.getAsLong() + RELOAD_DWELL.toNanos();
+      dwellUntilWall = wallClock.instant().plus(RELOAD_DWELL);
       dwellSet = true;
     }
   }
@@ -1500,7 +1520,8 @@ public final class ChatServerControllerImpl
         throw new ChatRefusal(pressureReason, java.util.Optional.of(retry), human);
       }
       if (dwellLeft.isPositive()) {
-        throw new ChatRefusal(RefusalReason.RELOAD_BACKOFF, java.util.Optional.of(dwellLeft), human);
+        throw new ChatRefusal(RefusalReason.RELOAD_BACKOFF,
+            java.util.Optional.of(reloadRetryLocked(signal)), human);
       }
       if (!holds.isEmpty()) throw heldRefusalLocked();
       LOG.info("Chat reloads for a {} request after a residency unload", kind);
@@ -1564,23 +1585,67 @@ public final class ChatServerControllerImpl
     });
   }
 
+  /**
+   * The reload wait as an absolute instant that stays the same for a given wait: the dwell's own
+   * end, or the pressure retry bound taken once when the pressure wait begins and renewed only
+   * after it has passed. It changes when the wait does (a new dwell or pressure wait, the dwell's
+   * end, pressure appearing, changing or clearing). Published rounded up to whole seconds, so it
+   * never says earlier than the bound the demand refusal applies.
+   */
   @Override
   public java.util.Optional<ChatResidency.ReloadStatus> reloadStatus() {
     synchronized (monitor) {
-      if (unloadedDetail == null && !unloadInFlight) return java.util.Optional.empty();
+      if (unloadedDetail == null && !unloadInFlight) {
+        pressureWaitSignal = null;
+        return java.util.Optional.empty();
+      }
       PressureSignal signal = effectivePressure();
-      Duration retry = reloadRetryLocked(signal);
+      ReloadWait wait = reloadWaitLocked(signal);
       return java.util.Optional.of(new ChatResidency.ReloadStatus(
-          signal == PressureSignal.NONE && retry.isZero() && holds.isEmpty(),
-          retry.isPositive() ? java.util.Optional.of(retry) : java.util.Optional.empty()));
+          signal == PressureSignal.NONE && dwellLeftLocked().isZero() && holds.isEmpty(),
+          java.util.Optional.ofNullable(wait).map(w -> wholeSecondsUp(w.until()))));
     }
   }
 
-  /** The ordinary chat refusal and status use the same dwell and pressure retry bound. */
-  private Duration reloadRetryLocked(PressureSignal signal) {
+  /** A running reload wait: its deadline on the monotonic clock and as an instant. */
+  private record ReloadWait(long untilNanos, Instant until) {}
+
+  /**
+   * The running reload wait (monitor), or null when none: under pressure with less than the
+   * pressure retry bound of dwell left, the pressure wait, begun or renewed now when needed;
+   * otherwise the dwell while it runs.
+   */
+  private ReloadWait reloadWaitLocked(PressureSignal signal) {
     Duration dwell = dwellLeftLocked();
-    return signal != PressureSignal.NONE && dwell.compareTo(PRESSURE_RETRY_AFTER) < 0
-        ? PRESSURE_RETRY_AFTER : dwell;
+    if (signal != PressureSignal.NONE && dwell.compareTo(PRESSURE_RETRY_AFTER) < 0) {
+      long now = nanoTime.getAsLong();
+      if (pressureWaitSignal != signal || now - pressureWaitUntilNanos >= 0) {
+        pressureWaitSignal = signal;
+        pressureWaitUntilNanos = now + PRESSURE_RETRY_AFTER.toNanos();
+        pressureWaitUntilWall = wallClock.instant().plus(PRESSURE_RETRY_AFTER);
+      }
+      return new ReloadWait(pressureWaitUntilNanos, pressureWaitUntilWall);
+    }
+    pressureWaitSignal = null;
+    return dwell.isPositive() ? new ReloadWait(dwellUntilNanos, dwellUntilWall) : null;
+  }
+
+  /** {@code instant} rounded up to a whole second. */
+  static Instant wholeSecondsUp(Instant instant) {
+    return instant.getNano() == 0 ? instant : Instant.ofEpochSecond(instant.getEpochSecond() + 1);
+  }
+
+  /**
+   * The ordinary chat refusal's retry-after, from the same wait status publishes: the whole
+   * seconds left until that wait's deadline, rounded up, at least one. A pressure wait that this
+   * refusal begins says the full pressure retry bound.
+   */
+  private Duration reloadRetryLocked(PressureSignal signal) {
+    ReloadWait wait = reloadWaitLocked(signal);
+    if (wait == null) return PRESSURE_RETRY_AFTER;
+    long left = wait.untilNanos() - nanoTime.getAsLong();
+    long second = Duration.ofSeconds(1).toNanos();
+    return Duration.ofSeconds(Math.max(1, Math.ceilDiv(left, second)));
   }
 
   /** A self-test keeps the server stopped; any other open hold owns the server meanwhile. */
@@ -1802,6 +1867,7 @@ public final class ChatServerControllerImpl
       // during sleep, so elapsed time cannot decide whether resume must restart it.
       if (dwellSet) {
         dwellUntilNanos = nanoTime.getAsLong() + RELOAD_DWELL.toNanos();
+        dwellUntilWall = wallClock.instant().plus(RELOAD_DWELL);
       }
       if (bootGate == BootGate.CLOSED) {
         bootGateDeadlineNanos = System.nanoTime() + bootGateTimeout.toNanos();

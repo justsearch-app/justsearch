@@ -84,6 +84,71 @@ The patch is recorded in the producer's evidence; it contains no repair.
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java"
       ]
+    },
+    {
+      "sources": [
+        {
+          "label": "agent choice",
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "choice": "nextReloadNotBefore is an absolute instant that stays the same for a given wait and changes only when the wait does; the ordinary chat refusal's retry-after counts down that same wait, in whole seconds rounded up, at least one.",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Autonomous GPU co-residence design and repair, including the round-2 decisions"
+        }
+      ],
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#consecutiveStatusPassesWhileChatWaitsUnderPressureKeepTheReloadInstantAndSeq"
+      ],
+      "behaviour": "Two consecutive operating status passes while chat waits under pressure, with nothing else changed, publish the same nextReloadNotBefore, rounded up to a whole second and about 30 s after the wait began, and the same servedOperating seq.",
+      "repaired": true,
+      "class": "New",
+      "evidence": "gates/test-intent/evidence/b6d536-b84-reload-instant.json",
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java"
+      ]
+    },
+    {
+      "sources": [
+        {
+          "label": "agent choice",
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "choice": "nextReloadNotBefore is an absolute instant that stays the same for a given wait and changes only when the wait does; the ordinary chat refusal's retry-after counts down that same wait, in whole seconds rounded up, at least one.",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Autonomous GPU co-residence design and repair, including the round-2 decisions"
+        }
+      ],
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#underPressureTheRefusalCountsDownTheRunningWaitInsteadOfRestartingIt"
+      ],
+      "behaviour": "Under pressure, the first refusal says the full 30 s; later refusals within the same wait say the whole seconds left of it, rounded up and at least one; pressure that outlasts the wait starts the next one at 30 s.",
+      "repaired": true,
+      "class": "New",
+      "evidence": "gates/test-intent/evidence/b6d536-b84-reload-instant.json",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java"
+      ]
+    },
+    {
+      "sources": [
+        {
+          "label": "agent choice",
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "choice": "nextReloadNotBefore is an absolute instant that stays the same for a given wait and changes only when the wait does; the ordinary chat refusal's retry-after counts down that same wait, in whole seconds rounded up, at least one.",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Autonomous GPU co-residence design and repair, including the round-2 decisions"
+        }
+      ],
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#clearedPressureEndsThePublishedReloadWaitAndRaisesSeq"
+      ],
+      "behaviour": "When the pressure clears, the next status pass publishes reloadAllowed=true with no nextReloadNotBefore and a higher servedOperating seq.",
+      "class": "New",
+      "evidence": "gates/test-intent/evidence/b6d536-b84-reload-instant-preservation.json",
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java"
+      ]
     }
   ]
 }
