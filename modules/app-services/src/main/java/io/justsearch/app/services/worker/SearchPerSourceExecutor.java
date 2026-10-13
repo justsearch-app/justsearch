@@ -186,6 +186,7 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
       SearchRequest backfillReq,
       java.util.function.Function<SearchRequest, SearchResponse> backfillFn) {
     List<List<SearchResult>> perSourceHits = new ArrayList<>();
+    List<SearchResponse> contributors = new ArrayList<>(responses);
     long totalHits = 0;
     long matchCount = 0;
     long maxTookMs = 0;
@@ -222,6 +223,7 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
         }
         totalHits = Math.max(totalHits, backfill.getTotalHits());
         matchCount = Math.max(matchCount, backfill.getMatchCount());
+        contributors.add(backfill);
       } catch (Exception failure) {
         EngineFutures.rethrowExecutorRefusal(failure);
         EngineFutures.rethrowCancellation(failure);
@@ -238,7 +240,7 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
     String spladeSkipReason = "";
     String hybridFallbackCause = "";
     String spladeSkipCause = "";
-    for (SearchResponse r : responses) {
+    for (SearchResponse r : contributors) {
       if (!r.hasSearchTrace() || !r.getSearchTrace().hasDegradation()) continue;
       io.justsearch.ipc.TraceDegradation d = r.getSearchTrace().getDegradation();
       anySpladeExecuted |= d.getSpladeExecuted();
@@ -272,7 +274,7 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
         .setMatchCount(matchCount)
         .setTookMs(maxTookMs)
         .clearFacets();
-    if (template.hasSearchTrace()) {
+    if (contributors.stream().anyMatch(SearchResponse::hasSearchTrace)) {
       io.justsearch.ipc.SearchTrace.Builder mt = template.getSearchTrace().toBuilder();
       mt.setDegradation(
           io.justsearch.ipc.TraceDegradation.newBuilder()

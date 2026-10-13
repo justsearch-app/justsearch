@@ -133,7 +133,7 @@ final class WorkerSearchServiceQueuedUnavailableTest
         ? pipeline().setSparseEnabled(true).setDenseAuto(true)
         : pipeline().setSparseEnabled(true).setDenseEnabled(true)),
         foreground(REQUEST_BUDGET)), "loading");
-    assertEquals(1, loading.waitCalls.get());
+    assertTrue(loading.waitCalls.get() > 0, "a timely query waits for loading models in cancellation-aware slices");
     assertEquals(0, encodes.get());
     loading.countDown();
     assertTrue(provider.isAvailable());

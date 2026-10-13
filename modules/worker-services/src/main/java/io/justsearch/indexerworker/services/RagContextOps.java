@@ -317,9 +317,15 @@ final class RagContextOps {
     // re-inject its full text here. (The Head's own fetchBatchFallback is filtered the same way.)
     Set<String> fallbackDocIds =
         ChunkExclusionQuery.dropExcludedParents(effectiveDocIds, request.getExcludedChunksList());
-    return buildFallbackWithVirtualChunks(
+    var fallback = buildFallbackWithVirtualChunks(
         question, fallbackDocIds, topK, chunksFoundInSearch, fallbackReason, "FULLTEXT_FALLBACK",
         docLevelFilterFor(filters));
+    if (SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire().equals(chunkContext.retrievalModeReason())) {
+      return fallback.toBuilder()
+          .setRetrievalModeReason(chunkContext.retrievalModeReason())
+          .setRetrievalModeCause(chunkContext.retrievalModeCause().wire()).build();
+    }
+    return fallback;
   }
 
   /**
@@ -457,6 +463,10 @@ final class RagContextOps {
   boolean retrievalWantsDense() {
     String mode = resolvedConfigSupplier.get().rag().retrieveMode();
     return "hybrid".equals(mode) || "auto".equals(mode);
+  }
+
+  boolean retrievalNeedsSemanticBudget() {
+    return retrievalWantsDense() || "mmr".equals(resolvedConfigSupplier.get().rag().diversifyMode());
   }
 
   /**
@@ -1379,7 +1389,9 @@ final class RagContextOps {
     // CrossEncoderReranker.rerank so every rerank caller (not just
     // chunk rerank) emits a uniform span. Remove the local wrap here.
     try {
-      var rerankResult = reranker.rerank(question, chunkTexts, config.deadlineBudgetMs(), acquisition);
+      var bounded = InferenceRequest.narrowed(acquisition, acquisition.deadlineNanos(),
+          InferenceRequest.SemanticBudget.FALLBACK);
+      var rerankResult = reranker.rerank(question, chunkTexts, config.deadlineBudgetMs(), bounded);
 
       if (rerankResult.skipped()) {
         // Register F-054: name the cause the reranker actually reported. This line said

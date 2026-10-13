@@ -21,6 +21,29 @@ final class SearchPerSourceCauseMergeTest {
   private static final String SBE = "SEMANTIC_BUDGET_EXCEEDED";
 
   @Test
+  void contributingBackfillKeepsItsStrongestCause() {
+    var first = dense(SBE, "contended").toBuilder()
+        .addResults(io.justsearch.ipc.SearchResult.newBuilder().setId("source"))
+        .setTotalHits(1).build();
+    var failedBackfill = SearchPerSourceExecutor.mergeSearchResponses(
+        List.of(first), 2, SearchRequest.getDefaultInstance(), request -> null);
+    assertEquals(List.of("source"),
+        failedBackfill.getResultsList().stream().map(io.justsearch.ipc.SearchResult::getId).toList());
+    assertEquals("contended", failedBackfill.getSearchTrace().getDegradation().getHybridFallbackCause());
+    var backfill = dense(SBE, "stuck").toBuilder()
+        .addResults(io.justsearch.ipc.SearchResult.newBuilder().setId("source"))
+        .addResults(io.justsearch.ipc.SearchResult.newBuilder().setId("backfill"))
+        .setTotalHits(2).build();
+    var merged = SearchPerSourceExecutor.mergeSearchResponses(
+        List.of(first), 2, SearchRequest.getDefaultInstance(), request -> backfill);
+    assertEquals(List.of("source", "backfill"),
+        merged.getResultsList().stream().map(io.justsearch.ipc.SearchResult::getId).toList());
+    assertEquals(2, merged.getTotalHits());
+    assertEquals(SBE, merged.getSearchTrace().getDegradation().getHybridFallbackReason());
+    assertEquals("stuck", merged.getSearchTrace().getDegradation().getHybridFallbackCause());
+  }
+
+  @Test
   void theStrongestDenseCauseWinsWithItsReason() {
     for (List<SearchResponse> sources :
         List.of(

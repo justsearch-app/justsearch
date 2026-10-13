@@ -455,7 +455,7 @@ public final class RAGContext implements ContextInjector {
         }
         Map<String, Object> err =
             errorPayload("No matching documents found in the index", "NO_CONTENT");
-        return InjectorResult.terminalError(new SseEvent("error", err));
+        return terminalRetrievalError(err, ragMeta);
       }
       // Tempdoc 610 §J.3 — mirror the worker fallback: never re-inject (via whole-doc fetch) a parent
       // doc whose chunks the user hid. If every selected doc is hidden, this empties to NO_CONTENT.
@@ -464,7 +464,7 @@ public final class RAGContext implements ContextInjector {
       if (fallback == null || fallback.isBlank()) {
         Map<String, Object> err = errorPayload("No content in selected files", "NO_CONTENT");
         err.put("docIds", docIds);
-        return InjectorResult.terminalError(new SseEvent("error", err));
+        return terminalRetrievalError(err, ragMeta);
       }
       context = fallback;
       wholeDocumentFallback = true;
@@ -931,4 +931,10 @@ public final class RAGContext implements ContextInjector {
     p.put("i18nKey", "errors." + code);
     return p;
   }
+  private static InjectorResult terminalRetrievalError(
+      Map<String, Object> error, Map<String, Object> metadata) {
+    List<SseEvent> events = metadata == null ? List.of() : List.of(new SseEvent("rag.meta", metadata));
+    return new InjectorResult(List.of(), events, java.util.Optional.of(new SseEvent("error", error)));
+  }
+
 }

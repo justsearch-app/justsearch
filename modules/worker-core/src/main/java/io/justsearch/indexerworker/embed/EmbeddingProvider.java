@@ -148,6 +148,11 @@ public interface EmbeddingProvider {
     return true;
   }
 
+  /** Whether lifecycle prewarm should retry the GPU while CPU queries remain ready. */
+  default boolean isGpuRetryDue() {
+    return false;
+  }
+
   /**
    * Warms the CPU session a query embed runs on when the GPU device turns it away (busy or stuck),
    * so the dense leg is still answered within its budget. Providers without a GPU session have

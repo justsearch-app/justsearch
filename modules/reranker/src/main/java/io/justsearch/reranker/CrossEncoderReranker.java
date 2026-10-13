@@ -189,14 +189,17 @@ public final class CrossEncoderReranker implements Closeable {
     authority.remainingNanos();
     long localDeadline = startNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(
         Math.max(1L, Math.min(deadlineMs, 30_000L)));
-    var acquisition = new SessionAcquisitionRequest(authority.urgency(),
-        startNanos + Math.min(authority.deadlineNanos() - startNanos, localDeadline - startNanos),
+    long runDeadline = startNanos + Math.min(
+        answerBy(authority.deadlineNanos()) - startNanos, localDeadline - startNanos);
+    long acquireDeadline = authority.releaseCallerAtDeadline() ? runDeadline
+        : startNanos + Math.min(authority.deadlineNanos() - startNanos, localDeadline - startNanos);
+    var acquisition = new SessionAcquisitionRequest(authority.urgency(), acquireDeadline,
         authority.cancellationRequested());
     // Whether the rerank's own budget, not the caller's deadline, bounds the wait for a session.
     boolean rerankBudgetBounds = localDeadline - authority.deadlineNanos() <= 0;
     OptionalLong releaseAt =
         authority.releaseCallerAtDeadline()
-            ? OptionalLong.of(answerBy(authority.deadlineNanos()))
+            ? OptionalLong.of(runDeadline)
             : OptionalLong.empty();
 
     if (documents.isEmpty()) {
@@ -408,8 +411,8 @@ public final class CrossEncoderReranker implements Closeable {
           } else {
             // The lease's own deadline is checked here, as lease.run does, so the catch below
             // sees only the run thread's answer: not returned in time, or not started.
-            acquisition.remainingNanos();
             try {
+              acquisition.remainingNanos();
               ran = lease.runWithin(inputs, releaseAt.getAsLong());
             } catch (SessionAcquireDeadlineExceededException notInTime) {
               long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;

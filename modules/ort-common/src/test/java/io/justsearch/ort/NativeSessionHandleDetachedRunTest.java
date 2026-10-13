@@ -42,6 +42,55 @@ final class NativeSessionHandleDetachedRunTest {
   private static final Duration DEADLINE = Duration.ofMillis(300);
 
   @Test
+  void abandonedPendingDispatchDoesNotStartNativeWork() throws Exception {
+    OrtSession gpu = mock(OrtSession.class);
+    when(gpu.run(anyMap())).thenReturn(mock(OrtSession.Result.class));
+    var dispatch = new CountDownLatch(1);
+    var dispatched = new AtomicReference<Thread>();
+    try (NativeSessionHandle handle = gpuHandle(gpu)) {
+      try (SessionHandle.Lease lease = handle.acquire(queryLeg(Duration.ofSeconds(5)))) {
+        assertThrows(SessionAcquireDeadlineExceededException.class,
+            () -> DetachableRun.runWithin(lease, Map.of(),
+                System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100), action -> {
+                  Thread thread = new Thread(() -> {
+                    try {
+                      dispatch.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException failure) {
+                      Thread.currentThread().interrupt();
+                    }
+                    action.run();
+                  });
+                  dispatched.set(thread);
+                  return thread;
+                }));
+      } finally {
+        dispatch.countDown();
+        if (dispatched.get() != null) dispatched.get().join(5_000);
+      }
+      assertEquals(0, org.mockito.Mockito.mockingDetails(gpu).getInvocations().stream()
+          .filter(call -> call.getMethod().getName().equals("run")).count(),
+          "abandoned dispatch must not enter native inference");
+      assertEquals(1, freeSeats(handle));
+    }
+  }
+
+  @Test
+  void expiredRunDeadlineDoesNotStartNativeWork() throws Exception {
+    OrtSession gpu = mock(OrtSession.class);
+    when(gpu.run(anyMap())).thenReturn(mock(OrtSession.Result.class));
+    try (NativeSessionHandle handle = gpuHandle(gpu)) {
+      try (SessionHandle.Lease lease = handle.acquire(queryLeg(Duration.ofSeconds(5)))) {
+        assertThrows(SessionAcquireDeadlineExceededException.class,
+            () -> lease.runWithin(Map.of(), System.nanoTime() - 1));
+      }
+      awaitPermits(handle, 1);
+      assertEquals(0, org.mockito.Mockito.mockingDetails(gpu).getInvocations().stream()
+          .filter(call -> call.getMethod().getName().equals("run")).count(),
+          "expired work must never invoke native inference");
+    }
+  }
+
+  @Test
   void aRunPastTheDeadlineReleasesTheCallerAndItsRunThreadReleasesOnce() throws Exception {
     CountDownLatch running = new CountDownLatch(1);
     CountDownLatch mayReturn = new CountDownLatch(1);

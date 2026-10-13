@@ -494,6 +494,14 @@ public final class NativeSessionHandle implements SessionHandle {
   }
 
   @Override
+  public boolean isGpuRetryDue() {
+    return !retired && gpuConfig != null && !deviceLost() && shouldUseGpu.getAsBoolean()
+        && !gpuSessionReleasing && !retiredGpuSessionOpen() && gpuRetryEnabled
+        && gpuSessionAttempted && !gpuAvailable && gpuFailedAtMs > 0
+        && System.currentTimeMillis() - gpuFailedAtMs > gpuRetryIntervalMs;
+  }
+
+  @Override
   public void addGenerationListener(Runnable listener) {
     generationListeners.add(java.util.Objects.requireNonNull(listener, "listener"));
   }
@@ -1239,6 +1247,11 @@ public final class NativeSessionHandle implements SessionHandle {
       ensureNotRetired();
       OrtSession session = cpuSession;
       if (session != null && !cpuSessionFailed) return session;
+
+      if (!request.mayCreateGpuSession()) {
+        throw new SessionAcquireDeadlineExceededException(
+            consumerName + ": no healthy query session yet", LOADING);
+      }
 
       boolean recreatingAfterFailure = false;
       CpuRecreateCause causeForEmit = CpuRecreateCause.UNKNOWN;

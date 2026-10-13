@@ -95,8 +95,9 @@ function stubFrames(frames: ReadonlyArray<{ event: string; data: unknown }>): vo
  * handed. The sources are always non-empty: an empty `rag.citations` would make every "no marks"
  * assertion below vacuous.
  */
-async function askWith(payload: Record<string, unknown>): Promise<Sv3TurnEvidence> {
+async function askWith(payload: Record<string, unknown>, meta?: Record<string, unknown>): Promise<Sv3TurnEvidence> {
   stubFrames([
+    ...(meta ? [{ event: 'rag.meta', data: meta }] : []),
     { event: 'rag.citations', data: { citations: [source()] } },
     { event: 'rag.citation_matches', data: payload },
     // The consumer requires a TERMINAL event; a body that just stops is a lost connection, not a
@@ -270,4 +271,13 @@ describe('the live arm reads the envelope through the SAME reader the reload doe
     expect(live.marks).toEqual(reloaded.marks);
     expect(live.matches).toEqual(reloaded.matches);
   });
+});
+
+it('keeps the retrieval fallback reason through citations and completion', async () => {
+  const evidence = await askWith(matchPayload('cross-encoder'), {
+    retrieval_mode: 'BM25', retrieval_mode_reason: 'SEMANTIC_BUDGET_EXCEEDED',
+    retrieval_mode_cause: 'loading',
+  });
+  expect(evidence).toMatchObject({ retrievalMode: 'BM25',
+    retrievalModeReason: 'SEMANTIC_BUDGET_EXCEEDED', retrievalModeCause: 'loading' });
 });

@@ -103,7 +103,7 @@ final class WorkerSearchServiceSpladeOnlyFallbackTest
   void timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason() {
     assertFallback(service(false, true).search(request(false), foreground(Duration.ofSeconds(2))),
         "SEMANTIC_BUDGET_EXCEEDED", "loading");
-    assertEquals(1, loading.waits);
+    assertTrue(loading.waits > 0, "a timely query waits for loading models in cancellation-aware slices");
   }
 
   @Test

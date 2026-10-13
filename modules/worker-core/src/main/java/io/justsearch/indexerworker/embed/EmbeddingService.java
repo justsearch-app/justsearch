@@ -653,6 +653,12 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   }
 
   @Override
+  public boolean isGpuRetryDue() {
+    return backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+        && onnx.encoder().isGpuRetryDue();
+  }
+
+  @Override
   public boolean isQueryWarm() {
     return !(backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx)
         || onnx.encoder().isQueryWarm();

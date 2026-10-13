@@ -14,6 +14,7 @@
  * shape that produced its response.
  */
 
+import { retrievalFallbackPhrase } from '../aggregate-substrate/strategies/searchTraceExplain.js';
 import { html, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
@@ -6052,9 +6053,10 @@ export class UnifiedChatView extends JfElement {
   private renderPreamble(): TemplateResult {
     const m = this.ragMeta!;
     const mode = m.retrieval_mode ?? '';
+    const explanation = retrievalFallbackPhrase(m.retrieval_mode_reason, m.retrieval_mode_cause);
     if (mode === 'FULLTEXT_FALLBACK') {
       return html`<div class="preamble">
-        Full-document retrieval (document too small for chunking)
+        Full-document retrieval${explanation ? ` · ${explanation}` : ''}
       </div>`;
     }
     const chunks = m.chunks_used ?? 0;
@@ -6067,6 +6069,7 @@ export class UnifiedChatView extends JfElement {
         (found > chunks ? ` (${found} found)` : ''),
     );
     parts.push(mode.toLowerCase().replace(/_/g, ' '));
+    if (explanation) parts.push(explanation);
     if (coverage > 0)
       parts.push(`coverage ${Math.round(coverage * 100)}%`);
     if (truncated) parts.push('context truncated');

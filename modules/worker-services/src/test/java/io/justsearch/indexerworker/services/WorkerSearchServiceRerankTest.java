@@ -133,7 +133,9 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
             new long[][] {{1}}, new long[][] {{1}}, new long[][] {{0}}, 1, 1, 0, 1));
     when(sessions.acquire(any())).thenAnswer(invocation -> {
       var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
-      assertEquals(deadline, authority.deadlineNanos(), "native wait uses earlier Engine deadline");
+      assertTrue(authority.deadlineNanos() < deadline, "native wait reserves response time");
+      assertTrue(authority.deadlineNanos() > deadline - java.util.concurrent.TimeUnit.SECONDS.toNanos(1),
+          "native wait retains the caller's useful budget");
       assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
           authority.urgency());
       assertFalse(authority.cancellationRequested().getAsBoolean());

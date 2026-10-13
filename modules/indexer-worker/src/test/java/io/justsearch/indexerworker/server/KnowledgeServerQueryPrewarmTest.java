@@ -38,6 +38,21 @@ final class KnowledgeServerQueryPrewarmTest {
   @TempDir Path dir;
 
   @Test
+  void cpuReadyEncoderRetriesGpuWithoutIndexingOrVectorOnlyQueries() throws Exception {
+    var sessions = new SlowGpuSessions(0);
+    sessions.cpuOnly = true;
+    try (var boot = new Boot(dir, "gpu-retry", sessions, 5_000L)) {
+      boot.initializeWhileObservingReadiness();
+      assertTrue(boot.embeddingReady(), "CPU readiness must be preserved");
+      sessions.retryDue = true;
+      boot.hybridSearch();
+      assertTrue(waitFor(Duration.ofSeconds(4), sessions::isGpuAvailable),
+          "periodic prewarm never retried the CPU-ready encoder's GPU");
+      assertTrue(boot.embeddingReady());
+    }
+  }
+
+  @Test
   // S21: readiness stays false until the query session is warm; the first search does not load
   void queryEncodersAreWarmBeforeReadyAndTheFirstSearchDoesNotFallBack() throws Exception {
     var sessions = new SlowGpuSessions(CREATION_MS);

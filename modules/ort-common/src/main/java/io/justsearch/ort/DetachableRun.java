@@ -122,6 +122,7 @@ final class DetachableRun {
     void enter(SessionAcquisitionRequest acquisition, long deadlineNanos) {
       lock.lock();
       try {
+        checkAuthority(acquisition, deadlineNanos);
         while (live + detached >= RUN_THREADS_PER_DEVICE) {
           if (live == 0) {
             throw new SessionAcquireDeadlineExceededException(
@@ -144,6 +145,7 @@ final class DetachableRun {
             cancellation.initCause(interrupted);
             throw cancellation;
           }
+          checkAuthority(acquisition, deadlineNanos);
         }
         live++;
       } finally {
@@ -160,6 +162,16 @@ final class DetachableRun {
       } finally {
         lock.unlock();
       }
+    }
+  }
+
+  private static void checkAuthority(SessionAcquisitionRequest acquisition, long deadlineNanos) {
+    if (Thread.currentThread().isInterrupted()
+        || (acquisition != null && acquisition.cancellationRequested().getAsBoolean())) {
+      throw new CancellationException("native run not started: caller cancelled or interrupted");
+    }
+    if (deadlineNanos - System.nanoTime() <= 0) {
+      throw new SessionAcquireDeadlineExceededException("native run deadline already passed", GATE);
     }
   }
 
@@ -195,6 +207,13 @@ final class DetachableRun {
   static OrtSession.Result runWithin(
       SessionHandle.Lease lease, Map<String, OnnxTensor> inputs, long deadlineNanos)
       throws OrtException {
+    return runWithin(lease, inputs, deadlineNanos, RUN_THREADS);
+  }
+
+  static OrtSession.Result runWithin(
+      SessionHandle.Lease lease, Map<String, OnnxTensor> inputs, long deadlineNanos,
+      ThreadFactory threads) throws OrtException {
+    checkAuthority(lease.acquisition(), deadlineNanos);
     if (!(lease.release() instanceof Release release)) return lease.runOnCallerThread(inputs);
     Map<String, OnnxTensor> owned = copyOf(inputs);
     if (owned == null) return lease.runOnCallerThread(inputs);
@@ -205,9 +224,9 @@ final class DetachableRun {
       closeAll(owned);
       throw notStarted;
     }
-    Task task = new Task(lease, release, owned);
+    Task task = new Task(lease, release, owned, deadlineNanos);
     try {
-      RUN_THREADS.newThread(task).start();
+      threads.newThread(task).start();
     } catch (RuntimeException | OutOfMemoryError noThread) {
       device.leave();
       closeAll(owned);
@@ -220,31 +239,42 @@ final class DetachableRun {
   }
 
   private static final class Task implements Runnable {
+    private static final int PENDING = -1;
     private static final int RUNNING = 0;
     private static final int COMPLETED = 1;
     private static final int ABANDONED = 2;
+    private static final int CANCELLED_BEFORE_START = 3;
 
     private final SessionHandle.Lease lease;
     private final Release release;
     private final Device device;
     private final Map<String, OnnxTensor> inputs;
-    private final AtomicInteger state = new AtomicInteger(RUNNING);
+    private final long deadlineNanos;
+    private final AtomicInteger state = new AtomicInteger(PENDING);
     private final CountDownLatch done = new CountDownLatch(1);
     private volatile OrtSession.Result result;
     private volatile Throwable failure;
 
-    Task(SessionHandle.Lease lease, Release release, Map<String, OnnxTensor> inputs) {
+    Task(SessionHandle.Lease lease, Release release, Map<String, OnnxTensor> inputs, long deadlineNanos) {
       this.lease = lease;
       this.release = release;
       this.device = release.device;
       this.inputs = inputs;
+      this.deadlineNanos = deadlineNanos;
     }
 
     @Override
     public void run() {
+      device.lock.lock();
+      try {
+        if (!state.compareAndSet(PENDING, RUNNING)) return;
+      } finally {
+        device.lock.unlock();
+      }
       OrtSession.Result returned = null;
       Throwable thrown = null;
       try {
+        checkAuthority(lease.acquisition(), deadlineNanos);
         returned = lease.runOnCallerThread(inputs);
       } catch (Throwable t) {
         thrown = t;
@@ -307,16 +337,27 @@ final class DetachableRun {
     /** Releases the caller, unless the run has just returned, in which case its outcome wins. */
     private OrtSession.Result abandon(RuntimeException toCaller) throws OrtException {
       boolean abandoned;
+      boolean unstarted;
       device.lock.lock();
       try {
-        abandoned = state.compareAndSet(RUNNING, ABANDONED);
+        unstarted = state.compareAndSet(PENDING, CANCELLED_BEFORE_START);
+        abandoned = unstarted || state.compareAndSet(RUNNING, ABANDONED);
         if (abandoned) {
           device.live--;
-          device.detached++;
+          if (!unstarted) device.detached++;
           release.detached = true;
+          device.freed.signalAll();
         }
       } finally {
         device.lock.unlock();
+      }
+      if (unstarted) {
+        try {
+          closeAll(inputs);
+        } finally {
+          release.ownerRelease.run();
+        }
+        throw toCaller;
       }
       if (abandoned) {
         log.warn("Native run passed its caller's deadline; continuing detached: {}",

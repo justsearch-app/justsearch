@@ -4784,7 +4784,7 @@ public final class KnowledgeServer implements Closeable {
         targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.BGE_M3, bgeM3,
             bgeM3::isQueryWarm, bgeM3::queryDevice, bgeM3::addSessionGenerationListener,
             (text, request) -> bgeM3.encode(text, request) != null,
-            bgeM3::prewarmCpuForQueries));
+            bgeM3::prewarmCpuForQueries, bgeM3::isGpuRetryDue));
       }
       var embedding = owner.embedding();
       if (embedding != null && embedding.isAvailable()) {
@@ -4792,14 +4792,14 @@ public final class KnowledgeServer implements Closeable {
             embedding, embedding::isQueryWarm, embedding::queryDevice,
             embedding::addSessionGenerationListener,
             (text, request) -> embedding.embedQuery(text, request) != null,
-            embedding::prewarmCpuForQueries));
+            embedding::prewarmCpuForQueries, embedding::isGpuRetryDue));
       }
       var splade = owner.splade();
       if (splade != null && owner.spladeIdf() == null) {
         targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.SPLADE, splade,
             splade::isQueryWarm, splade::queryDevice, splade::addSessionGenerationListener,
             (text, request) -> splade.encode(text, request) != null,
-            splade::prewarmCpuForQueries));
+            splade::prewarmCpuForQueries, splade::isGpuRetryDue));
       }
       return new QueryEncoderPrewarm.Selection(targets, hold::close);
     } catch (RuntimeException | Error failure) {

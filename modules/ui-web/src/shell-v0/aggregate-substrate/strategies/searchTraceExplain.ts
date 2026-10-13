@@ -217,6 +217,12 @@ function degradationPhrase(context: string, reason: string, cause?: string): str
   return `${phrase} (${LEG_CAUSE_WORDING[cause] ?? cause})`;
 }
 
+/** The semantic fallback explanation shared by both Ask surfaces. */
+export function retrievalFallbackPhrase(reason?: string, cause?: string): string {
+  return reason === 'SEMANTIC_BUDGET_EXCEEDED'
+    ? degradationPhrase('Keyword retrieval', reason, cause) : '';
+}
+
 function stageLabel(stage: TraceStage): string {
   return (stage.id && STAGE_LABELS[stage.id]) || stage.id || 'stage';
 }

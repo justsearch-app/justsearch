@@ -100,7 +100,7 @@ final class WorkerSearchServiceQueuedLoadingTest
     assertEquals("loading", degradation.getHybridFallbackCause());
     assertTrue(response.getTotalHits() >= 1);
     assertEquals(0, embeddings.queryCalls.get());
-    assertEquals(1, loading.waitCalls.get());
+    assertTrue(loading.waitCalls.get() > 0, "a timely query waits for loading models in cancellation-aware slices");
   }
 
   private static final class ObservedLatch extends CountDownLatch {

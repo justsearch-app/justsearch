@@ -90,7 +90,7 @@ final class QueryEncoderPrewarm implements AutoCloseable {
       Supplier<QueryDevice> device,
       Consumer<Runnable> generationListener,
       Encode encode,
-      CpuWarm cpuWarm) {
+      CpuWarm cpuWarm, BooleanSupplier retryDue) {
     Target {
       Objects.requireNonNull(role, "role");
       Objects.requireNonNull(owner, "owner");
@@ -99,6 +99,12 @@ final class QueryEncoderPrewarm implements AutoCloseable {
       Objects.requireNonNull(generationListener, "generationListener");
       Objects.requireNonNull(encode, "encode");
       Objects.requireNonNull(cpuWarm, "cpuWarm");
+      Objects.requireNonNull(retryDue, "retryDue");
+    }
+
+    Target(EncoderRole role, Object owner, BooleanSupplier warm, Supplier<QueryDevice> device,
+        Consumer<Runnable> generationListener, Encode encode, CpuWarm cpuWarm) {
+      this(role, owner, warm, device, generationListener, encode, cpuWarm, () -> false);
     }
 
     /** A target with no CPU session to warm. */
@@ -200,7 +206,11 @@ final class QueryEncoderPrewarm implements AutoCloseable {
     try {
       if (closed) return;
       if (backingOff && System.nanoTime() - retryAtNanos < 0) return;
-      if (!allWarm()) requestPass();
+      try (Selection held = select()) {
+        if (held.targets().stream().anyMatch(t -> !t.warm().getAsBoolean() || t.retryDue().getAsBoolean())) {
+          requestPass();
+        }
+      }
     } catch (RuntimeException e) {
       log.debug("Query prewarm check failed: {}", e.toString());
     }
@@ -217,7 +227,7 @@ final class QueryEncoderPrewarm implements AutoCloseable {
         if (closed) return;
         try {
           listen(target);
-          if (!target.warm().getAsBoolean()) {
+          if (!target.warm().getAsBoolean() || target.retryDue().getAsBoolean()) {
             String failure = encode(target);
             if (failure == null && !target.warm().getAsBoolean()) {
               failure = "the encode ran but its query session is not warm";
