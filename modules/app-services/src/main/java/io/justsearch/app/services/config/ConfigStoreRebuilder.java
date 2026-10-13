@@ -24,6 +24,8 @@ import tools.jackson.databind.json.JsonMapper;
 public final class ConfigStoreRebuilder {
 
   private static final ObjectMapper JSON = JsonMapper.builder().build();
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ConfigStoreRebuilder.class);
+  private static GpuProfileResolver.Resolution lastLoggedPlan;
 
   /**
    * The boot-time hardware probe, so a rebuild does not silently drop ordinal 150.
@@ -57,7 +59,8 @@ public final class ConfigStoreRebuilder {
    * Prepares an immutable ResolvedConfig from all sources without publishing it.
    *
    * <p>All fallible preparation, including settings serialization, occurs before a ConfigStore
-   * snapshot can be swapped. Preparation failures propagate to the caller.
+   * snapshot can be swapped. Settings failures propagate; unavailable chat planning degrades
+   * to an unplanned configuration with a visible reason.
    *
    * <p>Re-reads env vars, system properties, YAML, and UI settings, and re-contributes the
    * remembered startup hardware probe at ordinal 150 (see {@link #rememberAutoDetected}).
@@ -86,7 +89,7 @@ public final class ConfigStoreRebuilder {
     if (planner != null) {
       // Spec E step E7b: the device-memory plan, resolved from this build's explicit settings and
       // contributed at ordinal 150, where every explicit setting outranks it (P4).
-      plan = planner.plan(selected);
+      plan = safePlan(planner, selected);
       derived.putAll(GpuProfileResolver.contributions(plan, selected.ai().gpuLayers() > 0));
     }
     ResolvedConfig prepared = selected;
@@ -96,6 +99,23 @@ public final class ConfigStoreRebuilder {
     }
     if (plan != null) rememberPlan(prepared, plan);
     return prepared;
+  }
+
+  private static GpuProfileResolver.Resolution safePlan(DevicePlanner planner, ResolvedConfig selected) {
+    GpuProfileResolver.Resolution plan;
+    try {
+      plan = planner.plan(selected);
+    } catch (RuntimeException | LinkageError unavailable) {
+      LOG.debug("GPU planning unavailable; retaining unplanned configuration", unavailable);
+      plan = GpuProfileResolver.Resolution.unavailable();
+    }
+    synchronized (ConfigStoreRebuilder.class) {
+      if (!java.util.Objects.equals(lastLoggedPlan, plan)) {
+        LOG.info("GPU plan changed: profile={} reasons={}", plan.placementProfile(), plan.unmetSettings());
+        lastLoggedPlan = plan;
+      }
+    }
+    return plan;
   }
 
   /**
@@ -133,7 +153,7 @@ public final class ConfigStoreRebuilder {
     }
     DevicePlanner planner = devicePlanner;
     return planner == null ? java.util.Optional.empty()
-        : java.util.Optional.of(planner.plan(prepared));
+        : java.util.Optional.of(safePlan(planner, prepared));
   }
 
   private static void rememberPlan(ResolvedConfig prepared, GpuProfileResolver.Resolution plan) {

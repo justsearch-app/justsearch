@@ -6,6 +6,7 @@ import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import io.justsearch.ort.EncoderRole;
+import io.justsearch.ort.GpuArenaPlan;
 import io.justsearch.ort.GpuCallPacker;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.SessionAcquireDeadlineExceededException;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.IntStream;
 import net.logstash.logback.marker.Markers;
@@ -378,7 +380,8 @@ public final class CrossEncoderReranker implements Closeable {
         // even if a caller supplied an unusually large budget.
         SessionHandle.Lease acquired;
         try {
-          acquired = sessions.acquire(acquisition);
+          acquired = GpuCallPacker.acquireForCall(
+              sessions, acquisition, EncoderRole.RERANKER, paddedBatchSize, seqLength);
         } catch (RuntimeException notAcquired) {
           if (!(notAcquired instanceof InferenceRequest.DeadlineExceeded)) throw notAcquired;
           // No session within the acquisition deadline (the device was busy, or a session was
@@ -476,8 +479,12 @@ public final class CrossEncoderReranker implements Closeable {
    * count (Spec E §2.2).
    */
   private int callItems(int remaining, int seqLength) {
+    return callItems(sessions.arenaPlan(), remaining, seqLength);
+  }
+
+  private static int callItems(Optional<GpuArenaPlan> packingPlan, int remaining, int seqLength) {
     return GpuCallPacker.itemsPerCall(
-        sessions.arenaPlan(),
+        packingPlan,
         EncoderRole.RERANKER,
         Integer.MAX_VALUE,
         remaining,
@@ -517,9 +524,12 @@ public final class CrossEncoderReranker implements Closeable {
       return new RerankedResult(
           originalOrder(total), List.of(), RerankSkipCause.PREP_BUDGET_EXCEEDED, preInferenceMs);
     }
+    Optional<GpuArenaPlan> packingPlan = sessions.arenaPlan();
     SessionHandle.Lease acquired;
     try {
-      acquired = sessions.acquire(acquisition);
+      acquired = GpuCallPacker.acquireForCall(
+          sessions, acquisition, EncoderRole.RERANKER,
+          bucketBatchSize(callItems(packingPlan, total, seqLength)), seqLength, packingPlan);
     } catch (RuntimeException notAcquired) {
       if (!(notAcquired instanceof InferenceRequest.DeadlineExceeded)) throw notAcquired;
       long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -542,7 +552,7 @@ public final class CrossEncoderReranker implements Closeable {
       usedCpu[0] = lease.isCpu();
       int start = 0;
       while (start < total) {
-        int items = callItems(total - start, seqLength);
+        int items = lease.isCpu() ? total - start : callItems(packingPlan, total - start, seqLength);
         int end = start + items;
         int padded = bucketBatchSize(items);
         long[][] inputIds =

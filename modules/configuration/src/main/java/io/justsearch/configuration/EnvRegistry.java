@@ -1441,6 +1441,11 @@ public enum EnvRegistry {
     GPU_MEMORY_PLAN(
         "justsearch.gpu.memory_plan", "JUSTSEARCH_GPU_MEMORY_PLAN", LifecycleStage.PERMANENT),
 
+    /** Encoder roles explicitly placed outside the planned device. Engine-derived at ordinal 150. */
+    GPU_MEMORY_PLAN_UNPLANNED_ROLES(
+        "justsearch.gpu.memory_plan_unplanned_roles", "JUSTSEARCH_GPU_MEMORY_PLAN_UNPLANNED_ROLES",
+        LifecycleStage.PERMANENT),
+
     /**
      * Captured device availability, derived by the Engine. Only its auto-detected contribution
      * is read; preferences and environment overrides cannot invent a usable device or disable one.

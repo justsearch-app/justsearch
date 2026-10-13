@@ -6,6 +6,7 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.observability.runtime.RuntimeContext;
 import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.infra.health.InfraHealthAggregator;
@@ -105,10 +106,10 @@ public final class BootstrapHelpers {
     }
   }
 
-  /** Initial {@link RuntimeContext} read from system property (eval mode) + ConfigStore. */
+  /** Initial {@link RuntimeContext} read from the registered eval setting and ConfigStore. */
   public static RuntimeContext initialRuntimeContext() {
     io.justsearch.app.observability.runtime.SystemMode systemMode =
-        Boolean.getBoolean("justsearch.eval.mode")
+        EnvRegistry.EVAL_MODE.getBoolean(false)
             ? io.justsearch.app.observability.runtime.SystemMode.EVAL
             : io.justsearch.app.observability.runtime.SystemMode.PRODUCTION;
     ResolvedConfig rc = currentResolvedConfig();

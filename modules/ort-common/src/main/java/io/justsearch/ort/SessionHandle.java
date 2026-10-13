@@ -84,6 +84,11 @@ public interface SessionHandle extends AutoCloseable {
   /** True if the GPU session is currently available (session created + not being released). */
   boolean isGpuAvailable();
 
+  /** Retained weights of the realized GPU artifact; empty when no byte witness was captured. */
+  default java.util.OptionalLong retainedGpuWeightsBytes() {
+    return java.util.OptionalLong.empty();
+  }
+
   /**
    * The device a query run would select now (Spec D §1.1): {@link QueryDevice#GPU} only when a
    * GPU session is available for it and warm (§4.2), otherwise {@link QueryDevice#CPU}. A search
@@ -132,6 +137,14 @@ public interface SessionHandle extends AutoCloseable {
    */
   default java.util.Optional<GpuArenaPlan> arenaPlan() {
     return java.util.Optional.empty();
+  }
+
+  /**
+   * Whether this handle may select a planned GPU session, even when its current CPU placement
+   * exposes no packing plan. Such a handle must not upgrade an unbounded CPU-shaped call to GPU.
+   */
+  default boolean requiresGpuPacking() {
+    return false;
   }
 
   /** Observability view of GPU state (readiness, fallback cause, etc.). */

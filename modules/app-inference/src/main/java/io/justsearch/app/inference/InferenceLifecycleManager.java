@@ -1312,6 +1312,10 @@ public class InferenceLifecycleManager
 
   private final class ManagerChatActuator implements ChatActuator {
     @Override
+    public boolean configurationPrepared() {
+      return precommitComposition || preparedConfigApply != null;
+    }
+    @Override
     public DrainHold drain(Duration bound) throws InterruptedException {
       return drain(new ChatDrainPolicy(StopReason.RECONFIGURE, ChatDrainPolicy.Waiting.AFTER_IDLE,
           bound, ChatDrainPolicy.Expiry.REFUSE_BUSY, false));

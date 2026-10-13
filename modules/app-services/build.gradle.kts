@@ -12,6 +12,7 @@
 extra["coverage.enforce"] = "true"
 
 dependencies {
+  testRuntimeOnly(libs.onnxruntime) // Policy placement checks resolve ORT option enums only.
   testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:configuration"))
   api(project(":modules:app-api"))

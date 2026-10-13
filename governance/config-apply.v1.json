@@ -631,6 +631,10 @@
       "applyScope": "component:encoders"
     },
     {
+      "key": "justsearch.gpu.memory_plan_unplanned_roles",
+      "applyScope": "component:encoders"
+    },
+    {
       "key": "justsearch.head.stamp",
       "applyScope": "restart-required"
     },

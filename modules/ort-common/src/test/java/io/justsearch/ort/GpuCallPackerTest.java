@@ -123,14 +123,15 @@ final class GpuCallPackerTest {
   }
 
   @Test
-  void anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked() {
+  void anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked() {
     GpuArenaPlan tiny =
         GpuArenaPlan.resolve(
             GpuArenaPlanTest.facts(12_282, GpuArenaPlanTest.STANDARD_ONLY),
             new GpuArenaPlan.Settings(Optional.empty(), OptionalInt.empty(), OptionalInt.empty(),
                 Map.of(EncoderRole.SPLADE, 474.2 + 10), false));
-    org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-        () -> splade(Optional.of(tiny), 9, 512), "a known infeasible call must not reach native allocation");
+    assertEquals(1, org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> splade(Optional.of(tiny), 9, 512)),
+        "a single item remains available to the CPU session when GPU packing is infeasible");
 
     GpuArenaPlan withBgeM3 =
         GpuArenaPlan.resolve(

@@ -26,7 +26,9 @@ final class ConfigApplyScopesTest {
     }
     assertArrayEquals(
         Files.readAllBytes(findRepositoryRoot().resolve(ConfigApplyScopes.RESOURCE_PATH)), packaged);
-    assertEquals(288, ConfigApplyScopes.register().size());
+    assertEquals(289, ConfigApplyScopes.register().size(), "the additive encoder-device scope is registered");
+    assertEquals("component:encoders",
+        ConfigApplyScopes.scopeFor("justsearch.gpu.memory_plan_unplanned_roles").wireValue());
     assertEquals("hot", ConfigApplyScopes.scopeFor("justsearch.gpu.game_detection").wireValue());
     assertEquals("restart-required",
         ConfigApplyScopes.scopeFor("justsearch.gpu.device_available").wireValue());

@@ -117,6 +117,7 @@ public final class NativeSessionHandle implements SessionHandle {
   // ModelSessionPolicy.forFallback before calling the Builder).
   private final RuntimePolicy runtime;
   private final ModelSessionPolicy policy;
+  private volatile long retainedGpuWeights = -1;
   private Runnable onBeforeGpuRelease; // nullable, mutable for late-binding
   // Tempdoc 710 Move 2: recording hook bound via setOrtRunRecorder, threaded into every
   // Lease produced by acquire()/acquireCpu() from this point forward. Volatile — bound once
@@ -254,7 +255,11 @@ public final class NativeSessionHandle implements SessionHandle {
 
     // Initialize GPU status
     if (gpuConfig == null) {
-      this.ortCudaStatus = OrtCudaStatus.notConfigured();
+      String placement = policy.cpuPlacementReason().orElseGet(
+          () -> policy.variant() == null ? null : policy.variant().degradationReason());
+      this.ortCudaStatus = ModelSessionPolicy.UNMEASURED_PRECISION.equals(placement)
+          ? new OrtCudaStatus(false, false, false, ORT_VARIANT_ID, nativePath, placement, List.of())
+          : OrtCudaStatus.notConfigured();
     } else {
       this.ortCudaStatus = OrtCudaStatus.pending(ORT_VARIANT_ID, nativePath);
     }
@@ -739,7 +744,8 @@ public final class NativeSessionHandle implements SessionHandle {
    */
   @Override
   public java.util.Optional<GpuArenaPlan> arenaPlan() {
-    if (gpuConfig == null || !policy.gpu().plannedProfile()) {
+    if (gpuConfig == null || !policy.gpu().plannedProfile() || deviceLost()
+        || gpuSessionReleasing || !shouldUseGpu.getAsBoolean() || cannotRetainGpuWeights()) {
       return java.util.Optional.empty();
     }
     EncoderRole role = roleOf(consumerName);
@@ -747,6 +753,11 @@ public final class NativeSessionHandle implements SessionHandle {
     if (role == null) return plan;
     double capMiB = gpuConfig.gpuMemLimitBytes() / (1024.0 * 1024.0);
     return plan.map(p -> p.withRoleCapAtMost(role, capMiB));
+  }
+
+  @Override
+  public boolean requiresGpuPacking() {
+    return gpuConfig != null && policy.gpu().plannedProfile();
   }
 
   private boolean cannotRetainGpuWeights() {
@@ -757,6 +768,21 @@ public final class NativeSessionHandle implements SessionHandle {
     return DeviceArenaPlans.current(gpuConfig.gpuDeviceId())
         .map(plan -> plan.withRoleCapAtMost(role, capMiB))
         .flatMap(plan -> plan.role(role)).filter(budget -> budget.packingMiB() <= 0).isPresent();
+  }
+
+  @Override
+  public java.util.OptionalLong retainedGpuWeightsBytes() {
+    long bytes = retainedGpuWeights;
+    return isGpuAvailable() && bytes > 0 ? java.util.OptionalLong.of(bytes)
+        : java.util.OptionalLong.empty();
+  }
+
+  private static long modelWeightBytes(Path path) {
+    try {
+      return java.nio.file.Files.size(path);
+    } catch (java.io.IOException unavailable) {
+      return -1;
+    }
   }
 
   private static EncoderRole roleOf(String consumerName) {
@@ -1584,6 +1610,7 @@ public final class NativeSessionHandle implements SessionHandle {
         throw runOptionsFailure;
       }
       boolean rejectCreated;
+      long weightBytes = modelWeightBytes(modelPathUsed);
       synchronized (lifecycleLock) {
         if (deviceLost()) return; // Abandon it as onDeviceLost does: no native teardown.
         rejectCreated = retired;
@@ -1594,6 +1621,7 @@ public final class NativeSessionHandle implements SessionHandle {
         gpuGeneration++;
         sessionInstances.put(session, instance);
         if (!rejectCreated) {
+          retainedGpuWeights = weightBytes;
           gpuAvailable = true;
           ortCudaStatus = OrtCudaStatus.ready(ORT_VARIANT_ID, nativePath);
           events.onTransition(new TransitionReason.GpuInitialized(consumerName));

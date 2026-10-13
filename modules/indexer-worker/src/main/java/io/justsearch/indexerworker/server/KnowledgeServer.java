@@ -5083,6 +5083,12 @@ public final class KnowledgeServer implements Closeable {
     private QueryRoleSet composeQuery(EncoderConfigurationProjection projection,
         QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
         boolean requireRerankerGpu) {
+      return composeQuery(projection, selected, allowedMissing, requireRerankerGpu, false);
+    }
+
+    private QueryRoleSet composeQuery(EncoderConfigurationProjection projection,
+        QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
+        boolean requireRerankerGpu, boolean acceptIntentionalCpu) {
       runtimeSwapLock.lock();
       try {
         requireEncoderCapacity(false);
@@ -5091,13 +5097,14 @@ public final class KnowledgeServer implements Closeable {
           throw new IllegalStateException("Prior query preparation still owns resources");
         }
         preparedQueryRoles = this;
-        return composeQueryAdmitted(projection, selected, allowedMissing, requireRerankerGpu);
+        return composeQueryAdmitted(projection, selected, allowedMissing, requireRerankerGpu,
+            acceptIntentionalCpu);
       } finally { runtimeSwapLock.unlock(); }
     }
 
     private QueryRoleSet composeQueryAdmitted(EncoderConfigurationProjection projection,
         QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
-        boolean requireRerankerGpu) {
+        boolean requireRerankerGpu, boolean acceptIntentionalCpu) {
       InferenceSurface surface = InferenceCompositionRoot.composeQueryRoles(projection, selected,
           hardware, () -> !signalBus.isMainGpuActive(), ortSessionEvents);
       QueryRoleSet result = new QueryRoleSet(surface);
@@ -5117,7 +5124,10 @@ public final class KnowledgeServer implements Closeable {
             && result.reranker() == null && !allowedMissing.contains(io.justsearch.ort.EncoderRole.RERANKER)) {
           throw new IllegalStateException("Prepared reranker assembly is missing");
         }
-        if (result.reranker() != null) realizeQueryDevice(result, requireRerankerGpu);
+        if (result.reranker() != null) {
+          realizeQueryDevice(result, acceptIntentionalCpu
+              ? expectsRerankerGpu(result, requireRerankerGpu) : requireRerankerGpu);
+        }
         return result;
       } catch (RuntimeException | Error failure) {
         try { result.close(); }
@@ -5135,6 +5145,15 @@ public final class KnowledgeServer implements Closeable {
       sourceProjection = queryProjectionFor(sourceConfiguration, initialModelSelection, sourceObservation);
       sourceRerankerGpu = old.queryRoleSet.surfaceForOwner().reranker()
           .map(assembly -> assembly.sessions().isGpuAvailable()).orElse(false);
+    }
+
+    /** A known zero-cap policy is CPU placement; missing placement evidence stays strict. */
+    private static boolean expectsRerankerGpu(QueryRoleSet roles, boolean requestedGpu) {
+      if (!requestedGpu) return false;
+      var policies = roles.surfaceForOwner().policies();
+      var policy = policies == null ? null
+          : policies.models().get(io.justsearch.ort.EncoderRole.RERANKER);
+      return policy == null || policy.gpu() == null || policy.gpu().arenaCapBytes() > 0;
     }
 
     private void realizeQueryDevice(QueryRoleSet roles, boolean requireGpu) {
@@ -5207,7 +5226,7 @@ public final class KnowledgeServer implements Closeable {
 
     private void compose(EncoderConfigurationProjection projection, QueryRoleSelection selected) {
       query = composeQuery(projection, selected, Set.of(),
-          selected.reranker().targetEp() == ExecutionProvider.CUDA);
+          selected.reranker().targetEp() == ExecutionProvider.CUDA, true);
       services = queryServices(configuration, projection, query);
       successor = queryView(services, query);
       observation = encoderCompositionObservation(old.encoderSet, query, configuration,
@@ -5300,7 +5319,7 @@ public final class KnowledgeServer implements Closeable {
           || expectedView().retiring || query == null || query.isClosed() || aborted) {
         throw new IllegalStateException("Prepared query owner lost its physical predecessor");
       }
-      if (selection.reranker().targetEp() == ExecutionProvider.CUDA
+      if (expectsRerankerGpu(query, selection.reranker().targetEp() == ExecutionProvider.CUDA)
           && query.reranker() != null && !query.reranker().isGpuAvailable()) {
         throw new IllegalStateException("Prepared CUDA query device changed before commitment");
       }

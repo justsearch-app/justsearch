@@ -27,10 +27,11 @@ final class GpuArenaExplicitSettingsTest {
   }
 
   @Test
-  void anInfeasibleSingleItemIsRefusedBeforeNativeDispatch() {
-    org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-        () -> GpuCallPacker.itemsPerCall(Optional.of(smallSpladePlan()), EncoderRole.SPLADE,
-            4, 1, ignored -> 512));
+  void anInfeasibleSingleItemRemainsAvailableForCpuDispatch() {
+    int items = org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> GpuCallPacker.itemsPerCall(
+        Optional.of(smallSpladePlan()), EncoderRole.SPLADE, 4, 1, ignored -> 512),
+        "one CPU item must always remain runnable");
+    assertEquals(1, items);
     assertEquals(1, GpuCallPacker.itemsPerCall(Optional.of(smallSpladePlan()), EncoderRole.SPLADE,
         4, 1, ignored -> 32), "short inputs which fit must still run");
   }

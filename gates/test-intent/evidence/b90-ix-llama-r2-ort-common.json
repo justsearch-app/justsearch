@@ -1,0 +1,146 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:12:18.717Z",
+  "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+  "tree": "8ada9882379ab2e08e69917aa9a37388d28091c6",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.nonFp16CpuPlacementHasAStatusReasonAndLogsOnce\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aChangingArbiterCannotPromoteAnUnboundedCpuShapeToGpu\" --tests \"io.justsearch.ort.GpuCallPackerTest.anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked\" --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anInfeasibleSingleItemRemainsAvailableForCpuDispatch\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16623
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#nonFp16CpuPlacementHasAStatusReasonAndLogsOnce",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nonFp16CpuPlacementHasAStatusReasonAndLogsOnce(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aChangingArbiterCannotPromoteAnUnboundedCpuShapeToGpu",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChangingArbiterCannotPromoteAnUnboundedCpuShapeToGpu()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java#anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e7292177cbeb38f50629ed34b5607095af7ed8efdaed84f45af1914a2f9aa149",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anInfeasibleSingleItemRemainsAvailableForCpuDispatch",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37e0fe404e97ff24be210a22e1590c304e7e450d81b0bc8be2fa08b60d274956",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInfeasibleSingleItemRemainsAvailableForCpuDispatch()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7de3976a1",
+    "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.nonFp16CpuPlacementHasAStatusReasonAndLogsOnce\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aChangingArbiterCannotPromoteAnUnboundedCpuShapeToGpu\" --tests \"io.justsearch.ort.GpuCallPackerTest.anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked\" --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anInfeasibleSingleItemRemainsAvailableForCpuDispatch\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14821
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget",
+        "classification": "assertion",
+        "detail": "aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a CPU call must not fail against an unusable GPU packing budget ==> Unexpected exception thrown: java.lang.IllegalArgumentException: encoder_memory: SPLADE cannot fit one padded item in its GPU packing budget"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#nonFp16CpuPlacementHasAStatusReasonAndLogsOnce",
+        "classification": "assertion",
+        "detail": "nonFp16CpuPlacementHasAStatusReasonAndLogsOnce(Path): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (2 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.TooManyActualInvocations: &#10;logger.warn(&#10;    \"Encoder uses CPU: planned_profile_precision_unmeasured ({})\",&#"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aChangingArbiterCannotPromoteAnUnboundedCpuShapeToGpu",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java#anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked",
+        "classification": "assertion",
+        "detail": "anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalArgumentException: encoder_memory: SPLADE cannot fit one padded item in its GPU packing budget"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anInfeasibleSingleItemRemainsAvailableForCpuDispatch",
+        "classification": "assertion",
+        "detail": "anInfeasibleSingleItemRemainsAvailableForCpuDispatch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: one CPU item must always remain runnable ==> Unexpected exception thrown: java.lang.IllegalArgumentException: encoder_memory: SPLADE cannot fit one padded item in its GPU packing budget"
+      }
+    ]
+  },
+  "digest": "sha256:11d9d28391b2d4b867f1394ab99034118acf5bfb67eaf0e8aa719d2cd2d30248"
+}

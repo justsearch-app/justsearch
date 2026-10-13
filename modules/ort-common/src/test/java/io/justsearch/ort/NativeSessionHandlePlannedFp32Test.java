@@ -71,6 +71,82 @@ final class NativeSessionHandlePlannedFp32Test {
   }
 
   @Test
+  void aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget() throws Exception {
+    var plan = GpuArenaPlan.resolve(GpuArenaPlanTest.facts(12_282, GpuArenaPlanTest.STANDARD_ONLY),
+        new GpuArenaPlan.Settings(Optional.empty(), java.util.OptionalInt.empty(),
+            java.util.OptionalInt.empty(), Map.of(EncoderRole.SPLADE, 100.0), false));
+    DeviceArenaPlans.publish(DEVICE, plan);
+    try (var handle = handle(EncoderRole.SPLADE.consumerName(), planned(fallbackPolicy()), FP16)) {
+      try (var lease = handle.acquire(bulk())) { assertTrue(lease.isCpu()); }
+      int count = org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> GpuCallPacker.itemsPerCall(
+          handle.arenaPlan(), EncoderRole.SPLADE, 1, 1, ignored -> 512),
+          "a CPU call must not fail against an unusable GPU packing budget");
+      assertEquals(1, count);
+    } finally { DeviceArenaPlans.withdraw(DEVICE); }
+  }
+
+  @Test
+  void aChangingArbiterCannotPromoteAnUnboundedCpuShapeToGpu() throws Exception {
+    var plan = GpuArenaPlan.resolve(GpuArenaPlanTest.facts(12_282, GpuArenaPlanTest.STANDARD_ONLY),
+        GpuArenaPlan.Settings.none());
+    DeviceArenaPlans.publish(DEVICE, plan);
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    var roomy = planned(ModelSessionPolicy.forFallback(new GpuSessionConfig(DEVICE, 4096L * 1024 * 1024),
+        null, true, false, NativeSessionHandle.DEFAULT_GPU_RETRY_INTERVAL_MS));
+    try (var handle = handle(EncoderRole.SPLADE.consumerName(), roomy, FP16,
+            () -> calls.incrementAndGet() > 2);
+        var cache = mockStatic(OnnxSessionCache.class)) {
+      int items = GpuCallPacker.itemsPerCall(handle.arenaPlan(), EncoderRole.SPLADE, 64, 64,
+          ignored -> 512);
+      SessionHandle.Lease acquired;
+      try {
+        var method = GpuCallPacker.class.getMethod("acquireForCall", SessionHandle.class,
+            SessionAcquisitionRequest.class, EncoderRole.class, int.class, int.class);
+        acquired = (SessionHandle.Lease) method.invoke(null, handle, bulk(), EncoderRole.SPLADE,
+            items, 512);
+      } catch (NoSuchMethodException legacy) {
+        acquired = handle.acquire(bulk());
+      }
+      try (var lease = acquired) {
+        assertTrue(lease.isCpu(), "a CPU-shaped call must remain CPU across arbiter changes");
+      }
+      cache.verify(() -> OnnxSessionCache.createCachedGpuSession(any(), any(), any()),
+          org.mockito.Mockito.never());
+    } finally { DeviceArenaPlans.withdraw(DEVICE); }
+  }
+
+  @Test
+  void nonFp16CpuPlacementHasAStatusReasonAndLogsOnce(@org.junit.jupiter.api.io.TempDir Path dir)
+      throws Exception {
+    var cfg = ResolvedConfig.builder()
+        .contributeAutoDetected(Map.of("justsearch.gpu.memory_plan", "p12")).build();
+    var variant = VariantSelection.optimal(dir.resolve("model.onnx"), ModelPrecision.FP32,
+        ExecutionProvider.CUDA);
+    var logger = mock(org.slf4j.Logger.class);
+    try (var factory = mockStatic(org.slf4j.LoggerFactory.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      factory.when(() -> org.slf4j.LoggerFactory.getLogger(ModelSessionPolicyResolver.class))
+          .thenReturn(logger);
+      var policy = ModelSessionPolicyResolver.resolve(EncoderRole.SPLADE, cfg,
+          new HardwareProfile(true, true, 12L * 1024 * 1024 * 1024), variant);
+      ModelSessionPolicyResolver.resolve(EncoderRole.SPLADE, cfg,
+          new HardwareProfile(true, true, 12L * 1024 * 1024 * 1024), variant);
+      var lazy = new ModelSessionPolicy(policy.variant(), policy.gpu(), policy.cpu(),
+          new ModelSessionPolicy.Lifecycle(true, false, NativeSessionHandle.DEFAULT_GPU_RETRY_INTERVAL_MS),
+          policy.runOptions());
+      try (var handle = handle(EncoderRole.SPLADE.consumerName(), lazy, FP16)) {
+        assertEquals(0, policy.gpu().arenaCapBytes());
+        org.junit.jupiter.api.Assertions.assertAll(
+            () -> org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> org.mockito.Mockito.verify(logger,
+                org.mockito.Mockito.times(1)).warn(
+                    "Encoder uses CPU: planned_profile_precision_unmeasured ({})", ModelPrecision.FP32)),
+            () -> assertTrue(handle.status().failureReason() != null
+                && handle.status().failureReason().contains("planned_profile_precision_unmeasured"),
+                "CPU placement must expose the unmeasured-precision reason"));
+      }
+    }
+  }
+
+  @Test
   void aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu() throws Exception {
     ModelSessionPolicy planned = planned(fallbackPolicy());
     List<Path> loaded = new CopyOnWriteArrayList<>();
@@ -200,10 +276,15 @@ final class NativeSessionHandlePlannedFp32Test {
 
   private static NativeSessionHandle handle(String name, ModelSessionPolicy policy, Path gpuPath)
       throws Exception {
+    return handle(name, policy, gpuPath, () -> true);
+  }
+
+  private static NativeSessionHandle handle(String name, ModelSessionPolicy policy, Path gpuPath,
+      java.util.function.BooleanSupplier shouldUseGpu) throws Exception {
     NativeSessionHandle handle =
         NativeSessionHandle.builder(name, FP32)
             .gpuModelPath(gpuPath)
-            .shouldUseGpu(() -> true)
+            .shouldUseGpu(shouldUseGpu)
             .runtime(RuntimePolicy.defaults())
             .policy(policy)
             .build();

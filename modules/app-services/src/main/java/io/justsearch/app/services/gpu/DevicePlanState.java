@@ -64,8 +64,8 @@ public final class DevicePlanState {
       var before = current;
       current = resolution;
       io.justsearch.core.status.StatusChangeCounter.process().changed(
-          java.util.Arrays.asList(before.statusProfile(), before.source()),
-          java.util.Arrays.asList(resolution.statusProfile(), resolution.source()));
+          java.util.Arrays.asList(before.statusProfile(), before.source(), before.unmetSettings()),
+          java.util.Arrays.asList(resolution.statusProfile(), resolution.source(), resolution.unmetSettings()));
       for (Consumer<GpuProfileResolver.Resolution> consumer : consumers) deliver(consumer, resolution);
     }
   }

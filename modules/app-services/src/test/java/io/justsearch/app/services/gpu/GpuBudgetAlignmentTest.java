@@ -73,18 +73,45 @@ final class GpuBudgetAlignmentTest {
     var devices = new DeviceFacts(DeviceFacts.ProbeStatus.RAN_OK, 0, 12_080,
         java.util.List.of(pinned, other), java.util.Optional.of(pinned));
     var resolution = GpuProfileResolver.resolve(cfg, devices, weights, Set.of(ChatModelProfile.STANDARD));
-    var values = GpuProfileResolver.contributions(resolution, true);
-    assertFalse(values.containsKey("justsearch.embed.gpu_mem_mb"),
+    assertTrue(resolution.plan().orElseThrow().planned());
+    assertTrue(resolution.plan().orElseThrow().role(role).isEmpty(),
         "device 1 has no matching packing plan and cannot receive device 0's reduced cap");
-    assertTrue(resolution.unmetSettings().contains("encoder_memory"));
+    assertFalse(resolution.unmetSettings().contains("encoder_memory"));
+    assertTrue(resolution.unmetSettings().contains("encoder_device_conflict"));
   }
 
   @Test
   void explicitGpuEncodersKeepPressureProtectionWithMasterOff() {
-    var cfg = config(Map.of("justsearch.gpu.enabled", "false", "justsearch.embed.gpu_enabled", "true"));
-    var plan = GpuProfileResolver.resolve(cfg, device(), Map.of(EncoderRole.EMBEDDING, 598.3), Set.of());
-    assertTrue(BulkWorkPolicy.decide(plan.gateProfile(), false, true, false, false).held());
-    assertTrue(BulkWorkPolicy.decide(plan.gateProfile(), false, false, true, false).held());
+    var keys = new io.justsearch.configuration.EnvRegistry[] {
+        io.justsearch.configuration.EnvRegistry.EMBED_GPU_ENABLED,
+        io.justsearch.configuration.EnvRegistry.SPLADE_GPU_ENABLED,
+        io.justsearch.configuration.EnvRegistry.NER_GPU_ENABLED,
+        io.justsearch.configuration.EnvRegistry.RERANK_GPU_ENABLED,
+        io.justsearch.configuration.EnvRegistry.BGE_M3_GPU_ENABLED};
+    try {
+      for (var key : keys) System.setProperty(key.sysProp(), "true");
+      io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(
+          Map.of("justsearch.gpu.enabled", "false"));
+      io.justsearch.app.services.config.ConfigStoreRebuilder.rememberDevicePlanner(
+          selected -> GpuProfileResolver.resolve(selected, device(), WEIGHTS, Set.of()));
+      var cfg = io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(new io.justsearch.app.api.UiSettings());
+      assertAllRoleGpuFlags(cfg);
+      var plan = io.justsearch.app.services.config.ConfigStoreRebuilder.planOf(cfg).orElseThrow();
+      assertTrue(BulkWorkPolicy.decide(plan.gateProfile(), false, true, false, false).held());
+      assertTrue(BulkWorkPolicy.decide(plan.gateProfile(), false, false, true, false).held());
+    } finally {
+      for (var key : keys) System.clearProperty(key.sysProp());
+      io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(Map.of());
+      io.justsearch.app.services.config.ConfigStoreRebuilder.rememberDevicePlanner(null);
+    }
+  }
+
+  private static void assertAllRoleGpuFlags(ResolvedConfig cfg) {
+    assertTrue(cfg.ai().embedding().gpuEnabled());
+    assertTrue(cfg.ai().splade().gpuEnabled());
+    assertTrue(cfg.ai().ner().gpuEnabled());
+    assertTrue(cfg.ai().reranker().gpuEnabled());
+    assertTrue(cfg.ai().bgeM3().gpuEnabled());
   }
 
   private static DeviceFacts device() {

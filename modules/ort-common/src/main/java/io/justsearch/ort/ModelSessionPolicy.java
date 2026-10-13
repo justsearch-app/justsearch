@@ -5,6 +5,8 @@ import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.justsearch.configuration.model.ExecutionProvider;
+import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
 import java.util.Optional;
 
@@ -40,6 +42,19 @@ import java.util.Optional;
  */
 public record ModelSessionPolicy(
     VariantSelection variant, Gpu gpu, Cpu cpu, Lifecycle lifecycle, RunOptions runOptions) {
+
+  public static final String UNMEASURED_PRECISION = "planned_profile_precision_unmeasured";
+
+  /** Why a requested CUDA variant is intentionally placed on CPU, without changing its identity. */
+  @JsonIgnore
+  public Optional<String> cpuPlacementReason() {
+    if (variant != null && gpu.plannedProfile() && gpu.arenaCapBytes() == 0
+        && variant.executionProvider() == ExecutionProvider.CUDA
+        && variant.precision() != ModelPrecision.FP16) {
+      return Optional.of(UNMEASURED_PRECISION);
+    }
+    return Optional.empty();
+  }
 
   /**
    * Synthesises a minimal {@link ModelSessionPolicy} for the {@code verifyModel} Gradle task

@@ -41,6 +41,7 @@ testing {
         implementation(testFixtures(project(":modules:configuration")))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
+        implementation(libs.mockito.core)
         implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
         implementation(libs.archunit.junit5)
         runtimeOnly(libs.junit.jupiter.engine)

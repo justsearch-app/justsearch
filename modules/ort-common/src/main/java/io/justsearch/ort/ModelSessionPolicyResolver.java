@@ -36,6 +36,8 @@ import java.util.Optional;
  * Stage 1 preserves today's hardcoded per-encoder defaults verbatim.
  */
 public final class ModelSessionPolicyResolver {
+  private static final java.util.Set<java.nio.file.Path> REPORTED_CPU_MODELS =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   /** Default {@code GPU_RETRY_INTERVAL_MS} — moves from {@link NativeSessionHandle} constant. */
   private static final long DEFAULT_GPU_RETRY_INTERVAL_MS = 60_000L;
@@ -65,11 +67,11 @@ public final class ModelSessionPolicyResolver {
     requireNonNull(variant);
 
     return switch (role) {
-      case EMBEDDING -> resolveEmbedding(cfg.ai().embedding(), variant, planned(cfg));
-      case SPLADE -> resolveSplade(cfg.ai().splade(), variant, planned(cfg));
-      case NER -> resolveNer(cfg.ai().ner(), variant, planned(cfg));
-      case BGE_M3 -> resolveBgeM3(cfg.ai().bgeM3(), variant, planned(cfg));
-      case RERANKER -> resolveReranker(cfg.ai().reranker(), variant, planned(cfg));
+      case EMBEDDING -> resolveEmbedding(cfg.ai().embedding(), variant, planned(cfg, role));
+      case SPLADE -> resolveSplade(cfg.ai().splade(), variant, planned(cfg, role));
+      case NER -> resolveNer(cfg.ai().ner(), variant, planned(cfg, role));
+      case BGE_M3 -> resolveBgeM3(cfg.ai().bgeM3(), variant, planned(cfg, role));
+      case RERANKER -> resolveReranker(cfg.ai().reranker(), variant, planned(cfg, role));
       case CITATION -> resolveCitation(cfg.ai().citationScorer(), variant);
     };
   }
@@ -78,8 +80,16 @@ public final class ModelSessionPolicyResolver {
    * Whether the configuration carries an applied device-memory plan (Spec E revision 4 section
    * 2.2, step E7b): the Engine's own {@code justsearch.gpu.memory_plan} contribution.
    */
-  private static boolean planned(ResolvedConfig cfg) {
-    return !cfg.ai().gpuMemoryPlan().isBlank()
+  private static boolean planned(ResolvedConfig cfg, EncoderRole role) {
+    var resolution = cfg.resolution(
+        io.justsearch.configuration.EnvRegistry.GPU_MEMORY_PLAN_UNPLANNED_ROLES.configKey());
+    boolean outsidePlan = resolution != null && resolution.considered().stream()
+        .filter(source -> source.ordinal()
+            == io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_AUTO_DETECT
+            && source.hasValue())
+        .flatMap(source -> java.util.Arrays.stream(source.rawValue().split(",")))
+        .anyMatch(value -> role.name().equals(value.trim()));
+    return !outsidePlan && !cfg.ai().gpuMemoryPlan().isBlank()
         && !"no_gpu".equals(cfg.ai().gpuMemoryPlan());
   }
 
@@ -222,7 +232,8 @@ public final class ModelSessionPolicyResolver {
     // must not inherit its sibling's GPU estimate; preserve that artifact on the CPU instead.
     boolean unmeasuredPrecision = planned && variant.precision() != ModelPrecision.FP16;
     boolean onGpu = variant.executionProvider() == ExecutionProvider.CUDA && !unmeasuredPrecision;
-    if (unmeasuredPrecision && variant.executionProvider() == ExecutionProvider.CUDA) {
+    if (unmeasuredPrecision && variant.executionProvider() == ExecutionProvider.CUDA
+        && REPORTED_CPU_MODELS.add(variant.modelFile().toAbsolutePath().normalize())) {
       org.slf4j.LoggerFactory.getLogger(ModelSessionPolicyResolver.class).warn(
           "Encoder uses CPU: planned_profile_precision_unmeasured ({})", variant.precision());
     }
@@ -231,7 +242,7 @@ public final class ModelSessionPolicyResolver {
         arenaCapBytes,
         gpuDeviceId,
         Optional.empty(), // arenaExtendStrategyOverride reserved for per-session experiments
-        onGpu && planned);
+        variant.executionProvider() == ExecutionProvider.CUDA && planned);
   }
 
   /** Today's default RunOptions — shrinkage enabled. */

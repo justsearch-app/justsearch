@@ -16,5 +16,7 @@ public enum RefusalReason {
   REFUSED,
   ENGINE_STOPPING,
   DEVICE_RECOVERING,
-  SELF_TEST
+  SELF_TEST,
+  /** Managed self-test cannot run beside a server this Engine does not own. */
+  EXTERNAL_SERVER
 }

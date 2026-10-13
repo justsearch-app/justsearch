@@ -370,7 +370,7 @@ public final class InferenceCompositionRoot {
    *
    * <p>A CPU fallback releases no device memory. A live GPU assembly without its resolved policy
    * is unknown rather than guessed from desired configuration. An allocator ceiling is not evidence
-   * of a retained allocation, so without a measurement the guaranteed release is zero.
+   * of a retained allocation. Credit only the realized artifact's retained weights.
    */
   static Long sourceQueryReleasableBytes(QueryRoleSet source) {
     if (source == null || source.isClosed()) return 0L;
@@ -391,10 +391,11 @@ public final class InferenceCompositionRoot {
     Long queryBytes = query == null || query.isClosed() ? Long.valueOf(0L)
         : sourceRetainedLowerBound(query.surfaceForOwner());
     if (indexBytes == null || queryBytes == null) return null;
-    return withCompositionHeadroom(Math.addExact(indexBytes, queryBytes));
+    return Math.addExact(indexBytes, queryBytes);
   }
 
   private static Long sourceRetainedLowerBound(InferenceSurface surface) {
+    long weights = 0L;
     for (SessionHandle handle : surface.handles()) {
       if (!handle.isGpuAvailable()) continue;
       EncoderRole role = surface.handleRoles().entrySet().stream()
@@ -403,10 +404,23 @@ public final class InferenceCompositionRoot {
       ModelSessionPolicy policy = role == null || surface.policies() == null ? null
           : surface.policies().models().get(role);
       if (policy == null) return null;
-      // No retained-allocation measurement exists here. An arena ceiling can be mostly unused;
-      // credit zero until an ownership-scoped retained allocation can be proved.
+      var retained = handle.retainedGpuWeightsBytes();
+      if (retained != null && retained.isPresent()) {
+        weights = Math.addExact(weights, retained.getAsLong());
+        continue;
+      }
+      // The captured variant identifies the manifest-selected artifact, not a desired sibling.
+      // Missing evidence stays unknown, so unknown free memory cannot admit beside a GPU source.
+      if (policy.variant() == null) return null;
+      try {
+        long bytes = java.nio.file.Files.size(policy.variant().modelFile());
+        if (bytes <= 0) return null;
+        weights = Math.addExact(weights, bytes);
+      } catch (IOException unavailable) {
+        return null;
+      }
     }
-    return 0L;
+    return weights;
   }
 
   private static long withCompositionHeadroom(long arenaCapBytes) {

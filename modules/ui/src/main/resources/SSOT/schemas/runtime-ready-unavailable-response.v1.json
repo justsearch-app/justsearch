@@ -83,7 +83,8 @@
             "REFUSED",
             "ENGINE_STOPPING",
             "DEVICE_RECOVERING",
-            "SELF_TEST"
+            "SELF_TEST",
+            "EXTERNAL_SERVER"
           ],
           "description": "A chat refusal's reason (Spec A step 9): why this one request was not admitted. Present only on chat refusals."
         },

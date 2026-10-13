@@ -562,12 +562,13 @@ public final class SpladeEncoder implements Closeable {
       long[][] allInputIds, long[][] allAttentionMask, long[][] allTokenTypeIds, int batch, int len)
       throws OrtException {
     var acquisition = LocalSessionAcquisition.background();
-    try (var lease = sessions.acquire(acquisition)) {
+    try (var lease = GpuCallPacker.acquireForCall(
+        sessions, acquisition, EncoderRole.SPLADE, batch, inferenceSeqLen(len))) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
             "SPLADE first encode: using {} session (gpuConfigured={}, gpuAvailable={}, outputFormat={})",
-            sessions.isGpuAvailable() ? "GPU" : "CPU",
+            lease.isCpu() ? "CPU" : "GPU",
             sessions.status().configured(),
             sessions.isGpuAvailable(),
             outputFormat);
@@ -721,12 +722,13 @@ public final class SpladeEncoder implements Closeable {
   private Map<String, Float> runOnnxInferenceSingle(
       long[] inputIds, long[] attentionMask, long[] tokenTypeIds,
       SessionAcquisitionRequest acquisition) throws OrtException {
-    try (var lease = sessions.acquire(acquisition)) {
+    try (var lease = GpuCallPacker.acquireForCall(
+        sessions, acquisition, EncoderRole.SPLADE, 1, inputIds.length)) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
             "SPLADE first encode: using {} session (gpuConfigured={}, gpuAvailable={}, outputFormat={})",
-            sessions.isGpuAvailable() ? "GPU" : "CPU",
+            lease.isCpu() ? "CPU" : "GPU",
             sessions.status().configured(),
             sessions.isGpuAvailable(),
             outputFormat);

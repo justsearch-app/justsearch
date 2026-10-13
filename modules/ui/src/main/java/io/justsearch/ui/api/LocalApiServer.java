@@ -820,7 +820,7 @@ public class LocalApiServer {
   }
 
   private void handleResetIndex(Context ctx) {
-    if (!Boolean.getBoolean("justsearch.eval.mode")) {
+    if (!EnvRegistry.EVAL_MODE.getBoolean(false)) {
       ctx.status(404).json(Map.of("error", "Not available outside eval mode"));
       return;
     }
