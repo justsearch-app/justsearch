@@ -45,7 +45,7 @@ def stop(proc: subprocess.Popen, *, run=None) -> dict:
     run = run or subprocess.run
     recorded = _identities.get(proc)
     if recorded is None or recorded[0] != proc.pid:
-        raise RuntimeError("Process was not started by this script; no stop requested")
+        raise RuntimeError(f"PID {proc.pid}: ownership unknown (no captured spawn identity); inspect it manually; no stop requested")
     if os.name == "nt":
         birth = recorded[1]
         if not birth:

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // Tempdoc 606 — hermetic integration test for the admission GATE (acquireAdmission).
 // Drives the REAL acquireAdmission end-to-end against an ISOLATED temp state root

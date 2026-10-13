@@ -25,7 +25,7 @@ const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
 const { execFile, spawnSync } = require('child_process');
-const { terminateWithCodeSync, inspectRecordedTree, inspectProcessTrees } = require('./recorded-termination.cjs');
+const { terminateWithCodeSync, inspectRecordedTree, inspectProcessTrees, createTreeInspectionSession } = require('./recorded-termination.cjs');
 
 const ledgerLib = require('./exit-ledger.cjs');
 const { engineRow } = require('./engine-supervisor.cjs');
@@ -748,6 +748,7 @@ module.exports = {
   captureSpawnedIdentity,
   inspectRecordedTree,
   inspectProcessTrees,
+  createTreeInspectionSession,
   terminateWithCode,
   taskkillPid,
   terminateWithCodeSync,

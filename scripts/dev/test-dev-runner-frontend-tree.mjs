@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 // Deterministic PID-reuse interleavings at the runner's actual frontend-stop closure and other
 // dev-tool kill boundaries. No process is started or stopped by these simulated interleavings.
 import assert from 'node:assert/strict';
@@ -41,7 +42,7 @@ function frontendStop({ recorded = { pid, creationFileTimeUtc: birth }, outcome 
     if (exits) queueMicrotask(() => { frontend.exitCode = 1; frontend.emit('exit', 1); });
   };
   const source = fs.readFileSync(path.join(here, 'dev-runner.cjs'), 'utf8');
-  const closure = source.match(/  stopFrontendTree = async \(waitMs = 3000\) => \{[\s\S]*?\n  \};/)?.[0];
+  const closure = source.match(/  stopFrontendTree = async \(waitMs = 3000(?:, \{ asynchronous = false \} = \{\})?\) => \{[\s\S]*?\n  \};/)?.[0];
   assert.ok(closure, 'exercise the production frontend stop, including the starting revision');
   const context = {
     frontend, frontendIdentity: recorded,
@@ -57,8 +58,13 @@ function frontendStop({ recorded = { pid, creationFileTimeUtc: birth }, outcome 
         return { ok: outcome === 'terminated', outcome };
       } },
   };
+  let asynchronousCalled = false;
+  context.engineActuator.terminateWithCode = (...args) => {
+    asynchronousCalled = true;
+    return Promise.resolve(context.engineActuator.terminateWithCodeSync(...args));
+  };
   vm.runInNewContext(closure, context);
-  return { stop: context.stopFrontendTree, frontend, ended, calls };
+  return { stop: context.stopFrontendTree, frontend, ended, calls, get asynchronousCalled() { return asynchronousCalled; } };
 }
 
 test('frontend PID reuse between record and stop never ends the replacement, and reports incomplete', async () => {
@@ -97,6 +103,12 @@ test('frontend verified stop keeps the exit result, tree scope, code and five-se
 test('frontend still waits for exit and times out when termination did not produce an exit', async () => {
   const run = frontendStop({ exits: false });
   assert.equal(await run.stop(10), false);
+});
+test('cooperative frontend stop yields while its identity-bound tree termination runs', async () => {
+  const run = frontendStop();
+  assert.equal(await run.stop(10, { asynchronous: true }), true);
+  assert.equal(run.asynchronousCalled, true, 'frontend termination must let the Engine quit progress concurrently');
+  assert.deepEqual(run.calls, [{ target: pid, recordedBirth: birth, code: 1, tree: true, timeoutMs: 5000 }]);
 });
 
 test('actuator fallback rechecks the recorded birth through the termination handle', () => {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 // Deterministic interleavings through the production stop and spawn boundaries. These cases
 // never stop an OS process; every termination/lookup boundary is injected.
 import assert from 'node:assert/strict';

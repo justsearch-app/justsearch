@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Lane F stage B item B8 — the dev-runner supervisor's actuator, at unit level.
  *

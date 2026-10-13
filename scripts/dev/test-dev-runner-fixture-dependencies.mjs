@@ -1,3 +1,4 @@
+import './lib/test-fixture-processes.cjs';
 // Fixed staging lists must be sufficient to load the production reaper they copy.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

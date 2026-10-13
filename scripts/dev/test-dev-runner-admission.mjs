@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // Tempdoc 542 §B Layer 4: exercises readActiveOpLeases and the criticality dispatch's
 // classification logic. acquireAdmission's full execution path involves spawning processes

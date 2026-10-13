@@ -41,7 +41,7 @@ class TestStopBackend:
         captured(proc)
         mock_run.return_value.stdout = '{"outcome":"gone"}'
         stop_backend(proc)
-        assert "-Tree" in mock_run.call_args.args[0]  # an exited root can still have descendants
+        mock_run.assert_not_called()  # an exited backend requires no termination
         proc.terminate.assert_not_called()
 
     @patch("jseval.backend.os.name", "nt")

@@ -262,13 +262,19 @@ class TestStopBackendRetiresTheRecord:
         proc = MagicMock()
         proc.poll.return_value = None
         proc.pid = 4242
+        from jseval import owned_process
+        owned_process.capture(proc, birth_reader=lambda _p: "134000000000000000")
         seen = []
-        with patch("jseval.backend.subprocess.run", side_effect=lambda *a, **kw:
-                   seen.append((register_root / "jseval-4242.json").exists())) as tree_stop:
+        def terminate(*args, **kwargs):
+            seen.append((register_root / "jseval-4242.json").exists())
+            return MagicMock(stdout='{"outcome":"terminated"}', returncode=0)
+        with patch("jseval.backend.subprocess.run", side_effect=terminate) as tree_stop:
             stop_backend(proc, data_dir=tmp_path)
-        tree_stop.assert_called_once_with(
-            ["taskkill", "/PID", "4242", "/T", "/F"], capture_output=True,
-        )
+        tree_stop.assert_called_once()
+        args = tree_stop.call_args.args[0]
+        assert args[args.index("-Pid") + 1] == "4242"
+        assert args[args.index("-CreationFileTimeUtc") + 1] == "134000000000000000"
+        assert "-Tree" in args
         assert seen == [True]
         assert not (register_root / "jseval-4242.json").exists()
 

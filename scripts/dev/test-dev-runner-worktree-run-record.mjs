@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // The run record of a stack started from a worktree. The dev-runner keeps its state under the
 // MAIN checkout, but a stack launched from a worktree used to store `active.runPath` relative to

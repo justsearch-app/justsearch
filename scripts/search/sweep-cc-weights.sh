@@ -44,7 +44,8 @@ kill_backend() {
   [ -s "$OWNED_RECORD" ] || return 0
   powershell -NoProfile -Command '
     $r=Get-Content -Raw -LiteralPath $env:JUSTSEARCH_SWEEP_RECORD | ConvertFrom-Json
-    $result = & $env:JUSTSEARCH_SWEEP_TERMINATOR -Pid $r.pid -CreationFileTimeUtc $r.creationFileTimeUtc -Code 1 -Tree
+    # A separate native host makes Console.Out available in this pipeline as real stdout.
+    $result = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $env:JUSTSEARCH_SWEEP_TERMINATOR -Pid $r.pid -CreationFileTimeUtc $r.creationFileTimeUtc -Code 1 -Tree
     $status = $LASTEXITCODE
     $result | Write-Output
     if ($status -eq 3 -and ($result | Select-Object -Last 1 | ConvertFrom-Json).outcome -in @("gone", "mismatch")) { exit 0 }

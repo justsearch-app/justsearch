@@ -573,9 +573,7 @@ def stop_backend(proc: subprocess.Popen, data_dir: Path | None = None) -> None:
     registered-child cleanup is owned by dev-runner, not a jseval process scan.
     Unregistering by proc.pid also covers boot failures before registration.
     """
-    if os.name == "nt":
-        owned_process.stop(proc)
-    elif proc.poll() is not None:
+    if proc.poll() is not None:
         log.info("Backend already exited (rc=%d)", proc.returncode)
     else:
         pid = proc.pid

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * The Node exit ledger (scripts/dev/lib/exit-ledger.cjs; Spec F step 5, Spec B T11, T12, T15).
  *

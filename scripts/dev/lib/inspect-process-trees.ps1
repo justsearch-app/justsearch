@@ -1,6 +1,6 @@
 # Read-only census: one process-table enumeration for every recorded root and descendant.
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$RootsBase64)
+param([string]$RootsBase64, [switch]$Session)
 $ErrorActionPreference='Stop'
 Add-Type -Namespace JustSearchDev -Name CensusNative -MemberDefinition @'
 [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true)]
@@ -9,7 +9,11 @@ public static extern System.IntPtr OpenProcess(uint access, bool inherit, int pi
 public static extern bool GetProcessTimes(System.IntPtr process, out long creation, out long exit, out long kernel, out long user);
 [System.Runtime.InteropServices.DllImport("kernel32.dll")]
 public static extern bool CloseHandle(System.IntPtr handle);
+private static readonly System.Threading.Timer deadline = new System.Threading.Timer(
+  ignored => System.Environment.Exit(4), null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+public static void Arm(int milliseconds) { deadline.Change(milliseconds, System.Threading.Timeout.Infinite); }
 '@
+function Read-Census([string]$RootsBase64) {
 $handles=New-Object 'System.Collections.Generic.List[IntPtr]'
 $censusEnded=@{}
 function Pin-Birth([int]$id) {
@@ -66,5 +70,16 @@ try {
   [Console]::Out.WriteLine((@{ok=$true;outcome='inspected';complete=$true;processes=@($found.Values);identities=$identities}|ConvertTo-Json -Depth 6 -Compress))
 }catch{
   [Console]::Out.WriteLine((@{ok=$false;outcome='enumeration-failed';complete=$false;processes=@();error=$_.Exception.Message}|ConvertTo-Json -Compress))
-  exit 4
 }finally{foreach($h in $handles){[void][JustSearchDev.CensusNative]::CloseHandle($h)}}
+}
+if ($Session) {
+  # Query and idle limits belong to this helper itself: never terminate it by a numeric PID.
+  [JustSearchDev.CensusNative]::Arm(60000)
+  while ($null -ne ($request = [Console]::In.ReadLine())) {
+    [JustSearchDev.CensusNative]::Arm(10000)
+    Read-Census $request
+    [JustSearchDev.CensusNative]::Arm(60000)
+  }
+} else {
+  Read-Census $RootsBase64
+}

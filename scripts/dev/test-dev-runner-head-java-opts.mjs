@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Lane F (docs/design/lane-f-engine-jvm/design.md section 17.2, plus the item A13 follow-up):
  * the Engine launch-flag set, pinned from both spawn sites.

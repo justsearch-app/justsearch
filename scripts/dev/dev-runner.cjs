@@ -2881,7 +2881,7 @@ async function runAdmittedStart(opts, ctx) {
   let frontendStopIncomplete = true;
   // Keep the 5 s synchronous termination bound: the signal handler exits without awaiting us.
   // Root exit alone is insufficient when any descendant could not be proven or ended.
-  stopFrontendTree = async (waitMs = 3000) => {
+  stopFrontendTree = async (waitMs = 3000, { asynchronous = false } = {}) => {
     if (!frontend || !frontend.pid) return true;
     if (frontend.exitCode !== null || frontend.signalCode !== null) return !frontendStopIncomplete;
     let onFrontendExit;
@@ -2893,7 +2893,8 @@ async function runAdmittedStart(opts, ctx) {
     try {
       if (process.platform === 'win32') {
         const result = frontendIdentity?.pid === frontend.pid
-          ? engineActuator.terminateWithCodeSync(frontend.pid, frontendIdentity.creationFileTimeUtc,
+          ? await (asynchronous ? engineActuator.terminateWithCode : engineActuator.terminateWithCodeSync)(
+            frontend.pid, frontendIdentity.creationFileTimeUtc,
             engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree: true, timeoutMs: 5000 }) : null;
         frontendStopIncomplete = !result?.ok;
       } else {
@@ -2923,12 +2924,13 @@ async function runAdmittedStart(opts, ctx) {
     const detail = request?.reason === 'takeover' ? 'takeover'
       : (QUIT_DETAILS.has(request?.detail) ? request.detail : null);
     narrate(`stop requested (${request?.reason ?? 'quit'}${detail ? `, ${detail}` : ''}); asking the Engine to quit.`);
+    const frontendStop = stopFrontendTree(3000, { asynchronous: true });
     const outcome = await Promise.race([
       supervision.hostQuit({ detail }),
       new Promise((resolve) => setTimeout(() => resolve(null), engineActuator.QUIT_DEADLINE_MS + 1000)),
     ]);
     await actuator.flush();
-    const frontendStopped = await stopFrontendTree();
+    const frontendStopped = await frontendStop;
     const stopped = Boolean(outcome) && frontendStopped;
     await writeJsonAtomic(stopResultPath, {
       schemaVersion: 1,
@@ -3547,8 +3549,9 @@ async function stopRun(opts, {
   if (forgotten && !opts.forgetUnresolved) {
     const active = await readJsonIfExists(activePath);
     if (active?.runId === run.runId) await fsp.rm(activePath, { force: true });
-    return { ok: true, outcome: 'FORGOTTEN_UNRESOLVED', runId: run.runId, killedPids: [], portsClosed: false,
-      leftBehind: forgotten.leftBehind ?? [], note: forgetGuidance(run.runId) };
+    const message = `Stopped nothing because run ${run.runId} was forgotten. ${forgetGuidance(run.runId)}`;
+    return { ok: false, outcome: 'FORGOTTEN_UNRESOLVED', runId: run.runId, killedPids: [], portsClosed: false,
+      leftBehind: forgotten.leftBehind ?? [], note: message, error: { code: 'RUN_FORGOTTEN', message } };
   }
   if (opts.forgetUnresolved) {
     const caller = opts.callerIdentity ?? resolveCallerIdentity(opts.sessionId);
@@ -3682,10 +3685,15 @@ async function stopRun(opts, {
       birthTick: child.creationFileTimeUtc ? 10 : 10000, owned: false };
   });
   for (const p of helperProcesses) remember(p);
+  let inspectionSession;
+  try {
   const inspectBatch = async (roots) => {
     try {
       if (inspectTrees) return await inspectTrees(roots);
-      if (!inspectTree) return engineActuator.inspectProcessTrees(roots);
+      if (!inspectTree) {
+        inspectionSession ??= engineActuator.createTreeInspectionSession();
+        return await inspectionSession.inspect(roots);
+      }
       // Compatibility for injected individual-root fixtures; production uses one census.
       const results = await Promise.all(roots.map(p => Promise.resolve().then(() => inspectTree(p.pid, p.creationFileTimeUtc))));
       return { complete: results.every(s => (s?.complete === true || s?.outcome === 'inspected') && !s.enumerationLimitReached),
@@ -3703,6 +3711,11 @@ async function stopRun(opts, {
     await lookupPhase(allEntries(), snapshot);
     return snapshot;
   };
+  // Arm OS exit handles while the initial native inspection starts. Actions still wait for both.
+  let censusError;
+  const pendingCensus = !opts.forgetUnresolved
+    ? Promise.resolve(census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE))
+      .catch(error => { censusError = error; return null; }) : null;
   if (!opts.forgetUnresolved) {
     await inspectPhase();
     for (const p of tracked.values()) await lookupOne(p);
@@ -3735,7 +3748,8 @@ async function stopRun(opts, {
     return { ok: true, outcome: 'FORGOTTEN_UNRESOLVED', runId, killedPids: [], portsClosed: false,
       leftBehind, note: forgetGuidance(runId) };
   }
-  const exitCensus = await census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
+  const exitCensus = await pendingCensus;
+  if (censusError) throw censusError;
 
   // 1. Ask the holder (only a runner that listens: older runners never read the control file).
   let runnerAnswer = null;
@@ -4111,14 +4125,15 @@ async function stopRun(opts, {
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     ...exitAccounting,
   };
+  } finally { inspectionSession?.close(); }
 }
 
 async function cmdCleanup(opts) {
   // Cleanup stops the run and deletes its data: the same ownership gate as stop.
   await assertMayMutateRun(opts, 'cleanup');
-  let run = null;
+  let run = null, runPath = null;
   try {
-    ({ run } = await resolveRunTarget(opts));
+    ({ run, runPath } = await resolveRunTarget(opts));
   } catch (err) {
     if (isNoActiveRunError(err)) {
       process.stdout.write(JSON.stringify({ ok: true, runId: null, portsClosed: true, note: 'no_active_run' }) + '\n');
@@ -4126,7 +4141,22 @@ async function cmdCleanup(opts) {
     }
     throw err;
   }
-  const stopRes = await stopRun({ ...opts, runId: run.runId, disposition: 'normal_stop' });
+  const marker = await readJsonIfExists(path.join(path.dirname(runPath), 'forgotten-unresolved.json'));
+  let stopRes;
+  if (marker) {
+    const entries = marker.leftBehind ?? [];
+    const ids = [...new Set(entries.map(p => p.pid).filter(p => Number.isInteger(p) && p > 0))];
+    const observed = await engineActuator.lookupProcessIdentities(ids).catch(() => null);
+    const remaining = entries.map(p => ({ ...p, state: checkRecordedProcess(p,
+      observed?.get(p.pid) ?? (observed ? { present: false } : null)) }))
+      .filter(p => p.state === 'match' || p.state === 'unknown').map(p => describeUnresolved(p, p.state));
+    stopRes = remaining.length ? { outcome: 'FORGOTTEN_UNRESOLVED', portsClosed: false, leftBehind: remaining,
+      note: `Forgotten processes are still alive or unverifiable: ${remaining.map(p =>
+        `PID ${p.pid} (${p.name}), start ${p.startedAt}: ${p.reason}`).join('; ')}. ${forgetGuidance(run.runId)}` }
+      : { outcome: STOP_OUTCOME.STOPPED, portsClosed: true };
+  } else {
+    stopRes = await stopRun({ ...opts, runId: run.runId, disposition: 'normal_stop' });
+  }
   if (stopRes.outcome !== STOP_OUTCOME.STOPPED) {
     // Spec F §5.3: a stack not verified gone keeps its data; nothing is deleted under it.
     process.stdout.write(JSON.stringify({

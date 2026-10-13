@@ -1,3 +1,4 @@
+import './lib/test-fixture-processes.cjs';
 // Recovery across the real CLI and injected identity boundaries. Only fake harness children run.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -149,7 +150,7 @@ test('dev-all birth capture finishes in the spawn turn before stop', () => {
 });
 test('spawn capture retains the exited wrapper identity and stops its surviving tree', () => {
   const proof = path.join(root, 'exited-wrapper.json');
-  const identityExe = path.join(path.dirname(process.env.NODE_OPTIONS.split('--require=').at(-1)), 'Identity.exe');
+  const identityExe = process.platform === 'win32' ? require('./lib/test-fixture-processes.cjs').identityExecutable() : null;
   const code = `const cp=require('child_process'),fs=require('fs'); const child=cp.spawn(process.execPath,['-e','setTimeout(()=>{},120000)'],{stdio:'ignore',detached:true,windowsHide:true}); const r=cp.spawnSync(${JSON.stringify(identityExe)},[String(child.pid)],{encoding:'utf8',windowsHide:true}); fs.writeFileSync(${JSON.stringify(proof)},JSON.stringify({pid:child.pid,creationFileTimeUtc:r.stdout.trim()})); process.exit(0);`;
   const wrapper = spawn(process.execPath, ['-e', code], { stdio: 'ignore', windowsHide: true });
   const recorded = spawnSync(identityExe, [String(wrapper.pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim();

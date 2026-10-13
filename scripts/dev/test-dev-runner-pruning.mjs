@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

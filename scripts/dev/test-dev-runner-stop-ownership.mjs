@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // Spec F §5.3 / §8 step 10 (S17, S18): ending a dev stack leaves nothing running and never kills a
 // process outside that stack.

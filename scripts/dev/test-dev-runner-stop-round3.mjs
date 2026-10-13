@@ -1,3 +1,4 @@
+import './lib/test-fixture-processes.cjs';
 // Synthetic boundary checks plus CPU-only CLI/census fixtures with spawn-recorded ownership.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +17,7 @@ const test = (name, fn) => tests.push([name, fn]);
 const pid = 987654, birth = '134000000000000000';
 const owner = api.holderBlockFor(api.resolveCallerIdentity('owner'));
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
-const identityExe = path.join(path.dirname(process.env.NODE_OPTIONS.split('--require=').at(-1)), 'Identity.exe');
+const identityExe = process.platform === 'win32' ? require('./lib/test-fixture-processes.cjs').identityExecutable() : null;
 function fixture(id, extra = {}) {
   const run = { runId: id, holder: owner, pids: { frontendRootPid: pid },
     identities: { frontend: { pid, creationFileTimeUtc: birth } }, ...extra };
@@ -159,7 +160,8 @@ test('real cleanup of a forgotten run refuses clearly and preserves its data', (
   const data = fs.mkdtempSync(path.join(repo, 'tmp', 'round3-forgotten-cleanup-'));
   const sentinel = path.join(data, 'derived-still-in-use'); fs.writeFileSync(sentinel, 'preserve');
   const target = fixture('forgotten-cleanup', { pids: {}, identities: {}, dataDir: data });
-  fs.writeFileSync(path.join(target.dir, 'forgotten-unresolved.json'), JSON.stringify({ leftBehind: [{ pid, name: 'Engine.exe', creationFileTimeUtc: birth }] }));
+  const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},60000)'], { stdio: 'ignore', windowsHide: true });
+  fs.writeFileSync(path.join(target.dir, 'forgotten-unresolved.json'), JSON.stringify({ leftBehind: [{ ...child.recordedIdentity, name: 'Engine.exe' }] }));
   try {
     const result = spawnSync(process.execPath, [path.join(repo, 'scripts/dev/dev-runner.cjs'), 'cleanup', '--json',
       '--run', target.run.runId, '--session-id', 'owner', '--clean', 'hard'], { cwd: repo, env: process.env, encoding: 'utf8', windowsHide: true });
@@ -167,7 +169,7 @@ test('real cleanup of a forgotten run refuses clearly and preserves its data', (
     assert.equal(out.error?.code, 'STOP_INCOMPLETE', 'cleanup must explain the forgotten barrier, not throw a TypeError');
     assert.equal(out.cleaned, false); assert.match(out.error.message, /leaves processes running; a person decides/i);
     assert.equal(fs.readFileSync(sentinel, 'utf8'), 'preserve');
-  } finally { fs.rmSync(data, { recursive: true, force: true }); }
+  } finally { child.kill(); fs.rmSync(data, { recursive: true, force: true }); }
 });
 test('MCP incomplete stop delegates forgetting to a person and never supplies force', async () => {
   const target = fixture('mcp-stop');

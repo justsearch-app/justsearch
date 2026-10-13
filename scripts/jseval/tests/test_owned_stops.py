@@ -25,6 +25,20 @@ class Child:
 
 
 class OwnedStopTest(unittest.TestCase):
+    def test_exited_backend_without_identity_retires_record_without_stop(self):
+        child = Child()
+        child.returncode = 2
+        child.poll = lambda: 2
+        error = None
+        with patch.object(backend.subprocess, "run") as stop, patch.object(backend.run_register, "unregister_backend") as retire:
+            try:
+                backend.stop_backend(child)
+            except RuntimeError as exc:
+                error = exc
+            self.assertIsNone(error, "an exited backend needs no identity or termination")
+            stop.assert_not_called()
+            retire.assert_called_once_with(child.pid)
+
     def test_sweep_accepts_a_recorded_process_already_gone(self):
         source = (ROOT / "scripts/search/sweep-cc-weights.sh").read_text(encoding="utf-8")
         body = source.split("kill_backend() {", 1)[1].split("\n}", 1)[0]

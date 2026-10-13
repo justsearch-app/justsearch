@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 // Exercise the real Windows termination handles. Only sleepers spawned and recorded here are
 // targets. Inject process-table snapshots to make otherwise nondeterministic PID reuse repeatable.
 import assert from 'node:assert/strict';

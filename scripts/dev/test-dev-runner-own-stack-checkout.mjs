@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // The owner's own stack, and the paths a stop names, driven through throwaway CHECKOUTS.
 //
