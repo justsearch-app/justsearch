@@ -48,14 +48,26 @@ final class SynchronousGpuReleaseTest {
     }
   }
 
+  /**
+   * A release poll still running when the bound ends refuses the GPU start. Adapter readings are
+   * bounded themselves, so the poll is held here at its ledger record instead of at a reading.
+   */
   @Test
   void pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease() throws Exception {
     CountDownLatch sample = new CountDownLatch(1);
     try (var h = new ChildControlHarness(directory)) {
       h.virtualTime();
-      var vram = new ChildControlHarness.ScriptedVram(GpuMemorySource.NVML, 8 * GIB, 7 * GIB);
-      vram.onRead = n -> { if (n == 2) sample.await(); };
-      h.vram = vram;
+      h.vram = new ChildControlHarness.ScriptedVram(GpuMemorySource.NVML, 8 * GIB, 7 * GIB);
+      h.appendHook = (type, fields, next) -> {
+        if (type == LedgerRecordType.GPU_RELEASE) {
+          try {
+            sample.await();
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+          }
+        }
+        return next.append(type, fields);
+      };
       ChildHandle first = h.control().start(gpuSpec("sleep", OptionalLong.of(GIB)));
       await(h.control().stop(first, StopReason.MODEL_SWITCH, StopMode.NOW));
       try {

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T10:31:55.440Z",
-  "revision": "a164833f5275f02496c74a3422cad0bf66ec87e1",
-  "tree": "a371cbf6020d7dea62df30b2ecc6dc99f3ab1fdb",
+  "createdAt": "2026-10-13T20:23:54.474Z",
+  "revision": "f40ba7da82543cb0755f101eb0d2797b2caff4d9",
+  "tree": "a7dfc14e6c7715fdfe024e701e41a54705e15dc7",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.synchronousExitContinuationStartsReplacementAfterGpuRelease\" --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 35007
-    },
-    {
-      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.exitedSelfTestWrapperWithLiveDescendantCannotPass\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.selfTestDescendantSurvivalBlocksMainReload\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.unreadableDescendantsAreNotAnEmptySuccessfulSnapshot\" --rerun -PskipWebBuild=true --console=plain",
-      "cwd": ".",
-      "exitCode": 0,
-      "durationMs": 56529
+      "durationMs": 35335
     }
   ],
   "checks": [
@@ -35,7 +29,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#synchronousExitContinuationStartsReplacementAfterGpuRelease",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d1b0a087ed29be952e3e0c44e1c2066fe13776557795bd48d7623c7015fb2c84",
+      "contentDigest": "sha256:b3658bc56401ab3cd437b9d5325ec6221ee6573c100a9c8a4e3b3bcf2131ff35",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,58 +44,13 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d1b0a087ed29be952e3e0c44e1c2066fe13776557795bd48d7623c7015fb2c84",
+      "contentDigest": "sha256:b3658bc56401ab3cd437b9d5325ec6221ee6573c100a9c8a4e3b3bcf2131ff35",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#exitedSelfTestWrapperWithLiveDescendantCannotPass",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:15ea090ae344d0fe5dc1a42c32357e98a196d5a58b24ea2751dfc6e1ae5d2db0",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "exitedSelfTestWrapperWithLiveDescendantCannotPass()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#selfTestDescendantSurvivalBlocksMainReload",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:15ea090ae344d0fe5dc1a42c32357e98a196d5a58b24ea2751dfc6e1ae5d2db0",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "selfTestDescendantSurvivalBlocksMainReload()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#unreadableDescendantsAreNotAnEmptySuccessfulSnapshot",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:15ea090ae344d0fe5dc1a42c32357e98a196d5a58b24ea2751dfc6e1ae5d2db0",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "unreadableDescendantsAreNotAnEmptySuccessfulSnapshot()",
           "status": "passed"
         }
       ]
@@ -121,13 +70,7 @@
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.synchronousExitContinuationStartsReplacementAfterGpuRelease\" --tests \"io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest.pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 62564
-      },
-      {
-        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.exitedSelfTestWrapperWithLiveDescendantCannotPass\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.selfTestDescendantSurvivalBlocksMainReload\" --tests \"io.justsearch.app.services.chat.SelfTestProcessOwnershipTest.unreadableDescendantsAreNotAnEmptySuccessfulSnapshot\" --rerun -PskipWebBuild=true --console=plain",
-        "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 82106
+        "durationMs": 35024
       }
     ],
     "checks": [
@@ -140,23 +83,8 @@
         "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java#pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease",
         "classification": "assertion",
         "detail": "pendingGpuReleaseTimeoutRefusesSpawnAndAllowsRetryAfterRelease(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected java.io.IOException to be thrown, but nothing was thrown."
-      },
-      {
-        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#exitedSelfTestWrapperWithLiveDescendantCannotPass",
-        "classification": "assertion",
-        "detail": "exitedSelfTestWrapperWithLiveDescendantCannotPass(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a live descendant must make cleanup fail ==> expected: <false> but was: <true>"
-      },
-      {
-        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#selfTestDescendantSurvivalBlocksMainReload",
-        "classification": "assertion",
-        "detail": "selfTestDescendantSurvivalBlocksMainReload(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: closing the self-test session must not spawn main beside its surviving descendant ==> expected: <[]> but was: <[model.gguf]>"
-      },
-      {
-        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#unreadableDescendantsAreNotAnEmptySuccessfulSnapshot",
-        "classification": "assertion",
-        "detail": "unreadableDescendantsAreNotAnEmptySuccessfulSnapshot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: enumeration failure cannot certify that cleanup has no descendants to wait for ==> Expected java.lang.IllegalStateException to be thrown, but nothing was thrown."
       }
     ]
   },
-  "digest": "sha256:7c389c35ed0b370101b0a843207b2e08c90dc9949d1642366a1b27d8babb9573"
+  "digest": "sha256:556fc3da41306173e688410d3a061252cedf00bd1af424adf2378b4d8c45bddc"
 }

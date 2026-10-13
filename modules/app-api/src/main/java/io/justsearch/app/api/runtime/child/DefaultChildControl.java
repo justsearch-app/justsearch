@@ -87,7 +87,9 @@ import java.util.concurrent.TimeoutException;
  * the next chat start until it exits.
  *
  * <p>A GPU start waits for every pending release poll to finish ({@link #GPU_RELEASE_BOUND}) and
- * is refused only when one is still running after that.
+ * is refused only when one is still running after that. Each adapter reading is bounded ({@link
+ * #GPU_READ_BOUND}): one that does not answer ends its poll as unmeasured, so a hung driver call
+ * cannot keep GPU starts refused.
  */
 public final class DefaultChildControl implements ChildControl {
   static final Duration TERMINATE_WAIT = Duration.ofSeconds(5);
@@ -96,12 +98,15 @@ public final class DefaultChildControl implements ChildControl {
   static final Duration GPU_POLL_MAX = Duration.ofSeconds(5);
   static final long GPU_STABLE_BYTES = 64L * 1024 * 1024;
   static final double GPU_RELEASE_FRACTION = 0.75;
+  /** How long one adapter memory reading may take before it counts as unmeasured. */
+  static final Duration GPU_READ_BOUND = Duration.ofSeconds(2);
   /**
    * How long a GPU start waits for pending release polls: one poll's maximum, the sample interval
-   * it may overrun by, and a margin for its ledger record. A poll that ran before the start was
-   * asked for ends sooner.
+   * and the read bound it may overrun by, and a margin for its ledger record. A poll that ran
+   * before the start was asked for ends sooner.
    */
-  static final Duration GPU_RELEASE_BOUND = GPU_POLL_MAX.plus(GPU_POLL_INTERVAL).plusSeconds(1);
+  static final Duration GPU_RELEASE_BOUND =
+      GPU_POLL_MAX.plus(GPU_POLL_INTERVAL).plus(GPU_READ_BOUND).plusSeconds(1);
   static final int RECENT_EXITS = 32;
   private static final Duration GRACE_SLICE = Duration.ofMillis(50);
   private static final Duration CLOSE_WAIT = Duration.ofSeconds(12);
@@ -154,6 +159,9 @@ public final class DefaultChildControl implements ChildControl {
   private final Map<String, Held> chatScopes = new ConcurrentHashMap<>();
   private final Deque<ExitOutcome> recent = new ArrayDeque<>();
   private final Map<String, CompletableFuture<Void>> gpuPolls = new ConcurrentHashMap<>();
+  private final Object vramReads = new Object();
+  /** A reading past its bound that has not answered yet; none is started beside it. */
+  private CompletableFuture<OptionalLong> unansweredRead;
   private volatile boolean closed;
   private final Object extractionAdmission = new Object();
   private boolean extractionClosed;
@@ -355,7 +363,7 @@ public final class DefaultChildControl implements ChildControl {
     }
     for (Held held : List.copyOf(chatScopes.values())) {
       if (held.state() != ChildHandle.State.EXITED) continue;
-      endScope(held, "before_" + starting + "_start", starting);
+      endScope(held, "before_" + starting + "_start", starting, true);
       if (chatScopes.remove(held.childId, held)) held.descendants.close();
     }
   }
@@ -368,25 +376,38 @@ public final class DefaultChildControl implements ChildControl {
       throw new IllegalStateException("child " + held.childId + " has not exited");
     }
     if (held.descendants == null) return 0;
-    return endScope(held, request.reason().name(), held.spec.kind());
+    return endScope(held, request.reason().name(), held.spec.kind(), false);
   }
 
   /**
    * Ends what an exited chat root left running in its own job: each member is recorded first
    * ({@code child-note} {@code intended_cleanup:<reason>:job_member:<pid>@<start>}), then the job is
-   * ended through its handle and every recorded member awaited. A GPU child's memory is sampled
-   * before and its release polled after (unless its stop ended the Engine), so the next GPU start
-   * waits for it. Off Windows nothing can be ended: a running member refuses the chat start beside
-   * it, as before.
+   * ended through its handle and every recorded member awaited, and each outcome recorded after its
+   * intent: {@code cleanup_ended:...} or {@code cleanup_not_ended:...:<cause>}. A member not ended
+   * keeps its scope held, so it is counted and refuses chat starts until it exits; that exit is
+   * recorded too. When the job cannot be ended at all a chat start is refused with "chat start
+   * blocked: could not end leftover chat processes (<native error>)". A GPU child's memory is
+   * sampled before and its release polled after (unless its stop ended the Engine), so the next GPU
+   * start waits for it. Off Windows nothing can be ended: a running member refuses the chat start
+   * beside it, as before.
    *
    * @return how many members were ended
    */
-  private int endScope(Held held, String reason, ChildKind starting) throws IOException {
+  private int endScope(Held held, String reason, ChildKind starting, boolean admission)
+      throws IOException {
     List<ProcessHandle> members;
     try {
       members = held.descendants.snapshot();
     } catch (IllegalStateException unknown) {
       throw new IOException("chat start blocked: " + unknown.getMessage(), unknown);
+    }
+    // A member recorded as not ended stays counted after its job was closed, until its own exit.
+    members = new ArrayList<>(members);
+    for (ProcessHandle leftover : held.notEndedMembers.values()) {
+      boolean listed = members.stream().anyMatch(member -> member.pid() == leftover.pid());
+      if (leftover.isAlive() && !listed) {
+        members.add(leftover);
+      }
     }
     if (members.isEmpty()) return 0;
     if (!held.descendants.endable()) {
@@ -401,24 +422,57 @@ public final class DefaultChildControl implements ChildControl {
     boolean measured =
         held.spec.gpu() && (stopped == null || !stopped.request().reason().endsEngine());
     OptionalLong before = measured ? readVram(held.spec.gpuDevice()) : OptionalLong.empty();
+    Map<ProcessHandle, String> identities = new LinkedHashMap<>();
     for (ProcessHandle member : members) {
-      String birth = member.info().startInstant().map(Instant::toString).orElse("unknown");
+      String identity = member.pid() + "@"
+          + member.info().startInstant().map(Instant::toString).orElse("unknown");
+      identities.put(member, identity);
       noteDurability(held, append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
-          "intended_cleanup:" + reason + ":job_member:" + member.pid() + "@" + birth)));
+          "intended_cleanup:" + reason + ":job_member:" + identity)));
     }
-    held.descendants.end();
-    long deadline = System.nanoTime() + TERMINATE_WAIT.toNanos();
-    for (ProcessHandle member : members) {
-      try {
-        member.onExit().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-      } catch (InterruptedException interrupted) {
-        Thread.currentThread().interrupt();
-        throw new InterruptedIOException("interrupted ending what a " + held.spec.kind()
-            + " child (root pid " + held.pid() + ") left running");
-      } catch (ExecutionException | TimeoutException survived) {
-        throw new IOException("a " + held.spec.kind() + " descendant (pid " + member.pid()
-            + ") outlived the end of its job; no " + starting + " starts beside it", survived);
+    try {
+      held.descendants.end();
+    } catch (IOException | RuntimeException failure) {
+      String cause = String.valueOf(failure.getMessage());
+      for (var member : identities.entrySet()) {
+        notEnded(held, reason, member.getKey(), member.getValue(), cause);
       }
+      throw new IOException((admission ? "chat start blocked: " : "")
+          + "could not end leftover chat processes (" + cause + ")", failure);
+    }
+    long deadline = System.nanoTime() + TERMINATE_WAIT.toNanos();
+    ProcessHandle outlived = null;
+    InterruptedException interrupted = null;
+    for (var member : identities.entrySet()) {
+      boolean ended = false;
+      if (interrupted == null) {
+        try {
+          member.getKey().onExit()
+              .get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+          ended = true;
+        } catch (InterruptedException stop) {
+          interrupted = stop;
+        } catch (ExecutionException | TimeoutException survived) {
+          // recorded below as not ended
+        }
+      }
+      if (ended || !member.getKey().isAlive()) {
+        noteDurability(held, append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
+            "cleanup_ended:" + reason + ":job_member:" + member.getValue())));
+      } else {
+        notEnded(held, reason, member.getKey(), member.getValue(),
+            interrupted != null ? "interrupted" : "outlived_job_end");
+        if (outlived == null) outlived = member.getKey();
+      }
+    }
+    if (interrupted != null) {
+      Thread.currentThread().interrupt();
+      throw new InterruptedIOException("interrupted ending what a " + held.spec.kind()
+          + " child (root pid " + held.pid() + ") left running");
+    }
+    if (outlived != null) {
+      throw new IOException("a " + held.spec.kind() + " descendant (pid " + outlived.pid()
+          + ") outlived the end of its job; no " + starting + " starts beside it");
     }
     if (before.isPresent()) {
       synchronized (held) {
@@ -429,6 +483,26 @@ public final class DefaultChildControl implements ChildControl {
       startGpuPoll(held, poll, release);
     }
     return members.size();
+  }
+
+  /**
+   * Records that a job member was not ended, and why ({@code cleanup_not_ended:<reason>:job_member:
+   * <pid>@<start>:<cause>}). Its scope stays held, so it is still counted and still refuses a chat
+   * start beside it, and its own later exit is recorded once ({@code leftover_exited:job_member:
+   * <pid>@<start>}).
+   */
+  private void notEnded(Held held, String reason, ProcessHandle member, String identity,
+      String cause) {
+    String token = "cleanup_not_ended:" + reason + ":job_member:" + identity + ":" + cause;
+    noteDurability(held, append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
+        token.length() > MAX_NOTE ? token.substring(0, MAX_NOTE) : token)));
+    if (held.notEndedMembers.putIfAbsent(identity, member) == null) {
+      member.onExit().thenRun(() -> {
+        held.notEndedMembers.remove(identity, member);
+        append(LedgerRecordType.CHILD_NOTE,
+            noteFields(held.childId, "leftover_exited:job_member:" + identity));
+      });
+    }
   }
 
   /** Registers the manifest entry; on failure stops the child (ROLLBACK) and throws. */
@@ -847,6 +921,10 @@ public final class DefaultChildControl implements ChildControl {
           OptionalLong used = readVram(held.spec.gpuDevice());
           if (used.isEmpty()) {
             result = "unmeasured";
+            if (vramReadUnanswered()) {
+              append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
+                  "gpu_read_unanswered:bound_ms=" + GPU_READ_BOUND.toMillis()));
+            }
             break;
           }
           after = used;
@@ -882,7 +960,46 @@ public final class DefaultChildControl implements ChildControl {
     append(LedgerRecordType.GPU_RELEASE, fields);
   }
 
+  /**
+   * One adapter reading, bounded by {@link #GPU_READ_BOUND}: a read that does not answer in time
+   * is empty (the release poll then ends unmeasured), and while it still has not answered every
+   * later read is empty at once rather than queueing behind it, so a hung driver call can neither
+   * hold a release poll, nor a stop, nor a chat start past its bound.
+   */
   private OptionalLong readVram(Optional<GpuDevice> device) {
+    if (vram.source() == GpuMemorySource.NONE) return readVramNow(device);
+    CompletableFuture<OptionalLong> read = new CompletableFuture<>();
+    synchronized (vramReads) {
+      if (unansweredRead != null && !unansweredRead.isDone()) return OptionalLong.empty();
+      unansweredRead = null;
+    }
+    try {
+      threads.newThread(() -> read.complete(readVramNow(device))).start();
+    } catch (RuntimeException | Error failure) {
+      return OptionalLong.empty();
+    }
+    try {
+      return read.get(GPU_READ_BOUND.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException unanswered) {
+      synchronized (vramReads) {
+        unansweredRead = read;
+      }
+      return OptionalLong.empty();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return OptionalLong.empty();
+    } catch (ExecutionException impossible) {
+      return OptionalLong.empty();
+    }
+  }
+
+  private boolean vramReadUnanswered() {
+    synchronized (vramReads) {
+      return unansweredRead != null && !unansweredRead.isDone();
+    }
+  }
+
+  private OptionalLong readVramNow(Optional<GpuDevice> device) {
     try {
       OptionalLong used = vram.adapterUsedBytes(device);
       return used.isPresent() && used.getAsLong() >= 0 ? used : OptionalLong.empty();
@@ -1149,6 +1266,8 @@ public final class DefaultChildControl implements ChildControl {
     OptionalLong usedBefore = OptionalLong.empty();
     boolean ledgerDurable = true;
     String registryId;
+    /** Members recorded as not ended, until their own exit is recorded; by pid@start. */
+    final Map<String, ProcessHandle> notEndedMembers = new ConcurrentHashMap<>();
 
     Held(String childId, ChildSpec spec, Process process, ProcessTerminator.OsProcess os,
         Instant processStartedAt) {

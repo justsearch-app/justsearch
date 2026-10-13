@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.runtime.containment;
 
+import io.justsearch.configuration.SystemAccess;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -269,6 +270,7 @@ public final class WindowsEngineJob implements EngineContainment {
 
     private static ChatProcess create(ProcessBuilder builder) throws Throwable {
       if (ValueLayout.ADDRESS.byteSize() != 8) throw new IOException("Chat containment requires Win64");
+      String line = launchCommandLine(builder);
       MemorySegment group = Kernel.pointer("CreateJobObjectW", MemorySegment.NULL, MemorySegment.NULL);
       List<MemorySegment> handles = new ArrayList<>();
       List<java.io.Closeable> streams = new ArrayList<>();
@@ -321,9 +323,12 @@ public final class WindowsEngineJob implements EngineContainment {
               .map(e -> e.getKey() + "=" + e.getValue() + '\0').collect(java.util.stream.Collectors.joining()) + '\0';
           MemorySegment directory = builder.directory() == null ? MemorySegment.NULL
               : Kernel.wide(arena, builder.directory().getAbsolutePath());
-          Kernel.integer("CreateProcessW", MemorySegment.NULL,
-              Kernel.wide(arena, commandLine(builder.command())), MemorySegment.NULL, MemorySegment.NULL,
+          int created = (int) Kernel.call("CreateProcessW", MemorySegment.NULL,
+              Kernel.wide(arena, line), MemorySegment.NULL, MemorySegment.NULL,
               1, CREATION_FLAGS, Kernel.wide(arena, environment), directory, startup, result);
+          if (created == 0) {
+            throw cannotRun(builder, "CreateProcess" + Kernel.describe(Kernel.lastError()));
+          }
           process = result.get(ValueLayout.ADDRESS, 0);
           thread = result.get(ValueLayout.ADDRESS, 8);
         } finally {
@@ -361,6 +366,35 @@ public final class WindowsEngineJob implements EngineContainment {
     }
 
     /**
+     * The command line for {@code builder}, refused as {@code ProcessBuilder.start} refuses it: a NUL
+     * character with its own message, an argument the quoting rules reject in the "Cannot run
+     * program" shape.
+     */
+    private static String launchCommandLine(ProcessBuilder builder) throws IOException {
+      for (String argument : builder.command()) {
+        if (argument.indexOf('\0') >= 0) throw new IOException("invalid null character in command");
+      }
+      try {
+        return commandLine(builder.command());
+      } catch (IllegalArgumentException rejected) {
+        IOException failure = cannotRun(builder, rejected.getMessage());
+        failure.initCause(rejected);
+        throw failure;
+      }
+    }
+
+    /**
+     * A launch failure worded as {@code ProcessBuilder.start} words it, so logs and status read the
+     * same whichever way a child was started: {@code Cannot run program "<program>"}, the working
+     * directory when one is set, then the cause.
+     */
+    private static IOException cannotRun(ProcessBuilder builder, String cause) {
+      return new IOException("Cannot run program \"" + builder.command().getFirst() + "\""
+          + (builder.directory() == null ? "" : " (in directory \"" + builder.directory() + "\")")
+          + ": " + cause);
+    }
+
+    /**
      * The command line {@code java.lang.ProcessImpl} builds on Windows for {@code arguments}, by the
      * same rules: by default ({@code jdk.lang.Process.allowAmbiguousCommands} not {@code false}) an
      * argument is quoted only when it is empty or holds white space, its text is kept as it is, and
@@ -372,8 +406,10 @@ public final class WindowsEngineJob implements EngineContainment {
       for (String argument : arguments) {
         if (argument.indexOf('\0') >= 0) throw new IllegalArgumentException("NUL character in chat command");
       }
+      // Read through the configuration funnel; a blank value is the default there and, as in the
+      // JDK, anything but "false" keeps the legacy rules.
       boolean ambiguousAllowed = !"false".equalsIgnoreCase(
-          System.getProperty("jdk.lang.Process.allowAmbiguousCommands", "true"));
+          SystemAccess.sysProp("jdk.lang.Process.allowAmbiguousCommands", "true"));
       if (ambiguousAllowed) {
         String executable = new java.io.File(arguments.getFirst()).getPath();
         if (quoted(Rules.LEGACY, executable)) executable = '"' + executable + '"';
@@ -719,7 +755,12 @@ public final class WindowsEngineJob implements EngineContainment {
         Map.entry("TerminateProcess", FunctionDescriptor.of(I, A, I)),
         Map.entry("ReadFile", FunctionDescriptor.of(I, A, A, I, A, A)),
         Map.entry("WriteFile", FunctionDescriptor.of(I, A, A, I, A, A)),
-        Map.entry("CloseHandle", FunctionDescriptor.of(I, A)));
+        Map.entry("CloseHandle", FunctionDescriptor.of(I, A)),
+        Map.entry("FormatMessageW", FunctionDescriptor.of(I, I, A, I, I, A, I, A)));
+    /** FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, as the JDK asks. */
+    private static final int SYSTEM_MESSAGE = 0x1200;
+    /** The JDK's buffer for the system text, in UTF-16 units. */
+    private static final int MESSAGE_UNITS = 256;
     static Object call(String name, Object... arguments) throws Throwable {
       MethodHandle function = FUNCTIONS.computeIfAbsent(name, n -> bind(LINKER, LIBRARY, n,
           DESCRIPTORS.get(n), Linker.Option.captureCallState("GetLastError")));
@@ -732,6 +773,37 @@ public final class WindowsEngineJob implements EngineContainment {
         LAST_ERROR.set((int) ERROR.get(state, 0L));
         return result;
       }
+    }
+    static int lastError() {
+      return LAST_ERROR.get();
+    }
+    /**
+     * The error as the JDK's Windows launcher reports it after the function name:
+     * {@code " error=<code>, <system text>"}, the text without its final line break and full stop,
+     * or {@code " failed, error=<code>"} when Windows has no text for it.
+     */
+    static String describe(int code) {
+      String text = "";
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment buffer = arena.allocate(MESSAGE_UNITS * 2L, 2);
+        int units = (int) call("FormatMessageW", SYSTEM_MESSAGE, MemorySegment.NULL, code, 0,
+            buffer, MESSAGE_UNITS, MemorySegment.NULL);
+        if (units > 0) {
+          char[] chars = new char[units];
+          MemorySegment.copy(buffer, ValueLayout.JAVA_CHAR, 0, chars, 0, units);
+          text = new String(chars);
+          if (units > 3) {
+            if (text.endsWith("\n")) text = text.substring(0, text.length() - 1);
+            if (text.endsWith("\r")) text = text.substring(0, text.length() - 1);
+            if (text.endsWith(".")) text = text.substring(0, text.length() - 1);
+          }
+        }
+      } catch (VirtualMachineError fatal) {
+        throw fatal;
+      } catch (Throwable unavailable) {
+        text = "";
+      }
+      return text.isEmpty() ? " failed, error=" + code : " error=" + code + ", " + text;
     }
     static int integer(String name, Object... arguments) throws Throwable {
       int result = (int) call(name, arguments);

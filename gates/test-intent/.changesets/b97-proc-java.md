@@ -5,6 +5,13 @@ author-role: builder
 author-session: b97-proc-java
 ---
 
+# Named limits
+
+Accepted without change (round 4):
+
+- A failed self-test with a survivor takes about 12-14 s, because it waits out the stop timeout before ending what the self-test server left running.
+- At a clean quit, leftovers of an already-exited chat root are ended by the Engine's job without a per-member record.
+
 # Test-intent entries
 
 ```json
@@ -15,7 +22,7 @@ author-session: b97-proc-java
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SynchronousGpuReleaseTest.java"
       ],
       "class": "New",
-      "behaviour": "A synchronous exit continuation sees a running GPU release producer, with recovered release recorded before replacement spawn. A still-pending release timeout refuses spawning with a reason, then permits retry after release.",
+      "behaviour": "A synchronous exit continuation sees a running GPU release producer, with recovered release recorded before replacement spawn. A release poll still pending when the bounded wait ends (held at its ledger record, since adapter readings are bounded themselves) refuses spawning with a reason, then permits retry after release.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -270,6 +277,73 @@ author-session: b97-proc-java
         "instrumentation"
       ],
       "whatMoved": "The stand-in llama-server gains an opt-in --spawn-lingerer behaviour: once serving it starts one more process that records its own PID and creation instant and exits on a signal file or after 90 s, with lookup and release helpers that act only on those recorded identities. No existing behaviour, input or oracle of the fixture changes."
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/GpuReadBoundTest.java"
+      ],
+      "class": "New",
+      "behaviour": "An adapter memory reading that never returns ends the release poll as unmeasured within the GPU start bound, recorded, and the GPU start proceeds; while it still hangs the next switch neither waits on it nor queues behind it.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting), including round-4 repairs of the per-server job containment.",
+          "choice": "Each adapter memory reading is bounded at 2 s: a reading that does not answer ends its release poll as unmeasured (recorded as gpu-release result unmeasured, with a child-note gpu_read_unanswered), and while it still hangs later readings are empty at once, so GPU starts proceed; the GPU start wait grows by the read bound to 8.25 s. When a chat root's leftovers cannot be ended, each member's outcome is recorded after its intent (cleanup_ended:<reason>:job_member:<pid>@<start>, or cleanup_not_ended:...:<cause>), a member not ended keeps its scope held and refusing chat starts until it exits, its own exit is recorded once (leftover_exited:job_member:<pid>@<start>), and the start is refused with \"chat start blocked: could not end leftover chat processes (<native error>)\". A contained chat launch that cannot run fails with the JDK's text, Cannot run program \"<path>\"[ (in directory \"<dir>\")]: CreateProcess error=<n>, <system text>, an argument refused in strict mode with the JDK's text, and a NUL character with the JDK's \"invalid null character in command\"; jdk.lang.Process.allowAmbiguousCommands is read through io.justsearch.configuration.SystemAccess with the JDK's default and strict-mode rules. Named limits, accepted without change: a failed self-test with a survivor takes about 12-14 s because it waits out the stop timeout before ending what it left; at a clean quit, leftovers of an already-exited chat root are ended by the Engine's job without a per-member record.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b97-proc-java-round4.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/GpuReadBoundTest.java#aReadThatNeverReturnsEndsThePollUnmeasuredAndGpuStartsProceed"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobEndFailureTest.java"
+      ],
+      "class": "New",
+      "behaviour": "When a chat root's job cannot be ended, the refusal reads \"chat start blocked: could not end leftover chat processes (<native error>)\", the ledger records the not-ended outcome after the intent, the leftover stays counted in its scope, and its own later exit is recorded once; a chat start then proceeds.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting), including round-4 repairs of the per-server job containment.",
+          "choice": "Each adapter memory reading is bounded at 2 s: a reading that does not answer ends its release poll as unmeasured (recorded as gpu-release result unmeasured, with a child-note gpu_read_unanswered), and while it still hangs later readings are empty at once, so GPU starts proceed; the GPU start wait grows by the read bound to 8.25 s. When a chat root's leftovers cannot be ended, each member's outcome is recorded after its intent (cleanup_ended:<reason>:job_member:<pid>@<start>, or cleanup_not_ended:...:<cause>), a member not ended keeps its scope held and refusing chat starts until it exits, its own exit is recorded once (leftover_exited:job_member:<pid>@<start>), and the start is refused with \"chat start blocked: could not end leftover chat processes (<native error>)\". A contained chat launch that cannot run fails with the JDK's text, Cannot run program \"<path>\"[ (in directory \"<dir>\")]: CreateProcess error=<n>, <system text>, an argument refused in strict mode with the JDK's text, and a NUL character with the JDK's \"invalid null character in command\"; jdk.lang.Process.allowAmbiguousCommands is read through io.justsearch.configuration.SystemAccess with the JDK's default and strict-mode rules. Named limits, accepted without change: a failed self-test with a survivor takes about 12-14 s because it waits out the stop timeout before ending what it left; at a clean quit, leftovers of an already-exited chat root are ended by the Engine's job without a per-member record.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b97-proc-java-round4.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobEndFailureTest.java#aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A contained chat launch of a missing executable, with and without a working directory, and one with a missing working directory, fails with exactly the JDK's text for the same command. With jdk.lang.Process.allowAmbiguousCommands=false a .cmd launcher sees what it sees under the JDK and an argument the JDK refuses is refused with the JDK's text.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting), including round-4 repairs of the per-server job containment.",
+          "choice": "Each adapter memory reading is bounded at 2 s: a reading that does not answer ends its release poll as unmeasured (recorded as gpu-release result unmeasured, with a child-note gpu_read_unanswered), and while it still hangs later readings are empty at once, so GPU starts proceed; the GPU start wait grows by the read bound to 8.25 s. When a chat root's leftovers cannot be ended, each member's outcome is recorded after its intent (cleanup_ended:<reason>:job_member:<pid>@<start>, or cleanup_not_ended:...:<cause>), a member not ended keeps its scope held and refusing chat starts until it exits, its own exit is recorded once (leftover_exited:job_member:<pid>@<start>), and the start is refused with \"chat start blocked: could not end leftover chat processes (<native error>)\". A contained chat launch that cannot run fails with the JDK's text, Cannot run program \"<path>\"[ (in directory \"<dir>\")]: CreateProcess error=<n>, <system text>, an argument refused in strict mode with the JDK's text, and a NUL character with the JDK's \"invalid null character in command\"; jdk.lang.Process.allowAmbiguousCommands is read through io.justsearch.configuration.SystemAccess with the JDK's default and strict-mode rules. Named limits, accepted without change: a failed self-test with a survivor takes about 12-14 s because it waits out the stop timeout before ending what it left; at a clean quit, leftovers of an already-exited chat root are ended by the Engine's job without a per-member record.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b97-proc-java-round4.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java#aMissingExecutableFailsWithTheJdksText",
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchFailureTextTest.java#strictModeLaunchesAndRefusesAsTheJdkDoes"
+      ],
+      "repaired": true
     }
   ]
 }
