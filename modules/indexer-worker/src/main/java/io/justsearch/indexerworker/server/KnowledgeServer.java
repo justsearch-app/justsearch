@@ -408,6 +408,9 @@ public final class KnowledgeServer implements Closeable {
    *
    * <p>The durable form of this state is {@code auto_rebuild_*} in {@code state.json}; this field is
    * only the in-process consequence for the remainder of {@code start()}.
+   *
+   * <p>Task t-20261013-ef3c41: also set when that brake could not be read at all. A brake that
+   * cannot be read holds exactly like a spent one.
    */
   private volatile boolean rebuildBrakeExhausted;
 
@@ -1537,12 +1540,36 @@ public final class KnowledgeServer implements Closeable {
               this.buildingIndexPath = null;
             }
             String targetFingerprint = expectedIndexFingerprintOrNull();
-            int attempt = recordAutoRebuildAttemptOrSkip(genManager, targetFingerprint);
+            // Task t-20261013-ef3c41: a brake that cannot be read holds like a spent one. Without
+            // this the failed read either killed start() or, with the record re-initialized, read
+            // as a fresh budget and started a rebuild.
+            boolean brakeUnreadable = false;
+            int attempt = 0;
+            try {
+              attempt = recordAutoRebuildAttemptOrSkip(genManager, targetFingerprint);
+            } catch (IndexGenerationManager.AutoRebuildBrakeUnreadableException unreadable) {
+              brakeUnreadable = true;
+              log.error(
+                  "Schema mismatch on active generation {}, but the automatic-rebuild brake cannot"
+                      + " be read ({}). Serving the existing index read-only and NOT rebuilding:"
+                      + " a brake that cannot be read is treated as spent. Status reports"
+                      + " index.rebuild_brake_unreadable. RECOVERY: run Rebuild index from the UI"
+                      + " (core.rebuild-index).",
+                  activeIndexPath,
+                  unreadable.getMessage());
+            }
             LuceneRuntime blue =
                 blueReadOnly != null
                     ? blueReadOnly
                     : buildReadOnlyRuntime(activeIndexPath).openReadOnly();
-            if (attempt > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS) {
+            if (brakeUnreadable) {
+              this.searchLifecycle = blue;
+              publishIngestLifecycle(this.searchLifecycle);
+              this.buildingIndexPath = null;
+              // The same held state as a spent budget: ingestion stops, search serves read-only,
+              // and the operator's rebuild is the way forward.
+              this.rebuildBrakeExhausted = true;
+            } else if (attempt > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS) {
               // Do NOT rethrow. Rethrowing fails start(), which is the same dead-end the old
               // FAIL_CLOSED default produced, three boots later and with no explanation. Open the
               // existing index read-only instead: search keeps working on what is already there,

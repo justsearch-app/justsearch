@@ -88,6 +88,24 @@ final class StatusLifecycleHandlerTest {
   }
 
   @Test
+  void compatBlockedReasonNamesAnUnreadableBrake() {
+    WorkerOperationalView workerView =
+        compatWorkerView(
+            new CompatibilityStatusView(
+                "COMPATIBLE", "", "", "", "", "", "BLOCKED_REBUILD_BRAKE", true, "rebuild_brake_unreadable"));
+    assertEquals("index.rebuild_brake_unreadable", StatusLifecycleHandler.compatBlockedReason(workerView));
+  }
+
+  @Test
+  void compatBlockedReasonStillNamesASpentBrake() {
+    WorkerOperationalView workerView =
+        compatWorkerView(
+            new CompatibilityStatusView(
+                "COMPATIBLE", "", "", "", "", "", "BLOCKED_REBUILD_BRAKE", true, "rebuild_brake_exhausted"));
+    assertEquals("index.rebuild_brake_exhausted", StatusLifecycleHandler.compatBlockedReason(workerView));
+  }
+
+  @Test
   @DisplayName("compatBlockedReason returns null for a COMPATIBLE / empty compat state")
   void compatBlockedReasonNullWhenCompatible() {
     WorkerOperationalView workerView = compatWorkerView(CompatibilityStatusView.empty());
@@ -372,6 +390,44 @@ final class StatusLifecycleHandlerTest {
     assertFalse(
         env.composites().get("retrieval").reasonCodes().contains("chunk_embedding.not_ready"),
         "a fresh empty install must not present as a retrieval degradation");
+  }
+
+  /**
+   * Task t-20261013-ef3c41, S5 — the empty-corpus exemption needs a count that was read. An index
+   * the Worker could not count carries indexedDocuments 0 only for older readers; it must not be
+   * taken as the fresh, empty install that has nothing to embed. The view is built through the
+   * record's canonical constructor so the check compiles against a revision without the field and
+   * fails there by assertion.
+   */
+  @Test
+  void anUncountedIndexIsNotTreatedAsAnEmptyCorpus() throws Exception {
+    java.lang.reflect.RecordComponent[] components = CoreIndexView.class.getRecordComponents();
+    assertTrue(
+        java.util.Arrays.stream(components).anyMatch(c -> c.getName().equals("indexedDocumentsUnknown")),
+        "the Head's status view cannot say a document count is unknown");
+    Class<?>[] types =
+        java.util.Arrays.stream(components).map(java.lang.reflect.RecordComponent::getType).toArray(Class<?>[]::new);
+    Object[] args = new Object[components.length];
+    for (int i = 0; i < components.length; i++) {
+      Class<?> t = components[i].getType();
+      String name = components[i].getName();
+      args[i] = switch (name) {
+        case "indexHealthy", "indexedDocumentsUnknown" -> Boolean.TRUE;
+        case "indexState" -> "IDLE";
+        default -> t == boolean.class ? Boolean.FALSE : t == int.class ? (Object) 0
+            : t == long.class ? (Object) 0L : null;
+      };
+    }
+    CoreIndexView uncounted = CoreIndexView.class.getDeclaredConstructor(types).newInstance(args);
+    WorkerOperationalView base =
+        withChunkCoverage(compatWorkerView(CompatibilityStatusView.empty()), 0, ChunkCoverageView.empty());
+    WorkerOperationalView view =
+        WorkerOperationalViewBuilder.builder(base).core(uncounted).build();
+
+    ReadinessEnvelopeView env = newHandler().buildReadinessEnvelope(view, readyProjection(), freshContact());
+
+    assertNotEquals("READY", env.components().get("chunkEmbedding").state(),
+        "an uncounted index was taken as an empty one with nothing to embed");
   }
 
   @Test

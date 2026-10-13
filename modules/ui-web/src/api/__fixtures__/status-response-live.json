@@ -53,7 +53,8 @@
       "pendingUnknownSizeJobs" : 0,
       "searchableDocuments" : 0,
       "indexMaxDoc" : 0,
-      "indexNumDocs" : 0
+      "indexNumDocs" : 0,
+      "indexedDocumentsUnknown" : false
     },
     "failure" : {
       "failedJobs" : 0,

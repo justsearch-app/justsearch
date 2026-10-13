@@ -291,10 +291,17 @@ final class IndexStatusOps {
     long queueDepth = jobQueue.queueDepth();
     JobQueue.FailureSummary failures = jobQueue.failureSummary();
 
+    // Task t-20261013-ef3c41: a count that has never been read successfully is unknown, not 0. The
+    // numeric fields keep carrying 0 there for readers that predate doc_count_unknown, and the flag
+    // tells every newer reader that the 0 is not a count.
     long activeDocCount = 0;
+    boolean activeDocCountUnknown = false;
     IndexCountOps activeCountOps = searchCountOps != null ? searchCountOps : ingestCountOps;
     if (activeCountOps != null) {
-      activeDocCount = parentDocCountOrLastKnown(activeCountOps, lastKnownActiveDocCount);
+      java.util.OptionalLong active =
+          parentDocCountOrLastKnown(activeCountOps, lastKnownActiveDocCount);
+      activeDocCountUnknown = active.isEmpty();
+      activeDocCount = active.orElse(0L);
     }
 
     // "Documents indexed" counts the generation being WRITTEN while one exists — during a rebuild
@@ -305,8 +312,12 @@ final class IndexStatusOps {
     // size. Live validation caught it reporting 5 while 205 documents were searchable.
     IndexCountOps writtenOrServedCountOps = ingestCountOps != null ? ingestCountOps : activeCountOps;
     long docCount;
+    boolean docCountUnknown = false;
     if (writtenOrServedCountOps != null) {
-      docCount = parentDocCountOrLastKnown(writtenOrServedCountOps, lastKnownWrittenDocCount);
+      java.util.OptionalLong written =
+          parentDocCountOrLastKnown(writtenOrServedCountOps, lastKnownWrittenDocCount);
+      docCountUnknown = written.isEmpty();
+      docCount = written.orElse(0L);
     } else {
       docCount = jobQueue.completedCount();
     }
@@ -315,8 +326,20 @@ final class IndexStatusOps {
     // be counted on the reader that SERVES search — the same one activeDocCount reads. During a
     // rebuild the ingest reader is the half-built NEW generation while search still serves the old
     // one, so counting there described a generation no query could reach.
-    long searchableDocCount =
-        activeCountOps != null ? countDefaultScopeDocs(activeCountOps, activeDocCount) : docCount;
+    java.util.OptionalLong searchable;
+    if (activeCountOps != null) {
+      searchable =
+          countDefaultScopeDocs(
+              activeCountOps,
+              activeDocCountUnknown
+                  ? java.util.OptionalLong.empty()
+                  : java.util.OptionalLong.of(activeDocCount));
+    } else {
+      searchable =
+          docCountUnknown ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(docCount);
+    }
+    long searchableDocCount = searchable.orElse(0L);
+    boolean countsUnknown = docCountUnknown || searchable.isEmpty();
 
     long buildingDocCount = 0;
     if (ingestCountOps != null && ingestCountOps != activeCountOps) {
@@ -347,7 +370,13 @@ final class IndexStatusOps {
     return StatusResponse.newBuilder()
         .setCore(
             buildCore(
-                queueDepth, docCount, searchableDocCount, healthy, state, jobQueue.pendingBytes()))
+                queueDepth,
+                docCount,
+                searchableDocCount,
+                countsUnknown,
+                healthy,
+                state,
+                jobQueue.pendingBytes()))
         .setFailure(buildFailure(failures))
         .setMigration(
             buildMigration(
@@ -416,13 +445,14 @@ final class IndexStatusOps {
    *     default scope always contributes the two exclusions — but a zero would be a silent lie if
    *     that ever changed)
    */
-  private static long countDefaultScopeDocs(IndexCountOps countOps, long fallback) {
+  private static java.util.OptionalLong countDefaultScopeDocs(
+      IndexCountOps countOps, java.util.OptionalLong fallback) {
     Query defaultScope = QueryFilterBuilder.buildFilterQueryOnly(null);
     if (defaultScope == null) {
       return fallback;
     }
     try {
-      return countOps.countQueryOrThrow(defaultScope);
+      return java.util.OptionalLong.of(countOps.countQueryOrThrow(defaultScope));
     } catch (IOException e) {
       // A transient reader IO error must not report a hard 0: the FE renders a known 0 as the
       // "nothing indexed yet" empty-state CTA. Fall back to the unscoped count — an over-count
@@ -436,6 +466,7 @@ final class IndexStatusOps {
       long queueDepth,
       long docCount,
       long searchableDocCount,
+      boolean docCountUnknown,
       boolean healthy,
       String state,
       JobQueue.PendingBytes pendingBytes) {
@@ -448,6 +479,7 @@ final class IndexStatusOps {
             .setQueueDepth(queueDepth)
             .setDocCount(docCount)
             .setSearchableDocCount(searchableDocCount)
+            .setDocCountUnknown(docCountUnknown)
             .setIsHealthy(healthy)
             .setState(state)
             // Null-tolerant on purpose: a Worker can legitimately have no indexing loop.
@@ -1174,19 +1206,23 @@ final class IndexStatusOps {
    * Whole-document count (documents minus chunks) of {@code ops}. Task t-20261013-ef3c41: a read
    * failure used to be counted as 0 documents — a status that told the user their index was empty
    * because a reader was briefly unavailable. A failed read now reports the last count this
-   * process read successfully from the same reader, and only before any successful read 0.
+   * process read successfully from the same reader. Before any successful read there is no count to
+   * report and the answer is empty (unknown): the status then says so through {@code
+   * doc_count_unknown} instead of a 0 that reads as an empty index.
    */
-  private static long parentDocCountOrLastKnown(
+  private static java.util.OptionalLong parentDocCountOrLastKnown(
       IndexCountOps ops, java.util.concurrent.atomic.AtomicReference<CountReading> lastKnown) {
     try {
       long count =
           ops.docCountOrThrow() - ops.countByFieldOrThrow(SchemaFields.IS_CHUNK, "true");
       lastKnown.set(new CountReading(ops, count));
-      return count;
+      return java.util.OptionalLong.of(count);
     } catch (IOException | RuntimeException e) {
       CountReading previous = lastKnown.get();
       log.debug("Document count unreadable, reporting the last known count: {}", e.getMessage());
-      return previous != null && previous.ops() == ops ? previous.count() : 0L;
+      return previous != null && previous.ops() == ops
+          ? java.util.OptionalLong.of(previous.count())
+          : java.util.OptionalLong.empty();
     }
   }
 
@@ -1237,16 +1273,20 @@ final class IndexStatusOps {
     }
   }
 
-  /** The live document count, or {@code -1} when it cannot be read (never a guessed 0). */
-  private long docCountOrUnknown() {
+  /**
+   * The live document count, or empty when it cannot be read. Empty is "unknown", and the caller
+   * answers unknown for it: it never reaches the {@code docCount <= 0} emptiness predicate, which
+   * would read it as an index holding nothing to migrate.
+   */
+  private java.util.OptionalLong docCountOrUnknown() {
     if (ingestCountOps == null) {
-      return -1L;
+      return java.util.OptionalLong.empty();
     }
     try {
-      return ingestCountOps.docCountOrThrow();
+      return java.util.OptionalLong.of(ingestCountOps.docCountOrThrow());
     } catch (IOException | RuntimeException e) {
       log.debug("Failed to read the document count: {}", e.getMessage());
-      return -1L;
+      return java.util.OptionalLong.empty();
     }
   }
 
@@ -1268,11 +1308,27 @@ final class IndexStatusOps {
       // unresolvable). UNAVAILABLE, never COMPATIBLE — an absent answer is not a clean bill.
       return "UNAVAILABLE";
     }
-    if (autoRebuildBrakeExhausted(current)) {
+    IndexGenerationManager.AutoRebuildBrake brake = autoRebuildBrake(current);
+    if (brake == IndexGenerationManager.AutoRebuildBrake.EXHAUSTED
+        || brake == IndexGenerationManager.AutoRebuildBrake.UNREADABLE) {
       // The Worker has stopped rebuilding this shape by itself. Reported ahead of the plain
-      // mismatch because the remedy is different: waiting will not fix it.
+      // mismatch because the remedy is different: waiting will not fix it. Task t-20261013-ef3c41:
+      // a brake record for this shape whose count cannot be read holds exactly like a spent one.
       return "BLOCKED_REBUILD_BRAKE";
     }
+    String state = schemaCompatStateIgnoringBrake(current);
+    if (brake == IndexGenerationManager.AutoRebuildBrake.STATE_UNREADABLE
+        && ("BLOCKED_MISMATCH".equals(state) || "BLOCKED_LEGACY".equals(state))) {
+      // Task t-20261013-ef3c41: the state record holding the brake cannot be read, and a brake that
+      // cannot be read holds, so an index that needs a rebuild is not being rebuilt automatically.
+      // Said only where a rebuild is called for: nothing records one for a compatible or unknown index.
+      return "BLOCKED_REBUILD_BRAKE";
+    }
+    return state;
+  }
+
+  /** {@link #safeSchemaCompatState()} before the repeat-rebuild brake is consulted. */
+  private String schemaCompatStateIgnoringBrake(String current) {
     java.util.Optional<Map<String, String>> recorded = storedCommitUserDataOrUnknown();
     if (recorded.isEmpty()) {
       return "UNAVAILABLE";
@@ -1287,10 +1343,11 @@ final class IndexStatusOps {
     if (ParityDiagnostics.storedShapeUnreadable(ud, expected)) {
       return "UNAVAILABLE";
     }
-    long docCount = docCountOrUnknown();
-    if (docCount < 0) {
+    java.util.OptionalLong readCount = docCountOrUnknown();
+    if (readCount.isEmpty()) {
       return "UNAVAILABLE";
     }
+    long docCount = readCount.getAsLong();
     if (stored.isEmpty()) {
       // No recorded DIGEST. Two different indexes look like this and they get different answers
       // (tempdoc 931 §C.5): one that predates index_fingerprint_inputs recorded no shape at all and
@@ -1312,17 +1369,20 @@ final class IndexStatusOps {
     return ParityDiagnostics.holdsNothingToMigrate(docCount) ? "COMPATIBLE" : "BLOCKED_MISMATCH";
   }
 
-  /** True once the Worker has spent its automatic-rebuild budget on the current target shape. */
-  private boolean autoRebuildBrakeExhausted(String currentFingerprint) {
+  /**
+   * The repeat-rebuild brake for the current target shape. Task t-20261013-ef3c41: a failed read is
+   * {@code UNREADABLE}, never "no brake" — the answer used to be {@code false} there, so the status
+   * described an index the Worker would not rebuild as one that resolves itself.
+   */
+  private IndexGenerationManager.AutoRebuildBrake autoRebuildBrake(String currentFingerprint) {
     if (indexGenerationManager == null || currentFingerprint.isEmpty()) {
-      return false;
+      return IndexGenerationManager.AutoRebuildBrake.RELEASED;
     }
     try {
-      return indexGenerationManager.autoRebuildAttemptsFor(currentFingerprint)
-          > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS;
+      return indexGenerationManager.autoRebuildBrakeFor(currentFingerprint);
     } catch (RuntimeException e) {
       log.debug("Failed to read the auto-rebuild brake: {}", e.getMessage());
-      return false;
+      return IndexGenerationManager.AutoRebuildBrake.STATE_UNREADABLE;
     }
   }
 
@@ -1339,7 +1399,9 @@ final class IndexStatusOps {
   private String reindexRequiredReason() {
     String schemaState = safeSchemaCompatState();
     if ("BLOCKED_REBUILD_BRAKE".equals(schemaState)) {
-      return "rebuild_brake_exhausted";
+      return autoRebuildBrake(safeSchemaFingerprintCurrent()).unreadable()
+          ? "rebuild_brake_unreadable"
+          : "rebuild_brake_exhausted";
     }
     if ("BLOCKED_MISMATCH".equals(schemaState)) {
       return "schema_mismatch";

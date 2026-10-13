@@ -13,6 +13,12 @@ when it cannot tell. Repaired checks fail on cf3f14655 by assertion (evidence
 `--before cf3f14655`, where each records `passed` on the before-state by design). Checks of code
 new in this change run on the candidate only (`gates/test-intent/evidence/ef3c41-uncertain-deletes-after-only.json`).
 
+Round 2 (repairs on top of bf41272f9): the unknown document count (S5) and the unreadable rebuild brake.
+Its repaired checks fail on bf41272f9 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-repaired.json`;
+the UI ones in `gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-ui-repaired.json`), and its must-not-break checks pass on
+bf41272f9 and on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-preserved.json`,
+`gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-ui-preserved.json`).
+
 ```json
 {
   "entries": [
@@ -723,6 +729,234 @@ new in this change run on the candidate only (`gates/test-intent/evidence/ef3c41
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/UnreadableRootAvailabilityTest.java#aListableRootStaysAvailable"
       ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpResourcesReadTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 2: a document count that fails from the very first read (no earlier count to fall back on) is reported as unknown: the Worker sets doc_count_unknown, /api/status carries indexedDocumentsUnknown, and MCP's index summary says \"documents: unknown\" instead of \"documents: 0\". Fail-before against bf41272f9.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S5",
+          "quote": "When the document count or stored index metadata cannot be read (including the startup window), status says checking or unknown; it never says compatible, never shows 0 documents, and never says legacy index or rebuild required. An index holding documents with a different fingerprint is never reported compatible.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "When the backend reports the document count as unknown (indexedDocumentsUnknown), the UI shows \"Checking…\" while the server's uptime is under 120 s and \"Unknown\" after, never 0; the count is UNKNOWN in the store, so nothing treats the index as empty (no \"no documents\" gap, document search stays offered, the chat preview names no number). The flag is additive: indexedDocuments keeps carrying 0 for older readers.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aCountThatFailsFromTheFirstReadIsReportedUnknown",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperTest.java#anUncountedIndexReachesStatusAsUnknown",
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpResourcesReadTest.java#anUncountedIndexIsSummarisedAsUnknownNotZeroDocuments"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 2, must not break: a counted index keeps its count and is not marked unknown.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S5",
+          "quote": "When the document count or stored index metadata cannot be read (including the startup window), status says checking or unknown; it never says compatible, never shows 0 documents, and never says legacy index or rebuild required. An index holding documents with a different fingerprint is never reported compatible.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-preserved.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aReadableCountIsNotReportedUnknown"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/JobBatchExtractorForcedPathTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 2: the emptiness decisions do not treat an unknown count as empty. When the index cannot be counted, the extractor keeps the unchanged-file check instead of treating the batch as the first fill of an empty index (so an unchanged file is not extracted and written again), and the Head's chunk-embedding readiness does not take the uncounted index for the empty corpus that has nothing to embed. Fail-before against bf41272f9.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S5",
+          "quote": "When the document count or stored index metadata cannot be read (including the startup window), status says checking or unknown; it never says compatible, never shows 0 documents, and never says legacy index or rebuild required. An index holding documents with a different fingerprint is never reported compatible.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "When the backend reports the document count as unknown (indexedDocumentsUnknown), the UI shows \"Checking…\" while the server's uptime is under 120 s and \"Unknown\" after, never 0; the count is UNKNOWN in the store, so nothing treats the index as empty (no \"no documents\" gap, document search stays offered, the chat preview names no number). The flag is additive: indexedDocuments keeps carrying 0 for older readers.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/JobBatchExtractorForcedPathTest.java#anUnreadableCountKeepsTheUnchangedCheck",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#anUncountedIndexIsNotTreatedAsAnEmptyCorpus"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Round 2, UI: when /api/status reports indexedDocumentsUnknown, the files fact reads \"Checking…\" in the start-up window and \"Unknown\" after it, never 0; the store's counts are unknown, document search is not reported as \"no documents\", and the chat preview reads \"Searching your documents\" instead of \"Searching 0 documents\". Fail-before against bf41272f9 (vitest only; the before worktree is linked to this worktree's private node_modules and that run starts no Gradle).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S5",
+          "quote": "When the document count or stored index metadata cannot be read (including the startup window), status says checking or unknown; it never says compatible, never shows 0 documents, and never says legacy index or rebuild required. An index holding documents with a different fingerprint is never reported compatible.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "When the backend reports the document count as unknown (indexedDocumentsUnknown), the UI shows \"Checking…\" while the server's uptime is under 120 s and \"Unknown\" after, never 0; the count is UNKNOWN in the store, so nothing treats the index as empty (no \"no documents\" gap, document search stays offered, the chat preview names no number). The flag is additive: indexedDocuments keeps carrying 0 for older readers.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-ui-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#shows \"Checking…\" while the server is starting, never 0",
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#shows \"Unknown\" once the start-up window has passed, never 0",
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#is not treated as empty: the counts are unknown and document search is not \"no documents\"",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#an index the backend could not count shows no number, never \"Searching 0 documents\" (t-20261013-ef3c41)"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Round 2, UI, must not break: a known 0 is still the empty index and a known count is still shown.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S5",
+          "quote": "When the document count or stored index metadata cannot be read (including the startup window), status says checking or unknown; it never says compatible, never shows 0 documents, and never says legacy index or rebuild required. An index holding documents with a different fingerprint is never reported compatible.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-ui-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#a counted index is unchanged: a known 0 is still empty, a known count is still shown"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/BrakeExhaustedWorkerServesReadOnlyTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/observability/health/WorkerSnapshotTapTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 2, rebuild brake: a brake that cannot be read counts as braked. A state record whose files do not parse, or a brake record for the current target without an attempt count, refuses to count an automatic attempt; a real Worker booting over such a record holds (read-only search, no automatic rebuild generation), status reports BLOCKED_REBUILD_BRAKE with reindexRequiredReason rebuild_brake_unreadable, the Head maps it to index.rebuild_brake_unreadable with the index-rebuild recovery, and a person's rebuild is accepted. Fail-before against bf41272f9.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S6",
+          "quote": "An unparseable stored index fingerprint makes status say unknown; the index opens, is never reported compatible, and nothing rebuilds automatically.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "An automatic-rebuild brake that cannot be read counts as braked (orchestrator decision, round 2): no automatic rebuild or index replacement starts, search keeps serving the existing index read-only, status carries index.rebuild_brake_unreadable (reindexRequiredReason rebuild_brake_unreadable), and a person's explicit rebuild still runs. A brake record that names the current target but has no usable attempt count is unreadable in the same way.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-repaired.json",
+      "newChecks": [
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java#anUnreadableBrakeRefusesToCountAnAttempt",
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java#aBrakeRecordWithoutACountRefusesToCountAnAttempt",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aMismatchWithAnUnreadableBrakeIsReportedBrakedNamingTheUnreadableBrake",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/BrakeExhaustedWorkerServesReadOnlyTest.java#anUnreadableBrakeHoldsLikeASpentOneAndAPersonsRebuildStillRuns",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#compatBlockedReasonNamesAnUnreadableBrake",
+        "modules/app-services/src/test/java/io/justsearch/app/services/observability/health/WorkerSnapshotTapTest.java#anUnreadableRebuildBrakeRoutesToTheIndexRebuild"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 2, rebuild brake, must not break: a readable brake for another target still counts from one, a mismatch with no brake recorded is still a plain mismatch, and a spent brake still maps to index.rebuild_brake_exhausted.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "P2",
+          "quote": "Genuine index corruption still auto-recovers as before; a genuine schema mismatch still migrates; the identity grace clock still starts only on confirmed absence; candidate and boot reconciliation behave as before.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "An automatic-rebuild brake that cannot be read counts as braked (orchestrator decision, round 2): no automatic rebuild or index replacement starts, search keeps serving the existing index read-only, status carries index.rebuild_brake_unreadable (reindexRequiredReason rebuild_brake_unreadable), and a person's explicit rebuild still runs. A brake record that names the current target but has no usable attempt count is unreadable in the same way.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r2-preserved.json",
+      "newChecks": [
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java#aReadableBrakeForAnotherTargetStillCountsFromOne",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aMismatchWithNoBrakeRecordedIsStillAPlainMismatch",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#compatBlockedReasonStillNamesASpentBrake"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/JobBatchExtractorForcedPathTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OriginBoundaryAdmissionTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The extractor now decides \"empty index\" from the strict count (docCountOrThrow) so that a failed read is not 0. The IndexCountOps mocks in the existing harnesses answer docCountOrThrow with the same 7 they already gave docCount. Inputs, observations and every expected value of the existing tests are unchanged."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/api/__fixtures__/status-response-live.json"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The live status fixture is the Java serialization of a default status, regenerated by StatusRecordSchemaTest (updateSchemas). The additive core field indexedDocumentsUnknown now appears in it with its default, false; no other value changed. contract.test.ts and status-response.test.ts parse the same fixture against the regenerated schema with their expectations unchanged."
     }
   ]
 }

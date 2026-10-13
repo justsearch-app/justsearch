@@ -657,7 +657,10 @@ final class KnowledgeSearchEngine {
     @Override public StatusFacts statusFacts(EngineContext engineContext) {
       return captured.lease().withClient(client -> {
         var status = client.getStatus(engineContext);
-        return new StatusFacts(status.getCore().getDocCount(),
+        // Task t-20261013-ef3c41: a count the Worker could not read is unavailable (negative), the
+        // value the coverage clause already omits itself for — never a 0 that claims an empty index.
+        return new StatusFacts(
+            status.getCore().getDocCountUnknown() ? -1L : status.getCore().getDocCount(),
             status.getEnrichment().getEmbedding().getCoveragePercent(),
             status.getEnrichment().getSplade().getCoveragePercent());
       });

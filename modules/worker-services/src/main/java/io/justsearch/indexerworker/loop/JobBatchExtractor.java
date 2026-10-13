@@ -127,7 +127,7 @@ public final class JobBatchExtractor {
    * empty index (312 item 10).
    */
   public List<ExtractedJob> extractAll(List<JobQueue.IndexJob> jobs) {
-    indexEmptyForBatch = indexCountOps.docCount() == 0;
+    indexEmptyForBatch = indexKnownEmpty();
 
     List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
     for (JobQueue.IndexJob job : jobs) {
@@ -143,6 +143,22 @@ public final class JobBatchExtractor {
       indexingPacing.pace();
     }
     return extracted;
+  }
+
+  /**
+   * Whether the index is known to hold no documents. Task t-20261013-ef3c41: {@code docCount()}
+   * answers 0 when the reader cannot be read, which made an unreadable index "empty" and skipped
+   * the unchanged-file check for the whole batch — every file re-extracted and rewritten. Only a
+   * count that was actually read as 0 makes the index empty; an unreadable one keeps the check.
+   */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a closed reader throws unchecked
+  private boolean indexKnownEmpty() {
+    try {
+      return indexCountOps.docCountOrThrow() == 0;
+    } catch (IOException | RuntimeException unreadable) {
+      log.debug("Index count unreadable; keeping the unchanged-file check: {}", unreadable.getMessage());
+      return false;
+    }
   }
 
   /** Resets the per-batch index-empty cache. Called from {@code resetForProfiling}. */

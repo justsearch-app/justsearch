@@ -22,7 +22,7 @@
  * literal is unrepresentable because the factual chip carries a fact-ref, not a string.
  */
 
-import type { AiState } from '../state/aiStateStore.js';
+import { unknownDocumentCountLabel, type AiState } from '../state/aiStateStore.js';
 import { EMBED_VECTOR_DIM } from '../../api/generated/field-constants.js';
 import { whenKnown } from '../state/known.js';
 import { formatBytes, formatCount } from './format.js';
@@ -181,8 +181,11 @@ const FACTS: Record<string, FactDef> = {
     label: 'Files',
     source: {
       kind: 'observed',
+      // Task t-20261013-ef3c41: an index the backend could not count reads "Checking…" while the
+      // server is starting and "Unknown" after — never "0", which would say the index is empty.
       read: (s) =>
-        s.index ? whenKnown(s.index.documentCount, (n) => formatCount(n), () => undefined) : undefined,
+        unknownDocumentCountLabel(s.status) ??
+        (s.index ? whenKnown(s.index.documentCount, (n) => formatCount(n), () => undefined) : undefined),
     },
   },
   'core.size': {

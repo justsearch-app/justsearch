@@ -86,7 +86,8 @@ final class WorkerStatusMapper {
                         core.getPendingUnknownSizeJobs(),
                         core.getSearchableDocCount(),
                         core.getIndexMaxDoc(),
-                        core.getIndexNumDocs()))
+                        core.getIndexNumDocs(),
+                        core.getDocCountUnknown()))
                 .failure(new FailureTrackingView(
                         failure.getFailedCount(),
                         failure.getLastFailedPath(),

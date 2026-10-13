@@ -934,6 +934,27 @@ final class WorkerSnapshotTapTest {
     }
   }
 
+  /**
+   * Task t-20261013-ef3c41, round 2 — an unreadable rebuild brake holds like a spent one, so its
+   * recovery is the same: the explicit index rebuild, not a plain reindex (which the held Worker
+   * would not act on).
+   */
+  @Test
+  void anUnreadableRebuildBrakeRoutesToTheIndexRebuild() {
+    tap.accept(
+        view(
+            compat("COMPATIBLE", "COMPATIBLE", true, "rebuild_brake_unreadable"),
+            queueDb(true, true),
+            failure("", "", 0, 0)),
+        false);
+
+    HealthEvent event = conditions.find("schema.reindex-required", "worker.schema").orElseThrow();
+    AssertedCondition condition = (AssertedCondition) event.body();
+    assertTrue(condition.recovery().isPresent(), "required reindex must expose a recovery");
+    assertEquals("core.rebuild-index", condition.recovery().get().target().value());
+    assertEquals("{}", condition.recovery().get().defaultArgsJson());
+  }
+
   @Test
   @DisplayName("reindex reason changes modify the event, switch actions, and still clear")
   void reindexReasonChangeModifiesAndClearPreservesConditionSlot() {

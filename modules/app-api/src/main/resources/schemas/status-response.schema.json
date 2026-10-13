@@ -707,6 +707,9 @@
             "indexedDocuments" : {
               "type" : "integer"
             },
+            "indexedDocumentsUnknown" : {
+              "type" : "boolean"
+            },
             "pendingBytes" : {
               "type" : "integer"
             },

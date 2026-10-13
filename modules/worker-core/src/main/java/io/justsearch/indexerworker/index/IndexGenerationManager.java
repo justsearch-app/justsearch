@@ -1299,14 +1299,23 @@ public final class IndexGenerationManager {
     try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
+        // Task t-20261013-ef3c41: a state record that exists but cannot be read holds a brake this
+        // call cannot see. Re-initializing used to adopt the generation into a FRESH record — no
+        // attempts — so an unreadable brake read as "no brake" and a rebuild started.
+        if (stateRecordPossiblyPresent()) {
+          throw new AutoRebuildBrakeUnreadableException(statePath);
+        }
         initializeOrLoad();
         current = readStateBestEffort();
         if (current == null) {
-          return 1;
+          throw new AutoRebuildBrakeUnreadableException(statePath);
         }
       }
       State normalized = normalizeAndUpgradeStateIfNeeded(current);
       String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
+      if (brakeRecordMalformed(normalized, key)) {
+        throw new AutoRebuildBrakeUnreadableException(statePath);
+      }
       boolean sameTarget = key.equals(normalized.auto_rebuild_key());
       int nextCount =
           sameTarget && normalized.auto_rebuild_count() != null
@@ -1347,6 +1356,84 @@ public final class IndexGenerationManager {
     }
     String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
     return key.equals(current.auto_rebuild_key()) ? current.auto_rebuild_count() : 0;
+  }
+
+  /** What the repeat-rebuild brake says about automatic rebuilds toward one target shape. */
+  public enum AutoRebuildBrake {
+    /** Automatic rebuilds toward this target may start: the budget is not spent. */
+    RELEASED,
+    /** The budget for this target is spent: only a person's rebuild proceeds. */
+    EXHAUSTED,
+    /**
+     * The brake record names this target but its attempt count cannot be read (task
+     * t-20261013-ef3c41). Treated exactly like {@link #EXHAUSTED} — no automatic rebuild or index
+     * replacement starts — because a brake that cannot be read may be a spent one.
+     */
+    UNREADABLE,
+    /**
+     * The state record holding the brake exists but cannot be read at all, so neither the target
+     * nor the count is known (task t-20261013-ef3c41). Holds like {@link #UNREADABLE}; unlike it,
+     * it says nothing about whether a rebuild toward this target was ever called for.
+     */
+    STATE_UNREADABLE;
+
+    /** Whether the brake answer could not be read — either way, it holds. */
+    public boolean unreadable() {
+      return this == UNREADABLE || this == STATE_UNREADABLE;
+    }
+  }
+
+  /**
+   * The brake's answer for {@code targetKey}, read-only. Unlike {@link #autoRebuildAttemptsFor},
+   * a state record that exists but cannot be read is {@link AutoRebuildBrake#STATE_UNREADABLE},
+   * not "no attempts recorded"; only a store that has never written a state record is released by
+   * absence.
+   */
+  public AutoRebuildBrake autoRebuildBrakeFor(String targetKey) {
+    State current = readStateBestEffort();
+    if (current == null) {
+      return stateRecordPossiblyPresent()
+          ? AutoRebuildBrake.STATE_UNREADABLE
+          : AutoRebuildBrake.RELEASED;
+    }
+    String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
+    if (brakeRecordMalformed(current, key)) {
+      return AutoRebuildBrake.UNREADABLE;
+    }
+    return key.equals(current.auto_rebuild_key())
+            && current.auto_rebuild_count() > MAX_AUTO_REBUILD_ATTEMPTS
+        ? AutoRebuildBrake.EXHAUSTED
+        : AutoRebuildBrake.RELEASED;
+  }
+
+  /**
+   * A brake record names this target but carries no usable attempt count: the attempts made
+   * toward it cannot be read, which is not the same as none having been made.
+   */
+  private static boolean brakeRecordMalformed(State state, String key) {
+    return key.equals(state.auto_rebuild_key())
+        && (state.auto_rebuild_count() == null || state.auto_rebuild_count() < 1);
+  }
+
+  /**
+   * Whether a state record (current or previous) may exist. {@code Files.notExists} is true only
+   * when absence is confirmed, so a record whose existence cannot be checked counts as present.
+   */
+  private boolean stateRecordPossiblyPresent() {
+    return !Files.notExists(statePath) || !Files.notExists(statePrevPath);
+  }
+
+  /**
+   * The brake record exists but could not be read, so no automatic rebuild may start (task
+   * t-20261013-ef3c41). An {@link IOException} so callers that do not distinguish it keep failing
+   * closed, as they did when the read itself threw.
+   */
+  public static final class AutoRebuildBrakeUnreadableException extends IOException {
+    private static final long serialVersionUID = 1L;
+
+    public AutoRebuildBrakeUnreadableException(Path statePath) {
+      super("The automatic-rebuild brake in " + statePath + " cannot be read");
+    }
   }
 
   /**

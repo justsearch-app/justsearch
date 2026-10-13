@@ -716,7 +716,12 @@ message CoreStatus {
   // yet — the signal that separates "the corpus shrank" from "the index has not merged yet".
   int64 index_max_doc = 21;
   int64 index_num_docs = 22;
-  // Next available field number: 23
+  // Task t-20261013-ef3c41: true when doc_count and searchable_doc_count are NOT counts — the index
+  // could not be counted and no earlier count exists (the first read failed). Both then carry 0 for
+  // readers that predate this field; a reader that knows it must show the count as unknown, never
+  // as an empty index. Absent (false) means the counts are known, as every earlier sender meant.
+  bool doc_count_unknown = 23;
+  // Next available field number: 24
 }
 
 // Failure tracking and search quality signals.

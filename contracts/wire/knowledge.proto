@@ -52,6 +52,10 @@ message KnowledgeStatusView {
   int32 pending_ner_count = 27 [json_name = "pendingNerCount"];
   int32 completed_ner_count = 28 [json_name = "completedNerCount"];
 
+  // Task t-20261013-ef3c41: true when indexed_documents (and its doc_count alias) is NOT a count —
+  // the index could not be counted and no earlier count exists. Absent or false means known.
+  bool indexed_documents_unknown = 29 [json_name = "indexedDocumentsUnknown"];
+
   // === Deprecated aliases (SE-2) ===
   // Server emits these with the OLD wire-format names. Field numbers
   // 100-103 reserved for the alias block. CEL invariant enforces

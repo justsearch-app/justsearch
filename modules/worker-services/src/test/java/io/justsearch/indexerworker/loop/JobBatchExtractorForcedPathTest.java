@@ -81,6 +81,12 @@ final class JobBatchExtractorForcedPathTest {
 
   private Harness newHarness(Set<String> forcedPaths, DocumentIdentityStore identityStore)
       throws Exception {
+    return newHarness(forcedPaths, identityStore, true);
+  }
+
+  private Harness newHarness(
+      Set<String> forcedPaths, DocumentIdentityStore identityStore, boolean countReadable)
+      throws Exception {
     DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
     // Nothing changed on disk — the index's view of this doc is current. This is the precondition
     // that makes the UNCHANGED branch the DEFAULT outcome, so taking it is not the finding; NOT
@@ -90,7 +96,16 @@ final class JobBatchExtractorForcedPathTest {
     IndexCountOps indexCountOps = mock(IndexCountOps.class);
     // A non-empty index, so the `indexEmptyForBatch` short-circuit (312 item 10) is NOT what
     // decides the branch — otherwise both arms would skip the unchanged-check for the wrong reason.
-    when(indexCountOps.docCount()).thenReturn(7L);
+    if (countReadable) {
+      when(indexCountOps.docCount()).thenReturn(7L);
+      // Task t-20261013-ef3c41: the extractor decides "empty index" from the count it actually read.
+      when(indexCountOps.docCountOrThrow()).thenReturn(7L);
+    } else {
+      // What IndexCountOps does when its reader cannot be read: the lenient count answers 0 and the
+      // strict one throws.
+      when(indexCountOps.docCount()).thenReturn(0L);
+      when(indexCountOps.docCountOrThrow()).thenThrow(new IOException("reader unavailable"));
+    }
 
     TimeboxedContentExtractor contentExtractor = mock(TimeboxedContentExtractor.class);
     when(contentExtractor.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
@@ -142,6 +157,34 @@ final class JobBatchExtractorForcedPathTest {
   /** The key every marker writes for an admitted path — production's own derivation. */
   private static String forcedKey(Path file) {
     return PathNormalizer.normalizeKey(file);
+  }
+
+  /**
+   * Task t-20261013-ef3c41, S5 — an index that cannot be counted is not an empty one. Before, the
+   * failed count read as 0, the batch was treated as "first index of an empty index", the unchanged
+   * check was skipped and every unchanged file was extracted and written again.
+   */
+  @Test
+  void anUnreadableCountKeepsTheUnchangedCheck() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("unreadable-count.txt"), "same");
+    DocumentIdentityStore identityStore = mock(DocumentIdentityStore.class);
+    when(identityStore.resolve(anyString(), anyLong()))
+        .thenReturn(new DocumentIdentityStore.Identity("hash", "test-uid", 1L, 1L));
+    Harness h = newHarness(ConcurrentHashMap.newKeySet(), identityStore, false);
+    var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, false, null, file);
+
+    h.extractor().extractAll(List.of(claim));
+
+    assertEquals(1, invocations(h.documentFieldOps(), "isUnmodified"),
+        "the unchanged check was skipped as if the index were empty");
+    assertEquals(0, invocations(h.contentExtractor(), "extractArtifact"),
+        "an unchanged file was extracted again because the index could not be counted");
+  }
+
+  private static long invocations(Object mock, String method) {
+    return org.mockito.Mockito.mockingDetails(mock).getInvocations().stream()
+        .filter(i -> i.getMethod().getName().equals(method))
+        .count();
   }
 
   @Test
