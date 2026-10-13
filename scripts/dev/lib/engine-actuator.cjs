@@ -639,7 +639,7 @@ const CLI_ENGINE_ENDINGS = Object.freeze({
  * incarnation, so a runner that recorded it first keeps it.
  *
  * The exit code is the stop census's identity-bound observation when it has one
- * (`observedBy: 'census'`), otherwise the code the ending leaves. A code other than the ending's is
+ * (`observedBy: 'census'`), otherwise unknown; a stop attempt is not an exit observation. A code other than the ending's is
  * UNEXPECTED: a crash during the stop stays a crash. A cooperative quit with no observed code is
  * UNKNOWN.
  *
@@ -699,7 +699,7 @@ function createCliEngineRecorder({
       const why = refusal();
       if (why) return { written: false, why };
       const observedCode = Number.isInteger(observed?.exitCode) ? observed.exitCode : null;
-      const code = observedCode ?? ending.code;
+      const code = observedCode;
       const expected = endedBy === 'cooperative' ? expectedCodeFor(reason, policy) : ending.code;
       const exitClass = !Number.isInteger(code) ? 'UNKNOWN' : code === expected ? 'REQUESTED' : 'UNEXPECTED';
       const codeDistinctive = exitClass === 'UNEXPECTED'
@@ -715,6 +715,7 @@ function createCliEngineRecorder({
         observedAt: new Date(clock()),
         terminateCalledAt: Number.isFinite(terminateCalledAt) ? new Date(terminateCalledAt) : null,
         forced: ending.forced,
+        attemptedEnding: endedBy,
         phase,
         codeDistinctive,
         contract: { action: 'stop', exitClass: 'REQUESTED', counted: false },

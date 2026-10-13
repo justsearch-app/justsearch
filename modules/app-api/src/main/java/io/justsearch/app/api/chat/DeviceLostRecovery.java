@@ -26,6 +26,10 @@ public interface DeviceLostRecovery {
    */
   void requestRestart();
 
+  /** Durably reserves the admitted restart before chat commits to terminal shutdown. */
+  default void reserveRestart() throws IOException {}
+
+
   /** No restart path: every device loss fails closed. */
   DeviceLostRecovery UNAVAILABLE =
       new DeviceLostRecovery() {

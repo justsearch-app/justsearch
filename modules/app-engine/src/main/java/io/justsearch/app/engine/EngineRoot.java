@@ -207,6 +207,11 @@ public final class EngineRoot implements WorkerHost {
         }
 
         @Override
+        public void reserveRestart() throws IOException {
+          deviceLostRecovery.reserveRestart();
+        }
+
+        @Override
         public void requestRestart() {
           deviceLostRecovery.requestRestart();
         }

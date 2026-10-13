@@ -181,11 +181,13 @@ public final class ExitLedgerWriter {
       } catch (IOException e) {
         noteGap(LedgerGapReason.WRITE_FAILED, now);
         healthy = false;
+        ExitLedgerHealth.failed(this, ledgerDir, now);
         return false;
       }
       if (line.gap() != null) pendingGaps.remove(line.gap());
     }
     healthy = true;
+    ExitLedgerHealth.recovered(this);
     return true;
   }
 

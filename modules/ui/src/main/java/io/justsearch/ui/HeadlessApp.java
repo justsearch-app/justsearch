@@ -1206,15 +1206,32 @@ public class HeadlessApp {
   static final class LedgerSelfIntent
       implements io.justsearch.app.engine.EngineShutdownSequence.SelfIntent {
     private final io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer;
+    private boolean deviceLostReserved;
 
     LedgerSelfIntent(io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer) {
       this.writer = java.util.Objects.requireNonNull(writer, "writer");
     }
 
     @Override
-    public void record(io.justsearch.app.api.runtime.child.StopReason reason,
+    public synchronized void record(io.justsearch.app.api.runtime.child.StopReason reason,
         Optional<io.justsearch.app.api.runtime.child.StopDetail> detail, int expectedCode) {
-      writer.record(reason, detail, expectedCode);
+      if (reason == io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST && deviceLostReserved) {
+        deviceLostReserved = false; // consume the reservation without duplicating its record
+        return;
+      }
+      boolean durable = writer.record(reason, detail, expectedCode);
+      if (!durable && reason == io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST) {
+        throw new IllegalStateException("Device-loss restart reservation could not be persisted");
+      }
+    }
+
+    synchronized void reserveDeviceLost() {
+      if (deviceLostReserved) return;
+      if (!writer.record(io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST,
+          Optional.empty(), io.justsearch.app.engine.EngineExit.REQUESTED_RESTART)) {
+        throw new IllegalStateException("Device-loss restart reservation could not be persisted");
+      }
+      deviceLostReserved = true;
     }
 
     boolean healthy() {
@@ -1441,6 +1458,10 @@ public class HeadlessApp {
       engineRoot.bindDeviceLostRecovery(deviceLostRecovery(configPhase.dataDir(), () -> {
         var writer = selfIntentWriter.get();
         return writer == null || writer.healthy();
+      }, () -> {
+        var writer = selfIntentWriter.get();
+        if (writer == null) throw new IllegalStateException("Engine self-intent writer is not ready");
+        writer.reserveDeviceLost();
       }, deviceLostRestart));
       // Spec A §7.4: the machine's resumes reach the chat controller (timers reset, a probe).
       engineRoot.bindPowerEvents(powerEvents);
@@ -2354,13 +2375,13 @@ public class HeadlessApp {
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "app-instance-lock",
-            reason -> {
+            (reason, budget) -> {
               if (!workDrained.get() || !headClosed.get() || !indexClosed.get()
                   || !operationsClosed.get() || !processResourcesClosed.get()) {
                 throw new IllegalStateException("Instance lock retained until stateful owners close");
               }
               io.justsearch.app.api.runtime.containment.EngineContainment.current()
-                  .finishProcessRecording(java.time.Duration.ofSeconds(2));
+                  .finishProcessRecording(budget.waitFor(java.time.Duration.ofSeconds(2), 2000));
               if (appInstanceLock != null) appInstanceLock.close();
               return null;
             }));
@@ -2505,8 +2526,19 @@ public class HeadlessApp {
       java.util.function.BooleanSupplier ledgerWritesHealthy, Runnable restart) {
     java.util.Objects.requireNonNull(dataDir, "dataDir");
     java.util.Objects.requireNonNull(ledgerWritesHealthy, "ledgerWritesHealthy");
+    return deviceLostRecovery(dataDir, ledgerWritesHealthy, () -> {}, restart);
+  }
+
+  static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(Path dataDir,
+      java.util.function.BooleanSupplier ledgerWritesHealthy, Runnable reserve, Runnable restart) {
     java.util.Objects.requireNonNull(restart, "restart");
     return new io.justsearch.app.api.chat.DeviceLostRecovery() {
+      @Override
+      public void reserveRestart() throws java.io.IOException {
+        try { reserve.run(); }
+        catch (RuntimeException failure) { throw new java.io.IOException("Restart reservation failed", failure); }
+      }
+
       @Override
       public List<java.time.Instant> priorRestarts() throws java.io.IOException {
         if (!ledgerWritesHealthy.getAsBoolean()) {

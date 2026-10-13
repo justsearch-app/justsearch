@@ -34,6 +34,24 @@ import org.junit.jupiter.api.io.TempDir;
 final class HeadlessAppDeviceLostRestartTest {
 
   @Test
+  void failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart(@TempDir Path dataDir) throws Exception {
+    Path dir = java.nio.file.Files.createDirectories(dataDir.resolve("runtime/exit-ledger"));
+    Path blocked = java.nio.file.Files.createDirectory(dir.resolve("engine.v1.jsonl"));
+    var code = new AtomicInteger(-1);
+    var recorder = HeadlessApp.engineSelfIntent(dataDir, "failed-reservation");
+    var sequence = new EngineShutdownSequence(dataDir, List.of(), code::set, code::set,
+        () -> NativeQuiescence.QUIESCED, result -> {}, recorder);
+    try {
+      try { sequence.runAndExitDeviceLost(); } catch (IllegalStateException refused) { /* refused */ }
+      assertEquals(-1, code.get(), "unwritten DEVICE_LOST must not become an uncounted restart");
+    } finally { java.nio.file.Files.delete(blocked); }
+    var durable = HeadlessApp.engineSelfIntent(dataDir, "durable-reservation");
+    durable.record(StopReason.DEVICE_LOST, Optional.empty(), EngineExit.REQUESTED_RESTART);
+    assertEquals(1, HeadlessApp.deviceLostRecovery(dataDir, () -> true, () -> {}).priorRestarts().size(),
+        "reopening the history must count the durable reservation");
+  }
+
+  @Test
   void theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents(@TempDir Path dataDir)
       throws Exception {
     var recorder = HeadlessApp.engineSelfIntent(dataDir, "inst-1");

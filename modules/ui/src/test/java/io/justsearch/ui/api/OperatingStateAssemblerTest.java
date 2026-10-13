@@ -38,6 +38,46 @@ final class OperatingStateAssemblerTest {
   private static final Instant NOW = Instant.parse("2026-10-05T10:15:02.200Z");
   private static final long SAMPLED_AT_MS = Instant.parse("2026-10-05T10:15:01Z").toEpochMilli();
 
+  @Test
+  void ledgerWriteFailureIsVisibleUntilDurableRecovery(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir)
+      throws Exception {
+    var family = io.justsearch.app.api.runtime.ledger.LedgerFamily.CHILDREN;
+    String previousData = System.getProperty("justsearch.data.dir");
+    System.setProperty("justsearch.data.dir", dir.toString());
+    try {
+      var ledgerDir = java.nio.file.Files.createDirectories(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dir));
+      var path = family.current(ledgerDir);
+      java.nio.file.Files.createDirectory(path); // A file append cannot succeed at this path.
+      var writer = io.justsearch.app.api.runtime.ledger.ExitLedgerWriter.rotating(ledgerDir, family,
+          io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
+              io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE, NOW),
+          java.time.Clock.systemUTC());
+      var assembler = new OperatingStateAssembler();
+      try {
+        org.junit.jupiter.api.Assertions.assertFalse(writer.append(
+            io.justsearch.app.api.runtime.ledger.LedgerRecordType.HELPER_START, java.util.Map.of("helperId", "test")));
+        var view = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY, ComponentState.READY, "inference.x"),
+            inference("Healthy", false), PowerStatusView.unknown(), worker(0), SAMPLED_AT_MS, false, 2000, NOW, null);
+        assertTrue(view.degradations().stream().anyMatch(d -> d.code()
+            == io.justsearch.app.api.status.operating.DegradationCode.EXIT_LEDGER_UNWRITABLE
+            && d.reasonCode().equals("runtime.exit_ledger_unwritable")),
+            "failed owner receipts must be visible through the production status projection");
+      } finally {
+        java.nio.file.Files.delete(path);
+        assertTrue(writer.append(io.justsearch.app.api.runtime.ledger.LedgerRecordType.HELPER_START,
+            java.util.Map.of("helperId", "recovery")));
+      }
+      var recovered = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY, ComponentState.READY, "inference.x"),
+          inference("Healthy", false), PowerStatusView.unknown(), worker(0), SAMPLED_AT_MS, false, 2000, NOW, null);
+        org.junit.jupiter.api.Assertions.assertFalse(recovered.degradations().stream().anyMatch(d -> d.code()
+            == io.justsearch.app.api.status.operating.DegradationCode.EXIT_LEDGER_UNWRITABLE));
+    } finally {
+      if (previousData == null) System.clearProperty("justsearch.data.dir");
+      else System.setProperty("justsearch.data.dir", previousData);
+    }
+  }
+
   @ParameterizedTest(name = "engine {0} + generative {1} -> {2}")
   @CsvSource({
     "Healthy,    READY,       READY,   ",

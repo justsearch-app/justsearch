@@ -154,6 +154,7 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
         addDirectoryRedacted(zos, aiLogsDir, "ai/logs");
       }
 
+      addExitLedgers(zos, dataDir);
       addTelemetryFiles(zos, dataDir);
       addCrashReports(zos, dataDir);
       addRuntimeSnapshots(zos, engineContext);
@@ -201,6 +202,27 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
                 lifecycle,
                 gpu,
                 crash));
+  }
+
+  private static void addExitLedgers(ZipOutputStream zos, Path dataDir) throws IOException {
+    Path directory = dataDir.resolve("runtime/exit-ledger");
+    if (!Files.exists(directory)) return;
+    List<String> failures = new ArrayList<>();
+    try (var files = Files.newDirectoryStream(directory)) {
+      for (Path file : files) {
+        String name = file.getFileName().toString();
+        if (!name.matches("(engine|children)\\.v1(?:\\.(?:[0-9]+|lost))?\\.jsonl")) continue;
+        if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+          failures.add(name + ": not a regular ledger file");
+          continue;
+        }
+        try { addFileRedactedStreaming(zos, file, "runtime/exit-ledger/" + name); }
+        catch (IOException unavailable) { failures.add(name + ": collection failed"); }
+      }
+    } catch (IOException unavailable) { failures.add("ledger directory: collection failed"); }
+    if (!failures.isEmpty()) addBytesRedacted(zos,
+        String.join("\n", failures).getBytes(StandardCharsets.UTF_8),
+        "runtime/exit-ledger/collection-failures.txt");
   }
 
   private void addTelemetryFiles(ZipOutputStream zos, Path dataDir) {

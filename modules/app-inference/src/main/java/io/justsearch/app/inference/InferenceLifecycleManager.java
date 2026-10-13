@@ -1502,13 +1502,12 @@ public class InferenceLifecycleManager
       }
     }
     if (generation.generating()) {
-      // A reply in progress that finishes counts as a pass; so does one still streaming.
+      // Keep the existing grace for a reply to finish. Lease closure (including cancellation)
+      // and an exchange still open at the deadline both require the bounded health/token probe.
       long deadline = System.nanoTime() + ChatActuationRouter.DRAIN_BOUND.toNanos();
       while (generation.generating() && System.nanoTime() - deadline < 0) {
         Thread.sleep(50);
       }
-      LOG.info("Resume probe: a reply in progress answered; the server is trusted");
-      return ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.PASSED);
     }
     LlamaServerOps.ResumeProbeFinding finding = serverOps.probeAfterResume(onlineOps::probeOneToken);
     return switch (finding.result()) {

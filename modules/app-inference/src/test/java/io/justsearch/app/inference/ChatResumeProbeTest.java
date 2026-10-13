@@ -117,6 +117,41 @@ final class ChatResumeProbeTest {
     assertEquals(0, launches());
   }
 
+  @Test
+  @org.junit.jupiter.api.Timeout(75)
+  void anOpenGenerationCannotPassAFailingResumeProbe() throws Exception {
+    manager = onlineManager("--completion-fails");
+    try (var ignored = manager.admitExchange(
+        io.justsearch.app.inference.chat.GenerationTracker.Kind.GENERATE, null)) {
+      assertEquals(ChatActuator.ResumeOutcome.RELAUNCHED, probe().outcome(),
+          "an open exchange is not proof that the server answered after resume");
+    }
+  }
+
+  @Test
+  void aClosedGenerationCannotPassAFailingResumeProbe() throws Exception {
+    manager = onlineManager("--completion-fails");
+    var lease = manager.admitExchange(
+        io.justsearch.app.inference.chat.GenerationTracker.Kind.GENERATE, null);
+    Thread probing = Thread.currentThread();
+    var closer = Thread.ofPlatform().daemon().start(() -> {
+      try {
+        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < end) {
+          if (probing.getState() == Thread.State.TIMED_WAITING
+              && java.util.Arrays.stream(probing.getStackTrace()).anyMatch(frame ->
+                  frame.getMethodName().equals("probeAfterResume"))) break;
+          Thread.sleep(5);
+        }
+      } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+      lease.close();
+    });
+    try {
+      assertEquals(ChatActuator.ResumeOutcome.RELAUNCHED, probe().outcome(),
+          "closing a lease also happens on cancellation or failed generation");
+    } finally { lease.close(); closer.join(1000); }
+  }
+
   // ==================== the device-lost stop (§7.3) ====================
 
   @Test

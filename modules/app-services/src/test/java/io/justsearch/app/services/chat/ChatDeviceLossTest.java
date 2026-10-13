@@ -70,6 +70,22 @@ final class ChatDeviceLossTest {
     return controller;
   }
 
+  @Test
+  void aReservationFailureLatchesChatInsteadOfRequestingRestart() throws Exception {
+    var requests = new AtomicInteger();
+    var c = controller(new DeviceLostRecovery() {
+      public List<Instant> priorRestarts() { return List.of(); }
+      // No @Override: the identical check compiles before the reservation API exists.
+      public void reserveRestart() throws IOException { throw new IOException("disk full"); }
+      public void requestRestart() { requests.incrementAndGet(); }
+    });
+    c.reportDeviceLost(LOST);
+    assertTrue(actuator.deviceLostStopped.await(5, TimeUnit.SECONDS),
+        "failed persistence must enter the existing recovery-failure state");
+    assertEquals(0, requests.get());
+    assertEquals(FailedCode.DEVICE_LOST_LIMIT, actuator.latch.get());
+  }
+
   /** A restart path over a fixed history that counts its restart requests. */
   static final class Recovery implements DeviceLostRecovery {
     final List<Instant> prior;

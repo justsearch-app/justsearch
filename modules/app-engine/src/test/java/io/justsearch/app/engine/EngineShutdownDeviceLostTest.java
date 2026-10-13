@@ -37,6 +37,17 @@ final class EngineShutdownDeviceLostTest {
   }
 
   @Test
+  void failedDeviceLossReservationDoesNotCloseOrRequestRestart(@TempDir Path dataDir) {
+    var sequence = new EngineShutdownSequence(dataDir,
+        List.of(new Step("owner", reason -> { events.add("closed"); return null; })),
+        code::set, code::set, () -> NativeQuiescence.QUIESCED, result -> {},
+        (reason, detail, expected) -> { throw new IOException("ledger unavailable"); });
+    try { sequence.runAndExitDeviceLost(); } catch (IllegalStateException refused) { /* refused */ }
+    assertEquals(-1, code.get(), "a restart without a durable reservation bypasses the limit");
+    assertEquals(List.of(), events, "reservation precedes shutting down owners");
+  }
+
+  @Test
   void aDeviceLostRestartRecordsItsIntentClosesInRestartOrderAndExitsFour(@TempDir Path dataDir) {
     var sequence = sequence(dataDir, true);
 

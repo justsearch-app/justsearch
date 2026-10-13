@@ -863,8 +863,8 @@ public final class ChatServerControllerImpl
 
   /**
    * Runs a hold's own step, which the held-out gate lets through, and maps its failure onto a
-   * refusal. {@code supersededIsDone}: a later step with the same key replaced it (another hold's
-   * identical start), so the server is being brought where this step would have brought it.
+   * refusal. Starts required by a hold are serialized readiness barriers; they never complete
+   * merely because a later activation replaced a queued step.
    */
   private <T> T routeHeld(ChatActuation<T> step, boolean supersededIsDone) throws ChatRefusal {
     return routeHeld(step, supersededIsDone, false);
@@ -878,9 +878,12 @@ public final class ChatServerControllerImpl
   private <T> T routeHeld(ChatActuation<T> step, boolean supersededIsDone, boolean uninterruptible)
       throws ChatRefusal {
     try {
-      return uninterruptible ? (T) awaitUninterruptibly(enqueue(step)) : route(step);
+      // A running hold promises completed readiness. Keep its start as a serialized
+      // barrier: replacing a queued activation cannot complete the hold early.
+      ChatActuation<T> ready = supersededIsDone
+          ? ChatActuation.of(step.kind(), drained -> actuator.execute(step, drained)) : step;
+      return uninterruptible ? (T) awaitUninterruptibly(enqueue(ready)) : route(ready);
     } catch (SupersededException superseded) {
-      if (supersededIsDone) return null;
       throw refusal(RefusalReason.BUSY, superseded);
     } catch (RefusedException refused) {
       throw refusal(RefusalReason.ENGINE_STOPPING, refused);
@@ -1588,17 +1591,18 @@ public final class ChatServerControllerImpl
     return stop;
   }
 
-  /** Reads the device-lost limit after the stop; false when over it or unreadable (F10). */
+  /** Checks and durably reserves a restart; false when the limit or storage refuses it (F10). */
   private boolean restartWithinLimit(DeviceLostEvidence evidence) {
     boolean restart;
     String why;
     try {
       List<Instant> prior = deviceLostRecovery.priorRestarts();
       restart = withinDeviceLostLimit(prior, wallClock.instant());
+      if (restart) deviceLostRecovery.reserveRestart();
       why = restart ? "within the device-lost limit" : "over the device-lost limit";
     } catch (IOException | RuntimeException unreadable) {
       restart = false;
-      why = "the device-lost limit cannot be read (" + unreadable.getMessage() + ")";
+      why = "device-lost restart accounting failed (" + unreadable.getMessage() + ")";
     }
     if (restart) {
       LOG.error("GPU device lost ({} {}): {}; the Engine restarts", evidence.source(),

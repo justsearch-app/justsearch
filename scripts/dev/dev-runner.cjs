@@ -2977,6 +2977,7 @@ async function runAdmittedStart(opts, ctx) {
     : null;
 
   runJson = {
+    incarnation: startingRun.incarnation,
     exitCensusEngine: await engineIdentityAsync(backend.pid, dataDir),
     schemaVersion: 1,
     runId,
@@ -3568,7 +3569,7 @@ async function stopRun(opts, {
     // it ended: on the quit, with the runner whose job held it, or killed here.
     const stopDetail = reason === 'takeover' ? 'takeover' : (opts.detail ?? null);
     const engineRecords = dataDirAbs && run?.control?.stopRequest && backendBefore === 'match'
-      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: { session: runId, n: Number(run?.incarnation) || 1 } })
+      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: { session: runId, n: Number.isInteger(run?.incarnation) && run.incarnation > 0 ? run.incarnation : null } })
       : null;
     if (engineRecords) fallback.ledger = [];
     const recordEngine = (kind, fields) => {

@@ -38,7 +38,8 @@ final class WindowsJobWitness implements AutoCloseable {
   private final Map<Long, String> unproven = new HashMap<>();
   private final ArrayDeque<Event> pending = new ArrayDeque<>();
   private LedgerSink ledger;
-  private final Object recordingGate = new Object();
+  private final java.util.concurrent.locks.ReentrantLock recordingGate =
+      new java.util.concurrent.locks.ReentrantLock();
   private EngineIdentity owner;
   private int dropped;
   private boolean writing;
@@ -306,9 +307,10 @@ final class WindowsJobWitness implements AutoCloseable {
           io.justsearch.configuration.SystemAccess.rawEnvVar(
               io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo.ENVIRONMENT)));
       try {
-        synchronized (recordingGate) {
+        recordingGate.lock();
+        try {
           if (!recordingFinished) ledger.append(event.type(), fields);
-        }
+        } finally { recordingGate.unlock(); }
       } finally {
         synchronized (this) { writing = false; notifyAll(); }
       }
@@ -317,19 +319,30 @@ final class WindowsJobWitness implements AutoCloseable {
 
   void finish(java.time.Duration max) {
     long started = System.nanoTime();
-    long deadline = started + max.toNanos();
+    long deadline = started + Math.max(0, max.toNanos());
     synchronized (this) {
-      if (ledger == null || recordingFinished) return;
-      while (observedThrough < started + 50_000_000L || liveHelpers > 0 || writing || !pending.isEmpty()) {
+      if (ledger == null) return;
+      while (!recordingFinished && (observedThrough < started + 50_000_000L
+          || liveHelpers > 0 || writing || !pending.isEmpty())) {
         long left = deadline - System.nanoTime();
         if (left <= 0) break;
         try { wait(Math.max(1, Math.min(25, left / 1_000_000L))); }
         catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
       }
-      // Holding the writer monitor fences writes before the data-directory owner lock is freed.
-      // Surviving/missed helpers keep missing exits; no synthetic requested exit is invented.
-      synchronized (recordingGate) { recordingFinished = true; }
+      // Refuse future writes first. An append already on disk must finish before ownership
+      // can be released, even when another caller retries this fence after a timeout.
+      recordingFinished = true;
       pending.clear();
+    }
+    try {
+      if (!recordingGate.tryLock(Math.max(0, deadline - System.nanoTime()),
+          java.util.concurrent.TimeUnit.NANOSECONDS)) {
+        throw new IllegalStateException("Exit witness storage is still active; retain the instance lock");
+      }
+      recordingGate.unlock();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Exit witness fence interrupted; retain the instance lock", interrupted);
     }
   }
 

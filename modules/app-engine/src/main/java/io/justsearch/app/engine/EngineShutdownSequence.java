@@ -153,6 +153,7 @@ public final class EngineShutdownSequence {
   private final AtomicBoolean selfIntentRecorded = new AtomicBoolean();
   private final AtomicReference<Result> result = new AtomicReference<>();
   private final Object exitAuthority = new Object();
+  private boolean selfIntentDurable;
   private boolean exitRequested;
   private boolean fatalExitRequested;
   private boolean exitSelected;
@@ -224,14 +225,16 @@ public final class EngineShutdownSequence {
         EngineExit.ESCALATED_RESTART);
   }
 
-  private void recordSelfIntent(SelfIntentRecord intent) {
-    if (!selfIntentRecorded.compareAndSet(false, true)) return;
+  private synchronized boolean recordSelfIntent(SelfIntentRecord intent) {
+    if (!selfIntentRecorded.compareAndSet(false, true)) return selfIntentDurable;
     try {
       selfIntent.record(intent.reason(), intent.detail(), intent.expectedCode());
+      selfIntentDurable = true;
     } catch (Exception e) {
-      // The intent is evidence, never a gate: the exit proceeds and is classified without it.
+      // Ordinary quit still proceeds. Device-loss restart requires durable budget accounting.
       log.warn("Could not record the Engine's self-intent: {}", e.toString());
     }
+    return selfIntentDurable;
   }
 
   /**
@@ -377,10 +380,13 @@ public final class EngineShutdownSequence {
    * the requested-restart code, so the supervisor starts a new Engine that probes the device again.
    */
   public void runAndExitDeviceLost() {
-    if (!claimExit(false)) {
-      return;
+    synchronized (exitAuthority) {
+      if (exitRequested) return;
+      if (!recordSelfIntent(deviceLostSelfIntent())) {
+        throw new IllegalStateException("Device-loss restart reservation is not durable");
+      }
+      if (!claimExit(false)) return;
     }
-    recordSelfIntent(deviceLostSelfIntent());
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.REQUESTED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
