@@ -350,3 +350,14 @@ Accepted without change (round 4):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-procjava3-20261013",
+  "verdict": "accept",
+  "digest": "sha256:337eb77280de9b292e65b75aab0789d8c8223912a164ff3e02ad6782be96781a",
+  "note": "VC-procjava3 (independent Claude verifier) over two rounds on 1eb01f51e vs a164833f5 (rejected f40ba7da8 for SystemAccessFunnelTest): funnel test and all 39 ArchUnit classes pass; app-api 383, app-inference 487, app-services 3701 pass, PMD clean; new checks fail on f40ba7da8 for their reason (GPU release pending 6250 ms, raw native message, CreateProcessW text); adapted SynchronousGpuReleaseTest still checks a pending poll refuses then retry succeeds (fails on a164833f5); real processes: self-test with surviving server records intended_cleanup then cleanup_ended and the main start succeeds (12.4 s early variant), crash leftover ended, job listing failure refuses starts with chat start blocked and recovers, Engine death ends all helpers in 5 s incl. an unregistered suspended child, 0 ms idle CPU over 35 s, launch parity 34/34 incl. strict mode, job end failure keeps the member counted then records leftover_exited, launch failure text identical to the JDK in 5 cases, a never-returning VRAM read ends the poll unmeasured after 2.25 s. Named limits: failed self-test with survivor 12-14 s; no per-member records at clean quit; a VRAM read that never returns leaves later polls unmeasured for the process lifetime. Unverified: live self-test, model switch and GPU release on the real model (stack held by another session). Digest bound with --base a164833f5, the lane's base."
+}
+```
