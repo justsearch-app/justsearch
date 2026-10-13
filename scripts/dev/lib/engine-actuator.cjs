@@ -171,15 +171,19 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
 }
 
 /**
- * Terminate one process with a chosen code, only if it is still the recorded birth.
+ * Terminate one process with a chosen code, only if it is still the recorded birth: the birth is
+ * re-checked on the handle the termination uses. `tree` also ends its verified descendants, each
+ * through its own handle (`terminate-process.ps1 -Tree`); `birthTick` is the births' common tick
+ * (the microsecond, or the millisecond for a birth recorded in milliseconds).
  *
  * @returns {Promise<{ok: boolean, outcome: string, status: number|null}>}
  */
-function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeoutMs = 10000 } = {}) {
+function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeoutMs = 10000, tree = false,
+  birthTick = ledgerLib.BIRTH_TICKS.MICROSECOND } = {}) {
   return new Promise((resolve) => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', TERMINATE_SCRIPT,
       '-Pid', String(pid), '-CreationFileTimeUtc', String(creationFileTime), '-Code', String(code >>> 0),
-      '-BirthTick', String(ledgerLib.BIRTH_TICKS.MICROSECOND)],
+      '-BirthTick', String(birthTick), ...(tree ? ['-Tree'] : [])],
     { encoding: 'utf8', windowsHide: true, timeout: timeoutMs },
     (error, stdout) => {
       let outcome = 'failed';

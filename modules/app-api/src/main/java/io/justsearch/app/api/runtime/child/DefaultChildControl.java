@@ -653,11 +653,14 @@ public final class DefaultChildControl implements ChildControl {
       }
     }
     remember(recorded);
+    // The pending release is registered before the exit is published, so a waiter woken by the
+    // exit (a model switch starting the replacement) already sees it in awaitGpuRelease.
+    CompletableFuture<Void> release =
+        intent != null && held.spec.gpu() && !intent.request().reason().endsEngine()
+            ? registerGpuPoll(held) : null;
     held.exit.complete(recorded);
     if (stopFuture != null) stopFuture.complete(recorded);
-    if (intent != null && held.spec.gpu() && !intent.request().reason().endsEngine()) {
-      startGpuPoll(held);
-    }
+    if (release != null) startGpuPoll(held, release);
   }
 
   /** Spec B §3.1 R1-R5, decided by the kernel's exit code and our own calls, never by a clock. */
@@ -689,9 +692,13 @@ public final class DefaultChildControl implements ChildControl {
 
   // ------------------------------------------------------------------------------------- GPU
 
-  private void startGpuPoll(Held held) {
+  private CompletableFuture<Void> registerGpuPoll(Held held) {
     CompletableFuture<Void> done = new CompletableFuture<>();
     gpuPolls.put(held.childId, done); // one poll per child: its exit is recorded once
+    return done;
+  }
+
+  private void startGpuPoll(Held held, CompletableFuture<Void> done) {
     Thread poll = threads.newThread(() -> {
       try {
         pollGpu(held);

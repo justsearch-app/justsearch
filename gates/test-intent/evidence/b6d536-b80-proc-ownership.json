@@ -1,0 +1,98 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T05:12:19.617Z",
+  "revision": "44a9e8aa26fb28655eb031a816f23606402c6216",
+  "tree": "8f826c420d0751ba92333cc15e857406d9751bab",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlGpuBarrierTest.exitCompletionPublishesGpuBarrierBeforeNotifyingWaiters\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17501
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestStopFailureTest.selfTestStopFailurePreventsActivation\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18944
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlGpuBarrierTest.java#exitCompletionPublishesGpuBarrierBeforeNotifyingWaiters",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlGpuBarrierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f0d4ef15529791555bffc61804d04ce87c56accd3058646fffb2f55626859834",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exitCompletionPublishesGpuBarrierBeforeNotifyingWaiters()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestStopFailureTest.java#selfTestStopFailurePreventsActivation",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestStopFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7be48eff34cd23f27088bae92d7d6a9ee2841d48546a3778ea5ba57ea6772aed",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selfTestStopFailurePreventsActivation()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "44a9e8aa2",
+    "revision": "44a9e8aa26fb28655eb031a816f23606402c6216",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlGpuBarrierTest.exitCompletionPublishesGpuBarrierBeforeNotifyingWaiters\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13726
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestStopFailureTest.selfTestStopFailurePreventsActivation\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 19160
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlGpuBarrierTest.java#exitCompletionPublishesGpuBarrierBeforeNotifyingWaiters",
+        "classification": "assertion",
+        "detail": "exitCompletionPublishesGpuBarrierBeforeNotifyingWaiters(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the release is pending when the exit is published ==> expected: <[false]> but was: <[true]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestStopFailureTest.java#selfTestStopFailurePreventsActivation",
+        "classification": "assertion",
+        "detail": "selfTestStopFailurePreventsActivation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a candidate that survived its stop is not a passed self-test: GPU runtime activated. ==> expected: <failed> but was: <passed>"
+      }
+    ]
+  },
+  "digest": "sha256:43c9646c4997034c11f5f036d23f2eb806c215063935e103b2bec3b1bc13d462"
+}

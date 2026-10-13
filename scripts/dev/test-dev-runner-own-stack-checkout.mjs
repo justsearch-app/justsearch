@@ -103,6 +103,20 @@ function spawnSleeper() {
   sleepers.push(p);
   return p.pid;
 }
+
+/**
+ * The runner identity a current dev-runner records at spawn (pid + creation FILETIME + executable):
+ * a stop kills a recorded process only on that identity (Spec F §5.3, S17). Null when the pid names
+ * no process.
+ */
+function recordedIdentity(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { $p.CreationDate.ToFileTimeUtc().ToString() + '|' + $p.ExecutablePath }`],
+  { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+  const [creation, executable] = String(res.stdout || '').trim().split('|');
+  return /^[1-9]\d*$/.test(creation ?? '') ? { pid, creationFileTimeUtc: creation, executable: executable || null } : null;
+}
 function alive(pid) { try { process.kill(pid, 0); return true; } catch { return false; } }
 const posix = (p) => String(p).split(path.sep).join('/');
 
@@ -116,7 +130,8 @@ function craftOwnStack({ stateRoot = STATE, runId = 'run-OWN', ops = null } = {}
   fs.rmSync(runDir, { recursive: true, force: true });
   fs.mkdirSync(runDir, { recursive: true });
   const runFile = path.join(runDir, 'run.json');
-  fs.writeFileSync(runFile, JSON.stringify({ schemaVersion: 1, runId, dataDir: posix(DATA), pids: { runnerPid } }));
+  fs.writeFileSync(runFile, JSON.stringify({ schemaVersion: 1, runId, dataDir: posix(DATA), pids: { runnerPid },
+    identities: { runner: recordedIdentity(runnerPid) } }));
   const rel = path.relative(MAIN, runFile);
   fs.writeFileSync(path.join(stateRoot, 'active.json'), JSON.stringify({
     kind: 'backend-shared-lease.v1', schemaVersion: 1, runId,

@@ -11,9 +11,11 @@
 //   - a stop whose holder is frozen still records the Engine stop as `dev-cli`: the intent before
 //     acting and one REQUESTED exit when the Engine ends with its runner, so nothing is left open
 //     for the next runner to record as OWNER_DIED (S15).
-//   - fallback kills are identity-checked: a recorded identity that no longer matches is reported
-//     `pidReused` and not killed; a legacy record (no identities) bounds its processes by the record's
-//     write time (S18-U2).
+//   - fallback kills are identity-checked, and the birth is checked again on the handle that kills:
+//     a recorded identity that no longer matches is reported `pidReused` and not killed; a record
+//     without a birth never proves ownership: a process born before it is unknown, one born after it
+//     a reuse, and neither is killed (S17, S18-U2).
+//   - a registered helper left running or unverified makes the stop STOP_INCOMPLETE.
 //   - a port owner is never killed; a foreign one makes the stop STOP_INCOMPLETE and active.json is
 //     kept with `stopFailed` (S18-U3/U4).
 //   - a takeover whose stop of the predecessor fails is refused (`takeover_stop_failed`) (S18-U5).
@@ -352,15 +354,87 @@ const tests = [
     assert.equal(row?.pidReused, true, JSON.stringify(report?.fallback));
   }],
 
-  ['a legacy record (no identities): a process born after the record is not the run\'s; one born before it is (S18-U2)', async () => {
+  ['fallbackStopRechecksBirthOnTerminationHandle: a pid that names another process by the time the fallback acts is never killed, for the runner, the Engine, the frontend and a registered helper (Spec F §5.3)', async () => {
+    // A deterministic interleaving of PID reuse: the inspection sees each recorded birth (the recorded
+    // processes were alive then); when the stop acts, the pids name these processes, born later.
+    const runner = sleeper();
+    const engine = sleeper();
+    const frontend = sleeper();
+    const helper = sleeper();
+    const seen = new Map();
+    for (const p of [runner, engine, frontend, helper]) seen.set(p.pid, await birthOf(p.pid));
+    const recordedBirth = (pid) => String(BigInt(seen.get(pid).creationFileTime) - 36_000_000_000n);
+    const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: recordedBirth(p.pid), executable: seen.get(p.pid).executable });
+    // The helper's registration names its start an hour before this process's (milliseconds, as the
+    // manifest records it); its inspection still reads the registered identity.
+    const dataDir = path.join(STATE, 'reused-at-kill');
+    fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+    const helperStartedAt = new Date(engineActuator.fileTimeToMs(String(seen.get(helper.pid).creationFileTime)) - 3_600_000).toISOString();
+    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ children: [
+      { id: 'llama-server', pid: helper.pid, executable: seen.get(helper.pid).executable, startedAt: helperStartedAt }] }));
+    const target = craftRun('run-REUSED-AT-KILL', {
+      dataDir,
+      control: { stopRequest: 1 },
+      pids: { runnerPid: runner.pid, backendRootPid: engine.pid, frontendRootPid: frontend.pid },
+      identities: { runner: identity(runner), backend: identity(engine), frontend: identity(frontend) },
+    });
+    const inspected = new Set();
+    const res = await stopRun({ runId: 'run-REUSED-AT-KILL' }, {
+      resolveTarget: async () => target, gracefulShutdown: noGraceful, census: noCensus,
+      askRunner: async () => ({ outcome: 'no_answer' }),
+      lookupIdentities: async (pids) => new Map(pids.map((pid) => {
+        inspected.add(pid);
+        return [pid, { present: true, creationFileTime: recordedBirth(pid), executable: seen.get(pid).executable }];
+      })),
+      // The distinctive terminate did not run, so the Engine reaches the fallback kill.
+      terminateEngine: async () => ({ ok: false, outcome: 'failed', status: 4 }),
+      inspectChild: (pid) => {
+        if (pid !== helper.pid) return null;
+        inspected.add(pid);
+        return { alive: true, executable: seen.get(pid).executable, startedAt: helperStartedAt };
+      },
+      portWaitMs: 200 });
+    await sleep(500);
+    for (const [role, p] of [['runner', runner], ['backend', engine], ['frontend', frontend], ['helper', helper]]) {
+      assert.ok(inspected.has(p.pid), `the ${role} was inspected as the recorded process`);
+      assert.ok(alive(p.pid), `the ${role} pid names another process when the stop acts: it is never killed ${JSON.stringify(res)}`);
+      assert.ok(!res.killedPids.includes(p.pid), `the ${role} is not reported killed: ${JSON.stringify(res.killedPids)}`);
+    }
+    assert.equal(res.outcome, 'STOP_INCOMPLETE', JSON.stringify(res));
+  }],
+
+  ['a verified tree kill ends the recorded process and its descendants, each through a handle checked against its birth (Spec F §5.3)', async () => {
+    // The descendant is detached: outside the job libuv gives its parent's children, it does not end
+    // with its parent, so only the tree kill ends it (it ends itself after a minute regardless).
+    const parent = track(spawn(process.execPath, ['-e',
+      "const c=require('child_process').spawn(process.execPath,['-e','setTimeout(()=>{},60000)'],{stdio:'ignore',detached:true});console.log(c.pid);setTimeout(()=>{},600000)"],
+    { stdio: ['ignore', 'pipe', 'ignore'] }));
+    const childPid = await new Promise((resolve) => parent.stdout.once('data', (b) => resolve(Number(String(b).trim()))));
+    assert.ok(childPid > 0);
+    const parentBirth = (await birthOf(parent.pid)).creationFileTime;
+    const result = await engineActuator.terminateWithCode(parent.pid, parentBirth, engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree: true });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    await until('the recorded process and its descendant gone', () => !alive(parent.pid) && !alive(childPid), 10_000);
+  }],
+
+  ['missingBirthNeverEstablishesOwnership: a record without a birth (legacy, or written before discovery) never makes a process born before it the run\'s: unknown, not killed, the stop incomplete; one born after it is a reuse (S17, S18-U2)', async () => {
     const before = sleeper();
     await birthOf(before.pid);
     await sleep(50);
     const legacy = craftRun('run-LEGACY', { pids: { runnerPid: null, backendRootPid: null, frontendRootPid: before.pid } });
+    fs.writeFileSync(activePath, JSON.stringify({ kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: 'run-LEGACY' }));
     const res1 = await stopRun({ runId: 'run-LEGACY' }, {
-      resolveTarget: async () => legacy, gracefulShutdown: noGraceful, census: noCensus });
-    await until('the recorded frontend stopped', () => !alive(before.pid), 5_000);
-    assert.ok(res1.killedPids.includes(before.pid), JSON.stringify(res1));
+      resolveTarget: async () => legacy, gracefulShutdown: noGraceful, census: noCensus, portWaitMs: 200 });
+    await sleep(300);
+    assert.ok(alive(before.pid), 'a process the record does not identify by its birth is never killed');
+    assert.ok(!res1.killedPids.includes(before.pid), JSON.stringify(res1));
+    const row = readJson(path.join(legacy.dir, 'stop-report.json'))?.fallback?.processes?.find((p) => p.role === 'frontend');
+    assert.equal(row?.identity, 'unknown', JSON.stringify(row));
+    assert.equal(res1.outcome, 'STOP_INCOMPLETE', JSON.stringify(res1));
+    const active = readJson(activePath);
+    assert.equal(active?.runId, 'run-LEGACY', 'active.json is kept for a stack not verified gone');
+    assert.ok(active?.stopFailed?.reason, JSON.stringify(active));
+    fs.rmSync(activePath, { force: true });
 
     const later = craftRun('run-LEGACY2', { pids: { runnerPid: null, backendRootPid: null, frontendRootPid: null } });
     const after = sleeper();
@@ -371,6 +445,36 @@ const tests = [
     await sleep(300);
     assert.ok(alive(after.pid), 'a process born after the legacy record was written is not killed');
     assert.ok(!res2.killedPids.includes(after.pid));
+  }],
+
+  ['a stop whose registered helper survives its termination, or cannot be identified, is incomplete: active state and data stay (Spec F §5.3)', async () => {
+    const executable = path.join(STATE, 'llama-server.exe');
+    const startedAt = '2026-10-03T14:00:00.123Z';
+    for (const [name, inspectChild, terminateChild, outcome] of [
+      // Roots and ports gone; the helper is still the registered process after its termination.
+      ['survives', () => ({ alive: true, executable, startedAt }), () => true, 'termination-failed'],
+      // Roots and ports gone; the helper's identity cannot be read.
+      ['unknown', () => null, () => assert.fail('a helper without a verified identity is never killed'), 'unknown-identity'],
+    ]) {
+      const runId = `run-HELPER-${name}`;
+      const dataDir = path.join(STATE, `helper-${name}`);
+      fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+      const manifestPath = path.join(dataDir, 'runtime', 'manifest.json');
+      fs.writeFileSync(manifestPath, JSON.stringify({ children: [{ id: 'llama-server', pid: 22004, executable, startedAt }] }));
+      const target = craftRun(runId, { dataDir, pids: { runnerPid: null, backendRootPid: null, frontendRootPid: null } });
+      fs.writeFileSync(activePath, JSON.stringify({ kind: 'backend-shared-lease.v1', schemaVersion: 1, runId }));
+      const res = await stopRun({ runId }, {
+        resolveTarget: async () => target, gracefulShutdown: noGraceful, census: noCensus,
+        inspectChild, terminateChild, portWaitMs: 200 });
+      assert.deepEqual(res.childCleanup.map((c) => c.outcome), [outcome], JSON.stringify(res.childCleanup));
+      assert.equal(res.portsClosed, true, 'the ports are closed');
+      assert.equal(res.outcome, 'STOP_INCOMPLETE', `a helper left alive or unverified is not a stopped stack: ${JSON.stringify(res)}`);
+      const active = readJson(activePath);
+      assert.equal(active?.runId, runId, 'active.json is kept: takeover and data cleanup see a stack that may still run');
+      assert.ok(active?.stopFailed?.reason, JSON.stringify(active));
+      assert.ok(fs.existsSync(manifestPath), 'the data stays');
+      fs.rmSync(activePath, { force: true });
+    }
   }],
 
   ['a port held outside the run is never killed: STOP_INCOMPLETE with foreignPortOwner (S18-U3)', async () => {

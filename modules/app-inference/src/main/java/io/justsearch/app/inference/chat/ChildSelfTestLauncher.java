@@ -63,6 +63,19 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     } catch (IOException | RuntimeException failure) {
       return SelfTestRun.failed("llama-server could not start: " + message(failure));
     }
+    SelfTestRun outcome;
+    String survived;
+    try {
+      outcome = exercise(candidate, spec);
+    } finally {
+      survived = stopAndRelease(candidate);
+    }
+    // A candidate that may still run (and hold the GPU) is not a passed self-test (S19).
+    if (survived == null) return outcome;
+    return SelfTestRun.failed(outcome.exercised() ? survived : outcome.failure() + "; " + survived);
+  }
+
+  private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec) {
     try {
       String unhealthy = awaitHealthy(candidate, spec);
       if (unhealthy != null) return SelfTestRun.failed(unhealthy);
@@ -73,8 +86,6 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
       return SelfTestRun.failed("Self-test interrupted");
     } catch (Exception failure) {
       return SelfTestRun.failed(message(failure));
-    } finally {
-      stopAndRelease(candidate);
     }
   }
 
@@ -125,9 +136,10 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
   /**
    * Stops the candidate ({@code SELF_TEST}), waits for its recorded exit, for every process it
    * started and then for its GPU release, also when this thread is interrupted (the controller's
-   * shutdown): the next launch must not overlap it.
+   * shutdown): the next launch must not overlap it. Returns null when the candidate and every
+   * process it started exited, otherwise why the stop is incomplete.
    */
-  private void stopAndRelease(ChildHandle candidate) {
+  private String stopAndRelease(ChildHandle candidate) {
     boolean interrupted = Thread.interrupted();
     try {
       List<ProcessHandle> started = StartedProcesses.of(candidate);
@@ -143,12 +155,15 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         } catch (ExecutionException | TimeoutException survived) {
           LOG.warn("Self-test llama-server (pid {}) did not exit after a forced stop",
               candidate.pid());
-          return;
+          return "Self-test llama-server (pid " + candidate.pid()
+              + ") did not exit after a forced stop";
         }
       }
       if (!StartedProcesses.awaitExit(started, STOP_WAIT)) {
         LOG.warn("A process the self-test llama-server (pid {}) started is still running",
             candidate.pid());
+        return "A process the self-test llama-server (pid " + candidate.pid()
+            + ") started is still running";
       }
       while (true) {
         try {
@@ -161,6 +176,7 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
           interrupted = true;
         }
       }
+      return null;
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }
