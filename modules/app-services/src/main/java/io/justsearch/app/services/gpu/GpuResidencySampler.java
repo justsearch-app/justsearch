@@ -45,7 +45,8 @@ import org.slf4j.LoggerFactory;
  * UserContextReader}: the {@link GameDetector} rule over the foreground reading and this tick's PDH
  * figures, with our same process set, then its debounce. Each edge sets {@link
  * BulkWorkGate#setGame}; the chat controller hears {@link PressureSignal#GAME}, which outranks {@link
- * PressureSignal#EXTERNAL_MEMORY}. The first poll decides at once ({@link GameDetector#seed}), and
+ * PressureSignal#EXTERNAL_MEMORY}, or {@link PressureSignal#GAME_AND_EXTERNAL_MEMORY} while external
+ * pressure is raised too, so a game never hides that pressure from the controller. The first poll decides at once ({@link GameDetector#seed}), and
  * {@link #bootSample()} takes it synchronously before the chat controller's first start (CH7). While
  * detection is turned off ({@code justsearch.gpu.game_detection = off}) no game is detected and a
  * detected one clears at once.
@@ -288,7 +289,7 @@ public final class GpuResidencySampler implements AutoCloseable {
       }
       PressureSignal signal =
           game
-              ? PressureSignal.GAME
+              ? pressure ? PressureSignal.GAME_AND_EXTERNAL_MEMORY : PressureSignal.GAME
               : pressure ? PressureSignal.EXTERNAL_MEMORY : PressureSignal.NONE;
       if (signal != reported) {
         reported = signal;

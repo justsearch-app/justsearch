@@ -191,8 +191,11 @@ public final class ChatServerControllerImpl
   /** An unload step is queued or running (monitor). */
   private boolean unloadInFlight;
 
-  /** An unload waits for the next idle edge, a reply being in progress (monitor). */
+  /** An unload waits for the next idle edge or for the last open lease to close (monitor). */
   private boolean deferred;
+
+  /** A one-shot "no lease open" call is registered for the deferred unload (monitor). */
+  private boolean leaseWatch;
 
   /**
    * The pressure a person loaded chat anyway under, or null (monitor). While the reported pressure
@@ -1076,11 +1079,18 @@ public final class ChatServerControllerImpl
    * application's memory need always counts. A game alone counts only on a profile without a fit
    * margin, P12 or P8: on P16_PLUS it fits next to chat (Spec A O4, reconciliation F18/P3), and while
    * the profile is UNRESOLVED or NO_GPU the controller keeps today's behaviour, which never unloaded
-   * chat for a game (Spec E §2 UNRESOLVED row and Q8). VDU passes read {@link #bulkPressure()}.
+   * chat for a game (Spec E §2 UNRESOLVED row and Q8). A game never hides another application's
+   * memory need: with both reported, the game outranks it where a game counts and the memory need
+   * acts on its own elsewhere (Spec A C8/O4). VDU passes read {@link #bulkPressure()}.
    */
   private PressureSignal effectivePressure() {
     PressureSignal signal = pressure;
-    return signal == PressureSignal.GAME && !gameUnloadsChat(profile) ? PressureSignal.NONE : signal;
+    return switch (signal) {
+      case GAME -> gameUnloadsChat(profile) ? PressureSignal.GAME : PressureSignal.NONE;
+      case GAME_AND_EXTERNAL_MEMORY ->
+          gameUnloadsChat(profile) ? PressureSignal.GAME : PressureSignal.EXTERNAL_MEMORY;
+      case NONE, EXTERNAL_MEMORY -> signal;
+    };
   }
 
   /** A game alone unloads chat only where the profile has no fit margin (Spec A O4). */
@@ -1101,7 +1111,7 @@ public final class ChatServerControllerImpl
     return switch (signal) {
       case NONE -> null;
       case EXTERNAL_MEMORY -> RefusalReason.GPU_BUSY;
-      case GAME -> RefusalReason.GAME_MODE;
+      case GAME, GAME_AND_EXTERNAL_MEMORY -> RefusalReason.GAME_MODE;
     };
   }
 
@@ -1227,16 +1237,22 @@ public final class ChatServerControllerImpl
   }
 
   /**
-   * Settles an unload step. A step refused because a lease opened meanwhile defers to the next
-   * idle edge; one refused by an AUX lease (which makes no edge) is tried again on the next
-   * pressure report, which Spec E's sampler repeats. Nothing polls.
+   * Settles an unload step. A step refused because a lease was open defers until no lease is open:
+   * the next idle edge, or for a tokenize, template or query-assist lease (which makes no edge) the
+   * moment the last lease closes, as the generation activity reports it once. The sampler reports
+   * pressure only on change, so nothing else would try again. Nothing polls.
    */
   private void unloadEnded(StopDetail detail, long epoch, Object result, Throwable failure) {
+    if (settleUnload(detail, epoch, result, failure)) watchForNoLease();
+  }
+
+  /** @return true when the unload waits for the open leases to close (guarded by the monitor) */
+  private boolean settleUnload(StopDetail detail, long epoch, Object result, Throwable failure) {
     synchronized (monitor) {
       unloadInFlight = false;
       if (failure != null) {
         LOG.warn("Chat residency unload failed; chat stays as it was", failure);
-        return;
+        return false;
       }
       if (result == ChatActuator.ResidencyUnload.UNLOADED) {
         if (latchEpoch == epoch) {
@@ -1244,10 +1260,31 @@ public final class ChatServerControllerImpl
           LOG.info("Chat unloaded ({}); a demand reloads it after {} s with the pressure gone",
               detail.token(), RELOAD_DWELL.toSeconds());
         }
-        return;
+        return false;
       }
-      if (result == ChatActuator.ResidencyUnload.BUSY) deferred = true;
+      if (result != ChatActuator.ResidencyUnload.BUSY) return false;
+      deferred = true;
+      if (leaseWatch) return false;
+      leaseWatch = true;
+      return true;
     }
+  }
+
+  /** Asks the generation activity for one call once no lease is open, to resume a deferred unload. */
+  private void watchForNoLease() {
+    GenerationActivity activity = actuator.generationActivity();
+    if (activity == null) {
+      synchronized (monitor) {
+        leaseWatch = false;
+      }
+      return;
+    }
+    activity.whenNoLeaseOpen(() -> {
+      synchronized (monitor) {
+        leaseWatch = false;
+      }
+      onGenerationEdge(false);
+    });
   }
 
   /**

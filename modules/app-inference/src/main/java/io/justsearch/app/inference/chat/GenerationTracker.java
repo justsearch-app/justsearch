@@ -79,6 +79,8 @@ public final class GenerationTracker implements GenerationActivity {
   private final List<EdgeListener> listeners = new CopyOnWriteArrayList<>();
   private final ArrayDeque<Edge> pendingEdges = new ArrayDeque<>();
   private boolean delivering;
+  /** One-shot calls waiting for no lease to be open (guarded by monitor). */
+  private final List<Runnable> noLeaseWaiters = new java.util.ArrayList<>();
 
   /**
    * @param generationLifetime the indexing-pacing seam a GENERATE ticket with a work handle enters
@@ -136,6 +138,35 @@ public final class GenerationTracker implements GenerationActivity {
     Objects.requireNonNull(listener, "listener");
     listeners.add(listener);
     return () -> listeners.remove(listener);
+  }
+
+  /** Runs on the edge delivery executor, once no GENERATE, ASSIST, VDU or AUX lease is open. */
+  @Override
+  public void whenNoLeaseOpen(Runnable task) {
+    Objects.requireNonNull(task, "task");
+    synchronized (monitor) {
+      if (generateLeases + auxLeases != 0) {
+        noLeaseWaiters.add(task);
+        return;
+      }
+    }
+    deliverNoLease(List.of(task));
+  }
+
+  private void deliverNoLease(List<Runnable> tasks) {
+    for (Runnable task : tasks) {
+      try {
+        edgeDelivery.execute(() -> {
+          try {
+            task.run();
+          } catch (RuntimeException failure) {
+            LOG.warn("A no-lease-open call failed", failure);
+          }
+        });
+      } catch (RejectedExecutionException rejected) {
+        LOG.warn("No-lease-open delivery refused; the waiting step is not resumed", rejected);
+      }
+    }
   }
 
   // ==================== Admission ====================
@@ -351,12 +382,18 @@ public final class GenerationTracker implements GenerationActivity {
 
     private void closeLease() {
       boolean edge;
+      List<Runnable> idle = List.of();
       synchronized (monitor) {
         if (!leaseOpen) return;
         leaseOpen = false;
         edge = closeLeaseLocked(kind);
+        if (generateLeases + auxLeases == 0 && !noLeaseWaiters.isEmpty()) {
+          idle = List.copyOf(noLeaseWaiters);
+          noLeaseWaiters.clear();
+        }
       }
       if (edge) deliverEdges();
+      deliverNoLease(idle);
     }
 
     @Override
