@@ -312,31 +312,45 @@ fn evidence_scope(rows: &[Value]) -> Value {
     scope
 }
 
+/// One parse per non-blank line, read leniently as the reader, Java and Node do: malformed
+/// UTF-8 (a write cut off inside a non-ASCII path) is decoded with replacement, so one bad
+/// line costs that line, never the whole file. `None` marks a line that is not a JSON object.
+fn parsed_lines(bytes: &[u8]) -> Vec<Option<Value>> {
+    bytes
+        .split(|b| *b == b'\n')
+        .map(String::from_utf8_lossy)
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            serde_json::from_str::<Value>(&line)
+                .ok()
+                .filter(Value::is_object)
+        })
+        .collect()
+}
+
 fn json_lines(file: &Path) -> io::Result<Vec<Value>> {
-    match fs::read_to_string(file) {
-        Ok(text) => Ok(text
-            .lines()
-            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-            .filter(Value::is_object)
-            .collect()),
+    match fs::read(file) {
+        Ok(bytes) => Ok(parsed_lines(&bytes).into_iter().flatten().collect()),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
         Err(e) => Err(e),
     }
 }
 
-/// Every non-blank line of an evicted file. An unreadable line stays as an empty row, so the
-/// loss scope it contributes to is explicitly incomplete rather than silently narrower.
-fn dropped_rows(file: &Path) -> io::Result<Vec<Value>> {
-    Ok(fs::read_to_string(file)?
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            serde_json::from_str::<Value>(line)
-                .ok()
-                .filter(Value::is_object)
-                .unwrap_or_else(|| json!({}))
+/// Every non-blank line of an evicted file, with the number of corrupt lines among them. An
+/// unreadable line stays as an empty row, so the loss scope it contributes to is explicitly
+/// incomplete rather than silently narrower.
+fn dropped_rows(file: &Path) -> io::Result<(Vec<Value>, u64)> {
+    let mut corrupt = 0;
+    let rows = parsed_lines(&fs::read(file)?)
+        .into_iter()
+        .map(|row| {
+            row.unwrap_or_else(|| {
+                corrupt += 1;
+                json!({})
+            })
         })
-        .collect())
+        .collect();
+    Ok((rows, corrupt))
 }
 
 fn retain_and_rename(
@@ -384,7 +398,7 @@ fn retain_and_rename(
             break;
         }
         let bytes = fs::metadata(&file)?.len();
-        let rows = dropped_rows(&file)?;
+        let (rows, corrupt_lines) = dropped_rows(&file)?;
         let mut losses = json_lines(&loss_file)?;
         for row in &rows {
             if row["pid"].as_u64().is_none() || row["creationFileTime"].as_str().is_none() {
@@ -405,7 +419,8 @@ fn retain_and_rename(
         let now = format_timestamp(now_ms());
         let mut summary = json!({"schemaVersion":1,"type":"ledger-gap","seq":1,"at":now,"since":now,
             "writer":writer,"reason":"EVIDENCE_LOST","count":1,"droppedBytes":bytes,
-            "droppedFile":file.file_name().unwrap().to_string_lossy(),"detail":"archive dropped at retention bound"});
+            "droppedFile":file.file_name().unwrap().to_string_lossy(),"corruptLines":corrupt_lines,
+            "detail":"archive dropped at retention bound"});
         summary
             .as_object_mut()
             .unwrap()
@@ -893,6 +908,48 @@ mod tests {
                 .count(),
             1,
             "the retained generation stays readable"
+        );
+    }
+    #[test]
+    fn eviction_proceeds_past_a_line_cut_inside_a_multibyte_character() {
+        // A write cut off inside a non-ASCII path leaves bytes that are not UTF-8. That line is
+        // corrupt; the archive is still evicted at the real 128 MiB bound and the loss recorded.
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("engine.v1.2.jsonl");
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        let mut bytes = format!("{row}\n").into_bytes();
+        bytes.extend_from_slice(b"{\"schemaVersion\":1,\"executable\":\"C:/Users/Z\xC3");
+        fs::write(&old, bytes).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&old)
+            .unwrap()
+            .set_len(128 * 1024 * 1024 + 1)
+            .unwrap();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        assert_eq!(
+            fs::metadata(&old).ok().map(|m| m.len()),
+            None,
+            "the archive above the retention bound is evicted"
+        );
+        let losses: Vec<Value> = fs::read_to_string(dir.path().join("engine.v1.lost.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        let summary: Vec<_> = losses.iter().filter(|r| r["pid"].is_null()).collect();
+        assert_eq!(summary.len(), 1, "{losses:?}");
+        assert_eq!(
+            summary[0]["corruptLines"], 1,
+            "the cut-off line is counted as corrupt"
+        );
+        assert_eq!(summary[0]["scopeComplete"], false);
+        assert_eq!(
+            losses.iter().filter(|r| r["pid"] == 7).count(),
+            1,
+            "the readable row keeps its loss receipt"
         );
     }
     #[test]

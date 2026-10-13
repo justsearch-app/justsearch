@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T14:32:25.869Z",
-  "revision": "b366c050091c9d389bcbf16683706b17cabd36e7",
-  "tree": "57e1233966de9be4ce870880787e13c1fb71b49a",
+  "createdAt": "2026-10-13T16:36:23.782Z",
+  "revision": "622008be84afa5cf280f4f165f52d1cc0fd10037",
+  "tree": "7a1b48d0bc52d609af137a8631ca0061692b237d",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 24555
+      "durationMs": 18534
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time",
       "file": "modules/shell/src-tauri/src/exit_ledger.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:edcefc91e492f22d1a1c8ace3cfdbfb2c204948531dd9d8ce36aa6fcd28b274c",
+      "contentDigest": "sha256:7ca443b9699653b0174b5585954212080f87f392c35e44b776141108874ac6e2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -51,16 +51,16 @@
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 29444
+        "durationMs": 23388
       }
     ],
     "checks": [
       {
         "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time",
         "classification": "assertion",
-        "detail": "exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time:  ---- exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time stdout ----\n\nthread 'exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time' (32068) panicked at src\\exit_ledger.rs:936:9:\nassertion `left == right` failed: an unknown merged range keeps no stale lower bound: {\"schemaVersion\":1,\"type\":\"ledger-gap\",\"seq\":1,\"at\":\"2026-10-13T14:32:23.216Z\""
+        "detail": "exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time:  ---- exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time stdout ----\n\nthread 'exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time' (13420) panicked at src\\exit_ledger.rs:978:9:\nassertion `left == right` failed: an unknown merged range keeps no stale lower bound: {\"schemaVersion\":1,\"type\":\"ledger-gap\",\"seq\":1,\"at\":\"2026-10-13T16:36:21.175Z\""
       }
     ]
   },
-  "digest": "sha256:3662eea2de7d6c4bfd8466acf24065e459481e4e0931956ffd7fe0fa41a3d0c9"
+  "digest": "sha256:39cd9c278b8e372a87989e66f5ddd74a27df38578879e4595f7d4631d2d04c0d"
 }

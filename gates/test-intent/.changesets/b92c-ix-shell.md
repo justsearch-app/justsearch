@@ -31,6 +31,15 @@ to the runner's own child handle. Explicit warn takeovers of dead, legacy and ex
 are still logged as stale-reclaim interference. Node checks for these are outside this gate's
 scope; their before and after logs are in the run folder.
 
+Second review repairs (starting revision 622008be8): installed-shell rotation reads archives
+leniently, so one line that is not UTF-8 is a counted corrupt line and eviction still holds the
+retention bound. Conformance teardown on Windows ends a live runner through its own child handle,
+whose job ends the fixtures it started, then confirms each recorded fixture PID is held by no
+running process in process; only a PID still taken goes to the birth query, and only a runner
+that is still alive gets the orderly stop. No artifact is removed before every recorded fixture
+is confirmed exited. Node checks for this are outside this gate's scope; their before and after
+logs and the timing runs are in the run folder.
+
 ```json
 {
   "entries": [
@@ -100,6 +109,28 @@ scope; their before and after logs are in the run folder.
       "evidence": "gates/test-intent/evidence/b92c-ix-shell-r2-rust.json",
       "newChecks": [
         "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/exit_ledger.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "An archive line that is not valid UTF-8, such as a write cut off inside a non-ASCII path, no longer stalls installed-shell rotation: the archive above the 128 MiB retention bound is still evicted, the bad line is counted as a corrupt line on the eviction summary (whose scope stays incomplete), and the readable row keeps its loss receipt (review round 3, defect 2; starting revision 622008be8).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
+          "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
+          "label": "agent choice",
+          "choice": "Read retained archives and the loss journal line by line with lossy UTF-8 decoding, as the ledger reader, Java and Node already do; one bad line costs that line, never the retention bound."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b92c-ix-shell-r3-rust.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character"
       ],
       "repaired": true
     },

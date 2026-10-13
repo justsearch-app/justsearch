@@ -72,6 +72,31 @@ export async function awaitFixtureExit(dir, { sleep, graceMs = 5000, timeoutMs =
   }
 }
 
+/** False only when no running process holds the PID; a denied or invalid query counts as running. */
+function processRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code !== 'ESRCH';
+  }
+}
+
+/**
+ * The common teardown: the runner has ended and its job has ended the fixtures it started. A
+ * live fixture still holds its recorded PID, so a PID no running process holds confirms that
+ * fixture's exit in process, without a birth query. False when any PID is still taken after
+ * `windowMs`; those identities are left to `awaitFixtureExit`.
+ */
+export async function fixturesExited(dir, { windowMs = 1000, pollMs = 10, running = processRunning } = {}) {
+  const deadline = Date.now() + windowMs;
+  for (;;) {
+    if (!fixtureIdentities(dir).some(identity => running(identity.pid))) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise(resolve => setTimeout(resolve, pollMs));
+  }
+}
+
 export function removeFixtureDirectory(directory) {
   const root = path.resolve(directory);
   if (root === path.parse(root).root) throw new Error('refusing fixture filesystem root');

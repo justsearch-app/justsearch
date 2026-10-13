@@ -1,5 +1,5 @@
 import { runLifecycle } from '../lifecycle.mjs';
-import { awaitFixtureExit, removeFixtureDirectory } from '../fixture-cleanup.mjs';
+import { awaitFixtureExit, fixturesExited, removeFixtureDirectory } from '../fixture-cleanup.mjs';
 /**
  * Conformance adapter: the development supervisor (`scripts/dev/dev-runner.cjs`), lane F item B8.
  *
@@ -165,10 +165,18 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
 
   const cleanup = async () => {
-    // Ask the runner to close its own Engine first. Every fixture has recorded its PID and a
-    // moment it held it before running application code; a failed orderly stop can only target
+    const alive = () => child.exitCode === null && child.signalCode === null;
+    const runnerEnded = ms => within(exited.then(() => true), ms);
+    if (process.platform === 'win32' && alive()) {
+      // The runner's own handle cannot name a reused PID. Ending the runner closes its libuv job
+      // (KILL_ON_JOB_CLOSE), which ends the fixtures it started; their exits are confirmed below.
+      try { child.kill(); } catch { /* already gone */ }
+      await runnerEnded(2000);
+    }
+    // A runner still alive is asked to close its own Engine. Every fixture has recorded its PID and
+    // a moment it held it before running application code; a failed orderly stop can only target
     // births resolved from those retained identities and recorded before the stop.
-    if (child.exitCode === null && child.signalCode === null) {
+    if (alive()) {
       // The stop speaks for the session that started the run, with the same harness settings;
       // any other caller is refused as an owner conflict.
       const stop = spawn(process.execPath, [...preload,
@@ -180,8 +188,10 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
       });
       await within(new Promise((resolve, reject) => { stop.once('exit', resolve); stop.once('error', reject); }), 20000);
     }
-    if (process.platform === 'win32') await awaitFixtureExit(identities, { sleep: io.sleep });
-    const runnerEnded = ms => within(exited.then(() => true), ms);
+    // A PID still taken may be a live fixture or a reuse: only the birth query tells them apart.
+    if (process.platform === 'win32' && !(await fixturesExited(identities))) {
+      await awaitFixtureExit(identities, { sleep: io.sleep });
+    }
     let ended = await runnerEnded(5000);
     if (!ended && process.platform !== 'win32') {
       // Off Windows the runner is this process's own unreaped child while its exit is unseen, so

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { driveCase, watchSupervisor } from './adapters/dev-runner.mjs';
 import { awaitFixtureExit, fixtureIdentities, removeFixtureDirectory } from './fixture-cleanup.mjs';
+import * as fixtureCleanup from './fixture-cleanup.mjs';
 import actuator from '../dev/lib/engine-actuator.cjs';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -22,15 +23,21 @@ test('adapter retains artifacts when owned fixture exits cannot be verified',
     readJsonIfPresent(file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } },
   };
   const run = await driveCase({ testCase: { id: 'verified-fixture-cleanup', startTimeoutMs: 30000 }, policy: {}, io, workDir });
-  const lookup = actuator.lookupProcessIdentities;
+  const lookup = actuator.lookupProcessIdentities, kill = process.kill;
   try {
     const ready = await watchSupervisor({ statePath: run.statePath, predicate: s => s.state === 'running',
       timeoutMs: 45000, io, seen: run.seen });
     assert.ok(ready, `fixture did not start: ${run.output.stdout}\n${run.output.stderr}`);
+    // Both identity checks are inconclusive: the in-process PID probe is denied, the query fails.
+    process.kill = (pid, signal) => {
+      if (signal === 0) throw Object.assign(new Error('denied'), { code: 'EPERM' });
+      return kill.call(process, pid, signal);
+    };
     actuator.lookupProcessIdentities = async () => null;
     await assert.rejects(run.cleanup(), /artifacts retained/, 'unverified children forbid successful teardown');
     assert.ok(fs.existsSync(workDir), 'diagnostic evidence survives an inconclusive cleanup');
   } finally {
+    process.kill = kill;
     actuator.lookupProcessIdentities = lookup;
     // Production cleanup never traverses parent PIDs. The retry uses the same captured births.
     const dir = run.identities ?? path.join(workDir, 'fixture-identities');
@@ -39,6 +46,75 @@ test('adapter retains artifacts when owned fixture exits cannot be verified',
       'runner exit must be observed before removing its fixture');
     removeFixtureDirectory(workDir);
   }
+});
+
+test('fixtures the runner job ended are confirmed without a stop process or birth query',
+  { skip: process.platform !== 'win32' && 'Windows fixture identity boundary' }, async () => {
+  const base = path.join(repoRoot, 'tmp');
+  fs.mkdirSync(base, { recursive: true });
+  const workDir = fs.mkdtempSync(path.join(base, 'conformance-cleanup-'));
+  fs.writeFileSync(path.join(workDir, 'fake-engine.plan.json'), JSON.stringify({ incarnations: [{ mode: 'honour' }] }));
+  const io = { repoRoot, fakeEngine: path.join(repoRoot, 'scripts/supervisor-conformance/fake-engine.mjs'),
+    sleep, harnessOverrides: { JUSTSEARCH_SUPERVISOR_HARNESS: '1' },
+    readJsonIfPresent(file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } },
+  };
+  const run = await driveCase({ testCase: { id: 'job-ended-fixture-cleanup', startTimeoutMs: 30000 }, policy: {}, io, workDir });
+  const lookup = actuator.lookupProcessIdentities, terminate = actuator.terminateWithCode;
+  const keep = process.env.SUPERVISOR_CONFORMANCE_KEEP;
+  try {
+    const ready = await watchSupervisor({ statePath: run.statePath, predicate: s => s.state === 'running',
+      timeoutMs: 45000, io, seen: run.seen });
+    assert.ok(ready, `fixture did not start: ${run.output.stdout}\n${run.output.stderr}`);
+    // Every fixture the run starts has recorded itself once the set is stable for a second.
+    let recorded = [];
+    for (let stable = 0; stable < 10; stable++) {
+      const now = fixtureIdentities(run.identities).map(i => i.pid).sort();
+      if (now.join() !== recorded.join()) stable = 0;
+      recorded = now;
+      await sleep(100);
+    }
+    let queries = 0, stops = 0;
+    actuator.lookupProcessIdentities = async pids => { queries++; return lookup(pids); };
+    actuator.terminateWithCode = async (...args) => { stops++; return terminate(...args); };
+    process.env.SUPERVISOR_CONFORMANCE_KEEP = '1';
+    await run.cleanup();
+    assert.equal(queries, 0, 'fixtures whose PIDs no running process holds need no birth query');
+    assert.equal(stops, 0, 'no identity-bound stop is needed');
+    assert.deepEqual(fixtureIdentities(run.identities).map(i => i.pid).sort(), recorded,
+      'teardown of an ended runner starts no stop process');
+    for (const pid of recorded) {
+      assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `fixture ${pid} exited before teardown returned`);
+    }
+  } finally {
+    actuator.lookupProcessIdentities = lookup;
+    actuator.terminateWithCode = terminate;
+    if (keep === undefined) delete process.env.SUPERVISOR_CONFORMANCE_KEEP;
+    else process.env.SUPERVISOR_CONFORMANCE_KEEP = keep;
+    if (fixtureIdentities(run.identities).length) await awaitFixtureExit(run.identities, { sleep });
+    assert.equal(await Promise.race([run.exited.then(() => true), sleep(5000).then(() => false)]), true,
+      'runner exit must be observed before removing its fixture');
+    removeFixtureDirectory(workDir);
+  }
+});
+
+test('a recorded PID no running process holds confirms that fixture exited', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fixture-gone-'));
+  try {
+    const { spawn } = await import('node:child_process');
+    const child = spawn(process.execPath, ['-e', ''], { stdio: 'ignore', windowsHide: true });
+    await new Promise(resolve => child.once('exit', resolve));
+    fs.writeFileSync(path.join(dir, `${child.pid}-1.json`), JSON.stringify({ pid: child.pid, heldAtFileTimeUtc: '1' }));
+    assert.equal(await fixtureCleanup.fixturesExited(dir, { windowMs: 0 }), true);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a recorded PID still taken is never confirmed exited in process', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fixture-taken-'));
+  try {
+    fs.writeFileSync(path.join(dir, `${process.pid}-1.json`), JSON.stringify({ pid: process.pid, heldAtFileTimeUtc: '1' }));
+    assert.equal(await fixtureCleanup.fixturesExited(dir, { windowMs: 50 }), false,
+      'a live process or a reuse is left to the birth query');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('identity mismatch is already gone and never authorizes a fixture stop', async () => {
