@@ -104,3 +104,14 @@ Pending independent verifier review. The builder cannot self-accept or delegate.
   "note": "FAIL remaining status-consumer contract: live UI stays Online after disable while fresh canonical state is OFF, then updates only at next poll. Independent isolation checks pass; 239 status polls in 1200 seconds have no timeout, max 49.751 ms under recorded foreign load. No quiet-machine acceptance; unavailable before-test APIs and proof-gate failures remain gaps. Report: F:/agent-sandbox/design-b6d536/codex/verify-status2/report.md"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-status9-20261014",
+  "verdict": "accept",
+  "digest": "sha256:1d79995a6c3745d47237c11cdbae7b6dcf1632111c71f65e44cb9626f6bcf30d",
+  "note": "VC-status9 (independent Claude verifier) on b6d536/status-timeout-2 vs 98cad099f: accepted ce7685a1c (b82: settings recovery null priorSettings fixed, 8 failures gone; data-age staleness, live 20-min E2 scripted-agent load 0 at-rest/GPU flips vs 92/106 on the base, 10871 canonical and 1186 fresh reads with 0 timeouts; ordered publication under an injected barrier; hung UI status read no longer stops polling; nothing blocks under the publication lock) and the records commits 19f230c5f, 41554dac9 and 0f9e824b2 (docs state staleAfterMs = 3 x sampler period and lanes stale after 3 of their own cadences with consequences a and b; Adaptations name the right decisions; compat patches add only PROBE_ALLOWANCE_PERIODS; before-failures rerun at f6d579a86, ff0c00f5e and 93479e944 match the records; behaviour texts corrected to the current code). Decided trade-offs: a hung lane is stale only after 3 of its cadences (30-120 s idle); a fresh read missing its deadline shows the last published value as current; a server always slower than 10 s shows empty status. Unverified: none beyond the named flaky StatusIsolationHttpTest under full CPU load (6/30 on both). Digest bound with --base 98cad099f, the lane's base."
+}
+```
