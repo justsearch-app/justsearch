@@ -29,7 +29,7 @@ class VerifierStatus4Test extends VerifierStatusIsolationTest {
    if(owner.equals("at-rest"))VerifierStatus2Test.set(f.handler,"cachedAtRestAtMs",0L);
    var sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
    try{
-    assertTrue(entered.await(2,TimeUnit.SECONDS),"producer must really be reached");Thread.sleep(1200);
+    assertTrue(entered.await(2,TimeUnit.SECONDS),"producer must really be reached");StatusLaneAging.ageHeldLanes(f.handler);
     var s=get(f,"");assertFalse(s.path("meta").path("workerRpcStale").asBoolean());
     assertFalse(s.path("readiness").path("components").path("ai").path("stale").asBoolean());
     assertFalse(s.path("readiness").path("components").path("telemetry").path("stale").asBoolean());
@@ -47,6 +47,7 @@ class VerifierStatus4Test extends VerifierStatusIsolationTest {
    var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var failed=new AtomicInteger();
    f.handler.setConversationProtectionSupplier(()->{entered.countDown();try{release.await();}catch(InterruptedException e){throw new RuntimeException(e);}failed.incrementAndGet();throw new IllegalStateException("old pending failure");});
    get(f,"?fresh=true");assertTrue(entered.await(2,TimeUnit.SECONDS));
+   StatusLaneAging.ageHeldLanes(f.handler);
    assertEquals("unknown",get(f,"").path("conversationProtection").path("state").asText());
    f.handler.setConversationProtectionSupplier(()->"unlocked");get(f,"?fresh=true");
    release.countDown();

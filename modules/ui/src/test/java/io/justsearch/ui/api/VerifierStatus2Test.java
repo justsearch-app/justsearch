@@ -53,7 +53,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
           System.out.println("UNEXERCISED_OWNER="+name);
           org.junit.jupiter.api.Assumptions.assumeTrue(false,"supplier not reached in this fixture: "+name);
         }
-        Thread.sleep(1200);
+        StatusLaneAging.ageHeldLanes(f.handler);
         var s=get(f,"");
         System.out.println("OWNER="+name+" calls="+calls.get());
         assertFalse(s.path("meta").path("workerRpcStale").asBoolean(),"worker independent of "+name);

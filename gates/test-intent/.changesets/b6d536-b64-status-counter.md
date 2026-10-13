@@ -7,6 +7,8 @@ author-session: b64-status-counter
 
 Server-owned publication metadata replaces the completion inventory. Independent acceptance is pending.
 
+Refreshed after b82 (run b82g-status-records). Entry 2's evidence was re-run on the current checks. That entry is not marked repaired, so it has a candidate run only and no fail-before. Both checks pass with the same cases as the first record: 11 and 5. statusOwner-extra.test.ts is unchanged. statusCounterSignal.test.ts changed once, in b73 (6f177f241), and not because of b82's decision (a) or (b). In its 'does not acknowledge a current header when the snapshot reflects an older revision' case, the expectation 'a later request may retry the pending publication' became: the same counter value is not read again, and a later value is. b73's changeset entry for statusStorm.test.ts and statusCounterSignal.test.ts records that replacement and its source. verify-status7 and verify-status8 each found the changed expectation justified. Entry 2's behaviour text said the client 'retries stale observations only on another request'. That described the replaced expectation, so the text was corrected after the refresh (b82g correction). This corrects the description of code that did not change; no check or evidence changed. statusCounterSignal.test.ts line 35 asserts the one-read-per-value part.
+
 ```json
 {
   "entries": [
@@ -59,7 +61,7 @@ Server-owned publication metadata replaces the completion inventory. Independent
         "modules/ui-web/src/api/statusOwner-extra.test.ts"
       ],
       "class": "New",
-      "behaviour": "Additive server metadata coalesces bursts, retries stale observations only on another request, isolates head epochs and preserves caller bodies. Read-only approvals and replayed completions with unchanged server counters cause no fresh read. Failed responses can convey a different client's completed publication. The copied verifier approval/replay assertions remain unchanged.",
+      "behaviour": "Additive server metadata coalesces bursts. It makes one fresh read per observed value. A value still unreflected after that read is followed up only by ordinary reads started by later signals, at most 3; a later value gets one fresh read. It isolates head epochs and preserves caller bodies. Read-only approvals and replayed completions with unchanged server counters cause no fresh read. Failed responses can convey a different client's completed publication. The copied verifier approval/replay assertions remain unchanged.",
       "sources": [
         {
           "kind": "owner-words",
@@ -145,5 +147,16 @@ Pending independent verifier judgment; the builder does not accept its own chang
   "verdict": "accept",
   "digest": "sha256:241d3b09dd551375b313d6829ae962f7acc44e4efc618db818b7ebdeb9498e03",
   "note": "Independent verify-status8 on 2fd48e172: PASS. S20 back-off repaired: any successful status read ends the back-off; live, after 40 s of refused fresh reads and a successful poll, another client's lock and the mounted UI's own lock made 2 s later show at the next render (fail on ff5bb2ae9). Builder statusBackoff cases fail on ff5bb2ae9 by assertion (5/10) and pass (10/10). ui suite completes at the 384m default heap (1731 tests, 0 failures; ff5bb2ae9 runs out of heap after 1210); narrowed producer import finds 87/87 counter call sites of a full import. About one refused fresh read per poll interval is bounded (live 7 in 40 s, 3 in 30 s after a restart); the previous bound-of-6 case assumed one clock (3 on a single fake clock); a lagging fresh read gets at most 3 ordinary follow-ups per value (unit and a live 59 s held Worker lane); an own action during back-off shows at the next successful poll; the statusCounterSignal change is justified. Lock/unlock, failed, read-only, replay, reattach, approval, chat, agent tool, GPU, indexing, raw settings, second tab, header stripping, restart, idle 10 min and full-response comparison with f6d579a86 pass; suites, frontend, architecture, lane F, regen, API contract and governance show no new failures. E2 driver window: 239/239 status reads, max 23 ms, 33.8 fresh reads/min, at most 3 per value. Noted, not caused by this candidate: a fresh read missing its 100 ms deadline publishes expired lanes (at-rest UNKNOWN, GPU unavailable) for 100-300 ms, so the UI's fresh reads generate some counter values under load (10 flips per 12 min E2-like; a loop when lanes are slowed). Report: F:/agent-sandbox/design-b6d536/codex/verify-status8/report.md"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-status9-20261014",
+  "verdict": "accept",
+  "digest": "sha256:147044af6f18d59e6dc7cfd83a5d2f3cf03bccf78b16a9ed539cf94161cbbc53",
+  "note": "VC-status9 (independent Claude verifier) on b6d536/status-timeout-2 vs 98cad099f: accepted ce7685a1c (b82: settings recovery null priorSettings fixed, 8 failures gone; data-age staleness, live 20-min E2 scripted-agent load 0 at-rest/GPU flips vs 92/106 on the base, 10871 canonical and 1186 fresh reads with 0 timeouts; ordered publication under an injected barrier; hung UI status read no longer stops polling; nothing blocks under the publication lock) and the records commits 19f230c5f, 41554dac9 and 0f9e824b2 (docs state staleAfterMs = 3 x sampler period and lanes stale after 3 of their own cadences with consequences a and b; Adaptations name the right decisions; compat patches add only PROBE_ALLOWANCE_PERIODS; before-failures rerun at f6d579a86, ff0c00f5e and 93479e944 match the records; behaviour texts corrected to the current code). Decided trade-offs: a hung lane is stale only after 3 of its cadences (30-120 s idle); a fresh read missing its deadline shows the last published value as current; a server always slower than 10 s shows empty status. Unverified: none beyond the named flaky StatusIsolationHttpTest under full CPU load (6/30 on both). Digest bound with --base 98cad099f, the lane's base."
 }
 ```

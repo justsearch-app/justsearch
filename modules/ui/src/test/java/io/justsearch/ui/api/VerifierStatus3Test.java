@@ -7,6 +7,7 @@ class VerifierStatus3Test extends VerifierStatusIsolationTest {
   @Test void persistentHungWorkerDoesNotGrowProducerThreadsAndClearsAfterRelease() throws Exception {
     try(var f=new Fixture(true)){
       f.block.set(true);get(f,"?fresh=true");assertTrue(f.entered.await(2,TimeUnit.SECONDS));
+      StatusLaneAging.ageHeldLanes(f.handler);
       long high=0;int calls=f.calls.get();
       try{
         for(int i=0;i<50;i++){

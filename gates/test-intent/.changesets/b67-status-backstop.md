@@ -7,6 +7,14 @@ author-session: b67-status-backstop
 
 Canonical status owns publication completeness; independent acceptance remains pending.
 
+Refreshed after b82 (run b82g-status-records). The evidence of entries 1 and 2 was re-run on the current checks. Entry 1's fail-before ran again at 93479e944 with its original overlays:
+
+- The verifier-derived checks changed in b82 because of b82's decisions (a) and (b). Entry 3 records this adaptation.
+- StatusPublicationCompletenessTest gained b82's knownUserVisibleStatesAlwaysSignal case, which b82's changeset covers, and an import tidy. Entry 1's two named methods are unchanged.
+- statusBoundaryPoll.test.ts gained b82's S4 cases (headerlessStatusConvergesAfterSseEpoch), which b82's changeset covers. Its earlier cases are unchanged. Entry 1 checks the whole file, so its evidence now includes the S4 cases.
+
+The current checks call StatusLaneAging, a b82 test helper, so the fail-before also overlays it. StatusLaneAging reads StatusLifecycleHandler.PROBE_ALLOWANCE_PERIODS, which 93479e944 lacks. The compat before-patch gates/test-intent/evidence/b67-status-backstop-compat.patch adds only that constant, and no production code in that state reads it. The overlay modules/ui-web/node_modules/.before-run-private-install is an empty marker file. It gives the before worktree a real node_modules directory, so the evidence script links none. The before worktree's frontend packages came from a private install in its parent directory.
+
 ```json
 {
   "entries": [
@@ -60,6 +68,20 @@ Canonical status owns publication completeness; independent acceptance remains p
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java"
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Before each stale or unknown assertion on a held lane, the cases now age that lane by its own clock with StatusLaneAging.ageHeldLanes: they advance the handler clock beyond the capped idle limit and run one bounded sampler pass. Two b82 decisions caused this. Decision (a): a hung lane is reported stale only after 3 of its own update intervals, so detection is later when idle, about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown under load. Under the old rule a refresh in flight for more than 1 s made its lane stale, so these cases used to sleep 1.2 s: VerifierStatusIsolationTest's blocked-disk and hung-worker cases, VerifierStatus2Test's per-owner case, VerifierStatus4Test's additional-owner case and VerifierStatus5Test's samplerFailureAndRecoveryPublishCanonicalFreshnessChanges. Decision (b): when a fresh read misses its deadline, it shows the last published value labelled current, rather than unknown. So right after an action it can briefly show the pre-action value. These cases used to observe the held lane as stale or unknown right after a fresh read had missed its deadline, and they now age it first: VerifierStatus3Test's persistent hung worker, VerifierStatus4Test's older pending failure (conversation protection unknown) and VerifierStatus5Test's unknown unrelated owner. Each case still holds the same producer. It asserts the same stale or unknown marker on exactly that part, the same current values on every other part, the same counter and reflected-revision relations and the same recovery."
     }
   ]
 }
@@ -97,5 +119,16 @@ Canonical status owns publication completeness; independent acceptance remains p
   "verdict": "accept",
   "digest": "sha256:f8d5d758193c3a5fb4ee3d532dfcb98b8c4a18aa2f59315713b496bb180f7c81",
   "note": "Independent verify-status8 on 2fd48e172: PASS. S20 back-off repaired: any successful status read ends the back-off; live, after 40 s of refused fresh reads and a successful poll, another client's lock and the mounted UI's own lock made 2 s later show at the next render (fail on ff5bb2ae9). Builder statusBackoff cases fail on ff5bb2ae9 by assertion (5/10) and pass (10/10). ui suite completes at the 384m default heap (1731 tests, 0 failures; ff5bb2ae9 runs out of heap after 1210); narrowed producer import finds 87/87 counter call sites of a full import. About one refused fresh read per poll interval is bounded (live 7 in 40 s, 3 in 30 s after a restart); the previous bound-of-6 case assumed one clock (3 on a single fake clock); a lagging fresh read gets at most 3 ordinary follow-ups per value (unit and a live 59 s held Worker lane); an own action during back-off shows at the next successful poll; the statusCounterSignal change is justified. Lock/unlock, failed, read-only, replay, reattach, approval, chat, agent tool, GPU, indexing, raw settings, second tab, header stripping, restart, idle 10 min and full-response comparison with f6d579a86 pass; suites, frontend, architecture, lane F, regen, API contract and governance show no new failures. E2 driver window: 239/239 status reads, max 23 ms, 33.8 fresh reads/min, at most 3 per value. Noted, not caused by this candidate: a fresh read missing its 100 ms deadline publishes expired lanes (at-rest UNKNOWN, GPU unavailable) for 100-300 ms, so the UI's fresh reads generate some counter values under load (10 flips per 12 min E2-like; a loop when lanes are slowed). Report: F:/agent-sandbox/design-b6d536/codex/verify-status8/report.md"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-status9-20261014",
+  "verdict": "accept",
+  "digest": "sha256:f66587b4156f82c31dade249b0560e929353528b4baba8e0762480fc0d137d9a",
+  "note": "VC-status9 (independent Claude verifier) on b6d536/status-timeout-2 vs 98cad099f: accepted ce7685a1c (b82: settings recovery null priorSettings fixed, 8 failures gone; data-age staleness, live 20-min E2 scripted-agent load 0 at-rest/GPU flips vs 92/106 on the base, 10871 canonical and 1186 fresh reads with 0 timeouts; ordered publication under an injected barrier; hung UI status read no longer stops polling; nothing blocks under the publication lock) and the records commits 19f230c5f, 41554dac9 and 0f9e824b2 (docs state staleAfterMs = 3 x sampler period and lanes stale after 3 of their own cadences with consequences a and b; Adaptations name the right decisions; compat patches add only PROBE_ALLOWANCE_PERIODS; before-failures rerun at f6d579a86, ff0c00f5e and 93479e944 match the records; behaviour texts corrected to the current code). Decided trade-offs: a hung lane is stale only after 3 of its cadences (30-120 s idle); a fresh read missing its deadline shows the last published value as current; a server always slower than 10 s shows empty status. Unverified: none beyond the named flaky StatusIsolationHttpTest under full CPU load (6/30 on both). Digest bound with --base 98cad099f, the lane's base."
 }
 ```

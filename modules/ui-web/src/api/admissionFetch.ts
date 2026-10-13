@@ -4,6 +4,16 @@ import { withClientKind } from './clientKind.js';
 import { observeStatusResponse } from './statusInvalidation.js';
 
 const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'ADMISSION_INFERENCE_BUSY']);
+const waitObservers = new WeakMap<AbortSignal, (delayMs: number) => void>();
+
+/**
+ * Tells the owner of a request's signal when the server refused it for capacity or an upgrade and
+ * the request now waits {@code delayMs} before retrying. That wait follows the server's answer, so
+ * an owner that bounds unanswered requests can tell it apart from silence.
+ */
+export function observeAdmissionWait(signal: AbortSignal, observer: (delayMs: number) => void): void {
+  waitObservers.set(signal, observer);
+}
 
 /**
  * Retry only explicit pre-execution refusals. Network failures and committed streams are never replayed.
@@ -43,6 +53,7 @@ export async function fetchWithAdmissionWait(
     if ((!capacity && !upgrade) || !retrySafe || !replayable) return response;
     const delay = retryDelay(response.headers.get('Retry-After'));
     reportAdmissionWait(upgrade, delay);
+    if (signal) waitObservers.get(signal)?.(delay);
     await response.body?.cancel();
     await wait(delay, signal);
     attemptInput = typeof Request !== 'undefined' && reusable instanceof Request ? reusable.clone() : reusable;

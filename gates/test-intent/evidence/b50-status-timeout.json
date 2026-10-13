@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:d6365732a21827c41b0aed4b763fad01ff0383a5f7bddf14e2973868ad16dff8"
   },
-  "createdAt": "2026-10-10T04:41:27.059Z",
-  "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
-  "tree": "d74c278acea08f1ea82a2f889cee41a3f171d8ea",
+  "createdAt": "2026-10-13T22:53:46.392Z",
+  "revision": "19f230c5f3420348cd8042745c154017303084b0",
+  "tree": "f852a03aae537106c58ccc0fef13ba1f453d55ff",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.WorkerStatusSamplerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 22165
+      "durationMs": 63728
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:75791a3bd1faa58758009b6a080ba0b7f44c2830d91dd056e2b2245082fb852c",
+      "contentDigest": "sha256:bb60d70b374f840766774801a778cba280e46de34f791b8fe6913e8af0239eb3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -52,6 +52,74 @@
         },
         {
           "name": "failedObservationRetainsTheLastResponseAsStale()",
+          "status": "passed"
+        },
+        {
+          "name": "failure of disk-pressure stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of inference stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpl stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of conversation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of telemetry stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu-processing stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of device-plan stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of bulk-gate stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-capabilities stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of at-rest stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of agent stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of online-ai stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-saturation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of power stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of resume stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vision stays local",
           "status": "passed"
         },
         {
@@ -137,6 +205,18 @@
         {
           "name": "status does not wait for model-file-path",
           "status": "passed"
+        },
+        {
+          "name": "status does not wait for power",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for resume",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vision",
+          "status": "passed"
         }
       ]
     },
@@ -192,12 +272,13 @@
     "ref": "f6d579a86",
     "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.WorkerStatusSamplerTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 202308
+        "durationMs": 347732
       }
     ],
     "checks": [
@@ -213,5 +294,5 @@
       }
     ]
   },
-  "digest": "sha256:c9f4b3c0963a61187982e92a8bd1876ec7e3cff2a7af4aa8e11a35fe17892c0a"
+  "digest": "sha256:e0c37c22bdba2f8dad59c8769306ac1378b0b5f0a42a7f2e08b10af3caab87e3"
 }

@@ -105,6 +105,15 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private ComponentHandle indexComponent;
   private volatile StatusResponse initialStatus;
   private final StatusPublicationBackstop statusPublication = new StatusPublicationBackstop();
+  /**
+   * Orders publication. The sampler and HTTP reads both build a response from the current
+   * observations and publish it; built concurrently, a response from older observations could
+   * publish after a newer one and alternate a value, advancing the counter twice. One build and
+   * publish at a time reads each lane no older than the last publication did. The build only reads
+   * published observations in memory: no producer, owner lock or I/O is held under it.
+   */
+  private final java.util.concurrent.locks.ReentrantLock publicationOrder =
+      new java.util.concurrent.locks.ReentrantLock();
   private volatile Runnable refreshRequest;
   private final java.util.concurrent.ConcurrentHashMap<String, StatusObservation<?>> observations =
       new java.util.concurrent.ConcurrentHashMap<>();
@@ -132,6 +141,14 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       String name, Supplier<T> producer, long period) {
     return this.<T>observation(name).refresh(name, producer, clockMs, period, () -> {
       if (name.equals("worker")) refresh("registry", this::projectCurrentComponents, period);
+      refreshProjections();
+    }, true);
+  }
+
+  /** For a producer that answers from its own cache: the lane carries the cache's probe time. */
+  private <T> java.util.concurrent.CompletableFuture<Void> refreshProbe(
+      String name, Supplier<StatusObservation.Probe<T>> producer, long period) {
+    return this.<T>observation(name).refreshProbe(name, producer, clockMs, period, () -> {
       refreshProjections();
     }, true);
   }
@@ -204,6 +221,26 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   /** How many sampling periods a sample may age before it is reported stale. */
   static final int SAMPLE_STALE_PERIODS = 3;
+
+  /**
+   * A value whose data was at most this many periods old when it was published (a slow probe, or a
+   * source reading aged by its own cadence and caches) is late, not hung: that age is added to the
+   * lane's period to form its effective cadence. An older value adds nothing and is stale, so a hung
+   * probe or a stale source still goes stale within a bounded time.
+   */
+  static final int PROBE_ALLOWANCE_PERIODS = 3;
+
+  /** How many of a lane's most recent data ages at publish its effective cadence considers. */
+  static final int RECENT_PROBES = 4;
+
+  /** How long a fresh read waits for its observations before answering with the current values. */
+  static final long FRESH_READ_DEADLINE_MS = 100L;
+
+  /** How long one sampler pass waits for its observations; a held lane publishes when it can. */
+  static final long SAMPLER_OBSERVATION_BUDGET_MS = 1_000L;
+
+  /** How often a waiting read or sampler pass looks at its observations. */
+  private static final long OBSERVATION_POLL_NANOS = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(2L);
 
   /** The sampler's last observation; {@code null} until the first one. */
   private volatile WorkerViewSample lastWorkerSample;
@@ -528,35 +565,35 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   void handleStatus(Context ctx) {
     if ("true".equalsIgnoreCase(ctx.queryParam("fresh"))) {
-      var observed = new java.util.concurrent.CompletableFuture<Void>();
+      long due = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(FRESH_READ_DEADLINE_MS);
+      var answered = new java.util.concurrent.CompletableFuture<Void>();
       // Dispatch independently of the periodic reconciliation queue: that queue may already be
       // observing a hung owner. Coalescing and publication belong to each observation lane.
       Thread.ofPlatform().daemon().name("status-fresh-dispatch").start(() -> {
         try {
           var pending = dispatchObservations();
-          java.util.concurrent.CompletableFuture.allOf(
-                  pending.toArray(java.util.concurrent.CompletableFuture[]::new))
-              .thenCompose(ignored -> java.util.concurrent.CompletableFuture.allOf(
-                  refreshProjections().toArray(java.util.concurrent.CompletableFuture[]::new)))
-              .whenComplete((ignored, failure) -> observed.complete(null));
           var request = refreshRequest;
           if (request != null) request.run();
+          // Waits without attaching to the lanes: when the deadline answers first, nothing of this
+          // read stays behind on a held lane, and its release replays none of this read's work.
+          if (awaitObservations(pending, due)) awaitObservations(refreshProjections(), due);
         } catch (RuntimeException failure) {
-          observed.complete(null);
+          // The response reports each lane's own last observation.
+        } finally {
+          answered.complete(null);
         }
       });
-      var deadline = new java.util.concurrent.CompletableFuture<Void>();
       // A dedicated deadline cannot queue behind inference in the shared async pool.
       Thread.ofPlatform().daemon().name("status-read-deadline").start(() -> {
-        long due = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(100L);
         long remaining;
         while ((remaining = due - System.nanoTime()) > 0L) {
           java.util.concurrent.locks.LockSupport.parkNanos(remaining);
         }
-        deadline.complete(null);
+        answered.complete(null);
       });
-      ctx.future(() -> observed.applyToEither(deadline, ignored -> {
-        if (!observed.isDone()) observations.values().forEach(lane -> lane.expireOutstanding(clockMs.getAsLong()));
+      // The deadline ends this response's wait only. It is not evidence about any lane: a lane
+      // still observing keeps its last real value and ages by its own sampling period.
+      ctx.future(() -> answered.thenApply(ignored -> {
         writeStatus(ctx);
         return null;
       }));
@@ -612,15 +649,21 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     pending.add(refresh("inference", this::buildInferenceView, period));
     pending.add(refresh("power", this::buildPowerStatus, period));
     pending.add(refresh("resume", this::computeCatchingUp, period));
-    pending.add(refresh("gpu", this::buildGpuStatus, period));
-    pending.add(refresh("gpu-memory", () -> {
+    // A cached producer is sampled at least as rarely as its cache lives; that is its own period.
+    pending.add(refreshProbe("gpu", this::buildGpuStatus, Math.max(period, GPU_CACHE_TTL_MS)));
+    // The reading carries its own timestamp (the GPU sampler's tick, then the projection's cache):
+    // the lane is observed when the reading was taken, so its cadence counts the reading's age.
+    pending.add(refreshProbe("gpu-memory", () -> {
+      long probedAt = clockMs.getAsLong();
       var hold = gpuMemory;
-      return hold == null ? io.justsearch.app.api.status.operating.OperatingGpuView.unknown()
-          : hold.projection().view(period * SAMPLE_STALE_PERIODS);
+      var view = hold == null ? io.justsearch.app.api.status.operating.OperatingGpuView.unknown()
+          : hold.projection().view(observation("gpu-memory").staleAfterMs(period));
+      return new StatusObservation.Probe<>(view, view.sampledAt() == null ? probedAt
+          : Math.min(probedAt, Instant.parse(view.sampledAt()).toEpochMilli()));
     }, period));
-    pending.add(refresh("at-rest", this::buildAtRestProtection, period));
+    pending.add(refreshProbe("at-rest", this::buildAtRestProtection, Math.max(period, AT_REST_CACHE_TTL_MS)));
     pending.add(refresh("conversation", this::buildConversationProtection, period));
-    pending.add(refresh("models", this::buildModelDistributionStatus, Math.max(period, MODEL_DIST_CACHE_TTL_MS)));
+    pending.add(refreshProbe("models", this::buildModelDistributionStatus, Math.max(period, MODEL_DIST_CACHE_TTL_MS)));
     pending.add(refresh("agent", () -> agentService.isAvailable()
         ? new io.justsearch.app.api.status.AgentSessionView(agentService.activeSessionCount()) : null, period));
     pending.add(refresh("telemetry", this::currentTelemetrySnapshot, period));
@@ -681,13 +724,32 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   private static void awaitObservations(List<java.util.concurrent.CompletableFuture<Void>> pending) {
-    try {
-      java.util.concurrent.CompletableFuture.allOf(pending.toArray(java.util.concurrent.CompletableFuture[]::new))
-          .get(1_000L, java.util.concurrent.TimeUnit.MILLISECONDS);
-    } catch (java.util.concurrent.TimeoutException | java.util.concurrent.ExecutionException ignored) {
-      // Each lane publishes independently. A blocked lane owns no other lane's freshness.
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
+    // Each lane publishes independently. A blocked lane owns no other lane's freshness.
+    awaitObservations(pending, System.nanoTime()
+        + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(SAMPLER_OBSERVATION_BUDGET_MS));
+  }
+
+  /**
+   * Waits until every observation has completed or the deadline has passed, and reports which.
+   * It looks at the lanes instead of attaching a callback to them: a wait that ends at its
+   * deadline leaves nothing behind on a held lane, so a long hold collects no waiters from reads
+   * or sampler passes, and its release runs no obsolete work for them.
+   */
+  private static boolean awaitObservations(
+      List<java.util.concurrent.CompletableFuture<Void>> pending, long dueNanos) {
+    while (true) {
+      boolean done = true;
+      for (var lane : pending) {
+        if (!lane.isDone()) {
+          done = false;
+          break;
+        }
+      }
+      if (done) return true;
+      long remaining = dueNanos - System.nanoTime();
+      if (remaining <= 0L) return false;
+      java.util.concurrent.locks.LockSupport.parkNanos(Math.min(remaining, OBSERVATION_POLL_NANOS));
+      if (Thread.currentThread().isInterrupted()) return false;
     }
   }
 
@@ -767,6 +829,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   /** Observes all producers and reconciles taps off the HTTP path, then publishes one response. */
   private StatusResponse observeStatus() {
+    publicationOrder.lock();
+    try { return buildAndPublishStatus(); }
+    finally { publicationOrder.unlock(); }
+  }
+
+  private StatusResponse buildAndPublishStatus() {
     long uptimeMs = System.currentTimeMillis() - startTime.toEpochMilli();
 
     // JVM Memory
@@ -797,7 +865,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     String indexStatusReason = sample.failureReason();
     // workerRpcAtMs is the SAMPLE's observation time (tempdoc 885 item 6 moved the observation off
     // the request thread); age = now - workerRpcAtMs. A sample is stale when it failed, or when it
-    // is older than SAMPLE_STALE_PERIODS sampling periods — which is how a wedged sampler surfaces
+    // is older than SAMPLE_STALE_PERIODS effective cadences — which is how a wedged sampler surfaces
     // as "contact lost" instead of as a silently-frozen snapshot served as fresh.
     long workerRpcAtMs = sample.sampledAtMs();
     boolean workerRpcStale =
@@ -1239,18 +1307,19 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   /** 335 §9: Build GPU status from NVML probe (best-effort, Head-side, cached). */
-  private GpuStatusView buildGpuStatus() {
-    // Return cached value if fresh enough (avoid NVML init/shutdown per poll).
-    long now = System.currentTimeMillis();
+  private StatusObservation.Probe<GpuStatusView> buildGpuStatus() {
+    // Return cached value if fresh enough (avoid NVML init/shutdown per poll), with its probe time.
+    long now = clockMs.getAsLong();
+    long cachedAt = cachedGpuStatusAtMs;
     GpuStatusView cached = cachedGpuStatus;
-    if (cached != null && (now - cachedGpuStatusAtMs) < GPU_CACHE_TTL_MS) {
-      return cached;
+    if (cached != null && (now - cachedAt) < GPU_CACHE_TTL_MS) {
+      return new StatusObservation.Probe<>(cached, cachedAt);
     }
 
     GpuStatusView result = probeGpuStatus();
     cachedGpuStatus = result;
     cachedGpuStatusAtMs = now;
-    return result;
+    return new StatusObservation.Probe<>(result, now);
   }
 
   /**
@@ -1258,11 +1327,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Coarse on/off fidelity only — {@code qualityKnown=false} always, since the configuration-quality
    * distinction needs admin elevation (629 §R1 / confidence-probe P1).
    */
-  private AtRestProtectionView buildAtRestProtection() {
-    long now = System.currentTimeMillis();
+  private StatusObservation.Probe<AtRestProtectionView> buildAtRestProtection() {
+    long now = clockMs.getAsLong();
+    long cachedAt = cachedAtRestAtMs;
     AtRestProtectionView cached = cachedAtRest;
-    if (cached != null && (now - cachedAtRestAtMs) < AT_REST_CACHE_TTL_MS) {
-      return cached;
+    if (cached != null && (now - cachedAt) < AT_REST_CACHE_TTL_MS) {
+      return new StatusObservation.Probe<>(cached, cachedAt);
     }
     AtRestProtectionView result;
     try {
@@ -1281,7 +1351,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     }
     cachedAtRest = result;
     cachedAtRestAtMs = now;
-    return result;
+    return new StatusObservation.Probe<>(result, now);
   }
 
   /**
@@ -1360,19 +1430,20 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   private volatile long cachedModelDistCounter = -1L;
 
-  private ModelDistributionStatusView buildModelDistributionStatus() {
-    long now = System.currentTimeMillis();
+  private StatusObservation.Probe<ModelDistributionStatusView> buildModelDistributionStatus() {
+    long now = clockMs.getAsLong();
+    long cachedAt = cachedModelDistAtMs;
     ModelDistributionStatusView cached = cachedModelDist;
-    if (cached != null && (now - cachedModelDistAtMs) < MODEL_DIST_CACHE_TTL_MS
+    if (cached != null && (now - cachedAt) < MODEL_DIST_CACHE_TTL_MS
         && cachedModelDistCounter == io.justsearch.core.status.StatusChangeCounter.process().current()) {
-      return cached;
+      return new StatusObservation.Probe<>(cached, cachedAt);
     }
     long modelCounter = io.justsearch.core.status.StatusChangeCounter.process().current();
     ModelDistributionStatusView result = probeModelDistributionStatus();
     cachedModelDistCounter = modelCounter;
     cachedModelDist = result;
     cachedModelDistAtMs = now;
-    return result;
+    return new StatusObservation.Probe<>(result, now);
   }
 
   private ModelDistributionStatusView probeModelDistributionStatus() {

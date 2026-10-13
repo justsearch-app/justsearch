@@ -29,18 +29,22 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// b82: a status read the server leaves unanswered for one poll interval is abandoned (see
+// statusHungRead.test.ts), so the status variants keep a slow read pending just under that bound.
+const STATUS_SLOW_MS = 10_000 - 1;
+
 describe.each([
   { name: 'status', subscribe: subscribeStatus, rebind: setStatusApiBase,
-    interval: 10_000, snapshot: { uptimeMs: 123 } },
+    interval: 10_000, slow: STATUS_SLOW_MS, snapshot: { uptimeMs: 123 } },
   { name: 'inference', subscribe: subscribeInference, rebind: setInferenceApiBase,
-    interval: 5_000, snapshot: { generation: 123 } },
-])('$name polling lifecycle', ({ subscribe, rebind, interval, snapshot }) => {
+    interval: 5_000, slow: 30_000, snapshot: { generation: 123 } },
+])('$name polling lifecycle', ({ subscribe, rebind, interval, slow, snapshot }) => {
   it('keeps slow polls single-flight and resumes polling after completion', async () => {
     const pending = deferred<Response>();
     mocks.send.mockReturnValue(pending.promise);
     const listener = vi.fn();
     subscribe(listener);
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(slow);
     expect(mocks.send).toHaveBeenCalledTimes(1);
     expect(listener).not.toHaveBeenCalled();
     pending.resolve(new Response(JSON.stringify(snapshot)));
@@ -94,7 +98,7 @@ describe.each([
     oldBody.resolve(snapshot);
     await vi.advanceTimersByTimeAsync(0);
     expect(newListener).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(slow);
     expect(mocks.send).toHaveBeenCalledTimes(2);
     newRequest.resolve(new Response(JSON.stringify(snapshot)));
     await vi.advanceTimersByTimeAsync(0);
@@ -132,7 +136,7 @@ it('queues one post-action status read and resolves refreshes only after it publ
   let refreshed = false;
   void first.then(() => { refreshed = true; });
   expect(mocks.send).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(30_000);
+  await vi.advanceTimersByTimeAsync(STATUS_SLOW_MS);
   expect(mocks.send).toHaveBeenCalledTimes(1);
   beforeAction.resolve(new Response(JSON.stringify({ conversationProtection: { state: 'locked' } })));
   await vi.advanceTimersByTimeAsync(0);
@@ -140,7 +144,7 @@ it('queues one post-action status read and resolves refreshes only after it publ
   expect(mocks.send.mock.calls[1]![0]).toBe('/api/status?fresh=true');
   expect(listener).toHaveBeenLastCalledWith({ conversationProtection: { state: 'locked' } });
   expect(refreshed).toBe(false);
-  await vi.advanceTimersByTimeAsync(30_000);
+  await vi.advanceTimersByTimeAsync(STATUS_SLOW_MS);
   expect(mocks.send).toHaveBeenCalledTimes(2);
   afterAction.resolve(new Response(JSON.stringify({ conversationProtection: { state: 'unlocked' } })));
   await Promise.all([first, second]);

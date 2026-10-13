@@ -362,7 +362,7 @@ class StatusIsolationHttpTest {
       f.block.set(true);
       Thread sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
       try {
-        assertTrue(f.entered.await(2,TimeUnit.SECONDS)); Thread.sleep(1200);
+        assertTrue(f.entered.await(2,TimeUnit.SECONDS)); StatusLaneAging.ageHeldLanes(f.handler);
         var s=get(f,"");
         assertTrue((s.path("diskPressure").isNull() || s.path("diskPressure").isMissingNode()),"blocked disk producer must become unknown");
         assertFalse(s.path("meta").path("workerRpcStale").asBoolean(),"healthy worker must not be marked stale by blocked disk probe");
@@ -375,7 +375,7 @@ class StatusIsolationHttpTest {
       f.block.set(true);
       Thread sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
       try {
-        assertTrue(f.entered.await(2,TimeUnit.SECONDS)); Thread.sleep(1200);
+        assertTrue(f.entered.await(2,TimeUnit.SECONDS)); StatusLaneAging.ageHeldLanes(f.handler);
         var s=get(f,""); assertTrue(s.path("meta").path("workerRpcStale").asBoolean());
         assertFalse(s.path("readiness").path("components").path("ai").path("stale").asBoolean(),"hung worker must leave independent AI fresh");
         assertFalse(s.path("readiness").path("components").path("telemetry").path("stale").asBoolean(),"hung worker must leave telemetry fresh");

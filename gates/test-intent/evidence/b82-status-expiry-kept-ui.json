@@ -1,0 +1,133 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-13T06:36:31.764Z",
+  "revision": "98cad099f27ce769f501104885c05883b272b666",
+  "tree": "cfb0f772b26a6b548f268645bacac14c9851ca9a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/utils/pollingLifecycle.test.ts\" \"src/api/statusBoundary.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b82\\\\tmp\\\\test-intent-vitest-38752-1791873371351.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 20411
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1f6be96377f20f2a703939a49369385a99a064fb58d36e00e1a7752ce86167d0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'status' polling lifecycle keeps slow polls single-flight and resumes polling after completion",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle cancels an actual admission wait on last unsubscription",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle ignores obsolete JSON completion after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle ignores obsolete JSON completion after rebind",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle ignores an obsolete network failure after resubscription",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle keeps slow polls single-flight and resumes polling after completion",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle cancels an actual admission wait on last unsubscription",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle ignores obsolete JSON completion after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle ignores obsolete JSON completion after rebind",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle ignores an obsolete network failure after resubscription",
+          "status": "passed"
+        },
+        {
+          "name": "queues one post-action status read and resolves refreshes only after it publishes",
+          "status": "passed"
+        },
+        {
+          "name": "queues another fresh read for an action during the follow-up request",
+          "status": "passed"
+        },
+        {
+          "name": "discards queued refreshes from the old lifecycle after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "discards queued refreshes from the old lifecycle after rebind",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/statusBoundary.test.ts",
+      "file": "modules/ui-web/src/api/statusBoundary.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f81ca25277ad1e07ec301bff0e8d8c043fa983a2b2717eb715756991ea184905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "independent server publication boundary a refused read-only request still observes a foreign completed publication",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary a newer foreign publication on a read-only response refreshes once and leaves the body readable",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary a retired head response cannot replace a snapshot after a refused new-head read",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary missing metadata cannot certify an older response as current after a restart signal",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary an ordinary canonical poll with newer change metadata initiates a bounded fresh read",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary many read-only unchanged responses do not refresh",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:311c4d44b1d7c7e62d2da4610d7e82b8d426ab16bd85678d11d181591bf4053f"
+}

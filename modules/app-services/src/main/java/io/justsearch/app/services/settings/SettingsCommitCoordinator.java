@@ -835,9 +835,15 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
                 active.key, active.key, active.id, "encoders", 0, 0));
             config.installPrepared(preparedConfig);
             if (preparedForPublish != null) preparedForPublish.install();
-            io.justsearch.core.status.StatusChangeCounter.process().changed(
-                Boolean.TRUE.equals(active.priorSettings.getChatEnabled()),
-                Boolean.TRUE.equals(prepared.settings().getChatEnabled()));
+            // A recovery reset has no readable prior settings to compare: leaving quarantine is
+            // itself the change. An ordinary commit changes status only when chat enablement does.
+            if (active.recoveryReset()) {
+              io.justsearch.core.status.StatusChangeCounter.process().changed();
+            } else {
+              io.justsearch.core.status.StatusChangeCounter.process().changed(
+                  Boolean.TRUE.equals(active.priorSettings.getChatEnabled()),
+                  Boolean.TRUE.equals(prepared.settings().getChatEnabled()));
+            }
           } catch (RuntimeException | Error publicationFailure) {
             // The durable witness already names B. A broken prepared installer must not be
             // reported as a clean serving commit; boot reconstructs from that witness.
