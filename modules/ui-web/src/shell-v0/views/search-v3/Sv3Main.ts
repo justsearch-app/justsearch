@@ -156,6 +156,7 @@ import {
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
 import { sv3RunReceiptLabel } from './sv3-run.js';
+import { retrievalFallbackPhrase } from '../../aggregate-substrate/strategies/searchTraceExplain.js';
 import type { Sv3RunFeedItem, Sv3RunPrompt, Sv3RunView } from './sv3-run.js';
 
 /**
@@ -3074,6 +3075,9 @@ export class Sv3Main extends JfElement {
   private turnNote(turn: Sv3Turn): TemplateResult | typeof nothing {
     if (turn.status === 'streaming') return nothing;
     const broken = turn.status === 'failed' || turn.status === 'refused';
+    const fallback = retrievalFallbackPhrase(
+      turn.evidence?.retrievalModeReason ?? '', turn.evidence?.retrievalModeCause ?? '',
+    );
     if (turn.kind === 'agent') {
       return html`<span
         class="tail-note"
@@ -3081,11 +3085,11 @@ export class Sv3Main extends JfElement {
         data-outcome=${turn.status}
         data-broken=${String(broken)}
         data-cut-short=${String(sv3WasCutShort(turn.disposition))}
-        >${sv3RunReceiptLabel(turn.toolCalls, turn.status, turn.disposition)}</span
+        >${[sv3RunReceiptLabel(turn.toolCalls, turn.status, turn.disposition), fallback].filter(Boolean).join(' · ')}</span
       >`;
     }
     const sources = sv3TurnSourceCount(turn);
-    const note =
+    const detail =
       turn.status === 'halted'
         ? TURN_HALTED
         : turn.status === 'refused'
@@ -3098,6 +3102,7 @@ export class Sv3Main extends JfElement {
               sources === null || this.panelSpeaks(turn)
               ? ''
               : `${sources} ${sources === 1 ? 'source' : 'sources'}`;
+    const note = [detail, fallback].filter(Boolean).join(' · ');
     if (note === '') return nothing;
     return html`<span
       class="tail-note"

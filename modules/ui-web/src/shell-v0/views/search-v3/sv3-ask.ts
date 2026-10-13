@@ -358,6 +358,8 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   let sources: readonly RetrievalCitation[] = [];
   let matches: readonly CitationMatch[] = [];
   let retrievalMode = '';
+  let retrievalModeReason = '';
+  let retrievalModeCause = '';
   /** The producer the LAST `rag.citation_matches` envelope named; `null` until one says (847 §2.5). */
   let scorer: string | null = null;
   const claims = new Map<number, ClaimAcc>();
@@ -372,6 +374,8 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       matches,
       marks: claimsToCitations(claimsOf(claims, scorer), sources),
       retrievalMode,
+      retrievalModeReason,
+      retrievalModeCause,
     });
 
   /**
@@ -403,6 +407,8 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       const p = payload as RagMetaPayload | null;
       if (!p || typeof p.retrieval_mode !== 'string') return;
       retrievalMode = p.retrieval_mode;
+      retrievalModeReason = p.retrieval_mode_reason ?? '';
+      retrievalModeCause = p.retrieval_mode_cause ?? '';
       publish();
     },
     onRagCitations(payload: unknown) {

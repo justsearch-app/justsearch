@@ -1,0 +1,190 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T17:36:14.096Z",
+  "revision": "ac682075794ea213b97de5b3ee7aae71f0e32be2",
+  "tree": "f4d4c4aa587ea822e95ceb9cde9ba58d0a0a2cd3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.aFailedBgeEncoderDoesNotReplaceAnExplicitVector\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 28761
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.retrievalExplanationIsRecordedWithTheCompletedAnswer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 19696
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.InteractionThreadControllerTest.recordedRetrievalExplanationReachesTheThreadResponse\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22963
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:270d8ba137148165e6a17047e2cb2975e30d07bc9535e3c360b8665d773f788d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:270d8ba137148165e6a17047e2cb2975e30d07bc9535e3c360b8665d773f788d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:270d8ba137148165e6a17047e2cb2975e30d07bc9535e3c360b8665d773f788d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#retrievalExplanationIsRecordedWithTheCompletedAnswer",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2d923a91a87e82fbd15a29efe32505992cf9e8adba6ae524ff7494c330fef999",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retrievalExplanationIsRecordedWithTheCompletedAnswer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedRetrievalExplanationReachesTheThreadResponse",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:936d1b3e4afbde599cc5e682e82edefad21f8cda7e79ca393296d16ffa32a8fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordedRetrievalExplanationReachesTheThreadResponse()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#aFailedBgeEncoderDoesNotReplaceAnExplicitVector",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedBgeEncoderDoesNotReplaceAnExplicitVector()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ac6820757",
+    "revision": "ac682075794ea213b97de5b3ee7aae71f0e32be2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.aFailedBgeEncoderDoesNotReplaceAnExplicitVector\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 31453
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.retrievalExplanationIsRecordedWithTheCompletedAnswer\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16753
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.InteractionThreadControllerTest.recordedRetrievalExplanationReachesTheThreadResponse\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 18210
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline",
+        "classification": "assertion",
+        "detail": "aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the pre-inference budget is not a native run cutoff ==> expected: <> but was: <SEARCH_DEADLINE_EXCEEDED>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait",
+        "classification": "assertion",
+        "detail": "acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the response margin, rather than the rerank budget, bounded acquisition ==> expected: <SEARCH_DEADLINE_EXCEEDED> but was: <DEADLINE_EXCEEDED>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason",
+        "classification": "assertion",
+        "detail": "nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the acquisition budget expired before inference, while the search still had time ==> expected: <DEADLINE_EXCEEDED> but was: <SEARCH_DEADLINE_EXCEEDED>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#retrievalExplanationIsRecordedWithTheCompletedAnswer",
+        "classification": "assertion",
+        "detail": "retrievalExplanationIsRecordedWithTheCompletedAnswer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedRetrievalExplanationReachesTheThreadResponse",
+        "classification": "assertion",
+        "detail": "recordedRetrievalExplanationReachesTheThreadResponse(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the record's fallback explanation must reach reload ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#aFailedBgeEncoderDoesNotReplaceAnExplicitVector",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:9fa0f0a217e63c783471396f64f1c2e45c70d80a15467860ed10c6d21334519f"
+}

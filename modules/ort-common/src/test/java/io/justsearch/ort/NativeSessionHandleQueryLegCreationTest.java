@@ -28,6 +28,45 @@ import org.junit.jupiter.api.Test;
 final class NativeSessionHandleQueryLegCreationTest {
 
   @Test
+  void aFallbackQueryDoesNotCloseAFailedCpuSession() throws Exception {
+    OrtSession cpu = mock(OrtSession.class);
+    java.util.concurrent.CountDownLatch closeEntered = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch closeMayReturn = new java.util.concurrent.CountDownLatch(1);
+    org.mockito.Mockito.doAnswer(call -> {
+      closeEntered.countDown();
+      closeMayReturn.await(5, java.util.concurrent.TimeUnit.SECONDS);
+      return null;
+    }).when(cpu).close();
+    NativeSessionHandle handle = gpuConfiguredHandle("query-leg-failed-cpu");
+    var completed = new java.util.concurrent.CompletableFuture<Throwable>();
+    Thread caller = new Thread(() -> {
+      try (var ignored = handle.acquire(queryLeg())) {
+        completed.complete(null);
+      } catch (Throwable failure) {
+        completed.complete(failure);
+      }
+    });
+    try {
+      set(handle, "cpuSession", cpu);
+      set(handle, "cpuSessionFailed", true);
+      caller.start();
+      long end = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+      while (!completed.isDone() && closeEntered.getCount() != 0 && System.nanoTime() < end) {
+        Thread.sleep(5);
+      }
+      assertEquals(1, closeEntered.getCount(), "fallback query entered native close");
+      assertTrue(completed.isDone(), "fallback query retained its caller");
+      var failure = org.junit.jupiter.api.Assertions.assertInstanceOf(
+          SessionAcquireDeadlineExceededException.class, completed.get());
+      assertEquals(SessionAcquireDeadlineExceededException.Phase.LOADING, failure.phase());
+    } finally {
+      closeMayReturn.countDown();
+      caller.join(5_000);
+      handle.close();
+    }
+  }
+
+  @Test
   // S21: before the GPU session exists, a query leg runs on the CPU session and creates nothing
   void aQueryLegBeforeTheGpuSessionExistsRunsOnTheCpuSessionWithoutCreatingIt() throws Exception {
     OrtSession cpu = mock(OrtSession.class);

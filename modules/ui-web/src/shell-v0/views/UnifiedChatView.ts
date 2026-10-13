@@ -14,6 +14,7 @@
  * shape that produced its response.
  */
 
+import { retrievalFallbackPhrase } from '../aggregate-substrate/strategies/searchTraceExplain.js';
 import { html, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
@@ -2851,7 +2852,7 @@ export class UnifiedChatView extends JfElement {
           ${this.historyLocked
             ? html`${this.renderHistoryLocked()}
                 ${this.errorMessage
-                  ? html`<div class="error">${this.errorMessage}</div>`
+                  ? html`<div class="error">${this.errorMessage}${this.renderRetrievalFallback(this.ragMeta)}</div>`
                   : nothing}`
             : html`
                 ${this.renderUnifiedConversation()}
@@ -2859,7 +2860,7 @@ export class UnifiedChatView extends JfElement {
                 ${this.renderStreamingBlock()}
                 ${this.renderChatResidencyNotice()}
                 ${this.errorMessage
-                  ? html`<div class="error">${this.errorMessage}</div>`
+                  ? html`<div class="error">${this.errorMessage}${this.renderRetrievalFallback(this.ragMeta)}</div>`
                   : nothing}`}`}
         </div>
         ${this.renderEvidenceRail()}
@@ -5626,6 +5627,14 @@ export class UnifiedChatView extends JfElement {
           sources: ragSources,
           claims: claimsFromRecord(it.attributes.claimMatches),
           citations: matchesFromRecord(it.attributes.claimMatches),
+          ragMeta: typeof it.attributes.retrievalModeReason === 'string'
+            ? { ...base.ragMeta,
+                retrieval_mode: typeof it.attributes.retrievalMode === 'string'
+                  ? it.attributes.retrievalMode : base.ragMeta?.retrieval_mode,
+                retrieval_mode_reason: it.attributes.retrievalModeReason,
+                retrieval_mode_cause: typeof it.attributes.retrievalModeCause === 'string'
+                  ? it.attributes.retrievalModeCause : base.ragMeta?.retrieval_mode_cause }
+            : base.ragMeta,
           // Tempdoc 848 §2.6 — record-first, live fallback: the record is the authority for a
           // reloaded turn (where `base` carries none), and in-session the `attributes.live`
           // short-circuit above means this path is effectively reload-only.
@@ -5651,7 +5660,13 @@ export class UnifiedChatView extends JfElement {
         // read moved above the kind switch (859 §A §1.9), which is also why they now sit BEFORE the
         // error line rather than after it — the same "the thought preceded the event" order every
         // other carrier gets.
-        return html`<div class="error">${code ? html`[${code}] ` : nothing}${it.content}</div>`;
+        return html`<div class="error">${code ? html`[${code}] ` : nothing}${it.content}
+          ${this.renderRetrievalFallback({
+            retrieval_mode_reason: typeof it.attributes.retrievalModeReason === 'string'
+              ? it.attributes.retrievalModeReason : undefined,
+            retrieval_mode_cause: typeof it.attributes.retrievalModeCause === 'string'
+              ? it.attributes.retrievalModeCause : undefined,
+          })}</div>`;
       }
       case 'progress':
         // Search Thread S4-final (item 3) — a restored SEARCH event. `unifiedThreadProjection.ts`
@@ -5886,6 +5901,7 @@ export class UnifiedChatView extends JfElement {
       ${floorDivider}
       <div class="message assistant${inheritedClass}" data-item-id=${m.id ?? nothing} data-msg-idx=${idx}>
         <div class="message-shape-tag">${shapeLabel}</div>
+        ${this.renderRetrievalFallback(m.ragMeta)}
         ${/* Tempdoc 848 §2.6 — the turn's thinking, rendered from the COMMITTED/record message so it
             survives `done` and a reload. It keeps the position `renderStreamingBlock` gives it (after
             the shape tag, before the answer), so the block does not move as the turn settles. The
@@ -6052,9 +6068,10 @@ export class UnifiedChatView extends JfElement {
   private renderPreamble(): TemplateResult {
     const m = this.ragMeta!;
     const mode = m.retrieval_mode ?? '';
+    const explanation = retrievalFallbackPhrase(m.retrieval_mode_reason, m.retrieval_mode_cause);
     if (mode === 'FULLTEXT_FALLBACK') {
       return html`<div class="preamble">
-        Full-document retrieval (document too small for chunking)
+        Full-document retrieval (document too small for chunking)${explanation ? ` · ${explanation}` : ''}
       </div>`;
     }
     const chunks = m.chunks_used ?? 0;
@@ -6067,10 +6084,16 @@ export class UnifiedChatView extends JfElement {
         (found > chunks ? ` (${found} found)` : ''),
     );
     parts.push(mode.toLowerCase().replace(/_/g, ' '));
+    if (explanation) parts.push(explanation);
     if (coverage > 0)
       parts.push(`coverage ${Math.round(coverage * 100)}%`);
     if (truncated) parts.push('context truncated');
     return html`<div class="preamble">${parts.join(' · ')}</div>`;
+  }
+
+  private renderRetrievalFallback(meta?: RagMetaPayload | null): TemplateResult | typeof nothing {
+    const explanation = retrievalFallbackPhrase(meta?.retrieval_mode_reason, meta?.retrieval_mode_cause);
+    return explanation ? html`<div class="preamble" role="note">${explanation}</div>` : nothing;
   }
 
   private renderSchemaInput(): TemplateResult {

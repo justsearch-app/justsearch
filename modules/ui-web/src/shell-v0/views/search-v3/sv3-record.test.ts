@@ -29,6 +29,18 @@ const event = (
 
 const project = (events: readonly ThreadEvent[]) => projectSv3RecordTurns(events);
 
+it('reloads the recorded retrieval reason and cause as additive evidence', () => {
+  const [turn] = project([
+    event('retrieval-question', 'USER_MESSAGE', 'question'),
+    event('retrieval-answer', 'ASSISTANT_MESSAGE', 'answer', {
+      citations: [], retrievalMode: 'BM25', retrievalModeReason: 'SEMANTIC_BUDGET_EXCEEDED',
+      retrievalModeCause: 'loading',
+    }),
+  ]);
+  expect(turn?.evidence).toMatchObject({ retrievalMode: 'BM25',
+    retrievalModeReason: 'SEMANTIC_BUDGET_EXCEEDED', retrievalModeCause: 'loading' });
+});
+
 describe('a record becomes turns, bracketed by the user messages', () => {
   it('opens one turn per user message and keeps the answers under the question that asked', () => {
     clock = 0;

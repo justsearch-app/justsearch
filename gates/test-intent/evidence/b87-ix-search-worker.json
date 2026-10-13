@@ -1,0 +1,233 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T17:45:11.142Z",
+  "revision": "ac682075794ea213b97de5b3ee7aae71f0e32be2",
+  "tree": "a670ce23b5c7d295dbc00fe220766363b0fb89d9",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.cancelledSearchLeavesTheModelsReadyWaitPromptly\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.unifiedEncoderBudgetFailureSurvivesBothDerivedLegs\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.sparseOnlyUnifiedEncoderRetainsItsBudgetCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.internalRerankReleasesRetrievalWhileNativeRunIsHeld\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.emptyKeywordFallbackRetainsSemanticLoadingReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.bm25MmrReleasesBlockedQuestionEncode\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.bm25MmrReleasesBlockedPassageEncode\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 27252
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#cancelledSearchLeavesTheModelsReadyWaitPromptly",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledSearchLeavesTheModelsReadyWaitPromptly()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#unifiedEncoderBudgetFailureSurvivesBothDerivedLegs",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unifiedEncoderBudgetFailureSurvivesBothDerivedLegs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#sparseOnlyUnifiedEncoderRetainsItsBudgetCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparseOnlyUnifiedEncoderRetainsItsBudgetCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#internalRerankReleasesRetrievalWhileNativeRunIsHeld",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2522205b6d1c7ae5726a6ab04042e5a9d2e6b7f8a7de5b18888fcd3747e89083",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "internalRerankReleasesRetrievalWhileNativeRunIsHeld()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#emptyKeywordFallbackRetainsSemanticLoadingReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2522205b6d1c7ae5726a6ab04042e5a9d2e6b7f8a7de5b18888fcd3747e89083",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "emptyKeywordFallbackRetainsSemanticLoadingReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#bm25MmrReleasesBlockedQuestionEncode",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2522205b6d1c7ae5726a6ab04042e5a9d2e6b7f8a7de5b18888fcd3747e89083",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bm25MmrReleasesBlockedQuestionEncode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#bm25MmrReleasesBlockedPassageEncode",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2522205b6d1c7ae5726a6ab04042e5a9d2e6b7f8a7de5b18888fcd3747e89083",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bm25MmrReleasesBlockedPassageEncode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:270d8ba137148165e6a17047e2cb2975e30d07bc9535e3c360b8665d773f788d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:270d8ba137148165e6a17047e2cb2975e30d07bc9535e3c360b8665d773f788d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryPrewarmFixture.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b87-dispatch-fixture.patch",
+        "contentDigest": "sha256:521dc2f2bec8fdd4cf2501b3453cab19ae0118d8c3c46b91aff90a511ee505c2"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.cancelledSearchLeavesTheModelsReadyWaitPromptly\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.unifiedEncoderBudgetFailureSurvivesBothDerivedLegs\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.sparseOnlyUnifiedEncoderRetainsItsBudgetCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.internalRerankReleasesRetrievalWhileNativeRunIsHeld\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.emptyKeywordFallbackRetainsSemanticLoadingReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.bm25MmrReleasesBlockedQuestionEncode\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.bm25MmrReleasesBlockedPassageEncode\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankTest.aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 46686
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#cancelledSearchLeavesTheModelsReadyWaitPromptly",
+        "classification": "assertion",
+        "detail": "cancelledSearchLeavesTheModelsReadyWaitPromptly(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: cancelled search retained its models-ready waiter ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#unifiedEncoderBudgetFailureSurvivesBothDerivedLegs",
+        "classification": "assertion",
+        "detail": "unifiedEncoderBudgetFailureSurvivesBothDerivedLegs(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <NO_EMBEDDING_SERVICE>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#sparseOnlyUnifiedEncoderRetainsItsBudgetCause",
+        "classification": "assertion",
+        "detail": "sparseOnlyUnifiedEncoderRetainsItsBudgetCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <NO_EMBEDDING_SERVICE>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#internalRerankReleasesRetrievalWhileNativeRunIsHeld",
+        "classification": "assertion",
+        "detail": "internalRerankReleasesRetrievalWhileNativeRunIsHeld(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: internal rerank retained retrieval's caller ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#emptyKeywordFallbackRetainsSemanticLoadingReason",
+        "classification": "assertion",
+        "detail": "emptyKeywordFallbackRetainsSemanticLoadingReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <NO_CHUNKS_FOUND>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#bm25MmrReleasesBlockedQuestionEncode",
+        "classification": "assertion",
+        "detail": "bm25MmrReleasesBlockedQuestionEncode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: BM25 MMR retained its caller in native inference ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#bm25MmrReleasesBlockedPassageEncode",
+        "classification": "assertion",
+        "detail": "bm25MmrReleasesBlockedPassageEncode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: BM25 MMR retained its caller in native inference ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition",
+        "classification": "assertion",
+        "detail": "realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <java.util.concurrent.CancellationException> but was: <org.opentest4j.AssertionFailedError>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:2bd21ebd7bd5eb9d0871d16b38b8511c102a999953d56289680658970e2427ec"
+}

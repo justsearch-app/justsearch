@@ -38,6 +38,38 @@ import tools.jackson.databind.json.JsonMapper;
  */
 final class InteractionThreadControllerTest {
 
+  @Test
+  void recordedRetrievalExplanationReachesTheThreadResponse() {
+    var store = mock(ConversationStore.class);
+    when(store.loadHistory("conv-retrieval")).thenReturn(List.of(Map.of(
+        "id", "answer-1", "role", "assistant", "content", "answer",
+        "ts", "2026-08-25T10:00:04Z", "retrievalMode", "BM25",
+        "retrievalModeReason", "SEMANTIC_BUDGET_EXCEEDED", "retrievalModeCause", "loading")));
+    var agent = mock(AgentService.class);
+    when(agent.threadProjection(eq("conv-retrieval"), any())).thenReturn(ThreadProjection.of(List.of()));
+    var attributes = invokeGet(newController(store, agent), "conv-retrieval")
+        .get("events").get(0).get("attributes");
+    assertTrue(attributes.has("retrievalModeReason"), "the record's fallback explanation must reach reload");
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", attributes.get("retrievalModeReason").asString());
+    assertEquals("loading", attributes.get("retrievalModeCause").asString());
+    assertEquals("BM25", attributes.get("retrievalMode").asString());
+  }
+
+  @Test
+  void recordedTerminalRetrievalErrorReachesTheThreadAsAnErrorWithMetadata() {
+    var store = mock(ConversationStore.class);
+    when(store.loadHistory("conv-retrieval")).thenReturn(List.of(Map.of(
+        "id", "error-1", "role", "assistant", "content", "No matching documents found in the index",
+        "terminalError", true, "errorCode", "NO_CONTENT", "retrievalMode", "BM25",
+        "retrievalModeReason", "SEMANTIC_BUDGET_EXCEEDED", "retrievalModeCause", "loading")));
+    var agent = mock(AgentService.class);
+    when(agent.threadProjection(eq("conv-retrieval"), any())).thenReturn(ThreadProjection.of(List.of()));
+    var event = invokeGet(newController(store, agent), "conv-retrieval").get("events").get(0);
+    assertEquals("ERROR", event.get("kind").asString());
+    assertEquals("NO_CONTENT", event.get("attributes").get("errorCode").asString());
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", event.get("attributes").get("retrievalModeReason").asString());
+  }
+
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private final DefaultEngineExecutorRegistry executors = new DefaultEngineExecutorRegistry();
   private final List<InteractionThreadController> controllers = new ArrayList<>();

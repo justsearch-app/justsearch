@@ -210,6 +210,7 @@ final class QueryPrewarmFixture {
     final AtomicInteger queryRefusals = new AtomicInteger();
     volatile RuntimeException creationFailure;
     volatile boolean cpuOnly;
+    volatile boolean retryDue;
     private volatile boolean created;
     private volatile boolean warm;
     private volatile long generation;
@@ -234,6 +235,10 @@ final class QueryPrewarmFixture {
       return cpuOnly || warm;
     }
 
+    public boolean isGpuRetryDue() {
+      return cpuOnly && retryDue;
+    }
+
     /** Runs {@code listener} after the session is created or released. */
     public void addGenerationListener(Runnable listener) {
       generationListeners.add(listener);
@@ -243,6 +248,7 @@ final class QueryPrewarmFixture {
     public Lease acquire(SessionAcquisitionRequest request) {
       acquisitions.incrementAndGet();
       request.remainingNanos();
+      if (cpuOnly && retryDue && request.mayCreateGpuSession()) cpuOnly = false;
       if (cpuOnly) return new Lease(session, null, () -> {}, true, OrtRunRecorder.NOOP, request);
       long leaseGeneration;
       boolean createdNow = false;

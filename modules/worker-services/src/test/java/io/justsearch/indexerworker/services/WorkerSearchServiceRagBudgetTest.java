@@ -56,6 +56,128 @@ final class WorkerSearchServiceRagBudgetTest
   private final CountDownLatch releaseOnExit = new CountDownLatch(1);
   private RunningRuntime lifecycle;
 
+  @Test
+  void internalRerankReleasesRetrievalWhileNativeRunIsHeld() throws Exception {
+    lifecycle = openIndexWithMode(previousProperties, testLuceneExecutors(), "bm25", "position",
+        "Hello first passage", "Hello second passage", "Hello third passage");
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var nativeSession = org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.class);
+    org.mockito.Mockito.when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
+      entered.countDown();
+      release.await(10, java.util.concurrent.TimeUnit.SECONDS);
+      return org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.Result.class);
+    });
+    try (var handle = gpuHandle("rag-rerank", nativeSession)) {
+      var tokenizer = org.mockito.Mockito.mock(io.justsearch.reranker.RerankerTokenizer.class);
+      org.mockito.Mockito.when(tokenizer.encodePairs(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(
+          new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
+              new long[][] {{1}, {1}, {1}}, new long[][] {{1}, {1}, {1}},
+              new long[][] {{0}, {0}, {0}}, 3, 1, 0, 3));
+      var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+      service.setSearchReranker(new io.justsearch.reranker.CrossEncoderReranker(handle,
+          new io.justsearch.reranker.RerankerShape(8, false), tokenizer));
+      service.setChunkRerankerConfig(new io.justsearch.reranker.RerankerConfig.ChunkRerankerConfig(
+          true, Path.of("fixture.onnx"), 10, 10, 300, 2, 8, true, 0,
+          io.justsearch.reranker.RerankerConfig.RerankOrder.BEFORE_DIVERSIFY));
+      var result = new java.util.concurrent.CompletableFuture<RetrieveContextResponse>();
+      Thread caller = new Thread(() -> {
+        try {
+          result.complete(service.retrieveContext(question("Hello"), foreground(Duration.ofSeconds(2))));
+        } catch (Throwable failure) {
+          result.completeExceptionally(failure);
+        }
+      });
+      try {
+        caller.start();
+        assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS), "internal rerank entered native inference");
+        // Native execution is bounded by the retrieval's two-second request, not the 300ms pre-check.
+        caller.join(2_500);
+        assertTrue(result.isDone(), "internal rerank retained retrieval's caller");
+        assertTrue(assertDoesNotThrow(() -> result.get()).getContext().contains("Hello"));
+      } finally {
+        release.countDown();
+        caller.join(5_000);
+      }
+    }
+  }
+
+  @Test
+  void emptyKeywordFallbackRetainsSemanticLoadingReason() throws Exception {
+    lifecycle = openIndex("position", "Hello world");
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
+    service.setModelReadyLatchSupplier(() -> releaseOnExit);
+    var response = service.retrieveContext(question("unmatchedquasar"), foreground(REQUEST_BUDGET));
+    assertEquals("", response.getContext());
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", response.getRetrievalModeReason());
+    assertEquals("loading", response.getRetrievalModeCause());
+  }
+
+  @Test
+  void bm25MmrReleasesBlockedQuestionEncode() throws Exception {
+    blockedMmrReturnsContext(false);
+  }
+
+  @Test
+  void bm25MmrReleasesBlockedPassageEncode() throws Exception {
+    blockedMmrReturnsContext(true);
+  }
+
+  private void blockedMmrReturnsContext(boolean passage) throws Exception {
+    lifecycle = openIndexWithMode(previousProperties, testLuceneExecutors(), "bm25", "mmr",
+        "Hello first passage", "Hello second passage", "Hello third passage");
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var nativeSession = org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.class);
+    org.mockito.Mockito.when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
+      entered.countDown();
+      release.await(10, java.util.concurrent.TimeUnit.SECONDS);
+      return org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.Result.class);
+    });
+    try (var handle = gpuHandle("bm25-mmr", nativeSession)) {
+      var provider = org.mockito.Mockito.mock(EmbeddingProvider.class);
+      org.mockito.Mockito.when(provider.availability()).thenReturn(EmbeddingProvider.Availability.READY);
+      org.mockito.stubbing.Answer<float[]> encode = call -> {
+        InferenceRequest authority = call.getArgument(1);
+        try (var lease = handle.acquire(SessionAcquisitionRequest.from(authority));
+            var ignored = lease.run(Map.of())) {
+          return new float[] {1f, 0f, 0f, 0f};
+        }
+      };
+      if (passage) {
+        org.mockito.Mockito.when(provider.embedQuery(org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.any())).thenReturn(new float[] {1f, 0f, 0f, 0f});
+      } else {
+        org.mockito.Mockito.when(provider.embedQuery(org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.any())).thenAnswer(encode);
+      }
+      org.mockito.Mockito.when(provider.embedDocument(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.any())).thenAnswer(encode);
+      var service = new WorkerSearchService(lifecycle, provider);
+      var result = new java.util.concurrent.CompletableFuture<RetrieveContextResponse>();
+      Thread caller = new Thread(() -> {
+        try {
+          result.complete(service.retrieveContext(question("Hello").toBuilder().setTopK(1).build(),
+              foreground(Duration.ofSeconds(2))));
+        } catch (Throwable failure) {
+          result.completeExceptionally(failure);
+        }
+      });
+      try {
+        caller.start();
+        assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS), "MMR entered native encode");
+        caller.join(1_800);
+        assertTrue(result.isDone(), "BM25 MMR retained its caller in native inference");
+        var response = assertDoesNotThrow(() -> result.get());
+        assertTrue(response.getContext().contains("Hello"));
+      } finally {
+        release.countDown();
+        caller.join(5_000);
+      }
+    }
+  }
+
   @AfterEach
   void closeIndex() throws Exception {
     releaseOnExit.countDown();
@@ -170,6 +292,13 @@ final class WorkerSearchServiceRagBudgetTest
       String diversifyMode,
       String... contents)
       throws Exception {
+    return openIndexWithMode(saved, executors, "auto", diversifyMode, contents);
+  }
+
+  private static RunningRuntime openIndexWithMode(
+      Map<String, String> saved,
+      io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations executors,
+      String retrievalMode, String diversifyMode, String... contents) throws Exception {
     Path base = Files.createTempDirectory("justsearch-rag-budget-test-");
     String yaml =
         "app:\n  data_dir: " + base.toString().replace("\\", "\\\\") + "\n"
@@ -178,7 +307,7 @@ final class WorkerSearchServiceRagBudgetTest
     Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
     Files.writeString(cfg, yaml);
     setProperty(saved, "justsearch.config", cfg.toString());
-    setProperty(saved, "rag.retrieve.mode", "auto");
+    setProperty(saved, "rag.retrieve.mode", retrievalMode);
     setProperty(saved, "rag.diversify.mode", diversifyMode);
 
     RunningRuntime runtime =

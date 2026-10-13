@@ -227,6 +227,17 @@ public final class SearchInputCapture {
                 }, legs)
             : new SpladeEncoding.NotRequested();
 
+    // A unified encoder supplies both legs. Keep its failure when there is no successful
+    // replacement (or explicit dense vector), instead of relabelling it as a missing service.
+    if (bgeEncoding instanceof BgeM3Encoding.Failed failed) {
+      if (allowQueryEmbeddings && vectorEncoding instanceof VectorEncoding.Failed) {
+        vectorEncoding = new VectorEncoding.Failed(failed.reason(), failed.cause());
+      }
+      if (spladeEncoding instanceof SpladeEncoding.Failed) {
+        spladeEncoding = new SpladeEncoding.Failed(failed.reason(), failed.cause());
+      }
+    }
+
     EncodingResults encoding =
         new EncodingResults(
             vectorEncoding,

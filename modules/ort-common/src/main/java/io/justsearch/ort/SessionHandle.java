@@ -102,6 +102,11 @@ public interface SessionHandle extends AutoCloseable {
     return true;
   }
 
+  /** Whether lifecycle prewarm should retry the GPU while CPU queries remain ready. */
+  default boolean isGpuRetryDue() {
+    return false;
+  }
+
   /**
    * Makes the CPU session of a GPU handle warm (created and run once) so that a query the device
    * cannot seat within its budget can run on it instead of falling back to keyword search. The

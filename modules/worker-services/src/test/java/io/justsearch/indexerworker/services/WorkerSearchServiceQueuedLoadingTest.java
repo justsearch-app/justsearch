@@ -46,7 +46,7 @@ final class WorkerSearchServiceQueuedLoadingTest
     var embeddings = new GpuEmbeddings();
     var service = new WorkerSearchService(lifecycle, embeddings);
     var loading = new ObservedLatch(1);
-    service.setModelReadyLatchSupplier(() -> loading);
+    service.setModelReadyLatchSupplier(loading::forWait);
     var request = query(pipeline().setSparseEnabled(true).setDenseEnabled(true));
     CallContext call = foreground(REQUEST_BUDGET);
     waitAsIfQueued(QUEUED_PAST_THE_CAP);
@@ -66,7 +66,7 @@ final class WorkerSearchServiceQueuedLoadingTest
     var embeddings = new GpuEmbeddings();
     var service = new WorkerSearchService(lifecycle, embeddings);
     var loading = new ObservedLatch(1);
-    service.setModelReadyLatchSupplier(() -> loading);
+    service.setModelReadyLatchSupplier(loading::forWait);
     CallContext call = foreground(REQUEST_BUDGET);
     waitAsIfQueued(QUEUED_PAST_THE_CAP);
 
@@ -89,7 +89,7 @@ final class WorkerSearchServiceQueuedLoadingTest
     var embeddings = new GpuEmbeddings();
     var service = new WorkerSearchService(lifecycle, embeddings);
     var loading = new ObservedLatch(1);
-    service.setModelReadyLatchSupplier(() -> loading);
+    service.setModelReadyLatchSupplier(loading::forWait);
 
     var response = service.search(
         query(pipeline().setSparseEnabled(true).setDenseEnabled(true)),
@@ -100,10 +100,17 @@ final class WorkerSearchServiceQueuedLoadingTest
     assertEquals("loading", degradation.getHybridFallbackCause());
     assertTrue(response.getTotalHits() >= 1);
     assertEquals(0, embeddings.queryCalls.get());
-    assertEquals(1, loading.waitCalls.get());
+    assertEquals(1, loading.logicalWaits.get(), "one logical models-ready wait, regardless of cancellation slices");
   }
 
   private static final class ObservedLatch extends CountDownLatch {
+    final AtomicInteger logicalWaits = new AtomicInteger();
+
+    CountDownLatch forWait() {
+      logicalWaits.incrementAndGet();
+      return this;
+    }
+
     final AtomicInteger waitCalls = new AtomicInteger();
 
     ObservedLatch(int count) {

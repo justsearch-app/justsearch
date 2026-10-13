@@ -69,6 +69,8 @@ public enum CrossEncoderSkipReason {
   RPC_FAILED,
   /** The Worker is configured for reranking but the model was not loaded when the RPC arrived. */
   MODEL_NOT_LOADED,
+  /** The model is wired, but prewarm has not provided a usable native session yet. */
+  MODEL_LOADING,
   /**
    * Inference was attempted and the runtime threw — ONNX Runtime memory-arena exhaustion, a dead
    * session, a bad output shape. Register F-054: the deadline is irrelevant to this class, and the
@@ -93,6 +95,7 @@ public enum CrossEncoderSkipReason {
           SEARCH_DEADLINE_EXCEEDED,
           RPC_FAILED,
           MODEL_NOT_LOADED,
+          MODEL_LOADING,
           INFERENCE_FAILED,
           UNKNOWN -> true;
       case NAVIGATIONAL_QUERY,

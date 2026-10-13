@@ -214,6 +214,10 @@ public class BgeM3Encoder implements AutoCloseable {
     return sessions.isQueryWarm();
   }
 
+  public boolean isGpuRetryDue() {
+    return sessions.isGpuRetryDue();
+  }
+
   /** Runs {@code listener} after a session of this encoder is created or released. */
   public void addSessionGenerationListener(Runnable listener) {
     sessions.addGenerationListener(listener);

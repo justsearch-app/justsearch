@@ -1,0 +1,26 @@
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java b/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java
+index a03b2a1d6..e8efbd3fb 100644
+--- a/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java
+@@ -195,6 +195,12 @@ final class DetachableRun {
+   static OrtSession.Result runWithin(
+       SessionHandle.Lease lease, Map<String, OnnxTensor> inputs, long deadlineNanos)
+       throws OrtException {
++    return runWithin(lease, inputs, deadlineNanos, RUN_THREADS);
++  }
++
++  static OrtSession.Result runWithin(
++      SessionHandle.Lease lease, Map<String, OnnxTensor> inputs, long deadlineNanos,
++      ThreadFactory threads) throws OrtException {
+     if (!(lease.release() instanceof Release release)) return lease.runOnCallerThread(inputs);
+     Map<String, OnnxTensor> owned = copyOf(inputs);
+     if (owned == null) return lease.runOnCallerThread(inputs);
+@@ -207,7 +213,7 @@ final class DetachableRun {
+     }
+     Task task = new Task(lease, release, owned);
+     try {
+-      RUN_THREADS.newThread(task).start();
++      threads.newThread(task).start();
+     } catch (RuntimeException | OutOfMemoryError noThread) {
+       device.leave();
+       closeAll(owned);

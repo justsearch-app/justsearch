@@ -85,10 +85,104 @@ final class WorkerSearchServiceSemanticBudgetTest
   private RunningRuntime lifecycle;
   private final CountDownLatch releaseOnExit = new CountDownLatch(1);
 
+  @Test
+  void cancelledSearchLeavesTheModelsReadyWaitPromptly() throws Exception {
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
+    var entered = new CountDownLatch(1);
+    service.setModelReadyLatchSupplier(() -> { entered.countDown(); return releaseOnExit; });
+    var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+    CallContext base = foreground(Duration.ofSeconds(10));
+    CallContext call = new CallContext(null, null, cancelled::get, base.engineContext(),
+        base.provenance(), base.childLifetime(), base.deadlineNanos());
+    var completed = new java.util.concurrent.CompletableFuture<Throwable>();
+    Thread caller = new Thread(() -> {
+      try {
+        service.search(query(SearchMode.SEARCH_MODE_HYBRID), call);
+        completed.complete(null);
+      } catch (Throwable failure) {
+        completed.complete(failure);
+      }
+    });
+    try {
+      caller.start();
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+      cancelled.set(true);
+      caller.join(500);
+      assertTrue(completed.isDone(), "cancelled search retained its models-ready waiter");
+      assertTrue(completed.get() instanceof java.util.concurrent.CancellationException
+          || completed.get() instanceof WorkerServiceException);
+    } finally {
+      releaseOnExit.countDown();
+      caller.join(5_000);
+    }
+  }
+
   @BeforeEach
   void openIndex() throws Exception {
     previousConfig = System.getProperty("justsearch.config");
     lifecycle = newLifecycleWithOneDoc("Hello world");
+  }
+
+  @Test
+  void unifiedEncoderBudgetFailureSurvivesBothDerivedLegs() throws Exception {
+    for (var phase : SessionAcquireDeadlineExceededException.Phase.values()) {
+      var bge = mock(io.justsearch.indexerworker.bgem3.BgeM3Encoder.class);
+      when(bge.encode(anyString(), any())).thenThrow(
+          new SessionAcquireDeadlineExceededException("budget fixture", phase));
+      var bindings = new EncoderBindings();
+      bindings.bindBgeM3Encoder(bge);
+      var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE, bindings);
+      var response = service.search(query(pipeline().setSparseEnabled(true)
+          .setDenseEnabled(true).setSpladeEnabled(true)), foreground(REQUEST_BUDGET));
+      var degradation = response.getSearchTrace().getDegradation();
+      assertTrue(response.getTotalHits() > 0);
+      assertEquals("SEMANTIC_BUDGET_EXCEEDED", degradation.getHybridFallbackReason());
+      assertEquals("SEMANTIC_BUDGET_EXCEEDED", degradation.getSpladeSkipReason());
+      String cause = switch (phase) {
+        case LOADING -> "loading";
+        case GATE -> "contended";
+        case RUN -> "stuck";
+      };
+      assertEquals(cause, degradation.getHybridFallbackCause());
+      assertEquals(cause, degradation.getSpladeSkipCause());
+    }
+  }
+
+  @Test
+  void aFailedBgeEncoderDoesNotReplaceAnExplicitVector() throws Exception {
+    var bge = mock(io.justsearch.indexerworker.bgem3.BgeM3Encoder.class);
+    when(bge.encode(anyString(), any())).thenThrow(new SessionAcquireDeadlineExceededException(
+        "loading fixture", SessionAcquireDeadlineExceededException.Phase.LOADING));
+    var capture = new io.justsearch.indexerworker.services.input.SearchInputCapture(
+        lifecycle.textQueryOps(), lifecycle.indexCountOps(), lifecycle.commitOps(),
+        lifecycle.documentFieldOps(), lifecycle::resolvedConfig, lifecycle::indexAnalyzerOrNull,
+        lifecycle::latestCommitUserDataBestEffort,
+        () -> new io.justsearch.indexerworker.services.input.SearchInputCapture.EncoderSnapshot(
+            NoOpEmbeddingProvider.INSTANCE, null, null, null, null, bge));
+    var request = query(pipeline().setDenseEnabled(true)).toBuilder()
+        .addAllVector(List.of(0.25f, 0.5f)).build();
+    var inputs = capture.capture(request, true, null);
+    var vector = org.junit.jupiter.api.Assertions.assertInstanceOf(
+        io.justsearch.indexerworker.services.input.VectorEncoding.Success.class, inputs.encoding().vector());
+    assertEquals(request.getVectorList(), vector.vector(),
+        "even a dimension-mismatched explicit vector stays authoritative at capture");
+    org.junit.jupiter.api.Assertions.assertInstanceOf(
+        io.justsearch.indexerworker.services.input.BgeM3Encoding.Failed.class, inputs.encoding().bgeM3());
+  }
+
+  @Test
+  void sparseOnlyUnifiedEncoderRetainsItsBudgetCause() throws Exception {
+    var bge = mock(io.justsearch.indexerworker.bgem3.BgeM3Encoder.class);
+    when(bge.encode(anyString(), any())).thenThrow(new SessionAcquireDeadlineExceededException(
+        "sparse-only native refusal", SessionAcquireDeadlineExceededException.Phase.RUN));
+    var bindings = new EncoderBindings();
+    bindings.bindBgeM3Encoder(bge);
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE, bindings);
+    var response = service.search(query(pipeline().setSpladeEnabled(true)), foreground(REQUEST_BUDGET));
+    assertTrue(response.getTotalHits() > 0, "sparse-only keeps its keyword fallback");
+    var degradation = response.getSearchTrace().getDegradation();
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", degradation.getSpladeSkipReason());
+    assertEquals("stuck", degradation.getSpladeSkipCause());
   }
 
   @AfterEach

@@ -554,7 +554,15 @@ public final class ConversationEngine {
     // Run injectors once per request (iteration 0 only). Each injector may emit SSE events
     // (forwarded to sink) and may declare a terminal error that aborts before the LLM call.
     InjectorRunResult injectorRun = runInjectors(injectors, ctx, sink);
+    String retrievalRecordId = sessionId != null ? sessionId : threadId;
     if (injectorRun.terminated) {
+      if (retrievalRecordId != null && conversationStore != null
+          && !injectorRun.retrievalMetadata.isEmpty() && injectorRun.terminalError != null) {
+        conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+            String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
+            injectorRun.terminalError.payload().get("errorCode"));
+      }
       return;
     }
     ctx.appendMessages(injectorRun.messages);
@@ -584,6 +592,8 @@ public final class ConversationEngine {
     OnlineAiService ai = onlineAiSupplier.get();
     if (ai == null || !ai.isAvailable()) {
       emitError(sink, "AI service unavailable", "AI_OFFLINE");
+      persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+          "AI service unavailable", "AI_OFFLINE");
       return;
     }
 
@@ -626,6 +636,8 @@ public final class ConversationEngine {
                 ai, llmInput, maxTokens, sampling, consumers, ctx, usageRef, reasoningRef, sink);
       } catch (LlmStreamException e) {
         emitError(sink, e.getMessage(), e.errorCode);
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+            e.getMessage(), e.errorCode);
         return;
       }
       accumulatedFinalText = finalText;
@@ -642,12 +654,15 @@ public final class ConversationEngine {
         } catch (Exception e) {
           LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
           emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+              "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
           return;
         }
         result.events().forEach(sink);
         aggregateDeltas.addAll(result.messageDeltas());
         mergedDoneEntries.putAll(result.donePayloadEntries());
       }
+      mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
 
       // Tempdoc 610 §E.4 / §G — surface the prompt-token occupancy on the done payload so the FE can
       // render a context-budget meter. The model context window (the meter's denominator) is FE-side
@@ -698,6 +713,8 @@ public final class ConversationEngine {
       } catch (Exception e) {
         LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
         emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+            "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
         return;
       }
 
@@ -709,6 +726,8 @@ public final class ConversationEngine {
         }
         case STOP_ERROR -> {
           emitError(sink, "Conversation terminated with error", "CONTROLLER_STOP");
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+              "Conversation terminated with error", "CONTROLLER_STOP");
           return;
         }
         case CONTINUE -> ctx.incrementIteration();
@@ -1056,6 +1075,7 @@ public final class ConversationEngine {
       EngineConversationContext ctx,
       Consumer<SseEvent> sink) {
     List<Map<String, Object>> out = new ArrayList<>();
+    Map<String, Object> retrievalMetadata = new LinkedHashMap<>();
     for (ContextInjector inj : injectors) {
       InjectorResult result;
       try {
@@ -1064,7 +1084,7 @@ public final class ConversationEngine {
         SseEvent refusal = refusalEvent(e);
         if (refusal != null) {
           sink.accept(refusal);
-          return new InjectorRunResult(out, true);
+          return new InjectorRunResult(out, true, retrievalMetadata, refusal);
         }
         LOG.warn("ContextInjector {} threw; skipping injection", inj.id(), e);
         continue;
@@ -1072,18 +1092,43 @@ public final class ConversationEngine {
       if (result == null) {
         continue;
       }
-      result.events().forEach(sink);
+      for (SseEvent event : result.events()) {
+        if ("rag.meta".equals(event.name())) {
+          retrievalMetadata.clear();
+          copyRetrievalFact(retrievalMetadata, "retrievalMode", event.payload().get("retrieval_mode"));
+          copyRetrievalFact(retrievalMetadata, "retrievalModeReason", event.payload().get("retrieval_mode_reason"));
+          copyRetrievalFact(retrievalMetadata, "retrievalModeCause", event.payload().get("retrieval_mode_cause"));
+        }
+        sink.accept(event);
+      }
       if (result.terminalError().isPresent()) {
         sink.accept(result.terminalError().get());
-        return new InjectorRunResult(out, true);
+        return new InjectorRunResult(out, true, retrievalMetadata, result.terminalError().get());
       }
       out.addAll(result.messages());
     }
-    return new InjectorRunResult(out, false);
+    return new InjectorRunResult(out, false, retrievalMetadata, null);
   }
 
   /** Output of {@link #runInjectors}: accumulated messages + whether any injector aborted. */
-  private record InjectorRunResult(List<Map<String, Object>> messages, boolean terminated) {}
+  private record InjectorRunResult(List<Map<String, Object>> messages, boolean terminated,
+      Map<String, Object> retrievalMetadata, SseEvent terminalError) {}
+
+  private void persistRetrievalError(String recordId, ConversationShape shape,
+      Map<String, Object> retrievalMetadata, String message, Object errorCode) {
+    if (recordId == null || conversationStore == null || retrievalMetadata.isEmpty()) return;
+    var error = new LinkedHashMap<String, Object>();
+    error.put("role", "assistant");
+    error.put("content", message);
+    error.put("terminalError", true);
+    if (errorCode instanceof String code && !code.isBlank()) error.put("errorCode", code);
+    error.putAll(retrievalMetadata);
+    conversationStore.appendMessage(recordId, shape.id().value(), error);
+  }
+
+  private static void copyRetrievalFact(Map<String, Object> target, String key, Object value) {
+    if (value instanceof String text && !text.isBlank()) target.put(key, text);
+  }
 
   static SseEvent refusalEvent(Throwable failure) {
     RuntimeException refused = io.justsearch.app.services.worker.EngineRefusals.find(failure);
@@ -1275,6 +1320,9 @@ public final class ConversationEngine {
     // matches the Worker's cross-encoder produced) so a reloaded conversation renders the inline
     // per-claim marks FROM the record, matching the live render (the two paths cannot diverge).
     putIfPresent(persisted, "claimMatches", mergedDoneEntries.get("claimMatches"));
+    for (String key : List.of("retrievalMode", "retrievalModeReason", "retrievalModeCause")) {
+      putIfPresent(persisted, key, mergedDoneEntries.get(key));
+    }
     // Tempdoc 848 §2.1/§2.2 — the turn's thinking, as an ordered array of blocks. Passed as an
     // EXPLICIT argument rather than through `mergedDoneEntries`, because those entries also ship on
     // the `done` SSE payload: routing reasoning through them would re-send on the wire what already
