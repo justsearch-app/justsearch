@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -28,7 +29,7 @@ final class AtRestHealthTapTest {
   private AtRestHealthTap tap(ConditionStore store) {
     return new AtRestHealthTap(
         store,
-        new HealthEventChangeRegistry(),
+        new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()),
         HEAD,
         Clock.fixed(Instant.parse("2026-06-22T00:00:00Z"), ZoneOffset.UTC),
         AtRestProtection::unknown); // unused — tests drive reconcile(...) directly

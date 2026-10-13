@@ -46,7 +46,7 @@ final class CapabilityHealthBridgeConcurrentPublicationTest {
         if (inference.snapshot().state() == ComponentState.FAILED) awaitBarrier(entered, release);
       });
       var bridge = CapabilityHealthBridge.wireListeners(registry, store,
-          new HealthEventChangeRegistry(), Source.forProcess("head", "atomic-publication", "1"));
+          new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), Source.forProcess("head", "atomic-publication", "1"));
       try (bridge; observer) {
         var failure = executor.submit(() -> inference.transition(
             ComponentState.FAILED, "inference.crashed", "failure"));
@@ -74,7 +74,7 @@ final class CapabilityHealthBridgeConcurrentPublicationTest {
       var inference = registry.register(spec("generative", false));
       inference.transition(ComponentState.FAILED, "inference.model_load_failed", "seed");
       var store = new ConditionStore();
-      var changes = new HealthEventChangeRegistry();
+      var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
       var source = Source.forProcess("head", "concurrent-publication", "1");
       var bridge = blockMapper
           ? CapabilityHealthBridge.wireListeners(registry, store, changes, source, reason -> {

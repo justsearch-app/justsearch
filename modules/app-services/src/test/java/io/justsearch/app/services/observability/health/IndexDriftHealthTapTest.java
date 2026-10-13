@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -31,7 +32,7 @@ final class IndexDriftHealthTapTest {
   private static final Source HEAD = Source.forProcess("head", "i", "1.0");
 
   private IndexDriftHealthTap tap(ConditionStore store) {
-    return tap(store, new OccurrenceLog(200), new HealthEventChangeRegistry());
+    return tap(store, new OccurrenceLog(200), new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()));
   }
 
   private IndexDriftHealthTap tap(
@@ -123,7 +124,7 @@ final class IndexDriftHealthTapTest {
   /** A registry with a captured event list (HealthEventChangeRegistry is final — subscribe, don't subclass). */
   private static HealthEventChangeRegistry recording(
       CopyOnWriteArrayList<HealthEventChangeRegistry.HealthChangeEvent> sink) {
-    HealthEventChangeRegistry reg = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry reg = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     reg.subscribeTyped(sink::add);
     return reg;
   }
@@ -156,7 +157,7 @@ final class IndexDriftHealthTapTest {
   @Test
   void samePruneAtMsDoesNotReEmit() {
     OccurrenceLog occ = new OccurrenceLog(200);
-    IndexDriftHealthTap t = tap(new ConditionStore(), occ, new HealthEventChangeRegistry());
+    IndexDriftHealthTap t = tap(new ConditionStore(), occ, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()));
     t.reconcile(List.of(prunedRoot("/docs", 7, 1000L)));
     t.reconcile(List.of(prunedRoot("/docs", 7, 1000L))); // same prune event, next snapshot
     assertEquals(1, occ.recent().size(), "the same prune event must fire exactly once (dedup on at-ms)");
@@ -165,7 +166,7 @@ final class IndexDriftHealthTapTest {
   @Test
   void laterPruneEmitsAgain() {
     OccurrenceLog occ = new OccurrenceLog(200);
-    IndexDriftHealthTap t = tap(new ConditionStore(), occ, new HealthEventChangeRegistry());
+    IndexDriftHealthTap t = tap(new ConditionStore(), occ, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()));
     t.reconcile(List.of(prunedRoot("/docs", 7, 1000L)));
     t.reconcile(List.of(prunedRoot("/docs", 3, 2000L))); // a NEW prune (later at-ms)
     assertEquals(2, occ.recent().size(), "a new orphan-prune event must fire a second occurrence");
@@ -174,7 +175,7 @@ final class IndexDriftHealthTapTest {
   @Test
   void zeroOrphanCountNeverEmits() {
     OccurrenceLog occ = new OccurrenceLog(200);
-    tap(new ConditionStore(), occ, new HealthEventChangeRegistry())
+    tap(new ConditionStore(), occ, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()))
         .reconcile(List.of(prunedRoot("/docs", 0, 1000L)));
     assertTrue(occ.recent().isEmpty(), "no orphans pruned → no drift-corrected occurrence");
   }

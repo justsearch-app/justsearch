@@ -15,6 +15,7 @@ import io.justsearch.app.observability.health.Source;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +31,7 @@ class SettingsRecoveryNoticeTest {
       var owner = org.mockito.Mockito.mock(io.justsearch.app.api.settings.SettingsCommitOwner.class);
       org.mockito.Mockito.when(owner.recoveryIssue()).thenReturn(signal.minimalCompletionStage());
       var issue = new io.justsearch.app.api.settings.SettingsCommitOwner.RecoveryIssue(reason, 42L);
-      var store = new ConditionStore(); var changes = new HealthEventChangeRegistry();
+      var store = new ConditionStore(); var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
       if (alreadyCompleted) signal.complete(issue);
       SettingsRecoveryNotice.observeCommitRecovery(owner, store, changes, HEAD, Clock.systemUTC());
       if (!alreadyCompleted) { assertEquals(0, changes.currentSeq()); signal.complete(issue); }
@@ -68,7 +69,7 @@ class SettingsRecoveryNoticeTest {
             Path.of("C:", "data", "ui", "settings.json.corrupt-20260901-101112"), "expected a JSON object");
 
     SettingsRecoveryNotice.publish(
-        store, new HealthEventChangeRegistry(), recovery, HEAD, Clock.systemUTC());
+        store, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), recovery, HEAD, Clock.systemUTC());
 
     Optional<HealthEvent> found =
         store.find(LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT.code(), "settings");
@@ -89,7 +90,7 @@ class SettingsRecoveryNoticeTest {
   @DisplayName("clear removes the condition a prior publish asserted")
   void clearRemovesCondition() {
     ConditionStore store = new ConditionStore();
-    HealthEventChangeRegistry changes = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var recovery =
         new UiSettingsStore.RecoveredFromCorrupt(
             Path.of("settings.json.corrupt-20260901-101112"), "cannot parse");

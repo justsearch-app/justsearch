@@ -6,6 +6,7 @@ import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.api.stream.StreamId;
 import io.justsearch.app.observability.stream.SseStreamChannel;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 /**
@@ -38,10 +39,20 @@ public final class HealthEventChangeRegistry {
 
   private final SseStreamChannel channel;
 
-  public HealthEventChangeRegistry() {
-    this(new SseStreamChannel(STREAM_ID));
+  /**
+   * Listener delivery runs on {@code deliveryOwner}, an executor the caller's owner created; the
+   * channel shuts it down when it closes. Production builds its channel from a registry
+   * registration instead, so the registration is released too (see the channel constructor).
+   */
+  public HealthEventChangeRegistry(ExecutorService deliveryOwner) {
+    this(new SseStreamChannel(STREAM_ID, deliveryOwner));
   }
 
+  /**
+   * @param channel a channel built with an owner-supplied delivery executor; Health listeners run
+   *     only on that owner's threads
+   * @throws IllegalStateException when {@code channel} has no delivery executor
+   */
   public HealthEventChangeRegistry(SseStreamChannel channel) {
     this.channel = Objects.requireNonNull(channel, "channel").withInterruptibleDelivery();
   }

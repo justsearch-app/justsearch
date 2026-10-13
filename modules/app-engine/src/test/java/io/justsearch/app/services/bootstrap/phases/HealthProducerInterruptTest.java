@@ -27,6 +27,7 @@ import java.time.Clock;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -59,7 +60,7 @@ final class HealthProducerInterruptTest {
     int ioFailures = 0;
     int published = 0;
     for (int i = 0; i < RACES; i++) {
-      var changes = new HealthEventChangeRegistry();
+      var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
       var entered = new CountDownLatch(1);
       var deliveries = new AtomicInteger();
       var sub = changes.subscribe(envelope -> {

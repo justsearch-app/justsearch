@@ -13,6 +13,7 @@ import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.Source;
 import java.time.Clock;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /** Spec F §1.3: an uncontained Engine says so on the Health surface, with the failed call. */
@@ -24,7 +25,7 @@ final class EngineContainmentNoticeTest {
   void unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall() {
     var health = new ConditionStore();
     EngineContainmentNotice.publish(Status.UNAVAILABLE, Optional.of("AssignProcessToJobObject:5"),
-        health, new HealthEventChangeRegistry(), SOURCE, Clock.systemUTC());
+        health, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), SOURCE, Clock.systemUTC());
     var event = health.find(CODE, "engine").orElseThrow();
     String message = ((AssertedCondition) event.body()).message().orElseThrow();
     assertTrue(message.contains("AssignProcessToJobObject:5"), message);
@@ -38,7 +39,7 @@ final class EngineContainmentNoticeTest {
     for (Status status : new Status[] {Status.CONTAINED, Status.NOT_APPLICABLE}) {
       var health = new ConditionStore();
       EngineContainmentNotice.publish(status, Optional.empty(), health,
-          new HealthEventChangeRegistry(), SOURCE, Clock.systemUTC());
+          new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), SOURCE, Clock.systemUTC());
       assertTrue(health.find(CODE, "engine").isEmpty(), status.name());
     }
   }

@@ -45,7 +45,7 @@ final class LifecycleSnapshotTapTest {
   @BeforeEach
   void setUp() {
     conditions = new ConditionStore();
-    changes = new HealthEventChangeRegistry();
+    changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     listener = new RecordingListener();
     changes.subscribeTyped(listener);
     clock = new MutableClock(T0);

@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +53,7 @@ final class CapabilityHealthBridgeChatCauseTest {
       components.handle("generative").transition(ComponentState.FAILED, reasonCode, detail);
       ConditionStore conditions = new ConditionStore();
       try (AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
-          components, conditions, new HealthEventChangeRegistry(), HEAD)) {
+          components, conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD)) {
         return inferenceCondition(conditions);
       }
     }

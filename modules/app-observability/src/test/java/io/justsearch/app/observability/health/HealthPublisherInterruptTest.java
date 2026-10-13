@@ -80,7 +80,7 @@ final class HealthPublisherInterruptTest {
 
   @Test
   void slowObserverUnsubscribedElsewhereLeavesProducerUninterrupted() throws Exception {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var entered = new CountDownLatch(1);
     var sub = changes.subscribe(envelope -> {
       entered.countDown();
@@ -108,7 +108,7 @@ final class HealthPublisherInterruptTest {
 
   @Test
   void interruptibleObserverUnsubscribedElsewhereLeavesProducerUninterrupted() throws Exception {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var sub = changes.subscribe(envelope -> {
@@ -144,7 +144,7 @@ final class HealthPublisherInterruptTest {
     int ioFailures = 0;
     Path file = file();
     for (int i = 0; i < races; i++) {
-      var changes = new HealthEventChangeRegistry();
+      var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
       var entered = new CountDownLatch(1);
       var sub = changes.subscribe(envelope -> {
         entered.countDown();
@@ -169,7 +169,7 @@ final class HealthPublisherInterruptTest {
 
   @Test
   void channelCloseDuringDeliveryLeavesProducerUninterrupted() throws Exception {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var entered = new CountDownLatch(1);
     changes.subscribe(envelope -> {
       entered.countDown();
@@ -192,7 +192,7 @@ final class HealthPublisherInterruptTest {
 
   @Test
   void producerInterruptedBeforePublishStaysInterrupted() throws Exception {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var delivered = new CountDownLatch(1);
     // A careless observer that swallows InterruptedException. On the producer's thread it would
     // consume the producer's own interrupt; it must never run there.
@@ -218,7 +218,7 @@ final class HealthPublisherInterruptTest {
 
   @Test
   void producerInterruptedWhileWaitingReturnsPromptlyWithItsInterrupt() throws Exception {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var entered = new CountDownLatch(1);
     var hold = new AtomicBoolean(true);
     changes.subscribe(envelope -> {
@@ -244,7 +244,7 @@ final class HealthPublisherInterruptTest {
 
   @Test
   void blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder() throws Exception {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var entered = new CountDownLatch(1);
     var hold = new AtomicBoolean(true);
     var stubborn = changes.subscribe(envelope -> {
@@ -278,7 +278,7 @@ final class HealthPublisherInterruptTest {
 
   @Test
   void attachingThreadLeavesWithoutTheInterruptItsRetirementRaised() throws Exception {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var entered = new CountDownLatch(1);
     var registration = new AtomicReference<SseStreamChannel.Subscription>();
     var flagAfter = new AtomicReference<Boolean>();
