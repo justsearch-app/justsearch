@@ -23,6 +23,23 @@ final class WorkerIngestionAuthority {
     this.indexedSource = java.util.Objects.requireNonNull(probe, "probe");
   }
 
+  /**
+   * The root-identity check every deletion decision here asks (task t-20261013-ef3c41, round 4).
+   * Until the Worker's service wires its persistent one in, an in-memory one remembers the volume
+   * of each root this authority has seen a present source under.
+   */
+  private volatile SourcePresence.RootCheck rootCheck =
+      io.justsearch.indexerworker.services.RootWitness.inMemory();
+
+  void useRootCheck(SourcePresence.RootCheck check) {
+    this.rootCheck = java.util.Objects.requireNonNull(check, "check");
+  }
+
+  /** What can be said about {@code source} under {@code root}, with this authority's root check. */
+  SourcePresence.Verdict presence(Path source, Path root) {
+    return SourcePresence.classify(source, root, rootCheck);
+  }
+
   SourceAdmission admit(io.justsearch.indexerworker.queue.JobQueue.IndexJob job) throws IOException {
     if (job.ingestionRoot() == null) {
       // Pre-boundary queue and switch-buffer records cannot distinguish explicit files from
@@ -57,7 +74,7 @@ final class WorkerIngestionAuthority {
     try {
       freshness = FileFreshnessSnapshot.capture(filePath);
     } catch (IOException notCaptured) {
-      return switch (SourcePresence.classify(filePath, root)) {
+      return switch (presence(filePath, root)) {
         case ABSENT ->
             SourceAdmission.terminal(
                 SourceAdmissionAction.STALE_DONE,
@@ -92,6 +109,9 @@ final class WorkerIngestionAuthority {
       return SourceAdmission.terminal(
           SourceAdmissionAction.RETRYABLE_FAILURE, sourceUnreadable(filePath, null));
     }
+    // Round 4 (S8): a present source is what lets a later "not found" be told apart from another
+    // volume at the same letter; its root's volume is recorded once.
+    observePresent(filePath, root);
     return SourceAdmission.admitted(FileEnvelope.fromSnapshot(freshness));
   }
 
@@ -116,6 +136,16 @@ final class WorkerIngestionAuthority {
             ? "File not readable"
             : "File not readable: " + cause.getClass().getSimpleName()
                 + (cause.getMessage() == null ? "" : ": " + cause.getMessage()));
+  }
+
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a native identity read may throw unchecked
+  private void observePresent(Path filePath, Path root) {
+    try {
+      rootCheck.observedPresent(
+          SourcePresence.vouchingFolder(filePath.toAbsolutePath().normalize(), root));
+    } catch (RuntimeException notRecorded) {
+      // Recording is best-effort; nothing is removed on this path.
+    }
   }
 
   /** The outcome for a source whose folder is unavailable. Retried until the folder is back. */

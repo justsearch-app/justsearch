@@ -502,9 +502,11 @@ final class SyncDirectoryOps {
       if (pruneIncomplete) {
         log.warn(
             "syncDirectory for {}: prune incomplete (root or subtree unreadable); {} deleted,"
-                + " {} added, delete detection UNVERIFIED",
+                + " {} kept because their files could not be checked, {} added, delete detection"
+                + " UNVERIFIED",
             rootPath,
             filesDeleted,
+            pruneResult.keptUnknown(),
             filesAdded);
         return syncDirectoryDeleteUnverifiedResponse(filesDeleted, filesAdded);
       }

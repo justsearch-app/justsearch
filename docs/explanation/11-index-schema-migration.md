@@ -289,7 +289,11 @@ Those report `reindexRequiredReason = rebuild_brake_unreadable` (or `rebuild_bra
 the re-established record), shown as `index.rebuild_brake_unreadable`. Every automatic rebuild asks
 the brake before it starts: the schema-mismatch migration, the embedding-model-change re-embed, the
 rebuild from source of an index recovered to empty, and the backup-first rebuild. A boot that held a
-rebuild back reports it for the rest of that boot, because ingestion stays stopped until a restart.
+rebuild back reports it for the rest of that boot, because ingestion stays stopped in that boot. A
+person's rebuild in such a boot still finishes on its own: the held boot has no write runtime to open
+the new generation in, so the Worker asks the Engine for a restart, and the next boot builds the
+person's generation with ingestion running, so new and changed files are indexed again without any
+further action (`HeldBootPersonsRebuildTest`).
 A `state.json` that is present but does not parse still stops the boot earlier, in ownership
 reconciliation, so the Worker does not start at all in that case.
 
@@ -639,6 +643,51 @@ For `N >= 0`, the Engine blocks native cutover and marks the migration `FAILED` 
 ### Deadlines
 
 To avoid hanging forever in `SWITCHING`, the Worker enforces a maximum switching duration and transitions to `FAILED` if it cannot drain in time (no pointer swap).
+
+## Removing documents whose source is gone
+
+Task t-20261013-ef3c41. A document is removed because its file is gone only when the file is
+**confirmed absent**: reported not found while the root that holds it is present, can be listed,
+and is the same folder on the same volume it was. Admission, the pre-publish freshness check, the
+post-extraction re-hash, the writer's pre-write check and the watcher's delete confirmation all ask
+one shared root check for that (`SourcePresence.RootCheck`, implemented by `RootWitness`, cached
+for about a second per root rather than asked per file), the same question the prune asks through
+`RootPresenceGuard`. A root's volume is recorded in `root-volumes.properties` under the index base
+the first time a source under it is seen present or the root is first pruned; a root whose volume
+now differs from the recorded one, or cannot be read, answers "cannot tell" and nothing beneath it
+is removed. Such a root is not walked either: its walk ends with `ROOT_NOT_DIRECTORY`, the
+root-level unavailable state, until the original volume is back or the person removes the root
+(which forgets its record). Any other "cannot tell" (locked, access denied, a folder that cannot be listed) keeps
+the document and retries with growing back-off and no time limit.
+
+A prune keeps each document whose presence it cannot tell and goes on judging the rest, so one
+unreadable subfolder does not stop the genuine deletions beside it; a "not found" beneath a folder
+it could not list counts as "cannot tell". It re-checks the root at the first undecidable document
+of a batch and immediately before applying each batch's deletions (a batch with nothing to delete
+and nothing undecidable does not ask, and a run whose last batch did not ask asks once at the end);
+if the root has become unreadable, unavailable or another volume, it stops and removes nothing more.
+A run that kept
+documents or stopped reports itself incomplete, with the count of kept documents
+(`prune_incomplete`). A watcher DELETE is held for a 3 s settle window before it is classified, so a
+save-by-rename does not drop the file from search.
+
+Accepted limits:
+
+- A buffered `PRUNE_PREFIX` replayed after a legacy single-runtime switch checks that the prefix
+  folder is present and listable, but not that it is the same folder or volume.
+- The volume check compares the Windows volume serial number only, so two volumes that share a
+  serial (a cloned disk, for example) count as the same volume.
+- A root never seen present before its drive letter came to hold another volume has nothing
+  recorded to compare against, so that first swap cannot be told apart.
+- A folder inside a root that is the mount point of another volume never vouches for absence at
+  admission, freshness or the watcher, because its volume differs from the one recorded for the
+  root; files deleted there leave the index through the prune, which checks the root itself.
+- Re-queuing a file (a new scan or watch event) resets its retry back-off to the first step.
+- OneDrive (and other cloud) placeholder files are not treated specially; a placeholder that cannot
+  be read is handled like any other unreadable file.
+- The Lucene adapter's own recovery of a corrupt index (backing it up and opening a fresh empty
+  one while the index opens) does not reach the repeat-rebuild brake; only the rebuild from source
+  that the Worker starts afterwards asks it.
 
 ## Operator surface (Head REST → index-half port call)
 

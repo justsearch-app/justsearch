@@ -48,9 +48,10 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
 
   /**
    * As {@link #capture(Path, RootIdentity)}, and the root must also be on the volume {@code
-   * volumes} recorded for it at its first prune (recorded now when none is), so a different volume
-   * at the same path, even after a restart, vouches for nothing. An unreadable ledger is "cannot
-   * tell": the guard never vouches.
+   * volumes} recorded for it (or for the nearest recorded folder above it) when it was first seen
+   * (recorded now when none is), so a different volume at the same path, even after a restart,
+   * vouches for nothing. An unreadable ledger is "cannot tell": the guard never vouches. This is
+   * the same question {@link RootWitness} asks for every other path that can end in a deletion.
    */
   static PruneOps.PresenceGuard capture(
       Path root, RootIdentity registered, RootVolumeLedger volumes) {
@@ -65,7 +66,7 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
       if (registered != null) {
         registered.requireSame(baseline, normalized);
       }
-      requireRecordedVolume(normalized, baseline, volumes);
+      RootWitness.requireRecordedVolume(volumes, normalized, baseline);
       return new RootPresenceGuard(normalized, baseline, registered);
     } catch (IOException unavailableOrChanged) {
       log.warn(
@@ -74,29 +75,6 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
           normalized,
           unavailableOrChanged.getMessage());
       return () -> false;
-    }
-  }
-
-  private static void requireRecordedVolume(
-      Path root, RootIdentity baseline, RootVolumeLedger volumes) throws IOException {
-    String volume = baseline.volume();
-    if (volume == null) {
-      return;
-    }
-    java.util.Optional<String> recorded = volumes.recorded(root);
-    if (recorded.isPresent()) {
-      if (!recorded.get().equals(volume)) {
-        throw new IOException(
-            "root is on " + volume + ", not on " + recorded.get() + " where it was first indexed");
-      }
-      return;
-    }
-    try {
-      volumes.recordIfAbsent(root, volume);
-    } catch (IOException notRecorded) {
-      // Nothing is removed on the strength of this record, so a failed write only means a later
-      // volume swap is caught by the in-session identity alone.
-      log.warn("Could not record the volume of root {}: {}", root, notRecorded.getMessage());
     }
   }
 

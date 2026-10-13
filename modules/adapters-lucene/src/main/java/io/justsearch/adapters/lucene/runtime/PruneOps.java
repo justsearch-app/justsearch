@@ -56,17 +56,25 @@ public final class PruneOps {
     /** The abort checker stopped the run (cancellation or interruption). */
     ABORTED,
     /**
-     * The run stopped because it could no longer tell present from absent: the root stopped
-     * vouching for absence, or a document's presence could not be established. Nothing after that
-     * point was removed; deletions already confirmed stay applied.
+     * Not every document could be judged: some documents' presence could not be established (they
+     * were kept, and the rest were still judged), or the root stopped vouching for absence (the
+     * run stopped there; nothing after that point was removed). Deletions already confirmed stay
+     * applied.
      */
     INCOMPLETE
   }
 
-  /** Outcome of one prune: the number of documents removed and how the run ended. */
-  public record PruneResult(int pruned, Completion completion) {
+  /**
+   * Outcome of one prune: the number of documents removed, how the run ended, and how many
+   * documents were kept because their presence could not be told.
+   */
+  public record PruneResult(int pruned, Completion completion, int keptUnknown) {
     public PruneResult {
       Objects.requireNonNull(completion, "completion");
+    }
+
+    public PruneResult(int pruned, Completion completion) {
+      this(pruned, completion, 0);
     }
 
     public boolean complete() {
@@ -135,13 +143,18 @@ public final class PruneOps {
   /**
    * Prunes documents under {@code pathPrefix} whose backing files are confirmed absent.
    *
-   * <p>"Confirmed absent" (task t-20261013-ef3c41): the path is reported not found and the root was
-   * present before and after that observation. Absent candidates are collected per batch and only
-   * removed after {@link PresenceGuard#rootCurrent()} passes at the end of the batch, so a drive
-   * unplugged or a share dropped mid-batch removes nothing. The first document whose presence
-   * cannot be established ({@link PathPresence#UNKNOWN}), or a failed root check, ends the run as
-   * {@link Completion#INCOMPLETE} and discards the unconfirmed candidates of that batch: nothing
-   * further is removed.
+   * <p>"Confirmed absent" (task t-20261013-ef3c41): the path is reported not found, the nearest
+   * folder above it that exists can be listed ({@link PathPresence#absentBeneathListableFolder}),
+   * and the root was present, the same root, before and after that observation. Absent candidates
+   * are collected per batch and only removed after {@link PresenceGuard#rootCurrent()} passes
+   * immediately before they are applied, so a drive unplugged or a share dropped mid-batch removes
+   * nothing. A document whose presence cannot be established ({@link PathPresence#UNKNOWN}) is
+   * kept and the rest are still judged (round 4: one unreadable subfolder must not stop the
+   * genuine deletions beside it); the run then ends {@link Completion#INCOMPLETE} with the count of
+   * kept documents. The first such document of a batch re-checks the root at once: a root that no
+   * longer vouches ends the run there, discarding that batch's candidates. A batch in which every
+   * document was found asks nothing of the root, since nothing is removed on its strength; the run
+   * asks once more at its end, so a root that changed meanwhile still reports it incomplete.
    *
    * <p>The sink exists so a Worker-side collaborator can act on each confirmed deletion without
    * adapters-lucene taking a dependency on it (tempdoc 931 §C.6 wires the document-identity
@@ -172,6 +185,14 @@ public final class PruneOps {
     String normalized = normalizePathPrefix(pathPrefix);
     int checked = 0;
     Batch batch = new Batch(guard, confirmedDeletionSink);
+    Path boundary;
+    try {
+      boundary = Path.of(pathPrefix);
+    } catch (InvalidPathException invalid) {
+      boundary = null;
+    }
+    Map<Path, PathPresence> folderVerdicts = new java.util.HashMap<>();
+    int judged = 0;
 
     // Snapshot once so acquire and release use the same instance.
     LifecycleSnapshot snap = session.snapshot;
@@ -290,18 +311,32 @@ public final class PruneOps {
                 docId);
             continue;
           }
+          judged++;
           PathPresence presence = guard.presence(file);
+          if (presence == PathPresence.ABSENT) {
+            // "Not found" beneath a folder that cannot be listed proves nothing.
+            presence = PathPresence.absentBeneathListableFolder(file, boundary, folderVerdicts);
+          }
           if (presence == PathPresence.UNKNOWN) {
-            // A subtree or the whole root stopped answering. Nothing more is removed, including
-            // this batch's unconfirmed candidates; a later run resumes once it answers again.
-            log.warn(
-                "pruneByPathPrefix: presence of an indexed file could not be established; stopping"
-                    + " incomplete after {} checked, {} pruned for prefix {}",
-                checked,
-                batch.pruned,
-                normalized);
-            completion = Completion.INCOMPLETE;
-            break scan;
+            // Cannot tell: the document is kept and the rest are still judged. If it is the root
+            // itself that stopped answering, nothing more is removed, including this batch's
+            // unconfirmed candidates; a later run resumes once it answers again.
+            batch.keptUnknown++;
+            if (!batch.rootCheckedSinceUncertain) {
+              batch.rootCheckedSinceUncertain = true;
+              if (!guard.rootCurrent()) {
+                log.warn(
+                    "pruneByPathPrefix: the root stopped answering; stopping incomplete after {}"
+                        + " checked, {} pruned for prefix {}",
+                    checked,
+                    batch.pruned,
+                    normalized);
+                batch.candidates.clear();
+                completion = Completion.INCOMPLETE;
+                break scan;
+              }
+            }
+            continue;
           }
           if (presence == PathPresence.ABSENT) {
             // Ownership fields never authorize deletion of another document. Parents and chunks
@@ -314,23 +349,35 @@ public final class PruneOps {
       if (completion == Completion.COMPLETE && !batch.flush()) {
         completion = Completion.INCOMPLETE;
       }
+      // A root that stopped being the same root during the run makes the run incomplete even when
+      // no deletion was pending to notice it; one check per run, not per batch.
+      if (completion == Completion.COMPLETE && judged > 0 && !batch.lastFlushAskedRoot
+          && !guard.rootCurrent()) {
+        log.warn("pruneByPathPrefix: the root is no longer the same root; reporting incomplete for"
+            + " prefix {}", normalized);
+        completion = Completion.INCOMPLETE;
+      }
+      if (completion == Completion.COMPLETE && batch.keptUnknown > 0) {
+        completion = Completion.INCOMPLETE;
+      }
 
       // Commit whatever was confirmed and removed, unless the caller cancelled the run.
       if (batch.pruned > 0 && completion != Completion.ABORTED) {
         commitOps.commitAndTrack(CommitReason.PRUNE);
       }
       log.info(
-          "pruneByPathPrefix: {} - {} checked, {} pruned for prefix {}",
+          "pruneByPathPrefix: {} - {} checked, {} pruned, {} kept (presence unknown) for prefix {}",
           completion,
           checked,
           batch.pruned,
+          batch.keptUnknown,
           normalized);
-      return new PruneResult(batch.pruned, completion);
+      return new PruneResult(batch.pruned, completion, batch.keptUnknown);
 
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       log.warn("pruneByPathPrefix: interrupted after {} checked, {} pruned", checked, batch.pruned);
-      return new PruneResult(batch.pruned, Completion.ABORTED);
+      return new PruneResult(batch.pruned, Completion.ABORTED, batch.keptUnknown);
     } catch (IOException e) {
       throw new IndexRuntimeIOException(classifyIOException(e), "Prune failed", e);
     } finally {
@@ -352,6 +399,11 @@ public final class PruneOps {
     private final Consumer<String> sink;
     private final List<Candidate> candidates = new ArrayList<>();
     private int pruned;
+    private int keptUnknown;
+    /** Whether the root was re-checked after an undecidable document in the current batch. */
+    private boolean rootCheckedSinceUncertain;
+    /** Whether the most recent flush asked the root (it had candidates to apply). */
+    private boolean lastFlushAskedRoot;
 
     Batch(PresenceGuard guard, Consumer<String> sink) {
       this.guard = guard;
@@ -359,13 +411,17 @@ public final class PruneOps {
     }
 
     /**
-     * Removes the batch's candidates if the root still vouches for their absence.
+     * Removes the batch's candidates if the root still vouches for their absence, asking it right
+     * before they are applied. A batch without candidates asks nothing: nothing is removed on its
+     * strength.
      *
      * @return false when the root check failed; the candidates are discarded, nothing is removed
      */
     boolean flush() {
+      rootCheckedSinceUncertain = false;
+      lastFlushAskedRoot = !candidates.isEmpty();
       if (candidates.isEmpty()) {
-        return guard.rootCurrent();
+        return true;
       }
       if (!guard.rootCurrent()) {
         log.warn(

@@ -132,19 +132,23 @@ final class IngestResponses {
   }
 
   /**
-   * The prune stopped because the root or a subtree could not be read (task t-20261013-ef3c41).
-   * Carried as an error so every caller treats the prune as not done; the count is what was
-   * confirmed and removed before it stopped.
+   * The prune could not judge every document (task t-20261013-ef3c41): documents whose presence
+   * could not be told were kept, or the root stopped answering and the run stopped there. Carried
+   * as an error so every caller treats the prune as not done; the count is what was confirmed and
+   * removed, and the message names how many documents were kept as undecidable.
    */
-  static PruneResponse pruneIncompleteResponse(int prunedCount) {
+  static PruneResponse pruneIncompleteResponse(int prunedCount, int keptUnknown) {
     return PruneResponse.newBuilder()
         .setPrunedCount(prunedCount)
-        .setError(PRUNE_INCOMPLETE_ERROR)
+        .setError(pruneIncompleteError(keptUnknown))
         .build();
   }
 
-  static final String PRUNE_INCOMPLETE_ERROR =
-      "prune_incomplete: the folder or part of it could not be read; nothing further was removed";
+  static String pruneIncompleteError(int keptUnknown) {
+    return "prune_incomplete: the folder or part of it could not be read; "
+        + keptUnknown
+        + " documents whose files could not be checked were kept";
+  }
 
   static PruneResponse pruneResultResponse(int prunedCount, boolean aborted) {
     return PruneResponse.newBuilder().setPrunedCount(prunedCount).setAborted(aborted).build();

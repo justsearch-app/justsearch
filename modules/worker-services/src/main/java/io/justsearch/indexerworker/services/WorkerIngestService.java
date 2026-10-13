@@ -129,6 +129,8 @@ public final class WorkerIngestService {
   private final IndexGenerationManager indexGenerationManager;
   /** Volume each root was first pruned from, kept across restarts (task t-20261013-ef3c41, S8). */
   private final RootVolumeLedger rootVolumes;
+  /** Task t-20261013-ef3c41, round 4: the root-identity check every deletion decision asks. */
+  private final RootWitness rootWitness;
   private final boolean ingestIsServing;
   private final boolean hasServingRuntime;
   private final io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle;
@@ -197,6 +199,7 @@ public final class WorkerIngestService {
     this.capturedServingPath = indexPath;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
     this.rootVolumes = RootVolumeLedger.under(indexBasePath);
+    this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity);
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
@@ -464,16 +467,28 @@ public final class WorkerIngestService {
     });
   }
 
-  /** Confirmed absent: not found while the root (or the file's folder) is present. */
-  private static boolean confirmedAbsent(String normalizedPath, Path root) {
+  /**
+   * Confirmed absent: not found while the root (or the file's folder) is present and is the same
+   * folder and volume it was.
+   */
+  private boolean confirmedAbsent(String normalizedPath, Path root) {
     Path path;
     try {
       path = Path.of(normalizedPath);
     } catch (InvalidPathException invalid) {
       return false;
     }
-    return io.justsearch.indexerworker.loop.SourcePresence.classify(path, root)
+    return io.justsearch.indexerworker.loop.SourcePresence.classify(path, root, rootWitness)
         == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT;
+  }
+
+  /**
+   * The root-identity check this service's deletion decisions ask; the composition root hands it to
+   * the indexing loop and the watcher so every deletion decision asks the same one (task
+   * t-20261013-ef3c41, round 4).
+   */
+  public io.justsearch.indexerworker.loop.SourcePresence.RootCheck rootCheck() {
+    return rootWitness;
   }
 
   private static void requireWatcherRootCurrent(
@@ -1238,7 +1253,7 @@ public final class WorkerIngestService {
     // Task t-20261013-ef3c41: the person removed this folder, so the volume recorded for it no
     // longer stands; a folder added again later is recorded afresh at its first prune.
     try {
-      rootVolumes.forgetUnder(pathPrefix);
+      rootWitness.forgetUnder(pathPrefix);
     } catch (IOException | RuntimeException notForgotten) {
       log.warn("deleteByPath: could not drop the recorded volume under {}: {}", pathPrefix,
           notForgotten.getMessage());
@@ -1433,11 +1448,12 @@ public final class WorkerIngestService {
         }
         case INCOMPLETE -> {
           log.warn(
-              "pruneMissing incomplete for prefix: {} ({} pruned before the root or a subtree"
-                  + " stopped answering)",
+              "pruneMissing incomplete for prefix: {} ({} pruned, {} kept because their files"
+                  + " could not be checked)",
               pathPrefix,
-              result.pruned());
-          return pruneIncompleteResponse(result.pruned());
+              result.pruned(),
+              result.keptUnknown());
+          return pruneIncompleteResponse(result.pruned(), result.keptUnknown());
         }
         default -> {
           log.info(
@@ -2536,6 +2552,21 @@ public final class WorkerIngestService {
       } catch (InvalidPathException e) {
         throw WorkerServiceException.invalidArgument(
             "ScanRootRequest.root_path is not a valid path: " + e.getMessage());
+      }
+      boolean singleFile = recorded != null && recorded.singleFile();
+      if (!singleFile && Files.isDirectory(root, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+          && !rootWitness.onRecordedVolume(root)) {
+        // Task t-20261013-ef3c41, round 4, S8: a drive letter that now holds another volume, or a
+        // root whose volume cannot be told, shows the root-level unavailable state; its files are
+        // not taken for the original's and nothing of the original's is touched. A root that is
+        // itself a link walks as before.
+        sink.accept(
+            io.justsearch.ipc.ScanRootProgress.newBuilder()
+                .setComplete(true)
+                .setTerminalReasonCode("ROOT_NOT_DIRECTORY")
+                .setScanId(scanId)
+                .build());
+        return;
       }
       WorkerScanOps.ScanMode mode =
           switch (request.getMode()) {

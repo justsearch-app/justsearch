@@ -486,7 +486,8 @@ public final class JobBatchExtractor {
    * reported not found (the next admission decides with its own confirmation).
    */
   private IngestionOutcome sourceAccessOutcome(JobQueue.IndexJob claim, IOException failure) {
-    SourcePresence.Verdict verdict = SourcePresence.classify(claim.path(), claim.ingestionRoot());
+    SourcePresence.Verdict verdict =
+        ingestionAuthority.presence(claim.path(), claim.ingestionRoot());
     if (verdict == SourcePresence.Verdict.ROOT_UNAVAILABLE
         || verdict == SourcePresence.Verdict.SOURCE_UNREADABLE) {
       return ingestionAuthority.notConfirmedAbsent(verdict, claim.path(), failure);

@@ -26,6 +26,8 @@ on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r3-preser
 edited in round 3, so its round 2 checks were re-run against bf41272f9
 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r2b-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r2b-preserved.json`).
 
+Round 4 (on top of 6b15a8153): one root-identity check for every deletion path and the root's walk (S8), a prune that keeps what it cannot judge and goes on (P1), and S7/S9 checks through entry points that exist on cf3f14655. Its repaired checks fail on 6b15a8153 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-repaired.json`); its must-not-break checks pass on 6b15a8153 and on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-preserved.json`). The S7/S9 checks run against cf3f14655 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-s7s9-repaired.json`) and against 6b15a8153 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-s7s9-on-r3.json`).
+
 ```json
 {
   "entries": [
@@ -1196,6 +1198,179 @@ edited in round 3, so its round 2 checks were re-run against bf41272f9
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java#aReleasedBrakeStillStartsTheEmbeddingModelChangeReembed",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java#aReleasedBrakeStillRebuildsAnIndexRecoveredToEmpty",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerBrakeSentinelTest.java#aRealTargetStillConsumesBudgetNormally"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 4, S8 beyond the prune: a SUBST drive letter remapped from a folder on one volume to a folder on another volume (real volumes, real mappings) makes admission keep the source as a ROOT_UNAVAILABLE retry instead of retiring it as deleted, makes the pre-publish freshness check neither delete the document nor end the queue item, makes a witnessed watcher DELETE after a restart remove nothing, and makes the root's walk end with ROOT_NOT_DIRECTORY (the root-level unavailable state) without admitting the other volume's files. Fail-before against 6b15a8153 by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Every path that can end in a deletion asks the same root-identity question the prune asks before a file counts as confirmed absent: admission, the pre-publish freshness check, the post-extraction re-hash, the writer's pre-write check and the watcher's delete confirmation share one check (RootWitness, cached about one second per root, asked only for a source that was not found). A root whose volume differs from the one recorded for it, or whose volume cannot be read, is \"cannot tell\", and the root shows its root-level state: its walk ends with ROOT_NOT_DIRECTORY, the state the Head shows as unavailable (orchestrator decision, round 4).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#admissionKeepsTheSourceWhenItsDriveLetterNowHoldsAnotherVolume",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#theFreshnessCheckKeepsTheDocumentWhenItsDriveLetterNowHoldsAnotherVolume",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java#aWatcherDeleteOnAnotherVolumeAtTheSameLetterRemovesNothing",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java#aRootWhoseLetterNowHoldsAnotherVolumeShowsTheRootLevelState"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneDeniedSubfolderTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 4, P1 under a denied subfolder: with folders a, b and c under a root, a real deny-read ACL on b and a/file-0 and c/file-0 deleted, the prune removes those two documents, keeps every document under b (including one whose file was deleted before b was denied) and reports itself incomplete with the count of kept documents. Before, the first document under b stopped the run and discarded the batch's confirmed deletions, so nothing was removed on any run. Fail-before against 6b15a8153 by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "P1",
+          "quote": "A genuinely deleted file is removed with its chunks: immediately on a confirmed watcher delete, and within one sync cycle once its root is reachable (including files deleted while their root was offline).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S2",
+          "quote": "Pruning, from every caller (periodic sync, prune-first reindex with exclude rules or force, migration replay of a buffered prune), removes a document only when its file is reported not found while the same root is present, re-checked during the prune; if the root or a subtree becomes unreadable mid-prune, nothing more is removed and the run reports itself incomplete.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A prune keeps a document whose presence cannot be told and goes on judging the rest; a \"not found\" beneath a folder that could not be listed is \"cannot tell\". A document reported not found is removed only while the same root is present with the same identity, re-checked at the first undecidable document of a batch and immediately before each batch's deletions are applied. If the root itself becomes unreadable, unavailable or another volume, the run stops, removes nothing more and reports itself incomplete; a run that kept documents also reports itself incomplete, with the count of kept documents (orchestrator decision, round 4; it narrows S2's \"a subtree becomes unreadable mid-prune, nothing more is removed\" to the root, so one unreadable subfolder no longer stops the genuine deletions beside it, P1).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneDeniedSubfolderTest.java#aDeniedSubfolderDoesNotStopTheDeletionsBesideIt"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 4, must not break: on the same volume, admission still retires a source that was deleted, a confirmed watcher DELETE still removes the document, and the root still walks normally and admits its files after its volume was recorded. Pass on 6b15a8153 and on the candidate (the evidence also re-runs the earlier mid-prune root-loss checks, which still pass).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "P1",
+          "quote": "A genuinely deleted file is removed with its chunks: immediately on a confirmed watcher delete, and within one sync cycle once its root is reachable (including files deleted while their root was offline).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Every path that can end in a deletion asks the same root-identity question the prune asks before a file counts as confirmed absent: admission, the pre-publish freshness check, the post-extraction re-hash, the writer's pre-write check and the watcher's delete confirmation share one check (RootWitness, cached about one second per root, asked only for a source that was not found). A root whose volume differs from the one recorded for it, or whose volume cannot be read, is \"cannot tell\", and the root shows its root-level state: its walk ends with ROOT_NOT_DIRECTORY, the state the Head shows as unavailable (orchestrator decision, round 4).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-preserved.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#admissionStillRetiresASourceDeletedFromTheSameVolume",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java#aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java#aRootOnTheSameVolumeStillWalksNormally"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/HeldBootPersonsRebuildTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 4, a person's rebuild in a held boot: with the brake spent and the boot held, the person's rebuild is accepted; the held boot cannot open the new generation live, so the Worker asks for an Engine restart; after that restart (and nothing else) a file added after the rebuild becomes searchable and the serving boot is no longer held. Passes on 6b15a8153 and on the candidate: the behaviour already held, and the documentation that said ingestion stays stopped until a restart was corrected.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "After a person's explicit rebuild in a boot the rebuild brake held, new and changed files are indexed again without any further action by the person (orchestrator decision, round 4).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-preserved.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/HeldBootPersonsRebuildTest.java#aPersonsRebuildInAHeldBootIndexesNewFilesWithoutFurtherAction"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 4, S7 and S9 through entry points that exist on cf3f14655 (a real scan, the real durable queue, the real batch extractor and admission): a file held open without sharing for a month is still retried with a growing back-off instead of being marked RETRY_EXHAUSTED; a file replaced by a directory, or by a dangling junction, has its old text removed and is not left pending. Fail-before against cf3f14655 by assertion; all three pass on 6b15a8153 (evidence ef3c41-uncertain-deletes-r4-s7s9-on-r3.json).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S7",
+          "quote": "A file that stays unreadable is retried with counted, growing back-off (never re-extracted every second; the existing defer re-queues after a fixed 1 s without counting); its last indexed content stays searchable without a time limit; it is shown as \"indexed, source unreadable\" (an additive reason, distinct from missing from index) in the failed-files list and status; a restart keeps it queued and searchable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S9",
+          "quote": "A source file replaced by a directory or a symlink (including a dangling one) no longer leaves its old text searchable and is not retried forever.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-s7s9-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aLockedSourceIsStillRetriedPastTheSevenDayWindow",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aFileReplacedByADirectoryLeavesTheIndex",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aFileReplacedByADanglingJunctionLeavesTheIndex"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 4, S7 must not break: a file held open without sharing is re-queued at least 60 s out with its attempt counted, not after about one second. This passes on cf3f14655 as well: through these entry points a locked file already took the counted 60 s retry ladder there, so the fixed 1 s re-queue named in S7 is not what a locked file met on cf3f14655; the check is kept as a must-not-break check.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S7",
+          "quote": "A file that stays unreadable is retried with counted, growing back-off (never re-extracted every second; the existing defer re-queues after a fixed 1 s without counting); its last indexed content stays searchable without a time limit; it is shown as \"indexed, source unreadable\" (an additive reason, distinct from missing from index) in the failed-files list and status; a restart keeps it queued and searchable.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-s7s9-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aLockedSourceIsNotRequeuedWithinSeconds"
       ]
     }
   ]

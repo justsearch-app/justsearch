@@ -9,6 +9,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Map;
 
 /**
  * Three-way answer to "is this path there?" — the one file-level probe every deletion path uses
@@ -53,6 +54,73 @@ public enum PathPresence {
     try {
       return probe(Path.of(path));
     } catch (InvalidPathException invalid) {
+      return UNKNOWN;
+    }
+  }
+
+  /**
+   * Whether a path reported {@link #ABSENT} may count as absent (task t-20261013-ef3c41, round 4):
+   * "not found" beneath a folder that cannot be listed proves nothing, so the nearest ancestor that
+   * exists, at or below {@code boundary}, must be a folder whose entries can be listed (or not a
+   * folder at all, which holds nothing). Walking stops at {@code boundary}; when nothing up to it
+   * exists, the answer is {@link #ABSENT} and the caller's root check decides.
+   *
+   * @param folderVerdicts per-folder answers already reached in this run, reused so a prune pays
+   *     once per folder rather than once per file; may be {@code null}
+   * @return {@link #ABSENT} or {@link #UNKNOWN}
+   */
+  public static PathPresence absentBeneathListableFolder(
+      Path file, Path boundary, Map<Path, PathPresence> folderVerdicts) {
+    if (file == null) {
+      return UNKNOWN;
+    }
+    Path stop;
+    Path folder;
+    try {
+      stop = boundary == null ? null : boundary.toAbsolutePath().normalize();
+      folder = file.toAbsolutePath().normalize().getParent();
+    } catch (RuntimeException invalid) {
+      return UNKNOWN;
+    }
+    while (folder != null) {
+      PathPresence verdict =
+          folderVerdicts == null
+              ? folderVerdict(folder)
+              : folderVerdicts.computeIfAbsent(folder, PathPresence::folderVerdict);
+      if (verdict != ABSENT) {
+        // PRESENT: the nearest existing ancestor answers for what is beneath it.
+        return verdict == PRESENT ? ABSENT : UNKNOWN;
+      }
+      if (folder.equals(stop)) {
+        return ABSENT;
+      }
+      folder = folder.getParent();
+    }
+    return ABSENT;
+  }
+
+  /**
+   * {@link #ABSENT} when the folder is not found, {@link #PRESENT} when it exists and either is not
+   * a folder or can be listed, {@link #UNKNOWN} when it exists as a folder that cannot be listed or
+   * cannot be observed at all.
+   */
+  private static PathPresence folderVerdict(Path folder) {
+    BasicFileAttributes attributes;
+    try {
+      attributes = Files.readAttributes(folder, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    } catch (NoSuchFileException notFound) {
+      return ABSENT;
+    } catch (IOException | SecurityException cannotTell) {
+      return UNKNOWN;
+    }
+    if (!attributes.isDirectory()) {
+      return PRESENT;
+    }
+    try (DirectoryStream<Path> entries = Files.newDirectoryStream(folder)) {
+      // Reading the first entry is what proves the folder can be enumerated; empty is fine.
+      boolean firstEntryRead = entries.iterator().hasNext();
+      return firstEntryRead || attributes.isDirectory() ? PRESENT : UNKNOWN;
+    } catch (IOException | SecurityException | java.nio.file.DirectoryIteratorException e) {
       return UNKNOWN;
     }
   }

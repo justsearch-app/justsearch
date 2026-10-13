@@ -151,7 +151,7 @@ public final class StaleSnapshotResolver {
       // be read keeps its content and is retried with growing back-off; a source that came back
       // between the two looks is simply re-processed.
       SourcePresence.Verdict verdict =
-          SourcePresence.classify(filePath, claim == null ? null : claim.ingestionRoot());
+          ingestionAuthority.presence(filePath, claim == null ? null : claim.ingestionRoot());
       if (verdict == SourcePresence.Verdict.ABSENT) {
         validation = FileFreshnessSnapshot.SourceValidationResult.DELETED;
       } else if (verdict == SourcePresence.Verdict.PRESENT

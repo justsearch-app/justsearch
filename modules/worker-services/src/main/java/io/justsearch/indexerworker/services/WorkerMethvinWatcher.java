@@ -83,8 +83,14 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    */
   static final long DELETE_SETTLE_MS = 3_000L;
 
-  private volatile long deleteSettleMs = DELETE_SETTLE_MS;
   private final ConcurrentHashMap<Path, PendingDelete> pendingDeletes = new ConcurrentHashMap<>();
+
+  /**
+   * The root-identity check a settled DELETE asks before it counts as confirmed (task
+   * t-20261013-ef3c41, round 4); the composed Worker wires its service's persistent one in.
+   */
+  private volatile io.justsearch.indexerworker.loop.SourcePresence.RootCheck rootCheck =
+      RootWitness.inMemory();
   private final AtomicBoolean deleteDrainScheduled = new AtomicBoolean();
 
   /** A witnessed DELETE waiting out its settle window. */
@@ -493,19 +499,14 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     }
   }
 
-  /** Test seam: a settle window of 0 confirms a DELETE synchronously on the event thread. */
-  void setDeleteSettleMs(long settleMs) {
-    if (settleMs < 0) throw new IllegalArgumentException("settleMs must be >= 0");
-    this.deleteSettleMs = settleMs;
+  /** Uses {@code check} to confirm a settled DELETE: the same question every deletion asks. */
+  public void useRootCheck(io.justsearch.indexerworker.loop.SourcePresence.RootCheck check) {
+    this.rootCheck = Objects.requireNonNull(check, "check");
   }
 
   /** Holds a witnessed DELETE for {@link #DELETE_SETTLE_MS}, coalescing repeats of one path. */
   private void deferDelete(RootWatcherRegistry.Subscription witness, Path path) {
-    long settle = deleteSettleMs;
-    if (settle == 0L) {
-      settleDelete(witness, path);
-      return;
-    }
+    long settle = DELETE_SETTLE_MS;
     Path key = path.toAbsolutePath().normalize();
     pendingDeletes.put(
         key,
@@ -561,7 +562,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     if (!pendingDeletes.isEmpty()) {
       long delayMs =
           nextDueNanos == Long.MAX_VALUE
-              ? deleteSettleMs
+              ? DELETE_SETTLE_MS
               : Math.max(0L, TimeUnit.NANOSECONDS.toMillis(nextDueNanos - now) + 1L);
       scheduleDeleteDrain(delayMs);
     }
@@ -569,7 +570,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
 
   /** Acts on a settled DELETE according to what the path is now. */
   private void settleDelete(RootWatcherRegistry.Subscription witness, Path path) {
-    switch (io.justsearch.indexerworker.loop.SourcePresence.classify(path, witness.root())) {
+    switch (io.justsearch.indexerworker.loop.SourcePresence.classify(
+        path, witness.root(), rootCheck)) {
       case ABSENT -> handleDelete(witness, path);
       case PRESENT, SOURCE_UNREADABLE -> {
         // Recreated, atomically replaced, renamed in case only, or present but unreadable: the
