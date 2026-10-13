@@ -149,6 +149,28 @@ final class WorkerSearchServiceSemanticBudgetTest
   }
 
   @Test
+  void aFailedBgeEncoderDoesNotReplaceAnExplicitVector() throws Exception {
+    var bge = mock(io.justsearch.indexerworker.bgem3.BgeM3Encoder.class);
+    when(bge.encode(anyString(), any())).thenThrow(new SessionAcquireDeadlineExceededException(
+        "loading fixture", SessionAcquireDeadlineExceededException.Phase.LOADING));
+    var capture = new io.justsearch.indexerworker.services.input.SearchInputCapture(
+        lifecycle.textQueryOps(), lifecycle.indexCountOps(), lifecycle.commitOps(),
+        lifecycle.documentFieldOps(), lifecycle::resolvedConfig, lifecycle::indexAnalyzerOrNull,
+        lifecycle::latestCommitUserDataBestEffort,
+        () -> new io.justsearch.indexerworker.services.input.SearchInputCapture.EncoderSnapshot(
+            NoOpEmbeddingProvider.INSTANCE, null, null, null, null, bge));
+    var request = query(pipeline().setDenseEnabled(true)).toBuilder()
+        .addAllVector(List.of(0.25f, 0.5f)).build();
+    var inputs = capture.capture(request, true, null);
+    var vector = org.junit.jupiter.api.Assertions.assertInstanceOf(
+        io.justsearch.indexerworker.services.input.VectorEncoding.Success.class, inputs.encoding().vector());
+    assertEquals(request.getVectorList(), vector.vector(),
+        "even a dimension-mismatched explicit vector stays authoritative at capture");
+    org.junit.jupiter.api.Assertions.assertInstanceOf(
+        io.justsearch.indexerworker.services.input.BgeM3Encoding.Failed.class, inputs.encoding().bgeM3());
+  }
+
+  @Test
   void sparseOnlyUnifiedEncoderRetainsItsBudgetCause() throws Exception {
     var bge = mock(io.justsearch.indexerworker.bgem3.BgeM3Encoder.class);
     when(bge.encode(anyString(), any())).thenThrow(new SessionAcquireDeadlineExceededException(

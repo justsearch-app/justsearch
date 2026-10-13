@@ -51,6 +51,30 @@ import org.junit.jupiter.api.Test;
  */
 final class SubstrateDrivenEngineTest {
 
+  @Test
+  void retrievalExplanationIsRecordedWithTheCompletedAnswer() {
+    ContextInjector injector = new ContextInjector() {
+      @Override public String id() { return "core.test-retrieval-metadata"; }
+      @Override public io.justsearch.agent.api.conversation.InjectorResult inject(ConversationContext ctx) {
+        return new io.justsearch.agent.api.conversation.InjectorResult(
+            List.of(Map.of("role", "user", "content", "question")),
+            List.of(new SseEvent("rag.meta", Map.of("retrieval_mode", "BM25",
+                "retrieval_mode_reason", "SEMANTIC_BUDGET_EXCEEDED", "retrieval_mode_cause", "loading"))),
+            Optional.empty());
+      }
+    };
+    var store = new RecordingStore();
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(injector.id()), List.of()),
+        List.of(), List.of(injector), List.of(), List.of(), new ScriptedAi(List.of("answer")), store);
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "question"), Audience.USER, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal());
+    var answer = assistantRecords(store, "conv-1").get(0);
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", answer.get("retrievalModeReason"));
+    assertEquals("loading", answer.get("retrievalModeCause"));
+    assertEquals("BM25", answer.get("retrievalMode"));
+    assertEquals("answer", answer.get("content"));
+  }
+
   private static final ConversationShapeRef SHAPE_ID = new ConversationShapeRef("core.test-shape");
 
   @Test

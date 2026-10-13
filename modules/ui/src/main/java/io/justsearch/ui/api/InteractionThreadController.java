@@ -378,6 +378,10 @@ public final class InteractionThreadController {
       attributes.put("sources", sources);
     }
     Object citationScorer = msg.get("citationScorer");
+    for (String key : List.of("retrievalMode", "retrievalModeReason", "retrievalModeCause")) {
+      Object value = msg.get(key);
+      if (value instanceof String text && !text.isBlank()) attributes.put(key, text);
+    }
     if (citationScorer instanceof String scorer && !scorer.isBlank()) {
       attributes.put("citationScorer", citationScorer);
     }

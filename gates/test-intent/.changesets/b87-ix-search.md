@@ -74,7 +74,7 @@ Design choices are delegated choices, not owner-authored requirements. Independe
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-java.json",
+      "evidence": "gates/test-intent/evidence/b87-ix-search-worker.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#cancelledSearchLeavesTheModelsReadyWaitPromptly",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#unifiedEncoderBudgetFailureSurvivesBothDerivedLegs",
@@ -86,7 +86,7 @@ Design choices are delegated choices, not owner-authored requirements. Independe
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "RAG returns available lexical context within bounded authority when internal reranking or BM25 MMR native inference stalls. Empty keyword fallback retains the semantic-budget reason and loading cause. MMR uses position diversification on expiry.",
+      "behaviour": "Internal RAG reranking returns available lexical context by the retrieval request deadline, with native ownership retained until execution returns. Its local budget is a pre-inference check. BM25 MMR uses its semantic budget and position diversification on expiry. Empty keyword fallback retains the semantic reason and cause. The held-run fixture waits through the request deadline, rather than requiring the earlier local-budget cutoff.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -94,11 +94,11 @@ Design choices are delegated choices, not owner-authored requirements. Independe
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
           "label": "agent choice",
-          "choice": "RAG returns available lexical context within bounded authority when internal reranking or BM25 MMR native inference stalls. Empty keyword fallback retains the semantic-budget reason and loading cause. MMR uses position diversification on expiry."
+          "choice": "Internal RAG reranking returns available lexical context by the retrieval request deadline, with native ownership retained until execution returns. Its local budget is a pre-inference check. BM25 MMR uses its semantic budget and position diversification on expiry. Empty keyword fallback retains the semantic reason and cause. The held-run fixture waits through the request deadline, rather than requiring the earlier local-budget cutoff."
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-java.json",
+      "evidence": "gates/test-intent/evidence/b87-ix-search-worker.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#internalRerankReleasesRetrievalWhileNativeRunIsHeld",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#emptyKeywordFallbackRetainsSemanticLoadingReason",
@@ -190,7 +190,7 @@ Design choices are delegated choices, not owner-authored requirements. Independe
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-java.json",
+      "evidence": "gates/test-intent/evidence/b87-ix-search-worker.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition"
       ]
@@ -266,6 +266,126 @@ Design choices are delegated choices, not owner-authored requirements. Independe
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyAutoWithUnavailableProviderKeepsLoadingCause",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#seatedHybridWithModelsLoadingKeepsLoadingCause"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A native rerank slower than its 200ms pre-inference budget keeps its scores inside the search deadline. Acquisition is bounded by its budget and the caller response deadline; the wire skip reason names the bound that actually expired.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "A native rerank slower than its 200ms pre-inference budget keeps its scores inside the search deadline. Acquisition is bounded by its budget and the caller response deadline; the wire skip reason names the bound that actually expired."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r2-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java#nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Completed retrieval answers persist optional retrieval mode, reason and cause from their rag.meta event, and the canonical thread projection carries those fields for reload without inventing absent metadata.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "Completed retrieval answers persist optional retrieval mode, reason and cause from their rag.meta event, and the canonical thread projection carries those fields for reload without inventing absent metadata."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r2-java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#retrievalExplanationIsRecordedWithTheCompletedAnswer",
+        "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedRetrievalExplanationReachesTheThreadResponse"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/AskFallbackStream.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-retrieval-reload.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Unified Chat shows retrieval fallback explanations after the real stream completes or terminates with an error, and on its canonical recorded answer. Search Ask reload reads optional reason/cause fields and replaces empty live values with recorded values.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "Unified Chat shows retrieval fallback explanations after the real stream completes or terminates with an error, and on its canonical recorded answer. Search Ask reload reads optional reason/cause fields and replaces empty live values with recorded values."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r2-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/AskFallbackStream.test.ts#Unified Chat keeps the retrieval explanation after the stream completes",
+        "modules/ui-web/src/shell-v0/views/AskFallbackStream.test.ts#Unified Chat shows the retrieval explanation beside a terminal error",
+        "modules/ui-web/src/shell-v0/views/AskFallbackStream.test.ts#Unified Chat renders the retrieval explanation from a recorded answer",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#reloads the recorded retrieval reason and cause as additive evidence",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-retrieval-reload.test.ts#reload fills empty live retrieval explanations from the record"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-retrieval-reload.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Legacy records without retrieval metadata retain the same evidence object and empty retrieval mode.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "Legacy records without retrieval metadata retain the same evidence object and empty retrieval mode."
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r2-ui-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-retrieval-reload.test.ts#records without retrieval metadata retain their previous evidence"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A failed BGE-M3 encoder does not replace an explicitly supplied vector at capture, including a vector whose length differs from the index dimension. Explicit vectors remain successes at this boundary; their downstream validation stays authoritative.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "A failed BGE-M3 encoder does not replace an explicitly supplied vector at capture, including a vector whose length differs from the index dimension. Explicit vectors remain successes at this boundary; their downstream validation stays authoritative."
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r2-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#aFailedBgeEncoderDoesNotReplaceAnExplicitVector"
       ]
     }
   ]

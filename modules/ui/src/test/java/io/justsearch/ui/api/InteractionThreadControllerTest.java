@@ -38,6 +38,23 @@ import tools.jackson.databind.json.JsonMapper;
  */
 final class InteractionThreadControllerTest {
 
+  @Test
+  void recordedRetrievalExplanationReachesTheThreadResponse() {
+    var store = mock(ConversationStore.class);
+    when(store.loadHistory("conv-retrieval")).thenReturn(List.of(Map.of(
+        "id", "answer-1", "role", "assistant", "content", "answer",
+        "ts", "2026-08-25T10:00:04Z", "retrievalMode", "BM25",
+        "retrievalModeReason", "SEMANTIC_BUDGET_EXCEEDED", "retrievalModeCause", "loading")));
+    var agent = mock(AgentService.class);
+    when(agent.threadProjection(eq("conv-retrieval"), any())).thenReturn(ThreadProjection.of(List.of()));
+    var attributes = invokeGet(newController(store, agent), "conv-retrieval")
+        .get("events").get(0).get("attributes");
+    assertTrue(attributes.has("retrievalModeReason"), "the record's fallback explanation must reach reload");
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", attributes.get("retrievalModeReason").asString());
+    assertEquals("loading", attributes.get("retrievalModeCause").asString());
+    assertEquals("BM25", attributes.get("retrievalMode").asString());
+  }
+
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private final DefaultEngineExecutorRegistry executors = new DefaultEngineExecutorRegistry();
   private final List<InteractionThreadController> controllers = new ArrayList<>();

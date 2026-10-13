@@ -870,8 +870,8 @@ function reconcileEvidence(
     matches: prior.matches.length > 0 ? prior.matches : recorded.matches,
     marks: prior.marks.length > 0 ? prior.marks : recorded.marks,
     retrievalMode: prior.retrievalMode !== '' ? prior.retrievalMode : recorded.retrievalMode,
-    retrievalModeReason: prior.retrievalModeReason ?? recorded.retrievalModeReason,
-    retrievalModeCause: prior.retrievalModeCause ?? recorded.retrievalModeCause,
+    retrievalModeReason: prior.retrievalModeReason || recorded.retrievalModeReason,
+    retrievalModeCause: prior.retrievalModeCause || recorded.retrievalModeCause,
     // Tempdoc 865 §7.3 — the field's OWN question, per the rule above: *did the live turn actually
     // observe this?* For a boolean the answer is not a length or an empty string — `false` is a
     // stated observation, so the only "not observed" value is absence. A live turn that watched the

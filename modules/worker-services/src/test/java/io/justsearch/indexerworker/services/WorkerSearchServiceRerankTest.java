@@ -152,6 +152,85 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
     org.mockito.Mockito.verify(sessions).acquire(any());
   }
 
+  @Test
+  void aRunSlowerThanItsBudgetKeepsScoresInsideTheSearchDeadline() throws Exception {
+    var nativeSession = mock(ai.onnxruntime.OrtSession.class);
+    var output = mock(ai.onnxruntime.OnnxTensor.class);
+    when(output.getValue()).thenReturn(new float[] {0.3f, 0.9f});
+    var result = mock(ai.onnxruntime.OrtSession.Result.class);
+    when(result.get(0)).thenReturn(output);
+    when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(invocation -> {
+      new java.util.concurrent.CountDownLatch(1).await(450, java.util.concurrent.TimeUnit.MILLISECONDS);
+      return result;
+    });
+    try (var handle = WorkerSearchServiceSemanticBudgetTest.gpuHandle("slow-rerank", 0, nativeSession)) {
+      service.setSearchReranker(new CrossEncoderReranker(handle,
+          new io.justsearch.reranker.RerankerShape(8, false), fixedTokenizer(2)));
+      var response = service.rerank(RerankRequest.newBuilder().setQuery("query")
+          .addAllDocumentTexts(List.of("first", "second")).setDeadlineMs(200).build(),
+          rerankCall(java.util.concurrent.TimeUnit.SECONDS.toNanos(5)));
+      assertEquals("", response.getSkipReason(), "the pre-inference budget is not a native run cutoff");
+      assertFalse(response.getSkipped());
+      assertEquals(List.of(0.3f, 0.9f), response.getScoresList());
+      assertEquals(List.of(1, 0), response.getSortedIndicesList());
+    }
+  }
+
+  @Test
+  void acquisitionExpiryNamesTheResponseDeadlineWhenItBoundsTheWait() throws Exception {
+    var sessions = mock(io.justsearch.ort.SessionHandle.class);
+    when(sessions.environment()).thenReturn(ai.onnxruntime.OrtEnvironment.getEnvironment());
+    when(sessions.acquire(any())).thenAnswer(invocation -> {
+      var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
+      java.util.concurrent.locks.LockSupport.parkNanos(Math.max(0, authority.deadlineNanos() - System.nanoTime())
+          + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1));
+      throw new io.justsearch.ort.SessionAcquireDeadlineExceededException("fixture acquisition expired",
+          io.justsearch.ort.SessionAcquireDeadlineExceededException.Phase.GATE);
+    });
+    service.setSearchReranker(new CrossEncoderReranker(sessions,
+        new io.justsearch.reranker.RerankerShape(8, false), fixedTokenizer(1)));
+    var response = service.rerank(RerankRequest.newBuilder().setQuery("query")
+        .addDocumentTexts("document").setDeadlineMs(2000).build(),
+        rerankCall(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(2050)));
+    assertEquals("SEARCH_DEADLINE_EXCEEDED", response.getSkipReason(),
+        "the response margin, rather than the rerank budget, bounded acquisition");
+    assertTrue(response.getSkipped());
+  }
+
+  private CallContext rerankCall(long remainingNanos) {
+    var none = CallContext.none();
+    return new CallContext(null, null, () -> false, none.engineContext(),
+        none.provenance(), none.childLifetime(), System.nanoTime() + remainingNanos);
+  }
+
+  @Test
+  void nativeEntryAfterTheAcquireBudgetExpiresKeepsItsBudgetReason() throws Exception {
+    var sessions = mock(io.justsearch.ort.SessionHandle.class);
+    when(sessions.environment()).thenReturn(ai.onnxruntime.OrtEnvironment.getEnvironment());
+    when(sessions.acquire(any())).thenAnswer(invocation -> {
+      var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
+      java.util.concurrent.locks.LockSupport.parkNanos(Math.max(0, authority.deadlineNanos() - System.nanoTime())
+          + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1));
+      return mock(io.justsearch.ort.SessionHandle.Lease.class);
+    });
+    service.setSearchReranker(new CrossEncoderReranker(sessions,
+        new io.justsearch.reranker.RerankerShape(8, false), fixedTokenizer(1)));
+    var response = service.rerank(RerankRequest.newBuilder().setQuery("query")
+        .addDocumentTexts("document").setDeadlineMs(200).build(),
+        rerankCall(java.util.concurrent.TimeUnit.SECONDS.toNanos(5)));
+    assertEquals("DEADLINE_EXCEEDED", response.getSkipReason(),
+        "the acquisition budget expired before inference, while the search still had time");
+    assertTrue(response.getSkipped());
+  }
+
+  private static io.justsearch.reranker.RerankerTokenizer fixedTokenizer(int size) {
+    var tokenizer = mock(io.justsearch.reranker.RerankerTokenizer.class);
+    var rows = new long[size][1];
+    when(tokenizer.encodePairs(anyString(), any(String[].class))).thenReturn(
+        new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(rows, rows, rows, size, 1, 0, size));
+    return tokenizer;
+  }
+
   @Nested
   @DisplayName("without reranker wired")
   class WithoutReranker {

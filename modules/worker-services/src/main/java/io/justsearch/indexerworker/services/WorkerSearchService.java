@@ -350,13 +350,8 @@ public final class WorkerSearchService {
   /**
    * Awaits the models-ready latch until the absolute {@code deadlineNanos} (Spec D §1.3): a search
    * waits for its models only within its semantic sub-budget, then answers with the legs it has.
-   * The legacy overload restores interruption and reports {@link ModelsReady#TIMED_OUT}; admitted
-   * callers supply their authority so cancellation also releases a still-closed latch wait.
+   * Admitted callers supply their authority so cancellation also releases a still-closed latch wait.
    */
-  ModelsReady awaitModelsReady(String rpcName, long deadlineNanos) {
-    return awaitModelsReady(rpcName, deadlineNanos, null);
-  }
-
   private ModelsReady awaitModelsReady(
       String rpcName, long deadlineNanos, InferenceRequest acquisition) {
     var supplier = modelReadyLatchSupplier;

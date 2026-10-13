@@ -92,7 +92,8 @@ final class WorkerSearchServiceRagBudgetTest
       try {
         caller.start();
         assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS), "internal rerank entered native inference");
-        caller.join(1_500);
+        // Native execution is bounded by the retrieval's two-second request, not the 300ms pre-check.
+        caller.join(2_500);
         assertTrue(result.isDone(), "internal rerank retained retrieval's caller");
         assertTrue(assertDoesNotThrow(() -> result.get()).getContext().contains("Hello"));
       } finally {

@@ -2852,7 +2852,7 @@ export class UnifiedChatView extends JfElement {
           ${this.historyLocked
             ? html`${this.renderHistoryLocked()}
                 ${this.errorMessage
-                  ? html`<div class="error">${this.errorMessage}</div>`
+                  ? html`<div class="error">${this.errorMessage}${this.renderRetrievalFallback(this.ragMeta)}</div>`
                   : nothing}`
             : html`
                 ${this.renderUnifiedConversation()}
@@ -2860,7 +2860,7 @@ export class UnifiedChatView extends JfElement {
                 ${this.renderStreamingBlock()}
                 ${this.renderChatResidencyNotice()}
                 ${this.errorMessage
-                  ? html`<div class="error">${this.errorMessage}</div>`
+                  ? html`<div class="error">${this.errorMessage}${this.renderRetrievalFallback(this.ragMeta)}</div>`
                   : nothing}`}`}
         </div>
         ${this.renderEvidenceRail()}
@@ -5627,6 +5627,14 @@ export class UnifiedChatView extends JfElement {
           sources: ragSources,
           claims: claimsFromRecord(it.attributes.claimMatches),
           citations: matchesFromRecord(it.attributes.claimMatches),
+          ragMeta: typeof it.attributes.retrievalModeReason === 'string'
+            ? { ...base.ragMeta,
+                retrieval_mode: typeof it.attributes.retrievalMode === 'string'
+                  ? it.attributes.retrievalMode : base.ragMeta?.retrieval_mode,
+                retrieval_mode_reason: it.attributes.retrievalModeReason,
+                retrieval_mode_cause: typeof it.attributes.retrievalModeCause === 'string'
+                  ? it.attributes.retrievalModeCause : base.ragMeta?.retrieval_mode_cause }
+            : base.ragMeta,
           // Tempdoc 848 §2.6 — record-first, live fallback: the record is the authority for a
           // reloaded turn (where `base` carries none), and in-session the `attributes.live`
           // short-circuit above means this path is effectively reload-only.
@@ -5887,6 +5895,7 @@ export class UnifiedChatView extends JfElement {
       ${floorDivider}
       <div class="message assistant${inheritedClass}" data-item-id=${m.id ?? nothing} data-msg-idx=${idx}>
         <div class="message-shape-tag">${shapeLabel}</div>
+        ${this.renderRetrievalFallback(m.ragMeta)}
         ${/* Tempdoc 848 §2.6 — the turn's thinking, rendered from the COMMITTED/record message so it
             survives `done` and a reload. It keeps the position `renderStreamingBlock` gives it (after
             the shape tag, before the answer), so the block does not move as the turn settles. The
@@ -6074,6 +6083,11 @@ export class UnifiedChatView extends JfElement {
       parts.push(`coverage ${Math.round(coverage * 100)}%`);
     if (truncated) parts.push('context truncated');
     return html`<div class="preamble">${parts.join(' · ')}</div>`;
+  }
+
+  private renderRetrievalFallback(meta?: RagMetaPayload | null): TemplateResult | typeof nothing {
+    const explanation = retrievalFallbackPhrase(meta?.retrieval_mode_reason, meta?.retrieval_mode_cause);
+    return explanation ? html`<div class="preamble" role="note">${explanation}</div>` : nothing;
   }
 
   private renderSchemaInput(): TemplateResult {

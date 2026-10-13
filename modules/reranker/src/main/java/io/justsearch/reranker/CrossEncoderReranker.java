@@ -189,14 +189,15 @@ public final class CrossEncoderReranker implements Closeable {
     authority.remainingNanos();
     long localDeadline = startNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(
         Math.max(1L, Math.min(deadlineMs, 30_000L)));
-    long runDeadline = startNanos + Math.min(
-        answerBy(authority.deadlineNanos()) - startNanos, localDeadline - startNanos);
-    long acquireDeadline = authority.releaseCallerAtDeadline() ? runDeadline
-        : startNanos + Math.min(authority.deadlineNanos() - startNanos, localDeadline - startNanos);
+    long runDeadline = answerBy(authority.deadlineNanos());
+    long callerAcquireDeadline = authority.releaseCallerAtDeadline()
+        ? runDeadline : authority.deadlineNanos();
+    long acquireDeadline = startNanos + Math.min(
+        callerAcquireDeadline - startNanos, localDeadline - startNanos);
     var acquisition = new SessionAcquisitionRequest(authority.urgency(), acquireDeadline,
         authority.cancellationRequested());
     // Whether the rerank's own budget, not the caller's deadline, bounds the wait for a session.
-    boolean rerankBudgetBounds = localDeadline - authority.deadlineNanos() <= 0;
+    boolean rerankBudgetBounds = localDeadline - callerAcquireDeadline <= 0;
     OptionalLong releaseAt =
         authority.releaseCallerAtDeadline()
             ? OptionalLong.of(runDeadline)
@@ -392,7 +393,8 @@ public final class CrossEncoderReranker implements Closeable {
                   ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
                   : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
           log.debug(
-              Markers.append("reason_code", "rerank_skipped_acquire_budget")
+              Markers.append("reason_code", cause == RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+                      ? "rerank_skipped_acquire_budget" : "rerank_skipped_run_deadline")
                   .and(Markers.append("latency_ms", elapsedMs))
                   .and(Markers.append("budget_ms", deadlineMs))
                   .and(Markers.append("cause", cause.name())),
@@ -416,16 +418,21 @@ public final class CrossEncoderReranker implements Closeable {
               ran = lease.runWithin(inputs, releaseAt.getAsLong());
             } catch (SessionAcquireDeadlineExceededException notInTime) {
               long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+              RerankSkipCause cause = notInTime.phase() != SessionAcquireDeadlineExceededException.Phase.RUN
+                      && rerankBudgetBounds && acquisition.deadlineNanos() - System.nanoTime() <= 0
+                  ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
               log.debug(
-                  Markers.append("reason_code", "rerank_skipped_run_deadline")
+                  Markers.append("reason_code", cause == RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+                          ? "rerank_skipped_acquire_budget" : "rerank_skipped_run_deadline")
                       .and(Markers.append("latency_ms", elapsedMs))
-                      .and(Markers.append("phase", notInTime.phase().name())),
-                  "Rerank skipped: the native run could not finish by the caller's deadline: {}",
+                      .and(Markers.append("phase", notInTime.phase().name()))
+                      .and(Markers.append("cause", cause.name())),
+                  "Rerank skipped before its result was available: {}",
                   notInTime.getMessage());
               return new RerankedResult(
                   originalOrder(documents.size()),
                   List.of(),
-                  RerankSkipCause.RUN_DEADLINE_EXCEEDED,
+                  cause,
                   elapsedMs);
             }
           }
