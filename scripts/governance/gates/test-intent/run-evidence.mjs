@@ -20,7 +20,8 @@
  * `compile`, `environment`, `passed`, `skipped`.
  *
  * Exit: 0 when every check executed and passed on the candidate (and, with --before, failed with an
- * assertion before); 1 otherwise (the file is still written, so the failure is on record); 2 usage.
+ * assertion before); 1 otherwise; 2 usage/infrastructure error. Completed results are written
+ * even when removing the before-worktree fails.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -50,18 +51,37 @@ const IS_WIN = process.platform === 'win32';
 
 function sh(command, cwd) {
   const started = Date.now();
-  const res = spawnSync(command, { cwd, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+  // Native test extraction must be private to this invocation and checkout. Sharing the default
+  // path with another Gradle run silently skips app-services' native checks on Windows.
+  const env = { ...process.env };
+  if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
+    // Resolve the named directory itself (it may be a junction); links inside it are not followed.
+    const nativeSource = fs.realpathSync(env.LIGHTGBM_NATIVE_LIB_PATH);
+    env.LIGHTGBM_NATIVE_LIB_PATH = path.join(cwd, 'build', `lightgbm-evidence-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(env.LIGHTGBM_NATIVE_LIB_PATH, { recursive: true });
+    // Copy the complete tree, skipping symlinks and Windows junctions rather than following
+    // them into shared or external directories. The source remains untouched.
+    fs.cpSync(nativeSource, env.LIGHTGBM_NATIVE_LIB_PATH, {
+      recursive: true,
+      filter: (source) => !fs.lstatSync(source).isSymbolicLink(),
+    });
+  }
+  const res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+  const signal = res.signal ?? (IS_WIN && (res.status >>> 0) === 0xC000013A ? 'STATUS_CONTROL_C_EXIT' : null);
   return {
     command,
     cwd: path.relative(REPO_ROOT, cwd).replaceAll('\\', '/') || '.',
     exitCode: res.status ?? -1,
     durationMs: Date.now() - started,
-    output: `${res.stdout ?? ''}\n${res.stderr ?? ''}`,
+    output: [res.stdout ?? '', res.stderr ?? '',
+      ...(signal ? [`command interrupted: ${signal}`] : []),
+      ...(res.error ? [res.error.message] : []),
+    ].join('\n'),
   };
 }
 
 function gitOut(args, cwd, env) {
-  const res = spawnSync('git', args, { cwd, encoding: 'utf8', env: env ?? process.env });
+  const res = spawnSync('git', ['-c', 'core.longpaths=true', ...args], { cwd, encoding: 'utf8', env: env ?? process.env });
   if (res.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${res.stderr}`);
   return res.stdout.trim();
 }
@@ -190,6 +210,33 @@ function linkNodeModules(worktree) {
   if (fs.existsSync(src) && !fs.existsSync(dst)) fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
 }
 
+/** Detach links without visiting their targets, including dangling links and linked ancestors. */
+function unlinkWorktreeLinks(entry) {
+  const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
+  if (!stat) return;
+  if (stat.isSymbolicLink()) {
+    fs.unlinkSync(entry);
+  } else if (stat.isDirectory()) {
+    for (const name of fs.readdirSync(entry)) unlinkWorktreeLinks(path.join(entry, name));
+  }
+}
+
+function removeBeforeWorktree(worktree, created) {
+  // An invalid ref never creates/registers a worktree. Remove only our still-empty, real
+  // reservation, non-recursively; anything populated still goes through guarded Git removal.
+  if (!created && fs.lstatSync(worktree, { throwIfNoEntry: false })?.isDirectory()
+      && fs.readdirSync(worktree).length === 0) {
+    fs.rmdirSync(worktree);
+    return;
+  }
+  // Git for Windows can traverse junctions during recursive removal. Detach every link first,
+  // not only the node_modules link we created: a check or partial checkout can leave others.
+  // An unreadable directory or failed unlink aborts removal, leaving the tree for inspection.
+  unlinkWorktreeLinks(worktree);
+  const removed = spawnSync('git', ['-c', 'core.longpaths=true', 'worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+  if (removed.status !== 0) throw new Error(`before-state cleanup failed (${worktree}): ${removed.error?.message ?? removed.stderr}`);
+}
+
 function parseArgs(argv) {
   const a = { checks: [], overlays: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -201,6 +248,7 @@ function parseArgs(argv) {
     if (k === '--check') a.checks.push(v().replaceAll('\\', '/'));
     else if (k === '--out') a.out = v();
     else if (k === '--before') a.before = v();
+    else if (k === '--before-root') a.beforeRoot = path.resolve(v());
     else if (k === '--overlay') a.overlays.push(v().replaceAll('\\', '/'));
     else throw new Error(`unknown argument ${k}`);
   }
@@ -241,23 +289,38 @@ function main() {
   });
 
   let failBefore = null;
+  let cleanupError;
   if (args.before) {
-    const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'test-intent-before-'));
-    fs.rmSync(wt, { recursive: true, force: true });
-    gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
+    const wt = fs.mkdtempSync(path.join(args.beforeRoot ?? os.tmpdir(), 'test-intent-before-'));
+    let beforeError;
+    let created = false;
     try {
+      // Git accepts the reserved empty directory. Keep creation inside the cleanup scope so a
+      // failed checkout cannot leave links behind without even attempting to detach them.
+      gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
+      created = true;
       overlayInto(wt, args.checks, args.overlays);
-      linkNodeModules(wt);
+      if (args.checks.some(id => runnerFor(id) === 'vitest')) linkNodeModules(wt);
       const fb = runChecks(args.checks, wt);
       failBefore = {
         ref: args.before,
         revision: gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT),
         overlays: args.overlays,
-        runs: fb.runs.map(({ output: _o, ...r }) => ({ ...r, cwd: '<before-worktree>' })),
+        runs: fb.runs.map(({ output, ...r }) => ({ ...r, cwd: '<before-worktree>', ...(r.exitCode !== 0 ? { output } : {}) })),
         checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
       };
-    } finally {
-      spawnSync('git', ['worktree', 'remove', '--force', wt], { cwd: REPO_ROOT });
+    } catch (e) {
+      beforeError = e;
+    }
+    try {
+      removeBeforeWorktree(wt, created);
+    } catch (e) {
+      cleanupError = e;
+    }
+    if (beforeError) {
+      throw cleanupError
+        ? new AggregateError([beforeError, cleanupError], `${beforeError.message}; ${cleanupError.message}`)
+        : beforeError;
     }
   }
 
@@ -276,7 +339,7 @@ function main() {
       cargo: runs.some((r) => /^cargo /.test(r.command)) ? toolVersion('cargo --version') : null,
       ci: Boolean(process.env.CI),
     },
-    runs: runs.map(({ output: _o, ...r }) => r),
+    runs: runs.map(({ output, ...r }) => ({ ...r, ...(r.exitCode !== 0 ? { output } : {}) })),
     checks,
     failBefore,
   };
@@ -295,7 +358,15 @@ function main() {
     console.log(`fail-before ${c.id}: ${c.classification} — ${c.detail}`);
     if (c.classification !== 'assertion') ok = false;
   }
+  for (const [label, completed] of [['candidate', runs], ['fail-before', failBefore?.runs ?? []]]) {
+    for (const run of completed.filter(r => r.exitCode !== 0)) {
+      console.error(`${label} command exited ${run.exitCode}: ${run.command}\n${run.output}`);
+    }
+  }
   console.log(`evidence written: ${path.relative(REPO_ROOT, outAbs).replaceAll('\\', '/')}`);
+  // A failed child is a result, not an exception. Keep both its evidence/diagnostic and the
+  // cleanup error; report infrastructure failure only after publishing the completed results.
+  if (cleanupError) throw cleanupError;
   return ok ? 0 : 1;
 }
 
