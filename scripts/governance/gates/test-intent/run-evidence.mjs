@@ -205,6 +205,26 @@ function linkNodeModules(worktree) {
   if (fs.existsSync(src) && !fs.existsSync(dst)) fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
 }
 
+/** Detach links without visiting their targets, including dangling links and linked ancestors. */
+function unlinkWorktreeLinks(entry) {
+  const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
+  if (!stat) return;
+  if (stat.isSymbolicLink()) {
+    fs.unlinkSync(entry);
+  } else if (stat.isDirectory()) {
+    for (const name of fs.readdirSync(entry)) unlinkWorktreeLinks(path.join(entry, name));
+  }
+}
+
+function removeBeforeWorktree(worktree) {
+  // Git for Windows can traverse junctions during recursive removal. Detach every link first,
+  // not only the node_modules link we created: a check or partial checkout can leave others.
+  // An unreadable directory or failed unlink aborts removal, leaving the tree for inspection.
+  unlinkWorktreeLinks(worktree);
+  const removed = spawnSync('git', ['worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+  if (removed.status !== 0) throw new Error(`before-state cleanup failed (${worktree}): ${removed.error?.message ?? removed.stderr}`);
+}
+
 function parseArgs(argv) {
   const a = { checks: [], overlays: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -259,9 +279,11 @@ function main() {
   let failBefore = null;
   if (args.before) {
     const wt = fs.mkdtempSync(path.join(args.beforeRoot ?? os.tmpdir(), 'test-intent-before-'));
-    fs.rmSync(wt, { recursive: true, force: true });
-    gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
+    let beforeError;
     try {
+      // Git accepts the reserved empty directory. Keep creation inside the cleanup scope so a
+      // failed checkout cannot leave links behind without even attempting to detach them.
+      gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
       overlayInto(wt, args.checks, args.overlays);
       if (args.checks.some(id => runnerFor(id) === 'vitest')) linkNodeModules(wt);
       const fb = runChecks(args.checks, wt);
@@ -272,14 +294,17 @@ function main() {
         runs: fb.runs.map(({ output: _o, ...r }) => ({ ...r, cwd: '<before-worktree>' })),
         checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
       };
-    } finally {
-      // Remove the link itself before recursive worktree cleanup; never traverse a node_modules
-      // junction into the candidate checkout. A Java-only before-state needs no link at all.
-      const linkedModules = path.join(wt, 'modules', 'ui-web', 'node_modules');
-      if (fs.existsSync(linkedModules) && fs.lstatSync(linkedModules).isSymbolicLink()) fs.unlinkSync(linkedModules);
-      const removed = spawnSync('git', ['worktree', 'remove', '--force', wt], { cwd: REPO_ROOT });
-      if (removed.status !== 0) throw new Error(`before-state cleanup failed: ${removed.stderr}`);
+    } catch (e) {
+      beforeError = e;
     }
+    try {
+      removeBeforeWorktree(wt);
+    } catch (e) {
+      beforeError = beforeError
+        ? new AggregateError([beforeError, e], `${beforeError.message}; ${e.message}`)
+        : e;
+    }
+    if (beforeError) throw beforeError;
   }
 
   const evidence = {
