@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T13:13:03.935Z",
-  "revision": "66fbe51d52ffcbf2961cde2fef5b8911591fc6df",
-  "tree": "94ebc9df14c30f8683464c4f1597c6c61b226019",
+  "createdAt": "2026-10-13T21:06:24.198Z",
+  "revision": "c55059360f3e7dbf017bd01363a31cc8a3689511",
+  "tree": "b16a78e18b51c98c5f1fc78e7d32ef00352bf815",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.statusDuringReloadWaitMatchesTheDemandRefusal\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 46474
+      "durationMs": 18777
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#statusDuringReloadWaitMatchesTheDemandRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d3e713fc5df4e0ff0b13bb8b226186005adb52f3d44b3ef949ec8db0e55f31e1",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -64,7 +64,7 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.statusDuringReloadWaitMatchesTheDemandRefusal\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 48295
+        "durationMs": 49137
       }
     ],
     "checks": [
@@ -75,5 +75,5 @@
       }
     ]
   },
-  "digest": "sha256:93593786d0adb6005bcf714bc5321cbf07da2c9622a216a76172038f08d8f229"
+  "digest": "sha256:1ac537a4cff164fbb07bc9faa1d3bc9e55c78465e8e75fa90678633e63f1de18"
 }

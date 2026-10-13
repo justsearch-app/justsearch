@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T13:06:51.385Z",
-  "revision": "66fbe51d52ffcbf2961cde2fef5b8911591fc6df",
-  "tree": "77628cfcaa01a38b01a9e97f473eb26aeb61ee39",
+  "createdAt": "2026-10-13T21:04:32.588Z",
+  "revision": "c55059360f3e7dbf017bd01363a31cc8a3689511",
+  "tree": "656122464593c09e3e1ae27f7225ee37e2a37f7b",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.loadAnywaySurvivesOverlappingPressureAtTheSameEffectiveLevel\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.profileDowngradeKeepsTheOverrideUntilEffectivePressureClears\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.loadAnywayDuringDwellSurvivesReturningPressureUntilHysteresisClears\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.returningPressureOverrideStillYieldsToMoreSevereEffectivePressure\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 64363
+      "durationMs": 28654
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#loadAnywaySurvivesOverlappingPressureAtTheSameEffectiveLevel",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:700cbf8bff90308ea578d537243cbdb0df433c54aa2f80a75d2ce6d3e80c6f5f",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -60,7 +60,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#profileDowngradeKeepsTheOverrideUntilEffectivePressureClears",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:700cbf8bff90308ea578d537243cbdb0df433c54aa2f80a75d2ce6d3e80c6f5f",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -132,7 +132,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.loadAnywaySurvivesOverlappingPressureAtTheSameEffectiveLevel\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.profileDowngradeKeepsTheOverrideUntilEffectivePressureClears\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.loadAnywayDuringDwellSurvivesReturningPressureUntilHysteresisClears\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.returningPressureOverrideStillYieldsToMoreSevereEffectivePressure\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 38153
+        "durationMs": 45796
       }
     ],
     "checks": [
@@ -158,5 +158,5 @@
       }
     ]
   },
-  "digest": "sha256:f4d3dad9d30e13b1eac0cd7acb8de834917a2a80359e5e6bbdd1d35ee280c580"
+  "digest": "sha256:cf9cdff18b716ec5dc9590bd5c46f0899a0142a2dd3bb4c7f624a9f8fd31a129"
 }
