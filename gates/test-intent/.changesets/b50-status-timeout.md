@@ -16,6 +16,8 @@ Refreshed after b82 (run b82g-status-records). Entry 1's evidence was re-run on 
 - In b53 (971b55573), StatusNonBlockingHttpTest became a b53 check too. b53 added the failure-stays-local cases and the power, resume and vision sources. It replaced several expectations: a failed producer no longer aborts publication, and a held producer now marks only its own part stale. b53's entry 1 records those expectations and their sources. The case count rose from 26 to 46; no case was removed.
 - In b82, the blocked-dependency case changed because of b82's decision (a). Entry 3 records that adaptation.
 
+Entry 1's behaviour text was corrected after the refresh (b82g correction). It said fresh=true schedules an observation rather than joining it. The current code waits for that observation for at most 100 ms (StatusLifecycleHandler.FRESH_READ_DEADLINE_MS). It also said the stale or unknown markers are returned while a dependency cannot answer. They now appear only once the held part has aged past its own lane's limit (entry 3), and a failed producer marks only its own part. This corrects the description of code that did not change in this refresh; no check or evidence changed.
+
 ```json
 {
   "entries": [
@@ -26,7 +28,7 @@ Refreshed after b82 (run b82g-status-records). Entry 1's evidence was re-run on 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Real GET /api/status stays below one second and returns existing stale/unknown markers with an unchanged five-second client deadline while disk, inference, GPU capabilities/native memory, GPL, conversation protection, telemetry, VDU, device plan, bulk gate, registry, assembly, Worker, RRD, agent availability, online AI, GPU saturation, model-file path resolution or admission cannot answer. Boot returns unknown without joining its first observation; fresh=true schedules rather than joins observation. Failed producers retain the last response as stale; release and successful sampling restore freshness. The existing sampler checks retain RPC counts, sampling cadence and tap ownership; their boot and fresh observations now await the off-request producer.",
+      "behaviour": "Real GET /api/status stays below one second, with an unchanged five-second client deadline, while disk, inference, GPU capabilities/native memory, GPL, conversation protection, telemetry, VDU, device plan, bulk gate, registry, assembly, Worker, RRD, agent availability, online AI, GPU saturation, model-file path resolution or admission cannot answer. A held part is reported with the existing stale/unknown markers once it has aged past its own lane's limit (entry 3); the other parts stay current. A boot request without fresh=true returns unknown at once without joining its first observation. A fresh=true request starts an observation and waits for it for at most 100 ms (StatusLifecycleHandler.FRESH_READ_DEADLINE_MS). A part that has not answered by then keeps its last published value, or unknown before its first, and the response stays within the budget. A failed producer does not abort publication: only its own part becomes stale or unknown, and the other parts keep their current values. Release and successful sampling restore freshness. The existing sampler checks retain RPC counts, sampling cadence and tap ownership; their boot and fresh observations now await the off-request producer.",
       "sources": [
         {
           "kind": "owner-words",
