@@ -4,15 +4,15 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T04:43:20.772Z",
-  "revision": "44a9e8aa26fb28655eb031a816f23606402c6216",
-  "tree": "1ff20f5b131d7ba19cd2119daa38304478d4aee5",
+  "createdAt": "2026-10-13T22:03:13.190Z",
+  "revision": "41d9f3bf6c14c3bb60dcd41f81880102ec725610",
+  "tree": "01b99bb921986c4f2c706a19d6bf4ededd224e35",
   "environment": {
     "platform": "win32",
     "arch": "x64",
     "osRelease": "10.0.26200",
     "node": "v24.12.0",
-    "java": "Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=C:/agent-sandbox-tmp/b81/tmp",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
     "cargo": null,
     "ci": false
   },
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.slowAdvancingObserverIsNotWaitedForUntilBacklogDrains\" --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 11969
+      "durationMs": 8983
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureOnP16Plus\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAuxCompletes\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAssistCompletes\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12232
+      "durationMs": 8982
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#slowAdvancingObserverIsNotWaitedForUntilBacklogDrains",
       "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:94da01986adbd7f42ee0982f8e6fb4d8f759a2e6b99937c99f7185836458ffe9",
+      "contentDigest": "sha256:4db420756fc9408ef404565e23e08ef73a0ebdcb78cc49f48fe79f32f0841d24",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog",
       "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:94da01986adbd7f42ee0982f8e6fb4d8f759a2e6b99937c99f7185836458ffe9",
+      "contentDigest": "sha256:4db420756fc9408ef404565e23e08ef73a0ebdcb78cc49f48fe79f32f0841d24",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#gameDoesNotMaskMemoryPressureOnP16Plus",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4022d9e7f46d3bcedb96b0e79b22d670c358d5bbc9ff52cfcce06c29542e915a",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4022d9e7f46d3bcedb96b0e79b22d670c358d5bbc9ff52cfcce06c29542e915a",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesUnloadAfterAuxCompletes",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4022d9e7f46d3bcedb96b0e79b22d670c358d5bbc9ff52cfcce06c29542e915a",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesUnloadAfterAssistCompletes",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4022d9e7f46d3bcedb96b0e79b22d670c358d5bbc9ff52cfcce06c29542e915a",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -126,26 +126,31 @@
     "ref": "44a9e8aa2",
     "revision": "44a9e8aa26fb28655eb031a816f23606402c6216",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b81-gpu-health-compat.patch",
+        "contentDigest": "sha256:852a378197e79535df4f623719d407ea5c686038af78ad264c121794692aab67"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.slowAdvancingObserverIsNotWaitedForUntilBacklogDrains\" --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 20316
+        "durationMs": 99294
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureOnP16Plus\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAuxCompletes\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAssistCompletes\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 33137
+        "durationMs": 47214
       }
     ],
     "checks": [
       {
         "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#slowAdvancingObserverIsNotWaitedForUntilBacklogDrains",
         "classification": "assertion",
-        "detail": "slowAdvancingObserverIsNotWaitedForUntilBacklogDrains(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: frame 3 held the publisher 1000 ms although the observer's backlog never drained ==> expected: <true> but was: <false>"
+        "detail": "slowAdvancingObserverIsNotWaitedForUntilBacklogDrains(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: frame 3 held the publisher 1001 ms although the observer's backlog never drained ==> expected: <true> but was: <false>"
       },
       {
         "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog",
@@ -174,5 +179,5 @@
       }
     ]
   },
-  "digest": "sha256:13838245e1c6b555b05f79cfd28a3489a8e9dda550212eee6d284ce618c5cb0e"
+  "digest": "sha256:ae2ddeb04bdac77286ad746d16c9a56a4907fa29d2644523ca0e0832f2e88853"
 }

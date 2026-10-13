@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T10:11:42.547Z",
-  "revision": "83b5d54cf4ef3bb6203a004e7546c980fb34ecce",
-  "tree": "1cd55edb0c00dee53dbb2c05eb2fbee0fe39f710",
+  "createdAt": "2026-10-13T22:00:12.268Z",
+  "revision": "41d9f3bf6c14c3bb60dcd41f81880102ec725610",
+  "tree": "16d3a9e844339113f80049cfa384837ab5c019a0",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.combinedPressureIsAcceptedRoundTrippedAndListedInValidation\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 83019
+      "durationMs": 13419
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#combinedPressureIsAcceptedRoundTrippedAndListedInValidation",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:40b5864004d925b0571d93aeb14cd2b589383dfb6b9f555633308f2f37f39930",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -45,13 +45,18 @@
     "ref": "83b5d54cf",
     "revision": "83b5d54cf4ef3bb6203a004e7546c980fb34ecce",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b84-route-compat.patch",
+        "contentDigest": "sha256:878a084555cd72a88394f8667e9f8cd06574b3e44f58685f0d6a834788a6cc93"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.combinedPressureIsAcceptedRoundTrippedAndListedInValidation\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 32091
+        "durationMs": 37856
       }
     ],
     "checks": [
@@ -62,5 +67,5 @@
       }
     ]
   },
-  "digest": "sha256:0baf82987a87a2c87eb917eaa28ab2cafb1312422d7083028af0d55552c55051"
+  "digest": "sha256:c1fd13c1f1fd540e3f5f1094825c18bb07033ab72f24701e5d95950e7365e447"
 }
