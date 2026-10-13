@@ -1,4 +1,5 @@
 import { runLifecycle } from '../lifecycle.mjs';
+import { awaitFixtureExit, fixturesExited, removeFixtureDirectory } from '../fixture-cleanup.mjs';
 /**
  * Conformance adapter: the development supervisor (`scripts/dev/dev-runner.cjs`), lane F item B8.
  *
@@ -80,7 +81,20 @@ export async function watchSupervisor({ statePath, predicate, timeoutMs, io, see
   }
 }
 
+/** Settles with `promise`, or `false` after `ms`; the timer is cleared so it never holds the process open. */
+function within(promise, ms) {
+  let timer;
+  const expired = new Promise(resolve => { timer = setTimeout(() => resolve(false), ms); });
+  return Promise.race([promise, expired]).finally(() => clearTimeout(timer));
+}
+
 export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir(testCase.id), keepWorkDir = false }) {
+  // One identity directory per launch: a case that drives two runs never stops one run's
+  // fixtures on behalf of the other's teardown.
+  fs.mkdirSync(workDir, { recursive: true });
+  const identities = fs.mkdtempSync(path.join(workDir, 'fixture-identities-'));
+  const identityPreload = path.join(io.repoRoot, 'scripts/supervisor-conformance/fixture-identity.cjs');
+  const preload = process.platform === 'win32' ? ['--require', identityPreload] : [];
   const stateRoot = path.join(workDir, 'state');
   const dataDir = path.join(workDir, 'data');
   fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
@@ -98,6 +112,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const child = spawn(
     process.execPath,
     [
+      ...preload,
       path.join(io.repoRoot, 'scripts', 'dev', 'dev-runner.cjs'),
       'start',
       '--json',
@@ -114,8 +129,9 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         ...process.env,
         ...io.harnessOverrides,
         JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
-        JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, io.fakeEngine]),
-        JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify(IDLE_FRONTEND),
+        JUSTSEARCH_CONFORMANCE_IDENTITIES: identities,
+        JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, ...preload, io.fakeEngine]),
+        JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([IDLE_FRONTEND[0], ...preload, ...IDLE_FRONTEND.slice(1)]),
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
         // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
@@ -149,17 +165,54 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
 
   const cleanup = async () => {
-    try { child.kill(); } catch { /* already gone */ }
-    await io.sleep(150);
+    const alive = () => child.exitCode === null && child.signalCode === null;
+    const runnerEnded = ms => within(exited.then(() => true), ms);
+    if (process.platform === 'win32' && alive()) {
+      // The runner's own handle cannot name a reused PID. Ending the runner closes its libuv job
+      // (KILL_ON_JOB_CLOSE), which ends the fixtures it started; their exits are confirmed below.
+      try { child.kill(); } catch { /* already gone */ }
+      await runnerEnded(2000);
+    }
+    // A runner still alive is asked to close its own Engine. Every fixture has recorded its PID and
+    // a moment it held it before running application code; a failed orderly stop can only target
+    // births resolved from those retained identities and recorded before the stop.
+    if (alive()) {
+      // The stop speaks for the session that started the run, with the same harness settings;
+      // any other caller is refused as an owner conflict.
+      const stop = spawn(process.execPath, [...preload,
+        path.join(io.repoRoot, 'scripts/dev/dev-runner.cjs'), 'stop', '--json',
+        '--session-id', `supervisor-conformance-${testCase.id}`], {
+        cwd: io.repoRoot, windowsHide: true, stdio: 'ignore',
+        env: { ...process.env, ...io.harnessOverrides, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
+          JUSTSEARCH_CONFORMANCE_IDENTITIES: identities },
+      });
+      await within(new Promise((resolve, reject) => { stop.once('exit', resolve); stop.once('error', reject); }), 20000);
+    }
+    // A PID still taken may be a live fixture or a reuse: only the birth query tells them apart.
+    if (process.platform === 'win32' && !(await fixturesExited(identities))) {
+      await awaitFixtureExit(identities, { sleep: io.sleep });
+    }
+    let ended = await runnerEnded(5000);
+    if (!ended && process.platform !== 'win32') {
+      // Off Windows the runner is this process's own unreaped child while its exit is unseen, so
+      // its handle cannot name a reused PID: a failed orderly stop falls back to that handle.
+      try { child.kill('SIGTERM'); } catch { /* already gone */ }
+      ended = await runnerEnded(3000);
+      if (!ended) {
+        try { child.kill('SIGKILL'); } catch { /* already gone */ }
+        ended = await runnerEnded(2000);
+      }
+    }
+    if (!ended) throw new Error('fixture runner exit unconfirmed; artifacts retained');
     if (keepWorkDir) return;
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
       return;
     }
-    try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
+    removeFixtureDirectory(workDir);
   };
 
-  return { workDir, dataDir, stateRoot, statePath, child, output, exited, seen, cleanup, uiPort };
+  return { workDir, dataDir, stateRoot, statePath, child, output, exited, seen, cleanup, uiPort, identities };
 }
 
 const RESTART_CASES = new Set([
@@ -597,7 +650,7 @@ async function runLifecycleCase({ testCase, policy, io }) {
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
     } else {
-      try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
+      removeFixtureDirectory(workDir);
     }
   }
 }

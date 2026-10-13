@@ -521,7 +521,7 @@ function createSupervisionLoop({
     s.state = STATES.STOPPING;
     const deadlineMs = policy.gracefulStopDeadlineMs;
     const deadlineEpochMs = wallClock() + deadlineMs;
-    actuator.recordIntent({ reasonKey: ledgerKey, ...(detail !== undefined ? { detail } : {}),
+    await actuator.recordIntent({ reasonKey: ledgerKey, ...(detail !== undefined ? { detail } : {}),
       channel: 'REQUEST_FILE', deadlineAt: deadlineEpochMs });
     actuator.writeShutdownRequest(reason, deadlineEpochMs);
     // Narrated because the file is transient by design — the Engine deletes it on consumption — so
@@ -856,7 +856,7 @@ function createSupervisionLoop({
       const quitAt = clockNow() + deadlineMs;
       s.requestDeadlineAt = s.requestDeadlineAt === null ? quitAt : Math.min(s.requestDeadlineAt, quitAt);
       s.requestDeadlineMs = deadlineMs;
-      actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'REQUEST_FILE',
+      await actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'REQUEST_FILE',
         deadlineAt: deadlineEpochMs });
       await emit(STATES.STOPPING, { reason: 'quit' });
       return null;
@@ -871,13 +871,13 @@ function createSupervisionLoop({
     const bound = s.firstReadyDone || s.phase === 'discovered';
     let sent = false;
     if (bound && Number.isInteger(s.apiPort) && s.apiPort > 0) {
-      actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'HTTP_SHUTDOWN',
+      await actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'HTTP_SHUTDOWN',
         deadlineAt: deadlineEpochMs });
       const posted = await actuator.postShutdown(s.apiPort, 'quit', { deadlineAtEpochMs: deadlineEpochMs });
       sent = posted.ok;
     }
     if (!sent) {
-      actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'REQUEST_FILE',
+      await actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'REQUEST_FILE',
         deadlineAt: deadlineEpochMs });
       actuator.writeShutdownRequest('quit', deadlineEpochMs);
     }

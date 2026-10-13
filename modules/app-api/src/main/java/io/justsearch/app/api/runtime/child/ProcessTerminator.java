@@ -59,6 +59,12 @@ public interface ProcessTerminator {
     /** The child's creation FILETIME as a decimal string; empty where the OS has none. */
     Optional<String> creationFileTime();
 
+    /** Executable observed through this held handle; empty when unavailable. */
+    default Optional<String> executable() { return Optional.empty(); }
+
+    /** True only for the JDK handle whose native destroy operation rechecks its captured birth. */
+    default boolean matchesJdkIdentity(io.justsearch.app.api.runtime.ManagedChild child) { return false; }
+
     /** One terminate call with {@code code}: OK, ALREADY_EXITED or FAILED(error). */
     TerminateResult terminate(int code);
 

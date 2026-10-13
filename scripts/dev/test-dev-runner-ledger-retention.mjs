@@ -48,3 +48,60 @@ test('at the retention bound dropped identities have durable evidence-lost recor
     assert.ok(archiveBytes <= 1800);
   } finally { fs.rmSync(dir, { recursive: true }); }
 });
+
+// One retained engine row, a loss journal and a 100-byte bound: rotation must evict the archive.
+function journalEviction(journalLines) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loss-journal-'));
+  const current = ledger.currentPath(dir, 'engine');
+  const rotated = path.join(dir, 'engine.v1.1.jsonl'), archive = path.join(dir, 'engine.v1.2.jsonl');
+  const lossFile = path.join(dir, 'engine.v1.lost.jsonl');
+  const row = JSON.stringify({ schemaVersion: 1, type: 'engine-start', seq: 1, at: stamp,
+    writer: { role: 'shell', pid: 100, startedAt: stamp }, incarnation: { session: 'old', n: 1 },
+    pid: 200, creationFileTime: birth });
+  fs.writeFileSync(archive, `${row}\n`);
+  fs.writeFileSync(current, `${row}\n`);
+  fs.writeFileSync(lossFile, journalLines.map(line => `${line}\n`).join(''));
+  let failure = null;
+  try { ledger.retainAndRename(current, rotated, 100); } catch (error) { failure = error; }
+  const lines = fs.readFileSync(lossFile, 'utf8').split('\n').filter(Boolean);
+  return { dir, archive, failure, lines };
+}
+const earlierLoss = JSON.stringify({ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: '2026-10-07T10:00:00Z',
+  writer: { role: 'engine', pid: 90, startedAt: '2026-10-07T10:00:00Z' }, reason: 'EVIDENCE_LOST',
+  count: 1, since: '2026-10-07T10:00:00Z', droppedFile: 'engine.v1.3.jsonl', droppedBytes: 10 });
+const cutOff = '{"schemaVersion":1,"type":"ledger-gap","detail":"cut';
+const summaryOf = lines => lines.map(line => { try { return JSON.parse(line); } catch { return null; } })
+  .filter(r => r?.detail === 'archive dropped at retention bound');
+
+test('a cut-off loss-journal line is counted and kept verbatim while eviction proceeds', () => {
+  const { dir, archive, failure, lines } = journalEviction([earlierLoss, cutOff]);
+  try {
+    assert.equal(fs.existsSync(archive), false, `the archive above the bound is evicted (${failure?.message})`);
+    assert.equal(failure, null);
+    assert.deepEqual(lines.filter(line => line === cutOff), [cutOff], 'the unreadable journal line is kept as it was');
+    assert.ok(lines.includes(earlierLoss), 'earlier loss records survive the rewrite');
+    const [summary] = summaryOf(lines);
+    assert.equal(summary?.corruptLines, 1, 'the unreadable journal line is counted as corrupt');
+  } finally { fs.rmSync(dir, { recursive: true }); }
+});
+
+test('a clean loss journal keeps its records and gains the eviction summary', () => {
+  const { dir, archive, failure, lines } = journalEviction([earlierLoss]);
+  try {
+    assert.equal(failure, null);
+    assert.equal(fs.existsSync(archive), false, 'the archive above the bound is evicted');
+    assert.equal(lines[0], earlierLoss, 'the earlier loss record stays first and unchanged');
+    assert.equal(summaryOf(lines).length, 1, 'one summary for the eviction');
+    assert.ok(lines.some(line => JSON.parse(line).pid === 200), 'the evicted identity has a loss receipt');
+  } finally { fs.rmSync(dir, { recursive: true }); }
+});
+
+test('loss-journal compaction keeps an unreadable line verbatim', () => {
+  const padded = JSON.stringify({ ...JSON.parse(earlierLoss), detail: 'x'.repeat(300) });
+  const { dir, archive, failure, lines } = journalEviction([...Array(2000).fill(padded), cutOff]);
+  try {
+    assert.equal(fs.existsSync(archive), false, `the archive above the bound is evicted (${failure?.message})`);
+    assert.equal(lines.filter(line => line !== cutOff).length, 1, 'the readable journal compacted to one row');
+    assert.deepEqual(lines.filter(line => line === cutOff), [cutOff], 'compaction keeps the unreadable line');
+  } finally { fs.rmSync(dir, { recursive: true }); }
+});

@@ -1104,7 +1104,10 @@ export async function checkRunMutationOwnership({
   const { ownership, decision } = await buildOwnershipProjection({
     mainRepoRoot, callerRepoRoot, callerIdentity, takeover, active, runJson, evidence: 'full', stateRoot,
   });
-  if (decision && decision.action === 'conflict') {
+  // `takeover_denied` refuses a start that would stop another owner's stale stack. A call that
+  // mutates the run (stop, reload) is not a takeover, so it keeps its earlier disposition, as
+  // dev-runner's assertMayMutateRun does.
+  if (decision && decision.action === 'conflict' && decision.reason !== 'takeover_denied') {
     const idle = decision.verdict === 'IDLE_HOLD';
     return {
       allowed: false,
@@ -1292,7 +1295,8 @@ export async function main() {
         'Common errors:',
         '- NO_ACTIVE_RUN: call start, then retry.',
         '- OWNER_CONFLICT: another agent owns the stack. Call quick_health to see the owner,',
-        '  then ask the user before retrying with takeover: "warn".',
+        '  then ask the user before retrying with takeover: "warn". An idle, dead or abandoned owner',
+        '  needs no approval: its actionRequired says to retry with takeover: "warn" directly.',
         '  If the message says the stack is your own, an operation is running in it (named in the',
         '  message and criticalOps): wait for it to finish, or restart with takeover: "force"',
         '  (an UNSAFE_TO_INTERRUPT operation also needs --confirm-interrupt=<opId>, a dev-runner CLI flag).',
@@ -1353,6 +1357,7 @@ export async function main() {
           const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
           if (decision && decision.action === 'conflict') {
             const idle = decision.verdict === 'IDLE_HOLD';
+            const stale = decision.reason === 'takeover_denied';
             return toToolResult({
               ok: false,
               error: {
@@ -1362,10 +1367,13 @@ export async function main() {
               ownership,
               actionRequired: idle
                 ? 'Owner is idle — retry with takeover: "warn" (no user approval needed).'
-                : 'Ask the user before retrying with takeover: "warn".',
+                : stale
+                  ? 'Previous ownership is dead or abandoned — retry with takeover: "warn" to reclaim it (no user approval needed).'
+                  : 'Ask the user before retrying with takeover: "warn".',
             });
           }
-          // decision.action === 'proceed' (abandoned / dead / no-owner / self) → fall through to start.
+          // decision.action === 'proceed' (no-owner / self) → fall through to start. A dead or
+          // abandoned foreign stack needs an explicit takeover: deny never stops another's processes.
         } catch (_) { /* active.json missing or unreadable — proceed to start */ }
       }
 
@@ -2653,8 +2661,8 @@ export async function main() {
         'Tempdoc 606: wait until the shared dev stack becomes acquirable (the current owner releases, '
         + 'goes abandoned, or a critical op clears), then return HOW to take it — replacing the '
         + 'conflict→ask-user→manual-retry round-trip with one waited call. Polls the single ownership '
-        + 'verdict. acquirable:true returns recommendedTakeover ("deny" = just start; "warn" = idle owner, '
-        + 'self-authorize). acquirable:false on timeout (owner stayed active → ask the user or takeover:"force").',
+        + 'verdict. acquirable:true returns recommendedTakeover ("deny" = just start; "warn" = idle, dead or '
+        + 'abandoned owner, self-authorize). acquirable:false on timeout (owner stayed active → ask the user or takeover:"force").',
       inputSchema: AcquireWhenFreeInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
