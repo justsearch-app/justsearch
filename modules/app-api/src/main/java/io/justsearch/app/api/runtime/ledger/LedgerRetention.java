@@ -101,15 +101,38 @@ final class LedgerRetention {
     }
   }
 
+  /**
+   * Lines split on LF and decoded one by one with replacement, as the ledger reader and Node do:
+   * malformed UTF-8 (a write cut off inside a non-ASCII path) costs that line, never the file.
+   */
+  private static List<String> lenientLines(Path file) throws IOException {
+    byte[] bytes = Files.readAllBytes(file);
+    List<String> lines = new ArrayList<>();
+    int start = 0;
+    for (int i = 0; i <= bytes.length; i++) {
+      if (i < bytes.length && bytes[i] != '\n') continue;
+      lines.add(new String(bytes, start, i - start, StandardCharsets.UTF_8));
+      start = i + 1;
+    }
+    return lines;
+  }
+
   private static void recordLoss(Path current, Path dropped, long bytes) throws IOException {
     Path loss = lossPath(current);
-    StringBuilder lines = new StringBuilder(Files.exists(loss) ? Files.readString(loss, StandardCharsets.UTF_8) : "");
+    StringBuilder lines = new StringBuilder();
+    if (Files.exists(loss)) {
+      for (String line : lenientLines(loss)) {
+        if (!line.isBlank()) lines.append(line).append('\n');
+      }
+    }
     List<ObjectNode> droppedRecords = new ArrayList<>();
-    for (String line : Files.readAllLines(dropped, StandardCharsets.UTF_8)) {
+    int corruptLines = 0;
+    for (String line : lenientLines(dropped)) {
       if (line.isBlank()) continue;
       ObjectNode node;
       try { node = (ObjectNode) JSON.readTree(line); } catch (RuntimeException corrupt) { node = null; }
       if (node == null) {
+        corruptLines++;
         droppedRecords.add(JSON.createObjectNode()); // unreadable: its scope is unknown, not absent
         continue;
       }
@@ -131,7 +154,8 @@ final class LedgerRetention {
     summary.put("schemaVersion", 1); summary.put("type", "ledger-gap"); summary.put("seq", 1);
     summary.put("at", now); summary.put("since", now); summary.put("reason", "EVIDENCE_LOST");
     summary.put("count", 1); summary.put("droppedFile", dropped.getFileName().toString());
-    summary.put("droppedBytes", bytes); summary.put("detail", "archive dropped at retention bound");
+    summary.put("droppedBytes", bytes); summary.put("corruptLines", corruptLines);
+    summary.put("detail", "archive dropped at retention bound");
     ProcessHandle self = ProcessHandle.current();
     summary.set("writer", JSON.valueToTree(java.util.Map.of("role", "engine", "pid", self.pid(),
         "startedAt", self.info().startInstant().orElse(java.time.Instant.now()).toString())));

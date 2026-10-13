@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T17:43:58.049Z",
+  "revision": "2b8550ba8d4f090dd831ef1a209090e698560556",
+  "tree": "614f7fbdaea1083a81e268079140532c88751537",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.evictionProceedsPastALineCutInsideAMultibyteCharacter\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8573
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#evictionProceedsPastALineCutInsideAMultibyteCharacter",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:de77c03953b20b191099979b95f26ef0a08f26de070335e63007c40fcea656f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "evictionProceedsPastALineCutInsideAMultibyteCharacter()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2b8550ba8",
+    "revision": "2b8550ba8d4f090dd831ef1a209090e698560556",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.evictionProceedsPastALineCutInsideAMultibyteCharacter\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 15070
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#evictionProceedsPastALineCutInsideAMultibyteCharacter",
+        "classification": "assertion",
+        "detail": "evictionProceedsPastALineCutInsideAMultibyteCharacter(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the archive above the retention bound is evicted: java.nio.charset.MalformedInputException: Input length = 1 ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:8b76115d7f01571dee3b3f2a18767795ec965e02871e32bccee38d82374713f2"
+}

@@ -40,6 +40,10 @@ that is still alive gets the orderly stop. No artifact is removed before every r
 is confirmed exited. Node checks for this are outside this gate's scope; their before and after
 logs and the timing runs are in the run folder.
 
+Third review repairs (starting revision 2b8550ba8): Java ledger retention reads archives and the
+loss journal line by line with UTF-8 replacement, as the Rust shell and Node do, so one line that
+is not UTF-8 is a counted corrupt line and Java eviction still holds the retention bound.
+
 ```json
 {
   "entries": [
@@ -125,7 +129,7 @@ logs and the timing runs are in the run folder.
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
           "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
           "label": "agent choice",
-          "choice": "Read retained archives and the loss journal line by line with lossy UTF-8 decoding, as the ledger reader, Java and Node already do; one bad line costs that line, never the retention bound."
+          "choice": "Read retained archives and the loss journal line by line with lossy UTF-8 decoding, as the ledger readers and Node's retention already do (Java's retention follows in a later entry); one bad line costs that line, never the retention bound."
         }
       ],
       "evidence": "gates/test-intent/evidence/b92c-ix-shell-r3-rust.json",
@@ -225,6 +229,28 @@ logs and the timing runs are in the run folder.
       "evidence": "gates/test-intent/evidence/b92c-ix-shell-r2-java.json",
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#compactedUnknownRangeKeepsNewestEvictionTime"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "An archive line that is not valid UTF-8, such as a write cut off inside a non-ASCII path, no longer fails Java ledger rotation: the archive above the retention bound is still evicted, the bad line is counted as a corrupt line on the eviction summary (whose scope stays incomplete), and the readable row keeps its loss receipt (review round 4, item 1; starting revision 2b8550ba8).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
+          "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
+          "label": "agent choice",
+          "choice": "Give Java retention the line-by-line reading with UTF-8 replacement that the Rust shell and Node already use, and the same corruptLines count on the eviction summary."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b92c-ix-shell-r4-java.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#evictionProceedsPastALineCutInsideAMultibyteCharacter"
       ],
       "repaired": true
     }
