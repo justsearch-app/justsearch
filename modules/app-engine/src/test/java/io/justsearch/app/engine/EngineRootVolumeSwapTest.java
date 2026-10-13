@@ -9,10 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import io.justsearch.app.api.IndexingService;
+import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.app.services.worker.CancelToken;
+import io.justsearch.indexerworker.queue.JobQueue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -38,7 +42,8 @@ import org.junit.jupiter.api.io.TempDir;
  * another volume ("stick B") whose {@code docs} folder holds a same-named file with different text
  * and a file of its own, either across an Engine restart or while it runs. A second watched root
  * on the temp volume is the control: its marker becoming findable shows the pipeline ran, so a B
- * marker that stays unfindable was refused, not merely slow. Every mapping and folder this test
+ * marker that stays unfindable was refused, not merely slow. Round 6 adds the reindex button's
+ * recorded walk and a restart while the root reads unavailable. Every mapping and folder this test
  * creates is removed before it returns.
  */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
@@ -212,6 +217,52 @@ final class EngineRootVolumeSwapTest {
     IndexingService.WatchedRoot state = rootState(root);
     assertNull(state.walkError(), "the root reads indexed once its volume is back");
     assertNotNull(state.lastIndexed(), "the root reads indexed once its volume is back");
+  }
+
+  @Test
+  void aReindexRefusedOnAnotherVolumeShowsTheRootUnavailableAtOnce() throws Exception {
+    Path root = indexOnStickA();
+    Instant indexedAt = rootState(root).lastIndexed();
+    putStickBInPlace();
+    remapLetterTo(stickB);
+
+    // The walk the reindex button's recorded operation runs for this watched root.
+    var client = (EngineKnowledgeClient) harness.client();
+    var plan = new RecordedRootPlan(client.captureServingGeneration(TestEngineContexts.BACKGROUND),
+        List.of(new RecordedRootPlan.Root(root, "documents", false, false, List.of(), List.of())));
+    JobQueue.WalkEnumerationOutcome outcome = client
+        .enumerateWatchedRecordedRoot(plan, "ef3c41-reindex-" + System.nanoTime(), 1L,
+            TestEngineContexts.FOREGROUND, new CancelToken())
+        .toCompletableFuture().get(INDEXED_MS, TimeUnit.MILLISECONDS);
+
+    assertEquals(JobQueue.WalkEnumerationOutcome.FAILED, outcome,
+        "precondition: the Worker refused the reindex walk");
+    assertEquals("ROOT_NOT_DIRECTORY", walkError(root),
+        "the root reads unavailable as soon as the reindex walk is refused");
+    assertEquals(indexedAt, rootState(root).lastIndexed(), "the last-indexed time is kept");
+    awaitControl();
+    assertFalse(harness.awaitSearchable("okapi", SETTLE_MS),
+        "the reindex walk must add nothing from the other volume");
+    assertTrue(harness.awaitSearchable("marmoset", 10_000),
+        "the original's text stays searchable");
+  }
+
+  @Test
+  void aRestartWhileUnavailableKeepsTheLastIndexedTime() throws Exception {
+    Path root = indexOnStickA();
+    Instant indexedAt = rootState(root).lastIndexed();
+    harness.close();
+    harness = null;
+    remapLetterTo(stickB);
+
+    harness = EngineTestHarness.start(tempDir.resolve("data"));
+    awaitIndexHalfReady();
+    harness.client().reindexPersistedRoots(TestEngineContexts.BACKGROUND);
+    awaitRoot(root, r -> "ROOT_NOT_DIRECTORY".equals(r.walkError()),
+        "precondition: the boot walk of the root on another volume");
+
+    assertEquals(indexedAt, rootState(root).lastIndexed(),
+        "after a restart while unavailable the root still shows when it was last indexed");
   }
 
   /** Maps the letter to stick A, starts the Engine and indexes {@code docs} there plus the control. */

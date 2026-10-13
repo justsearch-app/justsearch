@@ -250,6 +250,38 @@ public final class WatchedRootsState {
     return true;
   }
 
+  /**
+   * Round 6 (S8): a walk the Worker refused with the root-level {@code reason}. The root reads
+   * unavailable and its walk is over, like {@link #markWalkFailed}, but the last-indexed time is
+   * kept, so a restart while the root is unavailable still shows when it was last indexed.
+   */
+  synchronized void markWalkRefused(Path root, String reason) {
+    walkErrors.put(root, reason);
+    walkCompleted.add(root);
+  }
+
+  /**
+   * Round 6 (S8): records a recorded walk's (the reindex button's) terminal outcome for a watched
+   * root the way the boot walk does. A refusal with the root-level reason makes the root read
+   * unavailable at once, keeping its last-indexed time; a complete walk of a root that read
+   * unavailable for that reason means its volume is back, and it reads indexed again. Every other
+   * outcome, and a root that is not watched, leaves the state alone.
+   */
+  public void recordRecordedWalk(Path root, boolean complete, String terminalReasonCode) {
+    String reason = RootLifecycleOps.ROOT_MISSING_REASON;
+    synchronized (this) {
+      if (!watchedRoots.containsKey(root)) {
+        return;
+      }
+      if (reason.equals(terminalReasonCode)) {
+        markWalkRefused(root, reason);
+      } else if (!complete || !markRootReturned(root, reason)) {
+        return;
+      }
+      persist();
+    }
+  }
+
   synchronized void markInitializationPending(Path root) {
     walkErrors.put(root, INITIALIZATION_PENDING);
   }

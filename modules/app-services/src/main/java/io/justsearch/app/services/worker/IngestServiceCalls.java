@@ -175,6 +175,12 @@ public interface IngestServiceCalls {
         () -> io.justsearch.ipc.WatchRootResponse.newBuilder().setWatching(false).build());
   }
 
+  /**
+   * Whether the folder at {@code rootPath} is not on the volume recorded for the root (task
+   * t-20261013-ef3c41, round 6): one volume identity read, no walk.
+   */
+  boolean refusesRootVolume(String rootPath);
+
   /** {@code IngestService/UnwatchRoot}. */
   io.justsearch.ipc.UnwatchRootResponse unwatchRoot(io.justsearch.ipc.UnwatchRootRequest request);
 }

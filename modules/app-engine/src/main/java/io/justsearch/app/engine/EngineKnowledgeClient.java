@@ -1351,6 +1351,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               ? JobQueue.WalkEnumerationOutcome.CANCELLED
               : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
                   ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+          if (!root.singleFile()) {
+            // Task t-20261013-ef3c41, round 6 (S8): the reindex walk records a root-level refusal
+            // as the root's state at once, as the boot walk does, instead of leaving it to read
+            // indexed until the periodic sync asks.
+            roots.recordRecordedWalk(root.path(),
+                outcome.get() == JobQueue.WalkEnumerationOutcome.COMPLETE,
+                terminal.getTerminalReasonCode());
+          }
         }
         return null;
       }, () -> {

@@ -514,6 +514,24 @@ public final class WorkerIngestService {
   }
 
   /**
+   * Task t-20261013-ef3c41, round 6 (S8): whether the folder at {@code rootPath} is a real folder
+   * that is not on the volume recorded for it, or whose volume cannot be told. One volume
+   * identity read, no walk: the Head asks it of every watched root each periodic cycle, so a
+   * root whose turn to be walked is far off still reads unavailable within one cycle. It changes
+   * nothing but records the volume of a root seen for the first time, as a walk would.
+   */
+  public boolean refusesRootVolume(String rootPath, CallContext ctx) {
+    java.util.Objects.requireNonNull(ctx, "ctx");
+    Path root;
+    try {
+      root = Path.of(rootPath).toAbsolutePath().normalize();
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
+    return rootWitness.refusesRootQuietly(root);
+  }
+
+  /**
    * Round 5 (S8): a sync of a root whose path now holds another volume adds nothing, updates
    * nothing and removes nothing; it answers with the root-level reason the Head shows at once.
    * A sync that finds the recorded volume back registers the root's held watch first, so changes
@@ -1683,8 +1701,13 @@ public final class WorkerIngestService {
         throw new IOException("Committed boot root requires a writable serving successor");
       }
       RootWatcherRegistry registry = rootWatcherRegistry;
+      // Round 6 (S8): the same volume check as every other watch registration. No watcher is
+      // registered on another volume at the root's path; the watch is held and registered once a
+      // walk or sync finds the recorded volume back, and this root's reconcile stops here.
       RootWatcherRegistry.WatchResult watched =
-          registry.watch(root.toString(), binding.collection());
+          rootOnAnotherVolume(root.toString()) != null
+              ? registry.watchWhenVolumeReturns(root, binding.collection())
+              : registry.watch(root.toString(), binding.collection());
       if (!watched.watching()) {
         throw new IOException("Committed boot root watcher registration failed: "
             + watched.errorMessage());

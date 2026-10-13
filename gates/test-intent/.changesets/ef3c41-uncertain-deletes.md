@@ -30,6 +30,8 @@ Round 4 (on top of 6b15a8153): one root-identity check for every deletion path a
 
 Round 5 (on top of 09a19e033): every path that adds or updates documents under a root asks the same root check as the deleting paths, so another volume at a root's drive letter never puts its files in the place of the original's, and the refused root reads unavailable at once (S8). Its repaired checks fail on 09a19e033 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-repaired.json`); its must-not-break check passes on 09a19e033 and on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-preserved.json`).
 
+Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root at once, every periodic cycle asks each root's volume, the boot-root reconcile of a migration cutover goes through the same volume check as every other watch registration, and a restart while a root is unavailable keeps its last-indexed time (S8). Its repaired checks fail on 5a7e266a5 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-repaired.json`); the check of the Worker's new volume check runs on the candidate only (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-after-only.json`). EngineRootVolumeSwapTest was edited in round 6, so its round 5 checks were re-run against 09a19e033 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-preserved.json`).
+
 ```json
 {
   "entries": [
@@ -1380,7 +1382,7 @@ Round 5 (on top of 09a19e033): every path that adds or updates documents under a
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java"
       ],
       "class": "New",
-      "behaviour": "Round 5, S8 on the whole running Engine (its own add, walk, watcher, sync and admission) with a real SUBST drive letter moved between a folder on one volume and a folder on another: after a restart onto the other volume, the boot walk, the periodic sync's call and a re-walk leave the original's text searchable and index neither the other volume's same-named file nor its own files; a swap while running makes the periodic sync's call add nothing and the root read ROOT_NOT_DIRECTORY at once; create and change events on the other volume index nothing; and when the original volume returns after a boot on the other one, a sync re-registers the watcher so a change there is indexed without a restart, and the root reads indexed again. A control root on the temp volume must index its new file first, so a refused marker is refused, not slow. Fail-before against 09a19e033 by assertion.",
+      "behaviour": "Round 5, S8 on the whole running Engine (its own add, walk, watcher, sync and admission) with a real SUBST drive letter moved between a folder on one volume and a folder on another: after a restart onto the other volume, the boot walk, the periodic sync's call and a re-walk leave the original's text searchable and index neither the other volume's same-named file nor its own files; a swap while running makes the periodic sync's call add nothing and the root read ROOT_NOT_DIRECTORY at once; create and change events on the other volume index nothing; and when the original volume returns after a boot on the other one, a sync re-registers the watcher so a change there is indexed without a restart, and the root reads indexed again. A control root on the temp volume must index its new file first, so a refused marker is refused, not slow. Fail-before against 09a19e033 by assertion. (EngineRootVolumeSwapTest re-run against 09a19e033 after its round 6 edit.)",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1398,7 +1400,7 @@ Round 5 (on top of 09a19e033): every path that adds or updates documents under a
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-repaired.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aRestartOntoAnotherVolumeKeepsTheOriginalText",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aSwapWhileRunningAddsNothingAndShowsTheRootUnavailableAtOnce",
@@ -1412,7 +1414,7 @@ Round 5 (on top of 09a19e033): every path that adds or updates documents under a
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java"
       ],
       "class": "New",
-      "behaviour": "Round 5, must not break: when the original volume returns to the drive letter after another volume was there while the Engine ran, a real change on the original is indexed, a file genuinely deleted there is pruned, and the root reads indexed. Passes on 09a19e033 and on the candidate.",
+      "behaviour": "Round 5, must not break: when the original volume returns to the drive letter after another volume was there while the Engine ran, a real change on the original is indexed, a file genuinely deleted there is pruned, and the root reads indexed. Passes on 09a19e033 and on the candidate. (EngineRootVolumeSwapTest re-run against 09a19e033 after its round 6 edit.)",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1430,9 +1432,125 @@ Round 5 (on top of 09a19e033): every path that adds or updates documents under a
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-preserved.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-preserved.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#theOriginalVolumeReturningIsIndexedAndPrunedAsBefore"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6, S8 on the whole running Engine with a real SUBST drive letter moved to a folder on another volume: the walk the reindex button's recorded operation runs for the watched root is refused, and the root reads ROOT_NOT_DIRECTORY as soon as that walk returns, with its last-indexed time kept and nothing of the other volume indexed (a control root on the temp volume indexes first); and after a restart onto the other volume the boot walk's refusal keeps the root's last-indexed time. Fail-before against 5a7e266a5 by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A walk the Worker refuses because the folder at a root's path is not on the volume first seen there makes the root read unavailable at once whichever walk it is: the boot walk, a re-walk, a sync, and the reindex button's recorded walk (core.reindex), whose refusal is now recorded as the root's walk error as the boot walk's is; a complete recorded walk of such a root clears it. The root's last-indexed time is kept, across a restart too. Each periodic cycle asks every root's volume with one volume identity read and no walk, and marks each refused root unavailable in that cycle; walking stays one root per cycle. The boot-root reconcile a migration cutover runs registers no watcher on another volume at a root's path: the watch is held, the reconcile of that root stops, and the watch resumes when a walk or sync finds the recorded volume back (orchestrator decisions, round 6).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-repaired.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aReindexRefusedOnAnotherVolumeShowsTheRootUnavailableAtOnce",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aRestartWhileUnavailableKeepsTheLastIndexedTime"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/PeriodicRootVolumeCheckTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6, S8: with three watched roots, the product's own periodic cycle (captured from its scheduler and run by the test) walks one root; when the folder at that root's path then becomes another volume, the next cycle still walks exactly one other root and the swapped root reads ROOT_NOT_DIRECTORY within that cycle, its last-indexed time kept. The Worker is a fake that answers the sync and the volume check as the real one does; the real answer on a real other volume is RootVolumeCheckTest's. Fail-before against 5a7e266a5 by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A walk the Worker refuses because the folder at a root's path is not on the volume first seen there makes the root read unavailable at once whichever walk it is: the boot walk, a re-walk, a sync, and the reindex button's recorded walk (core.reindex), whose refusal is now recorded as the root's walk error as the boot walk's is; a complete recorded walk of such a root clears it. The root's last-indexed time is kept, across a restart too. Each periodic cycle asks every root's volume with one volume identity read and no walk, and marks each refused root unavailable in that cycle; walking stays one root per cycle. The boot-root reconcile a migration cutover runs registers no watcher on another volume at a root's path: the watch is held, the reconcile of that root stops, and the watch resumes when a walk or sync finds the recorded volume back (orchestrator decisions, round 6).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/PeriodicRootVolumeCheckTest.java#aSwapOnARootWhoseTurnJustPassedReadsUnavailableWithinOneCycle"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/CommittedBootRootVolumeTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6, S8 with a real SUBST drive letter: after a root was walked on one volume and the letter now holds another, the committed boot-root reconcile a migration cutover runs registers no watcher, holds the watch, queues nothing of the other volume and stops with ROOT_NOT_DIRECTORY; when the recorded volume is back, a walk of the root registers the held watch. Fail-before against 5a7e266a5 by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A walk the Worker refuses because the folder at a root's path is not on the volume first seen there makes the root read unavailable at once whichever walk it is: the boot walk, a re-walk, a sync, and the reindex button's recorded walk (core.reindex), whose refusal is now recorded as the root's walk error as the boot walk's is; a complete recorded walk of such a root clears it. The root's last-indexed time is kept, across a restart too. Each periodic cycle asks every root's volume with one volume identity read and no walk, and marks each refused root unavailable in that cycle; walking stays one root per cycle. The boot-root reconcile a migration cutover runs registers no watcher on another volume at a root's path: the watch is held, the reconcile of that root stops, and the watch resumes when a walk or sync finds the recorded volume back (orchestrator decisions, round 6).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/CommittedBootRootVolumeTest.java#theCommittedBootReconcileWatchesNothingOnAnotherVolumeUntilItReturns"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6, S8 with a real SUBST drive letter: the Worker's volume check the periodic sync asks of every root each cycle says the root's own volume is not refused, another volume at its path is, without walking or queuing anything, and the recorded volume back at its path is not. No fail-before: the check calls the volume check this round adds, so it cannot compile at the base; the repaired periodic behaviour is pinned by PeriodicRootVolumeCheckTest.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A walk the Worker refuses because the folder at a root's path is not on the volume first seen there makes the root read unavailable at once whichever walk it is: the boot walk, a re-walk, a sync, and the reindex button's recorded walk (core.reindex), whose refusal is now recorded as the root's walk error as the boot walk's is; a complete recorded walk of such a root clears it. The root's last-indexed time is kept, across a restart too. Each periodic cycle asks every root's volume with one volume identity read and no walk, and marks each refused root unavailable in that cycle; walking stays one root per cycle. The boot-root reconcile a migration cutover runs registers no watcher on another volume at a root's path: the watch is held, the reconcile of that root stops, and the watch resumes when a walk or sync finds the recorded volume back (orchestrator decisions, round 6).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-after-only.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java#theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk"
       ]
     }
   ]

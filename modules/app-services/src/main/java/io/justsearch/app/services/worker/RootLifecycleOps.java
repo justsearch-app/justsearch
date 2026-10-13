@@ -296,6 +296,9 @@ final class RootLifecycleOps {
                         // Empty/all-excluded is completed, distinct from a walk still in progress.
                         watchedRootsState.markWalkedEmpty(normalized);
                     }
+                } else if (ROOT_MISSING_REASON.equals(reason)) {
+                    // Round 6 (S8): the root reads unavailable; its last-indexed time is kept.
+                    watchedRootsState.markWalkRefused(normalized, reason);
                 } else {
                     watchedRootsState.markWalkFailed(normalized, reason);
                 }

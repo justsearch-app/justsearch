@@ -122,10 +122,23 @@ public final class RootWitness implements SourcePresence.RootCheck {
    * that is itself a link is not refused here; those keep their own handling.
    */
   boolean refusesRoot(Path root) {
+    return refusesRoot(root, true);
+  }
+
+  /**
+   * {@link #refusesRoot(Path)} for the periodic check that asks every root's volume each cycle
+   * (round 6): the same answer, logged at debug so a root that stays on another volume does not
+   * warn once a minute.
+   */
+  boolean refusesRootQuietly(Path root) {
+    return refusesRoot(root, false);
+  }
+
+  private boolean refusesRoot(Path root, boolean loud) {
     Path key = normalize(root);
     return key != null
         && Files.isDirectory(key, LinkOption.NOFOLLOW_LINKS)
-        && !recordedVolumeHolds(key, true);
+        && !recordedVolumeHolds(key, loud);
   }
 
   /** Drops every answer and record at or under {@code pathPrefix}: the person removed the root. */

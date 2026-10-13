@@ -262,6 +262,11 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public boolean refusesRootVolume(String rootPath) {
+    return service.refusesRootVolume(rootPath, ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.UnwatchRootResponse unwatchRoot(io.justsearch.ipc.UnwatchRootRequest request) {
     return service.unwatchRoot(request, ctx);
   }

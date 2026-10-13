@@ -275,6 +275,40 @@ final class SyncOps {
                 .toList();
     }
 
+    /**
+     * Round 6 (S8): asks the volume identity of every root this cycle neither walked nor re-asked
+     * (one cheap read each, no walk) and makes each one the Worker refuses read unavailable now.
+     * Walking stays one root per cycle; without this a swap on a root whose turn just passed would
+     * read indexed for up to {@code roots × SYNC_INTERVAL_SECONDS}.
+     */
+    private void markRefusedRootsUnavailable(List<Path> roots, List<Path> asked,
+            EngineContext engineContext) {
+        if (rootsState == null) {
+            return;
+        }
+        String reason = RootLifecycleOps.ROOT_MISSING_REASON;
+        for (Path root : roots) {
+            if (asked.contains(root)) {
+                continue;
+            }
+            Boolean refused;
+            try {
+                refused = rpc.execute(
+                        "refusesRootVolume",
+                        KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                        stub -> stub.refusesRootVolume(root.toString()), engineContext);
+            } catch (CircuitBreakerOpenException e) {
+                log.debug("refusesRootVolume rejected by circuit breaker for {}", root);
+                return;
+            }
+            if (Boolean.TRUE.equals(refused) && rootsState.markRootUnavailable(root, reason)) {
+                log.info("Watched root {} is not on the volume it was first seen on; it reads"
+                        + " unavailable", root);
+                rootsState.persist();
+            }
+        }
+    }
+
     void startPeriodicSync() {
         EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.internal(
             "periodic-root-sync", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
@@ -315,10 +349,13 @@ final class SyncOps {
 
                                 // force=false: Worker will skip if user is actively searching
                                 syncWatchedDirectory(root.toString(), /* force= */ false, engineContext);
+                                List<Path> asked = new java.util.ArrayList<>(List.of(root));
                                 for (Path unavailable : unavailableRootsBesides(roots, root)) {
                                     syncWatchedDirectory(
                                             unavailable.toString(), /* force= */ false, engineContext);
+                                    asked.add(unavailable);
                                 }
+                                markRefusedRootsUnavailable(roots, asked, engineContext);
 
                             } catch (Exception e) {
                                 log.warn("Periodic sync failed", e);

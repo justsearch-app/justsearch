@@ -665,18 +665,23 @@ not read, and its queue item is retried with the root-level back-off (`ROOT_UNAV
 marked done; the original's documents stay searchable with their original text. The scan walk, a
 re-walk or reindex, and the sync (the periodic one included) refuse such a root before they look
 at any file: they add, update and remove nothing. No watcher is registered on such a root either,
-so creates, changes and renames on the other volume are never seen; the watch is held and
-registered as soon as a walk or sync finds the recorded volume back, without a restart. A watcher
+by the watch request or by the boot-root reconcile a migration cutover runs, so creates, changes
+and renames on the other volume are never seen; the watch is held and registered as soon as a walk
+or sync finds the recorded volume back, without a restart. A watcher
 already registered on the original drops events while the folder at the root's path is not the one
 it registered, as before.
 
 A refused walk or sync makes the root read unavailable at once: the Head records
 `ROOT_NOT_DIRECTORY` as the root's walk error (the root-level unavailable state of
-`/api/indexing-roots/substrate`), from the boot walk, a re-walk or reindex, or any sync, the
-periodic one included. The periodic sync asks such roots again every cycle (60 s) besides its
-round-robin root, and the first sync the Worker accepts, because the recorded volume is back,
-clears that state: the root reads indexed again, its held watch is registered, and the sync
-reconciles it as usual, pruning what was genuinely deleted. Removing the root forgets its record.
+`/api/indexing-roots/substrate`, which also skips the root's file count), from the boot walk, the
+reindex button's recorded walk (`core.reindex`), a re-walk, or any sync, the periodic one included.
+The root's last-indexed time is kept, across a restart too. The periodic sync still walks one
+round-robin root per cycle (60 s), but each cycle it also asks every other root's volume (one
+volume identity read per root, no walk) and marks each refused root unavailable in that cycle, and
+it syncs the roots that read unavailable again. The first sync or reindex walk the Worker accepts,
+because the recorded volume is back, clears that state: the root reads indexed again, its held
+watch is registered, and the sync reconciles it as usual, pruning what was genuinely deleted.
+Removing the root forgets its record.
 
 A prune keeps each document whose presence it cannot tell and goes on judging the rest, so one
 unreadable subfolder does not stop the genuine deletions beside it; a "not found" beneath a folder
@@ -703,7 +708,11 @@ Accepted limits:
   that second can still be answered from the previous look: a file admitted, or a deletion
   confirmed, in that window was judged against the volume that was there a moment before.
 - Watching and the unavailable state resume through the next accepted walk or sync, so a returned
-  volume is noticed within one periodic-sync interval (60 s), or at once by a reindex.
+  volume is noticed within one periodic-sync interval (60 s), or at once by a reindex. A swap is
+  noticed within one interval as well, unless a walk or sync of the root refuses it sooner.
+- A migration cutover whose boot-root reconcile meets a root on another volume fails there, as it
+  does when any boot-root watch cannot be registered; the root's watch is held as above and
+  nothing of the other volume is queued.
 - Re-queuing a file (a new scan or watch event) resets its retry back-off to the first step.
 - OneDrive (and other cloud) placeholder files are not treated specially; a placeholder that cannot
   be read is handled like any other unreadable file.
