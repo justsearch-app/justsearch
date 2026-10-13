@@ -168,6 +168,11 @@ public final class ChatServerControllerImpl
 
   /** The monotonic clock of the residency dwell; tests drive it by hand. */
   private final LongSupplier nanoTime;
+  // Failed VDU exit retains the normal configuration offline. Only this controller retries it.
+  private boolean vduRestorePending;
+  private long vduRetryAtNanos;
+  private long vduRetryDelaySeconds = 5;
+  private Pending vduRestoreAttempt;
 
   /** The pressure last reported (Spec E feeds it; the dev trigger too). */
   private volatile PressureSignal pressure = PressureSignal.NONE;
@@ -313,6 +318,10 @@ public final class ChatServerControllerImpl
   public CompletionStage<Void> setActivation(Activation activation) {
     Objects.requireNonNull(activation, "activation");
     if (activation.active()) {
+      synchronized (monitor) {
+        if (vduRestorePending) return CompletableFuture.failedFuture(new SupersededException(
+            "Normal chat restoration is waiting for its bounded retry or a person's request"));
+      }
       // Spec A §2.2: the residency latch ranks above boot order. A latched chat is not loaded by
       // a forwarded activation (reconciliation F6); a GPU start under pressure is refused into
       // UNLOADED (CH7). Only a demand or "load anyway" loads it again.
@@ -336,6 +345,7 @@ public final class ChatServerControllerImpl
       CompletableFuture<Void> waiters;
       synchronized (monitor) {
         bootWaiting = false;
+        vduRestorePending = false;
         // Chat switched off is OFF, not unloaded; nothing waits for a reload any more.
         waiters = clearLatchLocked();
         deferred = false;
@@ -445,6 +455,15 @@ public final class ChatServerControllerImpl
         Runnable replay = null;
         synchronized (monitor) {
           while (queue.isEmpty() && desired.terminal() == null && replay == null) {
+            if (vduRestorePending && holds.isEmpty() && vduRestoreAttempt == null) {
+              long remaining = vduRetryAtNanos - nanoTime.getAsLong();
+              if (remaining <= 0) {
+                queueVduRestoreLocked();
+                continue;
+              }
+              TimeUnit.NANOSECONDS.timedWait(monitor, remaining);
+              continue;
+            }
             if (bootGate != BootGate.CLOSED) {
               monitor.wait();
               continue;
@@ -698,7 +717,7 @@ public final class ChatServerControllerImpl
     if (bulkPressure() != PressureSignal.NONE) return false;
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded || !holds.isEmpty()) return false;
-      if (unloadedDetail != null || unloadInFlight) return false;
+      if (unloadedDetail != null || unloadInFlight || vduRestorePending) return false;
     }
     return actuator.failureLatch() == null && !actuator.serverRunning();
   }
@@ -893,6 +912,7 @@ public final class ChatServerControllerImpl
         if (!holds.remove(hold)) return;
         last = holds.stream().noneMatch(h -> h.kind() == hold.kind());
         noneOpen = holds.isEmpty();
+        monitor.notifyAll();
       }
       LOG.info("Chat hold closed: {} by {}", hold.kind(), hold.owner());
       if (last) {
@@ -1012,11 +1032,41 @@ public final class ChatServerControllerImpl
       routeHeld(actuator.vduExit(), false, true);
     } catch (ChatRefusal refused) {
       if (refused.reason() != RefusalReason.ENGINE_STOPPING) {
+        synchronized (monitor) {
+          vduRestorePending = true;
+          vduRetryDelaySeconds = 5;
+          vduRetryAtNanos = nanoTime.getAsLong() + TimeUnit.SECONDS.toNanos(vduRetryDelaySeconds);
+          monitor.notifyAll();
+        }
         throw new IllegalStateException(
-            "Failed to exit VDU mode; the server may keep its vision-safe configuration", refused);
+            "Normal chat is offline; the controller will retry restoration", refused);
       }
     } finally {
       release(hold);
+    }
+  }
+
+  /** Called under monitor; retries are serialized with all other server steps. */
+  private Pending queueVduRestoreLocked() {
+    if (vduRestoreAttempt != null) return vduRestoreAttempt;
+    Pending pending = queueLocked(actuator.vduExit(), new ArrayList<>());
+    vduRestoreAttempt = pending;
+    var unused = pending.result.whenComplete((result, failure) -> vduRestoreEnded(pending, failure));
+    return pending;
+  }
+
+  private void vduRestoreEnded(Pending pending, Throwable failure) {
+    synchronized (monitor) {
+      if (vduRestoreAttempt != pending) return;
+      vduRestoreAttempt = null;
+      if (failure == null) {
+        vduRestorePending = false;
+        vduRetryDelaySeconds = 5;
+      } else if (vduRestorePending) {
+        vduRetryDelaySeconds = Math.min(30, vduRetryDelaySeconds * 2);
+        vduRetryAtNanos = nanoTime.getAsLong() + TimeUnit.SECONDS.toNanos(vduRetryDelaySeconds);
+      }
+      monitor.notifyAll();
     }
   }
 
@@ -1422,6 +1472,11 @@ public final class ChatServerControllerImpl
         automaticVdu.interrupted = true;
         return automaticVdu.restored.copy();
       }
+      if (vduRestorePending) {
+        if (!human || !holds.isEmpty()) throw new ChatRefusal(
+            RefusalReason.FAILED, java.util.Optional.empty(), false);
+        return queueVduRestoreLocked().result.thenApply(ignored -> null);
+      }
       if (kind == DemandKind.BACKGROUND) {
         ChatRefusal yielded = backgroundYieldLocked(replying);
         if (yielded != null) throw yielded;
@@ -1577,10 +1632,8 @@ public final class ChatServerControllerImpl
   // ==================== Terminal ====================
 
   @Override
-  public void shutdown(StopReason reason, Duration budget) {
+  public void beginShutdown(StopReason reason) {
     Objects.requireNonNull(reason, "reason");
-    Objects.requireNonNull(budget, "budget");
-    long deadline = System.nanoTime() + budget.toNanos();
     List<Pending> refused;
     CompletableFuture<Void> waiters;
     CompletableFuture<Void> vduWaiters;
@@ -1606,6 +1659,13 @@ public final class ChatServerControllerImpl
           new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false));
     }
     closeEdgeSubscription();
+  }
+
+  @Override
+  public void shutdown(StopReason reason, Duration budget) {
+    Objects.requireNonNull(budget, "budget");
+    long deadline = System.nanoTime() + budget.toNanos();
+    beginShutdown(reason);
     StopReason terminalReason;
     synchronized (monitor) {
       terminalReason = desired.terminal();

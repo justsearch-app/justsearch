@@ -1850,6 +1850,7 @@ export class BrainSurface extends JfElement {
         label: aiEngineHeadline(aiVerdict),
         sub: this._unifiedAiState?.snapshotLive
           && this._unifiedAiState.status?.inference?.procedure === 'VDU_BATCH'
+          && this._unifiedAiState.status?.inference?.engineReason === 'automatic-vdu'
           ? 'Reading pictures. Chat resumes after the current document.'
           : 'Chat and summaries ready.',
       },

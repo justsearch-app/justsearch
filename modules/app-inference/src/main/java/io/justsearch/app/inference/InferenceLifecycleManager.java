@@ -1333,7 +1333,16 @@ public class InferenceLifecycleManager
     @Override
     public void terminalStop(StopReason reason, Duration timeout) {
       closed = true;
-      serverOps.stopServerForTerminalShutdown(terminalStopFor(reason), timeout);
+      try { serverOps.stopServerForTerminalShutdown(terminalStopFor(reason), timeout); }
+      finally {
+        // Terminal stop remains lock-independent even while a lifecycle step is stuck draining.
+        ConfiguredInference saved = preVduConfig;
+        ConfiguredInference current = configured;
+        if (saved != null) configured = saved;
+        else if (current.inference().vduMode()) configured = new ConfiguredInference(
+            current.inference().withVduMode(false), current.resolved(), current.policy());
+        preVduConfig = null;
+      }
     }
   }
 
@@ -1841,15 +1850,46 @@ public class InferenceLifecycleManager
     final ConfiguredInference saved;
     synchronized (runner.lock()) {
       saved = preVduConfig;
-      if (saved == null || !configuredInference().vduMode()) {
+      if (saved == null) {
         LOG.debug("Not in VDU mode; exitVduMode is a no-op");
         return;
       }
     }
     LOG.info("Exiting VDU mode (restoring normal server configuration)...");
-    ConfigApplyResult result = applyConfiguration(saved.inference(), saved.resolved(),
-        RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_EXIT, saved.policy());
-    if (result.failure() != null) throw result.failure();
+    long applyStarted = System.nanoTime();
+    try { events.onConfigApplyAttempt(configuredInference(), saved.inference(), true); }
+    catch (RuntimeException telemetryFailure) {
+      LOG.warn("Telemetry events.onConfigApplyAttempt threw: {}", telemetryFailure.getMessage());
+    }
+    // A finished pass must never roll back to its temporary vision configuration. Keep the
+    // normal snapshot even when its process cannot launch; the controller owns bounded retries.
+    configured = saved;
+    tokenOps.clearCaches();
+    runner.run(TransitionReason.VDU_EXIT, events::onConfigApplyFailure, priorView -> {
+      try {
+        serverOps.stopLlamaServer(reconfigureStop(TransitionReason.VDU_EXIT,
+            saved.inference().withVduMode(true), saved.inference()));
+        serverOps.resetHealthFailures();
+        runner.clearProps();
+        long startedAt = System.currentTimeMillis();
+        var request = new LlamaServerOps.StartRequest(
+            new LlamaServerConfigContext(saved.inference(), saved.resolved()), saved.policy());
+        var started = serverOps.startLlamaServer(request);
+        serverOps.waitForServerHealth(started);
+        verifyAppliedServer(request, started);
+        emitApplyComplete(applyStarted);
+        return TransitionOutcome.success(Mode.ONLINE, runner.view().withPhase(Mode.ONLINE)
+            .withExternal(serverOps.isUsingExternalRaw())
+            .withStartupDuration(System.currentTimeMillis() - startedAt));
+      } catch (Exception failure) {
+        try { serverOps.stopLlamaServer(chatStop(StopReason.ROLLBACK)); }
+        catch (RuntimeException cleanup) { failure.addSuppressed(cleanup); }
+        return TransitionOutcome.failureOffline(
+            new InferenceFailure.TransitionFailure(TransitionCode.CONFIG_APPLY_FAILED,
+                "Normal chat configuration could not be restored: " + safeMessage(failure), failure),
+            priorView);
+      }
+    });
     preVduConfig = null;
   }
 
@@ -3247,6 +3287,11 @@ public class InferenceLifecycleManager
     // The controller's shutdown is the only path that stops the server at quit: it goes terminal
     // first, refuses later steps and relaunches, then stops through the fence.
     actuationRouter.shutdown(terminalStopFor(null).reason(), timeout);
+  }
+
+  /** Fence procedure cleanup before interrupting its current inference request. */
+  public void beginTerminalShutdown() {
+    actuationRouter.beginShutdown(terminalStopFor(null).reason());
   }
 
   /**

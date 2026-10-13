@@ -193,6 +193,12 @@ public class VduBatchProcessor {
             if (automaticEligibility == null) vduProcessor.enterVduMode();
             else vduProcessor.enterVduMode(automaticEligibility);
         } catch (VduProcessor.VduException failure) {
+            if (automaticEligibility != null
+                    && failure.getCause() instanceof io.justsearch.app.api.chat.ChatRefusal refusal
+                    && refusal.reason() == io.justsearch.app.api.chat.RefusalReason.BUSY) {
+                vduCapabilityState.clearAll();
+                return report(progress, selected, 0, 0, BlockReason.NONE);
+            }
             vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
             var modeFailure = new IllegalStateException("Failed to enter VDU mode", failure);
             try {

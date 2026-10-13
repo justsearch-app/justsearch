@@ -320,6 +320,14 @@ final class AutomaticVduLoadedChatTest {
     Supplier<KnowledgeServerBootstrap> hosts = () -> host;
     BooleanSupplier claimed = () -> !holds.vduMayStart();
     try {
+      var clocked = VduOfflineTriggerSampler.class.getDeclaredConstructor(EngineExecutorRegistry.class,
+          Supplier.class, Supplier.class, BooleanSupplier.class, Supplier.class,
+          java.util.function.LongSupplier.class);
+      clocked.setAccessible(true);
+      return clocked.newInstance(executors, coordinators, hosts, claimed,
+          (Supplier<ChatHolds>) () -> holds, (java.util.function.LongSupplier) () -> IDLE + 1_000);
+    } catch (NoSuchMethodException beforeStartupRepair) { /* use the original seam below */ }
+    try {
       var constructor = VduOfflineTriggerSampler.class.getConstructor(EngineExecutorRegistry.class,
           Supplier.class, Supplier.class, BooleanSupplier.class, Supplier.class);
       return constructor.newInstance(executors, coordinators, hosts, claimed, (Supplier<ChatHolds>) () -> holds);

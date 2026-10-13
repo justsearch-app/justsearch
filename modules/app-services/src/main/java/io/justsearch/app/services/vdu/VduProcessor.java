@@ -329,7 +329,7 @@ public class VduProcessor {
                     LOG.debug("Processing page {}/{}", idx + 1, pageImages.size());
 
                     byte[] imageBytes = imagePreparer.prepare(pageImages.get(idx));
-                    OnlineAiService.VisionCompletionResult pageResult = EngineFutures.await(
+                    OnlineAiService.VisionCompletionResult pageResult = awaitDocument(
                         asVduBulkWork(() -> aiService.visionCompletionDetailed(PASS1_PROMPT,
                                 imageBytes, PASS1_MAX_TOKENS, SamplingParams.VDU, null, engineContext))
                             .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
@@ -385,7 +385,7 @@ public class VduProcessor {
             try {
                 String pass2Prompt = String.format(PASS2_PROMPT_TEMPLATE,
                     truncateForPrompt(extractedText, MAX_CONTEXT_CHARS));
-                enrichment = EngineFutures.await(
+                enrichment = awaitDocument(
                     asVduBulkWork(() -> aiService.chatCompletion(
                             List.of(Map.of("role", "user", "content", pass2Prompt)),
                             PASS2_MAX_TOKENS,
@@ -584,7 +584,7 @@ public class VduProcessor {
         String originalPageText = sentPageResults.get(worstIdx).content();
 
         byte[] imageBytes = imagePreparer.prepare(pageImages.get(pageIndex));
-        OnlineAiService.VisionCompletionResult probeResult = EngineFutures.await(
+        OnlineAiService.VisionCompletionResult probeResult = awaitDocument(
             asVduBulkWork(() -> aiService.visionCompletionDetailed(
                     PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
                     SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED, engineContext))
@@ -595,6 +595,20 @@ public class VduProcessor {
             filePath.getFileName(), pageIndex + 1, agreement);
 
         return VduAbstentionGate.agreementVerdict(agreement).withProbedPage(pageIndex + 1);
+    }
+
+    /** Terminal cancellation abandons the document and interrupts its owned HTTP task as well. */
+    private static <T> T awaitDocument(java.util.concurrent.CompletableFuture<T> future) {
+        try {
+            return future.get();
+        } catch (InterruptedException interrupted) {
+            try { future.cancel(true); }
+            catch (RuntimeException | Error cleanup) { interrupted.addSuppressed(cleanup); }
+            Thread.currentThread().interrupt();
+            throw new java.util.concurrent.CompletionException(interrupted);
+        } catch (java.util.concurrent.ExecutionException failed) {
+            throw new java.util.concurrent.CompletionException(failed.getCause());
+        }
     }
 
     /**

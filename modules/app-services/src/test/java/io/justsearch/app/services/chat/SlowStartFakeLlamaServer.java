@@ -84,14 +84,24 @@ public final class SlowStartFakeLlamaServer {
           StandardCharsets.US_ASCII, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
     ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
+    java.time.Instant launcherBirth = launcher == null ? null
+        : launcher.info().startInstant().orElseThrow();
+    java.util.function.BooleanSupplier launcherAlive = () -> launcher != null && launcher.isAlive()
+        && launcher.info().startInstant().filter(launcherBirth::equals).isPresent();
     if (home != null && "1".equals(value(args, "-np", "2"))
         && Files.exists(Path.of(home, "refuse-vision"))) {
       throw new IOException("The fake process refuses its vision configuration");
     }
+    if (home != null && !"1".equals(value(args, "-np", "2"))
+        && Files.exists(Path.of(home, "refuse-normal"))) {
+      throw new IOException("The fake process refuses its normal configuration");
+    }
+    if (home != null) Files.writeString(Path.of(home, "last-args.txt"),
+        String.join("\n", args), StandardCharsets.UTF_8);
     long ready = System.nanoTime()
         + TimeUnit.MILLISECONDS.toNanos(Long.getLong(DELAY_PROPERTY, 0L));
     while (System.nanoTime() < ready) {
-      if (launcher != null && !launcher.isAlive()) System.exit(0);
+      if (launcher != null && !launcherAlive.getAsBoolean()) System.exit(0);
       Thread.sleep(50);
     }
     HttpServer server =
@@ -131,10 +141,11 @@ public final class SlowStartFakeLlamaServer {
     });
     server.start();
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
-    while (launcher != null && launcher.isAlive() && System.nanoTime() < deadline) {
+    while (launcherAlive.getAsBoolean() && System.nanoTime() < deadline) {
       Thread.sleep(100);
     }
-    server.stop(0);
+    // Model the actual managed process stop. HttpServer.stop can wait for a deliberately paused
+    // handler; the fake must instead end with its launcher, without delaying terminal cleanup.
     System.exit(0);
   }
 

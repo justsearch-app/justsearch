@@ -349,6 +349,26 @@ public final class HeadAssembly implements AutoCloseable {
     if (inferenceManager != null) inferenceManager.stopServerForTerminalShutdown(timeout);
   }
 
+  /** Quiesce durable enrichment before the Engine's live-work drain, including its current document. */
+  public void quiesceEnrichmentForTerminalShutdown(
+      io.justsearch.app.api.runtime.child.StopRequest request, java.time.Duration timeout) {
+    recordTerminalStop(request);
+    if (inferenceManager != null) inferenceManager.beginTerminalShutdown();
+    long deadline = System.nanoTime() + timeout.toNanos();
+    var exited = offlineCoordinator == null
+        ? java.util.concurrent.CompletableFuture.<Void>completedFuture(null)
+        : offlineCoordinator.cancelForShutdown().toCompletableFuture();
+    stopGenerativeBackendForTerminalShutdown(timeout);
+    try {
+      exited.get(Math.max(0, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Enrichment shutdown was interrupted", interrupted);
+    } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException failure) {
+      throw new IllegalStateException("Enrichment did not quiesce for terminal shutdown", failure);
+    }
+  }
+
   /**
    * Constructs the head with the one Engine admission owner shared by the API and agent paths.
    * The separate parameter keeps the existing operation-lease compatibility seam while making

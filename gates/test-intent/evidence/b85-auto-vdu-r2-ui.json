@@ -1,0 +1,105 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-13T16:04:46.959Z",
+  "revision": "13524ddf01e92a273111ec752cacd74c0eeea233",
+  "tree": "6a2e2efc000a1f90f3cced41fa4390b87e236d0c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/BrainSurface.automatic-vdu.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b85-auto-vdu-r2-evidence\\\\test-intent-vitest-24088-1791907480789.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1788
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#names picture reading while loaded chat lends its server to a VDU pass",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0af83b409fcd5a42a263a8f7a9dc456b252dd49f14d28e5ba289dbf781c9050c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "names picture reading while loaded chat lends its server to a VDU pass",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#keeps normal chat wording after the hold closes and never claims stale picture reading",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0af83b409fcd5a42a263a8f7a9dc456b252dd49f14d28e5ba289dbf781c9050c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps normal chat wording after the hold closes and never claims stale picture reading",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#keeps the original panel sentence for explicit and chat-off automatic passes",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0af83b409fcd5a42a263a8f7a9dc456b252dd49f14d28e5ba289dbf781c9050c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps the original panel sentence for explicit and chat-off automatic passes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "13524ddf0",
+    "revision": "13524ddf01e92a273111ec752cacd74c0eeea233",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/BrainSurface.automatic-vdu.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b85-auto-vdu-r2-evidence\\\\test-intent-vitest-24088-1791907484894.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1394
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#names picture reading while loaded chat lends its server to a VDU pass",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#keeps normal chat wording after the hold closes and never claims stale picture reading",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#keeps the original panel sentence for explicit and chat-off automatic passes",
+        "classification": "assertion",
+        "detail": "keeps the original panel sentence for explicit and chat-off automatic passes:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Chat and summaries ready.'\n    at F:/justsearch-public/.claude/worktrees/b85-auto-vdu-r2-evidence/test-intent-before-8KlFnL/modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts:47:30\n    at file:///C:/agent"
+      }
+    ]
+  },
+  "digest": "sha256:484b038101b88cefd0bbccde8b9c92da04fcc63e2b0ccaaaf90ea979040b61f6"
+}

@@ -1575,8 +1575,14 @@ public class HeadlessApp {
         boolean workCleanupComplete = processRoot == null;
         if (processRoot != null) {
           try {
-            processRoot.admission().beginClosing();
-            processRoot.operationAttempts().beginClosing();
+            try {
+              if (bootstrap != null) bootstrap.quiesceEnrichmentForTerminalShutdown(
+                  terminalStopOf(io.justsearch.app.engine.ShutdownRequest.Reason.QUIT),
+                  java.time.Duration.ofSeconds(2));
+            } finally {
+              processRoot.admission().beginClosing();
+              processRoot.operationAttempts().beginClosing();
+            }
             processRoot.admission().cancelInteractive("shutdown");
             processRoot.quiesceProducers();
             boolean admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
@@ -1835,9 +1841,14 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "operation-admission",
             reason -> {
-              if (engineAdmission != null) engineAdmission.beginClosing();
-              if (attempts != null) attempts.beginClosing();
-              operationLeases.freezeAdmission(reason.wire());
+              try {
+                if (bootstrap != null) bootstrap.quiesceEnrichmentForTerminalShutdown(
+                    terminalStopOf(reason), java.time.Duration.ofSeconds(2));
+              } finally {
+                if (engineAdmission != null) engineAdmission.beginClosing();
+                if (attempts != null) attempts.beginClosing();
+                operationLeases.freezeAdmission(reason.wire());
+              }
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(

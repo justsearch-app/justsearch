@@ -40,3 +40,15 @@ not claim that picture reading is currently active. The existing states resume w
 Explicit passes and automatic passes with chat already off keep their existing entry and pacing
 paths, including the explicit pass's generation drain. The stricter AC-only admission and the
 one-attempt rule apply to borrowing loaded chat.
+
+## Restoration, startup and shutdown
+
+A failed exit never rolls back to the temporary vision configuration. It retains the previous normal configuration and profile offline, with `config_apply_failed`. The controller retries after 5 seconds, then 10, 20 and at most 30 seconds between failures. A person's next chat request requests an immediate serialized restoration attempt. Sampler ticks and ordinary activation forwarding cannot bypass that backoff. This shared exit repair applies to explicit passes too.
+
+Automatic BUSY entry is a deferral with no picture-reading offline/blocked reason. It defers for another five-minute idle window, then retries when eligible, without requiring fresh human activity. It cannot immediately retry in a loop.
+
+Both automatic paths clamp user idle age to JVM process uptime: startup starts the five-minute idle clock. Explicit passes do not wait for this clock. Loaded automatic borrowing remains Windows-only in practice: other platforms report an unknown power source and are safely ineligible.
+
+The additive `automatic-vdu` ENGINE reason is published only while an automatic VDU hold borrows loaded chat with chat enabled. The panel's document-boundary caption requires this reason and `VDU_BATCH`. Explicit and chat-off passes keep the original panel text.
+
+Terminal shutdown first fences chat actuations, then interrupts the enrichment task and its owned inference exchange, then stops the process. It retains the procedure work authority through the pending-status reset and actual exit, before closing admission. It does not relaunch normal chat. The interrupted document receives no success or FAILED update; the existing processing recovery resets it to PENDING for a later pass. This applies to loaded automatic, chat-off automatic and explicit passes, before the Engine's five-second live-work drain. Human activity during ordinary operation retains document-boundary interruption.

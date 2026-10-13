@@ -41,6 +41,7 @@ public final class VduOfflineTriggerSampler {
   private final Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier;
   private final BooleanSupplier chatClaimedSupplier;
   private final Supplier<io.justsearch.app.inference.chat.ChatHolds> chatHoldsSupplier;
+  private final java.util.function.LongSupplier processUptimeMillis;
   private long loadedAttemptAt = Long.MIN_VALUE;
   private volatile long retryAfter;
   private final ScheduledExecutorService executor;
@@ -62,10 +63,21 @@ public final class VduOfflineTriggerSampler {
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
       BooleanSupplier chatClaimedSupplier,
       Supplier<io.justsearch.app.inference.chat.ChatHolds> chatHoldsSupplier) {
+    this(executors, coordinatorSupplier, knowledgeServerSupplier, chatClaimedSupplier,
+        chatHoldsSupplier, () -> java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime());
+  }
+
+  VduOfflineTriggerSampler(EngineExecutorRegistry executors,
+      Supplier<OfflineCoordinator> coordinatorSupplier,
+      Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
+      BooleanSupplier chatClaimedSupplier,
+      Supplier<io.justsearch.app.inference.chat.ChatHolds> chatHoldsSupplier,
+      java.util.function.LongSupplier processUptimeMillis) {
     this.coordinatorSupplier = coordinatorSupplier;
     this.knowledgeServerSupplier = knowledgeServerSupplier;
     this.chatClaimedSupplier = chatClaimedSupplier;
     this.chatHoldsSupplier = chatHoldsSupplier;
+    this.processUptimeMillis = processUptimeMillis;
     ThreadFactory tf =
         r -> {
           Thread t = new Thread(r, "vdu-offline-trigger-sampler");
@@ -122,8 +134,7 @@ public final class VduOfflineTriggerSampler {
         return;
       }
       KnowledgeServerBootstrap ks = knowledgeServerSupplier.get();
-      long msSinceActivity =
-          ks != null ? ks.msSinceLastUserActivity(System.currentTimeMillis()) : Long.MAX_VALUE;
+      long msSinceActivity = idleMillis(ks);
       boolean energyReduced = ks != null && ks.energyState().reduced();
       // Spec A step 6: the claim is the chat controller's own answer (!vduMayStart()), wired at
       // CoreApiAssembly — realized state and open holds, never spec.
@@ -156,8 +167,20 @@ public final class VduOfflineTriggerSampler {
                 + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
             log.warn("Automatic enrichment pass failed", failure);
           }
-          else log.info("Automatic enrichment pass: processed={}, failed={}, remaining={}, blocked={}",
-              outcome.processed(), outcome.failed(), outcome.remaining(), outcome.blockedReason());
+          else {
+            if (loadedPass && outcome.processed() == 0 && outcome.failed() == 0
+                && outcome.remaining() > 0 && outcome.blockedReason()
+                    == io.justsearch.app.api.OfflineProcessingOutcome.BlockReason.NONE) {
+              // BUSY entry made no launch attempt. Defer for one idle window; a racing metadata
+              // lease must not strand the backlog until another person happens to act.
+              synchronized (VduOfflineTriggerSampler.this) {
+                loadedAttemptAt = Long.MIN_VALUE;
+                retryAfter = System.currentTimeMillis() + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
+              }
+            }
+            log.info("Automatic enrichment pass: processed={}, failed={}, remaining={}, blocked={}",
+                outcome.processed(), outcome.failed(), outcome.remaining(), outcome.blockedReason());
+          }
         });
       }
     } catch (RuntimeException e) {
@@ -167,12 +190,17 @@ public final class VduOfflineTriggerSampler {
     }
   }
 
-  private static boolean automaticEligible(KnowledgeServerBootstrap ks) {
+  private long idleMillis(KnowledgeServerBootstrap ks) {
+    return Math.min(processUptimeMillis.getAsLong(),
+        ks != null ? ks.msSinceLastUserActivity(System.currentTimeMillis()) : Long.MAX_VALUE);
+  }
+
+  private boolean automaticEligible(KnowledgeServerBootstrap ks) {
     if (ks == null) return false;
     var energy = ks.energyState();
     var bulk = ks.bulkWork();
     return energy != null && energy.source() == io.justsearch.app.util.EnergyState.Source.AC
-        && VduPacingPolicy.shouldTrigger(ks.msSinceLastUserActivity(System.currentTimeMillis()),
+        && VduPacingPolicy.shouldTrigger(idleMillis(ks),
             energy.reduced(), false, bulk != null && bulk.held());
   }
 }

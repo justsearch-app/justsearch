@@ -12,6 +12,8 @@
 extra["coverage.enforce"] = "true"
 
 dependencies {
+  // The shutdown regression drives the actual process-local admission/drain owner.
+  testImplementation(project(":modules:app-engine")) { isTransitive = false }
   testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:configuration"))
   api(project(":modules:app-api"))
