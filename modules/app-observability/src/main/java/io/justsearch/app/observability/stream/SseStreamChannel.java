@@ -16,7 +16,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -32,9 +31,13 @@ import java.util.function.Consumer;
  * <p>Numeric {@link #subscribeAndReplay} is the run-stream attachment contract: zero
  * attaches to the retained tail, and positive cursors require the existing numeric window.
  *
- * <p>Publishing never interrupts the publishing thread. Only threads this channel owns (its
- * delivery executor) and a subscriber's own attaching thread are ever interrupted, and only to
- * release that subscriber's observer code when its registration ends.
+ * <p>Publishing never interrupts the publishing thread. Only the delivery threads this channel runs
+ * on its owner-supplied executor and a subscriber's own attaching thread are ever interrupted, and
+ * only to release that subscriber's observer code when its registration ends.
+ *
+ * <p>The channel never creates an executor (C1-5/C1-16): asynchronous and interruptible delivery
+ * run on the executor its constructing owner supplies (in production a registration of the executor
+ * registry), which this channel shuts down, with the owner's release hook, when it closes.
  */
 public final class SseStreamChannel implements AutoCloseable {
   /**
@@ -51,8 +54,8 @@ public final class SseStreamChannel implements AutoCloseable {
   private final Clock clock;
   private final Object publicationGate = new Object();
   private final UUID incarnation = UUID.randomUUID();
-  private ExecutorService deliveryOwner;
-  private Runnable releaseDeliveryOwner;
+  private final ExecutorService deliveryOwner;
+  private final Runnable releaseDeliveryOwner;
   private boolean ownedDelivery;
   private int deliveryWaiters;
   private boolean closed;
@@ -63,14 +66,15 @@ public final class SseStreamChannel implements AutoCloseable {
 
   /** The supplied executor owns asynchronous delivery and is shut down with this channel. */
   public SseStreamChannel(StreamId streamId, ExecutorService deliveryOwner) {
-    this(streamId);
-    this.deliveryOwner = Objects.requireNonNull(deliveryOwner, "deliveryOwner");
+    this(streamId, new StreamSequenceTracker(), new FrameHistoryRingBuffer(), Clock.systemUTC(),
+        Objects.requireNonNull(deliveryOwner, "deliveryOwner"), null);
   }
 
   /** Also releases the owner's registration when this channel's lifetime ends. */
   public SseStreamChannel(StreamId streamId, ExecutorService deliveryOwner, Runnable releaseOwner) {
-    this(streamId, deliveryOwner);
-    this.releaseDeliveryOwner = Objects.requireNonNull(releaseOwner, "releaseOwner");
+    this(streamId, new StreamSequenceTracker(), new FrameHistoryRingBuffer(), Clock.systemUTC(),
+        Objects.requireNonNull(deliveryOwner, "deliveryOwner"),
+        Objects.requireNonNull(releaseOwner, "releaseOwner"));
   }
 
   /**
@@ -79,18 +83,37 @@ public final class SseStreamChannel implements AutoCloseable {
    * the per-listener drainers and waits at most {@link #SYNCHRONOUS_DELIVERY_BOUND_NANOS} for it to
    * be delivered; a publisher already interrupted, or interrupted while waiting, returns at once
    * with its interrupt intact. Other streams keep delivering on the caller's thread.
+   *
+   * @throws IllegalStateException when this channel was built without an owner-supplied delivery
+   *     executor: the drainers run only on threads an executor owner created
    */
   public SseStreamChannel withInterruptibleDelivery() {
+    requireDeliveryOwner("Interruptible delivery");
     synchronized (publicationGate) { ownedDelivery = true; }
     return this;
   }
 
   public SseStreamChannel(
       StreamId streamId, StreamSequenceTracker sequence, FrameHistoryRingBuffer history, Clock clock) {
+    this(streamId, sequence, history, clock, null, null);
+  }
+
+  private SseStreamChannel(StreamId streamId, StreamSequenceTracker sequence,
+      FrameHistoryRingBuffer history, Clock clock, ExecutorService deliveryOwner,
+      Runnable releaseOwner) {
     this.streamId = Objects.requireNonNull(streamId, "streamId");
     this.sequence = Objects.requireNonNull(sequence, "sequence");
     this.history = Objects.requireNonNull(history, "history");
     this.clock = Objects.requireNonNull(clock, "clock");
+    this.deliveryOwner = deliveryOwner;
+    this.releaseDeliveryOwner = releaseOwner;
+  }
+
+  private void requireDeliveryOwner(String use) {
+    if (deliveryOwner == null) {
+      throw new IllegalStateException(use + " on " + streamId
+          + " needs a delivery executor supplied by its owner; the channel never creates one");
+    }
   }
 
   public StreamId streamId() {
@@ -147,9 +170,13 @@ public final class SseStreamChannel implements AutoCloseable {
   /**
    * Publishes state immediately and drains each observer independently. A blocked observer cannot
    * gate the publisher or another subscriber. Each handoff still has one bounded serial drainer.
+   *
+   * @throws IllegalStateException when this channel was built without an owner-supplied delivery
+   *     executor; nothing is sequenced or retained in that case
    */
   public void publishAsync(SseFrameKind frameKind, Object payload) {
     Objects.requireNonNull(frameKind, "frameKind");
+    requireDeliveryOwner("Asynchronous publication");
     for (var listener : enqueuePublication(frameKind, payload).targets()) {
       listener.drainAsync();
     }
@@ -499,7 +526,7 @@ public final class SseStreamChannel implements AutoCloseable {
       ExecutorService owner;
       synchronized (publicationGate) {
         if (retired && retirementListeners.isEmpty() || !retired && draining) return;
-        if (deliveryOwner == null) deliveryOwner = Executors.newVirtualThreadPerTaskExecutor();
+        // Only publishAsync and owned publish reach here; both require an owner-supplied executor.
         owner = deliveryOwner;
         boolean deliver = !retired;
         if (deliver) draining = true;

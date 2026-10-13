@@ -45,7 +45,7 @@ final class CapabilityHealthBridgeObserverLifetimeTest {
 
   @org.junit.jupiter.api.Test
   void retiredRegistrationDoesNotBeginHealthPrefix() {
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var started = new java.util.concurrent.atomic.AtomicInteger();
     changes.channel().subscribeAndReplay(envelope -> {}, 0, started::incrementAndGet,
         io.justsearch.app.observability.stream.SseStreamChannel.Subscription::unsubscribe);
@@ -66,7 +66,7 @@ final class CapabilityHealthBridgeObserverLifetimeTest {
       var generative = components.register(spec("generative", false));
       generative.transition(ComponentState.READY, null, "initial");
       var changes = boundary.equals("executor") ? productionChanges(deliveryExecutors)
-          : new HealthEventChangeRegistry();
+          : new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
       var bridge = CapabilityHealthBridge.wireListeners(components, new ConditionStore(), changes,
           Source.forProcess("head", "lifetime", "1"));
       Runnable blocked = () -> {

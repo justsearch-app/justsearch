@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
@@ -70,7 +71,7 @@ class DataVersionMarkerTest {
     assertEquals(SupportedDataVersions.current().get("jobs-db"), read().storeVersions().get("jobs-db"));
     var health = new ConditionStore();
     assertDoesNotThrow(() -> NewerDataNotice.publish(message, health,
-        new HealthEventChangeRegistry(), new Source("head", "test", Optional.empty()), Clock.systemUTC()));
+        new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), new Source("head", "test", Optional.empty()), Clock.systemUTC()));
     var event = health.find(LifecycleReasonCode.DATA_NEWER_BUILD.code(), "data").orElseThrow();
     assertEquals(message.orElseThrow(), ((AssertedCondition) event.body()).message().orElseThrow());
     // Another boot must retain the warning: the high-water mark was not replaced by this build.
@@ -107,7 +108,7 @@ class DataVersionMarkerTest {
       assertTrue(notice.isEmpty());
       assertEquals(new DataVersionMarker.Marker("0.3.0", SupportedDataVersions.current()), read());
       var health = new ConditionStore();
-      NewerDataNotice.publish(notice, health, new HealthEventChangeRegistry(),
+      NewerDataNotice.publish(notice, health, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()),
           new Source("head", "test", Optional.empty()), Clock.systemUTC());
       assertTrue(health.find(LifecycleReasonCode.DATA_NEWER_BUILD.code(), "data").isEmpty());
     }

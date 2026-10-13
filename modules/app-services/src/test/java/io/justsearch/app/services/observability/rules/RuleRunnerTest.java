@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,7 +56,7 @@ final class RuleRunnerTest {
     evaluator = new CelEvaluator();
     scheduler = new DwellTimeScheduler(clock);
     conditions = new ConditionStore();
-    changes = new HealthEventChangeRegistry();
+    changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     listener = new RecordingListener();
     changes.subscribeTyped(listener);
     emitter = new RuleEmitter(conditions, changes, HEAD_SRC, clock);

@@ -11,6 +11,7 @@ import io.justsearch.app.observability.health.Severity;
 import io.justsearch.app.observability.health.Source;
 import java.time.Clock;
 import java.util.OptionalLong;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,7 @@ final class BootRecoveryEmitterTest {
   @DisplayName("emits head.unclean-shutdown-recovered (INFO) with previousPid attribute")
   void emitsOccurrenceWithPreviousPid() {
     OccurrenceLog occurrences = new OccurrenceLog();
-    HealthEventChangeRegistry changes = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
 
     BootRecoveryEmitter.emitUncleanShutdownRecovered(
         occurrences, changes, HEAD, Clock.systemUTC(), OptionalLong.of(4242L));
@@ -46,7 +47,7 @@ final class BootRecoveryEmitterTest {
   @DisplayName("emits with no previousPid attribute when the PID is unknown")
   void emitsWithoutPidWhenUnknown() {
     OccurrenceLog occurrences = new OccurrenceLog();
-    HealthEventChangeRegistry changes = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
 
     BootRecoveryEmitter.emitUncleanShutdownRecovered(
         occurrences, changes, HEAD, Clock.systemUTC(), OptionalLong.empty());

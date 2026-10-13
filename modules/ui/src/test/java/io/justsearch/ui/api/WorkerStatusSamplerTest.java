@@ -36,6 +36,7 @@ import io.justsearch.core.component.ComponentState;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,7 @@ final class WorkerStatusSamplerTest {
     ConditionStore conditions = new ConditionStore();
     handler.setLifecycleSnapshotTap(
         new LifecycleSnapshotTap(
-            conditions, new HealthEventChangeRegistry(), HEAD_SRC, Clock.systemUTC()));
+            conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD_SRC, Clock.systemUTC()));
 
     // First tick before client attachment: the tap must ASSERT index.unavailable.
     // Asserting only the cleared end-state would be vacuous — "absent" is also what a tap that
@@ -138,7 +139,7 @@ final class WorkerStatusSamplerTest {
         new io.justsearch.app.services.observability.health.IndexDriftHealthTap(
             new ConditionStore(),
             new io.justsearch.app.observability.health.OccurrenceLog(),
-            new HealthEventChangeRegistry(),
+            new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()),
             HEAD_SRC,
             Clock.systemUTC(),
             () -> {

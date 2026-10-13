@@ -16,6 +16,7 @@ import io.justsearch.core.context.RetainedStateBudget;
 import java.time.Duration;
 import java.util.Set;
 import io.justsearch.core.component.ComponentState;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /** Real registry/bridge/store contract: failure deltas are not the condition authority. */
@@ -29,7 +30,7 @@ final class CapabilityHealthBridgeCurrentStateTest {
           ComponentState.FAILED, "inference.model_load_failed", "corrupt model");
       var store = new ConditionStore();
       var bridge = CapabilityHealthBridge.wireListeners(
-          components.registry(), store, new HealthEventChangeRegistry(), HEAD);
+          components.registry(), store, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD);
       try (bridge) {
         assertTrue(store.find("inference.capability", "inference").isPresent());
         components.inference().transition(
@@ -48,12 +49,12 @@ final class CapabilityHealthBridgeCurrentStateTest {
       components.inference().transition(
           ComponentState.FAILED, "inference.model_load_failed", "failed");
       CapabilityHealthBridge.wireListeners(
-          components.registry(), store, new HealthEventChangeRegistry(), HEAD).close();
+          components.registry(), store, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD).close();
       components.index().transition(ComponentState.STARTING, "worker.starting", "recovering");
       components.inference().transition(
           ComponentState.STARTING, "inference.starting", "recovering");
       var bridge = CapabilityHealthBridge.wireListeners(
-          components.registry(), store, new HealthEventChangeRegistry(), HEAD);
+          components.registry(), store, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD);
       try (bridge) {
         assertFalse(store.find("inference.capability", "inference").isPresent(),
             "subscription replay must remove a failure whose clear was never observed");

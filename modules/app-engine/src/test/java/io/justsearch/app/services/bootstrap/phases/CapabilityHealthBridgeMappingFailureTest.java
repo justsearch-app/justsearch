@@ -14,6 +14,7 @@ import io.justsearch.core.context.RetainedStateBudget;
 import java.time.Duration;
 import java.util.Set;
 import io.justsearch.core.component.ComponentState;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 final class CapabilityHealthBridgeMappingFailureTest {
@@ -24,7 +25,7 @@ final class CapabilityHealthBridgeMappingFailureTest {
       components.inference().transition(
           ComponentState.FAILED, "inference.model_load_failed", "failed");
       var bridge = CapabilityHealthBridge.wireListeners(components.registry(), store,
-          new HealthEventChangeRegistry(), Source.forProcess("head", "mapping-failure", "1.0"),
+          new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), Source.forProcess("head", "mapping-failure", "1.0"),
           reason -> {
             if ("inference.crashed".equals(reason)) {
               components.inference().transition(ComponentState.READY, null, "healthy");

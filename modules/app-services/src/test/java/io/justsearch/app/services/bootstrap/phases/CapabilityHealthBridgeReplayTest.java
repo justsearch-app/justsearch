@@ -10,6 +10,7 @@ import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.Source;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.TestEngineComponents;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +38,7 @@ final class CapabilityHealthBridgeReplayTest {
       ConditionStore conditions = new ConditionStore();
 
       try (AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
-          components, conditions, new HealthEventChangeRegistry(), HEAD)) {
+          components, conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD)) {
         assertTrue(hasWorkerCondition(conditions));
       }
     }
@@ -50,7 +51,7 @@ final class CapabilityHealthBridgeReplayTest {
       ConditionStore conditions = new ConditionStore();
 
       try (AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
-          components, conditions, new HealthEventChangeRegistry(), HEAD)) {
+          components, conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD)) {
         assertFalse(hasWorkerCondition(conditions));
       }
     }
@@ -64,7 +65,7 @@ final class CapabilityHealthBridgeReplayTest {
       ConditionStore conditions = new ConditionStore();
 
       try (AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
-          components, conditions, new HealthEventChangeRegistry(), HEAD)) {
+          components, conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD)) {
         assertTrue(
             hasWorkerCondition(conditions),
             "STARTING is an actual registry observation, so its PENDING projection is visible");
@@ -79,7 +80,7 @@ final class CapabilityHealthBridgeReplayTest {
           ComponentState.FAILED, "inference.model_load_failed", "corrupt model");
       ConditionStore conditions = new ConditionStore();
       try (AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
-          components, conditions, new HealthEventChangeRegistry(), HEAD)) {
+          components, conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD)) {
         assertTrue(hasInferenceCondition(conditions), "the failure must first be visible");
         components.handle("generative").transition(ComponentState.READY, null, "healthy");
         assertFalse(hasInferenceCondition(conditions), "recovered chat clears the stale failure");
@@ -94,7 +95,7 @@ final class CapabilityHealthBridgeReplayTest {
       components.handle("generative").transition(ComponentState.READY, null, "healthy");
       ConditionStore conditions = new ConditionStore();
       AutoCloseable bridge = CapabilityHealthBridge.wireListeners(
-          components, conditions, new HealthEventChangeRegistry(), HEAD);
+          components, conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD);
       bridge.close();
 
       components.handle("index").transition(

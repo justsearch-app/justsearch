@@ -14,6 +14,7 @@ import io.justsearch.core.context.RetainedStateBudget;
 import java.time.Duration;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Set;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /** A Health attachment made during reentrant recovery observes the authority immediately. */
@@ -26,7 +27,7 @@ final class CapabilityHealthBridgeSubscriberRecoveryTest {
       registry.register(spec("index", true));
       var inference = registry.register(spec("generative", false));
       var store = new ConditionStore();
-      var changes = new HealthEventChangeRegistry();
+      var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
       var observed = new CopyOnWriteArrayList<String>();
       var subscriptions = new CopyOnWriteArrayList<SseStreamChannel.Subscription>();
       inference.transition(ComponentState.FAILED, "inference.model_load_failed", "seed failure");

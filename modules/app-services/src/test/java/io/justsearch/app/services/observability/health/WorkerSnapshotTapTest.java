@@ -53,7 +53,7 @@ final class WorkerSnapshotTapTest {
   void setUp() {
     conditions = new ConditionStore();
     occurrences = new OccurrenceLog();
-    changes = new HealthEventChangeRegistry();
+    changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     listener = new RecordingListener();
     changes.subscribeTyped(listener);
     clock = new MutableClock(T0);
@@ -912,7 +912,7 @@ final class WorkerSnapshotTapTest {
           new WorkerSnapshotTap(
               localConditions,
               new OccurrenceLog(),
-              new HealthEventChangeRegistry(),
+              new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()),
               HEAD_SRC,
               clock);
       localTap.accept(

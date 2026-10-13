@@ -48,7 +48,7 @@ final class SseTransportOwnerShutdownTest {
           .getDeclaredMethod("install", Javalin.class).invoke(null, transport);
     } catch (ClassNotFoundException missingOwner) { /* before-state */ }
     var channel = new SseStreamChannel(StreamId.system("shutdown-" + kind));
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var runs = new io.justsearch.app.observability.stream.run.RunChannelRegistry();
     var run = runs.open(new io.justsearch.app.observability.stream.run.RunId("shutdown-run"),
         new io.justsearch.app.observability.stream.run.RunDescriptor("core.test", "", 0),

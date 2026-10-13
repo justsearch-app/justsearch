@@ -63,7 +63,7 @@ final class SseAdmissionShutdownTest {
     var rawRelease = new CountDownLatch(1);
     var bodies = new ArrayList<InputStream>();
     var channel = new SseStreamChannel(StreamId.system("admission-" + kind));
-    var changes = new HealthEventChangeRegistry();
+    var changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var runs = new RunChannelRegistry();
     var run = runs.open(new RunId("admission-run"), new RunDescriptor("core.test", "", 0),
         RunChannelPolicy.conversational());

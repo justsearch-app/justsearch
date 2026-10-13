@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +63,7 @@ final class HealthEventStreamControllerTest {
   void setUp() {
     conditions = new ConditionStore();
     occurrences = new OccurrenceLog();
-    registry = new HealthEventChangeRegistry();
+    registry = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     Telemetry telemetry = mock(Telemetry.class);
     controller = new HealthEventStreamController(
             processExecutors,
