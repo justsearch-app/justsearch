@@ -7,6 +7,14 @@ author-session: b53-status-isolation-builder-20261010
 
 The before-state is ff0c00f5e. The copied independent verifier assertions are retained, with additional per-owner and post-action cases. Script-produced execution evidence binds the exact check sources to candidate execution and assertion failures before. Existing b50 acceptance is not rewritten. Independent intent acceptance remains pending.
 
+Refreshed after b82 (run b82g-status-records). Entry 1's evidence was re-run on the current checks, with the fail-before again at ff0c00f5e:
+
+- Two of its checks changed in b82 because of b82's decision (a): a held lane is now stale by its own age, not by a refresh that has been in flight for 1 s. Entry 5 records this adaptation.
+- pollingLifecycle.test.ts changed in b82 for b82's S3: a status read left unanswered for a whole poll interval is abandoned. Its status variants now hold the slow read for one millisecond less than the interval instead of 30 s. That is neither decision (a) nor (b), and its assertions are unchanged. b82's changeset covers that change.
+- StatusIsolationHttpTest's frontend case also records the Node child's start time and refuses cleanup when it changed (ea0c311cb). Its assertions are unchanged.
+
+The current checks call StatusLaneAging, a b82 test helper, so the fail-before overlays it. StatusLaneAging reads StatusLifecycleHandler.PROBE_ALLOWANCE_PERIODS, which ff0c00f5e lacks. The compat before-patch gates/test-intent/evidence/b53-status-isolation-compat.patch adds only that constant, and no production code in that state reads it. The overlay modules/ui-web/node_modules/.before-run-private-install is an empty marker file. It gives the before worktree a real node_modules directory, so the evidence script links none. The before worktree's frontend packages came from a private install in its parent directory.
+
 ```json
 {
   "entries": [
@@ -92,6 +100,17 @@ The before-state is ff0c00f5e. The copied independent verifier assertions are re
       "sources": [{"kind": "owner-words", "quote": "Each status component is produced and published independently, so a slow or failed producer marks only its own component stale or unknown and every other component stays current.", "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"}],
       "evidence": "gates/test-intent/evidence/b53-status-provenance.json",
       "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java"]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "b82 decision (a): a hung lane is reported stale only after 3 of its own update intervals, so detection is later when idle, about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown under load. Under the old rule, a refresh in flight for more than 1 s made its lane stale. So StatusIsolationHttpTest's blocked-disk and hung-worker cases used to sleep 1.2 s before asserting. They now advance the handler clock beyond the capped idle limit and run one bounded sampler pass (StatusLaneAging.ageHeldLanes). StatusNonBlockingHttpTest's blocked-dependency case used to advance its clock 1001 ms for non-lock sources. It now advances 31001 ms for every source, then runs one bounded sampler pass for non-lock sources. Each case still holds the same producer. It asserts the same stale or unknown marker on exactly that part, the same current values on every other part, the same bounded response time and the same recovery."
     }
   ]
 }

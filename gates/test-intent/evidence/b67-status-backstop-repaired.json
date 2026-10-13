@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:d6365732a21827c41b0aed4b763fad01ff0383a5f7bddf14e2973868ad16dff8"
   },
-  "createdAt": "2026-10-11T19:36:33.443Z",
-  "revision": "93479e944a42f6e64fdbf3d3e34b4a24c6ffcb21",
-  "tree": "e6d0cc769a15dfbe41470bb95223e0712d71a67e",
+  "createdAt": "2026-10-13T22:40:11.685Z",
+  "revision": "ce7685a1c7be8d40170f185f3b0e96b5fcadea72",
+  "tree": "386c82a8b1069b0f1725d723d87584b88c913de3",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierStatus5Test.realEncryptionOwnerPublishesItsCanonicalStateChange\" --tests \"io.justsearch.ui.api.VerifierStatus5Test.samplerFailureAndRecoveryPublishCanonicalFreshnessChanges\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.everyStatusBearingFieldAndFutureProducerHasAPublicationPath\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.producerWithoutOwnerPublicationStillSignalsCanonicalChange\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 61015
+      "durationMs": 23842
     },
     {
-      "command": "npx vitest run \"src/api/statusBoundary.test.ts\" \"src/api/statusBoundaryPoll.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-42312-1791747321116.json\"",
+      "command": "npx vitest run \"src/api/statusBoundary.test.ts\" \"src/api/statusBoundaryPoll.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b82g-status-records\\\\fe\\\\t\\\\test-intent-vitest-22244-1791931107477.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1974
+      "durationMs": 3326
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#realEncryptionOwnerPublishesItsCanonicalStateChange",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5521b0d40e24ddb01f07d70eee58f745fa739d8acc2a5f752331aba82141960c",
+      "contentDigest": "sha256:4c252c1f897d2e46c88e87acaf8212b100bd64b58151b9a867942d715a2df76a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#samplerFailureAndRecoveryPublishCanonicalFreshnessChanges",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5521b0d40e24ddb01f07d70eee58f745fa739d8acc2a5f752331aba82141960c",
+      "contentDigest": "sha256:4c252c1f897d2e46c88e87acaf8212b100bd64b58151b9a867942d715a2df76a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#everyStatusBearingFieldAndFutureProducerHasAPublicationPath",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:53e99406d39e8fcb7938468bd6a5a001709966290d6c54caa73fc6dae22911c9",
+      "contentDigest": "sha256:f333fcc82cdf8e8573de7be9dccf49ea493565e1c5d06b3a60649789466b6363",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#producerWithoutOwnerPublicationStillSignalsCanonicalChange",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:53e99406d39e8fcb7938468bd6a5a001709966290d6c54caa73fc6dae22911c9",
+      "contentDigest": "sha256:f333fcc82cdf8e8573de7be9dccf49ea493565e1c5d06b3a60649789466b6363",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -130,7 +130,7 @@
       "id": "modules/ui-web/src/api/statusBoundaryPoll.test.ts",
       "file": "modules/ui-web/src/api/statusBoundaryPoll.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7c91ace71ab89757a5bcdcb01e9f6c33529b9eba06c88ea323205cc04f021a1d",
+      "contentDigest": "sha256:3e726a49698ee97eac5dbaf411793def02e8a950ff711e7349d6ae453005109b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -154,6 +154,14 @@
         {
           "name": "restarting the store cannot retain the previous head body when the next head refuses its first read",
           "status": "passed"
+        },
+        {
+          "name": "headerlessStatusConvergesAfterSseEpoch (SSE before the first body=false)",
+          "status": "passed"
+        },
+        {
+          "name": "headerlessStatusConvergesAfterSseEpoch (SSE before the first body=true)",
+          "status": "passed"
         }
       ]
     }
@@ -165,20 +173,28 @@
       "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
       "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
       "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
-      "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java"
+      "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+      "modules/ui/src/test/java/io/justsearch/ui/api/StatusLaneAging.java",
+      "modules/ui-web/node_modules/.before-run-private-install"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b67-status-backstop-compat.patch",
+        "contentDigest": "sha256:1c1392f24a3feea1596d9adbd7a5305c0d0a4eef5ebf292e98f1657670d2c14e"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierStatus5Test.realEncryptionOwnerPublishesItsCanonicalStateChange\" --tests \"io.justsearch.ui.api.VerifierStatus5Test.samplerFailureAndRecoveryPublishCanonicalFreshnessChanges\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.everyStatusBearingFieldAndFutureProducerHasAPublicationPath\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.producerWithoutOwnerPublicationStillSignalsCanonicalChange\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 63489
+        "durationMs": 81868
       },
       {
-        "command": "npx vitest run \"src/api/statusBoundary.test.ts\" \"src/api/statusBoundaryPoll.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-42312-1791747390086.json\"",
+        "command": "npx vitest run \"src/api/statusBoundary.test.ts\" \"src/api/statusBoundaryPoll.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b82g-status-records\\\\fe\\\\t\\\\test-intent-vitest-22244-1791931203411.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1766
+        "durationMs": 3219
       }
     ],
     "checks": [
@@ -205,14 +221,14 @@
       {
         "id": "modules/ui-web/src/api/statusBoundary.test.ts",
         "classification": "assertion",
-        "detail": "independent server publication boundary a refused read-only request still observes a foreign completed publication:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-ZeMvVu/modules/ui-web/src/api/statusBoundary.test.ts:13:19\n    at file:///C:/agent-sandbox-tmp/b67/web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 | independent server publication boundary missing metadata cannot certify an older "
+        "detail": "independent server publication boundary a refused read-only request still observes a foreign completed publication:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at C:/agent-sandbox-tmp/b82g-status-records/fe/t/test-intent-before-HWnXXB/modules/ui-web/src/api/statusBoundary.test.ts:13:19\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///C:/age | independent server publication boundary missing metadata cannot certify an older"
       },
       {
         "id": "modules/ui-web/src/api/statusBoundaryPoll.test.ts",
         "classification": "assertion",
-        "detail": "a restarted head with a refused read clears subscribers and cannot replay the old body to a new subscriber:  AssertionError: expected { …(31) } to be null\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-ZeMvVu/modules/ui-web/src/api/statusBoundaryPoll.test.ts:37:18\n    at file:///C:/agent-sandbox-tmp/b67/web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 | an ordinary cached poll schedules one fresh read and a failed read never schedules itself:  AssertionError: expe"
+        "detail": "a restarted head with a refused read clears subscribers and cannot replay the old body to a new subscriber:  AssertionError: expected { …(31) } to be null\n    at C:/agent-sandbox-tmp/b82g-status-records/fe/t/test-intent-before-HWnXXB/modules/ui-web/src/api/statusBoundaryPoll.test.ts:37:18\n    at file:///C:/agent-sandbox-tmp/b82g-status-records/fe/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 | an ordinary cached poll schedules one fresh read and a failed read never schedules itself:"
       }
     ]
   },
-  "digest": "sha256:cca753f115885a63b9e44e0a88af72c11e1ccf809d53788c9b70271d08791074"
+  "digest": "sha256:79c328da4d42f14c0d062c70c013adf908cf0298e279b677477bd67974b49fe5"
 }

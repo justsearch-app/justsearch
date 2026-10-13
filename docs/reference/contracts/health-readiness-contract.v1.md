@@ -211,12 +211,27 @@ performs the `indexStatus` port call (10 s while idle, 2 s while indexing/backfi
 flight, plus one sample on every capability transition), and a request reports what the last sample
 found. Consequently `meta.workerRpcAtMs` is the **sample's** observation time, not a per-request
 timestamp, and successive responses within one sampling period carry the same value by design.
-`GET /api/status?fresh=true` requests one asynchronous sample and returns the latest observation without waiting. Before the first completed observation, status reports unknown/stale. A stalled or failed sampler retains the last observation with the existing freshness markers; HTTP requests never perform probes, RPCs, file reads or component-lock acquisition.
+`GET /api/status?fresh=true` requests one asynchronous sample and waits for it at most 100 ms
+(`StatusLifecycleHandler.FRESH_READ_DEADLINE_MS`). The deadline ends only that response's wait. It
+is not evidence about any source: a source that has not answered keeps its last published value and
+freshness markers, and the deadline neither marks it stale nor advances the status change counter.
+So when a fresh read misses its deadline, it shows the last published value labelled current,
+rather than unknown, and right after an action it can briefly show the pre-action value until that
+source publishes. Before the first completed observation, status reports unknown/stale. A stalled or failed sampler retains the last observation with the existing freshness markers; HTTP requests never perform probes, RPCs, file reads or component-lock acquisition.
 
 When the sample failed — the call threw, or the worker capability was unavailable — the Head
-substitutes a fallback view, so those arms answer from placeholder data. A sample older than three
-sampling periods is treated the same way, so a stalled sampler surfaces as loss of contact rather
-than as a frozen snapshot presented as fresh. Then:
+substitutes a fallback view, so those arms answer from placeholder data. A sample is treated the
+same way when it is older than three of its own lane's effective cadences, so a stalled sampler
+surfaces as loss of contact rather than as a frozen snapshot presented as fresh. Each source is
+sampled in its own lane. A lane's effective cadence is its sampling period plus the largest of its
+recent data ages at publish (from the source reading's own timestamp, or from the probe's start, to
+publication). Only data ages up to three periods count; a value whose data was already older than
+that when it was published is stale at once. A lane therefore goes stale between 3 and 12 of its
+periods after its last real observation: 6 to 24 s on the busy 2 s period, 30 to 120 s on the idle
+10 s period. A lane sampled at the lifetime of its source's cache uses that longer period. A hung
+lane is reported stale only after 3 of its own update intervals, so detection is later when idle,
+about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown
+under load. Then:
 
 4. `stale` is `true`, and `observedAt` carries the epoch of the newest *successful* Worker
    observation in this Head process — not the response-build time, which would be a false freshness

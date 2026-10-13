@@ -7,6 +7,14 @@ author-session: b67-status-backstop
 
 Canonical status owns publication completeness; independent acceptance remains pending.
 
+Refreshed after b82 (run b82g-status-records). The evidence of entries 1 and 2 was re-run on the current checks. Entry 1's fail-before ran again at 93479e944 with its original overlays:
+
+- The verifier-derived checks changed in b82 because of b82's decisions (a) and (b). Entry 3 records this adaptation.
+- StatusPublicationCompletenessTest gained b82's knownUserVisibleStatesAlwaysSignal case, which b82's changeset covers, and an import tidy. Entry 1's two named methods are unchanged.
+- statusBoundaryPoll.test.ts gained b82's S4 cases (headerlessStatusConvergesAfterSseEpoch), which b82's changeset covers. Its earlier cases are unchanged. Entry 1 checks the whole file, so its evidence now includes the S4 cases.
+
+The current checks call StatusLaneAging, a b82 test helper, so the fail-before also overlays it. StatusLaneAging reads StatusLifecycleHandler.PROBE_ALLOWANCE_PERIODS, which 93479e944 lacks. The compat before-patch gates/test-intent/evidence/b67-status-backstop-compat.patch adds only that constant, and no production code in that state reads it. The overlay modules/ui-web/node_modules/.before-run-private-install is an empty marker file. It gives the before worktree a real node_modules directory, so the evidence script links none. The before worktree's frontend packages came from a private install in its parent directory.
+
 ```json
 {
   "entries": [
@@ -60,6 +68,20 @@ Canonical status owns publication completeness; independent acceptance remains p
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java"
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Before each stale or unknown assertion on a held lane, the cases now age that lane by its own clock with StatusLaneAging.ageHeldLanes: they advance the handler clock beyond the capped idle limit and run one bounded sampler pass. Two b82 decisions caused this. Decision (a): a hung lane is reported stale only after 3 of its own update intervals, so detection is later when idle, about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown under load. Under the old rule a refresh in flight for more than 1 s made its lane stale, so these cases used to sleep 1.2 s: VerifierStatusIsolationTest's blocked-disk and hung-worker cases, VerifierStatus2Test's per-owner case, VerifierStatus4Test's additional-owner case and VerifierStatus5Test's samplerFailureAndRecoveryPublishCanonicalFreshnessChanges. Decision (b): when a fresh read misses its deadline, it shows the last published value labelled current, rather than unknown. So right after an action it can briefly show the pre-action value. These cases used to observe the held lane as stale or unknown right after a fresh read had missed its deadline, and they now age it first: VerifierStatus3Test's persistent hung worker, VerifierStatus4Test's older pending failure (conversation protection unknown) and VerifierStatus5Test's unknown unrelated owner. Each case still holds the same producer. It asserts the same stale or unknown marker on exactly that part, the same current values on every other part, the same counter and reflected-revision relations and the same recovery."
     }
   ]
 }
