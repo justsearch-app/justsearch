@@ -316,3 +316,14 @@ outside this gate's scope; their before and after logs are in the run folder.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-shell-20261013",
+  "verdict": "accept",
+  "digest": "sha256:f16994b24bf49b0b2edcca01af413c5271cf6b370652b94225753cb2a4af4cc1",
+  "note": "VC-shell (independent Claude verifier) over four rounds on 2b524d1eb vs 61ff9b955: crash-1-restarts-under-budget median 2.27 s vs 2.51 s base (20 interleaved runs), full conformance +2%; teardown ends a live runner by its own child handle, a detached fixture is stopped by recorded identity before its folder is removed (base left it running), a PID now held by an unrelated process is not touched, a bystander always survived; Rust, Java and Node retention evict past a bad archive or journal line and keep and count unparseable journal lines through rewrite and compaction (each fails on the prior revision by assertion); engine-self-restart-is-requested 2/162 vs 0/163 base, not significant; cargo test --lib 150, app-api 403, dev-runner 29/29, conformance self-tests 55/55; Java side unchanged since 622008be8 except retention. Unverified: live shell crash and Windows shutdown (S13, S16 Windows), tray quit and update (P5). Changeset wording checked entry by entry. Digest bound with --base 61ff9b955, the lane's base."
+}
+```
