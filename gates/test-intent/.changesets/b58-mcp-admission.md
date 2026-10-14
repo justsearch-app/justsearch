@@ -13,6 +13,16 @@ freeze, native ownership, recovery and retirement expectations remain. The HTTP 
 valid initialize instructions so its existing session test exercises admission. Independent
 acceptance belongs to the verifier or orchestrator.
 
+Evidence for b58-mcp-admission.json was regenerated on b599d4d7e (phase B). EngineAdmissionTransportTest
+and McpProtocolHandlerTest now name EngineAdmissionException.Reason.INFERENCE_BUSY, which 7655b8a20
+lacks, so they did not compile there. The compat before-patch
+gates/test-intent/evidence/b58-mcp-admission-compat.patch adds only that constant, plus the minimal
+case arms that exhaustive switches over Reason need to compile: ConversationEngine, ApiErrorHandler
+and RequestEngineWork, and the before-state test ApiErrorHandlerResolveTest, which is not one of the
+checks. Each arm throws IllegalStateException("compat: unreachable before-state reason"). Nothing in
+the before-state produces this reason, so no before-state behaviour changes. With the patch, all
+five checks fail before by assertion.
+
 ```json
 {
   "entries": [

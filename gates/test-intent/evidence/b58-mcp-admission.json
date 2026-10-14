@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-11T09:30:58.635Z",
-  "revision": "7655b8a20c9e2fc1da9b2d9e5dabc47716978b26",
-  "tree": "7759cf11a99d71843d7b5b4d017f781268ca6ce1",
+  "createdAt": "2026-10-14T16:53:57.732Z",
+  "revision": "99b515eeae0a6caa0b9e93a6ee1c372718c66aa7",
+  "tree": "8303c9d32e879fec41bc35e675d73c4db4a9fbfb",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.OnlineModeOpsTest.expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 183685
+      "durationMs": 4309
     },
     {
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerDeferredRetirementTest.deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 32483
+      "durationMs": 4379
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 27578
+      "durationMs": 6927
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 18778
+      "durationMs": 7194
     }
   ],
   "checks": [
@@ -77,7 +77,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3441074415122d24a3274f1645ebd555f593006d8f929b2271c50a438067ac82",
+      "contentDigest": "sha256:d1b27c531f2a0eaac0a6868d62f5637b8e3f7d83890be4adefb2d25d9c972860",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,7 +92,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java#nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3fc1377df5062644f9351f7ded535daafa5e9de3ad00b37e453ea51f044cb4bc",
+      "contentDigest": "sha256:09bc57a9c8a58c3920cb5fb2902bf1c34e0b51790817f0de59821e45782fe03c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -123,31 +123,36 @@
     "ref": "7655b8a20",
     "revision": "7655b8a20c9e2fc1da9b2d9e5dabc47716978b26",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b58-mcp-admission-compat.patch",
+        "contentDigest": "sha256:0974a84be7bc2497011dbe1c37c9b8fc1106cfea4a9d3338c556189377a0b22b"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.OnlineModeOpsTest.expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 38932
+        "durationMs": 15084
       },
       {
         "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerDeferredRetirementTest.deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 47328
+        "durationMs": 13322
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1479194
+        "durationMs": 10827
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 23451
+        "durationMs": 11181
       }
     ],
     "checks": [
@@ -178,5 +183,5 @@
       }
     ]
   },
-  "digest": "sha256:7d64df6954c3ebea69560ad85dab005c1f64fdcb09fa7ae929f512a4efc4837b"
+  "digest": "sha256:da20fbb50ebc8153a019cef012fd7577f4c5328de216ce2f0ad8d87d537c092e"
 }
