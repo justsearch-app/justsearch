@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:24:11.040Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "094fbc4b14ef8f1f75697c9de9fbbfdf05e6f454",
+  "createdAt": "2026-10-14T17:50:25.052Z",
+  "revision": "228c9da66221dd21e9ded4debbd9efc4a2c20584",
+  "tree": "92a854a1185aa3be6bd3f447d1596c0b465f84f9",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuDriverApiProbeDevicesTest.luidIsFormattedAsPdhNamesItsInstances\" --tests \"io.justsearch.ort.GpuDriverApiProbeDevicesTest.uuidIsFormattedAsNvidiaSmiAndCudaVisibleDevicesName\" --tests \"io.justsearch.ort.GpuDriverApiProbeDevicesTest.everyOrdinalCarriesItsIdentity\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4438
+      "durationMs": 2465
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.DevicePinningTest.theLargestMappedNvidiaAdapterWins\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.aTieGoesToDxgiEnumerationOrderNotCudaOrder\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.aHybridLaptopsIntegratedGpuNeverCounts\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.softwareAndUnmappedAdaptersAreNotCandidates\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.oneDeviceWithoutALuidIsOrdinalZero\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.severalDevicesWithoutAMapAreUnresolved\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.probeOutcomesMapToFactsStatus\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.aDriverBelowTheLlamaRuntimesCudaMajorHandsLlamaServerNoDevice\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.thePinnedDeviceMapsToReaderBusIdAndUuid\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.thePinnedDeviceMustBeOneOfTheDevices\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.thePinnedOrdinalIsEveryOrtRolesDefaultDevice\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.anExplicitRoleDeviceIdKeepsItsValue\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.nothingPinnedLeavesTheDefaults\" --tests \"io.justsearch.app.services.gpu.DeviceFactsMachineTest.thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4943
+      "durationMs": 3685
     },
     {
-      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerDeviceLaunchTest.aPinnedGpuLaunchNamesTheDevice\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLaunchTest.anUnpinnedGpuLaunchKeepsTheLineFromBeforeThePin\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.pinnedUuidBecomesTheOnlyVisibleCudaDevice\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.nothingPinnedLeavesTheInheritedEnvironment\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.pinningFlagsFollowTheWindowFlagsOnAGpuLaunch\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.cpuLaunchNamesNoDevice\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerDeviceLaunchTest.aPinnedGpuLaunchNamesTheDevice\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLaunchTest.anUnpinnedGpuLaunchKeepsTheLineFromBeforeThePin\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.pinnedUuidBecomesTheOnlyVisibleCudaDevice\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.nothingPinnedLeavesTheInheritedEnvironment\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.pinningFlagsFollowTheWindowFlagsOnAGpuLaunch\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9708
+      "durationMs": 5613
     }
   ],
   "checks": [
@@ -366,18 +366,8 @@
           "status": "passed"
         }
       ]
-    },
-    {
-      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#cpuLaunchNamesNoDevice",
-      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:ef92814c079d3838c9ebaabee6eb3b9693d153ab00a8442a6dec0b4816999aab",
-      "executed": false,
-      "skipped": false,
-      "outcome": "not-found",
-      "cases": []
     }
   ],
   "failBefore": null,
-  "digest": "sha256:295d6380654c2fea8a132b0710a81378b0cd75bd2716e249026b4e0e4c21d492"
+  "digest": "sha256:1df654974fbe0918341bd270508ece0b7c4bf4a92885ce257898069eabb6b7ab"
 }

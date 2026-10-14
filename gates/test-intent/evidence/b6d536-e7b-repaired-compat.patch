@@ -1,16 +1,29 @@
+Compat before-patch for b6d536-e7b-repaired-b15-refresh, applied to 481434f82 (coordinator
+decision 4).
+
+Production, one stub only: GpuCallPacker.acquireForCall, which GpuCallPackerTest calls
+(1f8ce3e01, b9abcaf97). It acquires nothing from the session handle and returns a do-nothing
+lease (no session, no run options, a no-op release, not a CPU lease, the no-op recorder, no
+device). It chooses no device for the call, so it supplies none of the packing or CPU dispatch
+behaviour under test. No production code in this state calls it.
+
 diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java b/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
-index adc7addee..e917b9447 100644
+index adc7addee..62f51ff1a 100644
 --- a/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
 +++ b/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
-@@ -89,6 +89,13 @@ public final class GpuCallPacker {
+@@ -89,6 +89,17 @@ public final class GpuCallPacker {
          .flatMap(GpuArenaPlan.Role::bulkCpuReason);
    }
  
-+  /** Compat declaration for fail-before runs only; nothing in this state reads it. */
++  /**
++   * Compat stub for fail-before runs only; nothing in this state reads it. It acquires nothing and
++   * returns a do-nothing lease: no session, no run options, a no-op release, not a CPU lease, the
++   * no-op recorder and no device. It chooses no device for the call.
++   */
 +  public static SessionHandle.Lease acquireForCall(
 +      SessionHandle sessions, SessionAcquisitionRequest request, EncoderRole role,
 +      int paddedCount, int paddedLength) {
-+    return null;
++    return new SessionHandle.Lease(null, null, () -> {}, false, OrtRunRecorder.NOOP);
 +  }
 +
    private static Optional<GpuArenaPlan.Role> packedRole(
