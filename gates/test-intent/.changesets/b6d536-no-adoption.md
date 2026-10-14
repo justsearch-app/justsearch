@@ -25,7 +25,9 @@ observation after the bound is unmeasurable, not a pass.
 Phase B (b599d4d7e): `b6d536-no-adoption-ownership.json` was regenerated candidate-only, without a
 before-state. LlamaServerProcessOwnershipTest now uses StopRequest and RecordingChildControl, which
 6f7895a79 lacks, and its entry is not a repair, so no fail-before is required. The check passes on the
-candidate.
+candidate. The former entry 18 (an Adaptation for `scripts/jseval/lane-f/e456-instruments.test.mjs`)
+is removed. The gate leaves the jseval suite out of scope by design (tempdoc 966 D1), so that item is
+never flagged and the entry covered nothing.
 
 ```json
 {
@@ -465,25 +467,6 @@ candidate.
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-no-adoption-executor-floor.json"
-    },
-    {
-      "items": [
-        "scripts/jseval/lane-f/e456-instruments.test.mjs"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "rename"
-      ],
-      "whatMoved": "'child policy never passes vacuously and any orphan/reload dominates a gap': the all-true fixture row carries llamaEndedAndChatReady instead of healthyLlamaAdopted, the field projectChildPolicies now reads for crash and restart (the E5 instrument measures that the old llama-server ended and the successor's own answers /health, instead of that it was adopted). The three assertions (undefined, false, true) are unchanged.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261005-b6d536",
-          "scenario": "S14",
-          "quote": "If the Engine crashes, hangs or is restarted, every helper ends with it (including a chat server just started but not yet registered); the supervisor restarts it and chat returns without user action (D2). Unless a game or low GPU memory blocks it, in which case chat shows why.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ]
     }
   ]
 }
