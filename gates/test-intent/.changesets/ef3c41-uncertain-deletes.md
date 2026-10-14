@@ -2338,3 +2338,14 @@ Round 9 (on top of 925610f44, decisions under the owner's delegation): on a plat
   "note": "Independent verifier accepted 925610f44 (round 8): D6 fixed live on the real interface; volume recording and upgrade seeding as decided; suites, ArchUnit, PMD clean; every new check fails on ef205d0e9 by assertion; earlier rounds' live S1-S8 verification still holds. Restart-before-re-registration window and profiling reset verified by tests only."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-ef3c41-r9-20261014",
+  "verdict": "accept",
+  "digest": "sha256:88251cfa317e9059b399529f50ed9526a435162358ad534e99d5d7805aa6da5f",
+  "note": "Independent verifier accepted round 9 (fdefda2f6): no platform volume identity defers nothing (seam run 2,710 tests, 0 failed); deleted, corrupt, malformed and denied volume ledger deletes nothing live; store-recoverability gate passes; full suite 9,816/0. a1d143cee only removes two unused exports (dead-code gate), with no behaviour change."
+}
+```
