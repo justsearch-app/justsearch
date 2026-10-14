@@ -7,6 +7,17 @@ author-session: b61-status-approval
 
 Execution receipts and streamed tool completions reach the production canonical status poller. The checks drive the mounted typed authorization host and pending bridge, the host AI reader, direct/resumed/reattached streams, trusted plugin fetch and invocation, virtual commands, consented retry and concurrent approvals. The unchanged operation, settings and after-action preservation checks retain their assertions. Independent acceptance is pending.
 
+Review history (records repair, 2026-10-14). On the previous content (digest sha256:40c11021...),
+verify-status5, -6 and -7 rejected and verify-status8 accepted; the gate reported that as a
+disagreement needing a tie-break. verify-status5 also judged that ea0c311cb replaced the
+operation-classified completion mechanism this entry describes with the server-owned status counter
+(b6d536-b64-status-counter.md), so this entry's evidence cannot stand for that design; verify-status6
+and -7 rejected on counter noise, metadata loss and back-off after refused fresh reads, which
+verify-status8 reports passing on 2fd48e172. This repair changed only the source (orchestrator wording
+no longer cited as owner words), so every earlier record is stale and the disagreement is not decided
+here. The next acceptor reviews the current content against the current check; the evidence file is
+invalid because statusCompletion.test.ts changed after its run.
+
 ```json
 {
   "entries": [
@@ -15,7 +26,7 @@ Execution receipts and streamed tool completions reach the production canonical 
       "class": "New",
       "repaired": true,
       "behaviour": "A successful server-executed pending approval, state-changing streamed tool completion or raw plugin operation request refreshes the production canonical observation before completion is delivered. Unknown operation identity after reconnect is observed conservatively. Failed, skipped and known read-only completions do not refresh; receipts remain readable and concurrent completions coalesce. Existing invocation, consented retry and virtual-command paths retain canonical completion.",
-      "sources": [{"kind": "owner-words", "quote": "Every path by which an action that changes status-surface state completes successfully in or through this UI must reach the same completion mechanism", "location": "task t-20261005-b6d536 request (b61 builder role contract, task item 5 / S20)"}],
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "Every path by which an action that changes status-surface state completes successfully in or through this UI must reach the same completion mechanism", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b61 builder role contract, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b61-status-completion.json",
       "newChecks": ["modules/ui-web/src/api/statusCompletion.test.ts"]
     }
