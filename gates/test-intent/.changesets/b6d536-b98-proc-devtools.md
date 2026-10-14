@@ -118,6 +118,28 @@ Java ownership belongs to b6d536/proc-java. Modules Java remains byte-for-byte a
           "choice": "Follow-up to the merge of b6d536/batch-1-proc, decided by the orchestrator under the owner's delegation: close the named gaps while keeping the identity-only rule (never find processes through parent PIDs, names or PID alone). A dev tool starts the real process directly where it can (node or java by absolute path, shell:false, no cmd shim) and records PID plus creation time at start; what a third-party tool starts is contained by a Windows job the starter creates (KILL_ON_JOB_CLOSE, no breakaway), so the kernel adds each descendant at its creation, and the run's stop ends the job host it recorded by identity, whose job handle closing ends every member. The run record names the root and every member by PID plus creation time; the stop verifies each has ended. A recorded PID that now shows another birth is not the run and is never touched."
         }
       ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "scripts/dev/test-dev-runner-process-races.mjs",
+        "scripts/dev/test-dev-runner-stop-recovery.mjs",
+        "scripts/jseval/tests/test_owned_stops.py"
+      ],
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Fail-before for four rewritten checks is not available at d52ee5e7a, because the interface they drive does not exist there: process-races 'dev-all refuses a replacement at the termination boundary' and stop-recovery 'dev-all birth capture finishes in the spawn turn before stop' evaluate dev-all's startOwnedChild, childRuns and terminateChild with the job starter (job-run.cjs) injected, and d52ee5e7a's dev-all has no startOwnedChild, childRuns or job starter (it spawns directly and its terminateChild stops the child's identity through engine-actuator); test_owned_stops 'test_sweep_accepts_a_recorded_process_already_gone' and 'test_sweep_leaves_a_foreign_port_owner_alone' drive kill_backend with a fake run stop taking -RecordPath and -Code, and d52ee5e7a's sweep reads no run stop (JUSTSEARCH_SWEEP_STOPPER) and calls a PID-addressed terminator (JUSTSEARCH_SWEEP_TERMINATOR -Pid). Copied to d52ee5e7a they fail on the missing names, not on the behavior they check. Their warrant is the unchanged inputs and expected outcomes of the checks they replace (a stale PID never reaches another killer; the recorded birth reaches the stop in the spawn turn; already-gone is success; a foreign port owner is never stopped), and each passes at a000e15c7 and at this change.",
+      "sources": [
+        {
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "kind": "delegated-choice",
+          "delegationScope": "Process ownership and exit accounting, task t-20261005-b6d536",
+          "label": "agent choice",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (archived at F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "choice": "Follow-up to the merge of b6d536/batch-1-proc, decided by the orchestrator under the owner's delegation: close the named gaps while keeping the identity-only rule (never find processes through parent PIDs, names or PID alone). A dev tool starts the real process directly where it can (node or java by absolute path, shell:false, no cmd shim) and records PID plus creation time at start; what a third-party tool starts is contained by a Windows job the starter creates (KILL_ON_JOB_CLOSE, no breakaway), so the kernel adds each descendant at its creation, and the run's stop ends the job host it recorded by identity, whose job handle closing ends every member. The run record names the root and every member by PID plus creation time; the stop verifies each has ended. A recorded PID that now shows another birth is not the run and is never touched."
+        }
+      ]
     }
   ]
 }
@@ -182,6 +204,20 @@ decoy's PID under a recycled-looking birth and a genuine same-name run, and the 
 check is now a normal check (a detached leaf of an exited wrapper does not survive its run's stop). The live sweep check now asserts
 kill_backend ends the java stand-in behind the recorded command before the fixture's own exit signal. Each fails by assertion on
 d52ee5e7a (detached worktree, new check files copied in) and passes after.
+
+Follow-up (fix(b6d536): ordered Engine quit and job containment for dev-all and dev-runner): on Ctrl+C or a stop, dev-all asks
+the Engine to quit through POST /api/lifecycle/shutdown, waits for its exit (QUIT_DEADLINE_MS plus 2 s) and only then stops its
+job; its children start in new process groups, so the console's Ctrl+C reaches dev-all alone. With no --data-dir, dev-all gives
+the Engine its own dev data folder as JUSTSEARCH_DATA_DIR and JUSTSEARCH_HOME (an inherited JUSTSEARCH_DATA_DIR is not an
+explicit choice). dev-runner starts the Engine inside a starter-owned job (job-run.cjs); the stop keeps its order (ordered quit,
+recorded identities, then the job for what is left), and each process the job's termination ended is listed by identity in the
+stop result and stop-report.json (engineJob.endedByJob); the Engine's exit record names the containment DEV_RUNNER_JOB. A clean
+Ctrl+C removes dev-all's and serve-worktree-fe's run records. New script checks: test-dev-runner-engine-job.mjs (the real CLI
+with the fake Engine and a detached grandchild; WindowsEngineJob's nested job reproduced call for call; the fallback stop's order)
+and four cases in test-dev-runner-job-stops.mjs (dev-all ordered quit on its own stop and on a real console Ctrl+C, dev-all
+isolation, serve-worktree-fe Ctrl+C record removal). Each of the seven new checks fails by assertion on bc5978095 (detached
+worktree, new check files copied in) and passes after; the nested-job check's containment and exit-code parts already pass on
+bc5978095, as a confirmation should, and it fails there only on the stop's listing of what the job ended.
 
 ## Acceptance records
 

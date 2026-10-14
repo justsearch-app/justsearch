@@ -12,6 +12,9 @@
 .NOTES
   One JSON line on stdout. Exit codes: 0 every recorded process has ended (outcome 'terminated' when
   this stop ended the host, 'gone' when the run had already ended); 4 incomplete or failure.
+  endedByJob lists by identity each recorded process the job's termination ended: the members still
+  running when this stop ended the host, or, for a run that had already ended, those the host
+  itself ended after its root exited.
 #>
 [CmdletBinding()]
 param(
@@ -55,6 +58,16 @@ try {
     Write-Outcome 'unknown-identity' @{ reason = 'the host birth is unknown' }
     exit 4
   }
+  # Which recorded processes are still running just before the job closes: those the stop ends.
+  $runningBefore = @()
+  if ($null -ne $record) {
+    $before = @(@($record.root) + @($record.members) | Where-Object { $_ -and $_.pid } |
+      Sort-Object -Property pid, creationFileTimeUtc -Unique)
+    if ($before.Count -gt 0) {
+      $runningBefore = @([JustSearchJobRun]::Survivors([int[]]@($before | ForEach-Object { [int]$_.pid }),
+        [long[]]@($before | ForEach-Object { [long]$_.creationFileTimeUtc }), $BirthTick, 0) | ForEach-Object { $_ | ConvertFrom-Json })
+    }
+  }
   $hostOutcome = [JustSearchJobRun]::EndHost($HostPid, $hostBirth, $Code, $BirthTick, $WaitMs)
   if ($hostOutcome -eq 'failed') {
     Write-Outcome 'failed' @{ host = $hostOutcome; reason = 'the recorded host could not be ended' }
@@ -71,7 +84,10 @@ try {
   $births = [long[]]@($members | ForEach-Object { [long]$_.creationFileTimeUtc })
   $survivors = @([JustSearchJobRun]::Survivors($pids, $births, $BirthTick, $WaitMs) | ForEach-Object { $_ | ConvertFrom-Json })
   $outcome = if ($survivors.Count -gt 0) { 'incomplete' } elseif ($hostOutcome -eq 'terminated') { 'terminated' } else { 'gone' }
-  Write-Outcome $outcome @{ host = $hostOutcome; members = $members.Count; survivors = $survivors }
+  $endedByJob = if ($hostOutcome -eq 'terminated') { $runningBefore } elseif ($null -ne $record -and $record.endedByJob) { @($record.endedByJob) } else { @() }
+  $endedByJob = @($endedByJob | Where-Object { $_ -and $_.pid } |
+    Where-Object { $s = $_; -not ($survivors | Where-Object { $_.pid -eq $s.pid -and $_.creationFileTimeUtc -eq $s.creationFileTimeUtc }) })
+  Write-Outcome $outcome @{ host = $hostOutcome; members = $members.Count; survivors = $survivors; endedByJob = $endedByJob }
   if ($survivors.Count -gt 0) { exit 4 }
   exit 0
 } catch {

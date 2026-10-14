@@ -604,8 +604,10 @@ function createEngineActuator({
           exitClass: decision.exitClass ?? 'TRANSIENT',
           counted: decision.counted === true,
         },
-        containment: 'LIBUV_JOB',
-        jobEmpty: null,
+        // A runner-started job holds the Engine and everything it starts (job-run.cjs); its host
+        // reports whether the job was empty once it ended what the Engine left. Otherwise Node's.
+        containment: state.child?.jobRun ? 'DEV_RUNNER_JOB' : 'LIBUV_JOB',
+        jobEmpty: state.child?.jobRun && state.child.jobFinal ? state.child.jobFinal.state === 'ended' : null,
       };
       await enqueue(() => append('engine-exit', fields));
       if (!ledger && ['UNEXPECTED', 'REQUESTED'].includes(classified.exitClass)) {

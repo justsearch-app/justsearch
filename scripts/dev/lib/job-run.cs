@@ -6,7 +6,11 @@
 // PID. The host holds the only job handle: when the host ends, for any reason, Windows ends every
 // member. When the root exits, the host ends what the root left in the job and exits with the
 // root's code. The run record names the host, the root and every member seen, each by PID and
-// creation time read on a handle that IsProcessInJob confirmed.
+// creation time read on a handle that IsProcessInJob confirmed, and lists by identity each member
+// the job's termination ended after the root had exited (endedByJob). The host ignores Ctrl+C and
+// Ctrl+Break: it outlives its root, and only its stopper or its own parent's job ends it early.
+// With newProcessGroup the root starts a new process group, so neither it nor anything it starts
+// receives the console's Ctrl+C; the starter then asks the root to quit through its own channel.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,6 +20,7 @@ using System.Threading;
 
 public static class JustSearchJobRun {
   const uint CREATE_SUSPENDED = 0x4;
+  const uint CREATE_NEW_PROCESS_GROUP = 0x200;
   const int STARTF_USESTDHANDLES = 0x100;
   const uint KILL_ON_JOB_CLOSE = 0x2000;
   const uint PROCESS_TERMINATE = 0x1;
@@ -86,6 +91,12 @@ public static class JustSearchJobRun {
   static extern IntPtr GetCurrentProcess();
   [DllImport("kernel32.dll")]
   static extern bool CloseHandle(IntPtr handle);
+  delegate bool ConsoleCtrl(uint type);
+  [DllImport("kernel32.dll")]
+  static extern bool SetConsoleCtrlHandler(ConsoleCtrl handler, bool add);
+
+  /** Ctrl+C (0) and Ctrl+Break (1) are not the host's to act on; close, logoff and shutdown are. */
+  static readonly ConsoleCtrl IgnoreInterrupts = type => type <= 1;
 
   static string Q(string value) {
     if (value == null) return "null";
@@ -129,8 +140,8 @@ public static class JustSearchJobRun {
     } finally { Marshal.FreeHGlobal(buffer); }
   }
 
-  /** Adds each current member not yet recorded: opened by its listed PID, kept only if IsProcessInJob. */
-  static bool RefreshMembers(IntPtr job, Dictionary<int, long> members, List<int> order) {
+  /** The PIDs the job lists as its active members now (nested jobs' members included), or null. */
+  static int[] ListedPids(IntPtr job) {
     int capacity = 64;
     for (int round = 0; round < 6; round++) {
       int length = 8 + IntPtr.Size * capacity;
@@ -139,43 +150,62 @@ public static class JustSearchJobRun {
         int returned;
         if (!QueryInformationJobObject(job, JOB_BASIC_PROCESS_ID_LIST, buffer, length, out returned)) {
           if (Marshal.GetLastWin32Error() == ERROR_MORE_DATA) { capacity *= 4; continue; }
-          return false;
+          return null;
         }
         int assigned = Marshal.ReadInt32(buffer, 0), listed = Marshal.ReadInt32(buffer, 4);
         if (assigned > listed) { capacity = assigned + 16; continue; }
-        bool changed = false;
-        for (int i = 0; i < listed; i++) {
-          int pid = (int)Marshal.ReadIntPtr(buffer, 8 + i * IntPtr.Size).ToInt64();
-          if (pid <= 0 || members.ContainsKey(pid)) continue;
-          IntPtr handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
-          if (handle == IntPtr.Zero) continue;
-          try {
-            bool inJob;
-            if (!IsProcessInJob(handle, job, out inJob) || !inJob) continue;
-            long birth = BirthOf(handle);
-            if (birth == 0) continue;
-            members[pid] = birth; order.Add(pid); changed = true;
-          } finally { CloseHandle(handle); }
-        }
-        return changed;
+        int[] pids = new int[listed];
+        for (int i = 0; i < listed; i++) pids[i] = (int)Marshal.ReadIntPtr(buffer, 8 + i * IntPtr.Size).ToInt64();
+        return pids;
       } finally { Marshal.FreeHGlobal(buffer); }
     }
-    return false;
+    return null;
+  }
+
+  /** Adds each current member not yet recorded: opened by its listed PID, kept only if IsProcessInJob. */
+  static bool RefreshMembers(IntPtr job, Dictionary<int, long> members, List<int> order) {
+    int[] listed = ListedPids(job);
+    if (listed == null) return false;
+    bool changed = false;
+    foreach (int pid in listed) {
+      if (pid <= 0 || members.ContainsKey(pid)) continue;
+      IntPtr handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+      if (handle == IntPtr.Zero) continue;
+      try {
+        bool inJob;
+        if (!IsProcessInJob(handle, job, out inJob) || !inJob) continue;
+        long birth = BirthOf(handle);
+        if (birth == 0) continue;
+        members[pid] = birth; order.Add(pid); changed = true;
+      } finally { CloseHandle(handle); }
+    }
+    return changed;
   }
 
   static string RecordJson(int hostPid, long hostBirth, int rootPid, long rootBirth, Dictionary<int, long> members,
-      List<int> order, string state, string rootExit) {
+      List<int> order, string state, string rootExit, List<int> endedByJob = null) {
     StringBuilder b = new StringBuilder();
     b.Append("{\"schema\":\"justsearch-job-run.v1\",\"pid\":").Append(hostPid)
      .Append(",\"creationFileTimeUtc\":\"").Append(hostBirth).Append("\",\"root\":").Append(Identity(rootPid, rootBirth))
      .Append(",\"members\":[");
     for (int i = 0; i < order.Count; i++) { if (i > 0) b.Append(','); b.Append(Identity(order[i], members[order[i]])); }
-    b.Append("],\"state\":").Append(Q(state)).Append(",\"rootExitCode\":").Append(rootExit ?? "null").Append('}');
+    b.Append("],\"state\":").Append(Q(state)).Append(",\"rootExitCode\":").Append(rootExit ?? "null");
+    if (endedByJob != null) {
+      b.Append(",\"endedByJob\":[");
+      for (int i = 0; i < endedByJob.Count; i++) { if (i > 0) b.Append(','); b.Append(Identity(endedByJob[i], members[endedByJob[i]])); }
+      b.Append(']');
+    }
+    b.Append('}');
     return b.ToString();
   }
 
   /** Runs one command line in a new job; returns the root's exit code. */
   public static int Host(string application, string commandLine, string directory, string recordPath) {
+    return Host(application, commandLine, directory, recordPath, false);
+  }
+
+  public static int Host(string application, string commandLine, string directory, string recordPath, bool newProcessGroup) {
+    SetConsoleCtrlHandler(IgnoreInterrupts, true);
     IntPtr job = CreateJobObjectW(IntPtr.Zero, null);
     if (job == IntPtr.Zero) throw new InvalidOperationException("CreateJobObjectW failed: " + Marshal.GetLastWin32Error());
     EXTENDED_LIMIT limits = new EXTENDED_LIMIT();
@@ -188,7 +218,7 @@ public static class JustSearchJobRun {
     startup.hStdInput = GetStdHandle(-10); startup.hStdOutput = GetStdHandle(-11); startup.hStdError = GetStdHandle(-12);
     PROCESS_INFORMATION info;
     if (!CreateProcessW(string.IsNullOrEmpty(application) ? null : application, new StringBuilder(commandLine),
-        IntPtr.Zero, IntPtr.Zero, true, CREATE_SUSPENDED, IntPtr.Zero,
+        IntPtr.Zero, IntPtr.Zero, true, CREATE_SUSPENDED | (newProcessGroup ? CREATE_NEW_PROCESS_GROUP : 0), IntPtr.Zero,
         string.IsNullOrEmpty(directory) ? null : directory, ref startup, out info))
       throw new InvalidOperationException("CreateProcessW failed: " + Marshal.GetLastWin32Error());
     try {
@@ -212,11 +242,14 @@ public static class JustSearchJobRun {
       uint code;
       if (!GetExitCodeProcess(info.hProcess, out code)) code = 1;
       RefreshMembers(job, members, order);
-      // The root has ended: what it left in its job is ended with it.
+      // The root has ended: what it left in its job is ended with it, and each such member is listed.
+      List<int> leftovers = new List<int>();
+      int[] listed = ListedPids(job);
+      if (listed != null) foreach (int pid in listed) if (pid != info.dwProcessId && members.ContainsKey(pid)) leftovers.Add(pid);
       TerminateJobObject(job, code);
       for (int i = 0; i < 200 && ActiveProcesses(job) > 0; i++) Thread.Sleep(25);
       WriteRecord(recordPath, RecordJson(hostPid, hostBirth, info.dwProcessId, rootBirth, members, order,
-          ActiveProcesses(job) == 0 ? "ended" : "incomplete", code.ToString()));
+          ActiveProcesses(job) == 0 ? "ended" : "incomplete", code.ToString(), leftovers));
       return (int)code;
     } finally {
       CloseHandle(info.hThread); CloseHandle(info.hProcess); CloseHandle(job);

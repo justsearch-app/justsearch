@@ -16,6 +16,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { EventEmitter } = require('node:events');
 const { spawn, spawnSync } = require('node:child_process');
 const { captureSpawnedIdentity } = require('./engine-actuator.cjs');
 
@@ -52,18 +53,23 @@ function recordDirectory(env = process.env) {
 }
 
 /**
+ * `newProcessGroup`: the root starts a new process group, so the console's Ctrl+C reaches neither
+ * it nor anything it starts; the caller then ends the run through the root's own quit channel or
+ * the job. The host itself never acts on Ctrl+C.
+ *
  * @returns {{ child: import('child_process').ChildProcess, recordPath: string|null,
  *   host: {pid: number, creationFileTimeUtc: string}|null, contained: boolean }}
  */
-function startInJob({ command, args = [], cwd, env = process.env, stdio, label = 'run',
-  platform = process.platform, spawnImpl = spawn, capture = captureSpawnedIdentity } = {}) {
+function startInJob({ command, args = [], cwd, env = process.env, stdio, label = 'run', newProcessGroup = false,
+  recordDir = null, platform = process.platform, spawnImpl = spawn, capture = captureSpawnedIdentity } = {}) {
   if (platform !== 'win32') {
     return { child: spawnImpl(command, args, { cwd, env, stdio, shell: false }), recordPath: null, host: null, contained: false };
   }
-  const dir = recordDirectory(env);
+  const dir = recordDir ?? recordDirectory(env);
   fs.mkdirSync(dir, { recursive: true });
   const recordPath = path.join(dir, `${label}-${process.pid}-${crypto.randomUUID()}.json`);
-  const spec = Buffer.from(JSON.stringify({ ...windowsCommand(command, args, env), cwd: cwd ?? null }), 'utf8').toString('base64');
+  const spec = Buffer.from(JSON.stringify({ ...windowsCommand(command, args, env), cwd: cwd ?? null,
+    ...(newProcessGroup ? { newProcessGroup: true } : {}) }), 'utf8').toString('base64');
   const child = spawnImpl('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', HOST_SCRIPT, '-Spec', spec, '-RecordPath', recordPath],
   { cwd, env, stdio, windowsHide: true, shell: false });
@@ -106,7 +112,69 @@ function retireRunRecord(run) {
   if (record?.state === 'ended') fs.rmSync(run.recordPath, { force: true });
 }
 
+/**
+ * Once the run's host has exited: a record its host closed as `ended` is retired; any other record
+ * (a host that was itself ended) is settled by the stop, which verifies every identity it names
+ * and removes the record when none is still running.
+ */
+function settleRunRecord(run, options) {
+  if (!run?.recordPath || !fs.existsSync(run.recordPath)) return { ok: true, outcome: 'gone' };
+  const record = readRunRecord(run);
+  if (record?.state === 'ended') {
+    fs.rmSync(run.recordPath, { force: true });
+    return { ok: true, outcome: 'gone', endedByJob: record.endedByJob ?? [] };
+  }
+  return stopJobRunSync(run, options);
+}
+
+/**
+ * Blocks until the host has recorded its root (written before the root is resumed, so the root has
+ * run no code yet), the host has exited, or `timeoutMs` passes. The host's PID cannot name another
+ * process meanwhile: libuv holds its handle until its exit is reaped.
+ */
+function waitForRootSync(run, { timeoutMs = 20000, intervalMs = 10 } = {}) {
+  if (!run?.recordPath) return null;
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    const record = readRunRecord(run);
+    if (record?.root?.pid && Number(record.pid) === run.child.pid) return record;
+    let alive = true;
+    try { process.kill(run.child.pid, 0); } catch { alive = false; }
+    if (!alive || Date.now() >= end) return null;
+    Atomics.wait(pause, 0, 0, intervalMs);
+  }
+}
+
+/**
+ * The root of a job run, seen as a child process: its PID and recorded birth are the root's, its
+ * streams and exit are the host's (the host passes its standard handles to the root and exits with
+ * the root's code once the job is empty). It has no kill(): a stop goes through a recorded identity
+ * or the job. `jobRun` is the run; `jobFinal` is the record its host left, read at its exit.
+ */
+function rootAsChild(run, record, { spawnfile } = {}) {
+  const host = run.child;
+  const facade = new EventEmitter();
+  Object.defineProperties(facade, {
+    pid: { value: record?.root?.pid ?? undefined, enumerable: true },
+    rootIdentity: { value: record?.root ? { pid: record.root.pid, creationFileTimeUtc: String(record.root.creationFileTimeUtc) } : null },
+    stdin: { get: () => host.stdin }, stdout: { get: () => host.stdout }, stderr: { get: () => host.stderr },
+    exitCode: { get: () => host.exitCode }, signalCode: { get: () => host.signalCode },
+    spawnfile: { value: spawnfile ?? host.spawnfile },
+    jobRun: { value: run },
+  });
+  facade.jobFinal = null;
+  host.on('error', (err) => facade.emit('error', err));
+  host.on('exit', (code, signal) => {
+    facade.jobFinal = readRunRecord(run);
+    facade.emit('exit', code, signal);
+  });
+  host.on('close', (code, signal) => facade.emit('close', code, signal));
+  return facade;
+}
+
 module.exports = {
-  startInJob, stopJobRunSync, readRunRecord, retireRunRecord, windowsCommand, quoteArgument,
+  startInJob, stopJobRunSync, readRunRecord, retireRunRecord, settleRunRecord, waitForRootSync, rootAsChild,
+  windowsCommand, quoteArgument,
   recordDirectory, NON_DISTINCTIVE_KILL_CODE, HOST_SCRIPT, STOP_SCRIPT,
 };

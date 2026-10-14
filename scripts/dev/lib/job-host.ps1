@@ -14,7 +14,9 @@
   stop is stop-job-run.ps1.
 
 .PARAMETER Spec
-  Base64 of UTF-8 JSON: { application?: string, commandLine: string, cwd?: string }.
+  Base64 of UTF-8 JSON: { application?: string, commandLine: string, cwd?: string, newProcessGroup?: boolean }.
+  With newProcessGroup the root and its descendants do not receive the console's Ctrl+C; this host
+  never acts on Ctrl+C or Ctrl+Break in any case.
 #>
 [CmdletBinding()]
 param(
@@ -25,7 +27,8 @@ $ErrorActionPreference = 'Stop'
 try {
   $run = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Spec)) | ConvertFrom-Json
   if (-not ('JustSearchJobRun' -as [type])) { Add-Type -Path (Join-Path $PSScriptRoot 'job-run.cs') }
-  $code = [JustSearchJobRun]::Host([string]$run.application, [string]$run.commandLine, [string]$run.cwd, $RecordPath)
+  $code = [JustSearchJobRun]::Host([string]$run.application, [string]$run.commandLine, [string]$run.cwd, $RecordPath,
+    [bool]$run.newProcessGroup)
 } catch {
   [Console]::Error.WriteLine("job-host: $($_.Exception.Message)")
   exit 127

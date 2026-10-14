@@ -23,6 +23,7 @@ const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
 const { engineIdentityAsync, startStopExitCensus } = require('./lib/stop-exit-census.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
+const jobRun = require('./lib/job-run.cjs');
 const ledgerLib = require('./lib/exit-ledger.cjs');
 const processIdentity = require('./lib/process-identity.cjs');
 
@@ -1731,11 +1732,12 @@ function postLifecycleShutdown(apiPort, timeoutMs) {
   });
 }
 
-// Tempdoc 819 §D: attempt the graceful ordered shutdown before stopRun's unconditional
-// `taskkill /T /F` fallback. Bounded (a 2s POST timeout + a 5s exit-wait, polled — never a blind
-// sleep) so a graceful attempt can never make `stop` less reliable than the taskkill-only path:
-// any failure (bad pid/port, connection refused, non-2xx, exit-wait timeout) falls through with
-// `outcome` set to something other than 'exited', and the caller taskkills as before.
+// Tempdoc 819 §D: attempt the graceful ordered shutdown before stopRun's fallback, which ends each
+// recorded process by its identity (pid plus birth, re-checked on the handle it terminates), never
+// a tree, and then the Engine's job for what is left. Bounded (a 2s POST timeout + a 5s exit-wait,
+// polled — never a blind sleep) so a graceful attempt can never make `stop` less reliable than the
+// fallback alone: any failure (bad pid/port, connection refused, non-2xx, exit-wait timeout) falls
+// through with `outcome` set to something other than 'exited', and the caller's fallback runs.
 //
 // `markerPath`, if given, is written right before the POST — the one moment a real shutdown
 // request is in flight — and left in place for any outcome where the backend genuinely received
@@ -1970,6 +1972,35 @@ function spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter) 
     });
   }
   return child;
+}
+
+/**
+ * The Engine in a job this runner starts (job-run.cjs): the root is created suspended inside a
+ * kill-on-close job with no breakaway, so every process the Engine starts is a member at its
+ * creation, including a detached one that Node's own job would let go. The Engine's nested job
+ * (WindowsEngineJob) sits inside this one. The returned child is the root as seen through its host
+ * (rootAsChild): the root's PID, the host's streams and exit, the root's code. When the root exits
+ * the host ends what is left in the job and lists each by identity in the run record. Off Windows,
+ * or for a shell command, the plain spawn.
+ */
+function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, splitter, { recordDir, label }) {
+  if (process.platform !== 'win32' || opts?.shell) return spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter);
+  const run = jobRun.startInJob({ command, args, cwd: opts.cwd, env: opts.env, stdio: opts.stdio, label, recordDir,
+    capture: () => null });
+  const record = jobRun.waitForRootSync(run);
+  // The host's identity as it recorded it on its own handle: what a stop's job step checks first.
+  if (record) run.host = { pid: Number(record.pid), creationFileTimeUtc: String(record.creationFileTimeUtc) };
+  else process.stderr.write(`[dev-runner] the Engine job host (pid ${run.child.pid}) recorded no root\n`);
+  const child = jobRun.rootAsChild(run, record, { spawnfile: command });
+  child.stdout?.on('data', (buf) => splitter('stdout', buf));
+  child.stderr?.on('data', (buf) => splitter('stderr', buf));
+  return child;
+}
+
+/** The job record's identities in the shape stop reports use. */
+function jobIdentities(list) {
+  return (Array.isArray(list) ? list : []).filter((p) => p?.pid)
+    .map((p) => ({ pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc) }));
 }
 
 const lockPath = path.join(stateRoot, 'active.lock.json');
@@ -2602,7 +2633,7 @@ async function runAdmittedStart(opts, ctx) {
   // Lane F stage B item B8: one incarnation of the Engine. A supervised restart calls this again
   // with the SAME log streams, the same run id and the same lease — 7.6's dev-runner sentence — so
   // what survives the child is everything except the child.
-  const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}) => spawnLogged(
+  const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}, n = 1) => spawnEngineInJob(
     spawnBackend.command,
     spawnBackend.args,
     {
@@ -2668,6 +2699,8 @@ async function runAdmittedStart(opts, ctx) {
         backendStderr.write(buf);
       }
     },
+    // The incarnation's job record lives with the run, where a fallback stop reads it.
+    { recordDir: path.join(runDir, 'engine-jobs'), label: `engine-${n}` },
   );
 
   // Spec F §5.2 (step 9): the Engine is spawned, observed and stopped by the actuator
@@ -2821,7 +2854,21 @@ async function runAdmittedStart(opts, ctx) {
     runId,
     policy: supervisionPolicy,
     spawnChild: (n, port, incarnationEnv) => {
-      backend = spawnEngineChild(port, incarnationEnv);
+      backend = spawnEngineChild(port, incarnationEnv, n);
+      const engineChild = backend;
+      // The job record is read at the host's exit (rootAsChild); whatever the job ended after the
+      // Engine exited is named here, and a record its host closed as `ended` is then retired.
+      engineChild.once?.('exit', () => {
+        const final = engineChild.jobFinal;
+        if (!engineChild.jobRun) return;
+        const ended = jobIdentities(final?.endedByJob);
+        if (ended.length) {
+          narrate(`Engine incarnation ${n}: its job ended ${ended.length} process(es) the Engine left running: `
+            + ended.map((p) => `pid ${p.pid} (born ${p.creationFileTimeUtc})`).join(', '));
+        }
+        if (final?.state && final.state !== 'ended') narrate(`Engine incarnation ${n}: its job closed ${final.state}`);
+        jobRun.retireRunRecord(engineChild.jobRun);
+      });
       return backend;
     },
     describeExit: (code) => engineSupervisor.describeExit(code, supervisionPolicy),
@@ -2867,6 +2914,9 @@ async function runAdmittedStart(opts, ctx) {
         record.pids.backendRootPid = pid;
         record.incarnation = n;
         record.identities = { ...(record.identities ?? {}), backend: null };
+        // The incarnation's job: a fallback stop ends what is left in it after the recorded identities.
+        const job = spawned?.child?.jobRun;
+        record.engineJob = job?.host ? { incarnation: n, recordPath: job.recordPath, host: job.host } : null;
         await updateRunRecord();
         // Spec F §5.3: the identity a fallback stop verifies before it kills this Engine. Looked up
         // without blocking discovery; written only while this incarnation is still the current one.
@@ -2977,7 +3027,18 @@ async function runAdmittedStart(opts, ctx) {
     ]);
     await actuator.flush();
     const frontendStopped = await frontendStop;
-    const stopped = Boolean(outcome) && frontendStopped;
+    // The Engine's job, once the Engine has exited: its host ended what the Engine left in it and
+    // named each by identity. A job whose host has not closed it is left to the stop's job step.
+    const engineChild = backend;
+    const final = engineChild?.jobRun ? engineChild.jobFinal : null;
+    const engineJob = engineChild?.jobRun ? {
+      incarnation: outcome?.incarnation ?? null,
+      host: engineChild.jobRun.host ?? null,
+      state: final?.state ?? 'running',
+      rootExitCode: final?.rootExitCode ?? null,
+      endedByJob: jobIdentities(final?.endedByJob),
+    } : null;
+    const stopped = Boolean(outcome) && frontendStopped && (!engineJob || engineJob.state === 'ended');
     await writeJsonAtomic(stopResultPath, {
       schemaVersion: 1,
       requestId: request?.requestId ?? null,
@@ -2985,6 +3046,7 @@ async function runAdmittedStart(opts, ctx) {
       outcome: stopped ? 'stopped' : 'incomplete',
       engine: outcome ? { state: outcome.state, code: outcome.code ?? null, incarnation: outcome.incarnation ?? null } : null,
       frontendStopped,
+      engineJob,
       at: nowIso(),
     }).catch((err) => narrate(`stop result write failed: ${err?.message ?? err}`));
     if (!ctx.settled) return; // a start in progress reports its own end (cmdStart)
@@ -3076,6 +3138,7 @@ async function runAdmittedStart(opts, ctx) {
       backend: startingRun.identities?.backend?.pid === backend.pid ? startingRun.identities.backend : null,
       frontend: frontendIdentity,
     },
+    engineJob: startingRun.engineJob ?? null,
     apiPortRequested: apiPortRequested,
     apiPortActual,
     uiPortRequested: uiPort,
@@ -3583,6 +3646,8 @@ async function stopRun(opts, {
   terminateProcess = engineActuator.terminateWithCode,
   portOwner = portOwnerOf,
   cliEngineRecorder = engineActuator.createCliEngineRecorder,
+  stopEngineJob = (job) => jobRun.stopJobRunSync({ recordPath: job.recordPath, host: job.host },
+    { code: engineActuator.NON_DISTINCTIVE_KILL_CODE }),
   portWaitMs = 10_000,
 } = {}) {
   const { run, runPath } = await resolveTarget(opts);
@@ -3958,6 +4023,39 @@ async function stopRun(opts, {
     childCleanup = dataDirAbs ? await cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
   }
 
+  // 5. Last, the Engine's job: whatever the Engine left running after the ordered quit and the
+  //    recorded identities. A runner that saw its Engine exit reports what the job's host ended;
+  //    otherwise the job's recorded host is ended here (on a handle showing its recorded birth),
+  //    which ends every member, and each recorded member is verified gone. Either way each process
+  //    the job's termination ended is listed by identity.
+  let engineJob = null;
+  const answeredJob = runnerAnswer?.engineJob ?? null;
+  const recordedJob = run?.engineJob?.recordPath && run.engineJob.host?.pid ? run.engineJob : null;
+  if (runnerStopped && answeredJob?.state === 'ended') {
+    engineJob = { source: 'runner', incarnation: answeredJob.incarnation ?? null, outcome: 'ended',
+      endedByJob: jobIdentities(answeredJob.endedByJob), survivors: [] };
+  } else if (recordedJob && process.platform === 'win32') {
+    if (!fs.existsSync(recordedJob.recordPath)) {
+      // Retired by the runner once its host closed the job as `ended`.
+      engineJob = { source: 'record', incarnation: recordedJob.incarnation ?? null, outcome: 'gone',
+        endedByJob: jobIdentities(answeredJob?.endedByJob), survivors: [] };
+    } else {
+      const result = await Promise.resolve().then(() => stopEngineJob(recordedJob))
+        .catch(() => ({ ok: false, outcome: 'failed' }));
+      engineJob = { source: 'stop', incarnation: recordedJob.incarnation ?? null, outcome: result?.outcome ?? 'failed',
+        host: result?.host ?? null, endedByJob: jobIdentities(result?.endedByJob), survivors: jobIdentities(result?.survivors) };
+      if (result?.host === 'terminated') {
+        for (const p of engineJob.endedByJob) if (!killedPids.includes(p.pid)) killedPids.push(p.pid);
+      }
+      if (!result?.ok) errors.push(`Engine job: ${engineJob.outcome}${engineJob.survivors.length
+        ? ` (${engineJob.survivors.map((p) => `pid ${p.pid}`).join(', ')} still running)` : ''}`);
+    }
+  }
+  const jobUnresolved = engineJob && !['ended', 'gone', 'terminated'].includes(engineJob.outcome)
+    ? (engineJob.survivors.length ? engineJob.survivors : [{ pid: recordedJob?.host?.pid ?? null,
+      creationFileTimeUtc: recordedJob?.host?.creationFileTimeUtc ?? null }])
+      .map((p) => ({ ...p, role: 'Engine job member', state: 'unknown' })) : [];
+
   const unresolvedProcesses = [];
   for (const p of tracked.values()) {
     const state = await lookupOne(p);
@@ -3999,7 +4097,7 @@ async function stopRun(opts, {
   // A registered helper left running, or whose exit could not be verified, is part of the stack.
   const helpersUnresolved = childCleanup.filter((c) => !['dead', 'terminated', 'identity-mismatch'].includes(c.outcome));
   const stackGone = survivors.length === 0 && portsFreeOfRun && helpersUnresolved.length === 0
-    && unresolvedProcesses.length === 0;
+    && unresolvedProcesses.length === 0 && jobUnresolved.length === 0;
   const outcome = stackGone && portsClosed ? STOP_OUTCOME.STOPPED : STOP_OUTCOME.STOP_INCOMPLETE;
   if (unresolvedProcesses.length) {
     errors.push('at least one tracked process identity is still running or of unknown state; the stop is incomplete');
@@ -4009,7 +4107,8 @@ async function stopRun(opts, {
     stopTrackedProcesses: unresolvedProcesses });
   await writeJsonAtomic(trackedPath, { processes: unresolvedProcesses, legacyBounds });
   const unresolved = [...survivors, ...unresolvedProcesses,
-    ...helpersUnresolved.map(c => ({ ...c, role: 'registered helper', state: c.outcome.includes('unknown') ? 'unknown' : 'match' }))]
+    ...helpersUnresolved.map(c => ({ ...c, role: 'registered helper', state: c.outcome.includes('unknown') ? 'unknown' : 'match' })),
+    ...jobUnresolved]
     .map(p => describeUnresolved(p, p.state));
   const nextStep = `Check each listed PID and start time in Task Manager; retry stop after it exits. `
     + forgetGuidance(runId);
@@ -4053,6 +4152,8 @@ async function stopRun(opts, {
     runner: runnerAnswer ? { outcome: runnerAnswer.outcome, waitedMs: runnerAnswer.waitedMs,
       engine: runnerAnswer.engine ?? null } : null,
     fallback,
+    // Every process the Engine's job ended after the Engine itself, by identity.
+    engineJob,
     ...(foreignPortOwner ? { foreignPortOwner } : {}),
   });
 
@@ -4108,6 +4209,7 @@ async function stopRun(opts, {
     // against the main checkout, where the run state lives).
     stopReportPath: mainRelativePath(stopReportPath),
     childCleanup,
+    engineJob,
     errors,
     unresolvedProcesses: unresolved,
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),

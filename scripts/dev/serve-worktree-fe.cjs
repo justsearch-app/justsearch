@@ -352,17 +352,37 @@ async function main(argv = process.argv) {
     ? registerServedVite({ port, explicitPort: !!explicitPortArg, spawnStartTime, child, childIdentity })
     : Promise.resolve(null);
 
-  child.on('exit', async (code) => {
-    // Bounded wait for a registration already in flight (e.g. a quick Vite boot) so the clean-exit
-    // retirement actually runs — but a human hitting Ctrl-C must never be held hostage by the
-    // (up to 30s) port-readiness poll: if registration has not settled yet, abandon it. A leaked
-    // record is not a leaked process — its lease lapses and the reaper (861 Phase 4) collects it.
+  // Bounded wait for a registration already in flight (e.g. a quick Vite boot) so the clean-exit
+  // retirement actually runs — but a human hitting Ctrl-C must never be held hostage by the
+  // (up to 30s) port-readiness poll: if registration has not settled yet, abandon it. A leaked
+  // record is not a leaked process — its lease lapses and the reaper (861 Phase 4) collects it.
+  const retireRegistration = async () => {
     const settled = await Promise.race([
       registered.then((r) => ({ timedOut: false, r })).catch(() => ({ timedOut: false, r: null })),
       new Promise((resolve) => setTimeout(() => resolve({ timedOut: true }), 1500)),
     ]);
     if (!settled.timedOut) await unregisterServedVite(settled.r).catch(() => {});
-    jobRun.retireRunRecord(run);
+  };
+  // The job run's record goes once its processes have verifiably ended: a host that closed its job
+  // as `ended` leaves nothing to verify; any other host (e.g. one Ctrl+C reached first) is settled
+  // by the stop, which verifies every recorded identity before removing the record.
+  const settleRun = () => (isWin && run.contained ? jobRun.settleRunRecord(run, { code: jobRun.NON_DISTINCTIVE_KILL_CODE }) : { ok: true });
+  let stopping = false;
+  const stopOnSignal = async () => {
+    if (stopping) return;
+    stopping = true;
+    const result = child.exitCode === null && child.signalCode === null ? killSpawnTree(child, run) : settleRun();
+    await retireRegistration();
+    if (!result.ok) console.error(`[serve-worktree-fe] incomplete stop: ${result.reason ?? result.outcome}`);
+    process.exit(result.ok ? 0 : 1);
+  };
+  process.on('SIGINT', stopOnSignal);
+  process.on('SIGTERM', stopOnSignal);
+
+  child.on('exit', async (code) => {
+    if (stopping) return; // the signal's stop exits once it has settled the run
+    await retireRegistration();
+    settleRun();
     process.exit(code ?? 0);
   });
 }
