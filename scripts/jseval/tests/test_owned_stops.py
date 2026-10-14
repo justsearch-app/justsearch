@@ -46,9 +46,10 @@ class OwnedStopTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             record = Path(tmp) / "owned.json"
             record.write_text(json.dumps({"pid": 12345, "creationFileTimeUtc": BIRTH}), encoding="utf-8")
+            # The run stop reports a run that had already ended as gone, with success (exit 0).
             helper = Path(tmp) / "gone.ps1"
-            helper.write_text("param([Alias('Pid')]$TargetPid,$CreationFileTimeUtc,$Code,[switch]$Tree)\n'{\"outcome\":\"gone\"}'; $global:LASTEXITCODE=3", encoding="utf-8")
-            env = {**os.environ, "JUSTSEARCH_SWEEP_RECORD": str(record), "JUSTSEARCH_SWEEP_TERMINATOR": str(helper)}
+            helper.write_text("param($RecordPath,$Code)\n'{\"outcome\":\"gone\",\"survivors\":[]}'; exit 0", encoding="utf-8")
+            env = {**os.environ, "JUSTSEARCH_SWEEP_RECORD": str(record), "JUSTSEARCH_SWEEP_STOPPER": str(helper)}
             result = subprocess.run(["powershell.exe", "-NoProfile", "-Command", command], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, "gone is a successful stop: " + result.stderr)
 
@@ -114,11 +115,12 @@ class OwnedStopTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             record = Path(tmp) / "owned.json"
             record.write_text(json.dumps({"pid": 12345, "creationFileTimeUtc": BIRTH}), encoding="utf-8")
-            helper = Path(tmp) / "fake-terminator.ps1"
-            helper.write_text("param([Alias('Pid')]$TargetPid,$CreationFileTimeUtc,$Code,[switch]$Tree)\nif ($TargetPid -ne 12345 -or $CreationFileTimeUtc -ne '" + BIRTH + "') {throw 'identity lost'}\n$global:LASTEXITCODE=0", encoding="utf-8")
+            # The run stop is addressed by the run record alone, never by the port's owner.
+            helper = Path(tmp) / "fake-stopper.ps1"
+            helper.write_text("param($RecordPath,$Code)\nif ($RecordPath -ne $env:JUSTSEARCH_SWEEP_RECORD) {throw 'run record lost'}\nexit 0", encoding="utf-8")
             # No production process can be stopped: both discovery and termination are simulated.
-            script = "$script:foreignKills=0; function Get-NetTCPConnection { [pscustomobject]@{OwningProcess=99999} }; function Stop-Process { $script:foreignKills++ }; " + command.replace("exit $LASTEXITCODE", "") + "; if ($script:foreignKills -gt 0) {exit 9}"
-            env = {**os.environ, "JUSTSEARCH_SWEEP_RECORD": str(record), "JUSTSEARCH_SWEEP_TERMINATOR": str(helper)}
+            script = "$script:foreignKills=0; function Get-NetTCPConnection { [pscustomobject]@{OwningProcess=99999} }; function Stop-Process { $script:foreignKills++ }; " + command.replace("exit $LASTEXITCODE", "").replace("exit $status", "if ($status -ne 0) {exit $status}") + "; if ($script:foreignKills -gt 0) {exit 9}"
+            env = {**os.environ, "JUSTSEARCH_SWEEP_RECORD": str(record), "JUSTSEARCH_SWEEP_STOPPER": str(helper)}
             result = subprocess.run(["powershell.exe", "-NoProfile", "-Command", script], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, "a foreign listener must not be killed: " + result.stderr)
 

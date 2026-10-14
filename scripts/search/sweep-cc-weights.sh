@@ -42,13 +42,13 @@ CONFIGS=(
 
 kill_backend() {
   [ -s "$OWNED_RECORD" ] || return 0
+  # The run is in its own job: ending its recorded host ends every process the job holds (the java
+  # behind ui.bat included), then each recorded identity is verified. Never a port, name or parent link.
   powershell -NoProfile -Command '
-    $r=Get-Content -Raw -LiteralPath $env:JUSTSEARCH_SWEEP_RECORD | ConvertFrom-Json
     # A separate native host makes Console.Out available in this pipeline as real stdout.
-    $result = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $env:JUSTSEARCH_SWEEP_TERMINATOR -Pid $r.pid -CreationFileTimeUtc $r.creationFileTimeUtc -Code 1
+    $result = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $env:JUSTSEARCH_SWEEP_STOPPER -RecordPath $env:JUSTSEARCH_SWEEP_RECORD -Code 1
     $status = $LASTEXITCODE
     $result | Write-Output
-    if ($status -eq 3 -and ($result | Select-Object -Last 1 | ConvertFrom-Json).outcome -in @("gone", "mismatch")) { exit 0 }
     exit $status
   ' || { echo "Owned backend stop incomplete; inspect $OWNED_RECORD before retrying" >&2; return 1; }
   : > "$OWNED_RECORD"
@@ -56,7 +56,7 @@ kill_backend() {
 
 OWNED_RECORD="$(mktemp)"
 export JUSTSEARCH_SWEEP_RECORD="$(cygpath -w "$OWNED_RECORD")"
-export JUSTSEARCH_SWEEP_TERMINATOR="$(cygpath -w "$REPO_ROOT/scripts/dev/lib/terminate-process.ps1")"
+export JUSTSEARCH_SWEEP_STOPPER="$(cygpath -w "$REPO_ROOT/scripts/dev/lib/stop-job-run.ps1")"
 trap 'kill_backend; if [ ! -s "$OWNED_RECORD" ]; then rm -f "$OWNED_RECORD"; fi' EXIT
 
 wait_ready() {

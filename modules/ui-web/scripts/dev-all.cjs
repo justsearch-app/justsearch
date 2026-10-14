@@ -3,14 +3,16 @@
  * Dev helper: starts the backend (runHeadless) and Vite together with a clean data dir and a free port.
  * Usage: npm run dev:all
  */
-const { spawn } = require("child_process");
 const path = require("path");
 const process = require("process");
 const fs = require("fs");
 const net = require("net");
 const http = require("http");
 const detLib = require("./lib/determinism-budget.cjs");
-const engineActuator = require("../../../scripts/dev/lib/engine-actuator.cjs");
+// Each child runs in its own Windows job (kernel-tracked membership, never parent links), so the
+// stop ends what Gradle and Vite start below them. Vite's node entry is started directly;
+// gradlew.bat runs through cmd.exe, its interpreter, inside the job.
+const jobRun = require("../../../scripts/dev/lib/job-run.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const uiWebDir = path.resolve(rootDir, "modules", "ui-web");
@@ -22,7 +24,7 @@ const dataDir = process.env.JUSTSEARCH_DATA_DIR || path.join(uiWebDir, ".dev-dat
 let backend;
 let frontend;
 let shuttingDown = false;
-const childIdentities = new WeakMap();
+const childRuns = new WeakMap();
 const det = detLib.createDeterminismBudget({ stdoutSentinel: "JUSTSEARCH_API_PORT=..." });
 
 async function findFreePort(startPort) {
@@ -123,9 +125,12 @@ async function waitForBackendReady(port, timeoutMs) {
   });
 }
 
-function recordChildIdentity(child) {
-  const identity = engineActuator.captureSpawnedIdentity(child);
-  if (identity) childIdentities.set(child, identity);
+/** Starts one child in its own job; the host's identity is read in this spawn turn. */
+function startOwnedChild(command, args, options) {
+  const run = jobRun.startInJob({ command, args, ...options });
+  childRuns.set(run.child, run);
+  run.child.on("exit", () => jobRun.retireRunRecord(run));
+  return run.child;
 }
 
 function terminateChild(proc) {
@@ -133,10 +138,9 @@ function terminateChild(proc) {
   if (proc.exitCode != null) return;
 
   if (process.platform === "win32") {
-    // Only the identity this script started; never a tree through parent links.
-    const identity = childIdentities.get(proc);
-    const result = engineActuator.terminateWithCodeSync(proc.pid, identity?.creationFileTimeUtc,
-      engineActuator.NON_DISTINCTIVE_KILL_CODE);
+    // The recorded run: its host (PID plus creation time) and, through the host's job, every
+    // process started below it. Never a tree through parent links.
+    const result = jobRun.stopJobRunSync(childRuns.get(proc), { code: jobRun.NON_DISTINCTIVE_KILL_CODE });
     if (!result.ok) console.error(`Incomplete child stop (${proc.pid}): ${result.outcome}`);
     return result;
   }
@@ -172,7 +176,7 @@ async function startBackend(port) {
     };
 
     const aiEnv = resolveAiDevEnv();
-    backend = spawn(
+    backend = startOwnedChild(
       gradlePath,
       ["--no-daemon", "--no-configuration-cache", "-PskipWebBuild=true", ":modules:ui:runHeadless"],
       {
@@ -183,10 +187,10 @@ async function startBackend(port) {
           JUSTSEARCH_API_PORT: String(port),
           JUSTSEARCH_DATA_DIR: dataDir,
         },
-        shell: process.platform === "win32",
+        stdio: "pipe",
+        label: "dev-all-backend",
       }
     );
-    recordChildIdentity(backend);
 
     backend.stdout.on("data", (data) => {
       log("api", data);
@@ -221,7 +225,9 @@ async function startBackend(port) {
 }
 
 function startFrontend(port) {
-  frontend = spawn("npm", ["run", "dev", "--", "--host", "--port", "5173", "--strictPort"], {
+  // ui-web's `dev` script is `vite`: run Vite's own node entry directly, as dev-runner does.
+  const viteEntry = path.join(uiWebDir, "node_modules", "vite", "bin", "vite.js");
+  frontend = startOwnedChild(process.execPath, [viteEntry, "--host", "--port", "5173", "--strictPort"], {
     cwd: uiWebDir,
     env: {
       ...process.env,
@@ -230,10 +236,9 @@ function startFrontend(port) {
       // Vite proxy currently reads VITE_API_PORT; keep for back-compat until vite.config.js is aligned.
       VITE_API_PORT: String(port),
     },
-    shell: process.platform === "win32",
     stdio: "inherit",
+    label: "dev-all-frontend",
   });
-  recordChildIdentity(frontend);
 
   frontend.on("exit", (code) => {
     shutdown();

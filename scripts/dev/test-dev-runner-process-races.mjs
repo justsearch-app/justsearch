@@ -239,6 +239,8 @@ test('exit during initial census lookup never records a replacement', async () =
 });
 
 test('dev-all refuses a replacement at the termination boundary', async () => {
+  // The stop is addressed to the run's recorded host (PID plus creation time); the job stop
+  // refuses a PID that now shows another birth. dev-all never hands a bare PID to another killer.
   const filename = path.resolve(here, '../../modules/ui-web/scripts/dev-all.cjs');
   const calls = [], ended = [], spawned = child();
   let script = fs.readFileSync(filename, 'utf8');
@@ -246,16 +248,14 @@ test('dev-all refuses a replacement at the termination boundary', async () => {
   script = script.slice(0, script.indexOf('process.on("SIGINT"'));
   const context = { require: id => id === 'process' ? { platform: 'win32', env: {} }
     : id === 'child_process' ? { spawn: () => { ended.push(pid); return child(); } }
-      : id.includes('engine-actuator') ? { ...actuator, terminateWithCodeSync: (...args) => {
-        calls.push(args); return { ok: false, outcome: 'mismatch' };
+      : id.includes('job-run') ? { NON_DISTINCTIVE_KILL_CODE: 1, stopJobRunSync: (...args) => {
+        calls.push(args); return { ok: false, outcome: 'unknown-identity' };
       } } : createRequire(filename)(id), __dirname: path.dirname(filename), console, setTimeout };
-  vm.runInNewContext(`${script}\nthis.stop = terminateChild; this.setIdentity = (child, value) => {
-    if (typeof childIdentities !== 'undefined') childIdentities.set(child, value);
-  };`, context);
-  context.setIdentity(spawned, { pid, creationFileTimeUtc: birth });
+  vm.runInNewContext(`${script}\nthis.stop = terminateChild; this.setRun = (child, value) => childRuns.set(child, value);`, context);
+  context.setRun(spawned, { child: spawned, recordPath: 'run.json', host: { pid, creationFileTimeUtc: birth } });
   await context.stop(spawned);
   assert.deepEqual(ended, [], 'dev-all must never delegate a stale PID to taskkill /T');
-  assert.equal(calls[0]?.[1], birth, 'the recorded birth reaches the termination handle');
+  assert.equal(calls[0]?.[0]?.host?.creationFileTimeUtc, birth, 'the recorded birth reaches the termination handle');
 });
 
 let failed = 0;

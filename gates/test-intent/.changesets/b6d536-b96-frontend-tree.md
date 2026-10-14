@@ -36,6 +36,27 @@ Choices under that delegation:
   that child and everything below it remain outside the kill scope.
 - Manual remedies carry the birth, or withhold a termination command when none is recorded.
 
+Adaptation, follow-up to the merge into b6d536/integration (fix(b6d536): end every process a dev tool
+starts, without parent links). Decided by the orchestrator under the owner's delegation (same
+delegation quote, location and scope as above, label agent choice): keep the identity-only rule (never
+find processes through parent PIDs, names or PID alone) and close the tree-stop gaps with job objects.
+The frontend tree stop of this lane is replaced as follows. serve-worktree-fe.cjs starts
+`node <ui-web>/node_modules/vite/bin/vite.js` directly (absolute node, shell:false, no npx or cmd shim)
+through `scripts/dev/lib/job-run.cjs`: a PowerShell host (`job-host.ps1` with `job-run.cs`) creates the
+root suspended inside a new job whose only limit is KILL_ON_JOB_CLOSE, so the kernel adds every
+descendant at creation, and records the host, the root and every member by PID plus creation time.
+A failed readiness gate, a signal or the script's exit stops the run with `stop-job-run.ps1`, which
+ends the host only when its handle shows the recorded birth (the job's only handle closes, so Windows
+ends every member) and then verifies each recorded identity has ended; a PID showing another birth is
+never touched. The Engine fallback, reaper, worktree-frontend register and legacy cleanup choices above
+are unchanged; the registered port owner is still the recorded identity the reaper may end. None of
+this lane's checks changed (frontend-tree 15/15 and 861-w3-serve-worktree-fe pass unmodified), so the
+gate entry list stays empty. The new script check `scripts/dev/test-dev-runner-job-stops.mjs` runs the
+real serve-worktree-fe.cjs with a CPU-only Vite fixture that never listens and starts a helper; after the
+readiness gate's stop no identity the fixtures or the job record named survives, and a same-name
+node.exe outside the run is alive. It fails by assertion on d52ee5e7a (Vite and its helper survive)
+and passes after.
+
 `scripts/dev/test-dev-runner-frontend-tree.mjs` executes the production frontend closure with
 deterministic PID reuse and partial-result interleavings, the Engine fallback and its caller,
 the reaper/worktree termination boundaries, unsupported-platform refusal, and printed remedies.

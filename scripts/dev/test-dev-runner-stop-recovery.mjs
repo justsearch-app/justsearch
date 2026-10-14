@@ -1,7 +1,8 @@
 import './lib/test-fixture-processes.cjs';
 // Recovery across the real CLI and injected identity boundaries. Only fake harness children run.
 // Identity-only stops, as on the integration side since 58a51a608: identities left by an earlier
-// (tree-era) stop are re-checked and reported, never killed through parent links.
+// (tree-era) stop are re-checked and reported, never killed through parent links. A dev tool's run
+// is started in its own job (scripts/dev/lib/job-run.cjs), so what it starts ends with its stop.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,11 +19,9 @@ const dataRoot = fs.mkdtempSync(path.join(repo, 'tmp', 'stop-recovery-data-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = root;
 const actuator = require('./lib/engine-actuator.cjs');
 const { stopRun, acquireAdmission, holderBlockFor, resolveCallerIdentity } = require('./dev-runner.cjs').__test;
-const tests = [], children = [], gaps = [];
+const tests = [], children = [];
 const extraOwned = [];
 const test = (name, fn) => tests.push([name, fn]);
-// Checks that need a tree stop: kept out of the suite as named gaps; run them with --gaps.
-const gap = (name, fn) => gaps.push([name, fn]);
 const pid = 987654, birth = '134000000000000000';
 function fixture(name, extra = {}) {
   const run = { runId: name, holder: holderBlockFor(resolveCallerIdentity('recovery-owner')), pids: { frontendRootPid: pid },
@@ -143,16 +142,21 @@ test('unknown Engine has an actionable recovery command and process details', as
   assert.match(result.unresolvedProcesses[0].reason, /ownership is unproven/);
 });
 test('dev-all birth capture finishes in the spawn turn before stop', () => {
+  // dev-all starts each child through the job starter, which reads the host's identity before it
+  // returns; a stop right after the spawn must already carry that birth.
   const file = path.join(repo, 'modules/ui-web/scripts/dev-all.cjs');
   let text = fs.readFileSync(file, 'utf8'); text = text.slice(0, text.indexOf('process.on("SIGINT"'));
   const calls = [], child = Object.assign(new EventEmitter(), { pid, exitCode: null, signalCode: null });
+  const jobRun = require('./lib/job-run.cjs');
   const context = { require: id => id === 'process' ? { platform: 'win32', env: {} }
-    : id.includes('engine-actuator') ? { ...actuator, captureSpawnedIdentity: () => ({ pid, creationFileTimeUtc: birth }),
-      lookupProcessIdentities: () => new Promise(() => {}), terminateWithCodeSync: (...args) => { calls.push(args); return { ok: true }; } }
+    : id.includes('job-run') ? { ...jobRun,
+      startInJob: options => jobRun.startInJob({ ...options, env: { JUSTSEARCH_JOB_RECORD_DIR: path.join(root, 'dev-all-runs') },
+        spawnImpl: () => child, capture: () => ({ pid, creationFileTimeUtc: birth }) }),
+      stopJobRunSync: (...args) => { calls.push(args); return { ok: true }; } }
       : createRequire(file)(id), __dirname: path.dirname(file), console, setTimeout };
-  vm.runInNewContext(`${text}\nthis.capture=recordChildIdentity; this.stop=terminateChild;`, context);
-  context.capture(child); context.stop(child);
-  assert.equal(calls[0]?.[1], birth, 'stop immediately after spawn must carry the birth');
+  vm.runInNewContext(`${text}\nthis.start=startOwnedChild; this.stop=terminateChild;`, context);
+  context.stop(context.start(process.execPath, ['fixture'], { stdio: 'ignore', label: 'dev-all-check' }));
+  assert.equal(calls[0]?.[0]?.host?.creationFileTimeUtc, birth, 'stop immediately after spawn must carry the birth');
 });
 let exitedWrapper;
 test('spawn capture retains the exited wrapper identity, and its identity stop ends nothing else', () => {
@@ -175,13 +179,33 @@ test('spawn capture retains the exited wrapper identity, and its identity stop e
   assert.equal(stopped.outcome, 'gone', JSON.stringify(stopped));
   exitedWrapper = { wrapper, captured, leaf };
 });
-gap('GAP: a detached leaf whose wrapper already exited is ended by a stop of the wrapper', () => {
-  // Needs a tree stop through parent links; no creator's ordered stop or Engine manifest and exit
-  // ledger covers a detached leaf of an exited wrapper. Failing by design under identity-only stops.
-  assert.ok(exitedWrapper, 'run after the spawn-capture test');
-  const { leaf } = exitedWrapper;
+test('a detached leaf of an exited wrapper does not survive its run\'s stop', async () => {
+  // A dev tool's run: started through the tools' job starter when the tree has one, so the kernel adds
+  // the leaf to the run's job at its creation and the run's stop ends it, without parent links. A
+  // tree without it starts and stops the run as the check above does, by the wrapper's identity alone.
+  const starter = path.join(repo, 'scripts/dev/lib/job-run.cjs');
+  let leaf;
+  if (fs.existsSync(starter)) {
+    const jobRun = require(starter);
+    const identityExe = require('./lib/test-fixture-processes.cjs').identityExecutable();
+    const proof = path.join(root, 'job-wrapper-leaf.json');
+    const code = `const cp=require('child_process'),fs=require('fs'); const child=cp.spawn(process.execPath,['-e','setTimeout(()=>{},120000)'],{stdio:'ignore',detached:true,windowsHide:true}); const r=cp.spawnSync(${JSON.stringify(identityExe)},[String(child.pid)],{encoding:'utf8',windowsHide:true}); fs.writeFileSync(${JSON.stringify(proof)},JSON.stringify({pid:child.pid,creationFileTimeUtc:r.stdout.trim()})); process.exit(0);`;
+    const records = path.join(root, 'job-runs');
+    const run = jobRun.startInJob({ command: process.execPath, args: ['-e', code], stdio: 'ignore',
+      env: { ...process.env, JUSTSEARCH_JOB_RECORD_DIR: records }, label: 'exited-wrapper' });
+    assert.ok(run.host?.creationFileTimeUtc, 'the run\'s host identity is read in the spawn turn');
+    leaf = await until(() => read(proof));
+    extraOwned.push(leaf);
+    const stopped = jobRun.stopJobRunSync(run);
+    assert.equal(stopped.ok, true, JSON.stringify(stopped));
+    const recorded = new Set((stopped.survivors ?? []).map(p => p.pid));
+    assert.equal(recorded.has(leaf.pid), false, 'the stop reports no surviving member');
+  } else {
+    assert.ok(exitedWrapper, 'run after the spawn-capture test');
+    ({ leaf } = exitedWrapper);
+  }
   const after = actuator.terminateWithCodeSync(leaf.pid, leaf.creationFileTimeUtc, 0, { inspectOnly: true });
-  assert.notEqual(after.outcome, 'inspected', 'the leaf survives its wrapper\'s identity-only stop');
+  assert.notEqual(after.outcome, 'inspected', 'the detached leaf must not survive its run\'s stop');
 });
 const read = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -267,10 +291,6 @@ test('real CLI forget prints the unknown Engine and leaves it alive', async () =
 let failed = 0;
 try {
   for (const [name, fn] of tests) { try { await fn(); console.log(`PASS ${name}`); } catch (e) { failed++; console.error(`FAIL ${name}: ${e.stack}`); } }
-  for (const [name, fn] of gaps) {
-    if (!process.argv.includes('--gaps')) { console.log(`GAP (not in suite) ${name}`); continue; }
-    try { await fn(); console.log(`GAP PASS ${name}`); } catch (e) { console.error(`GAP FAIL ${name}: ${e.message}`); }
-  }
 }
 finally {
   // Only our spawn-recorded identities, each by its own recorded birth; a runner's children end

@@ -84,7 +84,7 @@ Java ownership belongs to b6d536/proc-java. Modules Java remains byte-for-byte a
         "signature",
         "instrumentation"
       ],
-      "whatMoved": "Identity-only stops, as on the integration side since 58a51a608. Checks that asserted -Tree, a tree outcome or a descendant sweep now check the identity-only stop: the recorded process is ended through the handle on which its birth is rechecked, no tree option or -Tree reaches the terminator, a parent link in the process table licenses nothing (tree-handles drives the real handle with a linked child and shows it survives; a -Tree request is refused), and a frontend stop counts only a confirmed termination. Legacy stopUnresolvedTrees records are imported as tracked identities: a living one keeps the stop incomplete and is reported, never killed; an anonymous one is retired once its recorded roots are gone (no enumeration can re-prove it). The batch tree census and inspection host checks became checks of the batched identity lookup (one PowerShell per phase, fresh identities per phase, census armed before the lookup); the inspection-exception check became a lookup-exception check; a duplicate anonymous case in round3 was dropped. Fixture cleanup checks follow the integration side's spawn-recorded p.kill() and stopRecordedProcess paths. jseval keeps the integration side's held-Popen backend stop and its tests (subprocess.run is never called); the exited-backend case also asserts no termination; owned_process stops only the captured identity and test_owned_stops checks that and the absence of a descendant sweep; health_failure is checked for the manifest and exit-ledger identity path; the installer cleanup check runs Stop-FixtureProcess with a replaced, an unregistered and an owned process. The live sweep check asserts kill_backend ends the recorded command, and the fixture leaf ends on its creator's go signal. The stop-recovery self-exit fixture now exits once the runner has recorded its quit intent, because the identity-only frontend stop no longer waits for a tree enumeration. The stop-recovery check of a detached leaf of an exited wrapper needs a tree stop; it is kept out of the suite as a named gap (run with --gaps; it fails by design). CLI fixture lists drop the removed inspect-process-trees.ps1.",
+      "whatMoved": "Identity-only stops, as on the integration side since 58a51a608. Checks that asserted -Tree, a tree outcome or a descendant sweep now check the identity-only stop: the recorded process is ended through the handle on which its birth is rechecked, no tree option or -Tree reaches the terminator, a parent link in the process table licenses nothing (tree-handles drives the real handle with a linked child and shows it survives; a -Tree request is refused), and a frontend stop counts only a confirmed termination. Legacy stopUnresolvedTrees records are imported as tracked identities: a living one keeps the stop incomplete and is reported, never killed; an anonymous one is retired once its recorded roots are gone (no enumeration can re-prove it). The batch tree census and inspection host checks became checks of the batched identity lookup (one PowerShell per phase, fresh identities per phase, census armed before the lookup); the inspection-exception check became a lookup-exception check; a duplicate anonymous case in round3 was dropped. Fixture cleanup checks follow the integration side's spawn-recorded p.kill() and stopRecordedProcess paths. jseval keeps the integration side's held-Popen backend stop and its tests (subprocess.run is never called); the exited-backend case also asserts no termination; owned_process stops only the captured identity and test_owned_stops checks that and the absence of a descendant sweep; health_failure is checked for the manifest and exit-ledger identity path; the installer cleanup check runs Stop-FixtureProcess with a replaced, an unregistered and an owned process. The live sweep check asserts kill_backend ends the recorded command and, since the follow-up's job-object stop, the java stand-in behind it before the fixture's own exit signal. The stop-recovery self-exit fixture now exits once the runner has recorded its quit intent, because the identity-only frontend stop no longer waits for a tree enumeration. The stop-recovery check of a detached leaf of an exited wrapper, a named gap at the merge, is a normal check since the follow-up's job-object stop. CLI fixture lists drop the removed inspect-process-trees.ps1.",
       "sources": [
         {
           "delegationQuote": "do whatever you think is best. your working autonomously",
@@ -93,6 +93,29 @@ Java ownership belongs to b6d536/proc-java. Modules Java remains byte-for-byte a
           "label": "agent choice",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (archived at F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
           "choice": "Merge of b6d536/batch-1-proc into b6d536/integration, decided by the orchestrator under the owner's delegation: identity-only stops, as on the integration side since 58a51a608. Scripts stop only the identity they started (the owner's standing process rule: never stop a process by PID alone, by name, or by following a parent PID). Children are covered by their creator's ordered stop and by the Engine's manifest and exit ledger, never by a tree sweep; the tree mode of terminate-process.ps1, the batch tree census and stop_named_descendants are removed, and every other guarantee of this lane is kept."
+        }
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "scripts/dev/test-dev-runner-process-races.mjs",
+        "scripts/dev/test-dev-runner-stop-recovery.mjs",
+        "scripts/jseval/tests/test_owned_stops.py"
+      ],
+      "moved": [
+        "signature",
+        "instrumentation"
+      ],
+      "whatMoved": "Job-object stops for dev tools (scripts/dev/lib/job-run.cjs, job-host.ps1, job-run.cs, stop-job-run.ps1). process-races 'dev-all refuses a replacement at the termination boundary' and stop-recovery 'dev-all birth capture finishes in the spawn turn before stop' evaluate dev-all's declarations with the job starter injected instead of engine-actuator: the stop carries the host's recorded birth and dev-all never hands a bare PID to taskkill /T; inputs and expected outcomes are kept. test_owned_stops' two sweep checks drive kill_backend with a fake run stop taking the run record (-RecordPath, -Code) instead of a PID-addressed terminator; already-gone is still success and a foreign port owner is still never stopped.",
+      "sources": [
+        {
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "kind": "delegated-choice",
+          "delegationScope": "Process ownership and exit accounting, task t-20261005-b6d536",
+          "label": "agent choice",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (archived at F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "choice": "Follow-up to the merge of b6d536/batch-1-proc, decided by the orchestrator under the owner's delegation: close the named gaps while keeping the identity-only rule (never find processes through parent PIDs, names or PID alone). A dev tool starts the real process directly where it can (node or java by absolute path, shell:false, no cmd shim) and records PID plus creation time at start; what a third-party tool starts is contained by a Windows job the starter creates (KILL_ON_JOB_CLOSE, no breakaway), so the kernel adds each descendant at its creation, and the run's stop ends the job host it recorded by identity, whose job handle closing ends every member. The run record names the root and every member by PID plus creation time; the stop verifies each has ended. A recorded PID that now shows another birth is not the run and is never touched."
         }
       ]
     }
@@ -138,10 +161,27 @@ Merge into b6d536/integration (identity-only stops, as on the integration side s
 the tree mode of terminate-process.ps1, inspect-process-trees.ps1, the tree exports of
 recorded-termination.cjs and engine-actuator.cjs, the dev-runner tree inspection phases and
 stop_named_descendants are removed; installer, CI, sweep, dev-all, serve-worktree-fe, jseval and
-dev-runner stops end only the identity they started. Named gaps, not covered by a creator's ordered
-stop or by the Engine's manifest and exit ledger: the sweep's java child of its recorded cmd shim,
-serve-worktree-fe's vite grandchild of its cmd shim, dev-all's npm/vite children, and a detached
-leaf of an exited wrapper (stop-recovery --gaps).
+dev-runner stops end only the identity they started.
+
+Follow-up (fix(b6d536): end every process a dev tool starts, without parent links): the named gaps of the merge are closed
+without parent links. scripts/dev/lib/job-run.cjs starts a run under job-host.ps1, which creates the root suspended inside a new
+job (KILL_ON_JOB_CLOSE only, no breakaway), assigns it, writes the run record (host, root and every member by PID plus creation
+time, refreshed every 50 ms) and resumes it; when the root exits the host terminates the job, so an exited wrapper's detached leaf
+ends with it. stop-job-run.ps1 ends the host only when its handle shows the recorded birth (its job handle then closes and Windows
+ends every member) and verifies each recorded identity has ended; a PID that now shows another birth is reported gone and never
+touched. Per case: (a) the sweep's ui.bat runs through cmd.exe as its interpreter inside the job, so the java behind it is a member;
+(b) serve-worktree-fe starts node vite.js directly (no npx or cmd shim) inside a job; (c) dev-all starts node vite.js directly and
+gradlew.bat inside jobs; (d) a detached leaf of an exited wrapper is inside the starter's job, so it ends with the run. A leaf that
+was never recorded and was started outside any job cannot be proven ours: dev-runner reports it by identity as an unowned survivor
+(unresolvedProcesses) and leaves it alive.
+
+New script checks: test-dev-runner-job-stops.mjs runs the real serve-worktree-fe.cjs and dev-all.cjs in a scratch repository with
+CPU-only Vite and Gradle fixtures that record their own identities, snapshots the job records while the run lives, and asserts no
+recorded identity survives the stop and a same-name node.exe outside the run is alive; a third check stops a record naming a live
+decoy's PID under a recycled-looking birth and a genuine same-name run, and the decoy is never touched. The stop-recovery --gaps
+check is now a normal check (a detached leaf of an exited wrapper does not survive its run's stop). The live sweep check now asserts
+kill_backend ends the java stand-in behind the recorded command before the fixture's own exit signal. Each fails by assertion on
+d52ee5e7a (detached worktree, new check files copied in) and passes after.
 
 ## Acceptance records
 

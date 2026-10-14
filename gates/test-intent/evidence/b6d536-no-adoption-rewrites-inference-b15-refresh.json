@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T12:56:59.159Z",
-  "revision": "5970a2de5cd5a309f7aa701a2fbec06f60d7f730",
-  "tree": "3bb820511801d6b0c046d612778264184f511435",
+  "createdAt": "2026-10-14T07:55:08.227Z",
+  "revision": "d52ee5e7a26247dfb7053f49719fc6adf0c880e3",
+  "tree": "5f1afb3b6e1519021ea340cfd1e5fc8c784a2f68",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,39 +18,39 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerPreservedChildTest.orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest.closeAlwaysStopsServer\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.declaredConfigurationIdentity\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerPreservedChildTest.orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest.closeAlwaysStopsServer\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.declaredConfigurationIdentity\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8907
+      "durationMs": 31976
     }
   ],
   "checks": [
     {
-      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",
-      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "contentDigest": "sha256:78d9d3c809603cc24992b91631f1dfda77ceaf7d17832128d5aaef93f3db7c8b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:78d9d3c809603cc24992b91631f1dfda77ceaf7d17832128d5aaef93f3db7c8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal()",
           "status": "passed"
         }
       ]
@@ -74,7 +74,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#closeAlwaysStopsServer",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c04d7b613034f1fefcba576b49dbc3c116ffbbe61aa16430fb7bb6a419fef44e",
+      "contentDigest": "sha256:842e585d22b5320d037107bf3e792508cdb68e035b6425c09be9a0c0303357b3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1a124677a8ebcb1050020ff385c1169831c7b779a5e0eadc57a561b6e38ab126",
+      "contentDigest": "sha256:face7ce75d4fd49dcec567f5c87243c67cdbf9e235ebbb128eaf8424ea1134ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1a124677a8ebcb1050020ff385c1169831c7b779a5e0eadc57a561b6e38ab126",
+      "contentDigest": "sha256:face7ce75d4fd49dcec567f5c87243c67cdbf9e235ebbb128eaf8424ea1134ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#declaredConfigurationIdentity",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:93d6c11920e7581a9539db0d0e308b4039d853b7ffa8242f6e484b85e0913081",
+      "contentDigest": "sha256:595544a9c61ea4a35316ef03700e9829d92bcb1e20f95598113554af4327fd38",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -132,5 +132,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:7b6bf9e49343096f1f66b729bddc1fda49633910c41cd94518b1d1a9128035ef"
+  "digest": "sha256:705897f96ff9d16800371effd70057affe02167d8d06bfda54d4ba2bb7aebea8"
 }
