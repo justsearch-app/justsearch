@@ -15,6 +15,8 @@ Refreshed after b82 (run b82g-status-records). The evidence of entries 1 and 2 w
 
 The current checks call StatusLaneAging, a b82 test helper, so the fail-before also overlays it. StatusLaneAging reads StatusLifecycleHandler.PROBE_ALLOWANCE_PERIODS, which 93479e944 lacks. The compat before-patch gates/test-intent/evidence/b67-status-backstop-compat.patch adds only that constant, and no production code in that state reads it. The overlay modules/ui-web/node_modules/.before-run-private-install is an empty marker file. It gives the before worktree a real node_modules directory, so the evidence script links none. The before worktree's frontend packages came from a private install in its parent directory.
 
+Records phase B (batch 3) re-ran entry 2's evidence (`b67-status-backstop-preservation.json`) on b599d4d7e because VerifierStatusIsolationTest changed after that run. The entry has no fail-before; all four classes pass (9, 23, 10 and 14 cases).
+
 ```json
 {
   "entries": [

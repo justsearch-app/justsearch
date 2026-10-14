@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:d6365732a21827c41b0aed4b763fad01ff0383a5f7bddf14e2973868ad16dff8"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T22:53:46.392Z",
-  "revision": "19f230c5f3420348cd8042745c154017303084b0",
-  "tree": "f852a03aae537106c58ccc0fef13ba1f453d55ff",
+  "createdAt": "2026-10-14T15:41:05.637Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ad6338aa9a9430b2ca2396b79cb1b00610a14ff2",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.WorkerStatusSamplerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 63728
+      "durationMs": 66534
     }
   ],
   "checks": [
@@ -224,7 +224,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/WorkerStatusSamplerTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/WorkerStatusSamplerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:fc94a5ef5d8c9baa007e58349715d6edc3eb584ff2a815186c6f1755a42a0ffa",
+      "contentDigest": "sha256:ee504361a4197876529b33fa420b42d187fe7b89ff12a44678d992c283c462d0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -272,13 +272,18 @@
     "ref": "f6d579a86",
     "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b50-status-timeout-compat.patch",
+        "contentDigest": "sha256:3bbbee766497635af8f5895d446c6f96e510e311d00d82ed2cb7eea00b73e268"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.WorkerStatusSamplerTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 347732
+        "durationMs": 289597
       }
     ],
     "checks": [
@@ -294,5 +299,5 @@
       }
     ]
   },
-  "digest": "sha256:e0c37c22bdba2f8dad59c8769306ac1378b0b5f0a42a7f2e08b10af3caab87e3"
+  "digest": "sha256:fa82ff59c2e49cc5754507eee741ad79f38a333c4bf6d0d4d135a5d29fcc26b0"
 }

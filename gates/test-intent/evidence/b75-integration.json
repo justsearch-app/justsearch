@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-12T11:57:09.157Z",
-  "revision": "8bb75115720bc566b0a3f524651f16780287d42e",
-  "tree": "b567d1bd64a7c0d9df8a9226c47f86001f59575b",
+  "createdAt": "2026-10-14T16:23:16.785Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1561cbcba37acb3b62d5b9330f4280dc799de5ca",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusIsolationHttpTest.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatusIsolationTest.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus2Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus3Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus4Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus5Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight\" --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 20143
+      "durationMs": 45997
     },
     {
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 27956
+      "durationMs": 36227
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f6d52085ac40930e48844b0f2a784f366d9062c811e460a968b69bfdba86cf96",
+      "contentDigest": "sha256:358da8fcc3b133aeaf7a1714427eed1b7327844a0482a671175470c2268813a4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c78644d6b3882431efe5fe7aa978dc9f3b91d1c50e5f5483e76ad24d5f7d665b",
+      "contentDigest": "sha256:f8c6df480d3ce5984e92f5b2b2da69b96ede0c4b5b14fe48e7a32febd8fe150e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:53e99406d39e8fcb7938468bd6a5a001709966290d6c54caa73fc6dae22911c9",
+      "contentDigest": "sha256:f333fcc82cdf8e8573de7be9dccf49ea493565e1c5d06b3a60649789466b6363",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3205a0be274701f325805ce5d39470a675d555973a181456de7257ab297f7dd8",
+      "contentDigest": "sha256:572d4b5a6c177509f328aa17c55d1997c67443aaec01e6fa2e0c0f9afab0487f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:29d052c12ff2bbb50f6c07c3af53dd23ed9675772eb6aba758cf3362eb6c1578",
+      "contentDigest": "sha256:b68cbb0caae504c5cae6dc47d3de715e7fc30b289b53e3f7ac9a7173e184765e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0e9adcbb2c04c0a041afc32215ac645ca3f276a76b061747e2e94a9385909b39",
+      "contentDigest": "sha256:d389a05cf1bf7e548a184d57d9287a9dc8ca7276ba219f64d950744a1de45db8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5521b0d40e24ddb01f07d70eee58f745fa739d8acc2a5f752331aba82141960c",
+      "contentDigest": "sha256:4c252c1f897d2e46c88e87acaf8212b100bd64b58151b9a867942d715a2df76a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -283,5 +283,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:938ad577584ba786d5e00d56c462d618345faba20ef198c5bfaad7122c1f328d"
+  "digest": "sha256:217abb58ef1e7a12fd048713085ac744e5fb2fb9972bd326b8156a88079ea61e"
 }

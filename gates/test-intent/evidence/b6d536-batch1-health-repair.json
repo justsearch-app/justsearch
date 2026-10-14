@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T23:01:07.566Z",
-  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
-  "tree": "1edd85d096894c4f8b147e2d0bdc35b21141dde2",
+  "createdAt": "2026-10-14T15:58:00.824Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "3fa84636b125c4836f5bab5dce8033c9267f1dbe",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeReplayTest.recoveredChatClearsItsModelLoadFailureThroughTheBridge\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeReplayTest.recoveredChatClearsItsModelLoadFailureThroughTheBridge\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 17769
+      "durationMs": 6249
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeReplayTest.java#recoveredChatClearsItsModelLoadFailureThroughTheBridge",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeReplayTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:785a28d2a5e3732b9cd1c7acf0a83c4b5c67f09e9235bd68ff9c410dc7b88015",
+      "contentDigest": "sha256:e98a8bb94e43f06d725ffb66c4b64d5185eafbce2ff53b4572613b54d751851c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -45,13 +45,18 @@
     "ref": "1e333857b",
     "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b50-status-timeout-compat.patch",
+        "contentDigest": "sha256:3bbbee766497635af8f5895d446c6f96e510e311d00d82ed2cb7eea00b73e268"
+      }
+    ],
     "runs": [
       {
-        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeReplayTest.recoveredChatClearsItsModelLoadFailureThroughTheBridge\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeReplayTest.recoveredChatClearsItsModelLoadFailureThroughTheBridge\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 19426
+        "durationMs": 59219
       }
     ],
     "checks": [
@@ -62,5 +67,5 @@
       }
     ]
   },
-  "digest": "sha256:57e567bea46e972385cf99345c989fda8d8fe102e578f047f5b62c9468b8f10b"
+  "digest": "sha256:06e6e152beab74a875ef4a6c4d6cbd6a9e6d93a380ea0d25cdecdaf1d006718d"
 }

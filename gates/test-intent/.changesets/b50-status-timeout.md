@@ -18,6 +18,8 @@ Refreshed after b82 (run b82g-status-records). Entry 1's evidence was re-run on 
 
 Entry 1's behaviour text was corrected after the refresh (b82g correction). It said fresh=true schedules an observation rather than joining it. The current code waits for that observation for at most 100 ms (StatusLifecycleHandler.FRESH_READ_DEADLINE_MS). It also said the stale or unknown markers are returned while a dependency cannot answer. They now appear only once the held part has aged past its own lane's limit (entry 3), and a failed producer marks only its own part. This corrects the description of code that did not change in this refresh; no check or evidence changed.
 
+Refreshed in records phase B (batch 3) on b599d4d7e, because ee3c86b19 changed WorkerStatusSamplerTest to build HealthEventChangeRegistry with its delivery executor. That constructor does not exist at f6d579a86, so the fail-before now applies the compat before-patch gates/test-intent/evidence/b50-status-timeout-compat.patch. It adds only the declaration HealthEventChangeRegistry(ExecutorService), which ignores its argument and calls the existing no-argument constructor; no production code at f6d579a86 calls it. Both checks again fail by assertion there, with the same details as before, and pass on the candidate (46 and 9 cases).
+
 ```json
 {
   "entries": [

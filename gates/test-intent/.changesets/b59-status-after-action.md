@@ -16,7 +16,15 @@ after refused fresh reads. verify-status8 reports those cases passing on 2fd48e1
 residual it did not attribute to that candidate (expired lanes published under load, taken up by
 b82). This repair changed only the sources (orchestrator wording no longer cited as owner words), so
 every earlier record is stale and the disagreement is not decided here. The next acceptor reviews the
-current content; both evidence files are invalid because their check files changed after the runs.
+current content.
+
+Records phase B (batch 3) re-ran both evidence files on b599d4d7e because their check files changed
+after the first runs. `b59-status-after-action-new.json` passes (32 cases). For
+`b59-status-after-action-repaired.json`, BrainSurface.after-action.test.ts now imports
+../../api/statusInvalidation.js, which 1939ad02c lacks, so the fail-before applies the compat
+before-patch `gates/test-intent/evidence/b59-status-after-action-compat.patch`. It adds only
+modules/ui-web/src/api/statusInvalidation.ts with a no-op `observeStatusResponse()`; no 1939ad02c
+code calls it. The four cases again fail by their after-action assertions on 1939ad02c.
 
 ```json
 {

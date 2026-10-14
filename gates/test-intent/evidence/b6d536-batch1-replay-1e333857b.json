@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-09T00:04:14.826Z",
-  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
-  "tree": "628dd7b7ee47764d30315d6b1261b0c3de0bde03",
+  "createdAt": "2026-10-14T16:11:21.789Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "37235d081d39a8a2b6bbd6d8859ec205319de3cc",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 86561
+      "durationMs": 115962
     },
     {
-      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7128
+      "durationMs": 8334
     }
   ],
   "checks": [
@@ -50,7 +50,7 @@
       "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
       "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:575713ac3c72aa72d44f91b5ca5be5c5e099b4cf26541b445db34242335b267a",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -60,7 +60,27 @@
           "status": "passed"
         },
         {
+          "name": "legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren()",
+          "status": "passed"
+        },
+        {
           "name": "equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete()",
+          "status": "passed"
+        },
+        {
+          "name": "backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot()",
+          "status": "passed"
+        },
+        {
+          "name": "parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate()",
+          "status": "passed"
+        },
+        {
+          "name": "backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot()",
+          "status": "passed"
+        },
+        {
+          "name": "committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes()",
           "status": "passed"
         }
       ]
@@ -70,19 +90,24 @@
     "ref": "1e333857b",
     "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-batch1-replay-compat.patch",
+        "contentDigest": "sha256:280f2b360b862192624412b05aa3cc1bfa5088692c3bbf413abcbdbec6e9309e"
+      }
+    ],
     "runs": [
       {
-        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 70755
+        "durationMs": 146375
       },
       {
-        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 16116
+        "durationMs": 5722
       }
     ],
     "checks": [
@@ -94,9 +119,9 @@
       {
         "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
         "classification": "assertion",
-        "detail": "missingChunksAreNotCertifiedByTheParentTimestamp(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a matching timestamp must not certify a missing chunk ==> expected: <false> but was: <true> | equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: equal row counts cannot certify duplicate ordinals ==> expected: <false> but was: <true>"
+        "detail": "missingChunksAreNotCertifiedByTheParentTimestamp(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a matching timestamp must not certify a missing chunk ==> expected: <false> but was: <true> | equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: equal row counts cannot certify duplicate ordinals ==> expected: <false> but was: <true> | parentContentChangesInvalidateTheDeclarationEvenWith"
       }
     ]
   },
-  "digest": "sha256:c73f95c6d216015444256d1d98981b74f59206222486f1d666a913871617fdc9"
+  "digest": "sha256:552956b1ef2f4f3697905f0316dc47f2cd691358ef62a3285c2c16d2048990db"
 }

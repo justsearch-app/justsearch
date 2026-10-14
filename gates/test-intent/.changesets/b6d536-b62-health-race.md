@@ -11,6 +11,8 @@ The orchestrator's b62 brief (agent wording under the owner's end-to-end delegat
 delegated choices) requires R1 current-state publication under blocked mapping/delivery, R2 durable
 chunk completeness, and preservation of R3/R4. Independent verifier acceptance remains pending.
 
+Evidence refreshed in records phase B (batch 3) on b599d4d7e, fail-before again at 13950b090. ee3c86b19 made CapabilityHealthBridgeConcurrentPublicationTest build HealthEventChangeRegistry with its delivery executor, which 13950b090 lacks, so the fail-before applies the compat before-patch `gates/test-intent/evidence/b50-status-timeout-compat.patch`. It adds only the declaration HealthEventChangeRegistry(ExecutorService), which ignores its argument and calls the existing no-argument constructor; no production code at 13950b090 calls it. Entries 1 and 2 again fail by assertion there. Entry 4's check (not a repair) now compiles before and passes there; the earlier run recorded a compile failure.
+
 ```json
 {
   "entries": [

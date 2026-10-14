@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-11T08:37:23.764Z",
-  "revision": "23b8679eed760201748c485c2f5914a41f7ecf35",
-  "tree": "d9f6769944d0a1cae0beae7838490b7a4150a3fd",
+  "createdAt": "2026-10-14T17:15:48.246Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DefaultEngineComponentRegistryTest.statusCounterTracksPublicationAndNotSnapshotOrNoop\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15068
+      "durationMs": 11027
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.TransitionRunnerTest.statusCounterTracksBothChatTransitionEdges\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12854
+      "durationMs": 4673
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.PlacementStageTest.statusCounterTracksInstalledDistributionAndNotTimestampOnlyRewrite\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan\" --tests \"io.justsearch.app.services.power.EnergyStatePollerTest.energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.statusCounterTracksActivationProcedureAndNotStatusRead\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.statusCounterTracksSettingsCommitAndNotExactReplay\" --tests \"io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest.statusCounterTracksJobsAndNotReadOnlyReattachment\" --tests \"io.justsearch.app.services.worker.WatchedRootsStatusCounterTest.statusCounterTracksRootsAndNotDuplicateRemoval\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 14634
+      "durationMs": 6833
     },
     {
       "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.statusCounterTracksVerdictChangesAndNotRepeatedInputs\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12020
+      "durationMs": 8537
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusChangeCounterHttpTest.statusCounterResponseReflectsACompletedSampleAndNeverSamplesForMetadata\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 17118
+      "durationMs": 7751
     },
     {
-      "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-25552-1791707740920.json\"",
+      "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-38148-1791998115695.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4311
+      "durationMs": 1450
     }
   ],
   "checks": [
@@ -104,7 +104,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0ec2ed2755d307dffbc34c01b29e6fac92c9ff7ef9449d931ccb0335c69fce4b",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#statusCounterTracksActivationProcedureAndNotStatusRead",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5a72bd3b2573e24c0ea76348f8cd8598f815a57fd1d57dffa67bdf6e415b3e92",
+      "contentDigest": "sha256:1cef1a7d75cbac83200480bf8d8daa5f2b70d2f37e753a2fd1b7d194ce758243",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -254,43 +254,46 @@
   "failBefore": {
     "ref": "23b8679ee",
     "revision": "23b8679eed760201748c485c2f5914a41f7ecf35",
-    "overlays": [],
+    "overlays": [
+      "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/TestActivationForwarders.java"
+    ],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DefaultEngineComponentRegistryTest.statusCounterTracksPublicationAndNotSnapshotOrNoop\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 18193
+        "durationMs": 6142
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.TransitionRunnerTest.statusCounterTracksBothChatTransitionEdges\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 22071
+        "durationMs": 3146
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.PlacementStageTest.statusCounterTracksInstalledDistributionAndNotTimestampOnlyRewrite\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan\" --tests \"io.justsearch.app.services.power.EnergyStatePollerTest.energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.statusCounterTracksActivationProcedureAndNotStatusRead\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.statusCounterTracksSettingsCommitAndNotExactReplay\" --tests \"io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest.statusCounterTracksJobsAndNotReadOnlyReattachment\" --tests \"io.justsearch.app.services.worker.WatchedRootsStatusCounterTest.statusCounterTracksRootsAndNotDuplicateRemoval\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 17878
+        "durationMs": 6692
       },
       {
         "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.statusCounterTracksVerdictChangesAndNotRepeatedInputs\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 13764
+        "durationMs": 2482
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusChangeCounterHttpTest.statusCounterResponseReflectsACompletedSampleAndNeverSamplesForMetadata\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 20252
+        "durationMs": 6697
       },
       {
-        "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-25552-1791707840174.json\"",
+        "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-38148-1791998144660.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1645
+        "durationMs": 1294
       }
     ],
     "checks": [
@@ -306,33 +309,33 @@
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PlacementStageTest.java#statusCounterTracksInstalledDistributionAndNotTimestampOnlyRewrite",
-        "classification": "assertion",
-        "detail": "statusCounterTracksInstalledDistributionAndNotTimestampOnlyRewrite(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: install publication must invalidate status ==> expected: <1> but was: <0>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan",
-        "classification": "assertion",
-        "detail": "statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU profile owner must declare its publication ==> expected: <1> but was: <0>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java#energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot",
-        "classification": "assertion",
-        "detail": "energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: UNKNOWN to known power changes canonical status ==> expected: <1> but was: <0>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#statusCounterTracksActivationProcedureAndNotStatusRead",
-        "classification": "assertion",
-        "detail": "statusCounterTracksActivationProcedureAndNotStatusRead(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: runtime activation axis must invalidate status ==> expected: <1> but was: <0>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java#statusCounterTracksSettingsCommitAndNotExactReplay",
-        "classification": "assertion",
-        "detail": "statusCounterTracksSettingsCommitAndNotExactReplay(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: canonical chat intent must invalidate at settings commit ==> expected: <1> but was: <0>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteIndexingJobsBridgeTest.java#statusCounterTracksJobsAndNotReadOnlyReattachment",
-        "classification": "assertion",
-        "detail": "statusCounterTracksJobsAndNotReadOnlyReattachment(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: worker queue publication must invalidate status ==> expected: <1> but was: <0>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#statusCounterTracksVerdictChangesAndNotRepeatedInputs",
@@ -341,8 +344,8 @@
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootsStatusCounterTest.java#statusCounterTracksRootsAndNotDuplicateRemoval",
-        "classification": "assertion",
-        "detail": "statusCounterTracksRootsAndNotDuplicateRemoval(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: root ownership publication must invalidate status ==> expected: <1> but was: <0>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusChangeCounterHttpTest.java#statusCounterResponseReflectsACompletedSampleAndNeverSamplesForMetadata",
@@ -352,14 +355,14 @@
       {
         "id": "modules/ui-web/src/api/statusOwner-raw-settings.test.ts",
         "classification": "assertion",
-        "detail": "OWN-RAW-SETTINGS: a successful trusted raw settings completion reaches canonical status:  AssertionError: raw trusted plugin writes share the canonical completion owner: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-YgArE8/modules/ui-web/src/api/statusOwner-raw-settings.test.ts:14:84\n    at file:///C:/agent-sandb"
+        "detail": "OWN-RAW-SETTINGS: a successful trusted raw settings completion reaches canonical status:  AssertionError: raw trusted plugin writes share the canonical completion owner: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-3/test-intent-before-uOpmjg/modules/ui-web/src/api/statusOwner-raw-settings.test.ts:14:84\n    at processTicksAndRe"
       },
       {
         "id": "modules/ui-web/src/api/statusOwner-reattach.test.ts",
         "classification": "assertion",
-        "detail": "OWN-REATTACH-READONLY: a resumed read-only execution causes zero fresh reads:  AssertionError: replaying a successful read does not mutate any status state: expected 1 to be +0 // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-YgArE8/modules/ui-web/src/api/statusOwner-reattach.test.ts:22:80\n    at file:///C:/agent-sandbox-tmp/b64/ui-deps/no"
+        "detail": "OWN-REATTACH-READONLY: a resumed read-only execution causes zero fresh reads:  AssertionError: replaying a successful read does not mutate any status state: expected 1 to be +0 // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-3/test-intent-before-uOpmjg/modules/ui-web/src/api/statusOwner-reattach.test.ts:22:80\n    at file:///F:/justsearch-public/.claude/w"
       }
     ]
   },
-  "digest": "sha256:2ed9f52409fe320ac15523aa8189517550b1e47e3e8aa90a05dc35a125918226"
+  "digest": "sha256:1c5b3333176f0f81864391f92c68ceac99f936fd0735d75a2c494d527159e75a"
 }

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:2277c8e1104b2170c3a05f6144c4aa542093a987f4f9da877da647d0264e42c0"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-09T04:43:47.378Z",
-  "revision": "65daf680ad72aa146f15372abc793f0e9bc3a13b",
-  "tree": "e6aef1d35102674053be48183ad0c9e62f74ed73",
+  "createdAt": "2026-10-14T16:14:36.412Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "5cce499d7f8f95e9d764e051f0e62534753263c5",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,22 +18,22 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 20323
+      "durationMs": 13796
     },
     {
-      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13928
+      "durationMs": 6758
     },
     {
-      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 79672
+      "durationMs": 105679
     }
   ],
   "checks": [
@@ -91,7 +91,7 @@
       "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
       "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8eabdff1740c513e342cec25d273bf522cc60fc84f75d2d267f1ddf7c3188d7b",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,6 +119,10 @@
         {
           "name": "backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot()",
           "status": "passed"
+        },
+        {
+          "name": "committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes()",
+          "status": "passed"
         }
       ]
     },
@@ -139,5 +143,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:3e86b622e156e28e2582b810f54c119716c0faf3cb61d44f918d37b7b2556d43"
+  "digest": "sha256:f2a3de3d2c25be6025c28ae0694d1771427f88b134e48324951ac4185ac51586"
 }

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T23:19:43.406Z",
-  "revision": "1939ad02ce2c23bae1146e6b01b8055aa8b3fff8",
-  "tree": "92f5981cfd074a554c13b1974f24deb729210ab3",
+  "createdAt": "2026-10-14T17:11:10.803Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/api/statusInvalidation.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b59\\\\status-after-action\\\\test-tmp\\\\test-intent-vitest-40800-1791674375040.json\"",
+      "command": "npx vitest run \"src/api/statusInvalidation.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-26120-1791997869464.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 8364
+      "durationMs": 1338
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/api/statusInvalidation.test.ts",
       "file": "modules/ui-web/src/api/statusInvalidation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:770976c9e9109e71c66af416641a4c228a27d5132922e25a7e1a8d6e56153b7c",
+      "contentDigest": "sha256:5fdde9637e322b647d7f59b300ff2cd5eb10da6f0907fbfe96f9ff797a6cd5fa",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -157,10 +157,14 @@
         {
           "name": "failed operations and read-only operations do not request fresh status",
           "status": "passed"
+        },
+        {
+          "name": "shows a change made by another client after this UI next makes a read-only request",
+          "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:720a11a6461fd52feded3055cea5564e941cf3d8ba431508577757a318797cf6"
+  "digest": "sha256:108812f5eb5657804be381b6543a44b5a5d939e13cdc20896a072698c49a2a67"
 }

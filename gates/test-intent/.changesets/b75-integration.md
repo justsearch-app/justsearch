@@ -59,6 +59,8 @@ evidence re-run on the combined tree and a new acceptance record):
 These lists come from comparing the test-intent gate on the combined working tree with the gate
 on the base and on each of the five branch tips.
 
+Records phase B (batch 3) re-ran `b75-integration.json` on b599d4d7e because its check files changed after the first run. The entry has no fail-before. Every check passes, including StatusLifecycleQueryOnCpuTest (3 cases) and KnowledgeServerRecoveryCloseTest (24 cases).
+
 ```json
 {
   "entries": [
