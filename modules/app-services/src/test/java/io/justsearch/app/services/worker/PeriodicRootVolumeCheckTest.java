@@ -109,6 +109,12 @@ final class PeriodicRootVolumeCheckTest {
         String rootPath = call.getArgument(0);
         return onAnotherVolume.contains(Path.of(rootPath).toAbsolutePath().normalize());
       }
+      case "rootVolumeRefusal" -> {
+        // Round 8: the same volume check, answered with its root-level reason.
+        String rootPath = call.getArgument(0);
+        return onAnotherVolume.contains(Path.of(rootPath).toAbsolutePath().normalize())
+            ? ROOT_UNAVAILABLE_REASON : "";
+      }
       case "toString" -> {
         return "the Worker";
       }

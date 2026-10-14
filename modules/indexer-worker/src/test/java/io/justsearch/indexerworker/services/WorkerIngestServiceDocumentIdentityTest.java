@@ -103,6 +103,7 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
       var service = new WorkerIngestService(
           jobQueue, null, null, IndexingPacing.unthrottled(), base,
           manager.resolveGenerationPathStrict(buildingId), candidate, runtime, null, 0L);
+      addedAsThePerson(service, tempDir);
       service.acceptWatcherDelete(path,
           () -> candidate.indexingCoordinator().deleteByIdAndChunks(path));
       DeleteByIdResponse directResult = service.deleteById(
@@ -211,6 +212,7 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
     var service = new WorkerIngestService(
         jobQueue, null, null, IndexingPacing.unthrottled(), base,
         manager.resolveGenerationPathStrict(activeId), runtime, runtime, null, 0L);
+    addedAsThePerson(service, tempDir);
     AtomicInteger watcherEffects = new AtomicInteger();
     service.acceptWatcherDelete(watchedPath, () -> {
       var journal = jobQueue.listSwitchBufferOpsStrictForGeneration(buildingId);
@@ -700,5 +702,14 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
   private static DeleteByIdResponse delete(WorkerIngestService service, String docId) {
     return service.deleteById(
         DeleteByIdRequest.newBuilder().setDocId(docId).build(), CallContext.none());
+  }
+
+  /**
+   * Records {@code root} as a root the person added. A watcher delete happens only under such a
+   * root, and only the add records a volume (task t-20261013-ef3c41, round 8b, decision 2).
+   */
+  private static void addedAsThePerson(WorkerIngestService service, Path root) {
+    assertTrue(((RootWitness) service.rootCheck()).recordAdded(root),
+        "precondition: the person's add records the root's volume");
   }
 }

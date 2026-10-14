@@ -91,6 +91,7 @@ final class PruneMissingUncertainRootTest
     Path gone = Files.writeString(root.resolve("gone.txt"), "obsolete");
     String goneId = index(gone);
     String keptId = index(Files.writeString(root.resolve("kept.txt"), "current"));
+    addRoot(root);
     Files.delete(gone);
 
     PruneResponse response = service.pruneMissing(
@@ -113,5 +114,21 @@ final class PruneMissingUncertainRootTest
     runtime.commitOps().commitAndTrack();
     runtime.commitOps().maybeRefreshBlocking();
     return id;
+  }
+
+  /**
+   * The person's add of {@code root}: its watch registration with the add marker. Round 8 (refined
+   * decision 2): only the add records a root's volume; a build without the marker recorded it at
+   * the first prune.
+   */
+  private void addRoot(Path root) {
+    var request = io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString());
+    var marker = io.justsearch.ipc.WatchRootRequest.getDescriptor().findFieldByName("root_added");
+    if (marker != null) {
+      request.setField(marker, Boolean.TRUE);
+    }
+    org.junit.jupiter.api.Assertions.assertTrue(
+        service.watchRoot(request.build(), CallContext.none()).getWatching(),
+        "precondition: the person adds the root");
   }
 }

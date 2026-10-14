@@ -264,6 +264,51 @@ final class EngineTestHarness implements AutoCloseable {
     return ((KnowledgeServer) serverField.get(root)).captureServingView();
   }
 
+  /**
+   * Records {@code folder}'s volume as the person's add does: the Worker's watch with the add
+   * marker. Only the add records a root's volume, and every walk, sync and migration refuses a root
+   * with none recorded (task t-20261013-ef3c41, round 8, refined decision 2); tests that declare a
+   * root by writing {@code watched_roots.json}, or sync a folder directly, call this first. The
+   * watch subscription itself is then dropped from the Worker's registry (not removed as the
+   * person's removal does, which would drop the record too), so these tests run without watcher
+   * events, as they did before.
+   */
+  void addRootAsThePerson(Path folder) throws ReflectiveOperationException {
+    addRootAsThePerson(root, folder);
+  }
+
+  /** {@link #addRootAsThePerson(Path)} against an Engine a test started itself. */
+  static void addRootAsThePerson(EngineRoot engine, Path folder)
+      throws ReflectiveOperationException {
+    Field serverField = EngineRoot.class.getDeclaredField("server");
+    serverField.setAccessible(true);
+    recordAddedRoot(((KnowledgeServer) serverField.get(engine)).appServices().ingestService(),
+        folder);
+  }
+
+  /** {@link #addRootAsThePerson(Path)} against a Worker ingest service a test composed itself. */
+  static void recordAddedRoot(
+      io.justsearch.indexerworker.services.WorkerIngestService ingest, Path folder)
+      throws ReflectiveOperationException {
+    var added = ingest.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(folder.toString()).setRootAdded(true).build(),
+        io.justsearch.indexerworker.services.CallContext.none());
+    if (!added.getWatching()) {
+      throw new IllegalStateException(
+          "precondition: the person adds " + folder + ": " + added.getErrorMessage());
+    }
+    Field registryField =
+        io.justsearch.indexerworker.services.WorkerIngestService.class.getDeclaredField(
+            "rootWatcherRegistry");
+    registryField.setAccessible(true);
+    Object registry = registryField.get(ingest);
+    Method unwatch = registry.getClass().getDeclaredMethod("unwatch", String.class);
+    unwatch.setAccessible(true);
+    unwatch.invoke(registry, folder.toString());
+  }
+
+
+
   Path dataDir() {
     return dataDir;
   }

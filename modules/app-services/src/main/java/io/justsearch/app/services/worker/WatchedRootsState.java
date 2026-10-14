@@ -238,12 +238,14 @@ public final class WatchedRootsState {
   }
 
   /**
-   * Clears the root-level {@code reason} once a later sync of the root was accepted, which means
-   * the volume recorded for it is back: the sync reconciled the root, so it reads indexed again.
+   * Clears the root-level unavailable reason (plain, or with its detail such as the round-8
+   * upgrade reason) once a later sync of the root was accepted, which means the volume recorded
+   * for it is back or was confirmed: the sync reconciled the root, so it reads indexed again.
    * Returns whether the state changed.
    */
-  synchronized boolean markRootReturned(Path root, String reason) {
-    if (!watchedRoots.containsKey(root) || !reason.equals(walkErrors.get(root))) {
+  synchronized boolean markRootReturned(Path root) {
+    if (!watchedRoots.containsKey(root)
+        || !RootLifecycleOps.isRootUnavailableReason(walkErrors.get(root))) {
       return false;
     }
     markIndexed(root);
@@ -268,14 +270,13 @@ public final class WatchedRootsState {
    * outcome, and a root that is not watched, leaves the state alone.
    */
   public void recordRecordedWalk(Path root, boolean complete, String terminalReasonCode) {
-    String reason = RootLifecycleOps.ROOT_MISSING_REASON;
     synchronized (this) {
       if (!watchedRoots.containsKey(root)) {
         return;
       }
-      if (reason.equals(terminalReasonCode)) {
-        markWalkRefused(root, reason);
-      } else if (!complete || !markRootReturned(root, reason)) {
+      if (RootLifecycleOps.isRootUnavailableReason(terminalReasonCode)) {
+        markWalkRefused(root, RootLifecycleOps.unavailableReasonFor(terminalReasonCode));
+      } else if (!complete || !markRootReturned(root)) {
         return;
       }
       persist();

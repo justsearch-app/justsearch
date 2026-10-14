@@ -72,6 +72,7 @@ final class EngineSyncDirectoryTest {
     Files.createDirectories(syncTestDir);
     harness = EngineTestHarness.start(tempDir.resolve("data"));
     assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND), "the engine must be healthy before the sync tests");
+    harness.addRootAsThePerson(syncTestDir);
   }
 
   @AfterAll

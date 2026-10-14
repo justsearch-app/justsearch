@@ -246,12 +246,13 @@ final class SyncOps {
             return;
         }
         Path root = Path.of(rootPath).toAbsolutePath().normalize();
-        String reason = RootLifecycleOps.ROOT_MISSING_REASON;
         boolean changed;
-        if (response.getError().startsWith(reason)) {
-            changed = rootsState.markRootUnavailable(root, reason);
+        if (RootLifecycleOps.isRootUnavailableReason(response.getError())) {
+            // Round 8: a root whose drive is not confirmed after an upgrade shows that reason.
+            changed = rootsState.markRootUnavailable(root,
+                    RootLifecycleOps.unavailableReasonFor(response.getError()));
         } else if (response.getError().isEmpty()) {
-            changed = rootsState.markRootReturned(root, reason);
+            changed = rootsState.markRootReturned(root);
         } else {
             changed = false;
         }
@@ -271,7 +272,7 @@ final class SyncOps {
         }
         return roots.stream()
                 .filter(r -> !r.equals(synced))
-                .filter(r -> RootLifecycleOps.ROOT_MISSING_REASON.equals(rootsState.getWalkError(r)))
+                .filter(r -> RootLifecycleOps.isRootUnavailableReason(rootsState.getWalkError(r)))
                 .toList();
     }
 
@@ -286,22 +287,37 @@ final class SyncOps {
         if (rootsState == null) {
             return;
         }
-        String reason = RootLifecycleOps.ROOT_MISSING_REASON;
         for (Path root : roots) {
             if (asked.contains(root)) {
                 continue;
             }
-            Boolean refused;
+            // Round 8 (S8): the cycle's roots were listed when it began. A root the person removed
+            // since is not asked: the ask runs under the root's producer fence, which removal
+            // waits for and which refuses a removed root, so nothing is asked or marked for it.
+            var fence = rootsState.captureRootProducer(root, true);
+            boolean[] removed = {false};
+            String refusal;
             try {
-                refused = rpc.execute(
+                refusal = rpc.execute(
                         "refusesRootVolume",
                         KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                        stub -> stub.refusesRootVolume(root.toString()), engineContext);
+                        stub -> fence.run(
+                                () -> stub.rootVolumeRefusal(root.toString()),
+                                () -> {
+                                    removed[0] = true;
+                                    return "";
+                                }),
+                        engineContext);
             } catch (CircuitBreakerOpenException e) {
                 log.debug("refusesRootVolume rejected by circuit breaker for {}", root);
                 return;
             }
-            if (Boolean.TRUE.equals(refused) && rootsState.markRootUnavailable(root, reason)) {
+            if (removed[0]) {
+                log.debug("Watched root {} was removed during this cycle; it is not asked", root);
+                continue;
+            }
+            if (refusal != null && !refusal.isEmpty()
+                    && rootsState.markRootUnavailable(root, RootLifecycleOps.unavailableReasonFor(refusal))) {
                 log.info("Watched root {} is not on the volume it was first seen on; it reads"
                         + " unavailable", root);
                 rootsState.persist();

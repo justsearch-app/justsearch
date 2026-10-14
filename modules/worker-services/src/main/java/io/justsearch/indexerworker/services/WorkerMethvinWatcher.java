@@ -108,7 +108,20 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private final BiConsumer<Path, Boolean> reconcileSink;
   private final WorkerBurstDetector burstDetector = new WorkerBurstDetector();
   private final ScheduledExecutorService reconcileExecutor;
-  private final Map<Path, Boolean> pendingReconciliations = new ConcurrentHashMap<>();
+  private final Map<Path, PendingReconcile> pendingReconciliations = new ConcurrentHashMap<>();
+  /**
+   * Round 8 (task t-20261013-ef3c41, S8): how many times each root was removed. A reconcile asked
+   * for before a removal is dropped instead of syncing the removed root, even when the root was
+   * added again by the time it would run.
+   */
+  private final Map<Path, Long> removals = new ConcurrentHashMap<>();
+
+  /** A reconcile refused for capacity, kept for retry, with the removal count it was asked at. */
+  private record PendingReconcile(boolean force, long removals) {
+    PendingReconcile merge(PendingReconcile other) {
+      return new PendingReconcile(force || other.force, Math.max(removals, other.removals));
+    }
+  }
   private final Map<Path, RootSubscription> watchers = new ConcurrentHashMap<>();
   private final Map<Path, CompletableFuture<Void>> watchFutures = new ConcurrentHashMap<>();
   private final Map<Path, Object> failedEpochs = new ConcurrentHashMap<>();
@@ -677,13 +690,35 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     }
   }
 
+  /**
+   * Drops what this watcher still holds for {@code root} beyond its subscription: the person
+   * removed the root, so a reconcile asked for before now is never run (round 8, S8).
+   */
+  void forgetRoot(Path root) {
+    Path normalized = root.toAbsolutePath().normalize();
+    removals.merge(normalized, 1L, Long::sum);
+    pendingReconciliations.remove(normalized);
+  }
+
+  private long removalsOf(Path root) {
+    return removals.getOrDefault(root, 0L);
+  }
+
   private void submitReconcile(Path root, boolean force, int delaySeconds) {
     if (root == null) return;
+    submitReconcile(root, force, delaySeconds, removalsOf(root));
+  }
+
+  private void submitReconcile(Path root, boolean force, int delaySeconds, long askedAt) {
     try {
       var _ =
           reconcileExecutor.schedule(
               () -> {
                 try {
+                  if (removalsOf(root) != askedAt) {
+                    log.debug("Worker watcher reconcile dropped: {} was removed", root);
+                    return;
+                  }
                   reconcileSink.accept(root, force);
                 } catch (RuntimeException e) {
                   routingFailureSink.accept(e);
@@ -703,7 +738,10 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
         log.debug("Worker watcher reconcile rejected during close for {}", root);
         return;
       }
-      pendingReconciliations.merge(root, force, (left, right) -> left || right);
+      if (removalsOf(root) == askedAt) {
+        pendingReconciliations.merge(
+            root, new PendingReconcile(force, askedAt), PendingReconcile::merge);
+      }
       log.warn(
           "Worker watcher reconcile retained after executor capacity refusal for {} "
               + "(force={}, reason={})",
@@ -717,9 +755,11 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   }
 
   private void retryPendingReconciliations() {
-    for (Map.Entry<Path, Boolean> pending : List.copyOf(pendingReconciliations.entrySet())) {
+    for (Map.Entry<Path, PendingReconcile> pending :
+        List.copyOf(pendingReconciliations.entrySet())) {
       if (pendingReconciliations.remove(pending.getKey(), pending.getValue())) {
-        submitReconcile(pending.getKey(), pending.getValue(), 0);
+        submitReconcile(
+            pending.getKey(), pending.getValue().force(), 0, pending.getValue().removals());
       }
     }
   }

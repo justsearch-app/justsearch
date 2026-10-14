@@ -199,7 +199,8 @@ public final class WorkerIngestService {
     this.capturedServingPath = indexPath;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
     this.rootVolumes = RootVolumeLedger.under(indexBasePath);
-    this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity);
+    this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity,
+        folder -> rootWatcherRegistry.declaresRootCovering(folder));
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
@@ -499,36 +500,188 @@ public final class WorkerIngestService {
   static final String ROOT_ON_ANOTHER_VOLUME = "ROOT_NOT_DIRECTORY";
 
   /**
+   * Round 8 (refined decision 2): the reason a root awaiting its one-time upgrade seeding is
+   * refused while the drive at its path is not confirmed as the one its indexed files are on. The
+   * Head shows it verbatim as the root's unavailable reason. The Head keeps the same text as
+   * {@code RootLifecycleOps.ROOT_UNCONFIRMED_REASON} (app-services): no module both sides use
+   * holds the root reason codes, so a change here must be made there too (round 8b, decision 7).
+   */
+  public static final String ROOT_UNCONFIRMED_AFTER_UPGRADE =
+      ROOT_ON_ANOTHER_VOLUME + ": drive not confirmed after upgrade";
+
+  /** How many of a root's indexed files the upgrade seeding compares with the drive. */
+  static final int UPGRADE_EVIDENCE_SAMPLE = 50;
+
+  /**
    * The root at {@code rootPath}, normalised, when it is a real folder that is not on the volume
-   * recorded for it (or whose volume cannot be told); {@code null} otherwise, including for a
-   * path that is not valid, missing, or a link, which keep their own handling.
+   * recorded for it, has none recorded, or whose volume cannot be told; {@code null} otherwise,
+   * including for a path that is not valid, missing, or a link, which keep their own handling.
    */
   private Path rootOnAnotherVolume(String rootPath) {
-    Path root;
+    Path root = parsedRoot(rootPath);
+    return root != null && rootWitness.refusesRoot(root) ? root : null;
+  }
+
+  /**
+   * The root-level reason {@code root} is refused with: the upgrade reason while it awaits its
+   * one-time seeding, otherwise {@code ROOT_NOT_DIRECTORY} followed by {@code detail}.
+   */
+  private String refusalReason(Path root, String detail) {
+    return rootWitness.awaitsUpgradeSeeding(root)
+        ? ROOT_UNCONFIRMED_AFTER_UPGRADE
+        : ROOT_ON_ANOTHER_VOLUME + detail;
+  }
+
+  private static Path parsedRoot(String rootPath) {
     try {
-      root = Path.of(rootPath).toAbsolutePath().normalize();
+      return Path.of(rootPath).toAbsolutePath().normalize();
     } catch (InvalidPathException invalid) {
       return null;
     }
-    return rootWitness.refusesRoot(root) ? root : null;
   }
 
   /**
    * Task t-20261013-ef3c41, round 6 (S8): whether the folder at {@code rootPath} is a real folder
    * that is not on the volume recorded for it, or whose volume cannot be told. One volume
    * identity read, no walk: the Head asks it of every watched root each periodic cycle, so a
-   * root whose turn to be walked is far off still reads unavailable within one cycle. It changes
-   * nothing but records the volume of a root seen for the first time, as a walk would.
+   * root whose turn to be walked is far off still reads unavailable within one cycle. Round 8: it
+   * records nothing, except that a root awaiting its upgrade seeding is first checked on evidence.
    */
   public boolean refusesRootVolume(String rootPath, CallContext ctx) {
+    return !rootVolumeRefusal(rootPath, ctx).isEmpty();
+  }
+
+  /**
+   * {@link #refusesRootVolume} with the reason: empty when the root is not refused, else the
+   * root-level reason, which is {@link #ROOT_UNCONFIRMED_AFTER_UPGRADE} for a root whose drive is
+   * not confirmed after an upgrade. A root awaiting its upgrade seeding is checked on evidence
+   * first, so the periodic cycle adopts a returning drive without any action (round 8).
+   */
+  public String rootVolumeRefusal(String rootPath, CallContext ctx) {
     java.util.Objects.requireNonNull(ctx, "ctx");
+    Path root = parsedRoot(rootPath);
+    if (root == null) {
+      return "";
+    }
+    seedRootAfterUpgrade(root);
+    return rootWitness.refusesRootQuietly(root) ? refusalReason(root, "") : "";
+  }
+
+  /**
+   * Round 8 (refined decision 2): the one-time upgrade seeding. When neither the volume record nor
+   * its pending file exists (an upgrade from a version without the record), the {@code declared}
+   * roots are marked as awaiting seeding; then each root still awaiting it is checked on evidence.
+   * A failure to start records nothing: every root stays unproven and nothing is deleted.
+   */
+  public void seedRootVolumesAfterUpgrade(java.util.Collection<Path> declared) {
+    List<Path> roots = new ArrayList<>();
+    for (Path root : declared) {
+      roots.add(root.toAbsolutePath().normalize());
+    }
+    try {
+      if (rootVolumes.beginUpgradeSeeding(roots)) {
+        log.info("Upgrade: the volume of {} declared roots is confirmed on evidence", roots.size());
+      }
+    } catch (IOException notStarted) {
+      log.warn("Upgrade seeding of root volumes could not start; roots stay unconfirmed ({})",
+          notStarted.getMessage());
+      return;
+    }
+    for (Path root : roots) {
+      seedRootAfterUpgrade(root);
+    }
+  }
+
+  /**
+   * Round 8b (decision 3): a configured collection root (and the bundled help folder) is the
+   * person's configuration, not a declared root, so no add ever records its volume. Each one with
+   * nothing recorded at or above it is seeded once by the upgrade evidence rule; one whose drive is
+   * not confirmed records nothing, reads unavailable with {@link #ROOT_UNCONFIRMED_AFTER_UPGRADE}
+   * and keeps awaiting, so a later boot or migration adopts its returning drive. Nothing is
+   * deleted either way. Runs after the declared roots' upgrade seeding has begun.
+   */
+  public void seedConfiguredRoots(java.util.Collection<Path> configured) {
+    List<Path> roots = new ArrayList<>();
+    for (Path root : configured) {
+      if (root != null) {
+        roots.add(root.toAbsolutePath().normalize());
+      }
+    }
+    List<Path> awaiting;
+    try {
+      awaiting = rootVolumes.awaitSeedingUnlessRecorded(roots);
+    } catch (IOException notStarted) {
+      log.warn("Seeding of configured collection roots could not start; they stay unconfirmed ({})",
+          notStarted.getMessage());
+      return;
+    }
+    for (Path root : awaiting) {
+      seedRootAfterUpgrade(root);
+    }
+  }
+
+  private void seedRootAfterUpgrade(Path root) {
+    if (rootWitness.awaitsUpgradeSeeding(root)) {
+      rootWitness.seedAfterUpgrade(root, this::indexedFilesOnDrive);
+    }
+  }
+
+  /**
+   * The upgrade evidence rule: up to {@link #UPGRADE_EVIDENCE_SAMPLE} of the root's indexed files
+   * are compared with the drive now at its path; at least half must exist there with the indexed
+   * size and modification time. A root with no indexed documents holds. An index that cannot be
+   * read does not.
+   */
+  private boolean indexedFilesOnDrive(Path root) {
+    List<SyncDirectoryOps.IndexedFileStamp> sample;
+    try {
+      sample = candidateDiscoveryOps.sampleIndexedFiles(root, UPGRADE_EVIDENCE_SAMPLE);
+    } catch (IOException cannotTell) {
+      log.warn("The indexed files of {} cannot be read for the upgrade check ({})", root,
+          cannotTell.getMessage());
+      return false;
+    }
+    if (sample.isEmpty()) {
+      return true;
+    }
+    int matching = 0;
+    for (SyncDirectoryOps.IndexedFileStamp stamp : sample) {
+      if (stamp.matchesDisk()) {
+        matching++;
+      }
+    }
+    log.info("Upgrade check of {}: {} of {} sampled indexed files are on the drive", root,
+        matching, sample.size());
+    return matching * 2 >= sample.size();
+  }
+
+  /**
+   * Round 8 (S8): whether the folder at {@code rootPath} is a real folder on the volume recorded
+   * for it. Unlike {@link #refusesRootVolume} it never records: a root with nothing recorded is
+   * unproven and answers {@code false}. The deferred-root check asks this, so a recovery path
+   * never adopts whatever volume is at a root's path.
+   */
+  public boolean rootOnRecordedVolume(String rootPath) {
     Path root;
     try {
       root = Path.of(rootPath).toAbsolutePath().normalize();
     } catch (InvalidPathException invalid) {
       return false;
     }
-    return rootWitness.refusesRootQuietly(root);
+    return rootWitness.provenOnRecordedVolume(root);
+  }
+
+  /**
+   * Round 8 (S8): the current count of root removals (unwatches); {@link #rootRemovedSince} tells
+   * whether a root was removed after a count was taken.
+   */
+  public long rootRemovalMark() {
+    return rootWatcherRegistry.removalMark();
+  }
+
+  /** Whether the person removed {@code root} (unwatched it) after {@code mark} was taken. */
+  public boolean rootRemovedSince(Path root, long mark) {
+    return rootWatcherRegistry.removedSince(root, mark);
   }
 
   /**
@@ -538,10 +691,15 @@ public final class WorkerIngestService {
    * from then on are seen, and then reconciles as usual.
    */
   private SyncDirectoryResponse refuseSyncOfRootOnAnotherVolume(String rootPath) {
+    Path parsed = parsedRoot(rootPath);
+    if (parsed != null) {
+      // Round 8 (refined decision 2): the periodic sync retries a root's upgrade seeding.
+      seedRootAfterUpgrade(parsed);
+    }
     Path refused = rootOnAnotherVolume(rootPath);
     if (refused != null) {
-      return syncDirectoryErrorResponse(ROOT_ON_ANOTHER_VOLUME
-          + ": the folder at this path is not on the volume it was first seen on");
+      return syncDirectoryErrorResponse(refusalReason(refused,
+          ": the folder at this path is not on its recorded volume, or has none recorded"));
     }
     try {
       resumeWatchAwaitingVolume(Path.of(rootPath).toAbsolutePath().normalize());
@@ -935,6 +1093,12 @@ public final class WorkerIngestService {
         if (validPaths.isEmpty()) {
           return batchErrorResponse("All paths were invalid or unsafe");
         }
+        if (request.getRootAdded()) {
+          // Round 8b (decision 1): an explicit ingest request is a deliberate add and records the
+          // volume of each file's folder; a batch without the marker records nothing.
+          validPaths.stream().map(Path::getParent).filter(java.util.Objects::nonNull).distinct()
+              .forEach(rootWitness::recordExplicitFileFolder);
+        }
 
         // Force bypasses unchanged extraction for selected files. It cannot attest to untouched
         // vectors: whole-index legacy recovery or generation migration owns compatibility.
@@ -1323,15 +1487,6 @@ public final class WorkerIngestService {
       return unavailable;
     }
 
-    // Task t-20261013-ef3c41: the person removed this folder, so the volume recorded for it no
-    // longer stands; a folder added again later is recorded afresh at its first prune.
-    try {
-      rootWitness.forgetUnder(pathPrefix);
-    } catch (IOException | RuntimeException notForgotten) {
-      log.warn("deleteByPath: could not drop the recorded volume under {}: {}", pathPrefix,
-          notForgotten.getMessage());
-    }
-
     try {
       if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
@@ -1706,19 +1861,28 @@ public final class WorkerIngestService {
 
   /**
    * Round 7 (S8): reconciles a root the committed boot deferred, on the running server, once the
-   * volume recorded for it may be back. The same pass as {@link #reconcileCommittedBootRoot}, and
-   * the same {@code false} while the root is still on another volume, but a failure leaves the
-   * replay certificate alone: there is no cutover left for it to fence, and the caller retries.
+   * volume recorded for it may be back. The same pass as {@link #reconcileCommittedBootRoot}, but
+   * a failure leaves the replay certificate alone: there is no cutover left for it to fence, and
+   * the caller retries. Round 8: it returns {@code false}, changing nothing, while the root is not
+   * proven on its recorded volume (still another volume, or nothing recorded) and when the person
+   * removed the root after {@code removalMark} was taken; a removed root never gets its watch back.
    */
   public boolean reconcileReturnedBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
-      java.util.function.BooleanSupplier cancelled) throws IOException {
-    return reconcileBootRoot(binding, cancelled, false);
+      long removalMark, java.util.function.BooleanSupplier cancelled) throws IOException {
+    return reconcileBootRoot(binding, cancelled, false, removalMark);
   }
 
   private boolean reconcileBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
       java.util.function.BooleanSupplier cancelled, boolean certifying) throws IOException {
+    return reconcileBootRoot(binding, cancelled, certifying, Long.MAX_VALUE);
+  }
+
+  private boolean reconcileBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled, boolean certifying, long removalMark)
+      throws IOException {
     Path root = binding.path().toAbsolutePath().normalize();
     try (var ignoredMutation = mutationLease()) {
       SyncDirectoryOps.checkCancelled(cancelled);
@@ -1727,15 +1891,29 @@ public final class WorkerIngestService {
         throw new IOException("Committed boot root requires a writable serving successor");
       }
       RootWatcherRegistry registry = rootWatcherRegistry;
-      // Rounds 6 and 7 (S8): the same volume check as every other watch registration. No watcher
-      // is registered on another volume at the root's path; the watch is held and registered once
-      // the recorded volume is back, and the root is deferred rather than failing the boot.
-      if (rootOnAnotherVolume(root.toString()) != null) {
-        registry.watchWhenVolumeReturns(root, binding.collection());
-        return false;
+      RootWatcherRegistry.WatchResult watched;
+      if (certifying) {
+        // Rounds 6 and 7 (S8): the same volume check as every other watch registration. No
+        // watcher is registered on another volume at the root's path; the watch is held and
+        // registered once the recorded volume is back, and the root is deferred rather than
+        // failing the boot.
+        if (rootOnAnotherVolume(root.toString()) != null) {
+          registry.watchWhenVolumeReturns(root, binding.collection());
+          return false;
+        }
+        watched = registry.watch(root.toString(), binding.collection());
+      } else {
+        // Round 8 (S8): a deferred root is reconciled only while it is still declared and proven
+        // on its recorded volume; nothing here records a volume or holds a watch again.
+        if (registry.removedSince(root, removalMark)
+            || !rootWitness.provenOnRecordedVolume(root)) {
+          return false;
+        }
+        watched = registry.watchUnlessRemovedSince(root, binding.collection(), removalMark);
+        if (!watched.watching() && registry.removedSince(root, removalMark)) {
+          return false;
+        }
       }
-      RootWatcherRegistry.WatchResult watched =
-          registry.watch(root.toString(), binding.collection());
       if (!watched.watching()) {
         throw new IOException("Committed boot root watcher registration failed: "
             + watched.errorMessage());
@@ -2681,7 +2859,19 @@ public final class WorkerIngestService {
             "ScanRootRequest.root_path is not a valid path: " + e.getMessage());
       }
       boolean singleFile = recorded != null && recorded.singleFile();
-      if (!singleFile && rootWitness.refusesRoot(root)) {
+      if (request.getRootAdded()) {
+        // Round 8b (decision 1): a deliberate add (the person's add of this root, or an explicit
+        // ingest request of a folder or a file) alone records a volume.
+        rootWitness.recordDeliberateAdd(root, singleFile);
+      }
+      // Round 8b (decision 2): no walk records. A walk refuses its folder unless a volume recorded
+      // for its root, or at or above it, holds; one that cannot tell its root (before the roots
+      // are registered again after a restart) is deferred and deletes nothing.
+      boolean refused = !singleFile
+          && (request.getRootAdded()
+              ? rootWitness.refusesRoot(root)
+              : rootWitness.refusesWalk(root));
+      if (refused) {
         // Task t-20261013-ef3c41, round 4, S8: a drive letter that now holds another volume, or a
         // root whose volume cannot be told, shows the root-level unavailable state; its files are
         // not taken for the original's and nothing of the original's is touched. A root that is
@@ -2689,7 +2879,7 @@ public final class WorkerIngestService {
         sink.accept(
             io.justsearch.ipc.ScanRootProgress.newBuilder()
                 .setComplete(true)
-                .setTerminalReasonCode(ROOT_ON_ANOTHER_VOLUME)
+                .setTerminalReasonCode(refusalReason(root, ""))
                 .setScanId(scanId)
                 .build());
         return;
@@ -2749,7 +2939,15 @@ public final class WorkerIngestService {
       try {
         // Task t-20261013-ef3c41, round 5 (S8): no watcher is registered on another volume at the
         // root's path, so its creates and changes are never indexed into the root. The watch is
-        // held and registered once a walk or sync finds the recorded volume back.
+        // held and registered once a walk or sync finds the recorded volume back. Round 8 (refined
+        // decision 2): only the person's add records the root's volume; a root with none recorded
+        // is held the same way.
+        if (request.getRootAdded()) {
+          Path added = parsedRoot(rootPath);
+          if (added != null) {
+            rootWitness.recordAdded(added);
+          }
+        }
         Path held = rootOnAnotherVolume(rootPath);
         RootWatcherRegistry.WatchResult result =
             held != null
@@ -2773,10 +2971,29 @@ public final class WorkerIngestService {
       markReplayUncertainForWatchChangeDuringMigration();
       try {
         boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
+        forgetRemovedRoot(request.getRootPath());
         return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
       } finally {
         markReplayUncertainForWatchChangeDuringMigration();
       }
+    }
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 8: the person removed this root (the Head's removal unwatches it
+   * before deleting its documents), so the volume recorded for it and anything awaiting its upgrade
+   * seeding no longer stand; the same folder added again is recorded at that add. A deletion of
+   * documents by path alone is not a removal and keeps the record of a root that stays declared.
+   */
+  private void forgetRemovedRoot(String rootPath) {
+    if (rootPath == null || rootPath.isBlank()) {
+      return;
+    }
+    try {
+      rootWitness.forgetUnder(rootPath);
+    } catch (IOException | RuntimeException notForgotten) {
+      log.warn("unwatchRoot: could not drop the recorded volume under {}: {}", rootPath,
+          notForgotten.getMessage());
     }
   }
 

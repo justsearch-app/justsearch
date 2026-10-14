@@ -17,10 +17,10 @@ import org.slf4j.LoggerFactory;
  * boundary, so an unplugged drive, a dropped share, a root renamed away, or a different volume
  * mounted at the same letter mid-prune all stop the prune instead of reading as mass deletion.
  * When the root is registered with a watcher, the identity captured at registration must match
- * too, which catches a volume swap between registration and this prune; and the volume recorded at
- * the root's first prune ({@link RootVolumeLedger}) must match, which catches a swap made while the
- * app was not running. The capture holds no
- * handle, so the user may still rename or delete the root while a long prune runs.
+ * too, which catches a volume swap between registration and this prune; and the volume recorded
+ * when the person added the root ({@link RootVolumeLedger}) must match, which catches a swap made
+ * while the app was not running. The capture holds no handle, so the user may still rename or
+ * delete the root while a long prune runs.
  */
 final class RootPresenceGuard implements PruneOps.PresenceGuard {
   private static final Logger log = LoggerFactory.getLogger(RootPresenceGuard.class);
@@ -48,10 +48,11 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
 
   /**
    * As {@link #capture(Path, RootIdentity)}, and the root must also be on the volume {@code
-   * volumes} recorded for it (or for the nearest recorded folder above it) when it was first seen
-   * (recorded now when none is), so a different volume at the same path, even after a restart,
-   * vouches for nothing. An unreadable ledger is "cannot tell": the guard never vouches. This is
-   * the same question {@link RootWitness} asks for every other path that can end in a deletion.
+   * volumes} recorded for it (or for the nearest recorded folder above it), so a different volume
+   * at the same path, even after a restart, vouches for nothing. Round 8: a root with nothing
+   * recorded is unproven and never vouches; nothing is recorded here. An unreadable ledger is
+   * "cannot tell": the guard never vouches. This is the same question {@link RootWitness} asks for
+   * every other path that can end in a deletion.
    */
   static PruneOps.PresenceGuard capture(
       Path root, RootIdentity registered, RootVolumeLedger volumes) {

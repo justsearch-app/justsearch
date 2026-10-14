@@ -86,10 +86,12 @@ final class RootPresenceGuardTest {
     Path root = Files.createDirectory(tempDir.resolve("root"));
     Path base = Files.createDirectory(tempDir.resolve("indexBase"));
     RootVolumeLedger volumes = RootVolumeLedger.under(base);
+    // The person's add records the root's volume (round 8, refined decision 2).
+    volumes.recordIfAbsent(root, RootIdentity.capture(root).volume());
     assertTrue(RootPresenceGuard.capture(root, null, volumes).rootCurrent(),
-        "precondition: the first prune records the volume and vouches");
+        "precondition: the root on its recorded volume vouches");
     Path ledger = base.resolve(RootVolumeLedger.FILE_NAME);
-    assertTrue(Files.exists(ledger), "the volume is recorded at the first prune");
+    assertTrue(Files.exists(ledger), "the volume is recorded");
 
     try (var ignoredLock = FileChannel.open(ledger,
         StandardOpenOption.READ,

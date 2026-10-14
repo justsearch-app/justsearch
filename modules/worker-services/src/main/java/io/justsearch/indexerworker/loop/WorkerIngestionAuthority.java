@@ -94,10 +94,14 @@ final class WorkerIngestionAuthority {
 
     // Round 5 (S8): a present source is added, updated or retired only while its root is the one
     // it was. Another volume at the same drive letter, or a root that cannot be read, defers the
-    // source with the root-level back-off; the original's indexed content is untouched. The first
-    // admission under a root records the root's volume.
-    if (!rootCheck.admits(
-        SourcePresence.vouchingFolder(filePath.toAbsolutePath().normalize(), root))) {
+    // source with the root-level back-off; the original's indexed content is untouched. Round 8
+    // (refined decision 2): admission records nothing for a root; only the person's add does.
+    Path normalizedFile = filePath.toAbsolutePath().normalize();
+    Path answering = SourcePresence.vouchingFolder(normalizedFile, root);
+    boolean admitted = SourcePresence.answersAsRoot(normalizedFile, root)
+        ? rootCheck.admits(answering)
+        : rootCheck.admitsFile(answering);
+    if (!admitted) {
       return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
     }
 

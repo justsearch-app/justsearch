@@ -108,6 +108,7 @@ final class DifferentVolumeRootStateTest
   void aRootWhoseLetterNowHoldsAnotherVolumeShowsTheRootLevelState() throws Exception {
     Path root = mapLetterTo(Files.createDirectory(tempDir.resolve("stick-a")));
     Files.writeString(root.resolve("notes.txt"), "on the first stick");
+    addRoot(root);
     assertEquals("", scan(service(), root).getTerminalReasonCode(), "precondition: first walk");
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount(),
         "precondition: the root's first prune finds nothing missing");
@@ -129,6 +130,7 @@ final class DifferentVolumeRootStateTest
     // S8 / P1 (must not break): the volume check does not hold back the root's own volume.
     Path root = mapLetterTo(Files.createDirectory(tempDir.resolve("stick-b")));
     Files.writeString(root.resolve("notes.txt"), "on the stick");
+    addRoot(root);
     assertEquals("", scan(service(), root).getTerminalReasonCode());
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount());
 
@@ -145,6 +147,21 @@ final class DifferentVolumeRootStateTest
         .setMode(ScanMode.SCAN_MODE_INITIAL).build(), frames::add, CallContext.none());
     assertTrue(!frames.isEmpty() && frames.getLast().getComplete(), "the walk ends with a terminal");
     return frames.getLast();
+  }
+
+  /**
+   * The person's add of {@code root}: its watch registration with the add marker. Round 8 (refined
+   * decision 2): only the add records the root's volume; a build without the marker recorded it at
+   * the first registration, walk or prune.
+   */
+  private void addRoot(Path root) {
+    var request = io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString());
+    var marker = io.justsearch.ipc.WatchRootRequest.getDescriptor().findFieldByName("root_added");
+    if (marker != null) {
+      request.setField(marker, Boolean.TRUE);
+    }
+    assertTrue(service().watchRoot(request.build(), CallContext.none()).getWatching(),
+        "precondition: the person adds the root");
   }
 
   /** A fresh service over the same index and queue: what a restart of the worker sees. */

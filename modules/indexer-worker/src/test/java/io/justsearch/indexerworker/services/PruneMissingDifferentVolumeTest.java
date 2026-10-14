@@ -114,6 +114,7 @@ final class PruneMissingDifferentVolumeTest
     assertEquals(0, run("subst", letter, stickA.getParent().toString()));
     Path root = Path.of(letter + "\\music");
     String id = index(root.resolve("song.txt"));
+    addRoot(root);
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount(),
         "precondition: nothing is missing on the original stick");
 
@@ -138,6 +139,7 @@ final class PruneMissingDifferentVolumeTest
     assertEquals(0, run("subst", letter, stick.getParent().toString()));
     Path root = Path.of(letter + "\\music");
     String id = index(root.resolve("gone.txt"));
+    addRoot(root);
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount());
 
     Files.delete(gone);
@@ -157,6 +159,7 @@ final class PruneMissingDifferentVolumeTest
     assertEquals(0, run("subst", letter, stickA.getParent().toString()));
     Path root = Path.of(letter + "\\music");
     index(root.resolve("song.txt"));
+    addRoot(root);
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount());
     service().deleteByPath(
         DeleteByPathRequest.newBuilder().setPath(root.toString()).build(), CallContext.none());
@@ -166,6 +169,7 @@ final class PruneMissingDifferentVolumeTest
     assertEquals(0, run("subst", letter, "/d"));
     assertEquals(0, run("subst", letter, otherVolume.toString()));
     String id = index(root.resolve("gone.txt"));
+    addRoot(root);
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount());
     Files.delete(gone);
 
@@ -174,6 +178,21 @@ final class PruneMissingDifferentVolumeTest
     assertEquals(1, response.getPrunedCount(), response.getError());
     runtime.commitOps().maybeRefreshBlocking();
     assertNull(runtime.documentFieldOps().getDocumentField(id, SchemaFields.CONTENT));
+  }
+
+  /**
+   * The person's add of {@code root}: its watch registration with the add marker. Round 8 (refined
+   * decision 2): only the add records the root's volume; a build without the marker recorded it at
+   * the first registration, walk or prune.
+   */
+  private void addRoot(Path root) {
+    var request = io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString());
+    var marker = io.justsearch.ipc.WatchRootRequest.getDescriptor().findFieldByName("root_added");
+    if (marker != null) {
+      request.setField(marker, Boolean.TRUE);
+    }
+    assertTrue(service().watchRoot(request.build(), CallContext.none()).getWatching(),
+        "precondition: the person adds the root");
   }
 
   /** A fresh service over the same index and queue: what a restart of the worker sees. */

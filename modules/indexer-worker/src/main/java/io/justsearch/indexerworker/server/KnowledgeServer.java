@@ -152,6 +152,11 @@ public final class KnowledgeServer implements Closeable {
    */
   private volatile List<RootBinding> deferredBootRoots = List.of();
   private volatile String deferredBootRootsGeneration;
+  /**
+   * Round 8 (S8): the Worker's root-removal count taken before the boot reconciled its roots; a
+   * deferred root the person removed after it is dropped from the deferred set, never reconciled.
+   */
+  private volatile long deferredBootRootsRemovalMark;
   /** Deferred roots reconciled on the running server that still await convergence. */
   private final Set<RootBinding> reconciledDeferredBootRoots =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -1760,6 +1765,7 @@ public final class KnowledgeServer implements Closeable {
       // supplier + embedding telemetry at ctor time (last 2 setters eliminated).
       appServices = newAppServices();
       wireAppServicesPostConstruction(appServices);
+      seedRootVolumesAfterUpgrade();
 
       // 3.6 Embedding compatibility — MUST resolve BEFORE anything can commit (tempdoc 819 A).
       // This used to live in initDeferredModels() (async, behind multi-second ONNX composition),
@@ -6352,6 +6358,69 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
+   * Task t-20261013-ef3c41, round 8 (refined decision 2): before anything indexes, the one-time
+   * upgrade seeding confirms the volume of each declared root on evidence. Only a boot that knows
+   * the declared roots seeds; a root not confirmed now is retried by the periodic cycle.
+   */
+  private void seedRootVolumesAfterUpgrade() {
+    if (!(appServices instanceof DefaultWorkerAppServices producer)
+        || producer.ingestService() == null) {
+      return;
+    }
+    if (bootRootBindingsBound) {
+      producer.ingestService().seedRootVolumesAfterUpgrade(
+          bootRootBindings.stream().map(RootBinding::path).toList());
+    }
+    // Round 8b (decision 3): configured collection roots are seeded once, like upgraded roots.
+    producer.ingestService().seedConfiguredRoots(configuredRoots(
+        startupConfiguration == null ? null : startupConfiguration.collections()));
+  }
+
+  /** The configured collection roots and the bundled help folder: configuration, not added roots. */
+  private static List<Path> configuredRoots(ResolvedConfig.Collections collections) {
+    List<Path> roots = new ArrayList<>();
+    if (collections == null) {
+      return roots;
+    }
+    for (ResolvedConfig.CollectionCfg collection : collections.items()) {
+      for (Path root : collection.roots()) {
+        if (root != null) {
+          roots.add(root);
+        }
+      }
+    }
+    if (collections.bundledHelp() != null && collections.bundledHelp().path() != null) {
+      roots.add(collections.bundledHelp().path());
+    }
+    return roots;
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 8b (decision 3): a migration builds the new generation only from
+   * roots on their recorded volume. A configured root with nothing recorded is first seeded once on
+   * evidence. Any root still refused (another volume at its path, its drive not confirmed after an
+   * upgrade, or nothing recorded) fails the enumeration, so the cutover keeps the active generation
+   * and nothing indexed under that root is lost; a later migration retries.
+   */
+  private void requireMigrationRootsOnRecordedVolume(List<ResolvedConfig.FileSource> roots,
+      ResolvedConfig.Collections collections) throws IOException {
+    if (!(appServices instanceof DefaultWorkerAppServices producer)
+        || producer.ingestService() == null) {
+      return;
+    }
+    var ingest = producer.ingestService();
+    ingest.seedConfiguredRoots(configuredRoots(collections));
+    for (ResolvedConfig.FileSource source : roots) {
+      String refusal = ingest.rootVolumeRefusal(source.path().toString(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      if (!refusal.isEmpty()) {
+        throw new IOException("Migration root " + source.path() + " is not on its recorded volume ("
+            + refusal + "); the active generation is kept");
+      }
+    }
+  }
+
+  /**
    * A pointer committed before a crash is not a root-replay certificate. Reattach the durable
    * Head membership to B and make a complete disk/B pass while A still owns rollback capacity.
    * The last observation and admission release share the mutation fence, so a late watcher fault
@@ -6374,6 +6443,7 @@ public final class KnowledgeServer implements Closeable {
       throw new IOException("Committed successor boot lacks a writable reconciliation owner");
     }
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
+    long removalMark = producer.ingestService().rootRemovalMark();
     // Native switch-buffer receipts refer to pre-boot accepted queue revisions. Root
     // reconciliation may replace those revisions, so it cannot start until the exact receipts
     // have settled against B. This wait is scoped to the generation, never the global queue.
@@ -6475,7 +6545,7 @@ public final class KnowledgeServer implements Closeable {
               if (deferred.isEmpty()) {
                 rootReconciliationSettledGeneration = expectedActive;
               } else {
-                deferBootRoots(expectedActive, deferred);
+                deferBootRoots(expectedActive, deferred, removalMark);
               }
               return;
             }
@@ -6491,9 +6561,11 @@ public final class KnowledgeServer implements Closeable {
     throw new IOException("Committed successor roots did not converge before publication");
   }
 
-  private void deferBootRoots(String expectedActive, List<RootBinding> deferred) {
+  private void deferBootRoots(
+      String expectedActive, List<RootBinding> deferred, long removalMark) {
     reconciledDeferredBootRoots.clear();
     deferredBootRootsGeneration = expectedActive;
+    deferredBootRootsRemovalMark = removalMark;
     deferredBootRoots = List.copyOf(deferred);
     log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path: {};"
             + " the previous generation is kept until they are reconciled on that volume",
@@ -6524,6 +6596,11 @@ public final class KnowledgeServer implements Closeable {
    * index matches its disk, that is committed and checked again with the writer paused, as the
    * boot does. When no deferred root is left, this generation's root reconciliation settles and
    * the previous generation's removal completes. A failure is retried on the next check.
+   *
+   * <p>Round 8: every root the person removed since the boot is dropped first and counts as
+   * resolved: it is never reconciled, watched or indexed, and nothing of it is carried forward.
+   * When none is left the check stops. A root is reconciled only once it is proven on the volume
+   * recorded for it; this check never records a volume.
    */
   private void settleDeferredBootRoots() {
     if (deferredBootRoots.isEmpty() || closeStarted) return;
@@ -6546,22 +6623,24 @@ public final class KnowledgeServer implements Closeable {
         if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
         return;
       }
+      long removalMark = deferredBootRootsRemovalMark;
+      List<RootBinding> declared = withoutRemovedBootRoots(producer, pending, removalMark);
       List<RootBinding> converging = new ArrayList<>();
-      for (RootBinding binding : pending) {
-        if (reconcileReturnedBootRoot(producer, binding)) converging.add(binding);
+      for (RootBinding binding : declared) {
+        if (reconcileReturnedBootRoot(producer, binding, removalMark)) converging.add(binding);
       }
       List<RootBinding> settled = converging.isEmpty()
           ? List.of() : commitReturnedBootRoots(producer, active, converging);
-      List<RootBinding> remaining =
-          pending.stream().filter(binding -> !settled.contains(binding)).toList();
+      List<RootBinding> remaining = withoutRemovedBootRoots(producer,
+          declared.stream().filter(binding -> !settled.contains(binding)).toList(), removalMark);
       settled.forEach(reconciledDeferredBootRoots::remove);
       deferredBootRoots = remaining;
       allSettled = remaining.isEmpty();
       if (allSettled) {
         if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
         rootReconciliationSettledGeneration = expectedActive;
-        log.info("Every deferred boot root is reconciled on its recorded volume; generation {}"
-            + " may now remove its predecessor", expectedActive);
+        log.info("Every deferred boot root is reconciled on its recorded volume or was removed;"
+            + " generation {} may now remove its predecessor", expectedActive);
       }
     } finally {
       runtimeSwapLock.unlock();
@@ -6569,15 +6648,31 @@ public final class KnowledgeServer implements Closeable {
     if (allSettled) retryCommittedGenerationRetirement();
   }
 
+  /** {@code bindings} without the roots the person removed after {@code removalMark}. */
+  private List<RootBinding> withoutRemovedBootRoots(
+      DefaultWorkerAppServices producer, List<RootBinding> bindings, long removalMark) {
+    List<RootBinding> declared = new ArrayList<>();
+    for (RootBinding binding : bindings) {
+      if (producer.ingestService().rootRemovedSince(binding.path(), removalMark)) {
+        reconciledDeferredBootRoots.remove(binding);
+        log.info("Deferred boot root {} was removed; it is dropped and counts as resolved",
+            binding.path());
+      } else {
+        declared.add(binding);
+      }
+    }
+    return declared;
+  }
+
   /** Whether {@code binding} is reconciled on its recorded volume and awaits convergence. */
   @SuppressWarnings("PMD.AvoidCatchingGenericException") // a failed pass is retried, never thrown
   private boolean reconcileReturnedBootRoot(
-      DefaultWorkerAppServices producer, RootBinding binding) {
+      DefaultWorkerAppServices producer, RootBinding binding, long removalMark) {
     if (reconciledDeferredBootRoots.contains(binding)) return true;
     try {
-      if (producer.ingestService().refusesRootVolume(binding.path().toString(),
-          io.justsearch.indexerworker.services.CallContext.none())
-          || !producer.ingestService().reconcileReturnedBootRoot(binding, () -> closeStarted)) {
+      if (!producer.ingestService().rootOnRecordedVolume(binding.path().toString())
+          || !producer.ingestService().reconcileReturnedBootRoot(
+              binding, removalMark, () -> closeStarted)) {
         return false;
       }
       reconciledDeferredBootRoots.add(binding);
@@ -8787,6 +8882,9 @@ public final class KnowledgeServer implements Closeable {
                           + "proceeding without inline embedding/SPLADE");
                 }
                 List<ResolvedConfig.FileSource> roots = enumerateFiles ? loadMigrationRoots(rc) : List.of();
+                if (enumerateFiles) {
+                  requireMigrationRootsOnRecordedVolume(roots, rc.collections());
+                }
                 migrationEnumeratorRootsTotal.set(roots.size());
                 int totalEnqueued = enumerateFiles ? enqueueAllFilesUnderRoots(roots) : 0;
                 List<String> expectedSources = expectedProjectionSourceIds();

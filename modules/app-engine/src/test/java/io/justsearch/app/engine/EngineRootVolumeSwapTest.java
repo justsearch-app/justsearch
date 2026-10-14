@@ -302,7 +302,9 @@ final class EngineRootVolumeSwapTest {
       var response =
           harness.client().syncDirectory(control.toString(), false, TestEngineContexts.BACKGROUND);
       error = response == null ? "no answer" : response.getError();
-      if (error.isEmpty()) return;
+      // An answer from the Worker's ingest service means the index half is composed. Round 8
+      // (refined decision 2): before the control is added, its sync is refused as unproven.
+      if (error.isEmpty() || error.startsWith("ROOT_NOT_DIRECTORY")) return;
       Thread.sleep(200);
     }
     throw new AssertionError("the Engine's index half did not become ready: " + error);

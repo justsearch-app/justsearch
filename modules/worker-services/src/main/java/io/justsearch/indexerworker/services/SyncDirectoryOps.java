@@ -305,6 +305,88 @@ final class SyncDirectoryOps {
     return List.copyOf(absent);
   }
 
+  /**
+   * One indexed file document's path, size and modification time, as the index holds them (task
+   * t-20261013-ef3c41, round 8, refined decision 2: the upgrade seeding's evidence). A missing
+   * size or time is {@code -1}.
+   */
+  record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs) {
+    /** Whether the file exists at its path now, unlinked, with the indexed size and time. */
+    boolean matchesDisk() {
+      if (sizeBytes < 0 || modifiedAtMs < 0) {
+        return false;
+      }
+      try {
+        BasicFileAttributes attrs = Files.readAttributes(
+            path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        return attrs.isRegularFile()
+            && attrs.size() == sizeBytes
+            && attrs.lastModifiedTime().toMillis() == modifiedAtMs;
+      } catch (IOException | SecurityException notThere) {
+        return false;
+      }
+    }
+  }
+
+  /**
+   * Up to {@code limit} indexed file documents under {@code root} (parent documents only, no
+   * no-file projections), in path order, with their indexed size and modification time.
+   *
+   * @throws IOException when the serving index cannot be read; the caller then cannot tell
+   */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // the search path may throw unchecked
+  List<IndexedFileStamp> sampleIndexedFiles(Path root, int limit) throws IOException {
+    if (readPathOps == null) throw new IOException("Serving index read path is unavailable");
+    try {
+      String normalizedPrefix = PathNormalizer.normalizePathPrefix(root.toString());
+      var query = new org.apache.lucene.search.BooleanQuery.Builder()
+          .add(new org.apache.lucene.search.PrefixQuery(
+                  new org.apache.lucene.index.Term(SchemaFields.PATH, normalizedPrefix)),
+              org.apache.lucene.search.BooleanClause.Occur.MUST)
+          .add(new org.apache.lucene.search.TermQuery(
+                  new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
+              org.apache.lucene.search.BooleanClause.Occur.MUST_NOT)
+          .build();
+      var result = readPathOps.search(query, limit,
+          Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
+              SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
+          LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, null);
+      if (result == null) throw new IOException("Serving index sample returned no result");
+      List<IndexedFileStamp> sample = new ArrayList<>();
+      for (var hit : result.hits()) {
+        if (hit.fields().get(SchemaFields.PROJECTION_SOURCE_ID) != null) {
+          continue;
+        }
+        String path = hit.fields().get(SchemaFields.PATH);
+        if (path == null || path.isBlank()) {
+          path = hit.docId();
+        }
+        if (path == null || path.isBlank()) {
+          continue;
+        }
+        sample.add(new IndexedFileStamp(Path.of(path),
+            longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
+            longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT))));
+      }
+      return sample;
+    } catch (IOException incomplete) {
+      throw incomplete;
+    } catch (RuntimeException incomplete) {
+      throw new IOException("Serving index sample failed", incomplete);
+    }
+  }
+
+  private static long longOrMissing(String value) {
+    if (value == null || value.isBlank()) {
+      return -1L;
+    }
+    try {
+      return Long.parseLong(value.trim());
+    } catch (NumberFormatException notANumber) {
+      return -1L;
+    }
+  }
+
   private Set<String> getIndexedPathsUnderPrefixStrict(
       String prefix, PathBudget budget,
       java.util.function.BooleanSupplier cancelled) throws IOException {

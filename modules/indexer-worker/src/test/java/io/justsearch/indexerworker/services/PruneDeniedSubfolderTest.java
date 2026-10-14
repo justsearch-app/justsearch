@@ -96,6 +96,7 @@ final class PruneDeniedSubfolderTest
         ids.put(folder + "/file-" + i, index(file));
       }
     }
+    addRoot(root);
     Files.delete(root.resolve("a").resolve("file-0.txt"));
     Files.delete(root.resolve("c").resolve("file-0.txt"));
     Files.delete(root.resolve("b").resolve("file-0.txt"));
@@ -172,5 +173,21 @@ final class PruneDeniedSubfolderTest
     process.getInputStream().readAllBytes();
     assertTrue(process.waitFor(60, TimeUnit.SECONDS), command[0] + " did not finish");
     return process.exitValue();
+  }
+
+  /**
+   * The person's add of {@code root}: its watch registration with the add marker. Round 8 (refined
+   * decision 2): only the add records a root's volume; a build without the marker recorded it at
+   * the first prune.
+   */
+  private void addRoot(Path root) {
+    var request = io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString());
+    var marker = io.justsearch.ipc.WatchRootRequest.getDescriptor().findFieldByName("root_added");
+    if (marker != null) {
+      request.setField(marker, Boolean.TRUE);
+    }
+    assertTrue(
+        service().watchRoot(request.build(), CallContext.none()).getWatching(),
+        "precondition: the person adds the root");
   }
 }

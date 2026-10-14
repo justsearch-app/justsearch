@@ -181,6 +181,14 @@ public interface IngestServiceCalls {
    */
   boolean refusesRootVolume(String rootPath);
 
+  /**
+   * {@link #refusesRootVolume} with the root-level reason: empty when the root is not refused
+   * (round 8). A root whose drive is not confirmed after an upgrade answers with that reason.
+   */
+  default String rootVolumeRefusal(String rootPath) {
+    return refusesRootVolume(rootPath) ? RootLifecycleOps.ROOT_MISSING_REASON : "";
+  }
+
   /** {@code IngestService/UnwatchRoot}. */
   io.justsearch.ipc.UnwatchRootResponse unwatchRoot(io.justsearch.ipc.UnwatchRootRequest request);
 }

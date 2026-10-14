@@ -93,7 +93,8 @@ final class HeldBootPersonsRebuildTest {
       }
       if (!submitted) {
         server.appServices().ingestService().submitBatch(
-            BatchRequest.newBuilder().addFilePaths(added.toString()).build(), CallContext.none());
+            explicitIngest(BatchRequest.newBuilder().addFilePaths(added.toString())).build(),
+            CallContext.none());
         submitted = true;
       }
       if (searchable(server, "zebrafinch")) {
@@ -115,6 +116,19 @@ final class HeldBootPersonsRebuildTest {
     booted.onMigrationRestart(restarts::incrementAndGet);
     booted.start();
     return booted;
+  }
+
+  /**
+   * {@code batch} as the person's explicit ingest sends it: with the add marker, on a build that
+   * has it (task t-20261013-ef3c41, round 8b: only an explicit ingest request records the volume
+   * of its files' folder, and a file whose folder has none recorded is not indexed).
+   */
+  private static BatchRequest.Builder explicitIngest(BatchRequest.Builder batch) {
+    var marker = batch.getDescriptorForType().findFieldByName("root_added");
+    if (marker != null) {
+      batch.setField(marker, Boolean.TRUE);
+    }
+    return batch;
   }
 
   private static boolean searchable(KnowledgeServer server, String term) {

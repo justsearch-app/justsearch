@@ -34,6 +34,10 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
 
 Round 7 (on top of 5c975db88): a boot that still has the previous generation defers a root on another volume instead of failing start-up, keeps the previous generation until that root is reconciled on its returned volume, and finishes the removal without a restart (S8). Its repaired checks fail on 5c975db88 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-repaired.json`). Every SUBST test now holds a machine-wide per-letter lock from mapping to unmapping, and PruneMissingDifferentVolumeTest finds its second volume like the others, so their earlier checks were re-run against the same refs as before: cf3f14655 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-preserved.json`), 6b15a8153 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r4-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r4-preserved.json`), 09a19e033 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r5-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r5-preserved.json`), 5a7e266a5 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r6-repaired.json`), and on the candidate only (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-after-only.json`).
 
+Round 8 (on top of ef205d0e9): a deferred root the person removes is dropped from the deferred-root check before anything else, is never reconciled, watched or indexed, and counts as resolved for removing the previous generation; the deferred-root check never records a volume; and removal clears what else kept the root: the watcher's not-yet-run reconcile, the periodic cycle's volume ask and the Head's availability answer (S8). Its repaired checks fail on ef205d0e9 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-repaired.json`). Refined decision 2 of round 8: only the person's add records a root's volume, every other path refuses a root with none recorded, an upgrade from a version without the record confirms each root once on evidence, and a profiling reset removes each root as the person's removal does. Its repaired checks fail on ef205d0e9 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-volume-repaired.json`). The tests that recorded a root's volume through its first walk, prune or registration now add the root first (Adaptation entries), so their earlier evidence was re-run against the same refs, written to the same files.
+
+Round 8b (on top of ef205d0e9, decisions under the owner's delegation): only a deliberate add records a volume (the person's add of a root, or an explicit ingest request of a folder or of files, carrying the add marker), no walk ever records one, so a walk before the roots are registered again after a restart is deferred and deletes nothing, and a configured collection is seeded once by the upgrade rule and otherwise reads unavailable with nothing deleted (S8). Its repaired checks fail on ef205d0e9 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r8b-repaired.json`); its must-not-break check passes on ef205d0e9 and on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r8b-preserved.json`). Tests that queued an explicit ingest or deleted through the watcher without the record a deliberate add makes now make it first (Adaptation entries); evidence naming an edited test was re-run against the same refs, written to the same files.
+
 ```json
 {
   "entries": [
@@ -1584,6 +1588,603 @@ Round 7 (on top of 5c975db88): a boot that still has the previous generation def
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootDeferredRootTest.java#theOriginalVolumeReturningReconcilesTheRootAndRemovesThePreviousGeneration"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRemovedDeferredRootTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, S8 with a real SUBST drive letter through KnowledgeServer.start: a root the committed boot deferred (stick B at its letter, the previous generation kept) is removed by the person through the Worker calls the Head's removal makes while stick B is still mapped. Nothing of stick B becomes searchable, a file added to stick B afterwards is not indexed (no watcher), no volume is recorded for the root, and the removal resolves the deferral so the previous generation is removed. Fails on ef205d0e9: the deferred-root check recorded stick B, reconciled the removed root and indexed stick B's text.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A deferred root counts as removed when the Worker's watcher registry recorded its unwatch, the Worker side of the person's removal, after the boot took its removal count; the deferred-root check drops such roots first, and the re-registration of a returned root's watch is refused under the same monitor as the unwatch. The deferred-root check asks a volume proof that never records. Removal also drops the Worker watcher's not-yet-run reconciles of the root (by a per-root removal count), runs the periodic cycle's volume ask of each root under that root's producer fence, and forgets the Head's availability answer for the root and every root under it (orchestrator decisions 1, 3 and 4, round 8).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRemovedDeferredRootTest.java#aDeferredRootRemovedWhileAnotherVolumeIsMappedIsNeverIndexedWatchedOrRecorded"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRemovedDeferredRootTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, S8 with a real SUBST drive letter: after that removal, the root added again through the Worker calls the Head's add makes (WatchRoot, then ScanRoot) once stick A is back is watched and walked, stick A's text is indexed and searchable, and nothing of stick B is. Fails on ef205d0e9: stick B had been recorded as the root's volume, so the root added again with stick A was refused as unavailable.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A deferred root counts as removed when the Worker's watcher registry recorded its unwatch, the Worker side of the person's removal, after the boot took its removal count; the deferred-root check drops such roots first, and the re-registration of a returned root's watch is refused under the same monitor as the unwatch. The deferred-root check asks a volume proof that never records. Removal also drops the Worker watcher's not-yet-run reconciles of the root (by a per-root removal count), runs the periodic cycle's volume ask of each root under that root's producer fence, and forgets the Head's availability answer for the root and every root under it (orchestrator decisions 1, 3 and 4, round 8).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRemovedDeferredRootTest.java#theRemovedRootAddedAgainWithTheOriginalVolumeIndexesItAndNothingOfTheOther"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RemovedRootWatcherReconcileTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, S8 (removal keeps nothing of a root): an event-overflow reconcile the Worker's watcher asked for and had not yet run when the root was unwatched is dropped, while reconciles of other roots run as before. Fails on ef205d0e9: the removed root's reconcile ran, which syncs the removed root.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A deferred root counts as removed when the Worker's watcher registry recorded its unwatch, the Worker side of the person's removal, after the boot took its removal count; the deferred-root check drops such roots first, and the re-registration of a returned root's watch is refused under the same monitor as the unwatch. The deferred-root check asks a volume proof that never records. Removal also drops the Worker watcher's not-yet-run reconciles of the root (by a per-root removal count), runs the periodic cycle's volume ask of each root under that root's producer fence, and forgets the Head's availability answer for the root and every root under it (orchestrator decisions 1, 3 and 4, round 8).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RemovedRootWatcherReconcileTest.java#aReconcileAskedForBeforeTheRootWasRemovedNeverRuns"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/PeriodicCycleRemovedRootTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, S8 (removal keeps nothing of a root): a root the person removes while the periodic cycle's walk is with the Worker is not asked for its volume by that cycle, and the root still watched is asked as before. Fails on ef205d0e9: the cycle asked the removed root, which records the volume at its path.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A deferred root counts as removed when the Worker's watcher registry recorded its unwatch, the Worker side of the person's removal, after the boot took its removal count; the deferred-root check drops such roots first, and the re-registration of a returned root's watch is refused under the same monitor as the unwatch. The deferred-root check asks a volume proof that never records. Removal also drops the Worker watcher's not-yet-run reconciles of the root (by a per-root removal count), runs the periodic cycle's volume ask of each root under that root's producer fence, and forgets the Head's availability answer for the root and every root under it (orchestrator decisions 1, 3 and 4, round 8).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/PeriodicCycleRemovedRootTest.java#aRootRemovedDuringTheCycleIsNotAskedForItsVolume"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemovedRootAvailabilityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, S8 (removal keeps nothing of a root): a root removed while its folder was gone and added again once the folder is back does not show the removed root's cached unavailable answer. Fails on ef205d0e9: the Head kept the removed root's availability answer and showed the root added again as unavailable.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A deferred root counts as removed when the Worker's watcher registry recorded its unwatch, the Worker side of the person's removal, after the boot took its removal count; the deferred-root check drops such roots first, and the re-registration of a returned root's watch is refused under the same monitor as the unwatch. The deferred-root check asks a volume proof that never records. Removal also drops the Worker watcher's not-yet-run reconciles of the root (by a per-root removal count), runs the periodic cycle's volume ask of each root under that root's producer fence, and forgets the Head's availability answer for the root and every root under it (orchestrator decisions 1, 3 and 4, round 8).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemovedRootAvailabilityTest.java#aRootAddedAgainDoesNotShowTheRemovedRootsUnavailableAnswer"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UnprovenRootRefusedTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, refined decision 2, S8: once the upgrade seeding is done (the volume record exists), a declared root with no recorded volume (declared as after a restart: the Head re-registers its watch without the add marker) is unproven on every background path. A walk without the add marker, the periodic sync, the periodic volume check and the prune all refuse it with the root-level reason: nothing is recorded for it, nothing is queued, and an indexed document whose file is gone is kept. Fails on ef205d0e9: the re-registration and the first walk recorded whatever volume was at the root's path and walked it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-volume-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UnprovenRootRefusedTest.java#aBackgroundPathMeetingARootWithNoRecordedVolumeRefusesItAndRecordsNothing"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, refined decision 2, S8 through KnowledgeServer.start: an index written without the volume record (both record files deleted after a first boot indexed the roots) and unchanged drives. The upgrade boot records every declared root on the evidence of its indexed files, and a root with nothing indexed like an add; each root then syncs with nothing queued again and nothing deleted, and its text stays searchable. Fails on ef205d0e9: nothing is recorded at the upgrade boot.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-volume-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java#anUpgradeWithTheSameDrivesRecordsEveryRootOnEvidenceAndKeepsItsIndex",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java#anUpgradeRecordsARootWithNothingIndexedLikeAnAdd"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, refined decision 2, S8 with a real SUBST drive letter through KnowledgeServer.start: an upgrade boot where the root's letter now holds another volume (stick B, with a same-named file of other content) records nothing for that root, while the control root is recorded. The Head's re-registration of the watch, the periodic sync and the periodic volume check record nothing; the sync answers 'ROOT_NOT_DIRECTORY: drive not confirmed after upgrade', queues and deletes nothing; the root's text stays searchable and nothing of stick B is. Once the original drive is back, the periodic volume check adopts it without any other action, and the root syncs again deleting nothing. Fails on ef205d0e9: the upgrade boot records nothing and the first sync records stick B and syncs it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-volume-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java#anUpgradeWhereTheLetterHoldsAnotherVolumeRecordsNothingUntilTheDriveReturns"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/ProfilingResetRemovesRootsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, refined decision 2, S8: a profiling reset that clears the roots removes each one as the person's removal does: the Worker is told to stop watching each root (which drops its volume record, pending upgrade seeding, held watch and deferred state) and to delete under it, and no root is kept. Fails on ef205d0e9: the reset only cleared the Head's list.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8-volume-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/ProfilingResetRemovesRootsTest.java#aResetThatRemovesRootsRemovesEachOneAsThePersonsRemovalDoes"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/CommittedBootRootVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRemovedDeferredRootTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Round 8, refined decision 2: only the person's add records a root's volume. These tests established the precondition 'the root's volume is recorded on stick A' through the first walk, prune or registration, which no longer records. Each now establishes it the way the product does: the person's add, a WatchRoot request carrying the add marker (set through the descriptor, so the file still compiles and runs on the refs without the marker), or, in RootPresenceGuardTest, a direct record of the root's current volume. CommittedBootRemovedDeferredRootTest's re-add sets the marker on its WatchRoot and ScanRoot. Inputs, the swap, the observations and the expected outcomes are unchanged; each check's earlier evidence was re-run against its original ref.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/PeriodicRootVolumeCheckTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/PeriodicCycleRemovedRootTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Round 8, refined decision 2: the Head now asks the Worker's volume check with its reason (rootVolumeRefusal), so the root-level reason the upgrade rule adds reaches the root's state. The fake Worker answers that call from the same per-root state it answers refusesRootVolume from; the cycle, the swap and the expected outcomes are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Round 8, refined decision 2: the readiness probe syncs the control folder before it is added, to learn that the Worker's index half answers; that sync is now refused as unproven ('ROOT_NOT_DIRECTORY...'). The probe accepts that refusal as an answer, as it accepts an empty error. The checks themselves are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryCallerProvenanceTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceSyncDirectoryPhaseTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerRecordedScanAdmissionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SyncRootReplayProvenanceTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DocumentIdentityBootImportTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Round 8, refined decision 2: only the person's add records a root's volume, and every sync, walk, recorded scan, replay and migration walk refuses a root with none recorded. These tests synced, scanned, replayed or migrated a folder that no one had added, relying on the first look to record its volume. Each now adds the folder first the way the product does: a WatchRoot request carrying the add marker (an inline helper in the Worker tests; the candidate-reconciliation helper takes the add's record through the service's own root check; the transfer test's watch carries the marker; the identity test's add then drops only its watch subscription, so its own rename is not raced by watcher events, as before). The folders, inputs, calls and expected outcomes are unchanged; the one sync of a missing folder adds nothing.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingUncertainRootTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneDeniedSubfolderTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Round 8, refined decision 2: the prune refuses a root with no recorded volume, so the prune of a present root no longer records it at its first prune. aGenuinelyDeletedFileUnderAPresentRootIsPruned and aDeniedSubfolderDoesNotStopTheDeletionsBesideIt now add the root first with a WatchRoot request whose add marker is set through the descriptor, so the files compile and run on the refs without the marker. aRootRenamedAwayIsNotPruned is unchanged. The deletions, the denied folder and the expected counts are unchanged; their earlier evidence was re-run against the same refs, written to the same files.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexingWorkflowTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineMigrationLifecycleTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineCorruptionRebuildTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSyncDirectoryTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineScanRootFlowTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSwitchingFenceBufferingTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineVduMigrationReplayTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootRetirementTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRecordedIngestionProducerTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Round 8, refined decision 2: these Engine tests declared a root by writing watched_roots.json (which the harness's boot root membership does not read, so the upgrade seeding sees no root), composed a Worker service over a root no one added, or synced or scanned a folder directly, relying on the first walk to record its volume; the migration, rebuild, sync, scan and recorded walk now refuse such a root (a migration's cutover then waits). The harness gains addRootAsThePerson and recordAddedRoot: the Worker's WatchRoot with the add marker, after which only the watch subscription is dropped from the Worker's registry (not the person's removal, which would drop the record), so the tests run without watcher events as before. Each test calls it for the folder it declares, syncs or scans; the fence test creates and adds its sync folder before the migration starts instead of during SWITCHING, and the two fixtures that spy the service clear the add's invocations. Files, calls and expected outcomes are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8, refined decision 2 (orchestrator, under the owner's delegation): only the person's add, carrying an explicit add marker (root_added) through WatchRoot and ScanRoot, records a root's volume. Every other path (recovery, the periodic sync and its volume check, walks, the watcher, the boot reconcile, the deferred check, the prune) refuses a declared root with no recorded volume as unproven and records and deletes nothing. When neither the volume record nor its pending file exists (an upgrade from a version without the record), each declared root is seeded once: a root with indexed documents is recorded only if at least half of up to 50 sampled indexed files are on the drive at its path with their indexed size and modification time; a root with none is recorded like an add; otherwise nothing is recorded, the root reads unavailable with the reason 'drive not confirmed after upgrade', nothing is deleted, and the periodic cycle retries the same rule. A profiling reset that removes roots removes each one as the person's removal does.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WalkBeforeReregistrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8b, decision 2, S8: no walk writes a volume record. After a Worker restart, before the Head registers its roots again, a walk of a folder with no volume recorded for it (a root declared but never proven) is deferred with the root-level reason: it records nothing, queues nothing, and a prune under it deletes nothing, keeping an indexed document whose file is gone. Once the roots are registered again (without the add marker), the root the person added before the restart is walked normally and its new file is queued, while the unproven root stays refused, recording and deleting nothing. Fails on ef205d0e9: the first walk recorded whatever volume was at the folder's path and walked it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8b-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WalkBeforeReregistrationTest.java#aWalkAfterARestartBeforeTheRootsAreRegisteredRecordsAndDeletesNothingThenProceeds"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8b, decision 3, S8 with a real SUBST drive letter through KnowledgeServer.start: a configured collection (index.collections) whose file was indexed on stick A, an index written without the volume record, and the collection's letter now holding stick B (a same-named file of other content and a new one). The boot records nothing for the collection's root, which reads unavailable with 'ROOT_NOT_DIRECTORY: drive not confirmed after upgrade'. The person's rebuild then keeps the active generation: the collection's indexed text stays searchable, nothing of stick B is, and nothing is recorded. Fails on ef205d0e9: the rebuild records stick B, builds the new generation from it and drops the collection's indexed text.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8b-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java#aConfiguredCollectionWhoseLetterHoldsAnotherVolumeRecordsNothingAndKeepsItsIndex"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8b, decision 3, must not break: a configured collection on its own drive, after an upgrade from a version without the volume record, keeps the indexing it had and indexes new files. The person's rebuild completes, the collection's indexed file stays searchable and a file added since is indexed. Passes on ef205d0e9 and on the candidate.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r8b-preserved.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java#aConfiguredCollectionOnItsOwnDriveKeepsItsIndexAndIndexesNewFilesAfterAnUpgrade"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/HeldBootPersonsRebuildTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Round 8b, decision 1: only an explicit ingest request carrying the add marker records the volume of its files' folder, and a file whose folder has no recorded volume is not admitted. The test's file submitted after the person's rebuild is now sent the way the product's explicit ingest sends it, with the marker (set through the request's descriptor, so the test still builds on earlier refs). The file, the rebuild, the restarts and the expected outcome are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceDocumentIdentityTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Round 8b, decision 2: nothing but a deliberate add records a volume, so a watcher delete of a file in a folder with no recorded volume is not confirmed and removes nothing (before, the parent folder's volume was recorded the first time it was seen). A watcher delete happens only under a root the person added, so these tests first record their folder as the person's add does, through the service's own root check. The paths, the deletes, the journal order and the expected outcomes are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DocumentIdentityBootImportTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ExplicitIngestRecords.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Round 8b, decisions 1 and 2: the queue item the test puts in place before boot stands for an explicit file ingest made before a restart. That request now also records its file's folder volume, and no admission records one, so without the record the item is never admitted and the migration's cutover waits. A new test helper (ExplicitIngestRecords) writes the record the request would have written, before the boot. The item, the Blue identity, the boot and the expected outcome are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Round 8b, decision 1: the coordinator now binds a separate producer for an explicit ingest it did not just accept (recovered at boot or resumed), which carries no add marker, so binding takes three producers and the two-producer form was retired. The tests bind the same producer they bound before for the fresh, recovered and watched-root roles (one test keeps its separate watched-root producer). The ingests, the reindex routing and the expected outcomes are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

@@ -652,11 +652,50 @@ and is the same folder on the same volume it was. Admission, the pre-publish fre
 post-extraction re-hash, the writer's pre-write check and the watcher's delete confirmation all ask
 one shared root check for that (`SourcePresence.RootCheck`, implemented by `RootWitness`, cached
 for about a second per root rather than asked per file), the same question the prune asks through
-`RootPresenceGuard`. A root's volume is recorded in `root-volumes.properties` under the index base
-the first time a source under it is admitted, or the root is first walked, synced, watched or
-pruned; a root whose volume now differs from the recorded one, or cannot be read, answers "cannot
-tell" and nothing beneath it is removed. Any other "cannot tell" (locked, access denied, a folder
-that cannot be listed) keeps the document and retries with growing back-off and no time limit.
+`RootPresenceGuard`. A volume is recorded in `root-volumes.properties` under the index base only
+by a deliberate add, which is a request carrying the add marker (`root_added`): the person's add
+of a root (the Head's watch and walk requests), or an explicit ingest request of a folder or of
+files, a person's or an agent's (the Engine's `core.ingest` walk accepted in this process, and
+`SubmitBatch`). An explicit folder ingest records the folder's volume like an add; an explicit file
+ingest records the volume of the file's folder under that folder's own keys, which never answer for
+a root, unless a declared root covers the folder. No walk ever records a volume. An explicit ingest
+resumed after a restart is no fresh add: it carries no marker and records nothing. Every other path
+(admission, recovery, the periodic sync and its volume check, a re-walk or reindex, the watcher,
+the boot reconcile, the deferred-root check, the prune) treats a folder with no volume recorded at
+or above it as unproven: it records nothing, adds and removes nothing, and a root reads
+unavailable. That includes a walk the restarted Worker receives before the Head has registered its
+roots again, when it cannot tell which root the folder belongs to: the walk is deferred, deletes
+nothing, and proceeds once the roots are registered and the folder's root is on its recorded
+volume. A root whose volume differs from the recorded one, or cannot be read, answers "cannot tell"
+in the same way and nothing beneath it is removed. Any other "cannot tell" (locked, access denied,
+a folder that cannot be listed) keeps the document and retries with growing back-off and no time
+limit. A folder outside every declared root with no record (a removed root whose queued work
+outlived it, say) admits and prunes nothing beneath it.
+
+An upgrade from a version that kept no volume record confirms each declared root once, on
+evidence, at the first boot that finds neither `root-volumes.properties` nor its pending file
+`root-volumes-pending.properties`. The boot writes the declared roots to the pending file first,
+then an empty record, so an interrupted upgrade resumes rather than starting again. For a root
+with indexed documents, up to 50 of its indexed files are compared with the drive at its path: its
+volume is recorded only if at least half of them are there with their indexed size and
+modification time. A root with nothing indexed is recorded like an add. A root whose evidence
+fails, or whose volume cannot be read, records nothing: it reads unavailable with the reason
+`drive not confirmed after upgrade`, nothing under it is deleted and its text stays searchable.
+The periodic cycle retries the same rule for each root still pending, so a returning drive is
+adopted without any action. A drive that never matches stays unavailable; removing the root and
+adding it again records the drive at its path then. Once a root is confirmed or removed, it no
+longer awaits the upgrade, and the rule above applies.
+
+A configured collection (`index.collections` in the configuration) and the bundled help folder are
+the person's configuration, not roots the person added, so no add records their volume. Their files
+are indexed only when a migration builds a new generation; nothing else walks or prunes them. Each
+boot, and each migration before it enumerates them, seeds a configured root that has no volume
+recorded at or above it once, by the same evidence rule as an upgraded root (a root with nothing
+indexed is recorded on the drive at its path). A configured root whose drive is not confirmed
+records nothing and reads unavailable with the reason `drive not confirmed after upgrade`. A
+migration builds the new generation only from roots on their recorded volume: a root refused for
+any reason fails the migration's enumeration, so the cutover keeps the active generation and
+nothing indexed under that root is lost; a later migration retries.
 
 The same root check guards every path that adds or updates documents, so another volume at a
 root's drive letter never puts its files in the place of the original's. Admission of a present
@@ -681,7 +720,15 @@ volume identity read per root, no walk) and marks each refused root unavailable 
 it syncs the roots that read unavailable again. The first sync or reindex walk the Worker accepts,
 because the recorded volume is back, clears that state: the root reads indexed again, its held
 watch is registered, and the sync reconciles it as usual, pruning what was genuinely deleted.
-Removing the root forgets its record.
+
+Removing the root keeps nothing of it: its record and held watch are dropped, a reconcile the
+Worker's watcher asked for before the removal and has not run yet (an event overflow or burst) is
+dropped, the periodic cycle that listed the root before the removal does not ask its volume, and
+the Head forgets the root's last availability answer. The Worker drops the record when the root
+is unwatched, which is the removal; deleting documents by path under a root that stays declared
+keeps its record. A folder added again at the same path starts afresh. A profiling reset that
+clears the roots removes each one the same way; the index reset on its own keeps the roots and
+their records.
 
 A boot that still has the previous index generation (a stop or crash between a migration's cutover
 and the old generation's removal) reconciles every declared root against the new generation before
@@ -692,8 +739,12 @@ previous generation is kept, its removal unfinished, until the root has been rec
 recorded volume. The server checks a deferred root's volume every 10 s (one volume identity read);
 once the volume is back, without a restart, it reconciles the root, registering its watch, and
 once the index matches the root's disk it commits that and lets the previous generation's removal
-complete. A restart before then defers the root again. Any other boot-root failure, a missing root
-for example, still fails the boot.
+complete. That check never records a volume: a deferred root is reconciled only once it is on the
+volume recorded for it. A deferred root the person removes is dropped from the check before
+anything else and is never reconciled, watched or indexed; its removal counts as resolved, so the
+previous generation's removal completes once every other deferred root is reconciled or removed
+too, and the check stops when none is left. A restart before then defers the root again. Any other
+boot-root failure, a missing root for example, still fails the boot.
 
 A prune keeps each document whose presence it cannot tell and goes on judging the rest, so one
 unreadable subfolder does not stop the genuine deletions beside it; a "not found" beneath a folder
@@ -712,10 +763,26 @@ Accepted limits:
   folder is present and listable, but not that it is the same folder or volume.
 - The volume check compares the Windows volume serial number only, so two volumes that share a
   serial (a cloned disk, for example) count as the same volume.
-- The first time a root is seen (its first admission, walk, sync, watch or prune), the volume
-  recorded for it is whatever volume is at its path then. A root whose drive letter already held
-  another volume at that moment has that volume recorded, and the original is then the one
-  refused.
+- The person's add records whatever volume is at the root's path at that moment. A root added
+  while its drive letter held another volume has that volume recorded, and the original is then
+  the one refused, until the root is removed and added again.
+- The upgrade evidence compares size and modification time only. A different drive holding at
+  least half of the sampled files with the same size and time would be adopted; a drive whose
+  files were mostly changed or touched since they were indexed is not, and stays unavailable
+  until it is removed and added again.
+- On a platform that exposes no volume identity (anything but Windows), no volume is ever
+  recorded or compared: an add, an explicit ingest and the upgrade record nothing, and no root is
+  refused for its volume. Deletion there still requires the file to be reported not found under a
+  root that is present and can be listed, so nothing is pruned on uncertainty, but another volume
+  mounted at the same path is not told apart from the original. This path cannot be exercised on
+  Windows, where the checks run.
+- A migration cutover that is replaying a buffered `SYNC_ROOT` waits, holding the runtime lock, for
+  every queued file to settle, files awaiting a retry included, up to the 30-minute `SWITCHING`
+  budget. While a file waits for a retry then (a locked file, say), closing the index cannot take
+  the lock within its 5 s and fails, so the Engine keeps the index owner for a later attempt. The
+  cutover itself stays resumable and deletes nothing. This predates the task: main has the same
+  wait and the same close, and keeps such a file retrying for up to seven days; the task only adds
+  more files that wait for a retry (unreadable sources and refused roots, which never run out).
 - Each root answer is cached for about a second (`RootWitness.VOUCH_TTL_MS`), so a swap within
   that second can still be answered from the previous look: a file admitted, or a deletion
   confirmed, in that window was judged against the volume that was there a moment before.

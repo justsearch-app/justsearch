@@ -110,6 +110,7 @@ final class CommittedBootRootVolumeTest
     Path stickA = Files.createDirectory(tempDir.resolve("stick-c"));
     Path root = mapLetterTo(stickA);
     Files.writeString(root.resolve("notes.txt"), "on the first stick");
+    addRoot(root);
     assertEquals("", scan(service(), root).getTerminalReasonCode(),
         "precondition: the first walk records the root's volume");
     long queuedBefore = jobQueue.queueDepth();
@@ -148,6 +149,21 @@ final class CommittedBootRootVolumeTest
         .setMode(ScanMode.SCAN_MODE_INITIAL).build(), frames::add, CallContext.none());
     assertTrue(!frames.isEmpty() && frames.getLast().getComplete(), "the walk ends with a terminal");
     return frames.getLast();
+  }
+
+  /**
+   * The person's add of {@code root}: its watch registration with the add marker. Round 8 (refined
+   * decision 2): only the add records the root's volume; a build without the marker recorded it at
+   * the first registration, walk or prune.
+   */
+  private void addRoot(Path root) {
+    var request = io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString());
+    var marker = io.justsearch.ipc.WatchRootRequest.getDescriptor().findFieldByName("root_added");
+    if (marker != null) {
+      request.setField(marker, Boolean.TRUE);
+    }
+    assertTrue(service().watchRoot(request.build(), CallContext.none()).getWatching(),
+        "precondition: the person adds the root");
   }
 
   /** A fresh service over the same index and queue: what a restart of the worker sees. */

@@ -36,10 +36,23 @@ public final class SourcePresence {
 
     /**
      * True while content beneath {@code folder} may be added or updated: a present, listable folder
-     * on the volume recorded for it, which is recorded now when nothing is recorded yet. A folder
+     * on the volume recorded for it; a root with nothing recorded is unproven (round 8). A folder
      * that is another volume at the same path, or cannot be read, admits nothing (round 5).
      */
     boolean admits(Path folder);
+
+    /**
+     * {@link #vouches} for the parent folder of an explicitly ingested file, which is not a root
+     * (round 8, refined decision 2): the same answer unless the check tells the two apart.
+     */
+    default boolean vouchesForFile(Path folder) {
+      return vouches(folder);
+    }
+
+    /** {@link #admits} for the parent folder of an explicitly ingested file, which is not a root. */
+    default boolean admitsFile(Path folder) {
+      return admits(folder);
+    }
   }
 
   /** What can be said about a source right now. */
@@ -70,7 +83,9 @@ public final class SourcePresence {
       return Verdict.PRESENT;
     }
     Path folder = vouchingFolder(file, root);
-    if (!rootCheck.vouches(folder)) {
+    boolean vouches =
+        answersAsRoot(file, root) ? rootCheck.vouches(folder) : rootCheck.vouchesForFile(folder);
+    if (!vouches) {
       return Verdict.ROOT_UNAVAILABLE;
     }
     if (first == PathPresence.UNKNOWN) {
@@ -85,6 +100,18 @@ public final class SourcePresence {
       case PRESENT -> Verdict.PRESENT;
       case UNKNOWN -> Verdict.SOURCE_UNREADABLE;
     };
+  }
+
+  /**
+   * Whether the folder that answers for {@code file} is its ingestion root; otherwise it is the
+   * parent folder of an explicitly ingested file (or of a source with no root).
+   */
+  public static boolean answersAsRoot(Path file, Path root) {
+    if (root == null) {
+      return false;
+    }
+    Path boundary = root.toAbsolutePath().normalize();
+    return !boundary.equals(file) && file.startsWith(boundary);
   }
 
   /** The folder that answers for {@code file}: its ingestion root, or else its own folder. */

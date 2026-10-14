@@ -111,6 +111,7 @@ final class WatcherDeleteDifferentVolumeTest
     Path root = mapLetterTo(Files.createDirectory(tempDir.resolve("stick-a")));
     Path file = Files.writeString(root.resolve("notes.txt"), "on the first stick");
     String id = index(file);
+    addRoot(root);
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount(),
         "precondition: the root's first prune finds nothing missing");
 
@@ -131,6 +132,7 @@ final class WatcherDeleteDifferentVolumeTest
     Path root = mapLetterTo(Files.createDirectory(tempDir.resolve("stick-b")));
     Path file = Files.writeString(root.resolve("notes.txt"), "obsolete");
     String id = index(file);
+    addRoot(root);
     assertEquals(0, service().pruneMissing(request(root), CallContext.none()).getPrunedCount());
 
     Files.delete(file);
@@ -147,6 +149,21 @@ final class WatcherDeleteDifferentVolumeTest
     effect.set(true);
     runtime.indexingCoordinator().deleteByIdAndChunks(id);
     runtime.commitOps().commitAndTrack();
+  }
+
+  /**
+   * The person's add of {@code root}: its watch registration with the add marker. Round 8 (refined
+   * decision 2): only the add records the root's volume; a build without the marker recorded it at
+   * the first registration, walk or prune.
+   */
+  private void addRoot(Path root) {
+    var request = io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString());
+    var marker = io.justsearch.ipc.WatchRootRequest.getDescriptor().findFieldByName("root_added");
+    if (marker != null) {
+      request.setField(marker, Boolean.TRUE);
+    }
+    assertTrue(service().watchRoot(request.build(), CallContext.none()).getWatching(),
+        "precondition: the person adds the root");
   }
 
   /** A fresh service over the same index and queue: what a restart of the worker sees. */

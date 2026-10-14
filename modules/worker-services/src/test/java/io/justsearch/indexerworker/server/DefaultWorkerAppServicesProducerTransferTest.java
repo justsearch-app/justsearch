@@ -143,6 +143,8 @@ final class DefaultWorkerAppServicesProducerTransferTest {
           io.justsearch.ipc.WatchRootRequest.newBuilder()
               .setRootPath(root.toString())
               .setCollection("docs")
+              // The person's add (task t-20261013-ef3c41, round 8): only it records the volume.
+              .setRootAdded(true)
               .build(),
           io.justsearch.indexerworker.services.CallContext.none());
       assertTrue(watched.getWatching(), watched.getErrorMessage());

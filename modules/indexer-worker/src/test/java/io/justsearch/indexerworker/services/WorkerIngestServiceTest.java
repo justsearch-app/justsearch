@@ -167,6 +167,7 @@ final class WorkerIngestServiceTest {
         stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
         base, building, null, null, null, 0L);
     String root = tempDir.toAbsolutePath().toString();
+    addedByThePerson(base, tempDir);
 
     assertEquals(WorkerServiceException.Status.UNAVAILABLE,
         assertThrows(WorkerServiceException.class, () -> candidate.syncDirectory(
@@ -322,6 +323,7 @@ final class WorkerIngestServiceTest {
   @Test
   void syncDirectoryReturnsErrorWhenIndexRuntimeIsNull() {
     // Service was created with indexRuntime = null
+    addedByThePerson(tempDir.resolve("indexBase"), tempDir);
     SyncDirectoryRequest request = SyncDirectoryRequest.newBuilder()
         .setRootPath(tempDir.toAbsolutePath().toString())
         .build();
@@ -365,6 +367,7 @@ final class WorkerIngestServiceTest {
     WorkerIngestService svc = new WorkerIngestService(
         jobQueue, stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
         stubIndexBasePath, stubIndexPath, null, null, null, 0L);
+    addedByThePerson(stubIndexBasePath, tempDir);
 
     for (boolean force : new boolean[] {false, true}) {
       SyncDirectoryRequest request = SyncDirectoryRequest.newBuilder()
@@ -530,6 +533,7 @@ final class WorkerIngestServiceTest {
         new WorkerIngestService(
             nonSqliteQueue, stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
             indexBasePath, genDir, null, null, null, 0L);
+    addedByThePerson(indexBasePath, tempDir);
 
     SyncDirectoryRequest request =
         SyncDirectoryRequest.newBuilder().setRootPath(tempDir.toAbsolutePath().toString()).build();
@@ -583,6 +587,7 @@ final class WorkerIngestServiceTest {
             indexBasePath, genDir, null, null, null, 0L);
 
     String rootPath = tempDir.toAbsolutePath().toString();
+    addedByThePerson(indexBasePath, tempDir);
     JobQueue.EnqueueProvenance provenance =
         new JobQueue.EnqueueProvenance("agent", "AGENT_LOOP");
     CallContext caller =
@@ -638,6 +643,7 @@ final class WorkerIngestServiceTest {
     assertFalse(coalesced.force(), "coalescing preserves the incoming work parameters");
 
     String maintenanceRoot = Files.createDirectories(tempDir.resolve("maintenance-only")).toString();
+    addedByThePerson(indexBasePath, Path.of(maintenanceRoot));
     switchingService.syncDirectory(
         SyncDirectoryRequest.newBuilder().setRootPath(maintenanceRoot).setForce(true).build(), CallContext.none());
     var maintenancePayload = sqliteQueue.listSwitchBufferOps().stream()
@@ -966,4 +972,20 @@ final class WorkerIngestServiceTest {
     public void close() {}
   }
 
+  /**
+   * The person's add of {@code root}: its watch request with the add marker, which records the
+   * root's volume under {@code indexBasePath}. Task t-20261013-ef3c41, round 8 (refined decision
+   * 2): only the add records a root's volume, and every other path refuses a root with none
+   * recorded.
+   */
+  private static void addedByThePerson(Path indexBasePath, Path root) {
+    var adding = new WorkerIngestService(null, null, null,
+        IndexingPacing.unthrottled(), indexBasePath, null,
+        null, null, null, 0L);
+    var added = adding.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(),
+        CallContext.none());
+    assertTrue(added.getWatching(),
+        "precondition: the person adds " + root + ": " + added.getErrorMessage());
+  }
 }

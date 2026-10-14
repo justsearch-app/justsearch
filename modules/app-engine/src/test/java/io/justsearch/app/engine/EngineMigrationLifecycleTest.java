@@ -94,6 +94,7 @@ final class EngineMigrationLifecycleTest {
     writeWatchedRoots(dataDir, docsDir);
 
     engine = EngineTestHarness.start(dataDir);
+    engine.addRootAsThePerson(docsDir);
     KnowledgeServer liveServer = engineServer();
 
     assertTrue(
@@ -293,6 +294,7 @@ final class EngineMigrationLifecycleTest {
     // watcher roots. Accepted build effects also project C lexically into A (D1's active-source
     // projection), so the paused A signature is the known full set A+B+C, while B contains C.
     writeWatchedRoots(dataDir, greenDocs);
+    engine.addRootAsThePerson(greenDocs);
     var started = engine.client().startMigration(
         "count_divergence", TestEngineContexts.FOREGROUND);
     assertTrue(started.accepted(), "startMigration accepted");
@@ -396,6 +398,7 @@ final class EngineMigrationLifecycleTest {
     writeWatchedRoots(dataDir, docsDir);
 
     engine = EngineTestHarness.start(dataDir);
+    engine.addRootAsThePerson(docsDir);
 
     assertTrue(
         engine.client().submitBatch(List.of(file), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
@@ -459,6 +462,7 @@ final class EngineMigrationLifecycleTest {
     writeWatchedRoots(dataDir, watchedRoot);
 
     engine = EngineTestHarness.start(dataDir);
+    engine.addRootAsThePerson(watchedRoot);
     // Captured before the migration starts, so the release assertion at the end of this test has a
     // pointer to compare against.
     String activeBeforePause = engine.status().getMigration().getActiveGenerationId();
