@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
 
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
@@ -51,6 +52,8 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class WalkBeforeReregistrationTest
     extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
+  private static final boolean WINDOWS =
+      System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
   private static final String ROOT_UNAVAILABLE_REASON = "ROOT_NOT_DIRECTORY";
   private static final String RECORD_FILE = "root-volumes.properties";
 
@@ -83,6 +86,10 @@ final class WalkBeforeReregistrationTest
   @Test
   void aWalkAfterARestartBeforeTheRootsAreRegisteredRecordsAndDeletesNothingThenProceeds()
       throws Exception {
+    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
+    // (NoVolumeIdentityExtension, round 9).
+    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+        "a volume is recorded only where the platform exposes a volume identity");
     Path letters = Files.createDirectories(tempDir.resolve("letters")).toAbsolutePath().normalize();
     Path drafts = Files.createDirectories(tempDir.resolve("drafts")).toAbsolutePath().normalize();
     Files.writeString(drafts.resolve("notes.txt"), "notes in the drafts folder");

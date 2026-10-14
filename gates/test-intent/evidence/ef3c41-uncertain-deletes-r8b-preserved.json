@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
   },
-  "createdAt": "2026-10-14T16:00:59.087Z",
-  "revision": "ef205d0e921c698bd3d30aaad5ad4efce674689a",
-  "tree": "4581f2588b65411d3259d2b1d2ad314443467641",
+  "createdAt": "2026-10-14T18:53:24.787Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "d094b656606dae75aa2336ef4a3c3920391ac904",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ConfiguredCollectionVolumeTest.aConfiguredCollectionOnItsOwnDriveKeepsItsIndexAndIndexesNewFilesAfterAnUpgrade\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 26701
+      "durationMs": 16121
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java#aConfiguredCollectionOnItsOwnDriveKeepsItsIndexAndIndexesNewFilesAfterAnUpgrade",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:531f18c06dc05a7afbfe1487e39123fb0db28515b6ac5853ee2f64f9642491b4",
+      "contentDigest": "sha256:bd6292aa7a20a21b23e476e764814b2d5beb12f3d7a677c37a702b0cd787b5c7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
         "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ConfiguredCollectionVolumeTest.aConfiguredCollectionOnItsOwnDriveKeepsItsIndexAndIndexesNewFilesAfterAnUpgrade\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 62167
+        "durationMs": 23245
       }
     ],
     "checks": [
@@ -61,5 +61,5 @@
       }
     ]
   },
-  "digest": "sha256:56cdb7b4fb0da96f8e5b8308747ac04249dd9cc9032de87cdb3216c805a23899"
+  "digest": "sha256:f4fc58ca01f564b18c32308857d69f0b9d1f3d46c369862aea8938233daf6f5f"
 }

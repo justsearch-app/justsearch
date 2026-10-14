@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
   },
-  "createdAt": "2026-10-14T13:09:16.484Z",
-  "revision": "ef205d0e921c698bd3d30aaad5ad4efce674689a",
-  "tree": "6f6d66a4470c0d478f4a12a8fc4b924964e68c84",
+  "createdAt": "2026-10-14T18:40:40.344Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "0469f6ca9b6a7f662e14e7cb3ba6ae7a7e967ba6",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aGenuinelyDeletedFileIsStillPrunedInOneRun\" --tests \"io.justsearch.adapters.lucene.runtime.UnreadableFingerprintParityTest.aReadableDifferentFingerprintStillRequiresMigration\" --tests \"io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest.corruptIndexAutoRecoveryProducesBackupAndFreshIndex\" --tests \"io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest.schemaMismatchRebuildBackupFirstProducesBackupAndFreshIndex\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3339
+      "durationMs": 3781
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.services.SchemaCompatUnknownTest.aReadableDifferentFingerprintWithDocumentsIsStillAMismatch\" --tests \"io.justsearch.indexerworker.services.WorkerMethvinWatcherTest.genuineDeleteIsAppliedWithoutAnyFurtherEvent\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8176
+      "durationMs": 7625
     },
     {
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayUncertainRootTest.aBufferedPruneOfAPresentFolderRemovesTheDeletedFile\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.theSameVolumeAfterARestartStillPrunesAGenuineDelete\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere\" --tests \"io.justsearch.indexerworker.services.PruneMissingUncertainRootTest.aGenuinelyDeletedFileUnderAPresentRootIsPruned\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7387
+      "durationMs": 8098
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.UnreadableRootAvailabilityTest.aListableRootStaysAvailable\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3423
+      "durationMs": 3606
     }
   ],
   "checks": [
@@ -182,7 +182,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#theSameVolumeAfterARestartStillPrunesAGenuineDelete",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:04888c4c1268b6206ef7c57df1ea24adbf4cd2b3e389e8c6b1ba98719e9c94dd",
+      "contentDigest": "sha256:a3a9d5097143506e608f4b66255ae5b388d95806c68c3085bc35cae4c9612075",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -197,7 +197,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:04888c4c1268b6206ef7c57df1ea24adbf4cd2b3e389e8c6b1ba98719e9c94dd",
+      "contentDigest": "sha256:a3a9d5097143506e608f4b66255ae5b388d95806c68c3085bc35cae4c9612075",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -248,25 +248,25 @@
         "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aGenuinelyDeletedFileIsStillPrunedInOneRun\" --tests \"io.justsearch.adapters.lucene.runtime.UnreadableFingerprintParityTest.aReadableDifferentFingerprintStillRequiresMigration\" --tests \"io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest.corruptIndexAutoRecoveryProducesBackupAndFreshIndex\" --tests \"io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest.schemaMismatchRebuildBackupFirstProducesBackupAndFreshIndex\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 5851
+        "durationMs": 8663
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.services.SchemaCompatUnknownTest.aReadableDifferentFingerprintWithDocumentsIsStillAMismatch\" --tests \"io.justsearch.indexerworker.services.WorkerMethvinWatcherTest.genuineDeleteIsAppliedWithoutAnyFurtherEvent\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 10385
+        "durationMs": 15700
       },
       {
         "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayUncertainRootTest.aBufferedPruneOfAPresentFolderRemovesTheDeletedFile\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.theSameVolumeAfterARestartStillPrunesAGenuineDelete\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere\" --tests \"io.justsearch.indexerworker.services.PruneMissingUncertainRootTest.aGenuinelyDeletedFileUnderAPresentRootIsPruned\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 12849
+        "durationMs": 18761
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.UnreadableRootAvailabilityTest.aListableRootStaysAvailable\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 4974
+        "durationMs": 6387
       }
     ],
     "checks": [
@@ -337,5 +337,5 @@
       }
     ]
   },
-  "digest": "sha256:1518cf2168050bcff15c5b7e74a673f8c242b68d0046a3e3be8ab84bbdc0fbd4"
+  "digest": "sha256:d1ada838bccb66a7d7c027353466295516f150e5fcd9c1e991accbb358aee2d4"
 }

@@ -350,6 +350,10 @@ public final class RootWitness implements SourcePresence.RootCheck {
    * or for the nearest recorded folder above it (round 8, S8). It never records: a root with
    * nothing recorded is unproven, as is one whose volume or record cannot be read. The
    * deferred-root check asks this, so a recovery path never adopts the volume it finds.
+   *
+   * <p>Round 9: on a platform that exposes no volume identity nothing is ever recorded or
+   * compared, so a present, listable real folder is proven, as {@link #refusesRoot} never refuses
+   * it there; only the comparison is skipped.
    */
   @SuppressWarnings("PMD.AvoidCatchingGenericException") // a native identity read may throw unchecked
   boolean provenOnRecordedVolume(Path root) {
@@ -360,8 +364,11 @@ public final class RootWitness implements SourcePresence.RootCheck {
     }
     try {
       String volume = RootIdentity.capture(key).volume();
+      if (volume == null) {
+        return true;
+      }
       Optional<String> recorded = volumes.recordedFor(key);
-      return volume != null && recorded.isPresent() && recorded.get().equals(volume);
+      return recorded.isPresent() && recorded.get().equals(volume);
     } catch (IOException | RuntimeException cannotTell) {
       log.debug("Root {} is not proven on its recorded volume ({})", key, cannotTell.getMessage());
       return false;

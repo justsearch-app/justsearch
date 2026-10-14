@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
   },
-  "createdAt": "2026-10-14T13:11:00.469Z",
-  "revision": "ef205d0e921c698bd3d30aaad5ad4efce674689a",
-  "tree": "afa10f4b8399a6c6b5d1e570d4e428a2f3a25314",
+  "createdAt": "2026-10-14T18:43:50.894Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "c75abee5630b55065ecf54f3ef3846f19b6e7d71",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aGenuinelyDeletedFileIsStillPrunedInOneRun\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2835
+      "durationMs": 2808
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckStillRetiresAGenuinelyDeletedSource\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3331
+      "durationMs": 3488
     },
     {
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.theSameVolumeAfterARestartStillPrunesAGenuineDelete\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5916
+      "durationMs": 5872
     }
   ],
   "checks": [
@@ -86,7 +86,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#theSameVolumeAfterARestartStillPrunesAGenuineDelete",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:04888c4c1268b6206ef7c57df1ea24adbf4cd2b3e389e8c6b1ba98719e9c94dd",
+      "contentDigest": "sha256:a3a9d5097143506e608f4b66255ae5b388d95806c68c3085bc35cae4c9612075",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -101,7 +101,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:04888c4c1268b6206ef7c57df1ea24adbf4cd2b3e389e8c6b1ba98719e9c94dd",
+      "contentDigest": "sha256:a3a9d5097143506e608f4b66255ae5b388d95806c68c3085bc35cae4c9612075",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -122,19 +122,19 @@
         "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aGenuinelyDeletedFileIsStillPrunedInOneRun\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 4627
+        "durationMs": 5160
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckStillRetiresAGenuinelyDeletedSource\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 7082
+        "durationMs": 8345
       },
       {
         "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.theSameVolumeAfterARestartStillPrunesAGenuineDelete\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 8952
+        "durationMs": 15698
       }
     ],
     "checks": [
@@ -165,5 +165,5 @@
       }
     ]
   },
-  "digest": "sha256:5ccf762932e065fc8bf62d40f0eeabdaced2dc54674a84d0a286a6b406ce208e"
+  "digest": "sha256:089c2bacf60b9f88f9f01c0d0a0b5a0626204b5cb1824c4e3f635dbbb16235af"
 }

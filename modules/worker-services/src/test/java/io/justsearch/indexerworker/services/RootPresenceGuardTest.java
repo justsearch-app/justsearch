@@ -82,7 +82,10 @@ final class RootPresenceGuardTest {
 
   @Test
   void anUnreadableVolumeRecordVouchesForNothing() throws Exception {
-    assumeTrue(WINDOWS, "volume identity and NOSHARE locks are Windows features");
+    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
+    // (NoVolumeIdentityExtension, round 9).
+    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+        "volume identity and NOSHARE locks are Windows features");
     Path root = Files.createDirectory(tempDir.resolve("root"));
     Path base = Files.createDirectory(tempDir.resolve("indexBase"));
     RootVolumeLedger volumes = RootVolumeLedger.under(base);

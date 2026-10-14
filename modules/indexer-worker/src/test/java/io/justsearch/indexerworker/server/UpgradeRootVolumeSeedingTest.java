@@ -106,6 +106,10 @@ final class UpgradeRootVolumeSeedingTest {
 
   @Test
   void anUpgradeWithTheSameDrivesRecordsEveryRootOnEvidenceAndKeepsItsIndex() throws Exception {
+    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
+    // (NoVolumeIdentityExtension, round 9).
+    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+        "a volume is recorded only where the platform exposes a volume identity");
     Path letters = Files.createDirectories(tempDir.resolve("letters"));
     Path photos = Files.createDirectories(tempDir.resolve("photos"));
     Path letterFile = Files.writeString(letters.resolve("letter.txt"), "a capybara letter");
@@ -134,6 +138,10 @@ final class UpgradeRootVolumeSeedingTest {
 
   @Test
   void anUpgradeRecordsARootWithNothingIndexedLikeAnAdd() throws Exception {
+    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
+    // (NoVolumeIdentityExtension, round 9).
+    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+        "a volume is recorded only where the platform exposes a volume identity");
     Path letters = Files.createDirectories(tempDir.resolve("letters"));
     Path empty = Files.createDirectories(tempDir.resolve("empty"));
     Path letterFile = Files.writeString(letters.resolve("letter.txt"), "a capybara letter");
@@ -150,7 +158,10 @@ final class UpgradeRootVolumeSeedingTest {
   @Test
   void anUpgradeWhereTheLetterHoldsAnotherVolumeRecordsNothingUntilTheDriveReturns()
       throws Exception {
-    assumeTrue(WINDOWS, "SUBST drive letters exist on Windows only");
+    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
+    // (NoVolumeIdentityExtension, round 9).
+    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+        "SUBST drive letters and volume identity exist on Windows only");
     otherVolume = folderOnAnotherVolumeThan(tempDir, "ef3c41-upgrade-volume-");
     assumeTrue(otherVolume != null, "needs a second volume besides " + tempDir);
     Path stickA = Files.createDirectories(tempDir.resolve("stick-a"));

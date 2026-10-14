@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -13,6 +14,9 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The volume each declared root lives on, kept across restarts (task t-20261013-ef3c41, S8).
@@ -41,6 +45,15 @@ import java.util.Properties;
  * but cannot be read is "cannot tell": the caller removes nothing. A ledger with no base path is
  * disabled and checks nothing; an in-memory one (the unwired default of an authority or watcher,
  * never the Worker's own) records a folder the first time it is seen.
+ *
+ * <p>Loss and corruption (round 9): a file whose content is not a well-formed record (an entry
+ * that is not an absolute folder with a volume, or a pending entry that is not an absolute folder
+ * awaiting seeding) is corrupt; reading it is "cannot tell" like any unreadable file. At boot,
+ * {@link #beginUpgradeSeeding} discards a corrupt file and treats a lost or discarded record like
+ * the upgrade from a version without it: every declared root awaits its one-time seeding on
+ * evidence, reading "drive not confirmed after upgrade" until confirmed. A lost or discarded
+ * pending file makes every declared root with nothing recorded await it. A file that exists but
+ * cannot be opened is left as it is and nothing is recorded. None of these deletes anything.
  */
 final class RootVolumeLedger {
   static final String FILE_NAME = "root-volumes.properties";
@@ -50,6 +63,19 @@ final class RootVolumeLedger {
   private static final String FILE_FOLDER_PREFIX = "explicit-file-folder|";
   private static final String PENDING_COMMENT =
       "Roots awaiting their one-time upgrade seeding (task t-20261013-ef3c41)";
+  private static final String AWAITING = "awaiting";
+  /** A recorded volume: a lower-case scheme, a colon and a hexadecimal serial. */
+  private static final Pattern VOLUME = Pattern.compile("[a-z][a-z0-9-]*:[0-9a-f]+");
+  private static final Logger log = LoggerFactory.getLogger(RootVolumeLedger.class);
+
+  /** A record or pending file whose content is not well formed (round 9). */
+  static final class CorruptRecordException extends IOException {
+    private static final long serialVersionUID = 1L;
+
+    CorruptRecordException(Path file, String detail) {
+      super("The volume record " + file + " is corrupt: " + detail);
+    }
+  }
 
   private final Path file;
   /** The records of an in-memory ledger; {@code null} for a file-backed or disabled one. */
@@ -212,7 +238,7 @@ final class RootVolumeLedger {
         if (pending.containsKey(key)) {
           awaiting.add(root);
         } else if (recordedFor(root).isEmpty()) {
-          pending.setProperty(key, "awaiting");
+          pending.setProperty(key, AWAITING);
           awaiting.add(root);
           changed = true;
         }
@@ -225,12 +251,17 @@ final class RootVolumeLedger {
   }
 
   /**
-   * Starts the one-time upgrade seeding when neither the record nor the pending file exists: the
-   * {@code declared} roots are written to the pending file first, then an empty record. Does
-   * nothing for a ledger that is not file-backed, or whose record or pending file exists.
+   * Starts the one-time upgrade seeding when the record does not exist: the {@code declared} roots
+   * are written to the pending file first, then an empty record. That is the upgrade from a version
+   * without the record, an interrupted one, or a record lost since (round 9). A record or pending
+   * file that is corrupt is discarded first ({@link CorruptRecordException}): a discarded record
+   * counts as lost; a discarded pending file makes every declared root with nothing recorded at or
+   * above it await its seeding. Does nothing for a ledger that is not file-backed, or whose record
+   * and pending file are both well formed.
    *
    * @return whether seeding started now
-   * @throws IOException when either file cannot be read or written
+   * @throws IOException when either file cannot be opened, read or written for another reason;
+   *     nothing is discarded or recorded then
    */
   boolean beginUpgradeSeeding(Collection<Path> declared) throws IOException {
     if (file == null) {
@@ -238,15 +269,38 @@ final class RootVolumeLedger {
     }
     synchronized (lock) {
       Path pending = pendingFile();
-      if (Files.exists(file) || Files.exists(pending)) {
+      boolean recordKept = Files.exists(file) && !discardedAsCorrupt(file, false);
+      boolean pendingLost = Files.exists(pending) && discardedAsCorrupt(pending, true);
+      if (recordKept && !pendingLost) {
         return false;
       }
-      Properties awaiting = new Properties();
+      Properties awaiting = loadPending();
       for (Path root : declared) {
-        awaiting.setProperty(key(root), "awaiting");
+        if (!recordKept || recordedFor(root).isEmpty()) {
+          awaiting.setProperty(key(root), AWAITING);
+        }
       }
       write(pending, awaiting, PENDING_COMMENT);
-      store(new Properties());
+      if (!recordKept) {
+        store(new Properties());
+      }
+      return true;
+    }
+  }
+
+  /**
+   * Reads {@code target}; when it is corrupt, deletes it and answers {@code true}. Any other
+   * failure to read it is thrown and nothing is deleted.
+   */
+  private static boolean discardedAsCorrupt(Path target, boolean pendingEntries)
+      throws IOException {
+    try {
+      read(target, pendingEntries);
+      return false;
+    } catch (CorruptRecordException corrupt) {
+      Files.delete(target);
+      log.warn("{}; it was discarded and the declared roots await seeding on evidence",
+          corrupt.getMessage());
       return true;
     }
   }
@@ -334,27 +388,53 @@ final class RootVolumeLedger {
   }
 
   private Properties loadPending() throws IOException {
-    Properties awaiting = new Properties();
-    try (InputStream in = Files.newInputStream(pendingFile())) {
-      awaiting.load(in);
-    } catch (NoSuchFileException none) {
-      // Nothing awaits seeding.
-    }
-    return awaiting;
+    return read(pendingFile(), true);
   }
 
   private Properties load() throws IOException {
-    Properties entries = new Properties();
     if (memory != null) {
+      Properties entries = new Properties();
       entries.putAll(memory);
       return entries;
     }
-    try (InputStream in = Files.newInputStream(file)) {
+    return read(file, false);
+  }
+
+  /**
+   * The entries of {@code target}, empty when it does not exist.
+   *
+   * @throws CorruptRecordException when its content is not well formed
+   * @throws IOException when it exists but cannot be read
+   */
+  private static Properties read(Path target, boolean pendingEntries) throws IOException {
+    Properties entries = new Properties();
+    try (InputStream in = Files.newInputStream(target)) {
       entries.load(in);
     } catch (NoSuchFileException none) {
-      // Nothing recorded yet.
+      return entries;
+    } catch (IllegalArgumentException malformed) {
+      throw new CorruptRecordException(target, malformed.getMessage());
+    }
+    for (String name : entries.stringPropertyNames()) {
+      String value = entries.getProperty(name);
+      String folder = !pendingEntries && name.startsWith(FILE_FOLDER_PREFIX)
+          ? name.substring(FILE_FOLDER_PREFIX.length()) : name;
+      boolean wellFormed = absoluteFolder(folder)
+          && (pendingEntries ? AWAITING.equals(value) : VOLUME.matcher(value).matches());
+      if (!wellFormed) {
+        throw new CorruptRecordException(target, "an entry is not a folder with "
+            + (pendingEntries ? "its seeding state" : "a volume"));
+      }
     }
     return entries;
+  }
+
+  private static boolean absoluteFolder(String folder) {
+    try {
+      return !folder.isBlank() && Path.of(folder).isAbsolute();
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
   }
 
   private void store(Properties entries) throws IOException {

@@ -38,6 +38,8 @@ Round 8 (on top of ef205d0e9): a deferred root the person removes is dropped fro
 
 Round 8b (on top of ef205d0e9, decisions under the owner's delegation): only a deliberate add records a volume (the person's add of a root, or an explicit ingest request of a folder or of files, carrying the add marker), no walk ever records one, so a walk before the roots are registered again after a restart is deferred and deletes nothing, and a configured collection is seeded once by the upgrade rule and otherwise reads unavailable with nothing deleted (S8). Its repaired checks fail on ef205d0e9 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r8b-repaired.json`); its must-not-break check passes on ef205d0e9 and on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r8b-preserved.json`). Tests that queued an explicit ingest or deleted through the watcher without the record a deliberate add makes now make it first (Adaptation entries); evidence naming an edited test was re-run against the same refs, written to the same files.
 
+Round 9 (on top of 925610f44, decisions under the owner's delegation): on a platform with no volume identity (anything but Windows) a root is never deferred or reported unavailable for lack of a volume record; walks, watches, indexing and prunes behave as on cf3f14655 and only the volume comparison is skipped. A no-volume-identity seam lets a Windows run take that path; its checks run on the candidate only (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r9-after-only.json`), because the seam does not exist on 925610f44. A lost or corrupt volume record never causes a deletion: a lost or discarded record is rebuilt at the next boot by the upgrade rule, so each root reads "drive not confirmed after upgrade" until it is confirmed on evidence (S8). Its repaired checks fail on 925610f44 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r9-repaired.json`). Tests that need a volume identity now skip without one, as they already did off Windows for SUBST, and the test helpers assert the volume record only where there is one (Adaptation entries); evidence naming an edited test was re-run against the same refs, written to the same files.
+
 ```json
 {
   "entries": [
@@ -2182,6 +2184,140 @@ Round 8b (on top of ef205d0e9, decisions under the owner's delegation): only a d
           "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
           "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
           "choice": "Round 8b (orchestrator, under the owner's delegation and the task's rule: never delete indexed content, or approve an index, on uncertainty). (1) An explicit ingest request, a person's or an agent's, is a deliberate add and records the folder's volume; only that request may write the record, carrying the same add marker as the person's add (root_added on ScanRoot, and on BatchRequest for SubmitBatch). (2) No walk ever writes a volume record: a walk that finds no record for its root, or cannot tell which root it belongs to (before re-registration after a Worker restart), is deferred, deletes nothing, and resumes when the roots are registered. (3) A configured collection root is the person's configuration: when its record is absent it is seeded once by the upgrade rule (at least half of up to 50 sampled indexed files present with their indexed size and modification time, or nothing indexed); otherwise it reads unavailable with the same reason and nothing is deleted; it never loses indexing it had on ef205d0e9 while its drive is present. (4) A stalled cutover that blocks close is bounded only if it is new with this lane; if it already happened on main it is a named limit. (5) No volume identity off Windows: a named limit. (6) Upgrade evidence by size and modification time, as decided. (7) The duplicated reason constant is shared only through an existing common module, otherwise cross-referenced.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 9, decision 2, S8: after a first boot whose person's add recorded the root's volume, the record alone is lost or overwritten with bytes that are not a record, and the Worker boots again through KnowledgeServer.start over the same index. A lost record is rebuilt on evidence: the root, whose indexed file is on the drive at its path, is recorded again, its sync is available and deletes nothing, and its text stays searchable. A lost record whose root's evidence fails (one indexed file gone, another of another size) records nothing, the sync reads \"ROOT_NOT_DIRECTORY: drive not confirmed after upgrade\" and deletes nothing, and the gone file's text stays searchable. A corrupt record is discarded and rebuilt the same way. Fails on 925610f44: the leftover pending file ended the seeding, so the root was never recorded again and read unavailable without the upgrade reason.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 9 (orchestrator, under the owner's delegation and the task's rule: never delete indexed content on uncertainty). (1) With no volume identity on the platform (anything but Windows), a root is never deferred or reported unavailable for lack of a record: indexing, watching and genuine prunes behave as on main, and only the identity comparison is skipped; a seam that forces \"identity unavailable\" covers this on Windows. (2) A lost or unreadable volume record must never cause a deletion: roots read \"drive not confirmed\" and are re-seeded by the upgrade evidence rule, as already built; the record is classified in the store-recoverability register.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r9-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#aLostVolumeRecordIsSeededAgainOnEvidenceAndTheRootKeepsItsIndex",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#aLostVolumeRecordWhoseDriveIsNotConfirmedReadsUnconfirmedAndDeletesNothing",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#aCorruptVolumeRecordIsDiscardedAndSeededAgainOnEvidence"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityRootTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityExtension.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityExtension.java",
+        "modules/indexer-worker/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension",
+        "modules/worker-services/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension"
+      ],
+      "class": "New",
+      "behaviour": "Round 9, decision 1, S8: with the platform's volume identity taken away by the no-volume-identity seam (RootIdentity.VOLUME_IDENTITY_UNAVAILABLE, as on Linux and macOS), the root the person adds is watched, the periodic volume check never refuses it and the deferred-root check finds it proven; after a restart the Head's re-registration without the add marker watches it at once, a walk admits its two present files, a prune removes the indexed document whose file is gone and keeps the other, the root still never reads unavailable, and no volume is ever recorded. NoVolumeIdentitySeamTest checks that the seam takes the identity away and that a run with the seam's property (the JUnit extension NoVolumeIdentityExtension, autodetected, which runs a whole suite without volume identity, registered for autodetection in each module's META-INF/services) has it on. Candidate only: the seam does not exist on 925610f44, and the product there behaves the same on this path.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 9 (orchestrator, under the owner's delegation and the task's rule: never delete indexed content on uncertainty). (1) With no volume identity on the platform (anything but Windows), a root is never deferred or reported unavailable for lack of a record: indexing, watching and genuine prunes behave as on main, and only the identity comparison is skipped; a seam that forces \"identity unavailable\" covers this on Windows. (2) A lost or unreadable volume record must never cause a deletion: roots read \"drive not confirmed\" and are re-seeded by the upgrade evidence rule, as already built; the record is classified in the store-recoverability register.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r9-after-only.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityRootTest.java#withNoVolumeIdentityARootIsWalkedWatchedAndPrunedAsOnMainAndNeverReadsUnavailable",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java#theSeamTakesTheVolumeIdentityAway",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java#theSeamTakesTheVolumeIdentityAway"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootDeferredRootTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRemovedDeferredRootTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/CommittedBootRootVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UnprovenRootRefusedTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WalkBeforeReregistrationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Round 9, decision 1: these tests observe a recorded volume or another volume at the same path, which exists only where the platform exposes a volume identity. Each already skipped off Windows for SUBST, or now skips there too: their skip condition also skips a run with the no-volume-identity seam on (the system property justsearch.test.noVolumeIdentity), read directly so each file still builds on its earlier refs. On Windows without the seam they run as before; inputs, observations and expected outcomes are unchanged, and each check's earlier evidence was re-run against its original ref.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 9 (orchestrator, under the owner's delegation and the task's rule: never delete indexed content on uncertainty). (1) With no volume identity on the platform (anything but Windows), a root is never deferred or reported unavailable for lack of a record: indexing, watching and genuine prunes behave as on main, and only the identity comparison is skipped; a seam that forces \"identity unavailable\" covers this on Windows. (2) A lost or unreadable volume record must never cause a deletion: roots read \"drive not confirmed\" and are re-seeded by the upgrade evidence rule, as already built; the record is classified in the store-recoverability register.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceDocumentIdentityTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Round 9, decision 1: the helpers that add a root as the person does asserted, as a precondition, that the add recorded the root's volume, which fails wherever the platform has no volume identity (the Linux CI lane). They now assert it only where the folder has a volume identity; the add itself, the inputs and every observed outcome are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Round 9 (orchestrator, under the owner's delegation and the task's rule: never delete indexed content on uncertainty). (1) With no volume identity on the platform (anything but Windows), a root is never deferred or reported unavailable for lack of a record: indexing, watching and genuine prunes behave as on main, and only the identity comparison is skipped; a seam that forces \"identity unavailable\" covers this on Windows. (2) A lost or unreadable volume record must never cause a deletion: roots read \"drive not confirmed\" and are re-seeded by the upgrade evidence rule, as already built; the record is classified in the store-recoverability register.",
           "label": "agent choice"
         }
       ]

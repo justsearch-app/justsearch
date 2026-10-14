@@ -58,7 +58,10 @@ final class RootVolumeSwapGatesTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    assumeTrue(WINDOWS, "SUBST drive letters exist on Windows only");
+    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
+    // (NoVolumeIdentityExtension, round 9).
+    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+        "SUBST drive letters and volume identity exist on Windows only");
     // The scenario needs a second volume besides the test JVM's temp folder; it is found, not
     // assumed, and a machine without one skips the test rather than passing it.
     otherVolume = folderOnAnotherVolumeThan(tempDir, "ef3c41-swap-volume-");

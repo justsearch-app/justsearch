@@ -76,7 +76,10 @@ final class CommittedBootDeferredRootTest {
 
   @BeforeEach
   void setUp() {
-    assumeTrue(WINDOWS, "SUBST drive letters exist on Windows only");
+    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
+    // (NoVolumeIdentityExtension, round 9).
+    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+        "SUBST drive letters and volume identity exist on Windows only");
     otherVolume = folderOnAnotherVolumeThan(tempDir, "ef3c41-deferred-volume-");
     assumeTrue(otherVolume != null, "needs a second volume besides " + tempDir);
   }

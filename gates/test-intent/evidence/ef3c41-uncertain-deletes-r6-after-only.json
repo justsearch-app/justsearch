@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
   },
-  "createdAt": "2026-10-13T23:39:04.560Z",
-  "revision": "5a7e266a58b00f079a023e768213e2eb43c12a20",
-  "tree": "b6980caa2175d6abf44418aaedafe3029267da71",
+  "createdAt": "2026-10-14T18:42:45.329Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "318421559f09571c249078e5bb1dd759a7fffa1b",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.RootVolumeCheckTest.theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5826
+      "durationMs": 5684
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java#theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:247f0e37d6e910aed04d4903dce14d00ac49782cb670aaca50ac01a84f16e6b2",
+      "contentDigest": "sha256:cd9038edd0d69e90724bff06189013439fcc537f87b47d465f7baf013547f6df",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:a16a02913181dabd16a0462815bf9bd01f84da151d61bdec4dfaf9c10c780c42"
+  "digest": "sha256:13cacbfd49f97c5ef459510b2fae57bef27a8e4c2cb91386f69628c47fad4161"
 }

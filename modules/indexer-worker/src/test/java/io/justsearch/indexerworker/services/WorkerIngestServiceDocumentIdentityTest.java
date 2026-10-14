@@ -709,7 +709,9 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
    * root, and only the add records a volume (task t-20261013-ef3c41, round 8b, decision 2).
    */
   private static void addedAsThePerson(WorkerIngestService service, Path root) {
-    assertTrue(((RootWitness) service.rootCheck()).recordAdded(root),
-        "precondition: the person's add records the root's volume");
+    boolean recorded = ((RootWitness) service.rootCheck()).recordAdded(root);
+    if (NoVolumeIdentityExtension.volumeIdentityAvailable(root)) {
+      assertTrue(recorded, "precondition: the person's add records the root's volume");
+    }
   }
 }
