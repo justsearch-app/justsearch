@@ -3,7 +3,10 @@ package io.justsearch.app.services.vdu;
 
 import io.justsearch.app.api.OfflineProcessingOutcome;
 import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
@@ -37,7 +40,10 @@ public final class AutomaticVduBreaker {
 
   /** Why a pass counted. */
   public enum Cause {
-    /** Entered picture reading, every document attempt was refused by generation. */
+    /**
+     * Entered picture reading, but the Engine held generation closed (a settings change in progress
+     * or settings recovery), so every document attempt was turned away.
+     */
     REFUSED(VduCapabilityState.REASON_BREAKER_OPEN_REFUSED),
     /** Launched or relaunched llama-server for picture reading, but the vision entry failed. */
     ENTRY_FAILED(VduCapabilityState.REASON_BREAKER_OPEN_ENTRY_FAILED);
@@ -78,18 +84,29 @@ public final class AutomaticVduBreaker {
     }
   }
 
+  private static final DateTimeFormatter NEXT_TRY = DateTimeFormatter.ofPattern("HH:mm");
+
   private final VduCapabilityState status;
   private final LongSupplier nanoTime;
+  private final Clock wallClock;
   private State state = State.CLOSED;
   private int consecutive;
   private Cause cause;
   private String detail;
   private Duration backoff = FIRST_BACKOFF;
   private long probeAtNanos;
+  /** Wall-clock time of the next probe, for status text only; timing uses {@link #nanoTime}. */
+  private Instant probeAt;
 
   public AutomaticVduBreaker(VduCapabilityState status, LongSupplier nanoTime) {
+    this(status, nanoTime, Clock.system(java.time.ZoneId.systemDefault()));
+  }
+
+  /** @param wallClock gives the local time of the next try shown in status */
+  AutomaticVduBreaker(VduCapabilityState status, LongSupplier nanoTime, Clock wallClock) {
     this.status = Objects.requireNonNull(status, "status");
     this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
+    this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
   }
 
   /**
@@ -179,7 +196,10 @@ public final class AutomaticVduBreaker {
   /** @param restartBackoff whether a new back-off starts now (false keeps the elapsed deadline) */
   private void openLocked(boolean announce, boolean restartBackoff) {
     state = State.OPEN;
-    if (restartBackoff) probeAtNanos = nanoTime.getAsLong() + backoff.toNanos();
+    if (restartBackoff) {
+      probeAtNanos = nanoTime.getAsLong() + backoff.toNanos();
+      probeAt = wallClock.instant().plus(backoff);
+    }
     String text = describe();
     status.block(cause.reasonCode(), text);
     if (announce) LOG.warn("Automatic picture reading paused: {}", text);
@@ -188,11 +208,16 @@ public final class AutomaticVduBreaker {
   private String describe() {
     String seen = detail == null || detail.isBlank() ? "" : " (" + detail + ")";
     String what = cause == Cause.REFUSED
-        ? "every document attempt was refused" : "picture-reading mode could not be entered";
+        ? "the Engine held generation closed (a settings change in progress or settings recovery),"
+            + " so every document was turned away"
+        : "picture-reading mode could not be entered";
+    String next = nanoTime.getAsLong() - probeAtNanos < 0
+        ? "Next try at " + NEXT_TRY.format(probeAt.atZone(wallClock.getZone()))
+        : "Next try when the computer is next idle";
     return "Automatic picture reading is paused after " + OPEN_AFTER
         + " automatic passes in a row made no progress: " + what + seen
-        + ". Next automatic try in " + backoff.toMinutes() + " min; a manual run, applying settings"
-        + " or switching chat off or on resumes it now.";
+        + ". " + next + "; a manual run, applying settings or switching chat off or on"
+        + " resumes it now.";
   }
 
   private void closeLocked() {

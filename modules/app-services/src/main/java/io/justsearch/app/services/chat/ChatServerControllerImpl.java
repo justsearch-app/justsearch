@@ -989,6 +989,11 @@ public final class ChatServerControllerImpl
   }
 
   @Override
+  public long serverLaunches() {
+    return actuator.serverLaunches();
+  }
+
+  @Override
   public AutoCloseable addAutomaticVduResetListener(java.util.function.Consumer<String> listener) {
     Objects.requireNonNull(listener, "listener");
     automaticVduResetListeners.add(listener);

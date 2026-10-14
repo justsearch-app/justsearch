@@ -81,6 +81,14 @@ changeset.
           "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
           "label": "agent choice",
           "choice": "Count a pass when it (re)launched llama-server for picture reading and completed no document: every attempt refused, or the vision entry failed. A loaded-chat BUSY deferral, cancellation, activity interruption or an empty pass is neutral. Progress means processed + failed > 0."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Say the refused cause in plain words: the Engine held generation closed while a settings change was in progress or during settings recovery, so every document was turned away."
         }
       ],
       "evidence": "gates/test-intent/evidence/b100-vdu-breaker-java.json",
@@ -104,13 +112,27 @@ changeset.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Over the real lifecycle, chat controller, generation tracker, reconciler, sampler, coordinator and processor with the fake llama-server: with chat off and generation held closed, three automatic passes each launch llama-server, then no further automatic pass launches it or enters picture reading, with vdu.breaker_open.refused shown and documents and retries unchanged. The same holds for the failed-vision-launch loop with vdu.breaker_open.entry_failed. A committed settings apply, a committed prepared (record-only) publish, a person's chat switch and a person's explicit pass each close the pause through the real controller, so the next automatic pass runs at once. An explicit pass while paused reads every document. A refused chat-off entry under the settings-recovery fence leaves no llama-server running.",
+      "behaviour": "Over the real lifecycle, chat controller, generation tracker, reconciler, sampler, coordinator and processor with the fake llama-server: with chat off and generation held closed, three automatic passes each launch llama-server, then no further automatic pass launches it or enters picture reading, with vdu.breaker_open.refused shown and documents and retries unchanged. The same holds for the failed-vision-launch loop with vdu.breaker_open.entry_failed. A committed settings apply, a committed prepared (record-only) publish, a person's chat switch and a person's explicit pass each close the pause through the real controller, so the next automatic pass runs at once. An explicit pass while paused reads every document. A refused chat-off entry under the settings-recovery fence leaves no llama-server running. B2 at the seam: two refused passes, a pass that completes documents, two refused passes: still running; the third refused pass since progress pauses. A pass where one document really fails (a missing file, spending its attempt) and the next is refused is progress. B3 at the seam with a skewed breaker clock: no probe before 5 minutes, one probe after; then 10, 20, 40, 60 and 60 again; status detail says 'Next try at'; a probe that completes documents ends the pause and the next pass runs without waiting. A pass interrupted by activity during the pass, and a pass whose thread is interrupted mid-pass as quit's task cancellation does, each enter picture reading but neither count nor reset.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261005-b6d536",
           "scenario": "B1",
           "quote": "3 refused passes, then no 4th entry or relaunch within the back-off; status shows the reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "B2",
+          "quote": "2 refused, 1 progressing, 2 refused: still closed.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "B3",
+          "quote": "probe after 5 min; failure reopens with 10, then 20, capped at 60; success closes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -126,6 +148,14 @@ changeset.
           "scenario": "B5",
           "quote": "an explicit pass while open runs normally.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Cases implied by the adopted scenarios, as the orchestrator listed them: a refusal mixed with a real failure counts as progress; a pass cancelled by quit or activity neither counts nor resets; an Engine restart starts closed; status never claims paused when closed."
         },
         {
           "kind": "delegated-choice",
@@ -150,6 +180,14 @@ changeset.
           "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
           "label": "agent choice",
           "choice": "Name the two pause causes vdu.breaker_open.refused and vdu.breaker_open.entry_failed, carried in the existing VDU blocked-reason field and mapped like the other VDU codes (visualDocumentUnderstanding degraded, aiFeatures composite, not retrieval)."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Put the time of the next try into the existing message field of the vdu.unavailable health condition the status handler asserts for the paused component ('Next try at HH:mm', local time). The /api/status readiness component has no message field, so no wire field is added and that gap stays named."
         }
       ],
       "evidence": "gates/test-intent/evidence/b100-vdu-breaker-java.json",
@@ -161,7 +199,71 @@ changeset.
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#preparedSettingsPublishClosesTheBreaker",
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#switchingChatOffClosesTheBreaker",
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anExplicitPassClosesTheBreaker",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anExplicitPassWhileOpenReadsTheDocuments"
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anExplicitPassWhileOpenReadsTheDocuments",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#aPassThatCompletesDocumentsResetsTheCount",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#aRefusalMixedWithARealFailureCountsAsProgress",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#activityInterruptedPassNeitherCountsNorResets",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#cancelledPassNeitherCountsNorResets"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Round-2 repair of the round-1 commit d72a8a90c, at the same seam: with chat off and generation held closed, two refused automatic passes, then an automatic pass whose VDU entry the real controller refuses for GPU pressure before launching anything (pressure reported after the sampler's check). That pass launches no llama-server, spends no attempt and does not count, so the next refused automatic pass runs; where the breaker exists, the tick after it is paused, because the no-launch refusal did not reset the count either. Fail-before is against d72a8a90c (which counted the refusal as a failed entry and paused one pass early). On bc5978095 the check passes: nothing paused automatic passes there, and the reset clause applies only where the breaker exists.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Count a failed vision entry only when the pass launched or relaunched llama-server for picture reading: the processor compares the controller's count of llama-server launch attempts before and after the entry, and a refused entry that launched nothing (a reload back-off, a load in progress, GPU or game pressure) neither counts nor resets. This applies the agreed counting rule (decision 1); the verifier found the round-1 code counted every refused entry."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Count a pass when it (re)launched llama-server for picture reading and completed no document: every attempt refused, or the vision entry failed. A loaded-chat BUSY deferral, cancellation, activity interruption or an empty pass is neutral. Progress means processed + failed > 0."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b100-vdu-breaker-no-launch-java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anEntryRefusalThatLaunchedNothingNeitherCountsNorResets"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/PausedPictureReadingConditionMessageTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Through the real status handler and lifecycle tap over a real condition store: while the Head's VDU capability shows vdu.breaker_open.refused with its pause detail, the asserted vdu.unavailable condition (subject vdu) carries that detail, including 'Next try at', in its existing message field.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Put the time of the next try into the existing message field of the vdu.unavailable health condition the status handler asserts for the paused component ('Next try at HH:mm', local time). The /api/status readiness component has no message field, so no wire field is added and that gap stays named."
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "B1",
+          "quote": "3 refused passes, then no 4th entry or relaunch within the back-off; status shows the reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b100-vdu-breaker-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/PausedPictureReadingConditionMessageTest.java#thePauseConditionSaysWhenTheNextTryIs"
       ]
     },
     {

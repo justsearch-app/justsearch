@@ -308,7 +308,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'vdu.breaker_open.refused',
     wording:
-      'Automatic picture reading is paused because the local AI model kept refusing it; it tries again later',
+      'Automatic picture reading is paused because a settings change or settings recovery kept the AI model closed; it tries again later',
     severity: 'info',
   },
   {

@@ -35,7 +35,9 @@ import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -73,6 +75,12 @@ final class AutomaticVduBreakerSeamTest {
   private AutoCloseable following;
   private ChatActuator.DrainHold closedGate;
   private VduCapabilityState capability;
+  /** Activity during a pass: the batch's own interrupt check. */
+  private final AtomicBoolean activity = new AtomicBoolean();
+  /** Interrupts the next pass's thread once, as quit's task cancellation does. */
+  private final AtomicBoolean cancelNextPass = new AtomicBoolean();
+  /** Added to System.nanoTime() for the breaker's clock, so a test can skip the back-off. */
+  private final AtomicLong breakerSkew = new AtomicLong();
 
   @BeforeEach void setUp() throws Exception {
     seam = new ManagedChatSeam(directory, 30);
@@ -113,6 +121,7 @@ final class AutomaticVduBreakerSeamTest {
     when(index.markVduProcessing(anyString(), anyInt(), any())).thenAnswer(call -> {
       String id = call.getArgument(0, String.class);
       states.put(id, "PROCESSING");
+      if (cancelNextPass.getAndSet(false)) Thread.currentThread().interrupt();
       return retries.merge(id, 1, Integer::sum) - 1;
     });
     doAnswer(call -> {
@@ -130,13 +139,13 @@ final class AutomaticVduBreakerSeamTest {
     when(gpu.snapshot()).thenReturn(VduBatchProcessorTest.gpuSnapshot(24_000_000_000L));
     capability = new VduCapabilityState();
     var batch = new VduBatchProcessor(processor, gpu, () -> index, VduMetricCatalog.noop(),
-        capability, () -> false);
-    coordinator = new OfflineCoordinator(executors, admission, batch, () -> index, capability);
+        capability, (BooleanSupplier) activity::get);
+    coordinator = coordinator(admission, batch, index);
     host = mock(KnowledgeServerBootstrap.class);
     when(host.energyState()).thenReturn(new EnergyState(EnergyState.Intent.FULL, EnergyState.Source.AC));
     when(host.msSinceLastUserActivity(anyLong())).thenReturn(IDLE + 1_000);
     when(host.bulkWork()).thenReturn(new BulkWorkGate());
-    sampler = sampler(manager.chatHolds());
+    sampler = sampler(manager.chatHolds(), () -> !manager.chatHolds().vduMayStart());
   }
 
   @AfterEach void tearDown() throws Exception {
@@ -240,6 +249,199 @@ final class AutomaticVduBreakerSeamTest {
     assertNotEquals(REFUSED, capability.snapshot().blockedReason());
   }
 
+  // b100 counting rule: a refusal of the entry that launched nothing (here GPU pressure that began
+  // after the sampler's check) neither counts nor resets. On bc5978095 nothing pauses, so the pass
+  // after it runs there too.
+  @Test void anEntryRefusalThatLaunchedNothingNeitherCountsNorResets() throws Exception {
+    switchChatOff();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTicks(2);
+    ChatHolds holds = manager.chatHolds();
+    var residency = (io.justsearch.app.inference.chat.ChatResidency) holds;
+    var racing = sampler(holds, () -> false);
+    try {
+      residency.reportPressure(io.justsearch.app.api.chat.PressureSignal.EXTERNAL_MEMORY);
+      int launches = seam.models().size();
+      int ran = passes.get();
+      racing.checkOnce();
+      awaitPass();
+      assertEquals(ran + 1, passes.get(), "the automatic pass started and was refused at entry");
+      assertEquals(launches, seam.models().size(), "the refused entry launched nothing");
+    } finally {
+      residency.reportPressure(io.justsearch.app.api.chat.PressureSignal.NONE);
+      racing.stop();
+    }
+    refusedTick("the refusal that launched nothing did not count: this automatic pass runs");
+    if (breakerPresent()) {
+      assertPaused("and it did not reset: this was the third counted pass in a row");
+    }
+    assertTrue(retries.values().stream().allMatch(count -> count == 0), "no attempt spent: " + retries);
+  }
+
+  // B2 at the seam: two refused passes, one that completes documents, two refused: still running;
+  // the third refused pass since the progress pauses.
+  @Test void aPassThatCompletesDocumentsResetsTheCount() throws Exception {
+    switchChatOff();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTicks(2);
+    closedGate.close();
+    closedGate = null;
+    int read = acknowledged.get();
+    tick();
+    assertTrue(acknowledged.get() > read, "the progressing pass completed documents");
+    resetDocuments();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTicks(2);
+    refusedTick("the count restarted at the progressing pass, so this pass runs");
+    assertPaused("the third refused pass in a row since progress pauses automatic passes");
+    assertEquals(REFUSED, capability.snapshot().blockedReason());
+  }
+
+  // A refusal mixed with a real failure in one pass is progress: the failed document spends its
+  // attempt, so the count resets.
+  @Test void aRefusalMixedWithARealFailureCountsAsProgress() throws Exception {
+    switchChatOff();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTicks(2);
+    String missing = directory.resolve("missing.png").toString();
+    states.put(missing, "PENDING");
+    retries.put(missing, 0);
+    documents.add(0, missing);
+    refusedTick("the mixed pass runs");
+    assertEquals(1, retries.get(missing), "the missing document really failed and spent an attempt");
+    assertNotEquals("PENDING", states.get(missing), "the failed document left the backlog");
+    refusedTicks(2);
+    refusedTick("the mixed pass reset the count, so this pass runs");
+    assertPaused("the third refused pass in a row since the mixed pass pauses automatic passes");
+  }
+
+  // B3 at the seam: the probe after 5 minutes, then 10, 20, 40 and at most 60; progress closes.
+  @Test @Timeout(300) void halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress()
+      throws Exception {
+    switchChatOff();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTicks(3);
+    assertPaused("three refused passes pause automatic passes");
+    String detail = detail();
+    assertNotNull(detail, "status keeps the pause's detail");
+    assertTrue(detail.contains("Next try at "), "status says when the next try is: " + detail);
+    for (long minutes : new long[] {5, 10, 20, 40, 60, 60}) {
+      breakerSkew.addAndGet(TimeUnit.MINUTES.toNanos(minutes) - TimeUnit.SECONDS.toNanos(60));
+      assertPaused("no probe before the " + minutes + " min back-off ends");
+      breakerSkew.addAndGet(TimeUnit.SECONDS.toNanos(60));
+      refusedTick("one probe pass after " + minutes + " min");
+      assertEquals(REFUSED, capability.snapshot().blockedReason(), "a refused probe pauses again");
+    }
+    breakerSkew.addAndGet(TimeUnit.MINUTES.toNanos(60));
+    closedGate.close();
+    closedGate = null;
+    int read = acknowledged.get();
+    tick();
+    assertTrue(acknowledged.get() > read, "the probe completed documents");
+    assertNotEquals(REFUSED, capability.snapshot().blockedReason(), "progress ends the pause");
+    resetDocuments();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTick("after progress automatic passes run without waiting");
+  }
+
+  // A pass interrupted by activity entered picture reading but neither counts nor resets.
+  @Test void activityInterruptedPassNeitherCountsNorResets() throws Exception {
+    switchChatOff();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTicks(2);
+    activity.set(true);
+    try {
+      refusedTick("the interrupted pass enters");
+    } finally {
+      activity.set(false);
+    }
+    refusedTick("the interrupted pass did not count: this is only the third refused pass");
+    assertPaused("and it did not reset: three refused passes in a row pause automatic passes");
+    assertEquals(REFUSED, capability.snapshot().blockedReason());
+  }
+
+  // A pass cancelled the way quit cancels it (its thread interrupted mid-pass) neither counts nor
+  // resets.
+  @Test void cancelledPassNeitherCountsNorResets() throws Exception {
+    switchChatOff();
+    closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
+    refusedTicks(2);
+    cancelNextPass.set(true);
+    refusedTick("the cancelled pass enters");
+    assertFalse(cancelNextPass.get(), "the pass was cancelled at its first document");
+    resetDocuments();
+    refusedTick("the cancelled pass did not count: this is only the third refused pass");
+    assertPaused("and it did not reset: three refused passes in a row pause automatic passes");
+    assertEquals(REFUSED, capability.snapshot().blockedReason());
+  }
+
+  private void tick() throws Exception {
+    sampler.checkOnce();
+    awaitPass();
+  }
+
+  private void refusedTicks(int count) throws Exception {
+    for (int i = 1; i <= count; i++) refusedTick("automatic pass " + i + " runs");
+  }
+
+  /** One automatic pass that runs and launches llama-server. */
+  private void refusedTick(String why) throws Exception {
+    int launches = seam.models().size();
+    int ran = passes.get();
+    tick();
+    assertEquals(ran + 1, passes.get(), why);
+    assertTrue(seam.models().size() > launches, why + ": it launches llama-server");
+  }
+
+  /** One tick that starts no automatic pass and launches nothing. */
+  private void assertPaused(String why) throws Exception {
+    int launches = seam.models().size();
+    int ran = passes.get();
+    tick();
+    assertEquals(ran, passes.get(), why + ": no automatic pass enters picture reading");
+    assertEquals(launches, seam.models().size(), why + ": llama-server is not relaunched");
+  }
+
+  private void resetDocuments() {
+    for (String id : documents) {
+      states.put(id, "PENDING");
+      retries.put(id, 0);
+    }
+  }
+
+  private static boolean breakerPresent() {
+    try {
+      OfflineCoordinator.class.getMethod("automaticBreaker");
+      return true;
+    } catch (NoSuchMethodException beforeBreaker) {
+      return false;
+    }
+  }
+
+  /** The pause detail the Head keeps, or null where the capability snapshot has none. */
+  private String detail() throws Exception {
+    Object snapshot = capability.snapshot();
+    try {
+      return (String) snapshot.getClass().getMethod("detail").invoke(snapshot);
+    } catch (NoSuchMethodException beforeBreaker) {
+      return null;
+    }
+  }
+
+  private OfflineCoordinator coordinator(io.justsearch.app.engine.EngineAdmissionController admission,
+      VduBatchProcessor batch, KnowledgeClient index) throws Exception {
+    Supplier<KnowledgeClient> clients = () -> index;
+    try {
+      return OfflineCoordinator.class.getConstructor(EngineExecutorRegistry.class,
+              io.justsearch.app.api.EngineAdmissionService.class, VduBatchProcessor.class,
+              Supplier.class, VduCapabilityState.class, java.util.function.LongSupplier.class)
+          .newInstance(executors, admission, batch, clients, capability,
+              (java.util.function.LongSupplier) () -> System.nanoTime() + breakerSkew.get());
+    } catch (NoSuchMethodException beforeBreaker) {
+      return new OfflineCoordinator(executors, admission, batch, clients, capability);
+    }
+  }
+
   private void openRefused() throws Exception {
     switchChatOff();
     closedGate = ((GenerationTracker) manager.generationActivity()).closeNow();
@@ -312,10 +514,9 @@ final class AutomaticVduBreakerSeamTest {
     field.setLong(activity, System.nanoTime() - TimeUnit.MILLISECONDS.toNanos(IDLE + 1_000));
   }
 
-  private VduOfflineTriggerSampler sampler(ChatHolds holds) throws Exception {
+  private VduOfflineTriggerSampler sampler(ChatHolds holds, BooleanSupplier claimed) throws Exception {
     Supplier<OfflineCoordinator> coordinators = () -> coordinator;
     Supplier<KnowledgeServerBootstrap> hosts = () -> host;
-    BooleanSupplier claimed = () -> !holds.vduMayStart();
     var clocked = VduOfflineTriggerSampler.class.getDeclaredConstructor(EngineExecutorRegistry.class,
         Supplier.class, Supplier.class, BooleanSupplier.class, Supplier.class,
         java.util.function.LongSupplier.class);

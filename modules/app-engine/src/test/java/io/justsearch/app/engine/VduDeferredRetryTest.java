@@ -220,7 +220,7 @@ final class VduDeferredRetryTest {
 
   private OfflineCoordinator coordinator(EngineAdmissionController admission, VduBatchProcessor batch,
       VduCapabilityState capability) throws Exception {
-    java.util.function.Supplier<io.justsearch.app.services.worker.KnowledgeClient> clients = () -> client;
+    java.util.function.Supplier<KnowledgeClient> clients = () -> client;
     try {
       return OfflineCoordinator.class.getConstructor(io.justsearch.core.execution.EngineExecutorRegistry.class,
               io.justsearch.app.api.EngineAdmissionService.class, VduBatchProcessor.class,

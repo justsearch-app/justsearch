@@ -119,4 +119,12 @@ public interface ChatHolds {
     Objects.requireNonNull(listener, "listener");
     return () -> {};
   }
+
+  /**
+   * Attempts so far to launch a managed llama-server process, or {@code -1} when unknown. A VDU
+   * entry compares two readings to tell whether it launched or relaunched the server.
+   */
+  default long serverLaunches() {
+    return -1;
+  }
 }

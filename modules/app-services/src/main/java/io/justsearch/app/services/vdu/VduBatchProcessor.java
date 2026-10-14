@@ -338,14 +338,16 @@ public class VduBatchProcessor {
     static final String ENTRY_FAILURE_MESSAGE = "Failed to enter VDU mode";
 
     /**
-     * Whether {@code failure} is the one a pass ends with when entering VDU mode failed (the chat
-     * controller refused or the vision launch failed), as opposed to a failure after entry. The
-     * automatic-pass breaker counts failed entries.
+     * Whether {@code failure} is the one a pass ends with when entering VDU mode failed after
+     * launching or relaunching llama-server for it (the chat controller refused after a launch, or
+     * the vision launch failed), as opposed to a failure after entry or a refusal that launched
+     * nothing. The automatic-pass breaker counts these failed entries.
      */
     static boolean isEntryFailure(Throwable failure) {
         return failure != null && failure.getClass() == IllegalStateException.class
             && ENTRY_FAILURE_MESSAGE.equals(failure.getMessage())
-            && failure.getCause() instanceof VduProcessor.VduException;
+            && failure.getCause() instanceof VduProcessor.VduException
+            && !(failure.getCause() instanceof VduProcessor.EntryRefusedWithoutLaunch);
     }
 
     private static String rootMessage(Throwable failure) {

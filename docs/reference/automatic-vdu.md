@@ -48,10 +48,12 @@ one-attempt rule apply to borrowing loaded chat.
 An automatic pass counts against picture reading when it launched or relaunched llama-server for
 picture reading and completed no document. There are two causes, reported apart:
 
-- every document attempt was refused by generation (for example generation is held closed by a
-  settings drain or the settings-recovery fence): `vdu.breaker_open.refused`;
-- the vision entry itself failed (for example the server refuses its vision configuration):
-  `vdu.breaker_open.entry_failed`.
+- every document was turned away because the Engine held generation closed while a settings
+  change was in progress or during settings recovery: `vdu.breaker_open.refused`;
+- the vision entry itself failed after the pass launched or relaunched llama-server (for example
+  the server refuses its vision configuration): `vdu.breaker_open.entry_failed`. A refusal of the
+  entry that launched nothing (a reload back-off, a load in progress, GPU pressure) neither counts
+  nor resets.
 
 A pass that completes or fails at least one document resets the count; a refusal mixed with a real
 failure therefore counts as progress. A pass cancelled by quit or interrupted by activity, a loaded
@@ -60,8 +62,10 @@ chat BUSY deferral (no launch attempt) and a pass with nothing to do neither cou
 After three counted passes in a row automatic picture reading pauses. While paused no automatic
 pass enters picture-reading mode, so llama-server is not relaunched for vision. Document states and
 retry counts are unchanged and refusals still spend no attempt. Status shows the reason code above
-in the existing VDU blocked-reason field; the Head's capability snapshot also keeps the refusal or
-entry failure the passes saw (the wire status carries the code only).
+in the existing VDU blocked-reason field. The `/api/status` readiness component has no message
+field, so the time of the next try is not in it. The `vdu.unavailable` health condition asserted
+from that component carries it in its existing `message` field, for example "Next try at 14:05",
+together with the refusal or entry failure the passes saw.
 
 After a pause of 5 minutes one automatic pass may try (a half-open probe). If it makes progress the
 pause ends and the next pause starts again at 5 minutes; if it counts again the pause doubles: 10,

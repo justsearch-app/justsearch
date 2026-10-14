@@ -424,14 +424,27 @@ public final class LifecycleSnapshotTap {
    * returns. Idempotent — re-calling with the same envelope produces no broadcasts.
    */
   public synchronized void accept(ReadinessEnvelopeView envelope) {
+    accept(envelope, reasonCode -> Optional.empty());
+  }
+
+  /**
+   * As {@link #accept(ReadinessEnvelopeView)}, with the person-readable message an asserted
+   * condition carries for a component's reason code (b100: when paused automatic picture reading
+   * tries again). The message is the condition's existing {@code message} field.
+   */
+  public synchronized void accept(
+      ReadinessEnvelopeView envelope,
+      java.util.function.Function<String, Optional<String>> messageForReason) {
     Objects.requireNonNull(envelope, "envelope");
+    Objects.requireNonNull(messageForReason, "messageForReason");
     for (ReadinessDimension dim : ReadinessDimension.values()) {
       ReadinessComponentView component = envelope.components().get(dim.key());
-      reconcileDim(dim, component);
+      reconcileDim(dim, component, messageForReason);
     }
   }
 
-  private void reconcileDim(ReadinessDimension dim, ReadinessComponentView component) {
+  private void reconcileDim(ReadinessDimension dim, ReadinessComponentView component,
+      java.util.function.Function<String, Optional<String>> messageForReason) {
     boolean healthy = isHealthy(component);
     ConditionMapping target = healthy ? null : lookupMapping(dim, component);
     boolean unmappedUnhealthy = !healthy && target == null;
@@ -456,7 +469,9 @@ public final class LifecycleSnapshotTap {
 
     // Step 2: assert the new condition (if any).
     if (target != null) {
-      assertCondition(dim, component, target);
+      Optional<String> message = component.reasonCode() == null
+          ? Optional.empty() : messageForReason.apply(component.reasonCode());
+      assertCondition(dim, component, target, message == null ? Optional.empty() : message);
     } else {
       activeConditionPerDim.remove(dim);
     }
@@ -504,14 +519,15 @@ public final class LifecycleSnapshotTap {
   }
 
   private void assertCondition(
-      ReadinessDimension dim, ReadinessComponentView component, ConditionMapping target) {
+      ReadinessDimension dim, ReadinessComponentView component, ConditionMapping target,
+      Optional<String> message) {
     AssertedCondition body =
         new AssertedCondition(
             target.subject(),
             ConditionStatus.TRUE, // k8s: status TRUE means "the named condition holds"
             toPascalReason(component.reasonCode()),
             clock.instant(),
-            Optional.empty(),
+            message,
             target.recovery(), // 442 §B.9 + 447-impl-B: now carries OperationInvocation when mapping declared one
             target.relatedMetrics()); // slice 3a.1.4 Phase 6 — backend-declared metric correlation
     HealthEvent event =

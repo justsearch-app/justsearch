@@ -190,6 +190,13 @@ final class LlamaServerOps {
       new AtomicLong();
 
   /**
+   * b100: counts this Engine's attempts to launch a managed llama-server process (an adopted
+   * external server is no launch). The automatic picture-reading breaker counts a failed entry only
+   * when the pass launched or relaunched the server.
+   */
+  private final AtomicLong launchAttempts = new AtomicLong();
+
+  /**
    * T6/T27: the rung a RESOURCE step-down reached, for the configuration it was reached under. A
    * later automatic launch of the same declared configuration starts there for the rest of this
    * Engine's life instead of failing at the top rung again.
@@ -479,6 +486,11 @@ final class LlamaServerOps {
 
   // ==================== Process Lifecycle ====================
 
+  /** Attempts so far to launch a managed llama-server process, for any reason. */
+  long launchAttempts() {
+    return launchAttempts.get();
+  }
+
   StartResult startLlamaServer(StartRequest request)
       throws IOException, ModeTransitionException {
     Objects.requireNonNull(request, "request");
@@ -505,6 +517,7 @@ final class LlamaServerOps {
     if (external != null) return external;
 
     usingExternal = false;
+    launchAttempts.incrementAndGet();
 
     // Tempdoc 883 decision 1: the context window is a DERIVED resource, not a stored preference.
     // The rung comes from the ladder for this backend (or an operator's explicit value, as a

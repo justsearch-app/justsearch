@@ -188,6 +188,7 @@ public class VduProcessor {
     /** A non-null checkpoint selects the controller's idle-only automatic loaded-chat hold. */
     public void enterVduMode(java.util.function.BooleanSupplier automaticEligibility) throws VduException {
         if (chatHolds != null) {
+            long launchesBefore = chatHolds.serverLaunches();
             try {
                 VduHold hold = automaticEligibility == null ? chatHolds.holdVdu("vdu-batch")
                     : chatHolds.holdAutomaticVdu("automatic-vdu",
@@ -199,9 +200,13 @@ public class VduProcessor {
                         null);
                 }
             } catch (ChatRefusal refused) {
-                throw new VduException(
-                    "Failed to enter VDU mode: the chat server refused (" + refused.reason() + ")",
-                    refused);
+                String message =
+                    "Failed to enter VDU mode: the chat server refused (" + refused.reason() + ")";
+                long launchesAfter = chatHolds.serverLaunches();
+                if (launchesBefore >= 0 && launchesAfter == launchesBefore) {
+                    throw new EntryRefusedWithoutLaunch(message, refused);
+                }
+                throw new VduException(message, refused);
             }
             return;
         }
@@ -670,6 +675,17 @@ public class VduProcessor {
     /** VDU-specific exception for better error handling. */
     public static class VduException extends Exception {
         public VduException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /**
+     * The chat controller refused VDU entry before launching or relaunching llama-server (a reload
+     * back-off, a load in progress, GPU pressure and the like). The automatic-pass breaker does not
+     * count it: nothing was launched for picture reading.
+     */
+    public static final class EntryRefusedWithoutLaunch extends VduException {
+        public EntryRefusedWithoutLaunch(String message, ChatRefusal cause) {
             super(message, cause);
         }
     }

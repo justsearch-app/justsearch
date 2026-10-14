@@ -1397,6 +1397,11 @@ public class InferenceLifecycleManager
     }
 
     @Override
+    public long serverLaunches() {
+      return serverOps.launchAttempts();
+    }
+
+    @Override
     public boolean gpuChat() {
       try {
         if (configuredStartRequest().effectiveGpuLayers() <= 0) return false;
