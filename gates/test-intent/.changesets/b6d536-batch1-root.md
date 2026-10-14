@@ -9,6 +9,8 @@ author-session: b40-batch1-root-20261009-builder
 
 The orchestrator's b40 root-repair brief (agent wording under the owner's end-to-end delegation, cited below as delegated choices) requested current-state Health projection and declared chunk completeness without splitting unchanged content. Existing Health wire bodies and recovery occurrences remain the contract. Parent declarations reuse chunk_total and chunk_parent_content_sha256, preserving the physical catalog and its index fingerprint. Older parents take the old completeness check once per parent in a runtime and bypass unchanged admission until a successful rewrite installs the declaration; a failed rewrite remains eligible for another attempt. No acceptance record is supplied by the builder. Live verification belongs to the separate verifier.
 
+Evidence for b6d536-batch1-root.json was regenerated on b599d4d7e (phase B). CapabilityHealthBridgeCurrentStateTest now builds HealthEventChangeRegistry with an ExecutorService, which 04368bfca lacks, so it did not compile there. The compat before-patch gates/test-intent/evidence/b6d536-batch1-root-compat.patch adds only that constructor. It ignores the executor and calls the existing no-argument constructor, and no production code in that state calls it. With it, the check fails before by assertion.
+
 ```json
 {
   "entries": [

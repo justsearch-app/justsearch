@@ -9,6 +9,8 @@ author-session: b65-batch-observer-owner
 
 Independent verifier acceptance remains pending. The private execution adapter changes only process identity guarding, private build paths, dependencies and junction-safe cleanup; repository governance tooling and test assertions are unchanged.
 
+Evidence for b6d536-b65-observer-owner.json was regenerated on b599d4d7e (phase B). The current checks build HealthEventChangeRegistry with an ExecutorService, which 8eb24a870 lacks, so they did not compile there. The compat before-patch gates/test-intent/evidence/b6d536-b65-observer-owner-compat.patch adds only that constructor. It ignores the executor and calls the existing no-argument constructor, so delivery stays the before-state's own, and no production code in that state calls it. With it, all eight checks fail before by assertion.
+
 ```json
 {
   "entries": [
