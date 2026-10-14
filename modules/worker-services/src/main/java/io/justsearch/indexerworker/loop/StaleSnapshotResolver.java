@@ -142,7 +142,36 @@ public final class StaleSnapshotResolver {
       String collection,
       ValidatedExtractionArtifact artifact,
       String timing,
-      FileFreshnessSnapshot.SourceValidationResult validation, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
+      FileFreshnessSnapshot.SourceValidationResult observed, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
+    FileFreshnessSnapshot.SourceValidationResult validation = observed;
+    if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED
+        || validation == FileFreshnessSnapshot.SourceValidationResult.UNREADABLE) {
+      // Task t-20261013-ef3c41: "could not observe it" is never a deletion. Only a confirmed
+      // absence (not found while its root is present) removes the document; a source that cannot
+      // be read keeps its content and is retried with growing back-off; a source that came back
+      // between the two looks is simply re-processed.
+      SourcePresence.Verdict verdict =
+          ingestionAuthority.presence(filePath, claim == null ? null : claim.ingestionRoot());
+      if (verdict == SourcePresence.Verdict.ABSENT) {
+        validation = FileFreshnessSnapshot.SourceValidationResult.DELETED;
+      } else if (verdict == SourcePresence.Verdict.PRESENT
+          && validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
+        validation = FileFreshnessSnapshot.SourceValidationResult.FILE_KEY_CHANGED;
+      } else {
+        IngestionOutcome kept = ingestionAuthority.notConfirmedAbsent(verdict, filePath, null);
+        journal.recordOutcomeSafely(
+            filePath,
+            "STALE_UNCONFIRMED_KEPT",
+            () ->
+                jobQueue.markClaimFailed(
+                    claim,
+                    kept,
+                    LedgerEntryFactory.forEnvelope(
+                        envelope, collection, artifact, contentExtractor.extractionPolicy(),
+                        provenance)));
+        return true;
+      }
+    }
     IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(validation, timing);
     if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
       indexedDelta.accept(staleSourceHandler.deleteMissingSource(filePath));

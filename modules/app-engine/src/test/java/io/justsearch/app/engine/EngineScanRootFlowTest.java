@@ -86,6 +86,7 @@ final class EngineScanRootFlowTest {
             300_000L,
             5_000);
     KnowledgeClient client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+    EngineTestHarness.addRootAsThePerson(root, corpus);
 
     CancelToken token = new CancelToken();
     List<ScanRootProgress> events = new CopyOnWriteArrayList<>();

@@ -144,6 +144,22 @@ public final class KnowledgeServer implements Closeable {
   private List<RootBinding> bootRootBindings = List.of();
   private boolean bootRootBindingsBound;
   private volatile String rootReconciliationSettledGeneration;
+  /**
+   * Task t-20261013-ef3c41, round 7 (S8): the roots the committed boot deferred because the folder
+   * at their path was not on the volume recorded for them, and the generation they were deferred
+   * for. While any is left, the previous generation is kept and nothing settles this generation's
+   * root reconciliation; the deferred-root check reconciles each once its volume is back.
+   */
+  private volatile List<RootBinding> deferredBootRoots = List.of();
+  private volatile String deferredBootRootsGeneration;
+  /**
+   * Round 8 (S8): the Worker's root-removal count taken before the boot reconciled its roots; a
+   * deferred root the person removed after it is dropped from the deferred set, never reconciled.
+   */
+  private volatile long deferredBootRootsRemovalMark;
+  /** Deferred roots reconciled on the running server that still await convergence. */
+  private final Set<RootBinding> reconciledDeferredBootRoots =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
   private WorkerAppServices pendingAppServices;
@@ -333,6 +349,9 @@ public final class KnowledgeServer implements Closeable {
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
   private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
+  /** How often a root the committed boot deferred is checked for its recorded volume (round 7). */
+  private static final long DEFERRED_BOOT_ROOT_CHECK_MS = 10_000L;
+  private volatile java.util.concurrent.ScheduledFuture<?> deferredBootRootTask;
   private java.util.concurrent.ExecutorService deferredModelExecutor;
   // Tempdoc 419 / T5.1 (ADR-0028): scoped reverse-lookup store. Constructed in init() against
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
@@ -408,8 +427,22 @@ public final class KnowledgeServer implements Closeable {
    *
    * <p>The durable form of this state is {@code auto_rebuild_*} in {@code state.json}; this field is
    * only the in-process consequence for the remainder of {@code start()}.
+   *
+   * <p>Task t-20261013-ef3c41: also set when that brake could not be read at all. A brake that
+   * cannot be read holds exactly like a spent one. Round 3: set by every automatic rebuild the brake
+   * stopped (schema mismatch, embedding-model change, rebuild of a recovered-to-empty index,
+   * backup-first rebuild), never cleared within the boot; {@link #bootRebuildHold} says which
+   * answer held it.
    */
   private volatile boolean rebuildBrakeExhausted;
+
+  /**
+   * The brake answer that stopped an automatic rebuild in this boot, or {@code null} when none did
+   * (task t-20261013-ef3c41, round 3). The status reports it for the whole boot: ingestion stays
+   * stopped until the Worker restarts, so the status must not turn back to "compatible" because
+   * {@code state.json} later reads differently.
+   */
+  private volatile IndexGenerationManager.AutoRebuildBrake bootRebuildHold;
 
   /**
    * Whether this boot took the exhausted-brake path. A test seam, and a necessary one: every
@@ -1408,11 +1441,21 @@ public final class KnowledgeServer implements Closeable {
         if (preOpenMismatch && policyHandledInCatch) {
           throw IndexMetadataParityGuard.schemaMismatch();
         }
+        // Task t-20261013-ef3c41, round 3: the backup-first policy replaces the mismatched index
+        // inside the writable open below, so the brake is asked BEFORE that open. Held, the index
+        // is opened read-only instead and nothing is backed up or replaced.
+        IndexGenerationManager.AutoRebuildBrake backupFirstBrake =
+            preOpenMismatch && "rebuild_backup_first".equalsIgnoreCase(policy)
+                ? consultAutoRebuildBrake(genManager, "the backup-first rebuild of a mismatched index")
+                : IndexGenerationManager.AutoRebuildBrake.RELEASED;
+        if (backupFirstBrake.holds()) {
+          holdAutomaticRebuild(buildReadOnlyRuntime(activeIndexPath).openReadOnly(), backupFirstBrake);
+        }
         // A committed successor must reconcile durable watched roots before publication. Keep
         // its writer on the synchronous boot path so no read-only deferred view escapes first.
         boolean useDeferredWriter = hasLuceneSegments(activeIndexPath) && !preOpenMismatch
             && !committedPredecessorAtBoot;
-        {
+        if (!backupFirstBrake.holds()) {
           LuceneRuntimeBuilder builder =
               buildIndexRuntime(activeIndexPath)
                   .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE);
@@ -1423,7 +1466,21 @@ public final class KnowledgeServer implements Closeable {
           // tempdoc 628 Stage B (G3): if the adapter recovered this index to empty on open it dropped
           // a rebuild-pending marker. Rebuild from the source files still on disk (blue/green) rather
           // than serving a silently-empty index — unless policy is BACKUP_ONLY/FAIL_CLOSED.
+          IndexGenerationManager.AutoRebuildBrake recoveryBrake =
+              IndexGenerationManager.AutoRebuildBrake.RELEASED;
           if (IndexRecoveryMarker.exists(activeIndexPath)
+              && IndexRecoveryPolicy.shouldRebuildFromSource(rc.index())) {
+            // Task t-20261013-ef3c41, round 3: an automatic rebuild like any other, so it asks
+            // the brake first. Held, the recovered index serves read-only and the marker stays:
+            // the rebuild is still owed, and a person's rebuild provides it.
+            recoveryBrake = consultAutoRebuildBrake(
+                genManager, "the rebuild from source of an index recovered to empty");
+            if (recoveryBrake.holds()) {
+              holdAutomaticRebuildAfterWritableOpen(recoveryBrake);
+            }
+          }
+          if (recoveryBrake == IndexGenerationManager.AutoRebuildBrake.RELEASED
+              && IndexRecoveryMarker.exists(activeIndexPath)
               && IndexRecoveryPolicy.shouldRebuildFromSource(rc.index())) {
             log.warn(
                 "Index at {} was recovered to empty (reason={}). Rebuilding from source via blue/green...",
@@ -1468,13 +1525,21 @@ public final class KnowledgeServer implements Closeable {
           Map<String, String> commitMeta =
               this.ingestLifecycle.latestCommitUserDataBestEffort();
           String storedFp = commitMeta.get("embedding_model_sha256");
-          if (buildingIndexPath == null
+          if (buildingIndexPath == null && !rebuildBrakeExhausted
               && "blue_green_migrate".equalsIgnoreCase(schemaMismatchPolicy)) {
             if (storedFp != null && !storedFp.isBlank()) {
               java.util.Optional<String> currentFp = initialModelSelection == null
                   ? EmbeddingFingerprint.get()
                   : initialModelSelection.availableFingerprint("embedding");
-              if (currentFp.isPresent() && !storedFp.equals(currentFp.get())) {
+              // Task t-20261013-ef3c41, round 3: the re-embed is an automatic rebuild, so the brake
+              // is asked before it starts; held, the index serves read-only and ingestion stops.
+              IndexGenerationManager.AutoRebuildBrake reembedBrake =
+                  currentFp.isPresent() && !storedFp.equals(currentFp.get())
+                      ? consultAutoRebuildBrake(genManager, "the embedding-model-change re-embed")
+                      : IndexGenerationManager.AutoRebuildBrake.RELEASED;
+              if (reembedBrake.holds()) {
+                holdAutomaticRebuildAfterWritableOpen(reembedBrake);
+              } else if (currentFp.isPresent() && !storedFp.equals(currentFp.get())) {
                 log.warn(
                     "Embedding model fingerprint mismatch on active generation {}. "
                         + "Stored: {}..., Current: {}... Starting Blue/Green migration...",
@@ -1537,12 +1602,35 @@ public final class KnowledgeServer implements Closeable {
               this.buildingIndexPath = null;
             }
             String targetFingerprint = expectedIndexFingerprintOrNull();
-            int attempt = recordAutoRebuildAttemptOrSkip(genManager, targetFingerprint);
+            // Task t-20261013-ef3c41: a brake that cannot be read holds like a spent one. Without
+            // this the failed read either killed start() or, with the record re-initialized, read
+            // as a fresh budget and started a rebuild.
+            boolean brakeUnreadable = false;
+            IndexGenerationManager.AutoRebuildBrake unreadableKind = null;
+            int attempt = 0;
+            try {
+              attempt = recordAutoRebuildAttemptOrSkip(genManager, targetFingerprint);
+            } catch (IndexGenerationManager.AutoRebuildBrakeUnreadableException unreadable) {
+              brakeUnreadable = true;
+              unreadableKind = unreadable.kind();
+              log.error(
+                  "Schema mismatch on active generation {}, but the automatic-rebuild brake cannot"
+                      + " be read ({}). Serving the existing index read-only and NOT rebuilding:"
+                      + " a brake that cannot be read is treated as spent. Status reports"
+                      + " index.rebuild_brake_unreadable. RECOVERY: run Rebuild index from the UI"
+                      + " (core.rebuild-index).",
+                  activeIndexPath,
+                  unreadable.getMessage());
+            }
             LuceneRuntime blue =
                 blueReadOnly != null
                     ? blueReadOnly
                     : buildReadOnlyRuntime(activeIndexPath).openReadOnly();
-            if (attempt > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS) {
+            if (brakeUnreadable) {
+              // The same held state as a spent budget: ingestion stops, search serves read-only,
+              // and the operator's rebuild is the way forward.
+              holdAutomaticRebuild(blue, unreadableKind);
+            } else if (attempt > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS) {
               // Do NOT rethrow. Rethrowing fails start(), which is the same dead-end the old
               // FAIL_CLOSED default produced, three boots later and with no explanation. Open the
               // existing index read-only instead: search keeps working on what is already there,
@@ -1560,10 +1648,7 @@ public final class KnowledgeServer implements Closeable {
                   activeIndexPath,
                   IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS,
                   e);
-              this.searchLifecycle = blue;
-              publishIngestLifecycle(this.searchLifecycle);
-              this.buildingIndexPath = null;
-              this.rebuildBrakeExhausted = true;
+              holdAutomaticRebuild(blue, IndexGenerationManager.AutoRebuildBrake.EXHAUSTED);
             } else {
               // Auto-start Blue/Green migration on schema mismatch when enabled.
               log.warn(
@@ -1680,6 +1765,7 @@ public final class KnowledgeServer implements Closeable {
       // supplier + embedding telemetry at ctor time (last 2 setters eliminated).
       appServices = newAppServices();
       wireAppServicesPostConstruction(appServices);
+      seedRootVolumesAfterUpgrade();
 
       // 3.6 Embedding compatibility — MUST resolve BEFORE anything can commit (tempdoc 819 A).
       // This used to live in initDeferredModels() (async, behind multi-second ONNX composition),
@@ -3254,6 +3340,7 @@ public final class KnowledgeServer implements Closeable {
     svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
     svc.ingestService().setExpectedCommitMetadataSupplier(this::servingExpectedCommitMetadata);
+    svc.ingestService().setBootRebuildHoldSupplier(() -> bootRebuildHold);
     svc.ingestService().setIndexTargetMetadataSupplier(
         () -> configuredTargetCommitMetadata(ConfigStore.global().get()));
 
@@ -5947,21 +6034,88 @@ public final class KnowledgeServer implements Closeable {
    * schema-mismatch catch would replace the real, actionable mismatch with an unrelated IO failure.
    */
   /**
-   * Charges one rebuild attempt to {@code targetFingerprint}, or charges nothing when there is no
-   * target to charge it to.
+   * Charges one rebuild attempt to {@code targetFingerprint}, or charges nothing and holds when
+   * there is no target to charge it to.
    *
    * <p>An uncomputable fingerprint is not a target. Folding those boots into a shared bucket (the
    * literal string {@code "null"}, which is what {@code String.valueOf} produces) would let three
    * boots with an unreadable model file exhaust the budget for a completely unrelated real shape,
    * so the index that genuinely needed a rebuild would never get one. Package-private so the
    * distinction is testable without a running Worker.
+   *
+   * <p>Task t-20261013-ef3c41, round 3: such a boot used to answer "attempt 1" and rebuild without
+   * consulting the brake at all, so a rebuild that failed every time ran on every boot, unbounded.
+   * A rebuild whose budget cannot be consulted is held instead, as any brake that cannot be read
+   * is ({@link IndexGenerationManager.AutoRebuildBrake#TARGET_UNKNOWN}); still nothing is charged.
    */
   static int recordAutoRebuildAttemptOrSkip(
       IndexGenerationManager genManager, String targetFingerprint) throws IOException {
     if (targetFingerprint == null) {
-      return 1;
+      throw new IndexGenerationManager.AutoRebuildBrakeUnreadableException(
+          "The automatic-rebuild brake cannot be consulted: the rebuild's target index"
+              + " fingerprint cannot be computed",
+          IndexGenerationManager.AutoRebuildBrake.TARGET_UNKNOWN);
     }
     return genManager.recordAutoRebuildAttempt(targetFingerprint);
+  }
+
+  /**
+   * Asks the repeat-rebuild brake whether the automatic {@code rebuild} may start toward the shape
+   * this runtime writes (task t-20261013-ef3c41, round 3). {@code RELEASED} means it may, and its
+   * attempt has been recorded; any other answer means it must not, and has been logged.
+   */
+  private IndexGenerationManager.AutoRebuildBrake consultAutoRebuildBrake(
+      IndexGenerationManager genManager, String rebuild) throws IOException {
+    int attempt;
+    try {
+      attempt = recordAutoRebuildAttemptOrSkip(genManager, expectedIndexFingerprintOrNull());
+    } catch (IndexGenerationManager.AutoRebuildBrakeUnreadableException unreadable) {
+      log.error(
+          "{} would start now, but the automatic-rebuild brake cannot be consulted ({}). Serving"
+              + " the existing index read-only and NOT rebuilding: a brake that cannot be read is"
+              + " treated as spent. Status reports index.rebuild_brake_unreadable. RECOVERY: run"
+              + " Rebuild index from the UI (core.rebuild-index).",
+          rebuild,
+          unreadable.getMessage());
+      return unreadable.kind();
+    }
+    if (attempt > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS) {
+      log.error(
+          "{} would start now, but {} automatic rebuilds toward the same target fingerprint have"
+              + " already been attempted. Serving the existing index read-only and STOPPING"
+              + " ingestion. Status reports index.rebuild_brake_exhausted. RECOVERY: run Rebuild"
+              + " index from the UI (core.rebuild-index).",
+          rebuild,
+          IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS);
+      return IndexGenerationManager.AutoRebuildBrake.EXHAUSTED;
+    }
+    log.info("Starting {} (automatic attempt {} of {})", rebuild, attempt,
+        IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS);
+    return IndexGenerationManager.AutoRebuildBrake.RELEASED;
+  }
+
+  /**
+   * The held state: {@code readOnly} serves search, nothing is built, ingestion stays stopped for
+   * the rest of the boot, and the status names {@code brake}.
+   */
+  private void holdAutomaticRebuild(
+      LuceneRuntime readOnly, IndexGenerationManager.AutoRebuildBrake brake) {
+    this.searchLifecycle = readOnly;
+    publishIngestLifecycle(readOnly);
+    this.buildingIndexPath = null;
+    this.bootRebuildHold = brake;
+    this.rebuildBrakeExhausted = true;
+  }
+
+  /** {@link #holdAutomaticRebuild} when the active index is already open for writing. */
+  private void holdAutomaticRebuildAfterWritableOpen(IndexGenerationManager.AutoRebuildBrake brake)
+      throws IOException {
+    LuceneRuntime readOnly = buildReadOnlyRuntime(activeIndexPath).openReadOnly();
+    LuceneRuntime writable = this.ingestLifecycle;
+    holdAutomaticRebuild(readOnly, brake);
+    if (writable != null && writable != readOnly) {
+      writable.close();
+    }
   }
 
   private String expectedIndexFingerprintOrNull() {
@@ -6204,10 +6358,79 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
+   * Task t-20261013-ef3c41, round 8 (refined decision 2): before anything indexes, the one-time
+   * upgrade seeding confirms the volume of each declared root on evidence. Only a boot that knows
+   * the declared roots seeds; a root not confirmed now is retried by the periodic cycle.
+   */
+  private void seedRootVolumesAfterUpgrade() {
+    if (!(appServices instanceof DefaultWorkerAppServices producer)
+        || producer.ingestService() == null) {
+      return;
+    }
+    if (bootRootBindingsBound) {
+      producer.ingestService().seedRootVolumesAfterUpgrade(
+          bootRootBindings.stream().map(RootBinding::path).toList());
+    }
+    // Round 8b (decision 3): configured collection roots are seeded once, like upgraded roots.
+    producer.ingestService().seedConfiguredRoots(configuredRoots(
+        startupConfiguration == null ? null : startupConfiguration.collections()));
+  }
+
+  /** The configured collection roots and the bundled help folder: configuration, not added roots. */
+  private static List<Path> configuredRoots(ResolvedConfig.Collections collections) {
+    List<Path> roots = new ArrayList<>();
+    if (collections == null) {
+      return roots;
+    }
+    for (ResolvedConfig.CollectionCfg collection : collections.items()) {
+      for (Path root : collection.roots()) {
+        if (root != null) {
+          roots.add(root);
+        }
+      }
+    }
+    if (collections.bundledHelp() != null && collections.bundledHelp().path() != null) {
+      roots.add(collections.bundledHelp().path());
+    }
+    return roots;
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 8b (decision 3): a migration builds the new generation only from
+   * roots on their recorded volume. A configured root with nothing recorded is first seeded once on
+   * evidence. Any root still refused (another volume at its path, its drive not confirmed after an
+   * upgrade, or nothing recorded) fails the enumeration, so the cutover keeps the active generation
+   * and nothing indexed under that root is lost; a later migration retries.
+   */
+  private void requireMigrationRootsOnRecordedVolume(List<ResolvedConfig.FileSource> roots,
+      ResolvedConfig.Collections collections) throws IOException {
+    if (!(appServices instanceof DefaultWorkerAppServices producer)
+        || producer.ingestService() == null) {
+      return;
+    }
+    var ingest = producer.ingestService();
+    ingest.seedConfiguredRoots(configuredRoots(collections));
+    for (ResolvedConfig.FileSource source : roots) {
+      String refusal = ingest.rootVolumeRefusal(source.path().toString(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      if (!refusal.isEmpty()) {
+        throw new IOException("Migration root " + source.path() + " is not on its recorded volume ("
+            + refusal + "); the active generation is kept");
+      }
+    }
+  }
+
+  /**
    * A pointer committed before a crash is not a root-replay certificate. Reattach the durable
    * Head membership to B and make a complete disk/B pass while A still owns rollback capacity.
    * The last observation and admission release share the mutation fence, so a late watcher fault
    * cannot be mistaken for a clean boot.
+   *
+   * <p>A root whose folder is not on the volume recorded for it is deferred, never a start-up
+   * failure (task t-20261013-ef3c41, round 7, S8): its watch is held, it is left out of the
+   * convergence check so every other root is served, and this generation's root reconciliation
+   * stays unsettled, which keeps the previous generation until {@link #settleDeferredBootRoots}
+   * has reconciled the root on its returned volume. Every other failure fails the boot as before.
    */
   private void settleCommittedBootRoots(String expectedActive) throws IOException {
     if (!bootRootBindingsBound) {
@@ -6220,6 +6443,7 @@ public final class KnowledgeServer implements Closeable {
       throw new IOException("Committed successor boot lacks a writable reconciliation owner");
     }
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
+    long removalMark = producer.ingestService().rootRemovalMark();
     // Native switch-buffer receipts refer to pre-boot accepted queue revisions. Root
     // reconciliation may replace those revisions, so it cannot start until the exact receipts
     // have settled against B. This wait is scoped to the generation, never the global queue.
@@ -6258,15 +6482,21 @@ public final class KnowledgeServer implements Closeable {
     }
     for (int attempt = 0; attempt < 3; attempt++) {
       if (closeStarted || System.nanoTime() >= deadline) break;
+      List<RootBinding> settling = new ArrayList<>();
+      List<RootBinding> deferred = new ArrayList<>();
       for (RootBinding binding : bootRootBindings) {
-        producer.ingestService().reconcileCommittedBootRoot(
-            binding, () -> closeStarted || System.nanoTime() >= deadline);
+        if (producer.ingestService().reconcileCommittedBootRoot(
+            binding, () -> closeStarted || System.nanoTime() >= deadline)) {
+          settling.add(binding);
+        } else {
+          deferred.add(binding);
+        }
       }
       try {
         while (true) {
           active.commitOps().maybeRefreshBlocking();
           boolean rootsMatch = true;
-          for (RootBinding binding : bootRootBindings) {
+          for (RootBinding binding : settling) {
             if (!producer.ingestService().committedBootRootConverged(
                 binding, () -> closeStarted || System.nanoTime() >= deadline)) {
               rootsMatch = false;
@@ -6301,7 +6531,7 @@ public final class KnowledgeServer implements Closeable {
               throw new IOException("Committed successor generation changed during root replay");
             }
             boolean converged = true;
-            for (RootBinding binding : bootRootBindings) {
+            for (RootBinding binding : settling) {
               if (!producer.ingestService().committedBootRootConverged(
                   binding, () -> closeStarted || System.nanoTime() >= deadline)) {
                 converged = false;
@@ -6312,7 +6542,11 @@ public final class KnowledgeServer implements Closeable {
               if (!fence.releaseCurrentOwnerIfReplayCertain()) {
                 throw new IOException("Committed successor watcher failed at final release");
               }
-              rootReconciliationSettledGeneration = expectedActive;
+              if (deferred.isEmpty()) {
+                rootReconciliationSettledGeneration = expectedActive;
+              } else {
+                deferBootRoots(expectedActive, deferred, removalMark);
+              }
               return;
             }
           }
@@ -6325,6 +6559,173 @@ public final class KnowledgeServer implements Closeable {
       }
     }
     throw new IOException("Committed successor roots did not converge before publication");
+  }
+
+  private void deferBootRoots(
+      String expectedActive, List<RootBinding> deferred, long removalMark) {
+    reconciledDeferredBootRoots.clear();
+    deferredBootRootsGeneration = expectedActive;
+    deferredBootRootsRemovalMark = removalMark;
+    deferredBootRoots = List.copyOf(deferred);
+    log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path: {};"
+            + " the previous generation is kept until they are reconciled on that volume",
+        deferred.size(), deferred.stream().map(RootBinding::path).toList());
+    // The server's own maintenance scheduler, opened before the boot reconcile, runs the check
+    // only while something is deferred; it is closed with the reaper.
+    if (stuckJobReaper != null && deferredBootRootTask == null) {
+      deferredBootRootTask = stuckJobReaper.scheduleWithFixedDelay(
+          this::settleDeferredBootRootsSafely,
+          DEFERRED_BOOT_ROOT_CHECK_MS, DEFERRED_BOOT_ROOT_CHECK_MS, TimeUnit.MILLISECONDS);
+    }
+  }
+
+  /** A periodic task that throws is never run again, so a failed check only logs and waits. */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // the next check retries
+  private void settleDeferredBootRootsSafely() {
+    try {
+      settleDeferredBootRoots();
+    } catch (RuntimeException failure) {
+      log.warn("Deferred boot root check failed (will retry): {}", failure.toString());
+    }
+  }
+
+  /**
+   * Round 7 (S8): reconciles each root the committed boot deferred once the volume recorded for it
+   * is back, without a restart. A root still on another volume costs one volume read. A returned
+   * root is reconciled (its held watch registered, its difference queued or removed); once the
+   * index matches its disk, that is committed and checked again with the writer paused, as the
+   * boot does. When no deferred root is left, this generation's root reconciliation settles and
+   * the previous generation's removal completes. A failure is retried on the next check.
+   *
+   * <p>Round 8: every root the person removed since the boot is dropped first and counts as
+   * resolved: it is never reconciled, watched or indexed, and nothing of it is carried forward.
+   * When none is left the check stops. A root is reconciled only once it is proven on the volume
+   * recorded for it; this check never records a volume.
+   */
+  private void settleDeferredBootRoots() {
+    if (deferredBootRoots.isEmpty() || closeStarted) return;
+    boolean allSettled;
+    runtimeSwapLock.lock();
+    try {
+      List<RootBinding> pending = deferredBootRoots;
+      String expectedActive = deferredBootRootsGeneration;
+      if (pending.isEmpty() || closeStarted || indexGenerationManager == null
+          || !(appServices instanceof DefaultWorkerAppServices producer)
+          || !(ingestLifecycle instanceof RunningRuntime active)
+          || ingestLifecycle != searchLifecycle || !active.isAcceptingWrites()) return;
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state == null) return;
+      if (!expectedActive.equals(state.active_generation())) {
+        log.warn("Deferred boot roots belonged to generation {}, which is no longer active",
+            expectedActive);
+        reconciledDeferredBootRoots.clear();
+        deferredBootRoots = List.of();
+        if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
+        return;
+      }
+      long removalMark = deferredBootRootsRemovalMark;
+      List<RootBinding> declared = withoutRemovedBootRoots(producer, pending, removalMark);
+      List<RootBinding> converging = new ArrayList<>();
+      for (RootBinding binding : declared) {
+        if (reconcileReturnedBootRoot(producer, binding, removalMark)) converging.add(binding);
+      }
+      List<RootBinding> settled = converging.isEmpty()
+          ? List.of() : commitReturnedBootRoots(producer, active, converging);
+      List<RootBinding> remaining = withoutRemovedBootRoots(producer,
+          declared.stream().filter(binding -> !settled.contains(binding)).toList(), removalMark);
+      settled.forEach(reconciledDeferredBootRoots::remove);
+      deferredBootRoots = remaining;
+      allSettled = remaining.isEmpty();
+      if (allSettled) {
+        if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
+        rootReconciliationSettledGeneration = expectedActive;
+        log.info("Every deferred boot root is reconciled on its recorded volume or was removed;"
+            + " generation {} may now remove its predecessor", expectedActive);
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    if (allSettled) retryCommittedGenerationRetirement();
+  }
+
+  /** {@code bindings} without the roots the person removed after {@code removalMark}. */
+  private List<RootBinding> withoutRemovedBootRoots(
+      DefaultWorkerAppServices producer, List<RootBinding> bindings, long removalMark) {
+    List<RootBinding> declared = new ArrayList<>();
+    for (RootBinding binding : bindings) {
+      if (producer.ingestService().rootRemovedSince(binding.path(), removalMark)) {
+        reconciledDeferredBootRoots.remove(binding);
+        log.info("Deferred boot root {} was removed; it is dropped and counts as resolved",
+            binding.path());
+      } else {
+        declared.add(binding);
+      }
+    }
+    return declared;
+  }
+
+  /** Whether {@code binding} is reconciled on its recorded volume and awaits convergence. */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a failed pass is retried, never thrown
+  private boolean reconcileReturnedBootRoot(
+      DefaultWorkerAppServices producer, RootBinding binding, long removalMark) {
+    if (reconciledDeferredBootRoots.contains(binding)) return true;
+    try {
+      if (!producer.ingestService().rootOnRecordedVolume(binding.path().toString())
+          || !producer.ingestService().reconcileReturnedBootRoot(
+              binding, removalMark, () -> closeStarted)) {
+        return false;
+      }
+      reconciledDeferredBootRoots.add(binding);
+      log.info("Deferred boot root {} is on its recorded volume again and was reconciled",
+          binding.path());
+      return true;
+    } catch (IOException | RuntimeException failure) {
+      log.warn("Deferred boot root {} could not be reconciled yet (will retry): {}",
+          binding.path(), failure.toString());
+      return false;
+    }
+  }
+
+  /** The returned roots whose disk the index matches, committed and rechecked with the writer paused. */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a failed pass is retried, never thrown
+  private List<RootBinding> commitReturnedBootRoots(
+      DefaultWorkerAppServices producer, RunningRuntime active, List<RootBinding> converging) {
+    try {
+      active.commitOps().maybeRefreshBlocking();
+      List<RootBinding> matching = returnedBootRootsMatching(producer, converging);
+      if (matching.isEmpty()) return List.of();
+      if (!producer.pauseProducerForCutover(10_000)) return List.of();
+      try {
+        active.commitOps().commitAndTrack(
+            io.justsearch.adapters.lucene.runtime.CommitReason.SETTLE);
+        active.commitOps().maybeRefreshBlocking();
+        return returnedBootRootsMatching(producer, matching);
+      } finally {
+        producer.resumeProducerAfterCutover();
+      }
+    } catch (RuntimeException failure) {
+      log.warn("Deferred boot roots could not be committed yet (will retry): {}",
+          failure.toString());
+      return List.of();
+    }
+  }
+
+  private List<RootBinding> returnedBootRootsMatching(
+      DefaultWorkerAppServices producer, List<RootBinding> candidates) {
+    List<RootBinding> matching = new ArrayList<>();
+    for (RootBinding binding : candidates) {
+      try {
+        if (producer.ingestService().returnedBootRootConverged(binding, () -> closeStarted)) {
+          matching.add(binding);
+        }
+      } catch (IOException notCurrent) {
+        // Its watch or root changed since it was reconciled: reconcile it again on the next check.
+        reconciledDeferredBootRoots.remove(binding);
+        log.warn("Deferred boot root {} changed before it converged (will retry): {}",
+            binding.path(), notCurrent.toString());
+      }
+    }
+    return matching;
   }
 
   /** Reclaim a committed predecessor only after replay and every old view have settled. */
@@ -6669,6 +7070,7 @@ public final class KnowledgeServer implements Closeable {
         // the lock ourselves, just as deferred model initialization is joined above; otherwise a
         // close can own runtimeSwapLock while waiting for a reaper already queued on the same lock.
         if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
+        if (deferredBootRootTask != null) deferredBootRootTask.cancel(true);
         if (stuckJobReaper != null) {
           stuckJobReaper.shutdownNow();
           stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
@@ -8480,6 +8882,9 @@ public final class KnowledgeServer implements Closeable {
                           + "proceeding without inline embedding/SPLADE");
                 }
                 List<ResolvedConfig.FileSource> roots = enumerateFiles ? loadMigrationRoots(rc) : List.of();
+                if (enumerateFiles) {
+                  requireMigrationRootsOnRecordedVolume(roots, rc.collections());
+                }
                 migrationEnumeratorRootsTotal.set(roots.size());
                 int totalEnqueued = enumerateFiles ? enqueueAllFilesUnderRoots(roots) : 0;
                 List<String> expectedSources = expectedProjectionSourceIds();

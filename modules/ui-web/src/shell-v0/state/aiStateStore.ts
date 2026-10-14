@@ -402,6 +402,38 @@ function friendlyModel(id: string | null | undefined): string | null {
   return stripped.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Task t-20261013-ef3c41 — how long after the server starts an uncounted index reads "Checking…"
+ * rather than "Unknown". The first count is read while the index opens, so a count still missing
+ * this long after start is not a start-up delay any more. Measured on the server's own clock
+ * (`uptimeMs`), so a page opened late into a session does not restart the window.
+ */
+const DOCUMENT_COUNT_STARTUP_WINDOW_MS = 120_000;
+
+/**
+ * Task t-20261013-ef3c41 — whether the backend reported that it could not count the index
+ * (`indexedDocumentsUnknown`). Its `indexedDocuments`/`searchableDocuments` then carry a 0 kept only
+ * for older readers; it is not a count and must never read as an empty index. Absent ⇒ known.
+ */
+function documentCountUnknown(status: StatusSnapshot | null | undefined): boolean {
+  return status?.worker?.core?.indexedDocumentsUnknown === true;
+}
+
+/**
+ * The words shown in place of a document count the backend could not read: "Checking…" during the
+ * start-up window, "Unknown" after it (or when the server's uptime is not reported). `null` when the
+ * count is a count, so a caller renders the number as before.
+ */
+export function unknownDocumentCountLabel(
+  status: StatusSnapshot | null | undefined,
+): 'Checking…' | 'Unknown' | null {
+  if (!documentCountUnknown(status)) return null;
+  const uptimeMs = status?.uptimeMs;
+  return typeof uptimeMs === 'number' && uptimeMs >= 0 && uptimeMs < DOCUMENT_COUNT_STARTUP_WINDOW_MS
+    ? 'Checking…'
+    : 'Unknown';
+}
+
 function computeCapabilities(): AiCapabilities {
   const inference = inferenceSig.get();
   const status = statusSig.get();
@@ -413,7 +445,8 @@ function computeCapabilities(): AiCapabilities {
   const docs = status?.worker?.core?.indexedDocuments ?? 0;
   return {
     chat,
-    rag: chat && docs > 0,
+    // Task t-20261013-ef3c41: an index the backend could not count is not an empty one.
+    rag: chat && (documentCountUnknown(status) || docs > 0),
     extract: chat,
     embedding: status?.embedding?.compatState === 'COMPATIBLE',
   };
@@ -686,9 +719,14 @@ function computeIndex(): AiIndex {
     status === null || v === undefined || v === null ? UNKNOWN : known(v);
   const fromInference = <T>(v: T | undefined | null): Maybe<T> =>
     inference === null || v === undefined || v === null ? UNKNOWN : known(v);
+  // Task t-20261013-ef3c41: when the backend could not count the index, the 0 it carries for older
+  // readers is not a count — both counts are UNKNOWN, never a known 0 that reads as an empty index.
+  const countsUnknown = documentCountUnknown(status);
   return {
-    documentCount: fromStatus(status?.worker?.core?.indexedDocuments),
-    searchableDocumentCount: fromStatus(status?.worker?.core?.searchableDocuments),
+    documentCount: countsUnknown ? UNKNOWN : fromStatus(status?.worker?.core?.indexedDocuments),
+    searchableDocumentCount: countsUnknown
+      ? UNKNOWN
+      : fromStatus(status?.worker?.core?.searchableDocuments),
     pendingJobs: fromStatus(status?.worker?.core?.pendingJobs),
     embeddingPending: fromStatus(status?.embedding?.pendingCount),
     embeddingBlocked:
@@ -1039,6 +1077,8 @@ function stampSettledIndex(snap: StatusSnapshot): void {
     catchingUp: snap.catchingUp,
   });
   if (stability.kind !== 'settled') return;
+  // Task t-20261013-ef3c41: an uncounted index has no count to retain; the last settled one stays.
+  if (documentCountUnknown(snap)) return;
   const documentCount = snap.worker?.core?.indexedDocuments;
   if (documentCount == null) return;
   lastSettledIndexSig.set({

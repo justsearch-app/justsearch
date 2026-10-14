@@ -45,6 +45,11 @@ package io.justsearch.app.api.status;
  * reclaimed yet — the signal that separates "the corpus shrank" from "the index has not merged yet".
  * {@code indexedDocuments} is not a substitute: it subtracts chunk documents and can be counted on
  * the ingest reader during a rebuild.
+ *
+ * <p>Task t-20261013-ef3c41 added {@code indexedDocumentsUnknown}: true when {@code
+ * indexedDocuments} and {@code searchableDocuments} are not counts — the index could not be counted
+ * and no earlier count exists. Both then carry 0 for older readers; a surface that knows this field
+ * shows the count as checking or unknown, never as an empty index. False means the counts are known.
  */
 @SuppressWarnings("ArrayRecordComponent") // 419 C3 V1/V2: intentional for API time-series payload
 public record CoreIndexView(
@@ -64,11 +69,40 @@ public record CoreIndexView(
     long pendingUnknownSizeJobs,
     long searchableDocuments,
     long indexMaxDoc,
-    long indexNumDocs) {
+    long indexNumDocs,
+    boolean indexedDocumentsUnknown) {
   public CoreIndexView {
     indexState = indexState == null ? "" : indexState;
     recentJobQueueDepth = recentJobQueueDepth == null ? new long[0] : recentJobQueueDepth;
     recentDocsPerSec = recentDocsPerSec == null ? new double[0] : recentDocsPerSec;
+  }
+
+  /**
+   * Backward-compatible 17-arg ctor; the counts are known ({@code indexedDocumentsUnknown} false),
+   * which is what every sender before task t-20261013-ef3c41 meant.
+   */
+  public CoreIndexView(
+      boolean indexHealthy,
+      long indexedDocuments,
+      long pendingJobs,
+      String indexState,
+      long indexSizeBytes,
+      int pendingVduCount,
+      long writerQueueDepth,
+      long writerPendingDocs,
+      long commitCount,
+      long refreshLagMs,
+      long[] recentJobQueueDepth,
+      double[] recentDocsPerSec,
+      long pendingBytes,
+      long pendingUnknownSizeJobs,
+      long searchableDocuments,
+      long indexMaxDoc,
+      long indexNumDocs) {
+    this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
+        writerQueueDepth, writerPendingDocs, commitCount, refreshLagMs, recentJobQueueDepth,
+        recentDocsPerSec, pendingBytes, pendingUnknownSizeJobs, searchableDocuments, indexMaxDoc,
+        indexNumDocs, false);
   }
 
   /**

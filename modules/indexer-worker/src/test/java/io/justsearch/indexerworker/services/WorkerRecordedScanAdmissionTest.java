@@ -59,6 +59,7 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
       long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
       var loop = mock(IndexingLoop.class);
       var service = service(queue, loop);
+      addedByThePerson(temp.resolve("index"), directory);
       List<ScanRootProgress> frames = new ArrayList<>();
       service.scanRecordedRoot(request(singleFile ? file : directory, singleFile, epoch), frames::add, CallContext.none());
       var terminal = frames.getLast();
@@ -361,6 +362,7 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
       var service = new WorkerIngestService(
           queue, mock(IndexingLoop.class), null, IndexingPacing.unthrottled(), base,
           layout.activeGenerationPath(), null, readOnly, null, 0L);
+      addedByThePerson(base, source);
       List<ScanRootProgress> frames = new ArrayList<>();
 
       service.scanRecordedRoot(capturedRequest(source, epoch), frames::add, CallContext.none());
@@ -446,6 +448,7 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
       queue.open();
       long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
       var service = service(queue, mock(IndexingLoop.class));
+      addedByThePerson(temp.resolve("index"), root);
       List<ScanRootProgress> frames = new ArrayList<>();
     var switched = new AtomicBoolean();
       var failure = assertThrows(WorkerServiceException.class, () -> service.scanRecordedRoot(
@@ -476,6 +479,7 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
       queue.open();
       long epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
       var service = service(queue, mock(IndexingLoop.class));
+      addedByThePerson(temp.resolve("index"), root);
       var accepted = request(root, false, epoch);
       var recorded = new WorkerIngestService.RecordedRootScan(
           accepted.request().toBuilder().addExcludeGlobs("*.txt").build(),
@@ -553,5 +557,22 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
     return new WorkerIngestService.RecordedRootScan(ScanRootRequest.newBuilder()
         .setRootPath(root.toString()).setCollection("notes").setMode(ScanMode.SCAN_MODE_FORCE_REINDEX).build(),
         KEY, epoch, generation, false, List.of(), WorkerIngestService.RecordedScanMode.CAPTURED);
+  }
+
+  /**
+   * The person's add of {@code root}: its watch request with the add marker, which records the
+   * root's volume under {@code indexBasePath}. Task t-20261013-ef3c41, round 8 (refined decision
+   * 2): only the add records a root's volume, and every other path refuses a root with none
+   * recorded.
+   */
+  private static void addedByThePerson(Path indexBasePath, Path root) {
+    var adding = new WorkerIngestService(null, null, null,
+        IndexingPacing.unthrottled(), indexBasePath, null,
+        null, null, null, 0L);
+    var added = adding.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(),
+        CallContext.none());
+    assertTrue(added.getWatching(),
+        "precondition: the person adds " + root + ": " + added.getErrorMessage());
   }
 }

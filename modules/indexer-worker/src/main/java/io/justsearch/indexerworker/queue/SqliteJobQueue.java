@@ -79,6 +79,26 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   static final String STATE_RETRY_EXHAUSTED = "RETRY_EXHAUSTED";
 
+  /**
+   * Task t-20261013-ef3c41: a row being retried because its source exists but cannot be read
+   * ({@code RETRY_UNTIL_AVAILABLE} with a source-unreadable reason). It never becomes terminal, so
+   * the failed-files surface lists it explicitly — as "indexed, source unreadable" when the index
+   * holds its content — distinct from a file that is missing.
+   */
+  static final String SOURCE_UNREADABLE_RETRY =
+      "(state IN ('PENDING', 'PROCESSING') AND last_reason_code IN ('"
+          + io.justsearch.indexerworker.ingest.IngestionReasonCodes.SOURCE_UNREADABLE + "', '"
+          + io.justsearch.indexerworker.ingest.IngestionReasonCodes.INDEXED_SOURCE_UNREADABLE
+          + "'))";
+
+  /** Rows the failed-files surface lists: terminal failures plus unreadable-source retries. */
+  static final String ON_FAILED_SURFACE =
+      "state IN ('FAILED', 'RETRY_EXHAUSTED') OR " + SOURCE_UNREADABLE_RETRY;
+
+  /** The state the failed-files surface shows: the reason code for an unreadable-source retry. */
+  static final String FAILED_SURFACE_STATE =
+      "CASE WHEN " + SOURCE_UNREADABLE_RETRY + " THEN last_reason_code ELSE state END";
+
   /** SQLite busy timeout in milliseconds. */
   private static final int BUSY_TIMEOUT_MS = 5000;
 
@@ -2234,6 +2254,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         outcome != null
             && outcome.retryPolicy()
                 == io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_WITH_BACKOFF;
+    // Task t-20261013-ef3c41: a source that exists but cannot be read now (or whose folder is
+    // unavailable) is retried on the same counted, growing ladder, but never exhausts: nothing
+    // about it says the file is gone or unindexable, and its indexed content stays searchable.
+    boolean untilAvailable =
+        outcome != null
+            && outcome.retryPolicy()
+                == io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_UNTIL_AVAILABLE;
     lock.lock();
     try {
       ensureOpen();
@@ -2260,6 +2287,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 String newState;
                 if (terminal) {
                   newState = STATE_FAILED;
+                } else if (untilAvailable) {
+                  newState = STATE_PENDING;
                 } else if (transientOutcome) {
                   newState =
                       IngestionRetryLadder.exhausted(run.firstFailedAtMs(), now)
@@ -2273,13 +2302,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 Long retryAfter = null;
                 if (STATE_PENDING.equals(newState)) {
                   long backoffMs =
-                      transientOutcome
+                      transientOutcome || untilAvailable
                           ? IngestionRetryLadder.backoffMs(newAttempts)
                           : 1000L * (1L << Math.min(newAttempts - 1, 10));
                   long jitter =
                       ThreadLocalRandom.current().nextLong(0, Math.min(1000L, backoffMs) + 1);
+                  // No seven-day clamp for untilAvailable: the clamp would schedule every retry
+                  // after the window at the boundary itself, i.e. immediately.
                   retryAfter =
-                      transientOutcome
+                      untilAvailable
+                          ? now + backoffMs + jitter
+                          : transientOutcome
                           ? IngestionRetryLadder.nextRetryAtMs(
                               firstFailedAt, newAttempts, now, jitter)
                           : now + backoffMs + jitter;
@@ -3189,12 +3222,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       int effectiveLimit = limit > 0 ? Math.min(limit, 1000) : 100;
 
-      String sql = """
-          SELECT path, error_message, attempts, last_updated, collection, state, scan_id
-          FROM jobs WHERE state IN ('FAILED', 'RETRY_EXHAUSTED')
-          ORDER BY last_updated DESC
-          LIMIT ?
-          """;
+      String sql = "SELECT path, error_message, attempts, last_updated, collection, "
+          + FAILED_SURFACE_STATE + ", scan_id FROM jobs WHERE " + ON_FAILED_SURFACE
+          + " ORDER BY last_updated DESC LIMIT ?";
 
       List<FailedJobInfo> result = new ArrayList<>();
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -3254,12 +3284,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String upper = upperBoundExclusive(lower);
       int effectiveLimit = limit > 0 ? Math.min(limit, 1000) : 100;
 
-      String sql = """
-          SELECT path, error_message, attempts, last_updated, collection, state, scan_id
-          FROM jobs WHERE state IN ('FAILED', 'RETRY_EXHAUSTED') AND path >= ? AND path < ?
-          ORDER BY last_updated DESC
-          LIMIT ?
-          """;
+      String sql = "SELECT path, error_message, attempts, last_updated, collection, "
+          + FAILED_SURFACE_STATE + ", scan_id FROM jobs WHERE (" + ON_FAILED_SURFACE
+          + ") AND path >= ? AND path < ? ORDER BY last_updated DESC LIMIT ?";
 
       List<FailedJobInfo> result = new ArrayList<>();
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -3422,7 +3449,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
       String upper = upperBoundExclusive(lower);
 
-      String sql = "SELECT state, COUNT(*) FROM jobs WHERE path >= ? AND path < ? GROUP BY state";
+      // Task t-20261013-ef3c41: a source retried because it cannot be read is a problem for the
+      // user to see, not work in flight — counted with the failures so a folder holding a locked
+      // file does not read "indexing" forever.
+      String sql = "SELECT CASE WHEN " + SOURCE_UNREADABLE_RETRY + " THEN '" + STATE_FAILED
+          + "' ELSE state END AS shown_state, COUNT(*) FROM jobs WHERE path >= ? AND path < ?"
+          + " GROUP BY shown_state";
 
       long pending = 0L;
       long processing = 0L;

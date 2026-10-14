@@ -395,6 +395,33 @@ public final class IndexFingerprint {
     return List.copyOf(out);
   }
 
+  /**
+   * True when {@code digest} has the shape {@link #compute} writes: 64 lowercase hex characters
+   * (task t-20261013-ef3c41). Anything else stored under {@link #COMMIT_META_KEY} cannot be compared
+   * to a computed digest; a difference from it is unknown, not a shape change.
+   */
+  public static boolean isWellFormedDigest(String digest) {
+    if (digest == null || digest.length() != 64) {
+      return false;
+    }
+    for (int i = 0; i < digest.length(); i++) {
+      char c = digest.charAt(i);
+      if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** True when {@code json} parses as the JSON object {@link #canonicalJson} renders. */
+  public static boolean isReadableInputs(String json) {
+    if (json == null) {
+      return false;
+    }
+    JsonNode node = parseOrNull(json);
+    return node != null && node.isObject();
+  }
+
   private static JsonNode parseOrNull(String json) {
     try {
       return M.readTree(json);

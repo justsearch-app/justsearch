@@ -46,7 +46,7 @@ final class WatcherTransitionMatrixGuardTest {
   }
 
   @Test
-  @Timeout(10)
+  @Timeout(20)
   void watcherTransitionMatrixHoldsForAllDeterministicCells() throws Exception {
     RecordingDeleteSink delete = new RecordingDeleteSink();
     RecordingReconcile reconcile = new RecordingReconcile();
@@ -67,14 +67,19 @@ final class WatcherTransitionMatrixGuardTest {
       Files.delete(goneRoot);
 
       // Cell: DELETE while watched root is PRESENT → forwarded to the delete sink.
-      watcher.dispatchEvent(presentRegistration, WorkerMethvinWatcher.Kind.DELETE, child);
-      assertEquals(1, delete.deleted.size(), "delete under a present root must forward");
-      assertTrue(delete.deleted.get(0).endsWith("doc.txt"));
-
       // Cell: DELETE cascade while watched root is GONE (unmount) → SKIPPED (599 data-loss guard).
+      // Task t-20261013-ef3c41: a DELETE is applied once its absence is confirmed, after a short
+      // settle window, so both cells are read once the window has passed.
+      watcher.dispatchEvent(presentRegistration, WorkerMethvinWatcher.Kind.DELETE, child);
       watcher.dispatchEvent(goneRegistration, WorkerMethvinWatcher.Kind.DELETE, goneChild);
-      assertEquals(
-          1, delete.deleted.size(), "delete under a gone root must be skipped (no new sink call)");
+      long settleDeadline = System.currentTimeMillis() + 6_000;
+      while (System.currentTimeMillis() < settleDeadline && delete.deleted.isEmpty()) {
+        Thread.sleep(50);
+      }
+      Thread.sleep(500);
+      assertEquals(1, delete.deleted.size(),
+          "delete under a present root must forward; under a gone root it must be skipped");
+      assertTrue(delete.deleted.get(0).endsWith("doc.txt"));
 
       // Cell: OVERFLOW (events dropped) → forced reconcile of the root.
       watcher.handleOverflow(presentRoot, child);

@@ -2718,6 +2718,16 @@ describe('UnifiedChatView corpus counts (tempdoc 811 C-4)', () => {
     view.remove();
   });
 
+  it('an index the backend could not count shows no number, never "Searching 0 documents" (t-20261013-ef3c41)', async () => {
+    const view = mountView();
+    await view.updateComplete;
+    // Both counts UNKNOWN: what the store reports when /api/status says indexedDocumentsUnknown.
+    const text = await previewText(view, { documentCount: UNKNOWN, searchableDocumentCount: UNKNOWN });
+    expect(text).not.toBe('Searching 0 documents');
+    expect(text).toBe('Searching your documents');
+    view.remove();
+  });
+
   it('the landing corpus line counts the searchable population, falling back when absent', async () => {
     const view = mountView();
     await view.updateComplete;

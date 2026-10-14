@@ -694,6 +694,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.rootWatcherRegistry = nativeSource.rootWatcherRegistry;
     }
     this.ingestService.setRootWatcherRegistry(rootWatcherRegistry);
+    // Task t-20261013-ef3c41, round 4: the indexing loop's admission, freshness, re-hash and
+    // pre-write decisions and the watcher's DELETE confirmation all ask the service's one
+    // root-identity check, the same question the prune asks.
+    if (indexingLoop != null) indexingLoop.useRootCheck(ingestService.rootCheck());
+    this.workerWatcher.useRootCheck(ingestService.rootCheck());
     this.embeddingProviderTarget = new EmbeddingProviderTarget(this);
     if (nativeSource != null) copySourceQueryBindings(nativeSource);
   }
@@ -835,6 +840,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setDocumentIdentityStore(greenContext.documentIdentityStore());
     ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
     searchService.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
+    // Task t-20261013-ef3c41, round 4: the shared loop and watcher ask this service's root check.
+    if (indexingLoop != null) indexingLoop.useRootCheck(ingestService.rootCheck());
+    workerWatcher.useRootCheck(ingestService.rootCheck());
 
     this.healthService =
         new WorkerHealthService(

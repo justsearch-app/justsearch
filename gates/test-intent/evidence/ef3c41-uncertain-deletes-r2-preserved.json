@@ -1,0 +1,149 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-13T15:57:29.097Z",
+  "revision": "bf41272f98f4a1119da2ad809793ebd8740a569d",
+  "tree": "a0ac8fd1860c3f5dfa330a187a363a1803e4c671",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.UnknownCountAndUnreadableBrakeStatusTest.aReadableCountIsNotReportedUnknown\" --tests \"io.justsearch.indexerworker.services.UnknownCountAndUnreadableBrakeStatusTest.aMismatchWithNoBrakeRecordedIsStillAPlainMismatch\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8919
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.index.IndexRebuildBrakeTest.aReadableBrakeForAnotherTargetStillCountsFromOne\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2584
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleHandlerTest.compatBlockedReasonStillNamesASpentBrake\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3508
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aReadableCountIsNotReportedUnknown",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9cf89ea70d261a2d57b1bd46c8518ea014f33a3d0d2ef5295f838e9d9e82bf80",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReadableCountIsNotReportedUnknown()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java#aReadableBrakeForAnotherTargetStillCountsFromOne",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5efcba704a4f44f8c29f852daed5a971b58ad29a5a1ddb0e74114a0cff3fc3b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReadableBrakeForAnotherTargetStillCountsFromOne(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aMismatchWithNoBrakeRecordedIsStillAPlainMismatch",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9cf89ea70d261a2d57b1bd46c8518ea014f33a3d0d2ef5295f838e9d9e82bf80",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aMismatchWithNoBrakeRecordedIsStillAPlainMismatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#compatBlockedReasonStillNamesASpentBrake",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e74e51b18f5a51fba1c3f3e3fed2936b99b8fe24e08585ba19de1c3170913271",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compatBlockedReasonStillNamesASpentBrake()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bf41272f9",
+    "revision": "bf41272f98f4a1119da2ad809793ebd8740a569d",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.UnknownCountAndUnreadableBrakeStatusTest.aReadableCountIsNotReportedUnknown\" --tests \"io.justsearch.indexerworker.services.UnknownCountAndUnreadableBrakeStatusTest.aMismatchWithNoBrakeRecordedIsStillAPlainMismatch\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 19141
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.index.IndexRebuildBrakeTest.aReadableBrakeForAnotherTargetStillCountsFromOne\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5252
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleHandlerTest.compatBlockedReasonStillNamesASpentBrake\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 7456
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aReadableCountIsNotReportedUnknown",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java#aReadableBrakeForAnotherTargetStillCountsFromOne",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/UnknownCountAndUnreadableBrakeStatusTest.java#aMismatchWithNoBrakeRecordedIsStillAPlainMismatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#compatBlockedReasonStillNamesASpentBrake",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:8cc5d39f51fe2191574c3eb74c56ba5db1d5ec6f02a6b09e91ba1cb2299de2ab"
+}

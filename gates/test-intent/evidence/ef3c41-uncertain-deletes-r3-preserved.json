@@ -1,0 +1,125 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-13T16:33:22.550Z",
+  "revision": "9f9c1da1644069da66b36da4fd5e930f323bde75",
+  "tree": "74dfe83657fd272304cf5302733500afa6f821dd",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.LostBrakeStateBootTest.aLostStateOverACompatibleIndexBootsAndServesNormally\" --tests \"io.justsearch.indexerworker.server.AutomaticRebuildPathsConsultTheBrakeTest.aReleasedBrakeStillStartsTheEmbeddingModelChangeReembed\" --tests \"io.justsearch.indexerworker.server.AutomaticRebuildPathsConsultTheBrakeTest.aReleasedBrakeStillRebuildsAnIndexRecoveredToEmpty\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerBrakeSentinelTest.aRealTargetStillConsumesBudgetNormally\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23158
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostBrakeStateBootTest.java#aLostStateOverACompatibleIndexBootsAndServesNormally",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostBrakeStateBootTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a489d5ab60d919baddfe0de1910351467afb1c86db409c5067c6c25d6516844d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLostStateOverACompatibleIndexBootsAndServesNormally(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java#aReleasedBrakeStillStartsTheEmbeddingModelChangeReembed",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4aac2376e0ddfddb35377445ecb52dc2fcafbdd30a8fc0234462ab637024fa8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReleasedBrakeStillStartsTheEmbeddingModelChangeReembed(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java#aReleasedBrakeStillRebuildsAnIndexRecoveredToEmpty",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4aac2376e0ddfddb35377445ecb52dc2fcafbdd30a8fc0234462ab637024fa8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReleasedBrakeStillRebuildsAnIndexRecoveredToEmpty(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerBrakeSentinelTest.java#aRealTargetStillConsumesBudgetNormally",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerBrakeSentinelTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09bce89d54c736c4574bfa5086ea0a70a8fb3c325c6588cad53dd48730598f59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRealTargetStillConsumesBudgetNormally(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9f9c1da16",
+    "revision": "9f9c1da1644069da66b36da4fd5e930f323bde75",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.LostBrakeStateBootTest.aLostStateOverACompatibleIndexBootsAndServesNormally\" --tests \"io.justsearch.indexerworker.server.AutomaticRebuildPathsConsultTheBrakeTest.aReleasedBrakeStillStartsTheEmbeddingModelChangeReembed\" --tests \"io.justsearch.indexerworker.server.AutomaticRebuildPathsConsultTheBrakeTest.aReleasedBrakeStillRebuildsAnIndexRecoveredToEmpty\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerBrakeSentinelTest.aRealTargetStillConsumesBudgetNormally\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 27310
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostBrakeStateBootTest.java#aLostStateOverACompatibleIndexBootsAndServesNormally",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java#aReleasedBrakeStillStartsTheEmbeddingModelChangeReembed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java#aReleasedBrakeStillRebuildsAnIndexRecoveredToEmpty",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerBrakeSentinelTest.java#aRealTargetStillConsumesBudgetNormally",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:552ec9a7e92832c85866180b8e97dd9c659a1506cbbbe11120216a4f751f64f5"
+}

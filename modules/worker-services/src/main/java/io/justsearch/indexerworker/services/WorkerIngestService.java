@@ -127,6 +127,10 @@ public final class WorkerIngestService {
   private final IndexingPacing indexingPacing;
   private final io.justsearch.adapters.lucene.runtime.RunningRuntime ingestLifecycle;
   private final IndexGenerationManager indexGenerationManager;
+  /** Volume each root was first pruned from, kept across restarts (task t-20261013-ef3c41, S8). */
+  private final RootVolumeLedger rootVolumes;
+  /** Task t-20261013-ef3c41, round 4: the root-identity check every deletion decision asks. */
+  private final RootWitness rootWitness;
   private final boolean ingestIsServing;
   private final boolean hasServingRuntime;
   private final io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle;
@@ -194,6 +198,9 @@ public final class WorkerIngestService {
     this.searchLifecycle = searchLifecycle;
     this.capturedServingPath = indexPath;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
+    this.rootVolumes = RootVolumeLedger.under(indexBasePath);
+    this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity,
+        folder -> rootWatcherRegistry.declaresRootCovering(folder));
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
@@ -241,6 +248,7 @@ public final class WorkerIngestService {
         // Read through a supplier: the identity store is wired by setDocumentIdentityStore AFTER
         // this constructor runs, so capturing the field here would capture the UNAVAILABLE sentinel.
         confirmedDeletionMarker);
+    this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
         null,
@@ -400,7 +408,7 @@ public final class WorkerIngestService {
   public void acceptWatcherDelete(String normalizedPath, Runnable directEffect) {
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
-      acceptWatcherDeleteUnderLease(normalizedPath, directEffect, false, null, null);
+      acceptWatcherDeleteUnderLease(normalizedPath, directEffect, false, true, null, null);
     }
   }
 
@@ -413,13 +421,13 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
       acceptWatcherDeleteUnderLease(
-          normalizedPath, directEffect, false, witness.root(), witness.rootIdentity());
+          normalizedPath, directEffect, false, true, witness.root(), witness.rootIdentity());
     }
   }
 
   private boolean acceptWatcherDeleteUnderLease(
       String normalizedPath, Runnable directEffect, boolean requireConfirmedAbsence,
-      Path requiredRoot, RootIdentity expectedRootIdentity) {
+      boolean skipUnlessConfirmedAbsent, Path requiredRoot, RootIdentity expectedRootIdentity) {
     if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
       if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
         switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
@@ -430,6 +438,13 @@ public final class WorkerIngestService {
     return withFileMutationFence(() -> {
       if (expectedRootIdentity != null) {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
+      }
+      if (skipUnlessConfirmedAbsent && !confirmedAbsent(normalizedPath, requiredRoot)) {
+        // Task t-20261013-ef3c41: re-checked under the fence, because the file may have come back
+        // (or its root gone away) since the watcher confirmed the delete. Nothing is removed; a
+        // present file is re-admitted by its own CREATE/MODIFY event or the next sync.
+        log.debug("Watcher delete skipped: absence of {} no longer confirmed", normalizedPath);
+        return false;
       }
       if (requireConfirmedAbsence) {
         Path path;
@@ -451,6 +466,260 @@ public final class WorkerIngestService {
       }
       return true;
     });
+  }
+
+  /**
+   * Confirmed absent: not found while the root (or the file's folder) is present and is the same
+   * folder and volume it was.
+   */
+  private boolean confirmedAbsent(String normalizedPath, Path root) {
+    Path path;
+    try {
+      path = Path.of(normalizedPath);
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
+    return io.justsearch.indexerworker.loop.SourcePresence.classify(path, root, rootWitness)
+        == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT;
+  }
+
+  /**
+   * The root-identity check this service's deletion decisions ask; the composition root hands it to
+   * the indexing loop and the watcher so every deletion decision asks the same one (task
+   * t-20261013-ef3c41, round 4).
+   */
+  public io.justsearch.indexerworker.loop.SourcePresence.RootCheck rootCheck() {
+    return rootWitness;
+  }
+
+  /**
+   * The reason a walk, a sync or a watch of a root refused it because the folder at its path is
+   * not on the volume recorded for it (task t-20261013-ef3c41, S8). The Head records it as the
+   * root's walk error, which shows the root-level "unavailable" state.
+   */
+  static final String ROOT_ON_ANOTHER_VOLUME = "ROOT_NOT_DIRECTORY";
+
+  /**
+   * Round 8 (refined decision 2): the reason a root awaiting its one-time upgrade seeding is
+   * refused while the drive at its path is not confirmed as the one its indexed files are on. The
+   * Head shows it verbatim as the root's unavailable reason. The Head keeps the same text as
+   * {@code RootLifecycleOps.ROOT_UNCONFIRMED_REASON} (app-services): no module both sides use
+   * holds the root reason codes, so a change here must be made there too (round 8b, decision 7).
+   */
+  public static final String ROOT_UNCONFIRMED_AFTER_UPGRADE =
+      ROOT_ON_ANOTHER_VOLUME + ": drive not confirmed after upgrade";
+
+  /** How many of a root's indexed files the upgrade seeding compares with the drive. */
+  static final int UPGRADE_EVIDENCE_SAMPLE = 50;
+
+  /**
+   * The root at {@code rootPath}, normalised, when it is a real folder that is not on the volume
+   * recorded for it, has none recorded, or whose volume cannot be told; {@code null} otherwise,
+   * including for a path that is not valid, missing, or a link, which keep their own handling.
+   */
+  private Path rootOnAnotherVolume(String rootPath) {
+    Path root = parsedRoot(rootPath);
+    return root != null && rootWitness.refusesRoot(root) ? root : null;
+  }
+
+  /**
+   * The root-level reason {@code root} is refused with: the upgrade reason while it awaits its
+   * one-time seeding, otherwise {@code ROOT_NOT_DIRECTORY} followed by {@code detail}.
+   */
+  private String refusalReason(Path root, String detail) {
+    return rootWitness.awaitsUpgradeSeeding(root)
+        ? ROOT_UNCONFIRMED_AFTER_UPGRADE
+        : ROOT_ON_ANOTHER_VOLUME + detail;
+  }
+
+  private static Path parsedRoot(String rootPath) {
+    try {
+      return Path.of(rootPath).toAbsolutePath().normalize();
+    } catch (InvalidPathException invalid) {
+      return null;
+    }
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 6 (S8): whether the folder at {@code rootPath} is a real folder
+   * that is not on the volume recorded for it, or whose volume cannot be told. One volume
+   * identity read, no walk: the Head asks it of every watched root each periodic cycle, so a
+   * root whose turn to be walked is far off still reads unavailable within one cycle. Round 8: it
+   * records nothing, except that a root awaiting its upgrade seeding is first checked on evidence.
+   */
+  public boolean refusesRootVolume(String rootPath, CallContext ctx) {
+    return !rootVolumeRefusal(rootPath, ctx).isEmpty();
+  }
+
+  /**
+   * {@link #refusesRootVolume} with the reason: empty when the root is not refused, else the
+   * root-level reason, which is {@link #ROOT_UNCONFIRMED_AFTER_UPGRADE} for a root whose drive is
+   * not confirmed after an upgrade. A root awaiting its upgrade seeding is checked on evidence
+   * first, so the periodic cycle adopts a returning drive without any action (round 8).
+   */
+  public String rootVolumeRefusal(String rootPath, CallContext ctx) {
+    java.util.Objects.requireNonNull(ctx, "ctx");
+    Path root = parsedRoot(rootPath);
+    if (root == null) {
+      return "";
+    }
+    seedRootAfterUpgrade(root);
+    return rootWitness.refusesRootQuietly(root) ? refusalReason(root, "") : "";
+  }
+
+  /**
+   * Round 8 (refined decision 2): the one-time upgrade seeding. When neither the volume record nor
+   * its pending file exists (an upgrade from a version without the record), the {@code declared}
+   * roots are marked as awaiting seeding; then each root still awaiting it is checked on evidence.
+   * A failure to start records nothing: every root stays unproven and nothing is deleted.
+   */
+  public void seedRootVolumesAfterUpgrade(java.util.Collection<Path> declared) {
+    List<Path> roots = new ArrayList<>();
+    for (Path root : declared) {
+      roots.add(root.toAbsolutePath().normalize());
+    }
+    try {
+      if (rootVolumes.beginUpgradeSeeding(roots)) {
+        log.info("Upgrade: the volume of {} declared roots is confirmed on evidence", roots.size());
+      }
+    } catch (IOException notStarted) {
+      log.warn("Upgrade seeding of root volumes could not start; roots stay unconfirmed ({})",
+          notStarted.getMessage());
+      return;
+    }
+    for (Path root : roots) {
+      seedRootAfterUpgrade(root);
+    }
+  }
+
+  /**
+   * Round 8b (decision 3): a configured collection root (and the bundled help folder) is the
+   * person's configuration, not a declared root, so no add ever records its volume. Each one with
+   * nothing recorded at or above it is seeded once by the upgrade evidence rule; one whose drive is
+   * not confirmed records nothing, reads unavailable with {@link #ROOT_UNCONFIRMED_AFTER_UPGRADE}
+   * and keeps awaiting, so a later boot or migration adopts its returning drive. Nothing is
+   * deleted either way. Runs after the declared roots' upgrade seeding has begun.
+   */
+  public void seedConfiguredRoots(java.util.Collection<Path> configured) {
+    List<Path> roots = new ArrayList<>();
+    for (Path root : configured) {
+      if (root != null) {
+        roots.add(root.toAbsolutePath().normalize());
+      }
+    }
+    List<Path> awaiting;
+    try {
+      awaiting = rootVolumes.awaitSeedingUnlessRecorded(roots);
+    } catch (IOException notStarted) {
+      log.warn("Seeding of configured collection roots could not start; they stay unconfirmed ({})",
+          notStarted.getMessage());
+      return;
+    }
+    for (Path root : awaiting) {
+      seedRootAfterUpgrade(root);
+    }
+  }
+
+  private void seedRootAfterUpgrade(Path root) {
+    if (rootWitness.awaitsUpgradeSeeding(root)) {
+      rootWitness.seedAfterUpgrade(root, this::indexedFilesOnDrive);
+    }
+  }
+
+  /**
+   * The upgrade evidence rule: up to {@link #UPGRADE_EVIDENCE_SAMPLE} of the root's indexed files
+   * are compared with the drive now at its path; at least half must exist there with the indexed
+   * size and modification time. A root with no indexed documents holds. An index that cannot be
+   * read does not.
+   */
+  private boolean indexedFilesOnDrive(Path root) {
+    List<SyncDirectoryOps.IndexedFileStamp> sample;
+    try {
+      sample = candidateDiscoveryOps.sampleIndexedFiles(root, UPGRADE_EVIDENCE_SAMPLE);
+    } catch (IOException cannotTell) {
+      log.warn("The indexed files of {} cannot be read for the upgrade check ({})", root,
+          cannotTell.getMessage());
+      return false;
+    }
+    if (sample.isEmpty()) {
+      return true;
+    }
+    int matching = 0;
+    for (SyncDirectoryOps.IndexedFileStamp stamp : sample) {
+      if (stamp.matchesDisk()) {
+        matching++;
+      }
+    }
+    log.info("Upgrade check of {}: {} of {} sampled indexed files are on the drive", root,
+        matching, sample.size());
+    return matching * 2 >= sample.size();
+  }
+
+  /**
+   * Round 8 (S8): whether the folder at {@code rootPath} is a real folder on the volume recorded
+   * for it. Unlike {@link #refusesRootVolume} it never records: a root with nothing recorded is
+   * unproven and answers {@code false}. The deferred-root check asks this, so a recovery path
+   * never adopts whatever volume is at a root's path.
+   */
+  public boolean rootOnRecordedVolume(String rootPath) {
+    Path root;
+    try {
+      root = Path.of(rootPath).toAbsolutePath().normalize();
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
+    return rootWitness.provenOnRecordedVolume(root);
+  }
+
+  /**
+   * Round 8 (S8): the current count of root removals (unwatches); {@link #rootRemovedSince} tells
+   * whether a root was removed after a count was taken.
+   */
+  public long rootRemovalMark() {
+    return rootWatcherRegistry.removalMark();
+  }
+
+  /** Whether the person removed {@code root} (unwatched it) after {@code mark} was taken. */
+  public boolean rootRemovedSince(Path root, long mark) {
+    return rootWatcherRegistry.removedSince(root, mark);
+  }
+
+  /**
+   * Round 5 (S8): a sync of a root whose path now holds another volume adds nothing, updates
+   * nothing and removes nothing; it answers with the root-level reason the Head shows at once.
+   * A sync that finds the recorded volume back registers the root's held watch first, so changes
+   * from then on are seen, and then reconciles as usual.
+   */
+  private SyncDirectoryResponse refuseSyncOfRootOnAnotherVolume(String rootPath) {
+    Path parsed = parsedRoot(rootPath);
+    if (parsed != null) {
+      // Round 8 (refined decision 2): the periodic sync retries a root's upgrade seeding.
+      seedRootAfterUpgrade(parsed);
+    }
+    Path refused = rootOnAnotherVolume(rootPath);
+    if (refused != null) {
+      return syncDirectoryErrorResponse(refusalReason(refused,
+          ": the folder at this path is not on its recorded volume, or has none recorded"));
+    }
+    try {
+      resumeWatchAwaitingVolume(Path.of(rootPath).toAbsolutePath().normalize());
+    } catch (InvalidPathException invalid) {
+      // Nothing is held under a path that is not valid; the sync reports it below.
+    }
+    return null;
+  }
+
+  /** Registers a watch held for {@code root}'s volume, if any, now that the volume is back. */
+  private void resumeWatchAwaitingVolume(Path root) {
+    if (!rootWatcherRegistry.awaitsVolume(root)) {
+      return;
+    }
+    markReplayUncertainForWatchChangeDuringMigration();
+    try {
+      rootWatcherRegistry.resumeAwaitingVolume(root);
+    } finally {
+      markReplayUncertainForWatchChangeDuringMigration();
+    }
   }
 
   private static void requireWatcherRootCurrent(
@@ -681,6 +950,15 @@ public final class WorkerIngestService {
     statusOps.setExpectedCommitMetadataSupplier(supplier);
   }
 
+  /**
+   * What the Worker's boot held back by the repeat-rebuild brake, or {@code null} when nothing
+   * (task t-20261013-ef3c41, round 3). The status reports it for the rest of the boot.
+   */
+  public void setBootRebuildHoldSupplier(
+      Supplier<IndexGenerationManager.AutoRebuildBrake> supplier) {
+    statusOps.setBootRebuildHoldSupplier(supplier);
+  }
+
   /** Physical target metadata from the Worker that owns the configured model files. */
   public void setIndexTargetMetadataSupplier(Supplier<Map<String, Object>> supplier) {
     indexTargetMetadataSupplier = java.util.Objects.requireNonNull(supplier, "supplier");
@@ -814,6 +1092,12 @@ public final class WorkerIngestService {
 
         if (validPaths.isEmpty()) {
           return batchErrorResponse("All paths were invalid or unsafe");
+        }
+        if (request.getRootAdded()) {
+          // Round 8b (decision 1): an explicit ingest request is a deliberate add and records the
+          // volume of each file's folder; a batch without the marker records nothing.
+          validPaths.stream().map(Path::getParent).filter(java.util.Objects::nonNull).distinct()
+              .forEach(rootWitness::recordExplicitFileFolder);
         }
 
         // Force bypasses unchanged extraction for selected files. It cannot attest to untouched
@@ -1374,22 +1658,37 @@ public final class WorkerIngestService {
       // that stops half-way on user activity leaves orphans behind, which is what the breath-hold
       // did. `aborted` therefore stays false on this path; the response field remains for the
       // force/abort contract PruneOps still exposes.
-      int result = ingestLifecycle.pruneOps().pruneByPathPrefix(
-          pathPrefix,
-          indexingPacing::paceAndContinue,
-          100  // Throttle batch size
-      );
+      // Task t-20261013-ef3c41: a document is pruned only when its file is reported not found
+      // while the root holding it (its registered identity, re-checked every batch) is present.
+      Path pruneRoot = pruneRootFor(pathPrefix);
+      io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result =
+          ingestLifecycle.pruneOps().pruneByPathPrefix(
+              pathPrefix,
+              indexingPacing::paceAndContinue,
+              100, // Throttle batch size
+              pruneGuard(pruneRoot),
+              ignoredConfirmedDeletion -> {}); // unchanged: this path never marked identities
 
-      boolean aborted = result < 0;
-      int prunedCount = Math.max(0, result);
-
-      if (aborted) {
-        log.info("pruneMissing aborted for prefix: {} (user activity)", pathPrefix);
-      } else {
-        log.info("pruneMissing complete: {} orphans pruned for prefix: {}", prunedCount, pathPrefix);
+      switch (result.completion()) {
+        case ABORTED -> {
+          log.info("pruneMissing aborted for prefix: {} (user activity)", pathPrefix);
+          return pruneResultResponse(result.pruned(), true);
+        }
+        case INCOMPLETE -> {
+          log.warn(
+              "pruneMissing incomplete for prefix: {} ({} pruned, {} kept because their files"
+                  + " could not be checked)",
+              pathPrefix,
+              result.pruned(),
+              result.keptUnknown());
+          return pruneIncompleteResponse(result.pruned(), result.keptUnknown());
+        }
+        default -> {
+          log.info(
+              "pruneMissing complete: {} orphans pruned for prefix: {}", result.pruned(), pathPrefix);
+          return pruneResultResponse(result.pruned(), false);
+        }
       }
-
-      return pruneResultResponse(prunedCount, aborted);
 
     } catch (WorkerServiceException e) {
       // Must precede the catch-all: the SWITCHING branch above throws UNAVAILABLE from inside
@@ -1448,6 +1747,10 @@ public final class WorkerIngestService {
           blankReply(rootPath, syncDirectoryErrorResponse("root_path is required"));
       if (blank != null) {
         return blank;
+      }
+      SyncDirectoryResponse otherVolume = refuseSyncOfRootOnAnotherVolume(rootPath);
+      if (otherVolume != null) {
+        return otherVolume;
       }
 
       if (!finalCutoverReplay && switchBufferOps.isSwitching()) {
@@ -1510,7 +1813,8 @@ public final class WorkerIngestService {
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
           if (acceptWatcherDeleteUnderLease(
-              path, () -> deleteCandidateAndMark(path), true, root, difference.rootIdentity())) {
+              path, () -> deleteCandidateAndMark(path), true, false, root,
+              difference.rootIdentity())) {
             deleted++;
           }
         }
@@ -1535,15 +1839,50 @@ public final class WorkerIngestService {
    * published. The strict disk/index difference is evaluated against the serving B runtime; all
    * eligible files are re-admitted, including modifications that had no switch-buffer event.
    */
-  public void reconcileCommittedBootRoot(
+  public boolean reconcileCommittedBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding)
       throws IOException {
-    reconcileCommittedBootRoot(binding, () -> false);
+    return reconcileCommittedBootRoot(binding, () -> false);
   }
 
-  public void reconcileCommittedBootRoot(
+  /**
+   * Returns {@code false}, changing nothing, when the root is deferred (task t-20261013-ef3c41,
+   * round 7, S8): the folder at its path is not on the volume recorded for it. Its watch is then
+   * held until that volume is back, nothing of the other volume is read, and the caller leaves
+   * the root out of its convergence check and keeps the previous generation until the root has
+   * been reconciled through {@link #reconcileReturnedBootRoot}. A deferral is not a failure, so
+   * it leaves the replay certificate as it was. Any other failure throws as before.
+   */
+  public boolean reconcileCommittedBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
       java.util.function.BooleanSupplier cancelled) throws IOException {
+    return reconcileBootRoot(binding, cancelled, true);
+  }
+
+  /**
+   * Round 7 (S8): reconciles a root the committed boot deferred, on the running server, once the
+   * volume recorded for it may be back. The same pass as {@link #reconcileCommittedBootRoot}, but
+   * a failure leaves the replay certificate alone: there is no cutover left for it to fence, and
+   * the caller retries. Round 8: it returns {@code false}, changing nothing, while the root is not
+   * proven on its recorded volume (still another volume, or nothing recorded) and when the person
+   * removed the root after {@code removalMark} was taken; a removed root never gets its watch back.
+   */
+  public boolean reconcileReturnedBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      long removalMark, java.util.function.BooleanSupplier cancelled) throws IOException {
+    return reconcileBootRoot(binding, cancelled, false, removalMark);
+  }
+
+  private boolean reconcileBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled, boolean certifying) throws IOException {
+    return reconcileBootRoot(binding, cancelled, certifying, Long.MAX_VALUE);
+  }
+
+  private boolean reconcileBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled, boolean certifying, long removalMark)
+      throws IOException {
     Path root = binding.path().toAbsolutePath().normalize();
     try (var ignoredMutation = mutationLease()) {
       SyncDirectoryOps.checkCancelled(cancelled);
@@ -1552,8 +1891,29 @@ public final class WorkerIngestService {
         throw new IOException("Committed boot root requires a writable serving successor");
       }
       RootWatcherRegistry registry = rootWatcherRegistry;
-      RootWatcherRegistry.WatchResult watched =
-          registry.watch(root.toString(), binding.collection());
+      RootWatcherRegistry.WatchResult watched;
+      if (certifying) {
+        // Rounds 6 and 7 (S8): the same volume check as every other watch registration. No
+        // watcher is registered on another volume at the root's path; the watch is held and
+        // registered once the recorded volume is back, and the root is deferred rather than
+        // failing the boot.
+        if (rootOnAnotherVolume(root.toString()) != null) {
+          registry.watchWhenVolumeReturns(root, binding.collection());
+          return false;
+        }
+        watched = registry.watch(root.toString(), binding.collection());
+      } else {
+        // Round 8 (S8): a deferred root is reconciled only while it is still declared and proven
+        // on its recorded volume; nothing here records a volume or holds a watch again.
+        if (registry.removedSince(root, removalMark)
+            || !rootWitness.provenOnRecordedVolume(root)) {
+          return false;
+        }
+        watched = registry.watchUnlessRemovedSince(root, binding.collection(), removalMark);
+        if (!watched.watching() && registry.removedSince(root, removalMark)) {
+          return false;
+        }
+      }
       if (!watched.watching()) {
         throw new IOException("Committed boot root watcher registration failed: "
             + watched.errorMessage());
@@ -1598,8 +1958,9 @@ public final class WorkerIngestService {
         requireCandidateSubscription(registry, root, subscription);
         difference.requireCurrentRootIdentity();
       }
+      return true;
     } catch (IOException | RuntimeException failure) {
-      if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      if (certifying && mutationAdmission != null) mutationAdmission.markReplayUncertain();
       if (failure instanceof IOException incomplete) throw incomplete;
       throw new IOException("Committed boot root reconciliation failed", failure);
     }
@@ -1615,6 +1976,22 @@ public final class WorkerIngestService {
   public boolean committedBootRootConverged(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
       java.util.function.BooleanSupplier cancelled) throws IOException {
+    return bootRootConverged(binding, cancelled, true);
+  }
+
+  /**
+   * Round 7 (S8): {@link #committedBootRootConverged} for a deferred root reconciled on the
+   * running server; a failure leaves the replay certificate alone and the caller retries.
+   */
+  public boolean returnedBootRootConverged(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    return bootRootConverged(binding, cancelled, false);
+  }
+
+  private boolean bootRootConverged(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled, boolean certifying) throws IOException {
     try {
       SyncDirectoryOps.checkCancelled(cancelled);
       Path root = binding.path().toAbsolutePath().normalize();
@@ -1644,7 +2021,7 @@ public final class WorkerIngestService {
         return true;
       }
     } catch (IOException | RuntimeException failure) {
-      if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      if (certifying && mutationAdmission != null) mutationAdmission.markReplayUncertain();
       if (failure instanceof IOException incomplete) throw incomplete;
       throw new IOException("Committed boot root convergence failed", failure);
     }
@@ -1696,6 +2073,40 @@ public final class WorkerIngestService {
       throw WorkerServiceException.unavailable(
           "Candidate reconciliation root subscription changed during admission");
     }
+  }
+
+  /**
+   * The presence authority for one prune of {@code root}: present, listable, the registered
+   * identity while watched, and the volume recorded at the root's first prune (task
+   * t-20261013-ef3c41, S2 and S8).
+   */
+  private io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard pruneGuard(Path root) {
+    return RootPresenceGuard.capture(root, registeredRootIdentity(root), rootVolumes);
+  }
+
+  /**
+   * The identity a watched root was registered with, or {@code null} when no registration covers
+   * exactly this root. Reads the registry field at call time; it is replaceable by a setter.
+   */
+  private RootIdentity registeredRootIdentity(Path root) {
+    RootWatcherRegistry.Subscription subscription = rootWatcherRegistry.subscription(root);
+    return subscription == null ? null : subscription.rootIdentity();
+  }
+
+  /**
+   * The watched root that holds {@code path}, or the prefix itself when no registration covers it.
+   * A prune is vouched for by this root: it must be present, listable and the registered volume.
+   */
+  private Path pruneRootFor(String pathPrefix) {
+    Path prefix = Path.of(pathPrefix).toAbsolutePath().normalize();
+    Path best = null;
+    for (Path candidate = prefix; candidate != null; candidate = candidate.getParent()) {
+      if (rootWatcherRegistry.subscription(candidate) != null) {
+        best = candidate;
+        break;
+      }
+    }
+    return best == null ? prefix : best;
   }
 
   private static void requireCandidateRootIdentity(
@@ -2447,6 +2858,35 @@ public final class WorkerIngestService {
         throw WorkerServiceException.invalidArgument(
             "ScanRootRequest.root_path is not a valid path: " + e.getMessage());
       }
+      boolean singleFile = recorded != null && recorded.singleFile();
+      if (request.getRootAdded()) {
+        // Round 8b (decision 1): a deliberate add (the person's add of this root, or an explicit
+        // ingest request of a folder or a file) alone records a volume.
+        rootWitness.recordDeliberateAdd(root, singleFile);
+      }
+      // Round 8b (decision 2): no walk records. A walk refuses its folder unless a volume recorded
+      // for its root, or at or above it, holds; one that cannot tell its root (before the roots
+      // are registered again after a restart) is deferred and deletes nothing.
+      boolean refused = !singleFile
+          && (request.getRootAdded()
+              ? rootWitness.refusesRoot(root)
+              : rootWitness.refusesWalk(root));
+      if (refused) {
+        // Task t-20261013-ef3c41, round 4, S8: a drive letter that now holds another volume, or a
+        // root whose volume cannot be told, shows the root-level unavailable state; its files are
+        // not taken for the original's and nothing of the original's is touched. A root that is
+        // itself a link walks as before.
+        sink.accept(
+            io.justsearch.ipc.ScanRootProgress.newBuilder()
+                .setComplete(true)
+                .setTerminalReasonCode(refusalReason(root, ""))
+                .setScanId(scanId)
+                .build());
+        return;
+      }
+      if (!singleFile) {
+        resumeWatchAwaitingVolume(root);
+      }
       WorkerScanOps.ScanMode mode =
           switch (request.getMode()) {
             case SCAN_MODE_RESCAN -> WorkerScanOps.ScanMode.RESCAN;
@@ -2497,8 +2937,22 @@ public final class WorkerIngestService {
       // scan's incarnation check succeeded. Keep the existing final cutover fence conservative.
       markReplayUncertainForWatchChangeDuringMigration();
       try {
+        // Task t-20261013-ef3c41, round 5 (S8): no watcher is registered on another volume at the
+        // root's path, so its creates and changes are never indexed into the root. The watch is
+        // held and registered once a walk or sync finds the recorded volume back. Round 8 (refined
+        // decision 2): only the person's add records the root's volume; a root with none recorded
+        // is held the same way.
+        if (request.getRootAdded()) {
+          Path added = parsedRoot(rootPath);
+          if (added != null) {
+            rootWitness.recordAdded(added);
+          }
+        }
+        Path held = rootOnAnotherVolume(rootPath);
         RootWatcherRegistry.WatchResult result =
-            rootWatcherRegistry.watch(rootPath, request.getCollection());
+            held != null
+                ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
+                : rootWatcherRegistry.watch(rootPath, request.getCollection());
         return io.justsearch.ipc.WatchRootResponse.newBuilder()
             .setWatching(result.watching())
             .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())
@@ -2517,10 +2971,29 @@ public final class WorkerIngestService {
       markReplayUncertainForWatchChangeDuringMigration();
       try {
         boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
+        forgetRemovedRoot(request.getRootPath());
         return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
       } finally {
         markReplayUncertainForWatchChangeDuringMigration();
       }
+    }
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 8: the person removed this root (the Head's removal unwatches it
+   * before deleting its documents), so the volume recorded for it and anything awaiting its upgrade
+   * seeding no longer stand; the same folder added again is recorded at that add. A deletion of
+   * documents by path alone is not a removal and keeps the record of a root that stays declared.
+   */
+  private void forgetRemovedRoot(String rootPath) {
+    if (rootPath == null || rootPath.isBlank()) {
+      return;
+    }
+    try {
+      rootWitness.forgetUnder(rootPath);
+    } catch (IOException | RuntimeException notForgotten) {
+      log.warn("unwatchRoot: could not drop the recorded volume under {}: {}", rootPath,
+          notForgotten.getMessage());
     }
   }
 

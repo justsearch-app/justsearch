@@ -58,7 +58,11 @@ public record KnowledgeStatusView(
 
     // L160: stale-cache indicators (set when in-process port to Worker failed and cached view is served)
     Boolean statusStale,
-    Long statusStaleMs) {
+    Long statusStaleMs,
+
+    // Task t-20261013-ef3c41: true when indexedDocuments (and its aliases) is not a count — the
+    // index could not be counted and no earlier count exists. False means the count is known.
+    Boolean indexedDocumentsUnknown) {
 
   public KnowledgeStatusView {
     state = state == null ? "" : state;
@@ -75,7 +79,15 @@ public record KnowledgeStatusView(
     chunkEmbeddingReady = chunkEmbeddingReady == null ? Boolean.FALSE : chunkEmbeddingReady;
     statusStale = statusStale == null ? Boolean.FALSE : statusStale;
     statusStaleMs = statusStaleMs == null ? 0L : statusStaleMs;
+    indexedDocumentsUnknown =
+        indexedDocumentsUnknown == null ? Boolean.FALSE : indexedDocumentsUnknown;
   }
+
+  /**
+   * The {@link KnowledgeStatus#extras()} key that marks {@link KnowledgeStatus#docCount()} as not a
+   * count (task t-20261013-ef3c41). Present and true only then; absent means the count is known.
+   */
+  public static final String DOC_COUNT_UNKNOWN_EXTRA = "docCountUnknown";
 
   /** Creates a view from the internal {@link KnowledgeStatus} data carrier. */
   public static KnowledgeStatusView from(KnowledgeStatus ks) {
@@ -112,6 +124,7 @@ public record KnowledgeStatusView(
         .chunkEmbeddingReady(asBoolean(extras, "chunkVectorsReady"))
         .statusStale(Boolean.FALSE)
         .statusStaleMs(0L)
+        .indexedDocumentsUnknown(asBoolean(extras, DOC_COUNT_UNKNOWN_EXTRA))
         .build();
   }
 

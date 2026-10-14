@@ -240,6 +240,7 @@ final class EngineIndexingWorkflowTest {
     Files.delete(testFile);
 
     // 9. Sync to detect and prune the orphan.
+    harness.addRootAsThePerson(corpus);
     SyncDirectoryResponse sync = harness.client().syncDirectory(corpus.toString(), true, TestEngineContexts.FOREGROUND);
     assertTrue(
         sync.getFilesDeleted() >= 1,
@@ -302,6 +303,7 @@ final class EngineIndexingWorkflowTest {
     long initialCount = docCount();
 
     Path nestedRoot = corpus.resolve("nested");
+    harness.addRootAsThePerson(nestedRoot);
     SyncDirectoryResponse sync = harness.client().syncDirectory(nestedRoot.toString(), true, TestEngineContexts.FOREGROUND);
     assertTrue(
         sync.getFilesAdded() >= 4,
@@ -444,6 +446,7 @@ final class EngineIndexingWorkflowTest {
       Files.deleteIfExists(file);
     }
 
+    harness.addRootAsThePerson(massDeleteDir);
     SyncDirectoryResponse sync = harness.client().syncDirectory(massDeleteDir.toString(), true, TestEngineContexts.FOREGROUND);
     assertTrue(
         sync.getFilesDeleted() >= fileCount,

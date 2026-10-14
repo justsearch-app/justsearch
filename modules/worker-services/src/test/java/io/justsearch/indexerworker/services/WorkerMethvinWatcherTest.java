@@ -58,6 +58,134 @@ final class WorkerMethvinWatcherTest {
 
   @TempDir Path tempDir;
 
+  /** Longer than the watcher's delete settle window, so a deferred delete has had its chance. */
+  private static final long SETTLE_WAIT_MS = 5_000L;
+
+  // ---- Task t-20261013-ef3c41, scenario S3: a watcher delete removes a document only after its
+  // absence is confirmed. Each case performs the real file-system change; the DELETE notification
+  // is dispatched directly because the event sequence the OS reports for an atomic save or a
+  // case-only rename differs by platform and editor, and the claim under test is what the watcher
+  // does with a DELETE for a path that is present again.
+
+  @Test
+  @Timeout(30)
+  void atomicSaveDeleteNotificationKeepsTheDocument() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("atomic-save"));
+    Path doc = Files.writeString(root.resolve("notes.txt"), "version one");
+    RecordingQueue queue = new RecordingQueue();
+    RecordingDeleteSink sink = new RecordingDeleteSink();
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration = subscription(root, null, new Object());
+      // An editor's atomic save: write a sibling temp file, then move it over the original.
+      Path temp = Files.writeString(root.resolve("notes.txt.tmp"), "version two");
+      Files.move(temp, doc, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, doc);
+
+      Thread.sleep(SETTLE_WAIT_MS);
+      assertTrue(sink.observed.isEmpty(),
+          "An atomic save must never remove the document; deleted: " + sink.observed);
+      assertTrue(queue.enqueuedPaths.contains(doc),
+          "The saved file must be re-admitted so its new content is indexed");
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void caseOnlyRenameDeleteNotificationKeepsTheDocument() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("case-rename"));
+    Path before = Files.writeString(root.resolve("Report.txt"), "quarterly");
+    RecordingQueue queue = new RecordingQueue();
+    RecordingDeleteSink sink = new RecordingDeleteSink();
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration = subscription(root, null, new Object());
+      Path after = Files.move(before, root.resolve("report.TXT"));
+      boolean caseInsensitive = Files.exists(root.resolve("Report.txt"));
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, before);
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, after);
+
+      Thread.sleep(SETTLE_WAIT_MS);
+      if (caseInsensitive) {
+        // The old spelling still names the file, and the index keys it case-insensitively here:
+        // removing it would drop the renamed file out of search.
+        assertTrue(sink.observed.isEmpty(),
+            "A case-only rename must never remove the document; deleted: " + sink.observed);
+      } else {
+        assertEquals(1, sink.observed.size(), "On a case-sensitive volume the old name is gone");
+      }
+    }
+  }
+
+  @Test
+  @Timeout(40)
+  void deleteAndRecreateWithinSecondsIsNeverRemoved() throws Exception {
+    // Real watcher, real events: the file is deleted and written again a moment later.
+    Path root = Files.createDirectory(tempDir.resolve("recreate"));
+    RecordingQueue queue = new RecordingQueue();
+    RecordingDeleteSink sink = new RecordingDeleteSink();
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      registerAndActivate(watcher, root, null, new Object());
+      Thread.sleep(500);
+      Path doc = Files.writeString(root.resolve("draft.txt"), "first");
+      pollForEnqueued(queue, doc, 10_000);
+      int enqueuedBefore = queue.enqueuedPaths.size();
+      Files.delete(doc);
+      Thread.sleep(300);
+      Files.writeString(doc, "second, recreated");
+
+      Thread.sleep(SETTLE_WAIT_MS);
+      assertTrue(sink.observed.isEmpty(),
+          "A file recreated within seconds must never be removed; deleted: " + sink.observed);
+      assertTrue(queue.enqueuedPaths.size() > enqueuedBefore,
+          "The recreated file must be re-admitted so its new content is indexed");
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void deleteIsKeptWhenTheRootVanishesBeforeConfirmation() throws Exception {
+    // An unplug starts with child DELETE notifications while the root still answers; the root is
+    // gone a moment later. Nothing may be removed on that evidence.
+    Path root = Files.createDirectory(tempDir.resolve("unplugged"));
+    Path child = root.resolve("photo.jpg");
+    RecordingQueue queue = new RecordingQueue();
+    RecordingDeleteSink sink = new RecordingDeleteSink();
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration = subscription(root, null, new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);
+      Files.move(root, tempDir.resolve("unplugged-elsewhere"));
+
+      Thread.sleep(SETTLE_WAIT_MS);
+      assertTrue(sink.observed.isEmpty(),
+          "A delete must not be applied once the root that vouches for it is gone; deleted: "
+              + sink.observed);
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void genuineDeleteIsAppliedWithoutAnyFurtherEvent() throws Exception {
+    // P1 (must not break): a file that is really gone leaves the index on the watcher delete.
+    Path root = Files.createDirectory(tempDir.resolve("genuine"));
+    Path doc = Files.writeString(root.resolve("old.txt"), "obsolete");
+    RecordingQueue queue = new RecordingQueue();
+    RecordingDeleteSink sink = new RecordingDeleteSink();
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration = subscription(root, null, new Object());
+      Files.delete(doc);
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, doc);
+
+      assertNotNull(pollForDeletedPath(sink.observed, doc, 10_000),
+          "A confirmed delete must remove the document");
+      assertTrue(queue.enqueuedPaths.isEmpty(), "A deleted file must not be re-admitted");
+    }
+  }
+
   @Test
   void createAndModifyEventsDoNotQueueExcludedDirectoryContents() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("watched"));
@@ -460,7 +588,7 @@ final class WorkerMethvinWatcherTest {
   }
 
   @Test
-  void deleteForChildIsForwardedWhenRootExists() throws IOException {
+  void deleteForChildIsForwardedWhenRootExists() throws Exception {
     // Tempdoc 626 §I.3-A — the guard must NOT block normal deletions: when the watched root is
     // present, a child DELETE flows through to the sink as before.
     RecordingQueue queue = new RecordingQueue();
@@ -471,8 +599,11 @@ final class WorkerMethvinWatcherTest {
       RootWatcherRegistry.Subscription registration =
           subscription(root, null, new Object());
       watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);
-      assertEquals(1, sink.observed.size(), "Delete under an existing root must reach the sink");
-      assertTrue(sink.observed.get(0).endsWith("doc.txt"));
+      // Task t-20261013-ef3c41: a delete is applied once its absence is confirmed, which may wait
+      // out a short settle window; it must still arrive without any further event.
+      String observed = pollForDeletedPath(sink.observed, child, 10_000);
+      assertNotNull(observed, "Delete under an existing root must reach the sink");
+      assertEquals(1, sink.observed.size());
     }
   }
 
@@ -492,6 +623,7 @@ final class WorkerMethvinWatcherTest {
           subscription(missingRoot, null, new Object());
       Files.delete(missingRoot); // simulate the root vanishing (unmount/unplug)
       watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);
+      Thread.sleep(SETTLE_WAIT_MS);
       assertTrue(
           sink.observed.isEmpty(),
           "Delete must be SKIPPED while the watched root is gone; observed: " + sink.observed);

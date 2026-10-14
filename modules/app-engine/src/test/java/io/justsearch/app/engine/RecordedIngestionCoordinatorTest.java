@@ -70,10 +70,11 @@ final class RecordedIngestionCoordinatorTest {
     try (Fixture f = new Fixture(temp, 1)) {
       var ingestCalls = new AtomicInteger();
       var watchedCalls = new AtomicInteger();
-      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+      RecordedIngestionCoordinator.Producer ingest = (plan, key, epoch, context, cancellation) -> {
         ingestCalls.incrementAndGet();
         return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
-      }, (plan, key, epoch, context, cancellation) -> {
+      };
+      f.coordinator.bindProducer(ingest, ingest, (plan, key, epoch, context, cancellation) -> {
         watchedCalls.incrementAndGet();
         return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
       });
@@ -1995,6 +1996,6 @@ final class RecordedIngestionCoordinatorTest {
 
   private static void bindProducer(
       RecordedIngestionCoordinator coordinator, RecordedIngestionCoordinator.Producer producer) {
-    coordinator.bindProducer(producer, producer);
+    coordinator.bindProducer(producer, producer, producer);
   }
 }

@@ -38,6 +38,9 @@
     "indexedDocuments" : {
       "type" : "integer"
     },
+    "indexedDocumentsUnknown" : {
+      "type" : [ "boolean", "null" ]
+    },
     "migrationPauseReason" : {
       "type" : [ "string", "null" ]
     },

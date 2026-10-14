@@ -73,6 +73,7 @@ public final class KnowledgeHttpApiAdapter {
   }
 
   public interface SearchSession extends AutoCloseable {
+    /** {@code docCount} is negative when the index could not be counted (unknown, not empty). */
     record StatusFacts(long docCount, double embeddingCoveragePercent,
                        double spladeCoveragePercent) {}
     KnowledgeSearchResponse response();

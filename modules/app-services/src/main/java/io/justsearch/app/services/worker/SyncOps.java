@@ -211,6 +211,8 @@ final class SyncOps {
                 }
             }
 
+            recordRootAvailability(rootPath, response);
+
             if (response.getSkipped()) {
                 log.debug("SyncDirectory skipped for {} (force={})", rootPath, force);
             } else if (!response.getError().isEmpty()) {
@@ -230,6 +232,96 @@ final class SyncOps {
             EngineRefusals.rethrow(e);
             log.warn("syncDirectory RPC failed for {}", rootPath, e);
             return null;
+        }
+    }
+
+    /**
+     * Task t-20261013-ef3c41, round 5 (S8): a sync the Worker refused because the folder at the
+     * root's path is not the volume it was first seen on makes the root read unavailable at once,
+     * the periodic sync included; the next sync it accepts (the volume is back) clears that, and
+     * the root reads indexed again. Every other outcome leaves the root's walk state alone.
+     */
+    private void recordRootAvailability(String rootPath, SyncDirectoryResponse response) {
+        if (rootsState == null) {
+            return;
+        }
+        Path root = Path.of(rootPath).toAbsolutePath().normalize();
+        boolean changed;
+        if (RootLifecycleOps.isRootUnavailableReason(response.getError())) {
+            // Round 8: a root whose drive is not confirmed after an upgrade shows that reason.
+            changed = rootsState.markRootUnavailable(root,
+                    RootLifecycleOps.unavailableReasonFor(response.getError()));
+        } else if (response.getError().isEmpty()) {
+            changed = rootsState.markRootReturned(root);
+        } else {
+            changed = false;
+        }
+        if (changed) {
+            rootsState.persist();
+        }
+    }
+
+    /**
+     * Roots other than {@code synced} whose recorded walk error is the root-level unavailable
+     * reason. The periodic sync re-asks them every cycle, so a returned volume is noticed within
+     * one interval instead of one full round-robin.
+     */
+    private List<Path> unavailableRootsBesides(List<Path> roots, Path synced) {
+        if (rootsState == null) {
+            return List.of();
+        }
+        return roots.stream()
+                .filter(r -> !r.equals(synced))
+                .filter(r -> RootLifecycleOps.isRootUnavailableReason(rootsState.getWalkError(r)))
+                .toList();
+    }
+
+    /**
+     * Round 6 (S8): asks the volume identity of every root this cycle neither walked nor re-asked
+     * (one cheap read each, no walk) and makes each one the Worker refuses read unavailable now.
+     * Walking stays one root per cycle; without this a swap on a root whose turn just passed would
+     * read indexed for up to {@code roots × SYNC_INTERVAL_SECONDS}.
+     */
+    private void markRefusedRootsUnavailable(List<Path> roots, List<Path> asked,
+            EngineContext engineContext) {
+        if (rootsState == null) {
+            return;
+        }
+        for (Path root : roots) {
+            if (asked.contains(root)) {
+                continue;
+            }
+            // Round 8 (S8): the cycle's roots were listed when it began. A root the person removed
+            // since is not asked: the ask runs under the root's producer fence, which removal
+            // waits for and which refuses a removed root, so nothing is asked or marked for it.
+            var fence = rootsState.captureRootProducer(root, true);
+            boolean[] removed = {false};
+            String refusal;
+            try {
+                refusal = rpc.execute(
+                        "refusesRootVolume",
+                        KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                        stub -> fence.run(
+                                () -> stub.rootVolumeRefusal(root.toString()),
+                                () -> {
+                                    removed[0] = true;
+                                    return "";
+                                }),
+                        engineContext);
+            } catch (CircuitBreakerOpenException e) {
+                log.debug("refusesRootVolume rejected by circuit breaker for {}", root);
+                return;
+            }
+            if (removed[0]) {
+                log.debug("Watched root {} was removed during this cycle; it is not asked", root);
+                continue;
+            }
+            if (refusal != null && !refusal.isEmpty()
+                    && rootsState.markRootUnavailable(root, RootLifecycleOps.unavailableReasonFor(refusal))) {
+                log.info("Watched root {} is not on the volume it was first seen on; it reads"
+                        + " unavailable", root);
+                rootsState.persist();
+            }
         }
     }
 
@@ -273,6 +365,13 @@ final class SyncOps {
 
                                 // force=false: Worker will skip if user is actively searching
                                 syncWatchedDirectory(root.toString(), /* force= */ false, engineContext);
+                                List<Path> asked = new java.util.ArrayList<>(List.of(root));
+                                for (Path unavailable : unavailableRootsBesides(roots, root)) {
+                                    syncWatchedDirectory(
+                                            unavailable.toString(), /* force= */ false, engineContext);
+                                    asked.add(unavailable);
+                                }
+                                markRefusedRootsUnavailable(roots, asked, engineContext);
 
                             } catch (Exception e) {
                                 log.warn("Periodic sync failed", e);

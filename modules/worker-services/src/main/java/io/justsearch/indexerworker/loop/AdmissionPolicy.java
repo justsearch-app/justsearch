@@ -24,6 +24,7 @@ final class AdmissionPolicy {
       case FILE_KEY_CHANGED -> IngestionReasonCodes.FILE_KEY_CHANGED_AFTER_SNAPSHOT;
       case SOURCE_KIND_CHANGED -> IngestionReasonCodes.SOURCE_KIND_CHANGED_AFTER_SNAPSHOT;
       case DELETED -> IngestionReasonCodes.DELETED_AFTER_SNAPSHOT;
+      case UNREADABLE -> IngestionReasonCodes.SOURCE_UNREADABLE;
       case FRESH -> IngestionReasonCodes.STALE_AFTER_EXTRACTION;
     };
   }
