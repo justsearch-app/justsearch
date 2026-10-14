@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T23:59:08.773Z",
-  "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
-  "tree": "d25808626e4fd49db50c4519002782f5a8533556",
+  "createdAt": "2026-10-14T16:11:43.961Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "11dc83fb852a2c63dc44d3ea723daf4ed827a253",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.splade.SeatForEveryGpuRunTest.atMostOneNativeRunIsInFlightOnTheDevice\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9792
+      "durationMs": 13459
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.everyGpuRolesPolicyHasShrinkageOnForItsDevice\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.plainPinnedAndDeadlineGpuRunsPassTheHandlesRunOptions\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.cpuSessionsAreCreatedWithoutTheCudaProviderAndAreNeverSeated\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.withTheBreakerHeldOpenQueryLegsRunOnTheWarmCpuWithCauseStuckOrAreTurnedAway\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.resolvedGpuPoliciesKeepWeightsInTheArenaWithSameAsRequestedAndNoPatternOptimisation\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.outsidePlannedProfilesTheFp32FallbackOnTheGpuIsUnchanged\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4274
+      "durationMs": 4843
     }
   ],
   "checks": [
@@ -110,7 +110,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#resolvedGpuPoliciesKeepWeightsInTheArenaWithSameAsRequestedAndNoPatternOptimisation",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e36baeeb1730de7af4904bf74ff9dad72a4e2d953553d14dd14b610cba8e47d0",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#outsidePlannedProfilesTheFp32FallbackOnTheGpuIsUnchanged",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e36baeeb1730de7af4904bf74ff9dad72a4e2d953553d14dd14b610cba8e47d0",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -137,63 +137,6 @@
       ]
     }
   ],
-  "failBefore": {
-    "ref": "f648453b5",
-    "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
-    "overlays": [
-      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceMemoryFixtures.java"
-    ],
-    "runs": [
-      {
-        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.splade.SeatForEveryGpuRunTest.atMostOneNativeRunIsInFlightOnTheDevice\" --rerun -PskipWebBuild=true --console=plain",
-        "cwd": "<before-worktree>",
-        "exitCode": 0,
-        "durationMs": 49866
-      },
-      {
-        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.everyGpuRolesPolicyHasShrinkageOnForItsDevice\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.plainPinnedAndDeadlineGpuRunsPassTheHandlesRunOptions\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.cpuSessionsAreCreatedWithoutTheCudaProviderAndAreNeverSeated\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.withTheBreakerHeldOpenQueryLegsRunOnTheWarmCpuWithCauseStuckOrAreTurnedAway\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.resolvedGpuPoliciesKeepWeightsInTheArenaWithSameAsRequestedAndNoPatternOptimisation\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.outsidePlannedProfilesTheFp32FallbackOnTheGpuIsUnchanged\" --rerun -PskipWebBuild=true --console=plain",
-        "cwd": "<before-worktree>",
-        "exitCode": 0,
-        "durationMs": 13631
-      }
-    ],
-    "checks": [
-      {
-        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/SeatForEveryGpuRunTest.java#atMostOneNativeRunIsInFlightOnTheDevice",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#everyGpuRolesPolicyHasShrinkageOnForItsDevice",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#plainPinnedAndDeadlineGpuRunsPassTheHandlesRunOptions",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#cpuSessionsAreCreatedWithoutTheCudaProviderAndAreNeverSeated",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#withTheBreakerHeldOpenQueryLegsRunOnTheWarmCpuWithCauseStuckOrAreTurnedAway",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#resolvedGpuPoliciesKeepWeightsInTheArenaWithSameAsRequestedAndNoPatternOptimisation",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#outsidePlannedProfilesTheFp32FallbackOnTheGpuIsUnchanged",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      }
-    ]
-  },
-  "digest": "sha256:6b948e04eeeca9dd10b40f44281673fce1b7560b6366dbfa301300510a8609f1"
+  "failBefore": null,
+  "digest": "sha256:eec1bd5afe3677e7b19f62cc639f9ae7d898ade1e627933cd8f6af9f5901e1b5"
 }

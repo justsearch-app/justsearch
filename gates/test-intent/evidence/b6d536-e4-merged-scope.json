@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T23:15:06.257Z",
-  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
-  "tree": "d5ee7984ad1aba37a900a304ad657c6081da85ca",
+  "createdAt": "2026-10-14T16:07:58.785Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "100c80b7bca4e287236c28fcfe5c27f78cdf34b1",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7102
+      "durationMs": 4774
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
       "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:cfd9e0925ba67a8dcf5556c286b09a472cf4ccf4a8154349cddf36408f5b8832",
+      "contentDigest": "sha256:5030008593c02579f70060d04533ac4510b467b8bd94cd7eafd7e195ff4497b4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -48,19 +48,19 @@
     "patches": [],
     "runs": [
       {
-        "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 14681
+        "durationMs": 4070
       }
     ],
     "checks": [
       {
         "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
         "classification": "assertion",
-        "detail": "packagedRegisterIsTheRepositoryRegister(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <284> but was: <281>"
+        "detail": "packagedRegisterIsTheRepositoryRegister(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the additive encoder-device scope is registered ==> expected: <289> but was: <281>"
       }
     ]
   },
-  "digest": "sha256:09781c561ee01db32d5f3183abaa16283e7729ca1dd019f43bda41125923461b"
+  "digest": "sha256:6f8f462940a1233e51e7d0db0a41d28950f8bb743685011afc2510783376fbf4"
 }

@@ -24,6 +24,11 @@ chat server's stop-reason table:
   the process `PATH`; `ChildSpec` carries a path prefix that child control puts in front of the
   `PATH` the child inherits. New checks pin both.
 
+Phase B (b599d4d7e): `b6d536-integrate-merged-count.json` was regenerated. Later merges added keys,
+so the packaged-register check now expects 289. It passes on the candidate and fails by assertion on
+75e70d488 (289 expected, 282 actual). The 284 in the count entry below is the count at integration
+time.
+
 ## Evidence that goes stale on the integration branch only
 
 Each slice below ships as its own stacked PR, where its evidence was run against the test files

@@ -22,6 +22,11 @@ activation 9-16 s plus cold-disk margin). The crash path now takes that observat
 successor is identified, before the in-flight jobs finish, so the bound is still open; a first
 observation after the bound is unmeasurable, not a pass.
 
+Phase B (b599d4d7e): `b6d536-no-adoption-ownership.json` was regenerated candidate-only, without a
+before-state. LlamaServerProcessOwnershipTest now uses StopRequest and RecordingChildControl, which
+6f7895a79 lacks, and its entry is not a repair, so no fail-before is required. The check passes on the
+candidate.
+
 ```json
 {
   "entries": [
