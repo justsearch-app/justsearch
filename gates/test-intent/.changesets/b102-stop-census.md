@@ -55,6 +55,20 @@ Follow-up decisions after the independent verifier rejected f3a8282f7:
   probe, in any phase. (f3a8282f7 passed a ledger-ended Engine to the identity lookup three times
   in one stop.)
 
+Follow-up decisions after the independent verifier rejected 5b53911da:
+
+- A gap from an earlier read of the ledger is dropped when a later read in the same stop resolves
+  it, as with a torn line read whole later. (5b53911da kept the arming read's "engine-start lacks
+  exact PID/birth/executable identity" gap after the Engine start line had completed, so a stop
+  with the Engine's REQUESTED exit stayed incomplete.)
+- Each ledger file is cached per stop by file id, size and modification time. An unchanged file is
+  not opened again in the same stop; a grown file reads only its new tail. (5b53911da read each
+  file 7 times per stop: one payload read and six 256-byte head reads.)
+- The stop is not slower than b599d4d7e on the verifier's 17 MB ledger of about 20,000 Engine
+  children, and stays well under 60 s. (5b53911da took 39.4 s there against b599d4d7e's 19.1 s,
+  because it built the ledger view at every lookup phase and each view scanned every child for
+  each children record.)
+
 What changed:
 
 - `scripts/dev/lib/stop-exit-census.cjs`: `endedIdentitiesOf(view)` lists the run's Engine
@@ -65,11 +79,15 @@ What changed:
   `files`). The verdict adds a `ledger-damaged` gap per damaged file (`family`, `file`, `lines`
   and the counts), so accounting is incomplete; a torn line at the verdict is read once more
   after 250 ms first. One incremental reader serves the stop and its census (the stop passes its
-  own as `ledgerReader`) (`exit-ledger.cjs` `createIncrementalReader`: a file, known by its file id and first
-  bytes, is parsed once; later reads parse only the complete lines appended since). The ledger
-  view reads each helper window's instants once and finds windows, owner records, console
-  parents and report rows through PID and image indexes instead of rescanning every record per
-  helper; on the run's own 17 MB ledger the view went from 34.9 s to 0.09 s with output identical
+  own as `ledgerReader`) (`exit-ledger.cjs` `createIncrementalReader`: a file is known by its
+  file id, size and modification time from a stat; an unchanged file is not opened again, a
+  first read is one read of the whole file, a grown file reads and parses only the bytes
+  appended since, any other change parses it again from its start, and `version()` changes
+  when any read finds a difference). The verdict replaces the arming read's ledger gaps with the
+  final read's. The ledger view reads each helper window's instants once and finds windows,
+  owner records, owning children, console parents and report rows through PID and image indexes
+  instead of rescanning every record per helper, and `readRunLedger` looks up each Engine
+  owner's manifest once instead of once per child-spawn record; on the run's own 17 MB ledger the view went from 34.9 s to 0.09 s with output identical
   to b599d4d7e apart from `exitAccountingComplete`. A retried stop renames the earlier
   `exit-targets.json` and `process-exits.json` to the next free `.N.json`, merges every kept
   census's OS exits (and the targets it observed them for) into its verdict, and writes the
@@ -82,16 +100,17 @@ What changed:
   again before each lookup phase and the Engine job stop. An identity whose exit the ledger records
   is left out of every identity lookup and of the port-owner match. Every lookup verdict for it is
   `gone`, the post-kill wait for it is skipped, the Engine job stop skips it, and the stop report
-  lists it once in `resolvedByLedger`. `writeSelfExitStopReport` keeps an earlier report the same
+  lists it once in `resolvedByLedger`. The stop judges the ledger again only when the reader's
+  `version()` changed since its last judgement. `writeSelfExitStopReport` keeps an earlier report the same
   way as a stop does. Before writing its report, a stop
   renames an existing stop-report.json to the next free stop-report.N.json; the report and the
   stop's output list the kept reports as `earlierReports` (oldest first), and the report carries
   the census's `earlierCensus`. stop-report.json is always the latest stop's, so its readers
   (including the forget check) are unchanged.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (12 cases). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (14 cases). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
-b599d4d7e, as preservation), and all pass after:
+b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, and all pass after:
 
 1. Real `stop-job-run.ps1`: a job member whose PID now names a running process whose birth
    cannot be read (found at run time, query rights only) is a survivor without the ledger and is
@@ -108,7 +127,8 @@ b599d4d7e, as preservation), and all pass after:
 6. A stop over a 17 MiB synthetic ledger shaped like run 8f60c4e7's (2229 job processes, helper
    receipts, helper windows, rotated files): b599d4d7e took 167,572 ms and read 71,308,464
    ledger bytes; after, 4,614 ms and 17,832,236 bytes (ledger 17,827,116 bytes). It asserts at
-   most 20 s and at most one read of each ledger file.
+   most 20 s and exactly one read call on each ledger file and no whole-file read. On 5b53911da:
+   "children.v1.1.jsonl is read once per stop" fails with 7 read calls.
 7. Three stops of one run (incomplete, then two that complete): the first report is kept
    byte-for-byte as stop-report.1.json, the second as stop-report.2.json; each later report names
    them in `earlierReports`, and the retry's report names the kept census files in
@@ -124,5 +144,25 @@ b599d4d7e, as preservation), and all pass after:
    the ledger. On f3a8282f7 the lookup got it 3 times.
 12. `writeSelfExitStopReport` over an existing stop-report.json keeps it as stop-report.1.json
    and names it in `earlierReports`.
+13. The census arms while the Engine start line has only its first 80 bytes (no Engine target);
+   the line is then completed and the Engine exit appended. The verdict has the Engine's
+   REQUESTED exit, no gaps, and is complete. On 5b53911da the gap list still held the arming
+   read's Engine-identity gap.
+14. Real `stopRun` over a 17,000,732-byte ledger of 19,195 Engine children (spawn, start and exit
+   each, one owner): exactly one read call per ledger file, complete, at most 10 s. On 5b53911da
+   it took 31,041 ms with 7 read calls per file; after, 1,448 ms.
+
+Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
+17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
+three times, CPU load sampled before each run (26 to 46 % for b599d4d7e, 0 to 37 % for this
+change, about 11 GB free): b599d4d7e 13,239 / 13,745 / 14,578 ms, 120,178 record parses, 4 read
+calls per file, not complete; this change 1,250 / 1,276 / 1,276 ms, 60,089 parses, 1 read call per
+file, complete. The verifier's `assert-file-reads.cjs` and `assert-perf.cjs` pass on it, and its
+19 `independent.cjs` scenarios pass, `torn-engine-completes` included. b599d4d7e is slower
+because it parses the ledger twice and builds the view twice, each view scanning every child per
+children record; 5b53911da was slower still because it built that view at every lookup phase.
+The `world-state.mjs` CLI does not load the changed files; timed three times interleaved it took
+12,500 / 8,563 / 8,183 ms on b599d4d7e and 9,312 / 9,081 / 8,101 ms with this change, so its
+earlier 12.3 s against the 10 s budget was machine load.
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/.

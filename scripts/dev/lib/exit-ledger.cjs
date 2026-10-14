@@ -346,19 +346,19 @@ function totalOf(files) {
   return { ...total, skippedLines: total.corruptLines + total.unknownSchemaLines + total.unknownTypeLines };
 }
 
-/** How many leading bytes of a ledger file identify it across reads (with its file id). */
-const INCREMENTAL_HEAD_BYTES = 256;
-
 /**
- * readLedger for a caller that reads the same ledger more than once (a stop reads it when it arms
- * its census, before it judges the Engine's job and at its verdict): each file is parsed once, and
- * a later read parses only the complete lines appended since. A file is the same file when its file
- * id (which a rotation's rename keeps) and its first bytes are unchanged and it has not shrunk;
- * anything else is parsed again from its start. A line still being written when one read finds it
- * (a torn tail) is parsed whole by a later read. The result is readLedger's.
+ * readLedger for a caller that reads the same ledger more than once (a stop reads it before each of
+ * its phases, and its census when it arms and at its verdict). Each file is known by its file id
+ * (which a rotation's rename keeps), size and modification time. A file unchanged since the last
+ * read is not opened again; a file that grew is read from where the last read ended, so only its
+ * new tail is read and parsed, and a line still being written then (a torn tail) is parsed whole
+ * once it is complete; any other change parses the file again from its start. The result is
+ * readLedger's. `version()` changes whenever a read finds anything different.
  */
 function createIncrementalReader() {
   const cache = new Map();
+  const seen = new Map();
+  let version = 0;
   const readAt = (fd, position, length) => {
     const bytes = Buffer.alloc(length);
     let done = 0;
@@ -369,49 +369,61 @@ function createIncrementalReader() {
     }
     return done === length ? bytes : bytes.subarray(0, done);
   };
+  const fresh = (family) => ({ family, size: 0, mtimeNs: null, offset: 0, records: [],
+    tally: { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false } });
   function read(ledgerDir, family) {
     familyOf(family);
     const files = [];
     const records = [];
+    const signature = [];
     for (const file of ledgerFiles(ledgerDir, family)) {
-      let fd;
+      let stat;
       try {
-        fd = fs.openSync(file, 'r');
+        stat = fs.statSync(file, { bigint: true });
       } catch (err) {
         if (err && err.code === 'ENOENT') continue;
         throw err;
       }
-      try {
-        const stat = fs.fstatSync(fd, { bigint: true });
-        const size = Number(stat.size);
-        const key = stat.ino ? `${stat.dev}:${stat.ino}` : `path:${file}`;
-        const head = readAt(fd, 0, Math.min(size, INCREMENTAL_HEAD_BYTES));
-        let entry = cache.get(key);
-        if (!entry || entry.family !== family || size < entry.offset
-            || !head.subarray(0, entry.head.length).equals(entry.head)) {
-          entry = { family, head, offset: 0, records: [],
-            tally: { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false } };
+      const size = Number(stat.size);
+      const key = stat.ino ? `${stat.dev}:${stat.ino}` : `path:${file}`;
+      let entry = cache.get(key);
+      const unchanged = entry && entry.family === family && entry.size === size && entry.mtimeNs === stat.mtimeNs;
+      if (!unchanged) {
+        // Only a file that grew keeps what was parsed; anything else is parsed from its start.
+        if (!entry || entry.family !== family || size <= entry.size) {
+          entry = fresh(family);
           cache.set(key, entry);
         }
         if (size > entry.offset) {
-          const chunk = readAt(fd, entry.offset, size - entry.offset);
+          const fd = fs.openSync(file, 'r');
+          let chunk;
+          try {
+            chunk = readAt(fd, entry.offset, size - entry.offset);
+          } finally {
+            fs.closeSync(fd);
+          }
           const complete = chunk.lastIndexOf(0x0a) + 1;
           if (complete > 0) {
             readFileBytes(chunk.subarray(0, complete), family, entry.records, entry.tally);
             entry.offset += complete;
           }
         }
-        if (head.length > entry.head.length) entry.head = head;
+        entry.size = size;
+        entry.mtimeNs = stat.mtimeNs;
         entry.tally.tornTail = size > entry.offset;
-        for (const r of entry.records) records.push(r);
-        files.push({ file, ...entry.tally });
-      } finally {
-        fs.closeSync(fd);
       }
+      for (const r of entry.records) records.push(r);
+      files.push({ file, ...entry.tally });
+      signature.push(`${file}|${key}|${size}|${stat.mtimeNs}`);
+    }
+    const id = `${ledgerDir}|${family}`, now = signature.join('\n');
+    if (seen.get(id) !== now) {
+      seen.set(id, now);
+      version += 1;
     }
     return { records, ...totalOf(files), files };
   }
-  return { read };
+  return { read, version: () => version };
 }
 
 /** A record's string field, or null when absent, null or not a string (LedgerRecord.text). */

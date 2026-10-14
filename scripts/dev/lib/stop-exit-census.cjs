@@ -94,8 +94,13 @@ function readRunLedger(dataDir, reader = null) {
   out.engineContainment = [];
   const refs = [...(out.engine.records ?? []).filter(r => r.type === 'engine-self-intent').map(r => r.line.engine),
     ...(out.children.records ?? []).filter(r => r.type === 'child-spawn').map(r => r.line.owner)];
+  const refKeys = new Set();
   for (const ref of refs) {
     if (!ref || !isFileTime(ref.creationFileTime) || !/^[\w-]+$/.test(ref.instanceId ?? '')) continue;
+    // Each owner reference is looked up once: every child-spawn of an Engine names the same owner.
+    const refKey = `${ref.pid}/${ref.creationFileTime}/${ref.instanceId}`;
+    if (refKeys.has(refKey)) continue;
+    refKeys.add(refKey);
     try {
       const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime/instances', ref.instanceId, 'manifest.json'), 'utf8'));
       if (manifest.instanceId !== ref.instanceId || Number(manifest.pid) !== Number(ref.pid)) continue;
@@ -226,12 +231,18 @@ function ledgerView(ledger, runId) {
     }
   }
   const receipts = new Map(), windows = new Map();
+  // The run's children by PID, in ledger order, for the owner a record names.
+  const childrenByPid = new Map();
+  for (const c of children) {
+    if (!childrenByPid.has(c.pid)) childrenByPid.set(c.pid, []);
+    childrenByPid.get(c.pid).push(c);
+  }
   for (const r of ledger?.children?.records ?? []) {
     const line = r.line, inc = line?.incarnation, owner = line?.owner;
     const direct = engines.find(e => e.incarnation.session === inc?.session && e.incarnation.n === inc?.n
       && e.pid === Number(owner?.pid) && sameBirth(e.creationFileTimeUtc, owner?.creationFileTime));
-    const parser = children.find(c => c.pid === Number(owner?.pid)
-      && sameBirth(c.creationFileTimeUtc, owner?.creationFileTime));
+    const parser = (childrenByPid.get(Number(owner?.pid)) ?? [])
+      .find(c => sameBirth(c.creationFileTimeUtc, owner?.creationFileTime));
     const engine = direct ?? (parser && engines.find(e => ownedBy(parser, e)
       && e.incarnation.session === inc?.session && e.incarnation.n === inc?.n));
     if (!engine || r.writer?.role !== 'engine' || Number(r.writer.pid) !== Number(owner.pid)) continue;
@@ -1141,6 +1152,8 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     } catch (error) { scopeError = { reason: `owned-process census unavailable: ${error.message}` }; }
   }
   const input = exitTargets(run, manifest, observed, dataDir ? readLedger(dataDir) : null);
+  // The gaps of the arming read of the ledger; those added below are not the ledger's.
+  const armingReadGaps = input.gaps.length;
   input.observedAfterMs = (runtime.now ?? Date.now)();
   if (scopeError) input.gaps.push(scopeError);
   if (!scopeFile) input.gaps.push({ reason: 'no historical owned-process census supplied; B11 is a current registry, not an exit history' });
@@ -1166,11 +1179,13 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     const finalView = finalLedger ? ledgerView(finalLedger, run?.runId) : null;
     const refreshed = exitTargets(run, manifest, observed, finalLedger, finalView);
     const membershipGap = g => ['unaccounted_process', 'orphan_console_host', 'evidence_lost'].includes(g.reason);
-    // The witness writer runs independently of census arming. Re-evaluate observed membership
-    // against the final records, while preserving every OS target we actually armed a handle for.
+    // The ledger's gaps are the final read's: a gap of the arming read that a later read in this
+    // stop resolves (a torn Engine start completed, a record written since) is dropped. The witness
+    // writer runs independently of census arming, so observed membership is judged on the final
+    // records too, while every OS target a handle was armed for is kept.
     const finalInput = { ...armed, evidenceLost: refreshed.evidenceLost,
-      gaps: [...armed.gaps.filter(g => !membershipGap(g)), ...refreshed.gaps.filter(g => membershipGap(g)
-        && !armed.targets.some(t => t.pid === g.pid && sameBirth(t.creationFileTimeUtc, g.creationFileTimeUtc)))],
+      gaps: [...armed.gaps.slice(armingReadGaps), ...refreshed.gaps.filter(g => !membershipGap(g)
+        || !armed.targets.some(t => t.pid === g.pid && sameBirth(t.creationFileTimeUtc, g.creationFileTimeUtc)))],
       accountedProcesses: refreshed.accountedProcesses.filter(p => !armed.targets.some(t =>
         t.pid === p.pid && sameBirth(t.creationFileTimeUtc, p.creationFileTimeUtc))) };
     const result = exitResult(finalInput, output, outputFile, finalLedger, finalView);

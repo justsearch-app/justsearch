@@ -3819,10 +3819,16 @@ async function stopRun(opts, {
   // the stop and its census, so each ledger file is parsed once and later reads add what was appended.
   const ledgerReader = dataDirAbs ? ledgerLib.createIncrementalReader() : null;
   let ledgerEnded = [];
+  let ledgerVersion = null;
   const readLedgerEnded = () => {
     if (!ledgerReader) return ledgerEnded;
     try {
-      ledgerEnded = endedIdentitiesOf(ledgerView(readRunLedger(dataDirAbs, ledgerReader), runId));
+      const ledger = readRunLedger(dataDirAbs, ledgerReader);
+      // Judged again only when a ledger file changed since the last judgement.
+      if (ledgerReader.version() !== ledgerVersion) {
+        ledgerVersion = ledgerReader.version();
+        ledgerEnded = endedIdentitiesOf(ledgerView(ledger, runId));
+      }
     } catch (err) {
       errors.push(`exit ledger: ${err?.message ?? err}`);
     }

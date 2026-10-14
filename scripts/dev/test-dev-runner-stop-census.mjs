@@ -411,6 +411,28 @@ test('a damaged ledger line is a gap naming its file and line count; a torn line
   assert.deepEqual(whole.exitAccountingGaps.filter((g) => g.reason === 'ledger-damaged'), []);
 });
 
+test('a gap of the arming read that a later read resolves is dropped: a torn Engine start completed before the verdict', async () => {
+  const runId = 'stop-census-torn-engine';
+  const engine = noProcess(970811, '134364632933610725');
+  const dataDir = freshDir('torn-engine');
+  const ledger = runLedger(dataDir, runId, engine, process.execPath);
+  ledger.engineStart();
+  ledger.jobProcess(noProcess(970813, '134364634153991105'), 'j-torn-engine');
+  // The Engine start as its writer had written it when the census armed: its first 80 bytes.
+  const file = path.join(ledgerLib.ledgerDirectory(dataDir), 'engine.v1.jsonl');
+  const whole = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(file, whole.slice(0, 80));
+  const armed = await arm({ runId, pids: { backendRootPid: engine.pid } }, dataDir, [], () => {
+    fs.appendFileSync(file, whole.slice(80));
+    ledger.engineExit();
+  });
+  assert.deepEqual(armed.targets, [], 'the arming read has no Engine identity to arm');
+  const result = await armed.observer.finish();
+  assert.ok(result.processExits.some((e) => e.pid === engine.pid && e.ledgerClass === 'REQUESTED'), JSON.stringify(result.processExits));
+  assert.deepEqual(result.exitAccountingGaps, []);
+  assert.equal(result.exitAccountingComplete, true);
+});
+
 test('an identity whose exit the ledger records is never passed to an OS lookup or probe', async () => {
   const runId = 'stop-census-no-probe';
   const engine = noProcess(970801, '134364632933610725');
@@ -514,24 +536,31 @@ function syntheticLedger(dataDir, runId, engine, executable, minBytes) {
     .reduce((n, f) => n + fs.statSync(f).size, 0);
 }
 
-test('a stop over a 17 MB ledger reads each ledger file once and stays well inside the 60 s stop limit', async () => {
-  const runId = 'stop-census-17mb';
-  const engine = noProcess(970301, '134364632933610725');
-  const dataDir = freshDir('large');
-  const ledgerBytes = syntheticLedger(dataDir, runId, engine, process.execPath, 17 * 1024 * 1024);
-  assert.ok(ledgerBytes >= 17 * 1024 * 1024, `the ledger is at least 17 MiB: ${ledgerBytes}`);
+/**
+ * stopRun over `dataDir`, with every read of its ledger directory counted per file, whichever way
+ * it is read: whole-file reads, and reads through a descriptor (each call, and the bytes).
+ */
+async function measuredStop(runId, dataDir, engine) {
   const ledgerDir = path.resolve(ledgerLib.ledgerDirectory(dataDir)).toLowerCase();
   const inLedger = (file) => typeof file === 'string' && path.resolve(file).toLowerCase().startsWith(ledgerDir);
-  // Every byte the stop reads from the ledger directory, whichever way it is read.
-  let read = 0;
+  const reads = new Map();
+  const of = (file) => {
+    const key = path.basename(String(file));
+    if (!reads.has(key)) reads.set(key, { readFileCalls: 0, readSyncCalls: 0, bytes: 0 });
+    return reads.get(key);
+  };
   const fds = new Map();
   const original = { openSync: fs.openSync, closeSync: fs.closeSync, readSync: fs.readSync, readFileSync: fs.readFileSync };
   fs.openSync = function (file, ...rest) { const fd = original.openSync.call(this, file, ...rest); if (inLedger(file)) fds.set(fd, file); return fd; };
   fs.closeSync = function (fd, ...rest) { fds.delete(fd); return original.closeSync.call(this, fd, ...rest); };
-  fs.readSync = function (fd, ...rest) { const n = original.readSync.call(this, fd, ...rest); if (fds.has(fd)) read += n; return n; };
+  fs.readSync = function (fd, ...rest) {
+    const n = original.readSync.call(this, fd, ...rest);
+    if (fds.has(fd)) { const m = of(fds.get(fd)); m.readSyncCalls += 1; m.bytes += n; }
+    return n;
+  };
   fs.readFileSync = function (file, ...rest) {
     const out = original.readFileSync.call(this, file, ...rest);
-    if (inLedger(file)) read += Buffer.byteLength(out);
+    if (inLedger(file)) { const m = of(file); m.readFileCalls += 1; m.bytes += Buffer.byteLength(out); }
     return out;
   };
   const fixture = stopFixture({ runId, dataDir, engine });
@@ -543,11 +572,75 @@ test('a stop over a 17 MB ledger reads each ledger file once and stays well insi
     Object.assign(fs, original);
   }
   const elapsedMs = Date.now() - started;
-  console.log(`stop over a ${ledgerBytes}-byte ledger: ${elapsedMs} ms, ${read} ledger bytes read`);
+  const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
+  const files = fs.readdirSync(ledgerLib.ledgerDirectory(dataDir)).filter((n) => n.endsWith('.jsonl'));
+  return { out, report, elapsedMs, reads, files, bytesRead: [...reads.values()].reduce((sum, m) => sum + m.bytes, 0) };
+}
+
+/** No ledger file changed during the stop: each is read once, in one read, and never whole again. */
+function assertReadOnce(measured) {
+  for (const file of measured.files) {
+    const m = measured.reads.get(file) ?? { readFileCalls: 0, readSyncCalls: 0 };
+    assert.deepEqual([m.readFileCalls, m.readSyncCalls], [0, 1], `${file} is read once per stop: ${JSON.stringify(m)}`);
+  }
+}
+
+test('a stop over a 17 MB ledger reads each ledger file once and stays well inside the 60 s stop limit', async () => {
+  const runId = 'stop-census-17mb';
+  const engine = noProcess(970301, '134364632933610725');
+  const dataDir = freshDir('large');
+  const ledgerBytes = syntheticLedger(dataDir, runId, engine, process.execPath, 17 * 1024 * 1024);
+  assert.ok(ledgerBytes >= 17 * 1024 * 1024, `the ledger is at least 17 MiB: ${ledgerBytes}`);
+  const measured = await measuredStop(runId, dataDir, engine);
+  const { out, report, elapsedMs, bytesRead } = measured;
+  console.log(`stop over a ${ledgerBytes}-byte ledger: ${elapsedMs} ms, ${bytesRead} ledger bytes read`);
   assert.equal(out.outcome, 'STOPPED', JSON.stringify(out.errors));
-  const report = JSON.parse(original.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
   assert.equal(report.exitAccountingComplete, true, JSON.stringify(report.exitAccountingGaps?.slice(0, 3)));
   assert.equal(report.ledgerSummary.jobProcesses, 2229);
-  assert.ok(read <= ledgerBytes + 64 * 1024, `each ledger file is read once per stop: ${read} bytes read of ${ledgerBytes}`);
+  assert.ok(bytesRead <= ledgerBytes + 64 * 1024, `each ledger file is read once per stop: ${bytesRead} bytes read of ${ledgerBytes}`);
+  assertReadOnce(measured);
   assert.ok(elapsedMs < 20_000, `the stop takes a third of its 60 s limit at most: ${elapsedMs} ms`);
+});
+
+test('a stop over a 17 MB ledger of 19,000 Engine children reads each file once and stays well inside the 60 s limit', async () => {
+  const runId = 'stop-census-children';
+  const engine = noProcess(970901, '134364632933610725');
+  const dataDir = freshDir('children');
+  const dir = ledgerLib.ledgerDirectory(dataDir);
+  fs.mkdirSync(dir, { recursive: true });
+  const startedAt = isoMs(engine.creationFileTimeUtc);
+  const owner = { pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, instanceId: 'children-engine' };
+  const incarnation = { session: runId, n: 1 };
+  let seq = 0;
+  const line = (role, type, fields) => JSON.stringify({ schemaVersion: 1, type, seq: ++seq, at: startedAt,
+    writer: { role, pid: role === 'engine' ? engine.pid : 4000, startedAt }, ...fields }) + '\n';
+  fs.writeFileSync(path.join(dir, 'engine.v1.jsonl'),
+    line('dev-runner', 'engine-start', { incarnation, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc,
+      executable: process.execPath, processStartedAt: startedAt, cause: 'START', supervisorKind: 'dev-runner' })
+    + line('dev-runner', 'engine-exit', { incarnation, exitClass: 'REQUESTED', reason: 'QUIT', detail: null, code: 0,
+      codeName: 'ok', exitedAt: null, observedAt: startedAt, terminateCalledAt: null, forced: false, phase: 'STOPPING',
+      codeDistinctive: true }));
+  // The shape the verifier measured: each child's spawn, start and exit, 17,000,000 bytes in all.
+  const chunks = [];
+  let bytes = 0, children = 0;
+  while (bytes < 17_000_000) {
+    const childId = `child-${children}`;
+    const born = String(BigInt(engine.creationFileTimeUtc) + 10000n * BigInt(++children));
+    const chunk = line('engine', 'child-spawn', { childId, owner, kind: 'EXTRACTION' })
+      + line('engine', 'child-start', { childId, pid: 100001 + 4 * children, creationFileTime: born,
+        executable: 'C:\\fixture\\parser.exe', contained: true })
+      + line('engine', 'child-exit', { childId, exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false, exitedAt: startedAt });
+    chunks.push(chunk);
+    bytes += Buffer.byteLength(chunk);
+  }
+  fs.writeFileSync(path.join(dir, 'children.v1.jsonl'), chunks.join(''));
+  const measured = await measuredStop(runId, dataDir, engine);
+  const { out, report, elapsedMs } = measured;
+  console.log(`stop over ${children} ledger children (${bytes} bytes): ${elapsedMs} ms, reads ${JSON.stringify(Object.fromEntries(measured.reads))}`);
+  assert.equal(out.outcome, 'STOPPED', JSON.stringify(out.errors));
+  assert.equal(report.exitAccountingComplete, true, JSON.stringify(report.exitAccountingGaps?.slice(0, 3)));
+  assert.equal(report.ledgerSummary.children, children);
+  assertReadOnce(measured);
+  // b599d4d7e took about 19 s here (two whole reads), 5b53911da about 35 s (a view per phase).
+  assert.ok(elapsedMs < 10_000, `the stop takes a sixth of its 60 s limit at most: ${elapsedMs} ms`);
 });
