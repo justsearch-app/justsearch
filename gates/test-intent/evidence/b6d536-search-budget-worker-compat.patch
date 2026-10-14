@@ -1,0 +1,119 @@
+Compat before-patch for b6d536-search-budget-worker-repaired, applied to 68547f75a (the parent of
+the lane commit 3d181a70c that introduced the repaired behaviour; coordinator decisions 5 and 6).
+
+Production, declarations and neutral defaults only; no production code in this state reads any of
+them, and none supplies semantic budget or bulk urgency behaviour:
+- EmbeddingProvider.isAvailable() becomes a default returning true (abstract in this state). Every
+  implementation in this state overrides it, so none of them changes; it lets the later test
+  fixture, which implements availability() instead and reports READY, compile.
+- EmbeddingProvider.availability() (a default returning READY) and the Availability record with its
+  State enum and constants, the later availability snapshot the checks name.
+- NoOpEmbeddingProvider.starting(), returning the existing INSTANCE, the no-op provider this
+  state's checks used.
+- SessionAcquireDeadlineExceededException.Phase and a (message, phase) constructor that ignores the
+  phase and builds the exception exactly as this state's constructor does.
+- TraceDegradation's hybrid_fallback_cause and splade_skip_cause (proto fields 7 and 8), which
+  nothing in this state sets.
+
+diff --git a/modules/ipc-common/src/main/proto/indexing.proto b/modules/ipc-common/src/main/proto/indexing.proto
+index 0e59d6cf5..77326b006 100644
+--- a/modules/ipc-common/src/main/proto/indexing.proto
++++ b/modules/ipc-common/src/main/proto/indexing.proto
+@@ -181,6 +181,8 @@ message TraceDegradation {
+   string hybrid_fallback_reason = 4;
+   bool splade_executed = 5;
+   string splade_skip_reason = 6;
++  string hybrid_fallback_cause = 7; // Compat declaration (fail-before only): nothing in this state sets or reads it.
++  string splade_skip_cause = 8; // Compat declaration (fail-before only): nothing in this state sets or reads it.
+ }
+ 
+ // One query-level stage node.
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/SessionAcquireDeadlineExceededException.java b/modules/ort-common/src/main/java/io/justsearch/ort/SessionAcquireDeadlineExceededException.java
+index 933ed174a..2e6994515 100644
+--- a/modules/ort-common/src/main/java/io/justsearch/ort/SessionAcquireDeadlineExceededException.java
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/SessionAcquireDeadlineExceededException.java
+@@ -9,4 +9,20 @@ public final class SessionAcquireDeadlineExceededException extends SessionAcquis
+   public SessionAcquireDeadlineExceededException(String message) {
+     super(message);
+   }
++
++  /** Compat declaration (fail-before only): the later phase type. Nothing in this state reads it. */
++  public enum Phase {
++    LOADING,
++    GATE,
++    RUN
++  }
++
++  /**
++   * Compat declaration (fail-before only): the later constructor. It ignores the phase and builds
++   * the exception exactly as this state's constructor does. No production code in this state calls
++   * it.
++   */
++  public SessionAcquireDeadlineExceededException(String message, Phase ignoredPhase) {
++    this(message);
++  }
+ }
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+index d5fe071d2..e45e13a13 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+@@ -96,8 +96,38 @@ public interface EmbeddingProvider {
+   /** Returns the embedding dimension (e.g., 768 for nomic-embed-text). */
+   int dimension();
+ 
+-  /** Returns true if the embedding model is loaded and ready for inference. */
+-  boolean isAvailable();
++  /**
++   * Returns true if the embedding model is loaded and ready for inference.
++   *
++   * <p>Compat (fail-before only): abstract in this state; a default here so that later test
++   * fixtures, which implement {@link #availability()} instead, compile. Every implementation in
++   * this state overrides it, so none of them changes.
++   */
++  default boolean isAvailable() {
++    return true;
++  }
++
++  /**
++   * Compat declaration (fail-before only): the later availability snapshot. Nothing in this state
++   * reads it.
++   */
++  default Availability availability() {
++    return Availability.READY;
++  }
++
++  /** Compat declaration (fail-before only): the later availability snapshot type. */
++  record Availability(State state, Throwable failure) {
++    public enum State {
++      READY,
++      STARTING,
++      ABSENT,
++      FAILED
++    }
++
++    public static final Availability READY = new Availability(State.READY, null);
++    public static final Availability STARTING = new Availability(State.STARTING, null);
++    public static final Availability ABSENT = new Availability(State.ABSENT, null);
++  }
+ 
+   /** Returns true if the embedding model is using GPU acceleration. */
+   boolean isUsingGpu();
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+index d771dbe8c..fae05c492 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+@@ -12,6 +12,14 @@ public final class NoOpEmbeddingProvider implements EmbeddingProvider {
+ 
+   public static final NoOpEmbeddingProvider INSTANCE = new NoOpEmbeddingProvider();
+ 
++  /**
++   * Compat declaration (fail-before only): returns {@link #INSTANCE}, the provider this state's
++   * checks used for models that are still loading. Nothing in this state reads it.
++   */
++  public static NoOpEmbeddingProvider starting() {
++    return INSTANCE;
++  }
++
+   private NoOpEmbeddingProvider() {}
+ 
+   @Override

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:57:14.980Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "06ca990de45ad6993a077cf953a83e7d981c4044",
+  "createdAt": "2026-10-14T17:49:20.277Z",
+  "revision": "228c9da66221dd21e9ded4debbd9efc4a2c20584",
+  "tree": "6182003f4a599e9ddfa3dac7855e0c9a9dd7728a",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.explicitHybridWithModelsLoadingAnswersWithKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.autoDenseWithModelsLoadingReportsTheBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedEmbeddingHandleGivesKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedSpladeHandleSkipsOnlyThatLeg\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.stalledDenseRunGivesKeywordResultsInTime\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.allowlistsMatchTheReasonCodeEnum\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.parentEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.chunkEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.inlineDocumentEmbeddingAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.spladeBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.bgeM3BackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.nerBackfillAcquiresBackground\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 43007
+      "durationMs": 19143
     }
   ],
   "checks": [
@@ -210,77 +210,82 @@
     "ref": "68547f75a",
     "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-search-budget-worker-compat.patch",
+        "contentDigest": "sha256:5348894f07badaeaba2067b2b7ba542e982ed8446c94acc27fe3816f5e8ac873"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.explicitHybridWithModelsLoadingAnswersWithKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.autoDenseWithModelsLoadingReportsTheBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedEmbeddingHandleGivesKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedSpladeHandleSkipsOnlyThatLeg\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.stalledDenseRunGivesKeywordResultsInTime\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.allowlistsMatchTheReasonCodeEnum\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.parentEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.chunkEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.inlineDocumentEmbeddingAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.spladeBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.bgeM3BackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.nerBackfillAcquiresBackground\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 52755
+        "durationMs": 41895
       }
     ],
     "checks": [
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#explicitHybridWithModelsLoadingAnswersWithKeywordResults",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "explicitHybridWithModelsLoadingAnswersWithKeywordResults(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: execution timed out after 3000 ms"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#autoDenseWithModelsLoadingReportsTheBudgetReason",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "autoDenseWithModelsLoadingReportsTheBudgetReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: execution timed out after 3000 ms"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#contendedEmbeddingHandleGivesKeywordResults",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "contendedEmbeddingHandleGivesKeywordResults(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: io.justsearch.indexerworker.services.WorkerServiceException: inference deadline exceeded"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#contendedSpladeHandleSkipsOnlyThatLeg",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "contendedSpladeHandleSkipsOnlyThatLeg(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: io.justsearch.indexerworker.services.WorkerServiceException: inference deadline exceeded"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#stalledDenseRunGivesKeywordResultsInTime",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "stalledDenseRunGivesKeywordResultsInTime(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: execution timed out after 2750 ms"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#allowlistsMatchTheReasonCodeEnum",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "allowlistsMatchTheReasonCodeEnum(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[SKIPPED_VECTOR_BLOCKED, SKIPPED_NO_DISCRIMINATIVE_TERM, SKIPPED_NO_CHUNK_DOCS, SEMANTIC_BUDGET_EXCEEDED, EMBEDDING_COMPATIBILITY_BLOCKED, EMBEDDING_EXCEPTION, INITIALIZING, EMBEDDING_COMPATIBILITY_UNKNOWN, REBUILD_FAILED_NO_VECTORS, FINGERPRINT_MISMAT"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java#parentEmbeddingBackfillFallbackAcquiresBackground",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "parentEmbeddingBackfillFallbackAcquiresBackground(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: bulk work acquired with urgencies [FOREGROUND] ==> expected: <[BACKGROUND]> but was: <[FOREGROUND]>"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java#chunkEmbeddingBackfillFallbackAcquiresBackground",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "chunkEmbeddingBackfillFallbackAcquiresBackground(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: bulk work acquired with urgencies [FOREGROUND] ==> expected: <[BACKGROUND]> but was: <[FOREGROUND]>"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java#inlineDocumentEmbeddingAcquiresBackground",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "inlineDocumentEmbeddingAcquiresBackground(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: bulk work acquired with urgencies [FOREGROUND] ==> expected: <[BACKGROUND]> but was: <[FOREGROUND]>"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java#spladeBackfillFallbackAcquiresBackground",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "spladeBackfillFallbackAcquiresBackground(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: bulk work acquired with urgencies [FOREGROUND] ==> expected: <[BACKGROUND]> but was: <[FOREGROUND]>"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java#bgeM3BackfillFallbackAcquiresBackground",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "bgeM3BackfillFallbackAcquiresBackground(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: bulk work acquired with urgencies [FOREGROUND] ==> expected: <[BACKGROUND]> but was: <[FOREGROUND]>"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java#nerBackfillAcquiresBackground",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "nerBackfillAcquiresBackground(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: bulk work acquired with urgencies [FOREGROUND] ==> expected: <[BACKGROUND]> but was: <[FOREGROUND]>"
       }
     ]
   },
-  "digest": "sha256:edc0a16e1b45fd37e607078c5fa836b5c2133556ac20239f9eed7b74046af30a"
+  "digest": "sha256:09df51ae8f8b115925dad5e513b0649f507e2b2d422e53d63de155718941333f"
 }

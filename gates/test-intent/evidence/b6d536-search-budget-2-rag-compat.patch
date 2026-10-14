@@ -1,0 +1,90 @@
+Compat before-patch for b6d536-search-budget-2-rag-repaired, applied to 900bdf4a0 (the parent of
+the lane commit 7df6a0a7d that introduced the repaired behaviour; coordinator decisions 5 and 6).
+
+Production, declarations and neutral defaults only; no production code in this state reads any of
+them, and none supplies RAG budget behaviour:
+- EmbeddingProvider.isAvailable() becomes a default returning true (abstract in this state). Every
+  implementation in this state overrides it, so none of them changes; it lets the later test
+  fixture, which implements availability() instead and reports READY, compile.
+- EmbeddingProvider.availability() (a default returning READY) and the Availability record with its
+  State enum and constants, the later availability snapshot the checks name.
+- NoOpEmbeddingProvider.starting(), returning the existing INSTANCE: the provider this lane's checks
+  used for models still loading (7df6a0a7d).
+- RetrieveContextResponse.retrieval_mode_cause (proto field 11), which nothing in this state sets.
+
+diff --git a/modules/ipc-common/src/main/proto/indexing.proto b/modules/ipc-common/src/main/proto/indexing.proto
+index 66b5ebceb..f00e4ff81 100644
+--- a/modules/ipc-common/src/main/proto/indexing.proto
++++ b/modules/ipc-common/src/main/proto/indexing.proto
+@@ -488,6 +488,7 @@ message RetrieveContextResponse {
+ 
+   // Quality signals for CRAG-style retrieval confidence assessment
+   QualitySignals quality = 10;
++  string retrieval_mode_cause = 11; // Compat declaration (fail-before only): nothing in this state sets or reads it.
+ }
+ 
+ // Retrieval quality signals enabling agents to assess confidence
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+index cecfa50ca..888620586 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+@@ -96,8 +96,38 @@ public interface EmbeddingProvider {
+   /** Returns the embedding dimension (e.g., 768 for nomic-embed-text). */
+   int dimension();
+ 
+-  /** Returns true if the embedding model is loaded and ready for inference. */
+-  boolean isAvailable();
++  /**
++   * Returns true if the embedding model is loaded and ready for inference.
++   *
++   * <p>Compat (fail-before only): abstract in this state; a default here so that later test
++   * fixtures, which implement {@link #availability()} instead, compile. Every implementation in
++   * this state overrides it, so none of them changes.
++   */
++  default boolean isAvailable() {
++    return true;
++  }
++
++  /**
++   * Compat declaration (fail-before only): the later availability snapshot. Nothing in this state
++   * reads it.
++   */
++  default Availability availability() {
++    return Availability.READY;
++  }
++
++  /** Compat declaration (fail-before only): the later availability snapshot type. */
++  record Availability(State state, Throwable failure) {
++    public enum State {
++      READY,
++      STARTING,
++      ABSENT,
++      FAILED
++    }
++
++    public static final Availability READY = new Availability(State.READY, null);
++    public static final Availability STARTING = new Availability(State.STARTING, null);
++    public static final Availability ABSENT = new Availability(State.ABSENT, null);
++  }
+ 
+   /** Returns true if the embedding model is using GPU acceleration. */
+   boolean isUsingGpu();
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+index d771dbe8c..fae05c492 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+@@ -12,6 +12,14 @@ public final class NoOpEmbeddingProvider implements EmbeddingProvider {
+ 
+   public static final NoOpEmbeddingProvider INSTANCE = new NoOpEmbeddingProvider();
+ 
++  /**
++   * Compat declaration (fail-before only): returns {@link #INSTANCE}, the provider this state's
++   * checks used for models that are still loading. Nothing in this state reads it.
++   */
++  public static NoOpEmbeddingProvider starting() {
++    return INSTANCE;
++  }
++
+   private NoOpEmbeddingProvider() {}
+ 
+   @Override
