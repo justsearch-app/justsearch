@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Tempdoc 730 Increment 4 (B1/B2/B3) — death observability ratchet.
  *

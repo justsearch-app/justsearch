@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // The run record of a stack started from a worktree. The dev-runner keeps its state under the
 // MAIN checkout, but a stack launched from a worktree used to store `active.runPath` relative to
@@ -73,6 +74,7 @@ const sleepers = [];
 function spawnAliveProc() {
   // The holder's "supervisor": a harmless child a proceed may kill (never this test process).
   const p = spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' });
+  p.recordedIdentity = recordedIdentity(p.pid);
   sleepers.push(p);
   return p.pid;
 }

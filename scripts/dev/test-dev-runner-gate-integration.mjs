@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // Tempdoc 606 — hermetic integration test for the admission GATE (acquireAdmission).
 // Drives the REAL acquireAdmission end-to-end against an ISOLATED temp state root
@@ -85,6 +86,7 @@ function spawnAliveProc() {
   // A harmless long-lived child whose pid is "alive" for supervisor-liveness, and which
   // stopRun may safely kill on a proceed (it is NOT this test process).
   const p = spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' });
+  p.recordedIdentity = recordedIdentity(p.pid);
   sleepers.push(p);
   return p.pid;
 }

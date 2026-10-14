@@ -10,6 +10,7 @@ const fs = require("fs");
 const net = require("net");
 const http = require("http");
 const detLib = require("./lib/determinism-budget.cjs");
+const engineActuator = require("../../../scripts/dev/lib/engine-actuator.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const uiWebDir = path.resolve(rootDir, "modules", "ui-web");
@@ -21,6 +22,7 @@ const dataDir = process.env.JUSTSEARCH_DATA_DIR || path.join(uiWebDir, ".dev-dat
 let backend;
 let frontend;
 let shuttingDown = false;
+const childIdentities = new WeakMap();
 const det = detLib.createDeterminismBudget({ stdoutSentinel: "JUSTSEARCH_API_PORT=..." });
 
 async function findFreePort(startPort) {
@@ -121,18 +123,9 @@ async function waitForBackendReady(port, timeoutMs) {
   });
 }
 
-function killProcessTreeWindows(pid) {
-  if (!pid) return;
-  try {
-    // Best-effort. `/T` kills the process tree so the worker doesn't linger.
-    spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-      stdio: "ignore",
-      windowsHide: true,
-      shell: false,
-    });
-  } catch (_) {
-    // ignore
-  }
+function recordChildIdentity(child) {
+  const identity = engineActuator.captureSpawnedIdentity(child);
+  if (identity) childIdentities.set(child, identity);
 }
 
 function terminateChild(proc) {
@@ -140,8 +133,12 @@ function terminateChild(proc) {
   if (proc.exitCode != null) return;
 
   if (process.platform === "win32") {
-    killProcessTreeWindows(proc.pid);
-    return;
+    // Only the identity this script started; never a tree through parent links.
+    const identity = childIdentities.get(proc);
+    const result = engineActuator.terminateWithCodeSync(proc.pid, identity?.creationFileTimeUtc,
+      engineActuator.NON_DISTINCTIVE_KILL_CODE);
+    if (!result.ok) console.error(`Incomplete child stop (${proc.pid}): ${result.outcome}`);
+    return result;
   }
 
   try {
@@ -189,6 +186,7 @@ async function startBackend(port) {
         shell: process.platform === "win32",
       }
     );
+    recordChildIdentity(backend);
 
     backend.stdout.on("data", (data) => {
       log("api", data);
@@ -235,6 +233,7 @@ function startFrontend(port) {
     shell: process.platform === "win32",
     stdio: "inherit",
   });
+  recordChildIdentity(frontend);
 
   frontend.on("exit", (code) => {
     shutdown();

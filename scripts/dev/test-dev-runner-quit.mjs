@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Spec F steps 7 and 8, dev half: the one quit (its deadline from the contract, the request file and
  * the lifecycle POST addressed to one incarnation, Spec F §4.3) and suspended time that is not a hang

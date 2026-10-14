@@ -13,7 +13,7 @@
  *   `engine-owner-died`) written as writer role `dev-runner`, in order: a record queue makes the
  *   start record (which waits for the identity) precede every intent and exit of its incarnation;
  * - the forced kill: `terminate-process.ps1` with JS_ENGINE_STOP, identity-checked on one handle,
- *   and an identity-safe `taskkill /F` fallback that records `codeDistinctive: false`;
+ *   and a fallback on the same identity-checked helper with code 1 (`codeDistinctive: false`);
  * - reconciliation at supervision start (T1): an Engine start left open by an earlier supervisor is
  *   closed as `engine-owner-died` after an OS identity check, and never killed.
  *
@@ -25,6 +25,7 @@ const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
 const { execFile, spawnSync } = require('child_process');
+const { terminateWithCodeSync } = require('./recorded-termination.cjs');
 
 const ledgerLib = require('./exit-ledger.cjs');
 const { engineRow } = require('./engine-supervisor.cjs');
@@ -138,7 +139,7 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
     `$rows = @(Get-CimInstance Win32_Process -Filter '${filter}' -ErrorAction Stop | ForEach-Object {`,
     '  [pscustomobject]@{ pid = [int]$_.ProcessId;',
     '    creation = $(if ($_.CreationDate) { $_.CreationDate.ToFileTimeUtc().ToString() } else { $null });',
-    '    executable = $_.ExecutablePath } })',
+    '    executable = $_.ExecutablePath; name = $_.Name } })',
     'ConvertTo-Json -InputObject $rows -Compress -Depth 2',
   ].join('\n');
   return new Promise((resolve) => {
@@ -163,6 +164,7 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
             present: true,
             creationFileTime: typeof row.creation === 'string' && /^[1-9]\d{0,19}$/.test(row.creation) ? row.creation : null,
             executable: typeof row.executable === 'string' && row.executable ? row.executable : null,
+            name: typeof row.name === 'string' ? row.name : null,
           });
         }
         resolve(result);
@@ -170,42 +172,46 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
   });
 }
 
+/** Capture before yielding: libuv still holds the spawned child's handle and reserves its PID. */
+function captureSpawnedIdentity(child, { exec = spawnSync, platform = process.platform } = {}) {
+  if (platform !== 'win32' || !child?.pid || child.exitCode !== null || child.signalCode !== null) return null;
+  const result = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    path.join(__dirname, 'read-process-birth.ps1'), '-Pid', String(child.pid)],
+  { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+  const birth = String(result.stdout ?? '').trim();
+  return result.status === 0 && /^[1-9]\d{0,19}$/.test(birth)
+    ? { pid: child.pid, creationFileTimeUtc: birth } : null;
+}
+
 /**
  * Terminate one process with a chosen code, only if it is still the recorded birth: the birth is
- * re-checked on the handle the termination uses. `tree` also ends its verified descendants, each
- * through its own handle (`terminate-process.ps1 -Tree`); `birthTick` is the births' common tick
- * (the microsecond, or the millisecond for a birth recorded in milliseconds).
+ * re-checked on the handle the termination uses. Only that process is ended, never its tree;
+ * `birthTick` is the births' common tick (the microsecond, or the millisecond for a birth recorded
+ * in milliseconds).
  *
  * @returns {Promise<{ok: boolean, outcome: string, status: number|null}>}
  */
-function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeoutMs = 10000, tree = false,
+function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeoutMs = 10000,
   birthTick = ledgerLib.BIRTH_TICKS.MICROSECOND } = {}) {
   return new Promise((resolve) => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', TERMINATE_SCRIPT,
       '-Pid', String(pid), '-CreationFileTimeUtc', String(creationFileTime), '-Code', String(code >>> 0),
-      '-BirthTick', String(birthTick), ...(tree ? ['-Tree'] : [])],
+      '-BirthTick', String(birthTick)],
     { encoding: 'utf8', windowsHide: true, timeout: timeoutMs },
     (error, stdout) => {
-      let outcome = 'failed';
-      try { outcome = JSON.parse(String(stdout).trim().split(/\r?\n/).pop()).outcome ?? outcome; } catch { /* keep failed */ }
+      let detail = {};
+      try { detail = JSON.parse(String(stdout).trim().split(/\r?\n/).pop()) ?? {}; } catch { /* keep failed */ }
+      const outcome = detail.outcome ?? 'failed';
       const status = error ? (Number.isInteger(error.code) ? error.code : null) : 0;
-      resolve({ ok: status === 0 && outcome === 'terminated', outcome, status });
+      resolve({ ...detail, ok: status === 0 && outcome === 'terminated', outcome, status });
     });
   });
 }
 
-/** The non-distinctive fallback: `taskkill /F` of the pid alone (no /T), as the forced kill always was. */
-function taskkillPid(pid, { platform = process.platform } = {}) {
-  try {
-    if (platform === 'win32') {
-      const result = spawnSync('taskkill', ['/PID', String(pid), '/F'], { stdio: 'ignore', windowsHide: true, timeout: 5000 });
-      return result.status === 0;
-    }
-    process.kill(pid, 'SIGKILL');
-    return true;
-  } catch {
-    return false;
-  }
+/** Non-distinctive fallback, retaining its historical name for callers and exit accounting. */
+function taskkillPid(pid, { platform = process.platform, creationFileTime, exec = spawnSync } = {}) {
+  if (platform !== 'win32') return false; // no same-handle identity primitive on this platform
+  return terminateWithCodeSync(pid, creationFileTime, NON_DISTINCTIVE_KILL_CODE, { exec }).ok;
 }
 
 /**
@@ -415,8 +421,9 @@ function createEngineActuator({
       state.identityPromise = (state.pid
         ? lookupIdentities([state.pid]).then((map) => {
           const seen = map?.get(state.pid);
-          state.identity = seen?.present ? { creationFileTime: seen.creationFileTime, executable: seen.executable }
-            : { creationFileTime: null, executable: null, unknown: !map };
+          state.identity = !state.exit && child.exitCode == null && child.signalCode == null && seen?.present
+            ? { creationFileTime: seen.creationFileTime, executable: seen.executable }
+            : { creationFileTime: null, executable: null, unknown: !map || Boolean(state.exit) };
           return state.identity;
         }).catch(() => (state.identity = { creationFileTime: null, executable: null, unknown: true }))
         : Promise.resolve(state.identity = { creationFileTime: null, executable: null, unknown: true }));
@@ -520,8 +527,7 @@ function createEngineActuator({
 
     /**
      * The forced kill (T7). TerminateProcess with JS_ENGINE_STOP, identity-checked on one handle; if
-     * that cannot run, `taskkill /F` of the pid while the exit is not yet observed (libuv holds the
-     * process handle until then, so the pid cannot have been reused), recorded non-distinctive.
+     * that cannot run, retry with the non-distinctive code on an identity-checked handle.
      */
     async forceKill(reasonKey, { reason, detail } = {}) {
       const state = current;
@@ -556,8 +562,8 @@ function createEngineActuator({
       }
       if (state.exit || !state.pid) return { attempted: false, reason: 'already-exited' };
       state.terminate.fallback = true;
-      const killed = fallbackKill(state.pid);
-      log(`forced kill fell back to taskkill /F for pid ${state.pid} (the exit code will not be distinctive)`);
+      const killed = fallbackKill(state.pid, { creationFileTime: identity?.creationFileTime });
+      log(`forced kill used the identity-checked fallback for pid ${state.pid}: ${killed ? 'terminated' : 'incomplete'} (the exit code will not be distinctive)`);
       return { attempted: true, distinctive: false, fallback: true, killed };
     },
 
@@ -633,6 +639,7 @@ const CLI_ENGINE_ENDINGS = Object.freeze({
   runner: { forced: true, code: 0 },
   terminate: { forced: true, code: ledgerLib.JS_ENGINE_STOP },
   taskkill: { forced: true, code: NON_DISTINCTIVE_KILL_CODE },
+  'identity-fallback': { forced: true, code: NON_DISTINCTIVE_KILL_CODE },
 });
 
 /**
@@ -746,8 +753,10 @@ module.exports = {
   sameBirth,
   openEngineStarts,
   lookupProcessIdentities,
+  captureSpawnedIdentity,
   terminateWithCode,
   taskkillPid,
+  terminateWithCodeSync,
   postShutdown,
   shutdownPostBody,
   writeShutdownRequestFileSync,

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // Spec F §5.3 / §8 step 10 (S17, S18): ending a dev stack leaves nothing running and never kills a
 // process outside that stack.
@@ -409,28 +410,35 @@ const tests = [
     assert.equal(res.outcome, 'STOP_INCOMPLETE', JSON.stringify(res));
   }],
 
-  ['a verified tree kill ends the recorded process and its descendants, each through a handle checked against its birth (Spec F §5.3)', async () => {
-    // The descendant is detached: outside the job libuv gives its parent's children, it does not end
-    // with its parent, so only the tree kill ends it (it ends itself after a minute regardless).
+  ['a verified kill ends only the recorded process, through a handle checked against its birth, never its descendants through parent links (Spec F §5.3)', async () => {
+    // Identity-only stops, as on the integration side since 58a51a608: the detached descendant is
+    // outside its parent's job and is not reached through parent links; it ends itself shortly.
     const parent = track(spawn(process.execPath, ['-e',
-      "const c=require('child_process').spawn(process.execPath,['-e','setTimeout(()=>{},60000)'],{stdio:'ignore',detached:true});console.log(c.pid);setTimeout(()=>{},600000)"],
+      "const c=require('child_process').spawn(process.execPath,['-e','setTimeout(()=>{},8000)'],{stdio:'ignore',detached:true});console.log(c.pid);setTimeout(()=>{},600000)"],
     { stdio: ['ignore', 'pipe', 'ignore'] }));
     const childPid = await new Promise((resolve) => parent.stdout.once('data', (b) => resolve(Number(String(b).trim()))));
     assert.ok(childPid > 0);
     const parentBirth = (await birthOf(parent.pid)).creationFileTime;
-    const result = await engineActuator.terminateWithCode(parent.pid, parentBirth, engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree: true });
+    const result = await engineActuator.terminateWithCode(parent.pid, parentBirth, engineActuator.NON_DISTINCTIVE_KILL_CODE);
     assert.equal(result.ok, true, JSON.stringify(result));
-    await until('the recorded process and its descendant gone', () => !alive(parent.pid) && !alive(childPid), 10_000);
+    assert.equal(result.outcome, 'terminated', JSON.stringify(result));
+    await until('the recorded process gone', () => !alive(parent.pid), 10_000);
+    assert.ok(alive(childPid), 'the descendant is never ended through its parent link');
+    await until('the descendant ending by itself', () => !alive(childPid), 20_000);
   }],
 
   ['missingBirthNeverEstablishesOwnership: a record without a birth (legacy, or written before discovery) never makes a process born before it the run\'s: unknown, not killed, the stop incomplete; one born after it is a reuse (S17, S18-U2)', async () => {
     const before = sleeper();
     await birthOf(before.pid);
     await sleep(50);
-    const legacy = craftRun('run-LEGACY', { pids: { runnerPid: null, backendRootPid: null, frontendRootPid: before.pid } });
+    const legacy = craftRun('run-LEGACY', { apiPortActual: 23456,
+      pids: { runnerPid: null, backendRootPid: before.pid, frontendRootPid: before.pid } });
     fs.writeFileSync(activePath, JSON.stringify({ kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: 'run-LEGACY' }));
+    let shutdowns = 0;
     const res1 = await stopRun({ runId: 'run-LEGACY' }, {
-      resolveTarget: async () => legacy, gracefulShutdown: noGraceful, census: noCensus, portWaitMs: 200 });
+      resolveTarget: async () => legacy, gracefulShutdown: async () => { shutdowns++; return noGraceful(); },
+      census: noCensus, portOwner: async () => ({ closed: true }), portWaitMs: 200 });
+    assert.equal(shutdowns, 0, 'a live PID and an API port without a recorded birth never license HTTP shutdown');
     await sleep(300);
     assert.ok(alive(before.pid), 'a process the record does not identify by its birth is never killed');
     assert.ok(!res1.killedPids.includes(before.pid), JSON.stringify(res1));

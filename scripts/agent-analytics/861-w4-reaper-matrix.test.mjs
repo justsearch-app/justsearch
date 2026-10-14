@@ -653,10 +653,10 @@ await check('[F7] markRefusals discharges the obligation, retains every record, 
 
 /* ── the observed tier carries a ready-to-run kill line ───────────────────────────────────── */
 
-await check('the observed tier is reported with a ready-to-run kill line, never killed', () => {
+await check('the observed tier is reported without a kill command when no recorded birth exists', () => {
   const out = runCell(MATRIX.at(-1), 'sweep');
   assert.equal(out.reap.length, 0);
-  assert.equal(out.report[0].killLine, 'taskkill /PID 55501 /F');
+  assert.equal(out.report[0].killLine, 'identity unavailable; no safe termination command');
 });
 
 /* ── the [A1] join, unit-level ────────────────────────────────────────────────────────────── */
@@ -752,7 +752,7 @@ await check('MUTATION [A1]: the same mutant also breaks the declared-hold cell',
 
 /* ── scope: the reaper never reads the `foreign/` register ────────────────────────────────── */
 
-await check('SCOPE: the reaper requires exactly the agent-spawns-scope modules, plus one generic helper', async () => {
+await check('SCOPE: the reaper requires exactly the agent-spawns-scope modules and generic record/termination helpers', async () => {
   const src = await fsp.readFile(REAPER_PATH, 'utf8');
   const specs = [...src.matchAll(/require\('([^']+)'\)/g)].map((m) => m[1]).sort();
   assert.deepEqual(specs, [
@@ -761,6 +761,7 @@ await check('SCOPE: the reaper requires exactly the agent-spawns-scope modules, 
     './ownership-verdict.cjs',
     './process-identity.cjs',
     './process-record.cjs',
+    './recorded-termination.cjs',
     'node:child_process',
     'node:fs/promises',
     'node:path',

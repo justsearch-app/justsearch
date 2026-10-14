@@ -27,12 +27,14 @@ class TestRepoRoot:
 
 
 class TestStopBackend:
-    def test_already_exited(self):
+    @patch("jseval.backend.subprocess.run")
+    def test_already_exited(self, mock_run):
         proc = MagicMock()
         proc.poll.return_value = 0
         proc.returncode = 0
         stop_backend(proc)
-        # Should not call taskkill or terminate
+        mock_run.assert_not_called()  # an exited backend requires no termination
+        proc.terminate.assert_not_called()
 
     @patch("jseval.backend.os.name", "nt")
     @patch("jseval.backend.subprocess.run")
