@@ -69,11 +69,39 @@ Follow-up decisions after the independent verifier rejected 5b53911da:
   because it built the ledger view at every lookup phase and each view scanned every child for
   each children record.)
 
+Follow-up decisions after the independent verifier rejected bd198cc98:
+
+- A ledger file is known by the handle it is read through (its identity compared after the open),
+  never by a stat taken before the open. On any mismatch both files are read again in full. A
+  ledger read never drops records that b599d4d7e's whole read would have seen. (On bd198cc98 a
+  rotation between the stat and the open cached the replacement's bytes under the moved file's
+  identity: an archived child with no exit was lost, and the stop reported complete with no gap.)
+- Only records that prove an exit count as ended: an exit record, or a reconciliation that states
+  the process is gone. Anything else goes through the normal identity-checked path. (On
+  bd198cc98 an `engine-owner-died` with osCheck ALIVE_MATCH was taken as an exit: the live
+  identity got no lookup, and the stop said STOPPED while it ran.) The record kinds and outcomes
+  the ledger can hold for a process with an identity:
+  - proves the exit: `engine-exit` (the runner on the exit it observed, or the CLI once the Engine
+    is gone or its PID reused); `child-exit` (the Engine on its held handle's exit, or the
+    predecessor stop after the process exited; a start failure has no `child-start`, so no
+    identity); a witness's own `job-process-exit` (on its handle's wait); and a reconciliation
+    (`engine-owner-died`, `owner-died`, reconciled `job-process-exit`) with osCheck GONE;
+  - does not prove it: any reconciliation with osCheck ALIVE_MATCH (found alive) or
+    IDENTITY_UNKNOWN (could not tell), a reconciliation without osCheck, and `child-survived`,
+    `stop-intent`, `stop-escalate`, `engine-intent`, `engine-self-intent`, `helper-intent`,
+    `child-note`, `gpu-release` and `ledger-gap`, which are not exit records. Helper receipts
+    (`helper-exit`) and windows are not used to resolve identities.
+- Identities are matched at the precision each record was written with, never looser than the
+  less precise side: the ledger's microsecond, or the millisecond of a manifest helper's recorded
+  start. (On b599d4d7e and bd198cc98 a manifest helper's exact ledger exit was not matched, so the
+  stop probed its unreadable reused PID three times and reported STOP_INCOMPLETE.)
+
 What changed:
 
 - `scripts/dev/lib/stop-exit-census.cjs`: `endedIdentitiesOf(view)` lists the run's Engine
-  incarnations, ledger children and job witnesses with an exit record (a reconciliation's
-  IDENTITY_UNKNOWN record proves nothing). `readRunLedger` reports each family's `damage`: the
+  incarnations, ledger children and job witnesses whose exit record proves the exit
+  (`provesExit`: a record without osCheck of type `engine-exit`, `child-exit` or
+  `job-process-exit`, or one with osCheck GONE). `readRunLedger` reports each family's `damage`: the
   files with corrupt, unknown-schema, unknown-type or torn lines, with their counts
   (`exit-ledger.cjs` `readLedger` and the incremental reader now return per-file counts as
   `files`). The verdict adds a `ledger-damaged` gap per damaged file (`family`, `file`, `lines`
@@ -83,7 +111,11 @@ What changed:
   file id, size and modification time from a stat; an unchanged file is not opened again, a
   first read is one read of the whole file, a grown file reads and parses only the bytes
   appended since, any other change parses it again from its start, and `version()` changes
-  when any read finds a difference). The verdict replaces the arming read's ledger gaps with the
+  when any read finds a difference). A file that has to be read is opened, and its identity is
+  taken from the open handle (`fstat`). If that differs from the stat's, a rotation has replaced
+  it, so neither identity's cache is kept and the read starts again from the listing. A read whose
+  listing or file identities changed by its end starts again too. After 4 attempts the ledger is
+  read the way `readLedger` reads it. The verdict replaces the arming read's ledger gaps with the
   final read's. The ledger view reads each helper window's instants once and finds windows,
   owner records, owning children, console parents and report rows through PID and image indexes
   instead of rescanning every record per helper, and `readRunLedger` looks up each Engine
@@ -101,16 +133,19 @@ What changed:
   is left out of every identity lookup and of the port-owner match. Every lookup verdict for it is
   `gone`, the post-kill wait for it is skipped, the Engine job stop skips it, and the stop report
   lists it once in `resolvedByLedger`. The stop judges the ledger again only when the reader's
-  `version()` changed since its last judgement. `writeSelfExitStopReport` keeps an earlier report the same
+  `version()` changed since its last judgement. A recorded identity matches a ledger exit at the
+  coarser of the ledger's microsecond and the identity's own `birthTick` (the millisecond for a
+  manifest helper). `writeSelfExitStopReport` keeps an earlier report the same
   way as a stop does. Before writing its report, a stop
   renames an existing stop-report.json to the next free stop-report.N.json; the report and the
   stop's output list the kept reports as `earlierReports` (oldest first), and the report carries
   the census's `earlierCensus`. stop-report.json is always the latest stop's, so its readers
   (including the forget check) are unchanged.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (14 cases). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (18 cases). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
-b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, and all pass after:
+b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15 to 18 on bd198cc98 (16 passes on b599d4d7e, as
+preservation), and all pass after:
 
 1. Real `stop-job-run.ps1`: a job member whose PID now names a running process whose birth
    cannot be read (found at run time, query rights only) is a survivor without the ledger and is
@@ -151,6 +186,22 @@ b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, and all pass after
 14. Real `stopRun` over a 17,000,732-byte ledger of 19,195 Engine children (spawn, start and exit
    each, one owner): exactly one read call per ledger file, complete, at most 10 s. On 5b53911da
    it took 31,041 ms with 7 read calls per file; after, 1,448 ms.
+15. Rotation between the reader's stat and its open of children.v1.jsonl, through the census
+   with that reader: the reader then holds what `readLedger` holds, every record from before the
+   rotation included, and accounting is incomplete (the child has a start and no exit). On
+   bd198cc98 the reader held only the replacement's note. The verifier's `rotation-race.cjs` passes
+   on b599d4d7e and after, and fails on bd198cc98.
+16. Real `stopRun`: an Engine incarnation with an `engine-owner-died` ALIVE_MATCH record, tracked
+   and alive with its birth. It is looked up, the stop is `STOP_INCOMPLETE` and it is unresolved.
+   On bd198cc98 it was never looked up.
+17. `endedIdentitiesOf` over every exit record kind and reconciliation outcome: true for
+   `engine-exit`, `child-exit`, `job-process-exit`, and GONE reconciliations; false for
+   ALIVE_MATCH, IDENTITY_UNKNOWN, a reconciliation without osCheck, and `child-survived`.
+18. Real `stopRun` with two manifest helpers whose PIDs are present but whose births cannot be
+   read. The ledger has their births with sub-millisecond parts and their exits. The one whose
+   manifest start matches its ledger birth at the millisecond is never looked up and is resolved
+   by the ledger. The one recorded 1 ms after its ledger birth is looked up and stays unresolved.
+   On bd198cc98 and b599d4d7e both were looked up 3 times.
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -164,5 +215,11 @@ children record; 5b53911da was slower still because it built that view at every 
 The `world-state.mjs` CLI does not load the changed files; timed three times interleaved it took
 12,500 / 8,563 / 8,183 ms on b599d4d7e and 9,312 / 9,081 / 8,101 ms with this change, so its
 earlier 12.3 s against the 10 s budget was machine load.
+
+After the bd198cc98 fixes, the same harness was run again, interleaved three times, with CPU load
+of 0 to 32 %. b599d4d7e took 15,643 / 15,699 / 13,050 ms; this change took 1,445 / 1,201 /
+1,251 ms with 1 read call per file and was complete. `assert-file-reads.cjs` and
+`assert-perf.cjs` pass. Its `independent.cjs` (19) and `independent-extra.cjs` (22) scenarios all
+pass.
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/.

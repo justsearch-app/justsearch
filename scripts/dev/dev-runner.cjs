@@ -3834,8 +3834,11 @@ async function stopRun(opts, {
     }
     return ledgerEnded;
   };
+  // Births agree at the coarser precision of the two records: the ledger's microsecond, or the
+  // identity's own (`birthTick`: the millisecond for a manifest helper's recorded start).
   const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && ledgerEnded.some((e) => e.pid === Number(p.pid)
-    && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc)));
+    && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc),
+      BigInt(Math.max(Number(ledgerLib.BIRTH_TICKS.MICROSECOND), Number(p.birthTick ?? ledgerLib.BIRTH_TICKS.MICROSECOND)))));
   // Each identity resolved by its ledger exit instead of a lookup, once.
   const resolvedByLedger = [];
   const noteResolved = (p) => {

@@ -346,6 +346,9 @@ function totalOf(files) {
   return { ...total, skippedLines: total.corruptLines + total.unknownSchemaLines + total.unknownTypeLines };
 }
 
+/** How many times a read starts again when a rotation moves the files under it. */
+const STABLE_READ_ATTEMPTS = 4;
+
 /**
  * readLedger for a caller that reads the same ledger more than once (a stop reads it before each of
  * its phases, and its census when it arms and at its verdict). Each file is known by its file id
@@ -354,6 +357,13 @@ function totalOf(files) {
  * new tail is read and parsed, and a line still being written then (a torn tail) is parsed whole
  * once it is complete; any other change parses the file again from its start. The result is
  * readLedger's. `version()` changes whenever a read finds anything different.
+ *
+ * What is read is known by the handle it is read through, never by the stat before the open: a
+ * rotation between the two (the path now names the replacement file) shows as a different file id
+ * on the handle. Then neither file's cached records are kept, and the read starts again from the
+ * listing, so the moved file is read in full under its new name and the replacement in full under
+ * the old. A read that ends with a listing or a file id other than the one it started from starts
+ * again too. A ledger still rotating after STABLE_READ_ATTEMPTS reads is read as readLedger reads it.
  */
 function createIncrementalReader() {
   const cache = new Map();
@@ -369,59 +379,96 @@ function createIncrementalReader() {
     }
     return done === length ? bytes : bytes.subarray(0, done);
   };
+  // A file id, or null where the file system has none (then nothing about the file is cached).
+  const idOf = (stat) => (stat.ino ? `${stat.dev}:${stat.ino}` : null);
+  const statOf = (file) => {
+    try {
+      return fs.statSync(file, { bigint: true });
+    } catch (err) {
+      if (err && err.code === 'ENOENT') return null;
+      throw err;
+    }
+  };
   const fresh = (family) => ({ family, size: 0, mtimeNs: null, offset: 0, records: [],
     tally: { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false } });
-  function read(ledgerDir, family) {
-    familyOf(family);
+  const unchanged = (entry, family, size, mtimeNs) => Boolean(entry) && entry.family === family
+    && entry.size === size && entry.mtimeNs === mtimeNs;
+
+  // One read of the family's files, or null when a rotation moved them during it.
+  function readOnce(ledgerDir, family) {
+    const listed = ledgerFiles(ledgerDir, family);
     const files = [];
     const records = [];
-    const signature = [];
-    for (const file of ledgerFiles(ledgerDir, family)) {
-      let stat;
-      try {
-        stat = fs.statSync(file, { bigint: true });
-      } catch (err) {
-        if (err && err.code === 'ENOENT') continue;
-        throw err;
-      }
-      const size = Number(stat.size);
-      const key = stat.ino ? `${stat.dev}:${stat.ino}` : `path:${file}`;
-      let entry = cache.get(key);
-      const unchanged = entry && entry.family === family && entry.size === size && entry.mtimeNs === stat.mtimeNs;
-      if (!unchanged) {
-        // Only a file that grew keeps what was parsed; anything else is parsed from its start.
-        if (!entry || entry.family !== family || size <= entry.size) {
-          entry = fresh(family);
-          cache.set(key, entry);
-        }
-        if (size > entry.offset) {
-          const fd = fs.openSync(file, 'r');
-          let chunk;
-          try {
-            chunk = readAt(fd, entry.offset, size - entry.offset);
-          } finally {
-            fs.closeSync(fd);
+    const read = [];
+    for (const file of listed) {
+      const stat = statOf(file);
+      if (!stat) return null;
+      const id = idOf(stat);
+      let entry = id ? cache.get(id) : null;
+      let size = Number(stat.size), mtimeNs = stat.mtimeNs;
+      if (!unchanged(entry, family, size, mtimeNs)) {
+        const fd = fs.openSync(file, 'r');
+        try {
+          const held = fs.fstatSync(fd, { bigint: true });
+          if (idOf(held) !== id) {
+            // The path names another file than the one stat saw: a rotation. Both are read again.
+            if (id) cache.delete(id);
+            if (idOf(held)) cache.delete(idOf(held));
+            return null;
           }
-          const complete = chunk.lastIndexOf(0x0a) + 1;
-          if (complete > 0) {
-            readFileBytes(chunk.subarray(0, complete), family, entry.records, entry.tally);
-            entry.offset += complete;
+          size = Number(held.size);
+          mtimeNs = held.mtimeNs;
+          if (!unchanged(entry, family, size, mtimeNs)) {
+            // Only a file that grew keeps what was parsed; anything else is parsed from its start.
+            if (!entry || entry.family !== family || size <= entry.size) entry = fresh(family);
+            if (size > entry.offset) {
+              const chunk = readAt(fd, entry.offset, size - entry.offset);
+              const complete = chunk.lastIndexOf(0x0a) + 1;
+              if (complete > 0) {
+                readFileBytes(chunk.subarray(0, complete), family, entry.records, entry.tally);
+                entry.offset += complete;
+              }
+            }
+            entry.size = size;
+            entry.mtimeNs = mtimeNs;
+            entry.tally.tornTail = size > entry.offset;
+            if (id) cache.set(id, entry);
           }
+        } finally {
+          fs.closeSync(fd);
         }
-        entry.size = size;
-        entry.mtimeNs = stat.mtimeNs;
-        entry.tally.tornTail = size > entry.offset;
       }
       for (const r of entry.records) records.push(r);
       files.push({ file, ...entry.tally });
-      signature.push(`${file}|${key}|${size}|${stat.mtimeNs}`);
+      read.push({ file, id, size, mtimeNs });
     }
-    const id = `${ledgerDir}|${family}`, now = signature.join('\n');
-    if (seen.get(id) !== now) {
-      seen.set(id, now);
-      version += 1;
+    // Nothing moved while the files were read: the same files, under the same names.
+    const now = ledgerFiles(ledgerDir, family);
+    if (now.length !== listed.length || now.some((file, i) => file !== listed[i])) return null;
+    for (const r of read) {
+      const stat = statOf(r.file);
+      if (!stat || idOf(stat) !== r.id) return null;
     }
-    return { records, ...totalOf(files), files };
+    return { records, ...totalOf(files), files,
+      signature: read.map((r) => `${r.file}|${r.id}|${r.size}|${r.mtimeNs}`).join('\n') };
+  }
+
+  function read(ledgerDir, family) {
+    familyOf(family);
+    const key = `${ledgerDir}|${family}`;
+    for (let attempt = 0; attempt < STABLE_READ_ATTEMPTS; attempt++) {
+      const out = readOnce(ledgerDir, family);
+      if (!out) continue;
+      const { signature, ...result } = out;
+      if (seen.get(key) !== signature) {
+        seen.set(key, signature);
+        version += 1;
+      }
+      return result;
+    }
+    seen.delete(key);
+    version += 1;
+    return readLedger(ledgerDir, family);
   }
   return { read, version: () => version };
 }

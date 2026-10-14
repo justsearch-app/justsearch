@@ -86,6 +86,16 @@ function runLedger(dataDir, runId, engine, executable) {
         codeName: 'ok', exitedAt: null, observedAt: new Date(), terminateCalledAt: null, forced: false,
         phase: 'STOPPING', codeDistinctive: true });
     },
+    /** A child the Engine started (its spawn and start), and its exit when `exited`. */
+    child(childId, p, exited) {
+      engineWriter.append('child-spawn', { childId, kind: 'EXTRACTION', owner, incarnation });
+      engineWriter.append('child-start', { childId, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
+        executable: 'C:\\fixture\\parser.exe', contained: true });
+      if (exited) {
+        engineWriter.append('child-exit', { childId, exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false,
+          exitedAt: iso7(BigInt(p.creationFileTimeUtc) + 450000n) });
+      }
+    },
     /** A process the Engine's job witness held (its start only). */
     jobProcessStart(p, witnessId) {
       const common = { witnessId, pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner, incarnation };
@@ -255,11 +265,11 @@ test('a retried stop keeps every earlier stop report and names the reports and c
 });
 
 /** The census entry point with a stand-in for the PowerShell observer (as test-dev-runner-exit-census). */
-async function arm(run, dataDir, exitsAtFinish, atFinish = null) {
+async function arm(run, dataDir, exitsAtFinish, atFinish = null, options = {}) {
   let args, clock = 0, finished = false;
   const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => {};
   const flag = (f) => args[args.indexOf(f) + 1];
-  const observer = await census.startStopExitCensus(run, dataDir, dataDir, scope, {
+  const observer = await census.startStopExitCensus(run, dataDir, dataDir, scope, { ...options,
     launch: (a) => { args = a; fs.writeFileSync(flag('-ReadyFile'), '{}'); return proc; }, now: () => clock,
     pause: async (ms) => {
       clock += ms;
@@ -453,6 +463,137 @@ test('an identity whose exit the ledger records is never passed to an OS lookup 
   const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
   assert.ok(report.resolvedByLedger?.some((p) => p.pid === engine.pid && p.creationFileTimeUtc === engine.creationFileTimeUtc),
     JSON.stringify(report.resolvedByLedger));
+});
+
+test('a rotation between the stat and the open of a ledger file loses no record: the moved file is read again in full', async () => {
+  const runId = 'stop-census-rotation-race';
+  const engine = noProcess(970211, '134364632933610725');
+  const child = noProcess(970213, '134364634153991105');
+  const dataDir = freshDir('rotation-race');
+  const ledger = runLedger(dataDir, runId, engine, process.execPath);
+  ledger.engineStart();
+  ledger.child('c-live', child, false);
+  ledger.engineExit();
+  const dir = ledgerLib.ledgerDirectory(dataDir);
+  const current = path.join(dir, 'children.v1.jsonl'), moved = path.join(dir, 'children.v1.1.jsonl');
+  const before = ledgerLib.readLedger(dir, 'children').records.map((r) => [r.type, r.line.childId]);
+  // The writer rotates right after the reader's stat of the current file: the current file is
+  // renamed, and a replacement as long as it, holding only a note, takes its name.
+  const size = fs.statSync(current).size;
+  const note = JSON.stringify({ schemaVersion: 1, type: 'child-note', seq: 99, at: new Date().toISOString(),
+    writer: { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) }, childId: 'c-note', note: 'new file' });
+  const replacement = note + ' '.repeat(size - Buffer.byteLength(note) - 1) + '\n';
+  const stat = fs.statSync;
+  let rotated = false;
+  fs.statSync = function (file, ...rest) {
+    const out = stat.call(this, file, ...rest);
+    if (!rotated && path.resolve(String(file)) === path.resolve(current)) {
+      rotated = true;
+      fs.renameSync(current, moved);
+      fs.writeFileSync(current, replacement);
+    }
+    return out;
+  };
+  const reader = ledgerLib.createIncrementalReader();
+  let result;
+  try {
+    const armed = await arm({ runId, pids: { backendRootPid: engine.pid } }, dataDir, [], null, { ledgerReader: reader });
+    result = await armed.observer.finish();
+  } finally {
+    fs.statSync = stat;
+  }
+  assert.ok(rotated, 'the rotation happened between the stat and the open');
+  const read = reader.read(dir, 'children').records.map((r) => [r.type, r.line.childId]);
+  const truth = ledgerLib.readLedger(dir, 'children').records.map((r) => [r.type, r.line.childId]);
+  assert.deepEqual(read, truth, 'the reader holds what a whole read of the files holds');
+  for (const record of before) assert.ok(read.some((r) => r[0] === record[0] && r[1] === record[1]), `kept: ${record}`);
+  assert.equal(result.exitAccountingComplete, false, 'a child with a start and no exit leaves accounting incomplete');
+});
+
+test('an Engine a reconciliation found alive (ALIVE_MATCH) is looked up and blocks the stop', async () => {
+  const runId = 'stop-census-alive-match';
+  const live = noProcess(970301 + 20, '134364632933610725');
+  const engine = noProcess(970301 + 24, '134364633933610725');
+  const dataDir = freshDir('alive-match');
+  const dir = ledgerLib.ledgerDirectory(dataDir);
+  const writerOf = (role, pid, family) => ledgerLib.createLedgerWriter({ ledgerDir: dir, family,
+    writer: { role, pid, startedAt: Number((BigInt(engine.creationFileTimeUtc) - EPOCH) / 10000n) } });
+  const runner = writerOf('dev-runner', 4000, 'engine');
+  const start = (p, n) => runner.append('engine-start', { incarnation: { session: runId, n }, pid: p.pid,
+    creationFileTime: p.creationFileTimeUtc, executable: process.execPath, processStartedAt: new Date(isoMs(p.creationFileTimeUtc)),
+    cause: 'START', supervisorKind: 'dev-runner' });
+  // Incarnation 1: a later supervisor found it open, and found it alive (ALIVE_MATCH).
+  start(live, 1);
+  runner.append('engine-owner-died', { incarnation: { session: runId, n: 1 }, basis: 'OPEN_START', osCheck: 'ALIVE_MATCH',
+    exitClass: 'UNKNOWN', pid: live.pid });
+  // Incarnation 2, the run's Engine, ended as recorded.
+  start(engine, 2);
+  runner.append('engine-exit', { incarnation: { session: runId, n: 2 }, exitClass: 'REQUESTED', reason: 'QUIT', detail: null,
+    code: 0, codeName: 'ok', exitedAt: null, observedAt: new Date(), terminateCalledAt: null, forced: false,
+    phase: 'STOPPING', codeDistinctive: true });
+  // The stop: the incarnation found alive is still recorded, alive with its birth.
+  const fixture = stopFixture({ runId, dataDir, engine });
+  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'),
+    JSON.stringify({ processes: [{ ...live, role: 'engine', owned: false }] }));
+  const looked = [];
+  const io = { ...fixture.io, lookupIdentities: async (ids) => {
+    looked.push([...ids]);
+    return new Map(ids.map((pid) => [pid, pid === live.pid
+      ? { present: true, creationFileTime: live.creationFileTimeUtc, name: 'node.exe', executable: process.execPath } : { present: false }]));
+  } };
+  const out = await api.stopRun({}, io);
+  assert.ok(looked.some((ids) => ids.includes(live.pid)), `the identity found alive is looked up: ${JSON.stringify(looked)}`);
+  assert.equal(out.outcome, 'STOP_INCOMPLETE', 'an identity found alive still blocks the stop');
+  assert.deepEqual(out.unresolvedProcesses.map((p) => p.pid), [live.pid]);
+});
+
+test('of every exit record kind and reconciliation outcome, only an exit seen by its writer or a reconciliation that found the process gone proves an exit', () => {
+  // Every record kind and reconciliation outcome a ledger exit can hold, judged alone.
+  const exit = (type, osCheck) => ({ type, osCheck });
+  const proves = (e) => census.endedIdentitiesOf({ engines: [{ pid: 970401, creationFileTimeUtc: '134364632933610725', exit: e }],
+    children: [], witnesses: [] }).length === 1;
+  assert.deepEqual([
+    exit('engine-exit', null), exit('child-exit', null), exit('job-process-exit', null),
+    exit('engine-owner-died', 'GONE'), exit('owner-died', 'GONE'), exit('job-process-exit', 'GONE'),
+    exit('engine-owner-died', 'ALIVE_MATCH'), exit('owner-died', 'ALIVE_MATCH'), exit('job-process-exit', 'ALIVE_MATCH'),
+    exit('engine-owner-died', 'IDENTITY_UNKNOWN'), exit('owner-died', 'IDENTITY_UNKNOWN'), exit('job-process-exit', 'IDENTITY_UNKNOWN'),
+    exit('engine-owner-died', null), exit('owner-died', null), exit('child-survived', null),
+  ].map(proves), [true, true, true, true, true, true, false, false, false, false, false, false, false, false, false]);
+});
+
+test('a manifest helper is matched to its ledger exit at the millisecond its start was recorded with, and no coarser', async () => {
+  const runId = 'stop-census-manifest-ms';
+  const engine = noProcess(970501, '134364632933610725');
+  // Births with a sub-millisecond part, as the Engine records them; the manifest has milliseconds.
+  const ended = noProcess(970503, '134364634153991105');
+  const other = noProcess(970507, '134364634163993450');
+  const dataDir = freshDir('manifest-ms');
+  const ledger = runLedger(dataDir, runId, engine, process.execPath);
+  ledger.engineStart();
+  ledger.child('c-ended', ended, true);
+  ledger.child('c-other', other, true);
+  ledger.engineExit();
+  const exe = 'C:\\fixture\\parser.exe';
+  fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ pid: engine.pid, children: [
+    { id: 'c-ended', pid: ended.pid, kind: 'EXTRACTION', startedAt: isoMs(ended.creationFileTimeUtc), executable: exe },
+    // One millisecond after its ledger birth: another process under the same PID.
+    { id: 'c-other', pid: other.pid, kind: 'EXTRACTION', startedAt: isoMs(BigInt(other.creationFileTimeUtc) + 10000n), executable: exe },
+  ] }));
+  const fixture = stopFixture({ runId, dataDir, engine });
+  const looked = [];
+  const io = { ...fixture.io, lookupIdentities: async (ids) => {
+    looked.push([...ids]);
+    return new Map(ids.map((pid) => [pid, [ended.pid, other.pid].includes(pid)
+      ? { present: true, creationFileTime: null, name: 'parser.exe', executable: exe } : { present: false }]));
+  } };
+  const out = await api.stopRun({}, io);
+  assert.equal(looked.filter((ids) => ids.includes(ended.pid)).length, 0,
+    `the helper whose ledger exit matches at the millisecond is never looked up: ${JSON.stringify(looked)}`);
+  assert.ok(looked.some((ids) => ids.includes(other.pid)), 'a helper a millisecond off is looked up');
+  assert.equal(out.outcome, 'STOP_INCOMPLETE');
+  assert.deepEqual([...new Set(out.unresolvedProcesses.map((p) => p.pid))], [other.pid]);
+  const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
+  assert.ok(report.resolvedByLedger?.some((p) => p.pid === ended.pid), JSON.stringify(report.resolvedByLedger));
 });
 
 test('a self-exit report keeps the earlier stop report under the next number', async () => {

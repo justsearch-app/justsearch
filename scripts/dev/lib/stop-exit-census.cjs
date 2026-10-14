@@ -1085,10 +1085,23 @@ async function reconcileCrashedHelpers(dataDir, runId, lookup, append) {
  * (a reconciliation's IDENTITY_UNKNOWN). A process alive under such a PID whose birth cannot be
  * read is never one of them; nothing about it is decided here.
  */
+/**
+ * Whether a ledger exit record proves its process ended. A record its writer wrote on seeing the
+ * exit (engine-exit, child-exit, a witness's own job-process-exit; none carries an osCheck) proves
+ * it. A reconciliation (engine-owner-died, owner-died, a reconciled job-process-exit) records what a
+ * later owner found when it looked for the process: only osCheck GONE proves the exit; ALIVE_MATCH
+ * found it alive and IDENTITY_UNKNOWN could not tell.
+ */
+const DIRECT_EXIT_TYPES = new Set(['engine-exit', 'child-exit', 'job-process-exit']);
+function provesExit(exit) {
+  if (!exit) return false;
+  return exit.osCheck == null ? DIRECT_EXIT_TYPES.has(exit.type) : exit.osCheck === 'GONE';
+}
+
 function endedIdentitiesOf(view) {
   const ended = [];
   for (const item of [...view.engines, ...view.children, ...(view.witnesses ?? [])]) {
-    if (!item.exit || item.exit.osCheck === 'IDENTITY_UNKNOWN') continue;
+    if (!provesExit(item.exit)) continue;
     if (!Number.isSafeInteger(item.pid) || item.pid <= 0 || !isFileTime(item.creationFileTimeUtc)) continue;
     ended.push({ pid: item.pid, creationFileTimeUtc: item.creationFileTimeUtc,
       role: item.witnessId ? (CONSOLE_HOST_RE.test(item.executable ?? '') ? 'console-host' : 'job-helper')
