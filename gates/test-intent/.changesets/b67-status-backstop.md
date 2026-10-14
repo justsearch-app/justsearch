@@ -30,9 +30,13 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before a
       "behaviour": "The full canonical status structure publishes missed owner changes and stale/recovered transitions, excluding clocks and ages. Failed reads carry publication metadata; cached polls with unreflected changes refresh once; restart and missing metadata cannot restore older current state. Refused fresh reads do not create a loop. Copied verifier assertions are retained.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "metadata on any response counts, successful or not; a body is never shown as current unless it is known to be at least as new as what is displayed",
-          "location": "task t-20261005-b6d536 request (b67 builder brief, task item 5 / S20)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "metadata on any response counts, successful or not; a body is never shown as current unless it is known to be at least as new as what is displayed",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b67 builder brief, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b67-status-backstop-repaired.json",
@@ -56,9 +60,13 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before a
       "behaviour": "Retain the independent verifier real-HTTP isolation, admission, owner, projection and provenance checks as preservation evidence. Their assertions remain unchanged; the fixture temporary directory uses the test runtime directory.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Preservation: every check added by ea0c311cb, b53's StatusIsolationHttpTest and admission checks, the verifier's 65 own preservation cases where reusable",
-          "location": "task t-20261005-b6d536 request (b67 builder brief, Checks)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Preservation: every check added by ea0c311cb, b53's StatusIsolationHttpTest and admission checks, the verifier's 65 own preservation cases where reusable",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b67 builder brief, Checks)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b67-status-backstop-preservation.json",

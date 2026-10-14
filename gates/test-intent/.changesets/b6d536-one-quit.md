@@ -63,7 +63,7 @@ the coordinator's review.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Spec F step 4: a supervisor forces the Engine down with the job terminate code JS_ENGINE_STOP, which the register carries as SUPERVISOR_FORCED, class TRANSIENT, rendered supervisor_forced.",
           "label": "agent choice"
@@ -96,15 +96,19 @@ the coordinator's review.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Spec F section 4 as the builder implements it with today's shell: one quit deadline (contract quitDeadlineMs 8000, quitForceMarginMs 300) carried as deadlineAtEpochMs; the Engine budgets its close to the deadline minus the margin and stops the chat server through the controller's terminal stop beside the drain; a request naming an incarnation is the Engine's own only with that incarnation and a nonce, otherwise stale and deleted; a request naming none (today's shell) is legacy, cleared at the first boot checkpoint under the instance lock and honoured afterwards.",
           "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-08 integration builder brief Q2",
-          "quote": "Boot honours only a quit request addressed to this Engine incarnation; requests from earlier incarnations, without nonce, or expired are deleted and not honoured."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Boot honours only a quit request addressed to this Engine incarnation; requests from earlier incarnations, without nonce, or expired are deleted and not honoured.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-08 integration builder brief Q2'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-quit-repaired.json",
@@ -137,15 +141,19 @@ the coordinator's review.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Spec F section 4.3 QuitBudget QB1-QB3 and the request ownership rule as the builder implements them: Engine budget = deadline − quitForceMarginMs − now, a further 300 ms kept for the JVM exit, restart and the unbudgeted path keep today's waits, and a request with no incarnation is legacy so today's shell keeps working.",
           "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-08 integration builder brief Q2",
-          "quote": "Boot honours only a quit request addressed to this Engine incarnation; requests from earlier incarnations, without nonce, or expired are deleted and not honoured."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Boot honours only a quit request addressed to this Engine incarnation; requests from earlier incarnations, without nonce, or expired are deleted and not honoured.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-08 integration builder brief Q2'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-quit-budget.json",
@@ -190,7 +198,7 @@ the coordinator's review.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Orchestrator rule for the S16-D1 conflict (apply the reading that never loses user data and never leaves a process running after quit), applied by the builder as the prose above states: the D1 shutdown design binds; a quit abandons a non-yielding unit at the end of QB2 to its durable replay and ends unclean within the budget; the unit replays once to COMPLETE.",
           "label": "agent choice"
@@ -218,7 +226,7 @@ the coordinator's review.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the supervision and containment change (Spec F, item 6) end to end, including the power-notification producer it owns for S11.",
           "choice": "Spec F section 3.5: the windowless Engine registers once at boot with PowerRegisterSuspendResumeNotification; the upcall only enqueues, returns 0 and catches everything; a duplicate resume or a suspend while one is open is dropped.",
           "label": "agent choice"

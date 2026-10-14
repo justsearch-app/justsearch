@@ -28,7 +28,7 @@ Process-fixture exclusions and the safety wrapper are recorded in the builder re
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "The activation self-test candidate runs with the host prompt cache disabled (--cache-ram 0) in every mode, because it answers one tiny request and never resumes a conversation; without the flag llama.cpp enables its 8192 MiB default.",
           "label": "agent choice"
@@ -51,7 +51,7 @@ Process-fixture exclusions and the safety wrapper are recorded in the builder re
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "One explicit override for development, registered where the other inference configuration keys are registered and listed, validated as a non-negative integer number of MiB; an invalid value is refused with a clear message. Registration brings the registry's environment variable, which the launch honours with the system property taking precedence.",
           "label": "agent choice"

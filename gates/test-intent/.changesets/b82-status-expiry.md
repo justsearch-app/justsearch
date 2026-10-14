@@ -59,11 +59,12 @@ Decision records were searched for a conflict with these behaviours (status poll
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5, quoted in the b82 builder brief)",
-          "delegationScope": "how status publication (the status change counter added for task item 5 / S20) behaves when settings change",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how status publication (the status change counter added for task item 5 / S20) behaves when settings change. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision in the b82 brief, S1: \"a confirmed recovery reset completes normally and the status counter advances once. Do not invent a previous value: a recovery reset has no prior settings to compare.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5, quoted in the b82 builder brief)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-repaired-java.json",
@@ -93,19 +94,21 @@ Decision records were searched for a conflict with these behaviours (status poll
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision in the b82 brief, S2: \"the HTTP read deadline ends the wait for that response only; it does not invalidate an observation, change a reported value or advance the counter. A lane is reported stale (existing stale markers, unchanged wire format and reason codes) only from its own observation age against its own sampling period or a failed observation [...] values must not alternate because of request deadlines, and observation timestamps must reflect real probe times. The counter still advances for every real state change, including a lane becoming stale or recovering because of its own age or failure.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator addition to the b82 brief, S6: \"Timed-out fresh reads accumulate completion callbacks behind a held lane and replay obsolete work on recovery [...] Proposed check: freshDeadlineDetachesOutstandingObservationWaiters (hold one lane, many batches of real fresh HTTP reads, bounded getNumberOfDependents() on the lane future; release: bounded projection work; repeat with periodic sampling alone).\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-repaired-java.json",
@@ -135,27 +138,30 @@ Decision records were searched for a conflict with these behaviours (status poll
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the UI keeps its status display current for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the UI keeps its status display current for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision in the b82 brief, S3: \"Repair so a read that does not settle cannot stop the polling schedule or leave the display stuck, without raising any timeout as a fix for server slowness, without more than one read in flight per kind beyond what the existing rules allow, and without read storms (an abandoned read is aborted, not left running in parallel indefinitely). Decide the bound from the existing poll interval and justify.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the UI keeps its status display current for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the UI keeps its status display current for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator addition to the b82 brief, S4: \"Proposed check: headerlessStatusConvergesAfterSseEpoch in statusBoundaryPoll.test.ts (display headerless body, deliver SSE status signal, two intervals of successful ordinary polls: canonical status visible again). Keep the earlier guarantee: no older body shown as current after a new epoch.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the UI keeps its status display current for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the UI keeps its status display current for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator addition to the b82 brief, S5: \"Proposed check: mounted restart test with an online inference fixture from A, then B with status and inference reads failing: Brain not Online, chat capability unavailable.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-repaired-ui.json",
@@ -182,11 +188,12 @@ Decision records were searched for a conflict with these behaviours (status poll
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how status publication is checked for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how status publication is checked for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator addition to the b82 brief: \"if cheap and sound, strengthen two tests the reviewer says assert less than their names: StatusPublicationCompletenessTest (~64) derives expected inclusion from the production exclusion predicate, so a misclassified state passes\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-kept-java.json",
@@ -217,11 +224,12 @@ Decision records were searched for a conflict with these behaviours (status poll
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision in the b82 brief, S2: \"A lane is reported stale (existing stale markers, unchanged wire format and reason codes) only from its own observation age against its own sampling period or a failed observation, so a hung or failing producer is still marked stale, with exactly that part affected and the rest current, and clears on recovery, as verified in earlier rounds (OWN7-HUNG-WORKER, isolation cases).\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-kept-java.json",
@@ -244,11 +252,12 @@ Decision records were searched for a conflict with these behaviours (status poll
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the UI keeps its status display current for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the UI keeps its status display current for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision in the b82 brief, S3: \"Repair so a read that does not settle cannot stop the polling schedule or leave the display stuck [...] without more than one read in flight per kind beyond what the existing rules allow, and without read storms (an abandoned read is aborted, not left running in parallel indefinitely). Decide the bound from the existing poll interval and justify.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-kept-ui.json",
@@ -265,11 +274,12 @@ Decision records were searched for a conflict with these behaviours (status poll
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the UI keeps its status display current for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the UI keeps its status display current for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator addition to the b82 brief, S4: \"Keep the earlier guarantee: no older body shown as current after a new epoch.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-kept-ui.json",
@@ -295,11 +305,12 @@ Decision records were searched for a conflict with these behaviours (status poll
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision on L1 (under the owner's delegation): \"a lane must not read stale because its own probe is slow while it is still producing samples on its cadence [...] A lane's staleness limit is 3 x its effective cadence, where the effective cadence is its configured period plus its recent observed probe duration (bounded; use the larger of the last few, capped so that a hung probe still goes stale [...]). A lane that stops producing samples, fails, or has no sample still goes stale exactly as now.\" Then Orchestrator decision on L1, Option A (under the owner's delegation): \"A lane's effective cadence counts the age of the data it publishes, measured from the source reading's own timestamp to publish, so the gpu-memory lane's allowance comes from the GPU reading's age at publish (sampler tick plus projection cache) rather than from the near-zero read time; apply this generally (for lanes whose source has no timestamp, probe duration as now), not as a gpu-memory special case. Keep the cap: \"capped\" means excluded [...]; a probe or a data age beyond 3 periods is a hang or stale source and grants no allowance, and it still goes stale within the cap.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-repaired-java.json",
@@ -325,11 +336,12 @@ Decision records were searched for a conflict with these behaviours (status poll
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the status surface reports components that cannot answer in time (task item 5 / S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision on L1 (under the owner's delegation): \"a lane must not read stale because its own probe is slow while it is still producing samples on its cadence [...] A lane's staleness limit is 3 x its effective cadence, where the effective cadence is its configured period plus its recent observed probe duration (bounded; use the larger of the last few, capped so that a hung probe still goes stale [...]). A lane that stops producing samples, fails, or has no sample still goes stale exactly as now.\" Then Orchestrator decision on L1, Option A (under the owner's delegation): \"A lane's effective cadence counts the age of the data it publishes, measured from the source reading's own timestamp to publish, so the gpu-memory lane's allowance comes from the GPU reading's age at publish (sampler tick plus projection cache) rather than from the near-zero read time; apply this generally (for lanes whose source has no timestamp, probe duration as now), not as a gpu-memory special case. Keep the cap: \"capped\" means excluded [...]; a probe or a data age beyond 3 periods is a hang or stale source and grants no allowance, and it still goes stale within the cap.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b82-status-expiry-kept-java.json",

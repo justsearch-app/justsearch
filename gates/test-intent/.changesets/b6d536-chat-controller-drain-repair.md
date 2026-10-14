@@ -40,7 +40,7 @@ names the stale port. This changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Item 5 repair of Spec A steps 2-3: a search that meets the generative gate closed by a drain, start or stop answers without the optional AI steps and records the same skip reason as when AI is off (expansion AI_UNAVAILABLE), whether the refusal is thrown at the call or carried by the future; the drain itself and isAvailable() are unchanged.",
           "label": "agent choice"
@@ -69,7 +69,7 @@ names the stale port. This changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Item 5 repair of Spec A steps 2-3: every caller of an optional generative step (query expansion, query understanding, filter normalization, context sufficiency) treats a refusal because chat is draining, starting, stopping or unavailable exactly as AI being off, recording the same skip reason or returning the same AI-off result, and a synchronous throw is handled like an asynchronous failure.",
           "label": "agent choice"
@@ -101,7 +101,7 @@ names the stale port. This changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Item 5 repair of Spec A steps 2-3 changes only the refused path: with AI on a search still expands, and with AI off it skips expansion as before without calling the model.",
           "label": "agent choice"
@@ -125,7 +125,7 @@ names the stale port. This changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Item 5 repair of Spec A steps 2-3: GPL and other background generative jobs treat a refusal because chat is draining, starting, stopping or unavailable as AI being off; they defer and retry later (GPL on the AI-off backoff and budget, ending the job as the AI-off timeout does when the budget runs out; VDU leaving the document pending and blocking the pass as AI offline) instead of aborting or counting a failure.",
           "label": "agent choice"
@@ -156,7 +156,7 @@ names the stale port. This changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Item 5 repair of Spec A steps 2-3: a refusal caused by a chat-server transition (busy draining, another transition, interrupted, a superseded observation, an occupied settings transaction) is typed transient: retryable true, status 503 or 409 per the existing error contract (RECONFIGURE_IN_PROGRESS stays 409, an otherwise unlisted retryable refusal is 503 SERVICE_UNAVAILABLE), never 500 or PERMANENT.",
           "label": "agent choice"
@@ -180,7 +180,7 @@ names the stale port. This changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Item 5 repair of Spec A steps 2-3 types only transition refusals transient; a refusal that the same candidate cannot outlive (an invalid configuration) keeps its existing permanent projection.",
           "label": "agent choice"
@@ -202,7 +202,7 @@ names the stale port. This changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Item 5 repair of Spec A steps 2-3: the /v1 proxy's connection-refused reply says chat is not running and stays a retryable 503, without the stale internal port wording.",
           "label": "agent choice"

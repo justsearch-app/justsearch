@@ -30,11 +30,12 @@ The same change repairs F1-F3 in scripts/dev (dev-runner stop: termination valid
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b80 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b80 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a GPU pending release is visible before the exit is published.",
-          "label": "agent choice (orchestrator decision in the b80 builder brief)"
+          "label": "agent choice (orchestrator decision in the b80 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "DefaultChildControlTest (unchanged) keeps its GPU release, model-switch barrier and engine-ending stop expectations (no release poll when the stop ends the Engine); ChildControl.awaitGpuRelease javadoc and Spec B section 2.6 step 8 describe the release as a barrier for the next GPU start; decision records under docs/decisions/ searched for GPU release or child exit ordering: ADR-0050 (GPU co-residence by prevention) and ADR-0051 (held process lifetimes and owner-recorded exits) agree, none conflicting.",
@@ -52,17 +53,22 @@ The same change repairs F1-F3 in scripts/dev (dev-runner stop: termination valid
       "behaviour": "A runtime activation whose self-test candidate is healthy and exercised but survives its forced stop (ChildSurvivedException) ends with result failed: the stop was attempted once, no candidate context is installed, and the stored server executable and model path are unchanged.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request (item 6)",
-          "quote": "process ownership and exit accounting"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "process ownership and exit accounting",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (item 6)'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b80 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b80 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a self-test whose candidate survives is not a success and changes no activation settings.",
-          "label": "agent choice (orchestrator decision in the b80 builder brief)"
+          "label": "agent choice (orchestrator decision in the b80 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "RuntimeActivationServiceChatProfileTest, RuntimeActivationServiceTest and SelfTestGpuBarrierTest (unchanged) keep their passed, failed and refused self-test expectations; SelfTestRun's javadoc now states that a run whose candidate did not exit is never exercised; decision records under docs/decisions/ searched for self-test or activation commit rules: ADR-0051 names the activation self-test's llama-server as a held child whose stop is recorded by its owner, none conflicting.",

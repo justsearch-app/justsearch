@@ -51,7 +51,7 @@ files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 7-8) end to end within the agreed scenarios.",
           "choice": "Spec A step 7 as the builder implements it: the classified failures RESOURCE_EXHAUSTED, STARTUP_TIMEOUT, START_FAILED and MODEL_LOAD_FAILED get the reason codes inference.out_of_memory, inference.startup_timeout, inference.start_failed and inference.model_load_failed (FAULT), with their own UI wording; the other failures keep inference.crashed (MISSING_DLL keeps inference.runtime_not_installed); a stepped-down context window is the TRANSIENT notice inference.context_reduced on a READY component; a component that is starting while the engine is down reads as chat LOADING.",
           "label": "agent choice"
@@ -88,7 +88,7 @@ files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 7-8) end to end within the agreed scenarios.",
           "choice": "Spec A §3.1 as the builder implements it: one mapping from a classified failure and from a serving server's window to the generative component's state and reason code; a latched failure never replaces the user's choice to turn chat off. The ChatStatus snapshot and the Mode projection are not built: Spec C R1 makes operating.chat a projection of the RuntimeStatus quartet with no second chat state, and wiring the decider into the status surface is Spec C step C8.",
           "label": "agent choice"
@@ -129,7 +129,7 @@ files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 7-8) end to end within the agreed scenarios.",
           "choice": "Spec A §6.2 T2/T3 as the builder implements them: the boot-order gate is armed at boot; a GPU chat activation that meets it is not acted on (BOOT_WAIT); the gate opens once, on the encoders component's READY publication or after 45 s, and then asks the forwarder to send its current intent again rather than replaying a stored step; CPU chat and an unarmed controller never wait; the hook only reads the component registry.",
           "label": "agent choice"
@@ -175,7 +175,7 @@ files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 7-8) end to end within the agreed scenarios.",
           "choice": "A latched chat failure is scoped to the activation attempt it ended: the status projection reads it only while no later activation attempt has begun, and the latch itself still holds VDU and running holds refused until an activation, an operator retry or a configuration change clears it. A settings apply that relaunches a stepped-down server publishes READY with inference.context_reduced. The supervision contract's brain FAILED rows name the published reason code of each FAILED code, guarded by a contract test.",
           "label": "agent choice"

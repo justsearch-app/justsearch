@@ -100,7 +100,7 @@ branch belong to other tasks.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Spec F section 2.4 failure policy as the builder implements it: an Engine without its job still boots for the user and says so (sticky reason code engine.containment_unavailable, a WARNING health condition, the manifest field), and refuses to boot only where containment is a precondition of the run, the conformance harness or JUSTSEARCH_REQUIRE_CONTAINMENT.",
           "label": "agent choice"
@@ -143,7 +143,7 @@ branch belong to other tasks.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Orchestrator ruling: Spec F step V extends the StopDetail vocabulary with session_end, takeover, interrupted (owner-side QUIT details) and the reader-only unknown, so the exact-members check lists them; the exact-members, no-drift oracle is kept.",
           "label": "agent choice"

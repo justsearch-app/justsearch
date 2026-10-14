@@ -40,11 +40,12 @@ One refused fresh read per poll interval, while only fresh reads are refused, is
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the UI keeps its status display current for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the UI keeps its status display current for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision in the b76 brief: any successful status read (ordinary poll or fresh read) that shows the server is answering again ends the back-off; an action or receipt signal made after recovery gets its fresh read at once; back-off still bounds refused or failed reads and Retry-After is honoured while it applies; the display shows a change at the next render once the server reflects it, with at most one fresh read in flight and a bounded total per value.",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
       "evidence": "gates/test-intent/evidence/b76-status-backoff-ui.json",

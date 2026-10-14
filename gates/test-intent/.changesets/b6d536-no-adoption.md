@@ -43,7 +43,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Reconciliation rulings CH2-CH4 as the builder implements them: the declared configuration hash leaves out the port (two launches differing only in the configured port share it); a launch whose llama-server output reports the bind failure is retried once on a fresh port at the same context rung, never stepped down, on every managed launch including a recovery relaunch (orchestrator ruling: CH3 covers every managed launch); the explicit external server is set by justsearch.inference.external_endpoint as a loopback http URL with a port.",
           "label": "agent choice"
@@ -156,7 +156,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Reconciliation ruling CH4 as the builder implements it: the explicit configuration is justsearch.inference.external_endpoint (env JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT), accepted only as a loopback http URL with a port because every request is built against the loopback host; anything else is refused with a reason, never reinterpreted. Without it, a server on the configured port is ignored with one WARN and the status note external_server_ignored.",
           "label": "agent choice"
@@ -231,7 +231,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Orchestrator ruling on the failing pre-existing tests, under the owner's delegation: a configured port without the external endpoint is not adopted and is refused or ignored with external_server_ignored, asserted at the same seam (InferenceLifecycleManager.switchToOnlineMode / startLlamaServer).",
           "label": "agent choice"
@@ -265,7 +265,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Orchestrator ruling on the failing pre-existing tests, under the owner's delegation: rewrite each to assert the new rule at the same seam (close always stops; no readoption; a configured port without the external endpoint is not adopted and is refused or ignored with external_server_ignored; the port is not in the declared hash; every shutdown reason stops the chat server), keeping every assertion that still holds. Detach keeps its own always-managed policy because CH4 makes the strict witness policy refuse while an endpoint is set.",
           "label": "agent choice"
@@ -301,7 +301,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Orchestrator ruling on the failing pre-existing tests, under the owner's delegation: rewrite each to assert that every shutdown reason stops the chat server at the same seam, keeping the shutdown order and exit code; the HeadAssembly keep-alive directive is removed, not kept as a no-op.",
           "label": "agent choice"
@@ -399,7 +399,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Orchestrator ruling under the owner's delegation: remove LlamaServerProcessOwnership.adoptManaged (adoption retired by design) and rewrite the fence check to the new rule.",
           "label": "agent choice"
@@ -428,7 +428,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Orchestrator ruling under the owner's delegation: implement Spec A step 1's manifest rule in RuntimeManifestPublisher (registered children left at shutdown completion mean the handoff is incomplete for every reason) with test U20. Builder's reading: only the published state changes; a non-terminal completion with children left does not throw, so the shutdown exit path is unchanged.",
           "label": "agent choice"
@@ -453,7 +453,7 @@ observation after the bound is unmeasurable, not a pass.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
           "choice": "Orchestrator ruling under the owner's delegation (verifier repair round 1): the floor exists only to stop a vacuous pass, so it is lowered to the four factories that remain once the reconciler's adoption probe client is gone, and all four still inject their executor.",
           "label": "agent choice"

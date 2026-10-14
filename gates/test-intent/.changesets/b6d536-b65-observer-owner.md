@@ -20,9 +20,13 @@ Independent verifier acceptance remains pending. The private execution adapter c
       "behaviour": "Unsubscribe, bridge close, channel close and the registered Engine delivery owner shutdown release an interruptible blocked Health observer independently of publication.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)",
-          "quote": "Every thread or task that delivers Health events has one owner that ends it"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Every thread or task that delivers Health events has one owner that ends it",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "R1-R4 and existing publication, recovery and shutdown checks retain their expectations. Genuine drain failures must remain observable.",
@@ -44,9 +48,13 @@ Independent verifier acceptance remains pending. The private execution adapter c
       "behaviour": "Normal shutdown closes open Health, snapshot, event-only, multiplexed, run and blocking SSE streams through real HTTP, including blocked snapshot setup. Streams relinquish actual Engine admission before the production ordered work drain; shutdown completes promptly with exit 0 and clean=true.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)",
-          "quote": "Normal shutdown ends every open SSE attachment (Health and every other stream the server holds) promptly and exits 0 with clean=true"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Normal shutdown ends every open SSE attachment (Health and every other stream the server holds) promptly and exits 0 with clean=true",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "R1-R4 and existing publication, recovery and shutdown checks retain their expectations. Genuine drain failures must remain observable.",
@@ -65,9 +73,13 @@ Independent verifier acceptance remains pending. The private execution adapter c
       "behaviour": "A real selector or graceful-drain failure propagates to ordered shutdown accounting while later shutdown phases still run.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)",
-          "quote": "the exit code and clean flag must report a real failure when there is one"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "the exit code and clean flag must report a real failure when there is one",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "R1-R4 and existing publication, recovery and shutdown checks retain their expectations. Genuine drain failures must remain observable.",
@@ -86,9 +98,13 @@ Independent verifier acceptance remains pending. The private execution adapter c
       "behaviour": "Twelve committed refresh cycles over 100000 chunks do not retain another chunk-sized membership heap beyond the settled initial scan.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)",
-          "quote": "if the candidate retains state across refresh that it does not need, remove it"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "if the candidate retains state across refresh that it does not need, remove it",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b65 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "R1-R4 and existing publication, recovery and shutdown checks retain their expectations. Genuine drain failures must remain observable.",

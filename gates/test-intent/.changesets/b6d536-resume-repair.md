@@ -21,14 +21,22 @@ New regression files leave the established controller oracles unchanged. Fail-be
       "behaviour": "F1: after a 180-second monotonic-clock suspension during the 120-second pressure dwell, reportResume restores RELOAD_BACKOFF for PT2M and the server stays unloaded until it elapses. F2: a throwing device-loss stop leaves the controller processing an operator RECOVER; no restart is requested for the failed stop, and a later device loss is handled. The production lifecycle actuator latches STOP_FAILED before propagating a stop failure, without reading the ledger, and its latch remains clearable. Existing fixtures supply the same seams as the independent verifier probes.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Expected: resume restarts the full dwell (PT2M, RELOAD_BACKOFF) when a dwell was active at suspend, and likewise restarts the boot-order and server timers.",
-          "location": "task t-20261005-b6d536 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Expected: resume restarts the full dwell (PT2M, RELOAD_BACKOFF) when a dwell was active at suspend, and likewise restarts the boot-order and server timers.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "quote": "Expected: the failure is isolated like any other step failure, chat reaches a defined state (FAILED with a reason, or the device-lost path continues), and a later operator retry is processed.",
-          "location": "task t-20261005-b6d536 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Expected: the failure is isolated like any other step failure, chat reaches a defined state (FAILED with a reason, or the device-lost path continues), and a later operator retry is processed.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "repaired": true,
@@ -47,14 +55,22 @@ New regression files leave the established controller oracles unchanged. Fail-be
       "behaviour": "A resume after reload does not revive an old residency dwell; a subsequent pressure-blocked boot with no running server to unload still creates no dwell. The existing short-resume and future-dated DEVICE_LOST refusal controls remain unchanged and are also rerun.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Keep the short-resume control and the future-dated DEVICE_LOST limit case (restart refused) as preservation.",
-          "location": "task t-20261005-b6d536 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Keep the short-resume control and the future-dated DEVICE_LOST limit case (restart refused) as preservation.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "quote": "Expected: resume restarts the full dwell (PT2M, RELOAD_BACKOFF) when a dwell was active at suspend, and likewise restarts the boot-order and server timers.",
-          "location": "task t-20261005-b6d536 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Expected: resume restarts the full dwell (PT2M, RELOAD_BACKOFF) when a dwell was active at suspend, and likewise restarts the boot-order and server timers.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-resume-repair-preserved.json",

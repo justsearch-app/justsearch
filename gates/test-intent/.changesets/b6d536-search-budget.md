@@ -65,7 +65,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "One reason code, SEMANTIC_BUDGET_EXCEEDED, set per leg (hybrid_fallback_reason for dense, splade_skip_reason for SPLADE). The semantic deadline is min(start + cap, D - lexical reserve - margin), with a GPU cap of 2000 ms, a CPU cap of 8000 ms, a lexical reserve of 250 ms and a margin of 500 ms, each a named configuration value. A run past the deadline releases its caller, and the search answers within the semantic deadline plus margin.",
           "label": "agent choice"
@@ -99,7 +99,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "Every bulk (indexing and backfill) encoder acquisition, including the per-document fallbacks, carries BACKGROUND urgency. Only query-side encodes are FOREGROUND.",
           "label": "agent choice"
@@ -180,7 +180,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "One head deadline D per search, fixed when the search opens (open time + the client's request deadline, or a caller's narrower deadline). The expansion re-search gets min(now + 1500 ms, D). If the re-search newly misses a semantic leg the base kept, the base results stay and the expansion is skipped with reason TIMEOUT.",
           "label": "agent choice"
@@ -220,7 +220,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The cause vocabulary is contended, loading and stuck, carried per leg (hybrid_fallback_cause, splade_skip_cause) next to SEMANTIC_BUDGET_EXCEEDED. Across sources the strongest cause wins (stuck over loading over contended). The UI wording is 'semantic search did not answer in time' plus the worded cause. A rerank cut short by the search deadline is worded 'Relevance re-ranking did not fit in the time this search had — results are ranked without it'.",
           "label": "agent choice"
@@ -261,7 +261,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A query run with a semantic deadline runs on a separate platform thread that owns the lease and inputs it was given (copies) and closes them exactly once. The caller is released at the deadline. Each device (the CPU, or one CUDA device) has at most two run threads in flight, live or detached, counted across all handles under one lock before a thread starts, so at most two runs can outlive their callers on a device. A caller that finds both run threads held by detached runs fails at once with RUN (cause stuck). A caller that finds a run thread held by a live run waits for one until its own deadline, then fails with GATE (cause contended). The head deadline is a per-thread binding that worker RPCs and per-source fan-out threads read, bounding each RPC at min(category budget, D - now), at least 1 ms.",
           "label": "agent choice"
@@ -293,7 +293,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced by the head (and, since repair round 2, sent by the worker when its rerank call reaches its own deadline). DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
           "label": "agent choice"
@@ -331,7 +331,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The worker's rerank call answers by its call deadline (less a margin of up to 100 ms), so its engine admission is released before the head moves on. Its models-ready wait ends at that time, and its native run is released there too: the run continues on the reranker's own run threads (two per device, separate from the query encoders'), which bound the native time of abandoned reranks. When those threads all hold abandoned runs, the rerank is skipped at once instead of queueing. Each of these answers is a skipped rerank with skip_reason SEARCH_DEADLINE_EXCEEDED, which the Worker now also sends.",
           "label": "agent choice"
@@ -362,7 +362,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced by the head (and, since repair round 2, sent by the worker when its rerank call reaches its own deadline). DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
           "label": "agent choice"

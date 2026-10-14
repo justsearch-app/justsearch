@@ -7,8 +7,8 @@ author-session: 886833dd-a08f-492f-a40a-cc0976b5ce5e
 
 # Test-intent entries
 
-Task t-20261005-b6d536, the foreground inference pool (scenarios FP1 to FP11, agreed; the owner accepted
-"queue within the deadline and give the refusal its own code"). The Engine's foreground inference
+Task t-20261005-b6d536, the foreground inference pool (scenarios FP1 to FP11, agreed; "queue within the deadline and give the refusal its own code" is the orchestrator's
+recorded choice under the owner's end-to-end delegation, not the owner's words). The Engine's foreground inference
 lane now waits for a thread in a queue as long as its thread count, within the request's deadline
 and the search's semantic deadline, which both count from the start of the call; a full lane
 refuses with ADMISSION_INFERENCE_BUSY, and a closed call pool is reported as closed, not as a

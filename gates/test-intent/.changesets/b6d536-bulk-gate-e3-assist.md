@@ -57,7 +57,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "Short query-assist completions (query understanding, filter normalization, context sufficiency, expansion, follow-up rewrite) are ASSIST and are not chat generating (reconciliation v2 line 43); the caller declares the kind in a scope so the existing chatCompletion signature is unchanged.",
           "label": "agent choice"
@@ -86,7 +86,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "VDU's own generation is bulk work, not chat generating (Spec E 1.2 and F19): VduProcessor declares BulkWorkKind.VDU around its vision and enrichment calls and the chat server opens VDU leases that hold drains but are not counted.",
           "label": "agent choice"
@@ -114,7 +114,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "ASSIST keeps the drain semantics of AUX (reconciliation v2 F13: AUX and ASSIST never wait and fail fast in DRAINING, STARTING and STOPPING; inFlight counts GENERATE leases only).",
           "label": "agent choice"

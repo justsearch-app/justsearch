@@ -32,7 +32,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 7 rows T6, T7, T9 and T10 as the builder implements them in step 4: only a RESOURCE exit steps the derived window down, by one rung, and the reached rung is where the next start of that configuration begins in this Engine; an override is never reduced and fails with resource_exhausted; a CONFIG exit (unknown architecture, missing DLL, unloadable model) and an unclassified exit fail the start at once with their code, with no ladder walk and no same-configuration retry.",
           "label": "agent choice"
@@ -56,7 +56,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 7 row T6 with reconciliation F15 as the builder implements it in step 4: an allocation failure at the top rung of a derived window is classified RESOURCE and relaunched one rung lower, once, within the same start.",
           "label": "agent choice"
@@ -78,7 +78,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 7 rows T27 to T30 and T34 as the builder implements them in step 4: the lifecycle manager decides the follow-up of a managed crash or hang itself and submits it as a RECOVER step to the chat controller; a RESOURCE exit steps down one rung whatever the READY time; any other exit earns one same-configuration restart only after ten minutes of READY on the monotonic clock, at most once per configuration until activation, a configuration change or an operator retry clears the latch; otherwise chat fails with crash_loop.",
           "label": "agent choice"
@@ -102,7 +102,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 4.2 and ruling O6 as the builder implements them in step 4: the Head wraps the generative recovery action as operator-only, so the component monitor's ticks never admit a generative attempt and keep no budget for it, while each operator retry through the recover endpoint is admitted as one attempt regardless of earlier attempts.",
           "label": "agent choice"
@@ -124,7 +124,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A C9 as the builder implements it in step 4: the supervision contract's brain row is rewritten to the section 7 policy (classifier, RESOURCE step-down, one restart after a ten-minute READY window, no same-configuration retry while starting, fixed-delay health, monotonic timers), its numbers are declared in BrainSupervisionPolicy and the contract test fails on drift or on a return of the monitor retry wording.",
           "label": "agent choice"
@@ -145,7 +145,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 7.1 with ruling F17 as the builder implements it in step 4: one classifier reads the exit code and the launch log in a fixed order (lost bind, missing DLL, unknown architecture, device loss, allocation failure, Windows no-memory status, unloadable model, port in use, otherwise OTHER); a CUDA out-of-memory is RESOURCE, never device loss; the evidence is the first matching log line.",
           "label": "agent choice"
@@ -168,7 +168,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 7 rows T6 to T10 and T27 to T29 with ruling CH3 as the builder implements them in step 4: one pure policy maps a classified exit, the READY time, the restart latch and whether a lower rung exists to step down, restart once at the same configuration, or fail with a code; a suspect device is never restarted in place.",
           "label": "agent choice"
@@ -203,7 +203,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "As the builder implements step 4's process-launching tests: every fake llama-server a test launches is stopped and awaited by the fixture, including the release of what it held, before the test directory is deleted.",
           "label": "agent choice"
@@ -224,7 +224,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 4.2 as the builder implements it in step 4: with no automatic generative attempt left in the component monitor, the harness barrier that held that attempt is unreachable and is removed rather than kept as dead harness code; the installed scenario observes the absence of an automatic attempt instead.",
           "label": "agent choice"
@@ -265,7 +265,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 4.2 and ruling O6 as the builder implements them in step 4: the component monitor admits no automatic generative attempt and keeps no generative budget, each operator retry is one attempt, so the installed exhaustion fixture and the barrier that held the automatic attempt are retired and the success fixture proves the absence of an automatic attempt instead.",
           "label": "agent choice"

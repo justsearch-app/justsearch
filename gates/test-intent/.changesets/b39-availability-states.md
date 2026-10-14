@@ -39,9 +39,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "whatMoved": "Provider fakes implement availability instead of the removed abstract boolean. Query mocks return the same ready state as their boolean fixtures. Loading placeholders explicitly say STARTING, including the compatible cold-publication fixture. All old test methods, assertions, deadlines, model latches and inference/wait observations are kept. Non-query isAvailable stubs are unchanged.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause)."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause).",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ]
     },
@@ -53,9 +57,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "behaviour": "Four provider states each exercise HYBRID, SPLADE, AUTO, VECTOR and RAG through real WorkerSearchService and a temporary Lucene index. READY/STARTING after CPU semantic expiry return the budget reason/contended, keyword hits/BM25 or typed vector deadline. ABSENT preserves existing no-service outcomes. A timely FAILED provider preserves the unavailable-service outcomes. Every case observes zero inference, and queued cases zero latch access. The exact named preservation checks pass on a600f71b6 and after.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b39-behaviour.json",
@@ -74,9 +82,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "behaviour": "A failed provider after queued semantic expiry returns the existing unavailability outcomes. Aggregate assertions exercise all five modes on both revisions: HYBRID, AUTO, VECTOR and RAG incorrectly classify the failed provider as queue contention on a600f71b6; SPLADE without an encoder preserves no-service. The aggregate check fails before by assertion and passes after, with no waits or inference. Original load failure retention is checked separately at source.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b39-behaviour.json",
@@ -93,9 +105,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "behaviour": "Real InferenceCompositionRoot captures the exact thrown assembly cause, including suppressed cleanup failure, and carries it through query-role marking and index/query partition. The exact check compiles on the before-state and fails by assertion because the load cause is discarded, then passes after. Existing ownership checks are unchanged. A malformed installed-model manifest also retains its original capture exception instead of only its text, and publishes that exact cause.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause)."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause).",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b39-behaviour.json",
@@ -113,9 +129,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "behaviour": "Real KnowledgeServer boot with deferred initialization held exposes STARTING for an installed model; composition failure later publishes FAILED and the original cause. An uninstalled model stays ABSENT. Checks use a fake native assembly and no GPU or dev stack. Installed cold/failure checks compile before and fail assertions on the old absent-only projection; absent control passes both revisions. Cold presence uses the captured boot configuration even when the process-wide compatibility fingerprint cache says absent; the test injects that stale-cache condition explicitly.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause)."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause).",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b39-behaviour.json",
@@ -133,9 +153,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "behaviour": "Preservation control: a real KnowledgeServer boot with no configured or installed embedding model stays permanently absent, before and after the availability API change.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b39-behaviour.json",
@@ -151,9 +175,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "behaviour": "New availability API checks all four provider states, isAvailable only for READY, exact FAILED cause retention, valid cause/state combinations, and ready-backend close becoming permanently absent from that provider. No physical native sessions are used.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause)."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Give EmbeddingProvider an explicit availability state that names at least: ready; starting or loading (transient, a model is installed and will become ready); absent (no model configured or installed, permanent); failed (load failed, with its cause).",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b39-state-api.json",
@@ -170,9 +198,13 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
       "behaviour": "Removing a provider through the existing null-accepting setter keeps permanent-absence outcomes across HYBRID, SPLADE, AUTO, VECTOR and RAG. The boolean-only before-state incorrectly treats the null RAG provider as present after queue expiry; the check fails by assertion. After normalizing removal to the explicit absent provider every mode returns its existing absence outcome with no inference or latch access. The separate ordinary ABSENT control passes both revisions.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request b39 availability states",
-          "quote": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Behaviour must stay exactly as a600f71b6 specifies: queue expiry with a starting provider gives the FP3 outcome (contended); a request that reaches its seat in time and then waits for loading keeps cause loading; an absent provider keeps its existing outcome; a failed provider gets the existing outcome for an unavailable service with its cause.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request b39 availability states'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b39-behaviour.json",

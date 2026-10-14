@@ -126,7 +126,7 @@ Evidence, written by run-evidence.mjs with --before 5e4f4e698:
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 7-8) end to end within the agreed scenarios.",
           "choice": "The F1 repair changes the words only for a classified chat failure (inference.out_of_memory, startup_timeout, start_failed, model_load_failed, crashed): a chat model that is merely offline still reads offline, a health condition's own message still wins over a catalog sentence, and a capability failure without a classified cause keeps its evidence message.",
           "label": "agent choice"

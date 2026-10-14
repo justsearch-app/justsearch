@@ -32,7 +32,7 @@ changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 5.2 and reconciliation F13 as the builder implements them in step 3: the proxy admits each exchange through the lifecycle manager's generation tracker before it reaches llama-server (GENERATE for chat completions, AUX for /v1/models), keeps the lease until the client's stream closes, and answers 503 when admission is closed; a reconfigure drains these leases like in-process replies, so it waits for an open proxied reply (up to the drain bound) before it relaunches.",
           "label": "agent choice"
@@ -54,7 +54,7 @@ changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Reconciliation F13 as the builder implements it: every llama HTTP call on the proxy, agent and token paths is inside a lease, enforced by making the lease a parameter of the only exchange request builder; lifecycle probes (/health, /props) are the only lease-free requests; the U14 scan covers scripts/jseval, whose direct callers (tier2-eval, judge-ceiling, run_tier2_eval, qu-spike, qu-v3) now default to the Engine's /v1 proxy.",
           "label": "agent choice"
@@ -78,7 +78,7 @@ changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Reconciliation F13 as the builder implements it: the U14 scan names every main class that may reach a llama-server exchange path and why, so a new direct caller fails the scan until it holds a lease.",
           "label": "agent choice"
@@ -106,7 +106,7 @@ changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 3.4 as the builder implements it in step 3: the table is one exhaustive switch over StopReason; the controller's stop steps (deactivate, apply, VDU enter and exit) wait only while a server is serving, so a stop during a failed start or recovery closes admission without waiting on a server that is gone; prepare and recovery keep the bounded refuse-when-busy drain they had.",
           "label": "agent choice"
@@ -140,7 +140,7 @@ changeset covers only this slice's files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 5.2 with reconciliation F1 and F13 as the builder implements them: one monitor guards admission, the lease counts, the queue and the edges; the lease opens after the request lock; inFlight counts GENERATE leases only and AUX is not generating; queued is separate and drains do not wait for it; edges are delivered in order on an executor, never on the lease holder's thread; closeIfIdle checks leases and closes admission in one step, so an idle unload can never take a server with a reply in flight.",
           "label": "agent choice"

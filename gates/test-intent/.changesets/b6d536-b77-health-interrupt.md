@@ -23,19 +23,21 @@ The P1 PMD repair also touches two tests that b6d536-b71-bulk-throughput.md cove
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a thread that publishes Health (or any event on any channel) never leaves publish with an interrupt it did not have on entry, and is never interrupted because some other subscriber went away; a producer's own interrupt status from before the call is preserved.",
-          "label": "agent choice (orchestrator decision in the b77 builder brief)"
+          "label": "agent choice (orchestrator decision in the b77 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a blocked, slow, throwing or unsubscribing observer never outlives its subscription, the bridge or the producer owner, and cannot hold a producer or recovery indefinitely.",
-          "label": "agent choice (orchestrator decision in the b77 builder brief)"
+          "label": "agent choice (orchestrator decision in the b77 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "CapabilityHealthBridgeObserverLifetimeTest, SseAdmissionShutdownTest, SseTransportOwnerShutdownTest, LocalApiServerTransportShutdownTest, SseStreamChannel* and HealthEventChangeRegistry* tests and the verifier probes V5, V6 and B5-H2 retain their expectations; no decision record governs which thread delivers Health frames.",
@@ -61,11 +63,12 @@ The P1 PMD repair also touches two tests that b6d536-b71-bulk-throughput.md cove
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a thread that publishes Health (or any event on any channel) never leaves publish with an interrupt it did not have on entry, and is never interrupted because some other subscriber went away; a producer's own interrupt status from before the call is preserved.",
-          "label": "agent choice (orchestrator decision in the b77 builder brief)"
+          "label": "agent choice (orchestrator decision in the b77 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "CapabilityHealthBridgeObserverLifetimeTest, SseAdmissionShutdownTest, SseTransportOwnerShutdownTest, LocalApiServerTransportShutdownTest, SseStreamChannel* and HealthEventChangeRegistry* tests and the verifier probes V5, V6 and B5-H2 retain their expectations; no decision record governs which thread delivers Health frames.",
@@ -84,11 +87,12 @@ The P1 PMD repair also touches two tests that b6d536-b71-bulk-throughput.md cove
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a thread that publishes Health (or any event on any channel) never leaves publish with an interrupt it did not have on entry, and is never interrupted because some other subscriber went away; a producer's own interrupt status from before the call is preserved.",
-          "label": "agent choice (orchestrator decision in the b77 builder brief)"
+          "label": "agent choice (orchestrator decision in the b77 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "CapabilityHealthBridgeObserverLifetimeTest, SseAdmissionShutdownTest, SseTransportOwnerShutdownTest, LocalApiServerTransportShutdownTest, SseStreamChannel* and HealthEventChangeRegistry* tests and the verifier probes V5, V6 and B5-H2 retain their expectations; no decision record governs which thread delivers Health frames.",
@@ -107,11 +111,12 @@ The P1 PMD repair also touches two tests that b6d536-b71-bulk-throughput.md cove
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b77 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a thread that publishes Health (or any event on any channel) never leaves publish with an interrupt it did not have on entry, and is never interrupted because some other subscriber went away; a producer's own interrupt status from before the call is preserved.",
-          "label": "agent choice (orchestrator decision in the b77 builder brief)"
+          "label": "agent choice (orchestrator decision in the b77 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "CapabilityHealthBridgeObserverLifetimeTest, SseAdmissionShutdownTest, SseTransportOwnerShutdownTest, LocalApiServerTransportShutdownTest, SseStreamChannel* and HealthEventChangeRegistry* tests and the verifier probes V5, V6 and B5-H2 retain their expectations; no decision record governs which thread delivers Health frames.",

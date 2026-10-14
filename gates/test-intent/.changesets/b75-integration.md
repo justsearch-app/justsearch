@@ -78,7 +78,7 @@ on the base and on each of the five branch tips.
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06T21:10Z",
           "delegationScope": "integrating the b6d536 branches, where status-timeout's overlap check (an overlapping status read refused at the shared work pool's bound) contradicts b58's separate bounded observation pool for status reads",
           "choice": "The separate bounded observation pool wins. The overlap check's intent, that overlapping status reads beyond capacity are refused with the typed capacity reason and Retry-After rather than queued or admitted without bound, is asserted against the observation pool's own per-client and aggregate bounds, together with status-timeout's lock-free hold of status admission until the response is sent.",
           "label": "agent choice"

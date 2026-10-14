@@ -58,11 +58,12 @@ Known side effect: several of the adapted files are new checks of earlier change
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b79 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b79 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "make the owned Health delivery conform to the executor-ownership rule at its cause, without weakening the rule: the channel obtains its drainer executor from the owner that constructs it instead of creating one, and every guarantee of e331c571b stays.",
-          "label": "agent choice (orchestrator decision in the b79 builder brief)"
+          "label": "agent choice (orchestrator decision in the b79 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "docs/design/lane-f-engine-jvm/stages/C1.md (C1-5, C1-16) and docs/design/lane-f-engine-jvm/evidence/C1/executor-guards.md require every production executor to come from the registry or the named child OCR method; ExecutorArchitectureTest pins it and is unchanged. HealthPublisherInterruptTest, HealthProducerInterruptTest, SseStreamChannelPublisherInterruptTest, CapabilityHealthBridgeObserverLifetimeTest, SseAdmissionShutdownTest, SseTransportOwnerShutdownTest and LocalApiServerTransportShutdownTest keep their expectations; decision records under docs/decisions/ searched for executor or Health delivery ownership: none conflicting."
@@ -76,19 +77,21 @@ Known side effect: several of the adapted files are new checks of earlier change
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b79 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b79 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "make the owned Health delivery conform to the executor-ownership rule at its cause, without weakening the rule (raw executor constructors and factories are confined to the registry and the one child OCR method, C1-5/C1-16): the channel obtains its drainer executor from the owner that constructs it and refuses to run owned delivery without one.",
-          "label": "agent choice (orchestrator decision in the b79 builder brief)"
+          "label": "agent choice (orchestrator decision in the b79 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b79 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b79 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "executors or threads the owner creates are shut down with their owner (no leak across bridge or producer-owner shutdown).",
-          "label": "agent choice (orchestrator decision in the b79 builder brief)"
+          "label": "agent choice (orchestrator decision in the b79 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "docs/design/lane-f-engine-jvm/stages/C1.md (C1-5, C1-16) and docs/design/lane-f-engine-jvm/evidence/C1/executor-guards.md require every production executor to come from the registry or the named child OCR method; ExecutorArchitectureTest pins it and is unchanged. HealthPublisherInterruptTest, HealthProducerInterruptTest, SseStreamChannelPublisherInterruptTest, CapabilityHealthBridgeObserverLifetimeTest, SseAdmissionShutdownTest, SseTransportOwnerShutdownTest and LocalApiServerTransportShutdownTest keep their expectations; decision records under docs/decisions/ searched for executor or Health delivery ownership: none conflicting.",

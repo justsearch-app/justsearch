@@ -33,9 +33,13 @@ Refreshed after b82 (run b82g-status-records). Entry 2's evidence was re-run on 
       "behaviour": "Successful status-relevant owner publications advance a shared counter; reads, identical publications, settings replay and timestamp-only install rewrites do not. Chat loading and completion each signal. Every API response reports the counter without sampling, canonical reads report a conservative reflected revision. Raw plugin settings writes refresh status; read-only reattachment does not. Original verifier assertions are retained.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "the UI must learn that canonical state changed from the server that owns the state, not from client-side guesses about which requests or operation names change it",
-          "location": "task t-20261005-b6d536 request (b64 builder role contract, task item 5 / S20)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "the UI must learn that canonical state changed from the server that owns the state, not from client-side guesses about which requests or operation names change it",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b64 builder role contract, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b64-status-counter-repaired.json",
@@ -64,9 +68,13 @@ Refreshed after b82 (run b82g-status-records). Entry 2's evidence was re-run on 
       "behaviour": "Additive server metadata coalesces bursts. It makes one fresh read per observed value. A value still unreflected after that read is followed up only by ordinary reads started by later signals, at most 3; a later value gets one fresh read. It isolates head epochs and preserves caller bodies. Read-only approvals and replayed completions with unchanged server counters cause no fresh read. Failed responses can convey a different client's completed publication. The copied verifier approval/replay assertions remain unchanged.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "the UI must learn that canonical state changed from the server that owns the state, not from client-side guesses about which requests or operation names change it",
-          "location": "task t-20261005-b6d536 request (b64 builder role contract, task item 5 / S20)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "the UI must learn that canonical state changed from the server that owns the state, not from client-side guesses about which requests or operation names change it",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b64 builder role contract, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b64-status-signal.json",
@@ -92,9 +100,13 @@ Refreshed after b82 (run b82g-status-records). Entry 2's evidence was re-run on 
       "whatMoved": "Preserved b59/b61 fixtures now supply the server metadata carried by real transports; the Brain transport double invokes the same generic metadata reader as authorizedFetch. The old action/render assertions remain. CORS exact expectations include the three documented additive exposed headers. StatusIsolation child cleanup captures creation time at start and verifies it before stopping. The cross-client case is an additional assertion, with assertion failure on 23b8679ee and pass recorded in before-cross-client.log / cross-client.log.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "the UI must learn that canonical state changed from the server that owns the state, not from client-side guesses about which requests or operation names change it",
-          "location": "task t-20261005-b6d536 request (b64 builder role contract, task item 5 / S20)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "the UI must learn that canonical state changed from the server that owns the state, not from client-side guesses about which requests or operation names change it",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b64 builder role contract, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ]
     }

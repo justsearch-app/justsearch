@@ -53,7 +53,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The member lists of the chat and operating enums, defined once in app-api. Wire casing is the constant name, and chat details are lower-case tokens. A reason is valid only in the state it explains (an unload names its reason, a pressure unload is gpu_busy or game_mode, PAUSED and SLOWED name why). Generating is derived from inFlight. Durations are non-negative. An unknown gpu block has no figures, and absent chat and indexing blocks are omitted on the wire rather than sent as nulls.",
           "label": "agent choice"
@@ -89,7 +89,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The stop-reason, stop-mode, exit-class and child-kind members, and the rule that exactly QUIT, UPGRADE, ENGINE_RESTART and DEVICE_LOST end the Engine. The exit class is kept apart from the supervisor's restart class except for REQUESTED, so an intended stop and a crash are never conflated. ChildSpec labels are diagnostic, never paths, and argv is never empty. A failed terminate always carries its error. A requested exit always names its reason.",
           "label": "agent choice"
@@ -127,7 +127,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The ledger format and its failure handling. Append-only JSON lines of at most 4 KiB, forced to disk per record, with a v1 envelope (schemaVersion, type, seq, at, writer). seq is spent per attempt, and a failure is written as a ledger-gap record rather than stopping the caller. A torn line is closed with a newline before the next record. Retention is by size: rotate over 1 MiB at session start and before an append past 2 MiB, keeping one older generation. Readers tolerate crash leftovers and newer versions line by line. A machine-readable schema has the same enums as the Java types. The Engine's self-intent record accepts only reasons that end the Engine.",
           "label": "agent choice"
@@ -174,7 +174,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "PDH GPU adapter-memory and process-memory counters are the primary source, matched to the adapter by its DXGI LUID. NVML is a totals-only fallback, used only when the mapping is unambiguous (one NVIDIA adapter and one NVML device). An ambiguous multi-GPU machine reads UNKNOWN rather than guessing. Every failure is a named UNKNOWN and never an exception, so a machine without a usable NVIDIA GPU is unaffected. Native reads are serialized and close is idempotent.",
           "label": "agent choice"
@@ -218,7 +218,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "This first producer projects only what the status pass already observes and leaves everything else null or unknown. The mapping is from ENGINE axis and component state to chat state; from pending jobs and the energy-saver poll to indexing (the condition the Queue card already shows). Sample times do not change seq. Staleness is three sampler periods, and a GPU reading is stale after three cache windows. The GPU reading is diagnostic only. It is read at most once per 2 s under the reader's serialization. The first (slow) sample is taken on a background thread when the reader opens, with gpu unknown until it exists. A failing reader is unknown and cached for the window. Our use is the Engine plus its descendant processes, and external use is adapter used minus our dedicated use, floored at zero.",
           "label": "agent choice"
@@ -276,7 +276,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The refusal is one new ApiErrorCode, CHAT_UNAVAILABLE, of class TRANSIENT, beside the unchanged AI_STARTING and AI_OFFLINE. It carries an optional retryAfterMs on both HTTP and MCP. That field is omitted when the Engine does not know when to retry, and is allowed only on retryable codes.",
           "label": "agent choice"
@@ -310,7 +310,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "To tell the human webview from agents before chat demand distinguishes them, the webview declares its client kind. It does so only on non-GET, non-HEAD requests with Content-Type application/json, which are already preflighted. GETs, multipart uploads and SSE keep resolving to WEBVIEW by the Engine's existing default, so no simple request changes and no extra preflight appears. The established contract is unchanged: a missing header still resolves to WEBVIEW, and the CORS configuration is not modified.",
           "label": "agent choice"

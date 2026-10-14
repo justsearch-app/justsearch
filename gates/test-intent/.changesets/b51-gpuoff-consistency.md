@@ -20,14 +20,22 @@ author-session: b51-codex-builder
       "behaviour": "Automatic CPU profile layers remain zero at the actual self-test and accepted settings boundaries. CPU activation has no adapter VRAM measurement, uses a CPU success message, and preserves explicit context and layers including zero.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request (b51 builder role contract)",
-          "quote": "Activation and self-test must take their default layers from the same profile/plan decision the serving launch uses, not from a hard-coded default; only an explicit user value overrides it."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Activation and self-test must take their default layers from the same profile/plan decision the serving launch uses, not from a hard-coded default; only an explicit user value overrides it.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b51 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request (b51 builder role contract)",
-          "quote": "A CPU activation reports no VRAM measurement and describes itself truthfully."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "A CPU activation reports no VRAM measurement and describes itself truthfully.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b51 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b51-gpuoff-consistency.json",
@@ -46,9 +54,13 @@ author-session: b51-codex-builder
       "behaviour": "Both policy and explicit master GPU-off keep saved 4096 context / 12 layers, publish user_setting_unmet for layers through operating status and real settings/status HTTP, and clear it after zero. CPU context and GPU-off are met and have no spurious warning.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request (b51 builder role contract)",
-          "quote": "Raise the existing user_setting_unmet (layers) standing degradation with inference.setting_unmet, setting kept, cleared when no longer unmet."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Raise the existing user_setting_unmet (layers) standing degradation with inference.setting_unmet, setting kept, cleared when no longer unmet.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b51 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b51-gpuoff-consistency.json",
@@ -66,9 +78,13 @@ author-session: b51-codex-builder
       "behaviour": "An intentionally hidden CUDA device cannot classify a CPU child crash as DEVICE_SUSPECT. Existing stable restart and early-crash bounds continue through the actual captured server-failure classification.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request (b51 builder role contract)",
-          "quote": "Also investigate (report, fix if contained and caused by GPU-off handling): CRASH-RECOVERY in the same report"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Also investigate (report, fix if contained and caused by GPU-off handling): CRASH-RECOVERY in the same report",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b51 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b51-gpuoff-consistency.json",
@@ -86,9 +102,13 @@ author-session: b51-codex-builder
       "behaviour": "Existing chat-switch, profile selection and operator precedence scenarios preserve an automatic layer preference instead of inventing a saved 99-layer override. All other assertions are retained.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request (b51 builder role contract)",
-          "quote": "Activation and self-test must take their default layers from the same profile/plan decision the serving launch uses, not from a hard-coded default; only an explicit user value overrides it."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Activation and self-test must take their default layers from the same profile/plan decision the serving launch uses, not from a hard-coded default; only an explicit user value overrides it.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b51 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b51-gpuoff-consistency.json",
@@ -108,9 +128,13 @@ author-session: b51-codex-builder
       "whatMoved": "The automatic GPU test supplies the 99-layer resolved profile at auto-detect ordinal 150, rather than relying on the removed activation constant. Its 99 / explicit zero / explicit 12 / higher-priority environment zero and CPU launch assertions are unchanged.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request (b51 builder role contract)",
-          "quote": "Activation and self-test must take their default layers from the same profile/plan decision the serving launch uses, not from a hard-coded default; only an explicit user value overrides it."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Activation and self-test must take their default layers from the same profile/plan decision the serving launch uses, not from a hard-coded default; only an explicit user value overrides it.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b51 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ]
     }
