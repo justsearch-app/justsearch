@@ -543,3 +543,16 @@ so the unchanged evidence producer can select every case; their oracles are iden
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-vduauto-20261014",
+  "verdict": "accept",
+  "digest": "sha256:0bcfbf96a4ff5733f9a2c5e121682dfb503e95cbd3826909fae1c29f1ba21582",
+  "note": "VC-vduauto (independent Claude verifier) over four rounds, accepting 5554abe87 vs 0a79303bb (rejected 83f07cc4c for uncovered tests and a dead wrapper only): automatic restoration stops after 5 failures and a person's chat request, a settings apply or chat off/on resets it (live with a launch fault injector: exactly 5 attempts, status says retries stopped, no sixth in 2.5 min); a quit during chat-off and loaded-chat passes is clean (exit 0, no llama-server left) and the interrupted picture returns PENDING with its retry count; an explicit pass during a pending restore starts its first document in 5.4 s live; a committed settings publication while offline becomes the restore target (live context 16384 restored through passes and restart); automatic passes start about 305 s after the last activity and never while chat is offline; game mode, later settings, chat off, start race and shutdown during entry hold. Each new check fails on 83f07cc4c by assertion. Suites show no test passing at the base that fails now; ArchUnit failures identical to the base; PMD clean on changed lines. Named limits: worker document ownership is in memory; loaded-chat automatic reading off on non-Windows unknown power source. Digest bound with --base 0a79303bb, the lane's base."
+}
+```
