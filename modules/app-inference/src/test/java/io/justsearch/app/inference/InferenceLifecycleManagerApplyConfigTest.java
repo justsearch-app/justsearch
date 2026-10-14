@@ -70,6 +70,50 @@ final class InferenceLifecycleManagerApplyConfigTest {
   @TempDir Path directory;
   private ConfigStore previousStore;
 
+  @ParameterizedTest(name = "settingsPreparationCannotReplaceAHeldVduServer({0})")
+  @ValueSource(booleans = {false, true})
+  void settingsPreparationCannotReplaceAHeldVduServer(boolean enabled) throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig rc = resolved("vdu-held", true);
+    installGlobal(rc);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, rc, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      manager.enterVduMode();
+      int starts = server.starts.size();
+      int stops = server.stopReasons.size();
+      var failure = assertThrows(ModeTransitionException.class,
+          () -> manager.prepareResolvedConfig(b, rc, enabled));
+      assertTrue(failure.getMessage().contains("VDU"));
+      assertTrue(manager.currentConfig().vduMode());
+      assertEquals(starts, server.starts.size());
+      assertEquals(stops, server.stopReasons.size());
+      manager.exitVduMode();
+      assertSame(a, manager.currentConfig());
+    }
+  }
+
+  @Test
+  void adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig rc = resolved("external-self-test", true);
+    installGlobal(rc);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, rc, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      when(server.mock().isExternalServerActive()).thenReturn(true);
+      var router = io.justsearch.app.inference.chat.ChatActuationRouter.inline(manager.chatActuator());
+      var failure = assertThrows(ModeTransitionException.class,
+          () -> router.route(manager.chatActuator().selfTestStop()));
+      assertTrue(failure.getMessage().contains("external"));
+      assertTrue(server.stopReasons.isEmpty(), "external ownership must be preserved");
+      assertEquals(1, server.starts.size());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {1024, 0, 256})
   void promptCachePolicySurvivesEveryRelaunchPath(int chatMiB) throws Exception {

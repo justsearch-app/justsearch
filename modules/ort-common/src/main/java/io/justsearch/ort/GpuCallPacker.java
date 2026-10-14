@@ -6,14 +6,15 @@ import java.util.Optional;
 import java.util.function.IntUnaryOperator;
 
 /**
- * Packs encoder calls against a {@link GpuArenaPlan} (Spec E revision 4 §2.2 "Call shapes"). Pure:
- * the coefficients and the budget come from the plan the caller read for this call, and nothing
- * here holds state.
+ * Packs encoder calls against a {@link GpuArenaPlan} (Spec E revision 4 §2.2 "Call shapes"). The
+ * coefficients and the budget come from the plan the caller read for this call, and nothing here
+ * holds state.
  *
  * <p>A call over the next items, in order, is admitted when {@code paddedCount(n) ×
  * f(role, paddedLength(longest of the n))} is within the role's packing budget and n is within
  * today's count cap. Without a plan, on a profile that keeps today's constants, or for a role whose
  * activation was not measured, the call takes today's count: {@code min(countCap, remaining)}.
+ * A single item is always taken; {@link #acquireForCall} sends an infeasible GPU shape to the CPU.
  */
 public final class GpuCallPacker {
   private GpuCallPacker() {}
@@ -56,7 +57,7 @@ public final class GpuCallPacker {
       if (cost > budget.packingMiB()) break;
       admitted = n;
     }
-    // The plan's A_min admits one item of every role's longest call; a single item always runs.
+    // An item that cannot fit on the GPU still runs once, on a CPU lease selected below.
     return Math.max(1, admitted);
   }
 
@@ -66,6 +67,44 @@ public final class GpuCallPacker {
       IntUnaryOperator itemLength) {
     return itemsPerCall(plan, role, countCap, remaining, itemLength, IntUnaryOperator.identity(),
         IntUnaryOperator.identity());
+  }
+
+  /**
+   * Acquires the session for the actual padded call shape. A GPU budget limits GPU work only:
+   * when it cannot retain the weights or hold this shape, the same work runs on the CPU session.
+   */
+  public static SessionHandle.Lease acquireForCall(
+      SessionHandle sessions,
+      SessionAcquisitionRequest request,
+      EncoderRole role,
+      int paddedCount,
+      int paddedLength) {
+    Objects.requireNonNull(sessions, "sessions");
+    return acquireForCall(sessions, request, role, paddedCount, paddedLength, sessions.arenaPlan());
+  }
+
+  /** Uses the same packing-plan snapshot for lease selection and a retained lease's later calls. */
+  public static SessionHandle.Lease acquireForCall(
+      SessionHandle sessions,
+      SessionAcquisitionRequest request,
+      EncoderRole role,
+      int paddedCount,
+      int paddedLength,
+      Optional<GpuArenaPlan> plan) {
+    Objects.requireNonNull(sessions, "sessions");
+    Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(role, "role");
+    Objects.requireNonNull(plan, "plan");
+    if (paddedCount < 1 || paddedLength < 1) {
+      throw new IllegalArgumentException("a call needs at least one padded item and token");
+    }
+    Optional<GpuArenaPlan.Role> budget = plan.filter(GpuArenaPlan::planned)
+        .flatMap(snapshot -> snapshot.role(role));
+    boolean cpu = (budget.isEmpty() && sessions.requiresGpuPacking())
+        || budget.filter(rolePlan -> rolePlan.capMiB() <= rolePlan.weightsMiB()
+            || rolePlan.activation().filter(activation -> paddedCount
+                * activation.perItemMiB(paddedLength) > rolePlan.packingMiB()).isPresent()).isPresent();
+    return cpu ? sessions.acquireCpu(request) : sessions.acquire(request);
   }
 
   /**

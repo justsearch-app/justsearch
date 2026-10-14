@@ -473,6 +473,12 @@ public final class ChatServerControllerImpl
             + (desired.terminal() == null ? "closed" : desired.terminal()) + "); " + step + " refused");
       }
       if (heldOut && !holds.isEmpty()) return null;
+      var preparationRefusal = vduPreparationRefusalLocked(step);
+      if (preparationRefusal != null) {
+        pending = new Pending(step, desired.version());
+        pending.result.completeExceptionally(preparationRefusal);
+        return pending;
+      }
       pending = queueLocked(step, superseded);
     }
     for (Pending replaced : superseded) supersede(replaced, pending.version);
@@ -676,6 +682,13 @@ public final class ChatServerControllerImpl
   }
 
   private void runStep(Pending pending) {
+    synchronized (monitor) {
+      var refusal = vduPreparationRefusalLocked(pending.step);
+      if (refusal != null) {
+        pending.result.completeExceptionally(refusal);
+        return;
+      }
+    }
     ChatActuator.DrainHold drained;
     if (pending.step.drainsFirst()) {
       try {
@@ -733,6 +746,16 @@ public final class ChatServerControllerImpl
       }
     }
     complete(pending, () -> actuator.execute(pending.step, drained));
+  }
+
+  /** The hold owns the server from admission, including the gap before its overlay is applied. */
+  private io.justsearch.app.api.ModeTransitionException vduPreparationRefusalLocked(
+      ChatActuation<?> step) {
+    if (step.kind() != ChatActuation.Kind.PREPARE
+        || holds.stream().noneMatch(hold -> hold.kind() == Kind.VDU)) return null;
+    return new io.justsearch.app.api.ModeTransitionException(
+        io.justsearch.app.api.ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+        "VDU holds the chat server; retry settings after the picture batch finishes");
   }
 
   private interface StepResult {
@@ -1029,6 +1052,10 @@ public final class ChatServerControllerImpl
     synchronized (holdEdges) {
       boolean first;
       synchronized (monitor) {
+        if (kind == Kind.VDU && (actuator.configurationPrepared()
+            || current != null && current.step.kind() == ChatActuation.Kind.PREPARE)) {
+          throw new ChatRefusal(RefusalReason.BUSY, java.util.Optional.empty(), false);
+        }
         java.util.EnumSet<Kind> open = java.util.EnumSet.noneOf(Kind.class);
         for (OpenHold existing : holds) open.add(existing.kind());
         RefusalReason refusal = admission(kind, new HoldState(
@@ -1142,6 +1169,7 @@ public final class ChatServerControllerImpl
     } catch (io.justsearch.app.api.ModeTransitionException transition) {
       throw refusal(switch (transition.reason()) {
         case ALREADY_TRANSITIONING, INTERRUPTED -> RefusalReason.BUSY;
+        case EXTERNAL_SERVER_CONFLICT -> RefusalReason.EXTERNAL_SERVER;
         default -> RefusalReason.FAILED;
       }, transition);
     } catch (Exception failure) {

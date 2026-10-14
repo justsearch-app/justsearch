@@ -245,6 +245,8 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    * future re-verification of already-present files.
    */
   public static void verify(Path file, long expectedSize, String expectedSha256) throws Exception {
+    var observed = io.justsearch.app.inference.ChatArtifactIdentity.isChatModel(file)
+        ? io.justsearch.app.inference.ChatArtifactIdentity.observe(file) : null;
     if (expectedSize > 0) {
       long size = Files.size(file);
       if (size != expectedSize) {
@@ -254,6 +256,14 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
     String got = sha256(file);
     if (!got.equalsIgnoreCase(expectedSha256)) {
       throw new IllegalStateException("SHA-256 mismatch");
+    }
+    if (observed != null) {
+      try {
+        io.justsearch.app.inference.ChatArtifactIdentity.rememberVerified(
+            file, observed.size(), got, observed);
+      } catch (IOException unavailable) {
+        log.debug("Verified chat receipt unavailable; background verification will retry", unavailable);
+      }
     }
   }
 

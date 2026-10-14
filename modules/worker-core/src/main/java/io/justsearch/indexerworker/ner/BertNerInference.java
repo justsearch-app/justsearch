@@ -222,7 +222,8 @@ public final class BertNerInference implements Closeable {
 
     // Every caller is bulk enrichment (NerService per-document and single-chunk batches), so the
     // single-text path yields to foreground queries like the batched path does (Spec D §3.4).
-    try (var lease = sessions.acquire(LocalSessionAcquisition.background())) {
+    try (var lease = GpuCallPacker.acquireForCall(
+        sessions, LocalSessionAcquisition.background(), EncoderRole.NER, 1, seqLen)) {
       try (OnnxTensor inputIdsTensor =
               OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(inputIds), shape);
           OnnxTensor attentionMaskTensor =
@@ -412,7 +413,8 @@ public final class BertNerInference implements Closeable {
 
       long[] shape = {batchSize, padLen};
 
-      try (var lease = sessions.acquire(acquisition)) {
+      try (var lease = GpuCallPacker.acquireForCall(
+          sessions, acquisition, EncoderRole.NER, batchSize, padLen)) {
         try (OnnxTensor inputIdsTensor =
                 OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(flatIds), shape);
             OnnxTensor attentionMaskTensor =

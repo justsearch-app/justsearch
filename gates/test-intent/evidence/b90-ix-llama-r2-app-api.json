@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:46:14.482Z",
+  "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+  "tree": "0b2d5dec267b043cbf167b1c047669837da0b036",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatVocabularyTest.exactMembers\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14968
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java#exactMembers",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d228a9c561fafa0ff8f2cd1725b645955435d01fd0f605f07d358ec34f0285de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exactMembers() — every enum keeps its members and the additive external-server refusal",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7de3976a1",
+    "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatVocabularyTest.exactMembers\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 26413
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java#exactMembers",
+        "classification": "assertion",
+        "detail": "exactMembers() — every enum keeps its members and the additive external-server refusal: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, LOADING, BUSY, OFF, FAILED, REFUSED, ENGINE_STOPPING, DEVICE_RECOVERING, SELF_TEST, EXTERNAL_SERVER]> but was: <[GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, LOADING, BUSY, OFF, FAILED, REFUSED, ENGINE_STOPPING, DEVICE_REC"
+      }
+    ]
+  },
+  "digest": "sha256:17547bef508ebb7a21d81a88e65f02e349e38f00080e7a16dab1f2d5a4a446d9"
+}

@@ -1,0 +1,158 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T08:14:18.905Z",
+  "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+  "tree": "1657721439352734c8b92855b132358b4a24bf39",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.chatModelSwitchIsAdmittedWithTheOldChatLoaded\" --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.samePlanRepreparationIsAdmittedWithChatLoaded\" --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.aRealRetainedWeightShortfallStillRefusesReplacement\" --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.externalTensorWeightsKeepTheConservativeArenaEstimate\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.sourceEstimateUsesRealizedGpuHandleAndPolicy\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 25844
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#chatModelSwitchIsAdmittedWithTheOldChatLoaded",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:48ab7bd9a36b44378956cc7a6b0f3399470cc454de9aa628f3de698f1ea45447",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatModelSwitchIsAdmittedWithTheOldChatLoaded(12282)",
+          "status": "passed"
+        },
+        {
+          "name": "chatModelSwitchIsAdmittedWithTheOldChatLoaded(16376)",
+          "status": "passed"
+        },
+        {
+          "name": "chatModelSwitchIsAdmittedWithTheOldChatLoaded(24564)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#samePlanRepreparationIsAdmittedWithChatLoaded",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:48ab7bd9a36b44378956cc7a6b0f3399470cc454de9aa628f3de698f1ea45447",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "samePlanRepreparationIsAdmittedWithChatLoaded(16376)",
+          "status": "passed"
+        },
+        {
+          "name": "samePlanRepreparationIsAdmittedWithChatLoaded(24564)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#aRealRetainedWeightShortfallStillRefusesReplacement",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:48ab7bd9a36b44378956cc7a6b0f3399470cc454de9aa628f3de698f1ea45447",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRealRetainedWeightShortfallStillRefusesReplacement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#externalTensorWeightsKeepTheConservativeArenaEstimate",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:48ab7bd9a36b44378956cc7a6b0f3399470cc454de9aa628f3de698f1ea45447",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalTensorWeightsKeepTheConservativeArenaEstimate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceEstimateUsesRealizedGpuHandleAndPolicy",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:392044a3d3bb4e87bacb6706b174882024ece8d9001610b3aefb0b2a8b2b6b11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourceEstimateUsesRealizedGpuHandleAndPolicy(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1f8ce3e01",
+    "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.chatModelSwitchIsAdmittedWithTheOldChatLoaded\" --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.samePlanRepreparationIsAdmittedWithChatLoaded\" --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.aRealRetainedWeightShortfallStillRefusesReplacement\" --tests \"io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest.externalTensorWeightsKeepTheConservativeArenaEstimate\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.sourceEstimateUsesRealizedGpuHandleAndPolicy\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 57379
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#chatModelSwitchIsAdmittedWithTheOldChatLoaded",
+        "classification": "assertion",
+        "detail": "chatModelSwitchIsAdmittedWithTheOldChatLoaded(12282): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the plan's activation allowance must not be required again for a private replacement: candidateMiB=5471, freeMiB=2379, retainedMiB=600 ==> expected: not equal but was: <REFUSED> | chatModelSwitchIsAdmittedWithTheOldChatLoaded(16376): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the plan's activation allowance must not be required again for a p"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#samePlanRepreparationIsAdmittedWithChatLoaded",
+        "classification": "assertion",
+        "detail": "samePlanRepreparationIsAdmittedWithChatLoaded(16376): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the plan's activation allowance must not be required again for a private replacement: candidateMiB=5979, freeMiB=5347, retainedMiB=600 ==> expected: not equal but was: <REFUSED> | samePlanRepreparationIsAdmittedWithChatLoaded(24564): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the plan's activation allowance must not be required again for a p"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#aRealRetainedWeightShortfallStillRefusesReplacement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#externalTensorWeightsKeepTheConservativeArenaEstimate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceEstimateUsesRealizedGpuHandleAndPolicy",
+        "classification": "assertion",
+        "detail": "sourceEstimateUsesRealizedGpuHandleAndPolicy(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retained weights plus free device memory permit replacing the source ==> expected: <IN_PLACE> but was: <REFUSED>"
+      }
+    ]
+  },
+  "digest": "sha256:5a31bcca6052efdd05cead8431a95fb27702cfdae1763bde084eca09afffdd47"
+}

@@ -32,6 +32,37 @@ import org.mockito.ArgumentCaptor;
 final class GenerativeSettingsComponentOwnerTest {
   @TempDir Path directory;
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "heldPictureBatchRefusesSettingsWithoutReplacingItsChild({0})")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void heldPictureBatchRefusesSettingsWithoutReplacingItsChild(boolean enabled) throws Exception {
+    try (var seam = new io.justsearch.app.services.chat.ManagedChatSeam(directory, 0);
+        var _ = seam.manager().chatHolds().holdVdu("settings-vdu-check")) {
+      var desired = io.justsearch.configuration.resolved.ConfigStore.global().get();
+      var handle = mock(ComponentHandle.class);
+      var spec = new ComponentSpec("generative", false, Set.of(),
+          ComponentSpec.ComposeCapability.IN_PLACE, Duration.ofMinutes(3), 1);
+      var before = new EngineComponentSnapshot.Component(spec, ComponentState.READY, null,
+          Instant.parse("2026-09-23T00:00:00Z"), 1L, "A", "A", null, 0, "VDU");
+      var staging = new EngineComponentSnapshot.Component(spec, ComponentState.RELOADING, null,
+          before.stateSince(), 1L, "A", "A", null, 0, "preparing");
+      when(handle.snapshot()).thenReturn(before, staging);
+      when(handle.transitionIfUnchanged(eq(before), eq(ComponentState.RELOADING), any(), any()))
+          .thenReturn(true);
+      when(handle.transitionIfUnchanged(eq(staging), eq(before.state()), eq(before.reasonCode()),
+          eq(before.evidence()))).thenReturn(true);
+      var settings = new UiSettings();
+      settings.setChatEnabled(enabled);
+      var owner = new GenerativeSettingsComponentOwner(seam.manager(), handle, directory, false);
+      int launches = seam.models().size();
+      assertThrows(SettingsCommitOwner.Refused.class,
+          () -> owner.prepare(settings, desired, Set.of("chatEnabled"), SettingsCandidateContext.NONE).abort());
+      assertEquals(launches, seam.models().size(), "settings must not replace the held child");
+      org.junit.jupiter.api.Assertions.assertTrue(seam.manager().isOnline());
+      org.junit.jupiter.api.Assertions.assertTrue(seam.manager().currentConfig().vduMode());
+      verify(handle).transitionIfUnchanged(staging, before.state(), before.reasonCode(), before.evidence());
+    }
+  }
+
   @Test
   void transientProfilePreparesTheModelAndProjectorPairWithoutChangingResolvedSettings()
       throws Exception {

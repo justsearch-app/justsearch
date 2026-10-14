@@ -25,12 +25,13 @@ final class ChatRefusalWireTest {
     for (RefusalReason reason : RefusalReason.values()) {
       var refusal = new ChatRefusal(reason, Optional.of(Duration.ofSeconds(5)), true);
       Map<String, Object> body = ChatResidencyGate.refusalBody(refusal, null, null);
-      String expected = switch (reason) {
-        case GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, SELF_TEST, BUSY, DEVICE_RECOVERING ->
+      String expected = switch (reason.name()) {
+        case "GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF", "SELF_TEST", "BUSY", "DEVICE_RECOVERING", "EXTERNAL_SERVER" ->
             "CHAT_UNAVAILABLE";
-        case LOADING -> "AI_STARTING";
-        case OFF, FAILED, REFUSED -> "AI_OFFLINE";
-        case ENGINE_STOPPING -> "SERVICE_UNAVAILABLE";
+        case "LOADING" -> "AI_STARTING";
+        case "OFF", "FAILED", "REFUSED" -> "AI_OFFLINE";
+        case "ENGINE_STOPPING" -> "SERVICE_UNAVAILABLE";
+        default -> throw new AssertionError("unmapped refusal: " + reason);
       };
       assertEquals(expected, body.get("errorCode"), reason.name());
       assertEquals(reason.name(), body.get("reason"));
@@ -42,4 +43,12 @@ final class ChatRefusalWireTest {
           "refusal " + reason, "api-error-response.v1.json", JSON.writeValueAsString(body));
     }
   }
+  @Test void externalServerRefusalKeepsItsNamedWireReason() {
+    var reason = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> RefusalReason.valueOf("EXTERNAL_SERVER"), "an external owner must have a named refusal");
+    var body = ChatResidencyGate.refusalBody(new ChatRefusal(reason, Optional.empty(), false), null, null);
+    assertEquals("CHAT_UNAVAILABLE", body.get("errorCode"));
+    assertEquals("EXTERNAL_SERVER", body.get("reason"));
+  }
+
 }

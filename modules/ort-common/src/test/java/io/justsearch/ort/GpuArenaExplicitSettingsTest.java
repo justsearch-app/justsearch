@@ -18,6 +18,30 @@ import org.junit.jupiter.params.provider.CsvSource;
 final class GpuArenaExplicitSettingsTest {
   private static final double EPS = 1e-6;
 
+  @Test
+  void anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet() {
+    var plan = smallSpladePlan();
+    assertEquals(700, plan.role(EncoderRole.SPLADE).orElseThrow().capMiB());
+    assertTrue(plan.unmetSettings().contains(GpuArenaPlan.UNMET_ENCODER_MEMORY),
+        "the stored cap cannot accommodate the promised single 512-token SPLADE call");
+  }
+
+  @Test
+  void anInfeasibleSingleItemRemainsAvailableForCpuDispatch() {
+    int items = org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> GpuCallPacker.itemsPerCall(
+        Optional.of(smallSpladePlan()), EncoderRole.SPLADE, 4, 1, ignored -> 512),
+        "one CPU item must always remain runnable");
+    assertEquals(1, items);
+    assertEquals(1, GpuCallPacker.itemsPerCall(Optional.of(smallSpladePlan()), EncoderRole.SPLADE,
+        4, 1, ignored -> 32), "short inputs which fit must still run");
+  }
+
+  private static GpuArenaPlan smallSpladePlan() {
+    return GpuArenaPlan.resolve(GpuArenaPlanTest.facts(12_282, GpuArenaPlanTest.STANDARD_ONLY),
+        new GpuArenaPlan.Settings(Optional.empty(), OptionalInt.empty(), OptionalInt.empty(),
+            Map.of(EncoderRole.SPLADE, 700.0), false));
+  }
+
   @ParameterizedTest
   @CsvSource({"6144, BELOW_P8", "10240, P8"})
   void anUnplannedDeviceStillKeepsAndExplainsItsExplicitContext(

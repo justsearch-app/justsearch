@@ -969,6 +969,8 @@ public final class EngineRoot implements WorkerHost {
     this.batchSize = batchSize;
     this.terminalWriterFaultAction =
         Objects.requireNonNull(terminalWriterFaultAction, "terminalWriterFaultAction");
+    processResources.closeWithProcess(io.justsearch.app.inference.ChatArtifactIdentity.start(
+        processResources.executors()));
   }
 
   @Override

@@ -12,6 +12,7 @@ import io.justsearch.app.observability.health.HealthEvent;
 import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.Severity;
 import io.justsearch.app.observability.health.Source;
+import io.justsearch.configuration.EnvRegistry;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -61,8 +62,8 @@ import java.util.Optional;
  * { "conditionId": "schema.reindex-required", "subject": "worker.schema" }
  * }</pre>
  *
- * <p>Both endpoints are gated on {@code -Djustsearch.eval.mode=true}; production builds
- * return 404 (mirroring {@code /api/debug/reset-index} at
+ * <p>Both endpoints are gated on the registered {@link EnvRegistry#EVAL_MODE} setting;
+ * production builds return 404 (mirroring {@code /api/debug/reset-index} at
  * {@code LocalApiServer.handleResetIndex}).
  */
 public final class DebugConditionController {
@@ -85,7 +86,7 @@ public final class DebugConditionController {
 
   /** Eval-mode-gated trip handler. */
   public void handleTrip(Context ctx) {
-    if (!Boolean.getBoolean("justsearch.eval.mode")) {
+    if (!EnvRegistry.EVAL_MODE.getBoolean(false)) {
       ctx.status(HttpStatus.NOT_FOUND).json(Map.of("error", "Not available outside eval mode"));
       return;
     }
@@ -189,7 +190,7 @@ public final class DebugConditionController {
 
   /** Eval-mode-gated clear handler. Removes a synthetic condition by (id, subject). */
   public void handleClear(Context ctx) {
-    if (!Boolean.getBoolean("justsearch.eval.mode")) {
+    if (!EnvRegistry.EVAL_MODE.getBoolean(false)) {
       ctx.status(HttpStatus.NOT_FOUND).json(Map.of("error", "Not available outside eval mode"));
       return;
     }

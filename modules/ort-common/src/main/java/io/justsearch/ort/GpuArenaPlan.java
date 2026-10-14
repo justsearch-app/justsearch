@@ -352,6 +352,7 @@ public record GpuArenaPlan(
    *     footprint
    * @param externalChat the configured external chat endpoint
    * @param deviceSeats GPU runs the device allows at once (Spec D G1; Owner decision 8)
+   * @param kvType the launch's key/value-cache precision; the measured representation is q8_0
    */
   public record Facts(
       OptionalDouble deviceTotalMiB,
@@ -359,7 +360,15 @@ public record GpuArenaPlan(
       Set<ChatModelProfile> installedChatModels,
       Map<ChatModelProfile, Double> chatModelFileMiB,
       ExternalChat externalChat,
-      int deviceSeats) {
+      int deviceSeats,
+      String kvType) {
+    public Facts(OptionalDouble deviceTotalMiB, Map<EncoderRole, Double> gpuRoleWeightsMiB,
+        Set<ChatModelProfile> installedChatModels, Map<ChatModelProfile, Double> chatModelFileMiB,
+        ExternalChat externalChat, int deviceSeats) {
+      this(deviceTotalMiB, gpuRoleWeightsMiB, installedChatModels, chatModelFileMiB,
+          externalChat, deviceSeats, "q8_0");
+    }
+
     public Facts {
       Objects.requireNonNull(deviceTotalMiB, "deviceTotalMiB");
       gpuRoleWeightsMiB = Collections.unmodifiableMap(gpuRoleWeightsMiB.isEmpty()
@@ -367,6 +376,7 @@ public record GpuArenaPlan(
       installedChatModels = Set.copyOf(installedChatModels);
       chatModelFileMiB = Map.copyOf(chatModelFileMiB);
       Objects.requireNonNull(externalChat, "externalChat");
+      Objects.requireNonNull(kvType, "kvType");
       if (deviceSeats < 1) throw new IllegalArgumentException("deviceSeats must be at least 1");
       if (gpuRoleWeightsMiB.containsKey(EncoderRole.CITATION)) {
         throw new IllegalArgumentException("the citation scorer never runs on the GPU");
@@ -455,8 +465,14 @@ public record GpuArenaPlan(
    * </ul>
    */
   public static GpuArenaPlan resolve(Facts facts, Settings settings) {
+    return resolve(facts, settings, Optional.empty());
+  }
+
+  /** Budget an explicitly selected chat artifact with the same rule as measured chat. */
+  public static GpuArenaPlan resolve(Facts facts, Settings settings, Optional<Chat> selectedChat) {
     Objects.requireNonNull(facts, "facts");
     Objects.requireNonNull(settings, "settings");
+    Objects.requireNonNull(selectedChat, "selectedChat");
     if (settings.gpuOff() || facts.deviceTotalMiB().isEmpty()) {
       Set<String> unmet = new LinkedHashSet<>();
       // The CPU placement veto keeps the preference, but cannot apply positive offload layers.
@@ -471,7 +487,7 @@ public record GpuArenaPlan(
         .filter(placed -> onGpuInPlan(placed.getKey(), settings))
         .mapToDouble(Map.Entry::getValue)
         .sum();
-    boolean chatCanRun = !facts.installedChatModels().isEmpty()
+    boolean chatCanRun = selectedChat.isPresent() || !facts.installedChatModels().isEmpty()
         || facts.externalChat() == ExternalChat.LOCAL;
 
     ChatPlan selected = null;
@@ -487,7 +503,7 @@ public record GpuArenaPlan(
               >= minimumActivation(plan.profile())) {
         defaultSelected = plan;
       }
-      Chat candidate = chatFor(plan, settings, facts, chatCanRun);
+      Chat candidate = selectedChat.orElseGet(() -> chatFor(plan, settings, facts, chatCanRun));
       Budget budget = budget(device, candidate.footprintMiB(), weights, facts);
       if (budget.packingMiB() >= minimumActivation(plan.profile())) {
         selected = plan;
@@ -499,9 +515,9 @@ public record GpuArenaPlan(
       Budget atFloor = budget(device, chatCanRun ? floor.footprintMiB() : 0, weights, facts);
       Profile profile = atFloor.packingMiB() >= minimumActivation(Profile.P8)
           ? Profile.P8 : Profile.BELOW_P8;
-      if (settings.chatExplicit()) {
+      if (settings.chatExplicit() || selectedChat.isPresent()) {
         ChatPlan fallback = defaultSelected != null ? defaultSelected : PLANS.get(1);
-        Chat chat = chatFor(fallback, settings, facts, chatCanRun);
+        Chat chat = selectedChat.orElseGet(() -> chatFor(fallback, settings, facts, chatCanRun));
         Set<String> unmet = new LinkedHashSet<>();
         settings.contextTokens().ifPresent(ignored -> unmet.add(UNMET_CONTEXT));
         settings.gpuLayers().ifPresent(ignored -> unmet.add(UNMET_LAYERS));
@@ -514,7 +530,8 @@ public record GpuArenaPlan(
       return todaysConstants(profile, todaysChat(), Optional.empty(), facts, settings, Set.of());
     }
 
-    Chat chat = chatFor(selected, settings, facts, chatCanRun);
+    Chat chat = selectedChat.isPresent() ? selectedChat.get()
+        : chatFor(selected, settings, facts, chatCanRun);
     Budget budget = budget(device, chat.footprintMiB(), weights, facts);
     Set<String> unmet = new LinkedHashSet<>();
     if (settings.chatExplicit() && budget.packingMiB() < minimumActivation(selected.profile())) {
@@ -541,6 +558,11 @@ public record GpuArenaPlan(
           ? PACKING_FRACTION * Math.max(0, explicit - w) : budget.packingMiB();
       if (explicit != null) largestRunBudget = Math.max(largestRunBudget, explicit - w);
       Optional<Activation> activation = Optional.ofNullable(ACTIVATIONS.get(role));
+      if (explicit != null && (cap <= w || (activation.isPresent()
+          && packing < activation.get().perItemMiB(LONGEST_ITEM_TOKENS.get(role))
+              * (role == EncoderRole.RERANKER ? RERANKER_SMALLEST_PADDED_PAIRS : 1)))) {
+        unmet.add(UNMET_ENCODER_MEMORY);
+      }
       Optional<String> bulkCpuReason =
           activation.isEmpty() ? Optional.of(BGE_M3_UNMEASURED) : Optional.empty();
       roles.put(role, new Role(w, cap, packing, activation, COUNT_CAPS.get(role), bulkCpuReason,
@@ -674,6 +696,18 @@ public record GpuArenaPlan(
       double file = facts.chatModelFileMiB().getOrDefault(model, 0.0);
       footprint = file + CHAT_KV_MIB_PER_1K_TOKENS * context / 1_024.0
           + UNMEASURED_CHAT_OVERHEAD_MIB;
+      extrapolated = true;
+    }
+    // The measured cache was q8_0. Do not claim those measurements for a different cache
+    // representation, or spend savings from a lower precision without a measurement.
+    String kv = facts.kvType().toLowerCase(java.util.Locale.ROOT);
+    if (!"q8_0".equals(kv)) {
+      double multiplier = switch (kv) {
+        case "f16", "bf16" -> 2.0;
+        case "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl" -> 1.0;
+        default -> 4.0;
+      };
+      footprint += (multiplier - 1) * CHAT_KV_MIB_PER_1K_TOKENS * context / 1_024.0;
       extrapolated = true;
     }
     return new Chat(Optional.of(model), OptionalInt.of(context), projectorOnGpu, footprint,

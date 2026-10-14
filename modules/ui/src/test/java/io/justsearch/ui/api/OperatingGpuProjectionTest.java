@@ -40,6 +40,40 @@ import org.junit.jupiter.api.Test;
 
 @DisplayName("operating.gpu projection of the GPU memory reader")
 final class OperatingGpuProjectionTest {
+  @Test
+  void aDepartedChildKeepsTheOwnershipCapturedWithItsMemorySample() {
+    ManualClock clock = new ManualClock(T0);
+    FakeReader reader = new FakeReader(clock, at -> pdh(at, 10 * GIB));
+    var pids = new AtomicReference<>(Set.of(ENGINE, LLAMA));
+    try (var sampler = new io.justsearch.app.services.gpu.GpuResidencySampler(reader, pids::get,
+        new io.justsearch.core.scheduling.BulkWorkGate(), clock,
+        org.mockito.Mockito.mock(java.util.concurrent.ScheduledExecutorService.class))) {
+      sampler.bootSample();
+      assertEquals(7 * GIB, sampler.latest().ourDedicatedBytes());
+      pids.set(Set.of(ENGINE));
+      var projection = sampled(new OperatingGpuProjection(sampler.statusReader(), pids::get, clock));
+      assertEquals(7 * GIB, projection.view(6_000).ourDedicatedBytes(),
+          "the old llama allocation must not become external memory after the child exits");
+      assertEquals(3 * GIB, projection.view(6_000).externalUsedBytes());
+    }
+  }
+
+  @Test
+  void pdhWithoutProcessFiguresPreservesUnknownAttribution() {
+    ManualClock clock = new ManualClock(T0);
+    FakeReader reader = new FakeReader(clock, at -> new GpuMemorySample(GpuMemorySource.PDH,
+        Optional.empty(), Optional.of(DEVICE), Optional.of("RTX"), OptionalLong.of(12 * GIB),
+        OptionalLong.of(10 * GIB), Map.of(), at));
+    try (var sampler = new io.justsearch.app.services.gpu.GpuResidencySampler(reader,
+        () -> Set.of(ENGINE), new io.justsearch.core.scheduling.BulkWorkGate(), clock,
+        org.mockito.Mockito.mock(java.util.concurrent.ScheduledExecutorService.class))) {
+      sampler.bootSample();
+      var view = sampled(new OperatingGpuProjection(sampler.statusReader(), () -> Set.of(ENGINE), clock))
+          .view(6_000);
+      assertNull(view.ourDedicatedBytes());
+      assertNull(view.externalUsedBytes());
+    }
+  }
 
   static final Instant T0 = Instant.parse("2026-10-05T10:00:00Z");
   static final long GIB = 1L << 30;

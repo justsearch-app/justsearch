@@ -128,6 +128,11 @@ public interface ChatActuator {
   /** A serving managed chat with open admission, no exchange leases and no queued requests. */
   default boolean idleForAutomaticVdu() { return false; }
 
+  /** A prepared configuration still owns the server until commit or abort; must not take locks. */
+  default boolean configurationPrepared() {
+    return false;
+  }
+
   /**
    * True when the next start of the server loads its model onto a CUDA device (GPU layers above
    * zero on a machine with CUDA). Only such a start waits behind the boot-order gate (Spec A §6.2);

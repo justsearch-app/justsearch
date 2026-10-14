@@ -247,6 +247,69 @@ final class ChatHoldsTest {
   // ==================== the self-test session (T37-T39) ====================
 
   @Test
+  void anExternalServerRefusalNamesTheExternalServer() throws Exception {
+    actuator.externalSelfTest = true;
+    var refused = assertThrows(ChatRefusal.class, () -> controller().beginSelfTest("activation"));
+    assertEquals("EXTERNAL_SERVER", refused.reason().name());
+    assertEquals(List.of(), runs);
+    assertFalse(actuator.log.contains("self-test-stop"));
+  }
+
+  @Test
+  void heldVduRefusesPreparationBeforeAnyDrain() throws Exception {
+    var c = controller();
+    try (var _ = c.holdVdu("pictures")) {
+      actuator.policies.clear();
+      var body = new AtomicBoolean();
+      assertThrows(ModeTransitionException.class, () -> c.route(ChatActuation.draining(
+          ChatActuation.Kind.PREPARE, failure -> null, drained -> { body.set(true); return null; })));
+      assertEquals(List.of(), actuator.policies, "VDU refusal must precede the generative drain");
+      assertFalse(body.get());
+    }
+  }
+
+  @Test
+  void pendingVduEntryRefusesPreparationBetweenItsTwoSteps() throws Exception {
+    var c = controller();
+    actuator.activationGate = new CountDownLatch(1);
+    var vdu = CompletableFuture.supplyAsync(() -> {
+      try { return c.holdVdu("pictures"); }
+      catch (ChatRefusal refused) { throw new IllegalStateException(refused); }
+    });
+    try {
+      assertTrue(actuator.activationEntered.await(5, TimeUnit.SECONDS));
+      var preparation = c.submit(ChatActuation.draining(ChatActuation.Kind.PREPARE,
+          failure -> null, drained -> null)).toCompletableFuture();
+      assertTrue(preparation.isCompletedExceptionally(),
+          "opening VDU ownership must refuse preparation even before its overlay step");
+      var failure = assertThrows(ExecutionException.class, () -> preparation.get(5, TimeUnit.SECONDS));
+      assertInstanceOf(ModeTransitionException.class, failure.getCause());
+    } finally {
+      actuator.activationGate.countDown();
+      try (var _ = vdu.get(5, TimeUnit.SECONDS)) { }
+    }
+  }
+
+  @Test
+  void aPreparedConfigurationRetainsOwnershipUntilCommitOrAbort() throws Exception {
+    var c = controller();
+    actuator.configurationPrepared = true;
+    try {
+      var refusal = assertThrows(ChatRefusal.class, () -> {
+        try (var ignored = c.holdVdu("pictures")) { }
+      });
+      assertEquals(RefusalReason.BUSY, refusal.reason());
+      assertEquals(List.of(), actuator.log);
+      assertEquals(List.of(), actuator.policies);
+    } finally {
+      actuator.configurationPrepared = false;
+    }
+    try (var ignored = c.holdVdu("pictures")) {
+      assertTrue(actuator.running.get());
+    }
+  }
+
+  @Test
   void aSelfTestStopsTheMainServerFirstRunsTheCandidateAndEndsOnClose() throws Exception {
     var c = controller();
     c.setActivation(new ChatActuationRouter.Activation(true, TransitionReason.AUTO_START))
@@ -445,6 +508,10 @@ final class ChatHoldsTest {
     volatile Object forbiddenLock;
     private volatile boolean selfTestHeld;
     private volatile CountDownLatch drainGate;
+    volatile boolean externalSelfTest;
+    volatile boolean configurationPrepared;
+    volatile CountDownLatch activationGate;
+    final CountDownLatch activationEntered = new CountDownLatch(1);
 
     void blockDrain() {
       drainGate = new CountDownLatch(1);
@@ -491,6 +558,10 @@ final class ChatHoldsTest {
           activation.active() ? ChatActuation.Kind.ACTIVATE : ChatActuation.Kind.DEACTIVATE,
           "mode", null, null,
           drained -> {
+            if (activationGate != null && activation.active()) {
+              activationEntered.countDown();
+              activationGate.await();
+            }
             if (activation.active() && selfTestHeld) {
               throw new ModeTransitionException(
                   ModeTransitionException.Reason.ALREADY_TRANSITIONING, "self-test");
@@ -529,6 +600,10 @@ final class ChatHoldsTest {
     public ChatActuation<Void> selfTestStop() {
       return ChatActuation.<Void>draining(ChatActuation.Kind.SELF_TEST, HoldActuator::busy,
           drained -> {
+            if (externalSelfTest) {
+              throw new ModeTransitionException(ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT,
+                  "external llama-server is active");
+            }
             selfTestHeld = true;
             running.set(false);
             log.add("self-test-stop");
@@ -553,6 +628,10 @@ final class ChatHoldsTest {
     @Override
     public boolean serverRunning() {
       return running.get();
+    }
+
+    public boolean configurationPrepared() {
+      return configurationPrepared;
     }
 
     @Override

@@ -1313,6 +1313,10 @@ public class InferenceLifecycleManager
 
   private final class ManagerChatActuator implements ChatActuator {
     @Override
+    public boolean configurationPrepared() {
+      return precommitComposition || preparedConfigApply != null;
+    }
+    @Override
     public DrainHold drain(Duration bound) throws InterruptedException {
       return drain(new ChatDrainPolicy(StopReason.RECONFIGURE, ChatDrainPolicy.Waiting.AFTER_IDLE,
           bound, ChatDrainPolicy.Expiry.REFUSE_BUSY, false));
@@ -1347,14 +1351,14 @@ public class InferenceLifecycleManager
     public ChatActuation<Void> selfTestStop() {
       return ChatActuation.<Void>draining(ChatActuation.Kind.SELF_TEST, InferenceLifecycleManager.this::drainRefused,
           drained -> {
-            selfTestHeld = true;
-            boolean adoptedExternal;
             synchronized (runner.lock()) {
-              adoptedExternal =
-                  serverOps.isExternalServerActive() && runner.currentMode() == Mode.ONLINE;
+              if (serverOps.isExternalServerActive()) {
+                throw modeTransition(ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT,
+                    "Cannot run a managed self-test while using an external llama-server instance");
+              }
+              selfTestHeld = true;
             }
-            // A server this Engine did not start is not stopped for a self-test.
-            if (!adoptedExternal) switchToIndexingModeStep(TransitionReason.SELF_TEST);
+            switchToIndexingModeStep(TransitionReason.SELF_TEST);
             return null;
           });
     }
@@ -2375,6 +2379,10 @@ public class InferenceLifecycleManager
       // configured only; the session's end starts it once (Spec A U11).
       boolean startManaged = enabled && !selfTestHeld
           && (!restartIfOnline || runner.currentMode() == Mode.ONLINE);
+      if (configuredInference().vduMode()) {
+        throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+            "VDU is using the inference configuration; retry settings after the batch finishes");
+      }
       if (precommitComposition || preparedConfigApply != null) {
         throw modeTransition(
             ModeTransitionException.Reason.ALREADY_TRANSITIONING,

@@ -1,0 +1,89 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:41:47.375Z",
+  "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+  "tree": "a66cd900fe3e1ec1c40aaa0c0cfeacc2f977b5c4",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:reranker:test --tests \"io.justsearch.reranker.RerankerCpuPackingTest.one512TokenPairReturnsCpuScoresUnderAnInfeasibleGpuCap\" --tests \"io.justsearch.reranker.RerankerCpuPackingTest.gpuLeaseKeepsItsPackingPlanWhenTheDevicePlanIsWithdrawn\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 25499
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/reranker/src/test/java/io/justsearch/reranker/RerankerCpuPackingTest.java#one512TokenPairReturnsCpuScoresUnderAnInfeasibleGpuCap",
+      "file": "modules/reranker/src/test/java/io/justsearch/reranker/RerankerCpuPackingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e544e11400e4c7ba99f02b39629f74b6130e68ac04fc9c97cbf76d99922425f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "one512TokenPairReturnsCpuScoresUnderAnInfeasibleGpuCap()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/reranker/src/test/java/io/justsearch/reranker/RerankerCpuPackingTest.java#gpuLeaseKeepsItsPackingPlanWhenTheDevicePlanIsWithdrawn",
+      "file": "modules/reranker/src/test/java/io/justsearch/reranker/RerankerCpuPackingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e544e11400e4c7ba99f02b39629f74b6130e68ac04fc9c97cbf76d99922425f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpuLeaseKeepsItsPackingPlanWhenTheDevicePlanIsWithdrawn()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7de3976a1",
+    "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+    "overlays": [
+      "modules/reranker/build.gradle.kts",
+      "modules/reranker/gradle.lockfile"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:reranker:test --tests \"io.justsearch.reranker.RerankerCpuPackingTest.one512TokenPairReturnsCpuScoresUnderAnInfeasibleGpuCap\" --tests \"io.justsearch.reranker.RerankerCpuPackingTest.gpuLeaseKeepsItsPackingPlanWhenTheDevicePlanIsWithdrawn\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 17453
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/reranker/src/test/java/io/justsearch/reranker/RerankerCpuPackingTest.java#one512TokenPairReturnsCpuScoresUnderAnInfeasibleGpuCap",
+        "classification": "assertion",
+        "detail": "one512TokenPairReturnsCpuScoresUnderAnInfeasibleGpuCap(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU scoring must not throw because its unused GPU cap is too small ==> Unexpected exception thrown: java.lang.IllegalArgumentException: encoder_memory: RERANKER cannot fit one padded item in its GPU packing budget"
+      },
+      {
+        "id": "modules/reranker/src/test/java/io/justsearch/reranker/RerankerCpuPackingTest.java#gpuLeaseKeepsItsPackingPlanWhenTheDevicePlanIsWithdrawn",
+        "classification": "assertion",
+        "detail": "gpuLeaseKeepsItsPackingPlanWhenTheDevicePlanIsWithdrawn(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: withdrawing the device plan must keep every retained GPU call at four padded rows ==> expected: <[4, 4, 4, 4, 4]> but was: <[4, 16]>"
+      }
+    ]
+  },
+  "digest": "sha256:0759acc63376648069d39cd11bfb5dc78b4195a597bd9442cb5a33f0b81d1f3b"
+}

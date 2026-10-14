@@ -219,6 +219,14 @@ final class PackStagingOps {
 
     try {
       moveAtomicBestEffort(tmp, dest);
+      if (io.justsearch.app.inference.ChatArtifactIdentity.isChatModel(dest)) {
+        try {
+          io.justsearch.app.inference.ChatArtifactIdentity.rememberWritten(
+              dest, fileEntry.sizeBytes, fileEntry.sha256);
+        } catch (IOException unavailable) {
+          log.debug("Verified pack chat receipt unavailable", unavailable);
+        }
+      }
     } catch (IOException e) {
       throw new PackStagingException(
           "PACK_STAGE_FAILED", "Failed to stage " + pathInPack + ": " + e.getMessage(), e);

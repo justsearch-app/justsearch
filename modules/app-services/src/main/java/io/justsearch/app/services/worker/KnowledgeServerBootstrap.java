@@ -1095,7 +1095,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // (precision, doc counts) with non-eval content. `justsearch.eval.mode` is the
             // same flag that gates `/api/debug/reset-index` (LocalApiServer) and is set by
             // the `runHeadlessEval` Gradle task.
-            if (Boolean.getBoolean("justsearch.eval.mode")) {
+            if (EnvRegistry.EVAL_MODE.getBoolean(false)) {
                 log.info("Skipping help-file auto-ingest (eval mode)");
                 return;
             }

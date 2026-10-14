@@ -23,7 +23,7 @@ final class ChatVocabularyTest {
   private static final Instant SINCE = Instant.parse("2026-10-05T10:00:00Z");
 
   @Test
-  @DisplayName("every enum has exactly the reconciled members, in order")
+  @DisplayName("exactMembers() — every enum keeps its members and the additive external-server refusal")
   void exactMembers() {
     assertEquals(List.of("OFF", "LOADING", "READY", "UNLOADED", "REFUSED", "FAILED"),
         names(ChatState.class));
@@ -38,7 +38,7 @@ final class ChatVocabularyTest {
     assertEquals(List.of("COLD_START", "BOOT_ORDER", "RECONFIGURE", "MODEL_SWITCH", "VDU",
         "RECOVERY", "RELOAD", "STEP_DOWN"), names(LoadingCause.class));
     assertEquals(List.of("GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF", "LOADING", "BUSY", "OFF",
-        "FAILED", "REFUSED", "ENGINE_STOPPING", "DEVICE_RECOVERING", "SELF_TEST"),
+        "FAILED", "REFUSED", "ENGINE_STOPPING", "DEVICE_RECOVERING", "SELF_TEST", "EXTERNAL_SERVER"),
         names(RefusalReason.class));
     assertEquals(List.of("HUMAN_CHAT", "AGENT_CHAT", "ASSIST", "BACKGROUND", "AUX"),
         names(DemandKind.class));

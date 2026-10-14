@@ -1,0 +1,146 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T08:17:31.194Z",
+  "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+  "tree": "bf687e02a610c58c94311c1bd5a46cd024a2840a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingSavedChatIsUnavailableAndNamesItsMissingFile\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingCandidateDoesNotReplaceTheReadyServersObservedState\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 39190
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingSavedChatIsUnavailableAndNamesItsMissingFile",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74d6631a47b86fb2e5445139de211c9aabdbb4173aca6a61bceb2b2d29be100f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingSavedChatIsUnavailableAndNamesItsMissingFile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74d6631a47b86fb2e5445139de211c9aabdbb4173aca6a61bceb2b2d29be100f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingCandidateDoesNotReplaceTheReadyServersObservedState",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74d6631a47b86fb2e5445139de211c9aabdbb4173aca6a61bceb2b2d29be100f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingCandidateDoesNotReplaceTheReadyServersObservedState()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f416e634a4d5dc644836a5ef671c15c0deb544a2d5230a5c21a42db2a11030e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f416e634a4d5dc644836a5ef671c15c0deb544a2d5230a5c21a42db2a11030e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1f8ce3e01",
+    "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingSavedChatIsUnavailableAndNamesItsMissingFile\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingCandidateDoesNotReplaceTheReadyServersObservedState\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 49300
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingSavedChatIsUnavailableAndNamesItsMissingFile",
+        "classification": "assertion",
+        "detail": "missingSavedChatIsUnavailableAndNamesItsMissingFile(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an absent saved chat model must report unavailable chat rather than OFF ==> expected: <FAILED> but was: <OFF>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage",
+        "classification": "assertion",
+        "detail": "unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an extrapolated chat allocation must have a visible placement diagnostic ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingCandidateDoesNotReplaceTheReadyServersObservedState",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:44cd9ddc02306a24ee87e4196f7178c84517ae764ee667affc0db809b8100ab8"
+}

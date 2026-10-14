@@ -105,7 +105,7 @@ public record InferenceConfig(
             source + " must be a non-negative integer MiB (0..2147483647): " + value, invalid);
       }
     }
-    return Boolean.parseBoolean(SystemAccess.sysProp("justsearch.eval.mode")) ? 0 : bound;
+    return EnvRegistry.EVAL_MODE.getBoolean(false) ? 0 : bound;
   }
 
   /** The host cache limit actually passed to the child for this mode. */
@@ -153,6 +153,15 @@ public record InferenceConfig(
 
   /** Resolves manager configuration from the same snapshot used by its composition decision. */
   public static InferenceConfig fromResolvedConfig(ResolvedConfig rc, Path baseDir) {
+    return resolve(rc, baseDir, false);
+  }
+
+  /** Planning uses launch selection and validation, without repeating launch INFO messages. */
+  public static InferenceConfig forPlanning(ResolvedConfig rc, Path baseDir) {
+    return resolve(rc, baseDir, true);
+  }
+
+  private static InferenceConfig resolve(ResolvedConfig rc, Path baseDir, boolean planning) {
     Objects.requireNonNull(rc, "rc");
     log.debug("Creating InferenceConfig from resolved configuration");
     Path resolvedBaseDir =
@@ -285,11 +294,35 @@ public record InferenceConfig(
       associatedModelsDir = configuredModelsDir;
     }
 
+    // The installer persists an absolute path even for a shipped profile member. Canonical
+    // paths and the filesystem's identity distinguish that same artifact from a same-named
+    // custom file elsewhere; the path's configuration source does not change its identity.
+    ChatModelProfile installedProfile = usingLlmModelOverride
+        ? profileForInstalledFile(modelPath, configuredModelsDir) : null;
+    if (installedProfile == null && usingLlmModelOverride
+        && !Path.of(llmModelPathOverride).isAbsolute() && !Files.exists(modelPath)) {
+      // Legacy managed relative selections also describe an installation still being prepared.
+      // Keep that intent independent of activation order; absolute missing overrides stay unknown.
+      for (ChatModelProfile candidate : ChatModelProfile.values()) {
+        if (modelPath.toAbsolutePath().normalize().equals(
+            configuredModelsDir.resolve(candidate.modelFile()).toAbsolutePath().normalize())) {
+          installedProfile = candidate;
+          break;
+        }
+      }
+    }
+    boolean customModelOverride = usingLlmModelOverride && installedProfile == null;
+    if (installedProfile != null) {
+      profile = installedProfile;
+      associatedModelsDir = configuredModelsDir;
+      mmprojModel = nonBlankOr(rc.ai().mmprojModel(), profile.mmprojFile());
+    }
+
     Path mmprojPath;
-    if (usingLlmModelOverride && !EnvRegistry.MMPROJ_MODEL.isSet()) {
+    if (customModelOverride && !EnvRegistry.MMPROJ_MODEL.isSet()) {
       // When the user explicitly picks a model file path, we should NOT assume a specific projector.
       // Passing a mismatched mmproj can cause llama-server startup to fail.
-      log.info(
+      log.atLevel(planning ? org.slf4j.event.Level.DEBUG : org.slf4j.event.Level.INFO).log(
           "LLM model override is set; mmproj not explicitly configured. Starting in text-only mode (mmproj disabled). "
               + "Set {} / {} to enable vision.",
           EnvRegistry.MMPROJ_MODEL.sysProp(),
@@ -306,7 +339,8 @@ public record InferenceConfig(
     // The claim is made only when the profile actually supplied the model file. A per-file
     // VLM_MODEL override displaces a profile member, and a stale "compact" stamp on someone
     // else's file is worse than no stamp at all.
-    String chatProfileId = (!usingLlmModelOverride && profileModelFileUsed) ? profile.id() : null;
+    String chatProfileId = installedProfile != null ? installedProfile.id()
+        : (!usingLlmModelOverride && profileModelFileUsed) ? profile.id() : null;
 
     log.debug("  Resolved paths:");
     log.debug("    Server executable: {} (exists: {})", serverExe, Files.exists(serverExe));
@@ -318,7 +352,7 @@ public record InferenceConfig(
 
     // ONE greppable line naming what governed. This is what a human reads when the wrong
     // model loads.
-    log.info(
+    log.atLevel(planning ? org.slf4j.event.Level.DEBUG : org.slf4j.event.Level.INFO).log(
         "Chat model governed by {}: model={} mmproj={} chatProfileId={}",
         governedByLabel(owner, usingLlmModelOverride, profile, chatProfileId),
         modelPath,
@@ -336,6 +370,38 @@ public record InferenceConfig(
         chatProfileId);
   }
 
+  /** Matches the selected file to the profile's canonical installed artifact and file identity. */
+  private static ChatModelProfile profileForInstalledFile(Path file, Path modelsDir) {
+    for (ChatModelProfile candidate : ChatModelProfile.values()) {
+      Path shipped = modelsDir.resolve(candidate.modelFile());
+      if (!Files.isRegularFile(shipped) || !Files.isRegularFile(file)) continue;
+      try {
+        Path canonical = file.toRealPath();
+        Path expected = shipped.toRealPath();
+        if ((canonical.equals(expected) || Files.isSameFile(canonical, expected))
+            && Files.isSameFile(file, shipped) && matchesManifest(canonical, candidate)) return candidate;
+      } catch (IOException unreadable) {
+        throw new java.io.UncheckedIOException("Cannot identify selected chat artifact", unreadable);
+      }
+    }
+    return null;
+  }
+
+  /** Configuration reads only a bounded receipt; an owned background lane verifies uncertain bytes. */
+  private static boolean matchesManifest(Path file, ChatModelProfile profile) throws IOException {
+    var registry = io.justsearch.configuration.model.ModelRegistryLoader
+        .loadFromClasspath("ai/model-registry.v2.json");
+    for (var pkg : registry.packages()) {
+      for (var variant : pkg.variants()) {
+        String relative = Path.of(pkg.targetDir() == null ? "" : pkg.targetDir())
+            .resolve(variant.filename()).toString().replace('\\', '/');
+        if (!relative.equals(profile.modelFile())) continue;
+        return ChatArtifactIdentity.matches(file, variant.sizeBytes(), variant.sha256());
+      }
+    }
+    return false;
+  }
+
   /** Who owns the stored {@code justsearch.llm.model_path} value, if anyone. */
   enum ModelPathOwner {
     /** No stored value at all. */
@@ -350,6 +416,13 @@ public record InferenceConfig(
     SYSTEM_STORED,
     /** settings.json / worker-snapshot / auto-detected value that never became an operator lock. */
     STORED_SETTINGS
+  }
+
+  /** Whether an operator locked the path independently of system-owned profile selection. */
+  public static boolean operatorModelPathSelected(ResolvedConfig cfg) {
+    var owner = classifyModelPathOwner(cfg, cfg.ai().llmModelPath() != null);
+    return owner == ModelPathOwner.OPERATOR_ENV || owner == ModelPathOwner.OPERATOR_SYSPROP
+        || owner == ModelPathOwner.OPERATOR_YAML;
   }
 
   /**
@@ -485,7 +558,7 @@ public record InferenceConfig(
           "modules/shell/src-tauri/resources/headless");
       Path devFound = findExistingServerExecutable(devBase, preferCudaVariant);
       if (devFound != null) {
-        log.info("  Found via dev layout (Tauri resources): {}", devFound);
+        log.debug("  Found via dev layout (Tauri resources): {}", devFound);
         return devFound;
       }
       return canonicalServerExecutable(explicitRepoRoot);
@@ -509,7 +582,7 @@ public record InferenceConfig(
       if (preferCudaVariant) {
         Path cudaVariant = findCudaVariant(nativeBin);
         if (cudaVariant != null) {
-          log.info("  Preferring CUDA variant over baseline: {}", cudaVariant);
+          log.debug("  Preferring CUDA variant over baseline: {}", cudaVariant);
           return cudaVariant;
         }
       }
@@ -547,7 +620,7 @@ public record InferenceConfig(
     // 4. Last resort: any variant (CUDA binary works for CPU too, just larger)
     Path anyVariant = findCudaVariant(nativeBin);
     if (anyVariant != null) {
-      log.info("  No baseline found; falling back to variant: {}", anyVariant);
+      log.debug("  No baseline found; falling back to variant: {}", anyVariant);
       return anyVariant;
     }
 

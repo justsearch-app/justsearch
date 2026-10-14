@@ -3,6 +3,7 @@ package io.justsearch.app.services.gpu;
 
 import io.justsearch.app.api.status.operating.Profile;
 import io.justsearch.app.api.status.operating.ProfileSource;
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.resolved.ConfigResolution;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -40,17 +41,24 @@ public final class GpuProfileResolver {
 
   /** The per-role GPU memory keys, by role. */
   private static final Map<EncoderRole, String> CAP_KEYS = Map.of(
-      EncoderRole.EMBEDDING, "justsearch.embed.gpu_mem_mb",
-      EncoderRole.SPLADE, "justsearch.splade.gpu_mem_mb",
-      EncoderRole.NER, "justsearch.ner.gpu_mem_mb",
-      EncoderRole.RERANKER, "justsearch.rerank.gpu_mem_mb",
-      EncoderRole.BGE_M3, "justsearch.bgem3.gpu_mem_mb");
+      EncoderRole.EMBEDDING, EnvRegistry.EMBED_GPU_MEM_MB.configKey(),
+      EncoderRole.SPLADE, EnvRegistry.SPLADE_GPU_MEM_MB.configKey(),
+      EncoderRole.NER, EnvRegistry.NER_GPU_MEM_MB.configKey(),
+      EncoderRole.RERANKER, EnvRegistry.RERANK_GPU_MEM_MB.configKey(),
+      EncoderRole.BGE_M3, EnvRegistry.BGE_M3_GPU_MEM_MB.configKey());
 
-  static final String MEMORY_PLAN_KEY = "justsearch.gpu.memory_plan";
-  static final String PROJECTOR_KEY = "justsearch.mmproj.offload";
-  static final String CHAT_PROFILE_KEY = "justsearch.chat.profile";
-  static final String CONTEXT_KEY = "justsearch.context.size";
-  static final String BGE_M3_GPU_KEY = "justsearch.bgem3.gpu_enabled";
+  private static final Map<EncoderRole, String> GPU_ENABLED_KEYS = Map.of(
+      EncoderRole.EMBEDDING, EnvRegistry.EMBED_GPU_ENABLED.configKey(),
+      EncoderRole.SPLADE, EnvRegistry.SPLADE_GPU_ENABLED.configKey(),
+      EncoderRole.NER, EnvRegistry.NER_GPU_ENABLED.configKey(),
+      EncoderRole.RERANKER, EnvRegistry.RERANK_GPU_ENABLED.configKey(),
+      EncoderRole.BGE_M3, EnvRegistry.BGE_M3_GPU_ENABLED.configKey());
+
+  static final String MEMORY_PLAN_KEY = EnvRegistry.GPU_MEMORY_PLAN.configKey();
+  static final String PROJECTOR_KEY = EnvRegistry.MMPROJ_OFFLOAD.configKey();
+  static final String CHAT_PROFILE_KEY = EnvRegistry.CHAT_PROFILE.configKey();
+  static final String CONTEXT_KEY = EnvRegistry.CONTEXT_SIZE.configKey();
+  static final String BGE_M3_GPU_KEY = EnvRegistry.BGE_M3_GPU_ENABLED.configKey();
 
   private GpuProfileResolver() {}
 
@@ -67,13 +75,23 @@ public final class GpuProfileResolver {
    *     are placed
    */
   public record Resolution(Optional<GpuArenaPlan> plan, ProfileSource source, int cudaDeviceId,
-      boolean noUsableGpu, Profile encoderDeviceProfile) {
+      boolean noUsableGpu, Profile encoderDeviceProfile, Set<String> diagnosticReasons, Set<EncoderRole> unplannedRoles) {
+    public Resolution(Optional<GpuArenaPlan> plan, ProfileSource source, int cudaDeviceId,
+        boolean noUsableGpu, Profile encoderDeviceProfile) {
+      this(plan, source, cudaDeviceId, noUsableGpu, encoderDeviceProfile, Set.of(), Set.of());
+    }
+    public Resolution(Optional<GpuArenaPlan> plan, ProfileSource source, int cudaDeviceId,
+        boolean noUsableGpu, Profile encoderDeviceProfile, Set<String> diagnosticReasons) {
+      this(plan, source, cudaDeviceId, noUsableGpu, encoderDeviceProfile, diagnosticReasons, Set.of());
+    }
     public Resolution(Optional<GpuArenaPlan> plan, ProfileSource source, int cudaDeviceId) {
       this(plan, source, cudaDeviceId, false, Profile.UNRESOLVED);
     }
     public Resolution {
       Objects.requireNonNull(plan, "plan");
       Objects.requireNonNull(encoderDeviceProfile, "encoderDeviceProfile");
+      diagnosticReasons = Set.copyOf(diagnosticReasons);
+      unplannedRoles = Set.copyOf(unplannedRoles);
       if (plan.isPresent() != (source != null)) {
         throw new IllegalArgumentException("a source is present exactly when a plan resolved");
       }
@@ -82,6 +100,12 @@ public final class GpuProfileResolver {
     /** No plan: the profile is UNRESOLVED. */
     public static Resolution unresolved() {
       return new Resolution(Optional.empty(), null, -1);
+    }
+
+    /** Planning failed; preserve the selected unplanned configuration and explain its status. */
+    public static Resolution unavailable() {
+      return new Resolution(Optional.empty(), null, -1, false, Profile.UNRESOLVED,
+          Set.of("gpu_plan_unavailable"));
     }
 
     /** The status profile (Spec C vocabulary: below P8 reads as the P8 class). */
@@ -97,7 +121,7 @@ public final class GpuProfileResolver {
 
     /** The bulk-work gate's profile. */
     public BulkWorkGate.Profile gateProfile() {
-      return BulkWorkGate.Profile.valueOf(statusProfile().name());
+      return BulkWorkGate.Profile.valueOf(placementProfile().name());
     }
 
     /**
@@ -110,7 +134,9 @@ public final class GpuProfileResolver {
 
     /** The {@code user_setting_unmet} tokens; empty when every explicit setting is met. */
     public Set<String> unmetSettings() {
-      return plan.map(GpuArenaPlan::unmetSettings).orElse(Set.of());
+      var reasons = new java.util.LinkedHashSet<>(diagnosticReasons);
+      plan.ifPresent(value -> reasons.addAll(value.unmetSettings()));
+      return Set.copyOf(reasons);
     }
   }
 
@@ -153,18 +179,75 @@ public final class GpuProfileResolver {
         return Resolution.unresolved();
       }
     }
+    Set<EncoderRole> unplannedRoles = java.util.Arrays.stream(EncoderRole.values())
+        .filter(role -> conflictingDevice(cfg, role, ordinal))
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    Map<EncoderRole, Double> plannedWeights = new EnumMap<>(EncoderRole.class);
+    gpuRoleWeightsMiB.forEach((role, weight) -> {
+      if (!unplannedRoles.contains(role)) plannedWeights.put(role, weight);
+    });
+    // An explicit cap on another device does not consume this device's budget either.
+    Map<EncoderRole, Double> plannedCaps = new EnumMap<>(EncoderRole.class);
+    settings.roleGpuMemMiB().forEach((role, cap) -> {
+      if (!unplannedRoles.contains(role)) plannedCaps.put(role, cap);
+    });
+    settings = new GpuArenaPlan.Settings(settings.chatProfile(), settings.contextTokens(),
+        settings.gpuLayers(), plannedCaps, settings.gpuOff(), settings.projectorOnGpu());
     String endpoint = cfg.ai().inferenceExternalEndpoint();
     GpuArenaPlan.Facts facts = new GpuArenaPlan.Facts(
         total,
-        gpuRoleWeightsMiB,
+        plannedWeights,
         installedChatModels,
         chatModelFileMiB(cfg),
         endpoint == null || endpoint.isBlank()
             ? GpuArenaPlan.ExternalChat.NONE : GpuArenaPlan.ExternalChat.LOCAL,
-        DeviceGatePolicy.DEFAULTS.seats());
-    GpuArenaPlan plan = GpuArenaPlan.resolve(facts, settings);
+        DeviceGatePolicy.DEFAULTS.seats(), cfg.ai().llmKvType());
+    var launch = io.justsearch.app.inference.InferenceConfig.forPlanning(cfg, null);
+    // A locked path selects an actual profile artifact, even when automatic device selection
+    // would prefer a smaller sibling. Budget the launch's file, preserving explicit precedence.
+    if (cfg.ai().llmModelPath() != null && launch.chatProfileId() != null
+        && (io.justsearch.app.inference.InferenceConfig.operatorModelPathSelected(cfg)
+            || !ChatModelProfile.STANDARD.id().equals(launch.chatProfileId()))) {
+      settings = new GpuArenaPlan.Settings(
+          Optional.of(ChatModelProfile.resolve(launch.chatProfileId())), settings.contextTokens(),
+          settings.gpuLayers(), settings.roleGpuMemMiB(), settings.gpuOff(), settings.projectorOnGpu());
+    }
     GpuArenaPlan automaticPlan = GpuArenaPlan.resolve(facts, GpuArenaPlan.Settings.none());
-    boolean overridden = !plan.equals(automaticPlan);
+    var diagnostics = new java.util.LinkedHashSet<String>();
+    if (!unplannedRoles.isEmpty()) diagnostics.add("encoder_device_conflict");
+    Optional<GpuArenaPlan.Chat> selectedChat = Optional.empty();
+    boolean customChat = launch.chatProfileId() == null || customProjector(cfg, launch);
+    boolean unavailableManagedSelection = cfg.ai().llmModelPath() != null
+        && launch.chatProfileId() != null
+        && !installedChatModels.contains(ChatModelProfile.resolve(launch.chatProfileId()));
+    boolean missingChat = (customChat || unavailableManagedSelection)
+        && !java.nio.file.Files.isRegularFile(launch.modelPath());
+    boolean cpuChat = settings.gpuLayers().isPresent() && settings.gpuLayers().getAsInt() == 0;
+    // The configured external server ignores local launch paths and layer settings.
+    if ((endpoint == null || endpoint.isBlank()) && (missingChat || cpuChat || customChat)) {
+      boolean projector = cfg.ai().mmprojOffload() && launch.mmprojPath() != null
+          && !cpuChat && !missingChat;
+      double reservation = 0;
+      if (!missingChat && !cpuChat) {
+        reservation = fileMiB(launch.modelPath()) + (projector ? fileMiB(launch.mmprojPath()) : 0)
+            + GpuArenaPlan.UNMEASURED_CHAT_OVERHEAD_MIB
+            + unmeasuredKvMiB(launch.contextSize(), cfg.ai().llmKvType());
+      }
+      selectedChat = Optional.of(new GpuArenaPlan.Chat(Optional.empty(),
+          OptionalInt.of(launch.contextSize()), projector, reservation, customChat && !missingChat));
+      if (missingChat) diagnostics.add("chat_model_missing:" + launch.modelPath());
+      else if (customChat) diagnostics.add("chat_model_unmeasured");
+    }
+    GpuArenaPlan plan = GpuArenaPlan.resolve(facts, settings, selectedChat);
+    // A measured but explicitly locked profile may leave no room for automatic encoders.
+    // Keep that model and its honest footprint, while retaining custom-chat pressure protection.
+    if ((selectedChat.isPresent()
+            || io.justsearch.app.inference.InferenceConfig.operatorModelPathSelected(cfg))
+        && plan.unmetSettings().contains(GpuArenaPlan.UNMET_ENCODER_MEMORY)) {
+      plan = withoutCoResidence(plan, plan.chat(), plan.budget(), plannedWeights,
+          "chat_profile_budget_unmet");
+    }
+    boolean overridden = !unplannedRoles.isEmpty() || !plan.equals(automaticPlan) || !"q8_0".equalsIgnoreCase(cfg.ai().llmKvType());
     Profile encoderProfile = Profile.UNRESOLVED;
     if (plan.profile() == GpuArenaPlan.Profile.NO_GPU && total.isPresent()
         && !gpuRoleWeightsMiB.isEmpty() && cfg.ai().gpuAccelerationAllowed()) {
@@ -172,7 +255,8 @@ public final class GpuProfileResolver {
     }
     return new Resolution(Optional.of(plan),
         overridden ? ProfileSource.USER_OVERRIDE : ProfileSource.MEASURED, ordinal,
-        device.status() == DeviceFacts.ProbeStatus.RAN_NO_DEVICE, encoderProfile);
+        device.status() == DeviceFacts.ProbeStatus.RAN_NO_DEVICE, encoderProfile,
+        diagnostics, unplannedRoles);
   }
 
   /**
@@ -184,7 +268,7 @@ public final class GpuProfileResolver {
         ? Optional.of(ChatModelProfile.resolve(cfg.ai().chatProfile())) : Optional.empty();
     OptionalInt context = explicit(cfg, CONTEXT_KEY) && cfg.ai().contextSize() > 0
         ? OptionalInt.of(cfg.ai().contextSize()) : OptionalInt.empty();
-    OptionalInt layers = explicit(cfg, "justsearch.gpu.layers")
+    OptionalInt layers = explicit(cfg, EnvRegistry.GPU_LAYERS.configKey())
         ? OptionalInt.of(cfg.ai().gpuLayers()) : OptionalInt.empty();
     Map<EncoderRole, Double> caps = new EnumMap<>(EncoderRole.class);
     putExplicitCap(cfg, caps, EncoderRole.EMBEDDING, cfg.ai().embedding().gpuMemMb());
@@ -196,7 +280,7 @@ public final class GpuProfileResolver {
       caps.putIfAbsent(EncoderRole.BGE_M3, (double) cfg.ai().bgeM3().gpuMemMb());
     }
     boolean gpuOff = !cfg.ai().gpuAccelerationAllowed()
-        || (explicit(cfg, "justsearch.gpu.enabled") && !cfg.ai().masterGpuEnabled());
+        || (explicit(cfg, EnvRegistry.GPU_ENABLED.configKey()) && !cfg.ai().masterGpuEnabled());
     Optional<Boolean> projector = explicit(cfg, PROJECTOR_KEY)
         ? Optional.of(cfg.ai().mmprojOffload()) : Optional.empty();
     return new GpuArenaPlan.Settings(chatProfile, context, layers, caps, gpuOff, projector);
@@ -221,13 +305,22 @@ public final class GpuProfileResolver {
   public static Map<String, String> contributions(Resolution resolution, boolean gpuBackedChat) {
     Map<String, String> out = new LinkedHashMap<>();
     if (resolution.plan().isEmpty()) return out;
+    if (!resolution.unplannedRoles().isEmpty()) out.put(EnvRegistry.GPU_MEMORY_PLAN_UNPLANNED_ROLES.configKey(),
+        resolution.unplannedRoles().stream().map(Enum::name).sorted()
+            .collect(java.util.stream.Collectors.joining(",")));
     GpuArenaPlan plan = resolution.plan().get();
-    if (resolution.noUsableGpu()) out.put("justsearch.gpu.device_available", "false");
+    for (var entry : plan.roles().entrySet()) {
+      if (entry.getValue().capMiB() == 0 && entry.getValue().bulkCpuReason().isPresent()) {
+        String enabledKey = GPU_ENABLED_KEYS.get(entry.getKey());
+        if (enabledKey != null) out.put(enabledKey, "false");
+      }
+    }
+    if (resolution.noUsableGpu()) out.put(EnvRegistry.GPU_DEVICE_AVAILABLE.configKey(), "false");
     if (plan.profile() == GpuArenaPlan.Profile.NO_GPU) {
       out.put(MEMORY_PLAN_KEY, "no_gpu");
       // Device facts also own automatic availability; a loadable CUDA backend is not a device.
-      out.put("justsearch.gpu.enabled", "false");
-      out.put("justsearch.gpu.layers", "0");
+      out.put(EnvRegistry.GPU_ENABLED.configKey(), "false");
+      out.put(EnvRegistry.GPU_LAYERS.configKey(), "0");
       out.put(PROJECTOR_KEY, "false");
       plan.chat().contextTokens().ifPresent(t -> out.put(CONTEXT_KEY, String.valueOf(t)));
       return out;
@@ -282,6 +375,58 @@ public final class GpuProfileResolver {
       }
     }
     return installed;
+  }
+
+  private static boolean customProjector(ResolvedConfig cfg,
+      io.justsearch.app.inference.InferenceConfig launch) {
+    String file = cfg.ai().mmprojModel();
+    return file != null && !file.isBlank() && launch.mmprojPath() != null
+        && launch.chatProfileId() != null
+        && !file.equals(ChatModelProfile.resolve(launch.chatProfileId()).mmprojFile());
+  }
+
+  private static boolean conflictingDevice(ResolvedConfig cfg, EncoderRole role, int ordinal) {
+    return switch (role) {
+      case EMBEDDING -> explicit(cfg, EnvRegistry.EMBED_GPU_DEVICE_ID.configKey())
+          && cfg.ai().embedding().gpuDeviceId() != ordinal;
+      case SPLADE -> explicit(cfg, EnvRegistry.SPLADE_GPU_DEVICE_ID.configKey())
+          && cfg.ai().splade().gpuDeviceId() != ordinal;
+      case NER -> explicit(cfg, EnvRegistry.NER_GPU_DEVICE_ID.configKey())
+          && cfg.ai().ner().gpuDeviceId() != ordinal;
+      case BGE_M3 -> explicit(cfg, EnvRegistry.BGE_M3_GPU_DEVICE_ID.configKey())
+          && cfg.ai().bgeM3().gpuDeviceId() != ordinal;
+      case RERANKER -> explicit(cfg, EnvRegistry.RERANK_GPU_DEVICE_ID.configKey())
+          && cfg.ai().reranker().gpuDeviceId() != ordinal;
+      case CITATION -> false;
+    };
+  }
+
+  private static double fileMiB(java.nio.file.Path path) {
+    if (path == null || !java.nio.file.Files.isRegularFile(path)) return 0;
+    try {
+      return java.nio.file.Files.size(path) / MIB;
+    } catch (java.io.IOException unreadable) {
+      throw new java.io.UncheckedIOException("Cannot measure selected chat artifact", unreadable);
+    }
+  }
+
+  private static double unmeasuredKvMiB(int context, String kvType) {
+    double multiplier = switch (kvType.toLowerCase(Locale.ROOT)) {
+      case "q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl" -> 1.0;
+      case "f16", "bf16" -> 2.0;
+      default -> 4.0;
+    };
+    return multiplier * GpuArenaPlan.CHAT_KV_MIB_PER_1K_TOKENS * context / 1_024.0;
+  }
+
+  private static GpuArenaPlan withoutCoResidence(GpuArenaPlan plan, GpuArenaPlan.Chat chat,
+      Optional<GpuArenaPlan.Budget> budget, Map<EncoderRole, Double> weights, String reason) {
+    Map<EncoderRole, GpuArenaPlan.Role> roles = new EnumMap<>(EncoderRole.class);
+    weights.forEach((role, weight) -> roles.put(role, new GpuArenaPlan.Role(weight, 0, 0,
+        Optional.empty(), 1, Optional.of(reason), false)));
+    var unmet = new java.util.LinkedHashSet<>(plan.unmetSettings());
+    unmet.add(GpuArenaPlan.UNMET_ENCODER_MEMORY);
+    return new GpuArenaPlan(plan.profile(), false, chat, budget, roles, 0, unmet);
   }
 
   private static Map<ChatModelProfile, Double> chatModelFileMiB(ResolvedConfig cfg) {

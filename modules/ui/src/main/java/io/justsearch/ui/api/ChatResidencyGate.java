@@ -150,7 +150,7 @@ public final class ChatResidencyGate {
    */
   public static ApiErrorCode codeFor(RefusalReason reason) {
     return switch (reason) {
-      case GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, SELF_TEST, BUSY, DEVICE_RECOVERING ->
+      case GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, SELF_TEST, BUSY, DEVICE_RECOVERING, EXTERNAL_SERVER ->
           ApiErrorCode.CHAT_UNAVAILABLE;
       case LOADING -> ApiErrorCode.AI_STARTING;
       case OFF, FAILED, REFUSED -> ApiErrorCode.AI_OFFLINE;
@@ -169,6 +169,7 @@ public final class ChatResidencyGate {
       case BUSY -> "Chat is busy; try again shortly.";
       case SELF_TEST -> "Chat is paused while a model test runs.";
       case DEVICE_RECOVERING -> "Chat is paused while the graphics card recovers.";
+      case EXTERNAL_SERVER -> "A managed model test cannot run while an external llama-server is in use.";
       case OFF -> "Chat is off.";
       case FAILED -> "Chat could not start.";
       case REFUSED -> "Chat may not load for this request.";

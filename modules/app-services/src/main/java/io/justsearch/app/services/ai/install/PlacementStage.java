@@ -96,6 +96,15 @@ final class PlacementStage {
       return "Failed to finalize: " + e.getMessage();
     }
 
+    if (io.justsearch.app.inference.ChatArtifactIdentity.isChatModel(targetFile)) {
+      try {
+        io.justsearch.app.inference.ChatArtifactIdentity.promoted(
+            partialFile, targetFile, dl.sizeBytes(), dl.sha256());
+      } catch (IOException unavailable) {
+        log.debug("Chat verification receipt could not follow promotion", unavailable);
+      }
+    }
+
     // Tempdoc 374 alpha.15 fix B: archive extraction. The cuda-runtime package ships its DLLs in a
     // single zip (too large for the NSIS installer payload). After download + SHA verification the
     // zip is expanded into the same directory; the archive itself stays on disk so the planner's

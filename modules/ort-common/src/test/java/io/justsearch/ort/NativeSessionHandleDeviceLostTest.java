@@ -40,6 +40,45 @@ final class NativeSessionHandleDeviceLostTest {
   /** A CUDA device id no other test uses, so its gate and health start clean. */
   private static final int DEVICE = 61;
 
+  @Test
+  void lossDuringCreationCannotPublishOrCloseTheReturningGpuCandidate() throws Exception {
+    int device = 961;
+    OrtSession candidate = mock(OrtSession.class);
+    OrtSession cpu = mock(OrtSession.class);
+    NativeSessionHandle handle = handle("loss-during-creation", device, null, cpu);
+    set(handle, "gpuSessionAttempted", false);
+    set(handle, "gpuAvailable", false);
+    boolean cpuLease;
+    boolean gpuAvailable;
+    String failureReason;
+    try (handle;
+        var cuda = org.mockito.Mockito.mockStatic(OrtCudaHelper.class);
+        var _ = org.mockito.Mockito.mockConstruction(OrtSession.SessionOptions.class);
+        var _ = org.mockito.Mockito.mockConstruction(ai.onnxruntime.providers.OrtCUDAProviderOptions.class);
+        var _ = org.mockito.Mockito.mockStatic(SessionOptionsApplier.class);
+        var cache = org.mockito.Mockito.mockStatic(OnnxSessionCache.class)) {
+      cuda.when(() -> OrtCudaHelper.checkMissingCudaRuntimeDlls(org.mockito.ArgumentMatchers.any()))
+          .thenReturn(java.util.List.of());
+      cache.when(() -> OnnxSessionCache.createCachedGpuSession(org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+          .thenAnswer(invocation -> {
+            DeviceHealth.forDevice(device).reportLost(719);
+            return candidate;
+          });
+      try (var lease = handle.acquire(background(Duration.ofSeconds(5)))) {
+        cpuLease = lease.isCpu();
+      }
+      gpuAvailable = handle.isGpuAvailable();
+      failureReason = handle.status().failureReason();
+    }
+    org.junit.jupiter.api.Assertions.assertAll(
+        () -> assertTrue(cpuLease, "a candidate returned after device loss must not be leased"),
+        () -> assertFalse(gpuAvailable),
+        () -> assertTrue(failureReason != null && failureReason.contains("lost"),
+            "READY must not overwrite loss"),
+        () -> verify(candidate, org.mockito.Mockito.never()).close());
+  }
+
   static final String CUDA_719 =
       "Error code - ORT_RUNTIME_EXCEPTION - message: Non-zero status code returned while running"
           + " MatMul node. Name:'/encoder/layer.0/attention/self/query/MatMul' Status Message:"

@@ -451,7 +451,8 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       try (Scope _ = ortSpan.makeCurrent()) {
         // The local five-minute horizon bounds this acquisition, not prior tokenization or
         // earlier ORT batches. D2 may supply the caller's absolute deadline here instead.
-        try (var lease = sessions.acquire(batchAcquisition(acquisition))) {
+        try (var lease = GpuCallPacker.acquireForCall(
+            sessions, batchAcquisition(acquisition), EncoderRole.EMBEDDING, batchSize, maxLen)) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
 
           long tExtract;
@@ -490,7 +491,11 @@ public final class OnnxEmbeddingEncoder implements Closeable {
                   runOomFallbackLadder(
                       batchSize,
                       i -> {
-                        if (gpuLease[0] == null) gpuLease[0] = sessions.acquire(batchAcquisition(acquisition));
+                        if (gpuLease[0] == null) {
+                          gpuLease[0] = GpuCallPacker.acquireForCall(
+                              sessions, batchAcquisition(acquisition), EncoderRole.EMBEDDING,
+                              1, fallbackSeqLen);
+                        }
                         return runSingleHidden(
                             gpuLease[0], allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
                       },
@@ -941,7 +946,8 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       // Tempdoc 400 LR2-a/LR2-b: span starts before acquire; see batched path above.
       Span ortSpan = EncoderOrtRunSpans.maybeOrtRun(ORT_TRACER, "embed", 1, mask.length);
       try (Scope _ = ortSpan.makeCurrent()) {
-        try (var lease = sessions.acquire(acquisition)) {
+        try (var lease = GpuCallPacker.acquireForCall(
+            sessions, acquisition, EncoderRole.EMBEDDING, 1, seqLen)) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
           try (OrtSession.Result result = lease.run(inputs)) {
             // Tempdoc 710 Move 2: ORT-call timing is now recorded at the Lease choke point
@@ -1146,7 +1152,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
   /** Warms the CPU session a query the device turns away runs on (see SessionHandle). */
   public boolean prewarmCpuForQueries(io.justsearch.core.execution.InferenceRequest request) {
     return sessions.prewarmCpuForQueries(
-        io.justsearch.ort.SessionAcquisitionRequest.from(request));
+        SessionAcquisitionRequest.from(request));
   }
 
   /** Returns the ORT CUDA status for observability. */
