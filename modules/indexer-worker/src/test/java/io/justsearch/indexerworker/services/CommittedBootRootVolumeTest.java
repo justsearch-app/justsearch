@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
@@ -22,8 +22,12 @@ import io.justsearch.ipc.ScanRootProgress;
 import io.justsearch.ipc.ScanRootRequest;
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -38,10 +42,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 6, scenario S8 — the boot-root reconcile a migration cutover runs
- * goes through the same volume check as every other watch registration: no watcher is registered
- * on another volume at a root's drive letter, and the watch resumes when the recorded volume
- * returns.
+ * Task t-20261013-ef3c41, rounds 6 and 7, scenario S8 — the boot-root reconcile a migration
+ * cutover runs goes through the same volume check as every other watch registration: no watcher is
+ * registered on another volume at a root's drive letter, and the watch resumes when the recorded
+ * volume returns. Round 7: such a root is deferred, not a failure, so it neither throws nor makes
+ * the cutover's replay uncertain.
  *
  * <p>Real conditions: a SUBST letter is mapped to a folder on one volume and its drive root is
  * walked once (which records the volume), then the letter is mapped to a folder on another volume
@@ -57,6 +62,7 @@ final class CommittedBootRootVolumeTest
   @TempDir Path tempDir;
   private Path otherVolume;
   private String letter;
+  private LetterLock letterLock;
   private SqliteJobQueue jobQueue;
   private RunningRuntime runtime;
   private IndexGenerationManager.IndexLayout layout;
@@ -78,7 +84,11 @@ final class CommittedBootRootVolumeTest
   @AfterEach
   void tearDown() throws Exception {
     if (letter != null) {
-      run("subst", letter, "/d");
+      try {
+        run("subst", letter, "/d");
+      } finally {
+        letterLock.close();
+      }
     }
     if (runtime != null) {
       runtime.close();
@@ -96,7 +106,7 @@ final class CommittedBootRootVolumeTest
   }
 
   @Test
-  void theCommittedBootReconcileWatchesNothingOnAnotherVolumeUntilItReturns() throws Exception {
+  void theCommittedBootReconcileDefersARootOnAnotherVolumeUntilItReturns() throws Exception {
     Path stickA = Files.createDirectory(tempDir.resolve("stick-c"));
     Path root = mapLetterTo(stickA);
     Files.writeString(root.resolve("notes.txt"), "on the first stick");
@@ -108,13 +118,19 @@ final class CommittedBootRootVolumeTest
     WorkerIngestService service = service();
     RootWatcherRegistry registry = new RootWatcherRegistry();
     service.setRootWatcherRegistry(registry);
+    Object owner = new Object();
+    WorkerMutationAdmission admission = new WorkerMutationAdmission(owner);
+    service.setMutationAdmission(admission, owner);
     var binding =
         new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, "documents");
 
-    IOException refused =
-        assertThrows(IOException.class, () -> service.reconcileCommittedBootRoot(binding));
+    assertDoesNotThrow(() -> {
+      service.reconcileCommittedBootRoot(binding);
+    }, "a root on another volume is deferred, never a start-up failure");
 
-    assertTrue(refused.getMessage().contains(ROOT_UNAVAILABLE_REASON), refused.getMessage());
+    assertTrue(admission.replayCertain(), "a deferred root leaves the cutover's replay certain");
+    assertTrue(service.refusesRootVolume(root.toString(), CallContext.none()),
+        "the root reads " + ROOT_UNAVAILABLE_REASON + " to the Head while it is deferred");
     assertNull(registry.subscription(root),
         "no watcher is registered on another volume at the root's path");
     assertTrue(registry.awaitsVolume(root), "the watch is held until the recorded volume is back");
@@ -149,11 +165,15 @@ final class CommittedBootRootVolumeTest
             .collect(Collectors.toSet());
     for (char c = 'T'; c >= 'M'; c--) {
       if (used.contains(c)) continue;
+      LetterLock held = LetterLock.tryHold(c);
+      if (held == null) continue;
       String candidate = c + ":";
       if (run("subst", candidate, target.toString()) == 0) {
         letter = candidate;
+        letterLock = held;
         return Path.of(letter + "\\");
       }
+      held.close();
     }
     assumeTrue(false, "no free drive letter for SUBST");
     throw new IllegalStateException("unreachable");
@@ -202,5 +222,49 @@ final class CommittedBootRootVolumeTest
     process.getInputStream().readAllBytes();
     assertTrue(process.waitFor(30, TimeUnit.SECONDS), "subst did not finish");
     return process.exitValue();
+  }
+
+  /**
+   * A hold on one SUBST drive letter shared by every test process on this machine: a lock on a
+   * per-letter file in the user's temp folder, taken before the letter is mapped and released only
+   * after it is unmapped, so SUBST tests running at once (Gradle forks, or modules built together)
+   * never pick, remap into or take over the same letter.
+   */
+  private static final class LetterLock implements AutoCloseable {
+    private final FileChannel channel;
+    private final FileLock lock;
+
+    private LetterLock(FileChannel channel, FileLock lock) {
+      this.channel = channel;
+      this.lock = lock;
+    }
+
+    /** The hold on {@code letter}, or {@code null} while another test holds it. */
+    static LetterLock tryHold(char letter) throws IOException {
+      Path folder =
+          Path.of(System.getenv().getOrDefault("TEMP", System.getProperty("java.io.tmpdir")));
+      FileChannel channel = FileChannel.open(folder.resolve("justsearch-subst-" + letter + ".lock"),
+          StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      FileLock lock = null;
+      try {
+        lock = channel.tryLock();
+      } catch (OverlappingFileLockException heldInThisProcess) {
+        // Another test class in this JVM holds the letter.
+      } finally {
+        if (lock == null) {
+          channel.close();
+        }
+      }
+      return lock == null ? null : new LetterLock(channel, lock);
+    }
+
+    @Override
+    public void close() throws IOException {
+      try {
+        lock.release();
+      } finally {
+        channel.close();
+      }
+    }
   }
 }

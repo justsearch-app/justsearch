@@ -1684,15 +1684,41 @@ public final class WorkerIngestService {
    * published. The strict disk/index difference is evaluated against the serving B runtime; all
    * eligible files are re-admitted, including modifications that had no switch-buffer event.
    */
-  public void reconcileCommittedBootRoot(
+  public boolean reconcileCommittedBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding)
       throws IOException {
-    reconcileCommittedBootRoot(binding, () -> false);
+    return reconcileCommittedBootRoot(binding, () -> false);
   }
 
-  public void reconcileCommittedBootRoot(
+  /**
+   * Returns {@code false}, changing nothing, when the root is deferred (task t-20261013-ef3c41,
+   * round 7, S8): the folder at its path is not on the volume recorded for it. Its watch is then
+   * held until that volume is back, nothing of the other volume is read, and the caller leaves
+   * the root out of its convergence check and keeps the previous generation until the root has
+   * been reconciled through {@link #reconcileReturnedBootRoot}. A deferral is not a failure, so
+   * it leaves the replay certificate as it was. Any other failure throws as before.
+   */
+  public boolean reconcileCommittedBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
       java.util.function.BooleanSupplier cancelled) throws IOException {
+    return reconcileBootRoot(binding, cancelled, true);
+  }
+
+  /**
+   * Round 7 (S8): reconciles a root the committed boot deferred, on the running server, once the
+   * volume recorded for it may be back. The same pass as {@link #reconcileCommittedBootRoot}, and
+   * the same {@code false} while the root is still on another volume, but a failure leaves the
+   * replay certificate alone: there is no cutover left for it to fence, and the caller retries.
+   */
+  public boolean reconcileReturnedBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    return reconcileBootRoot(binding, cancelled, false);
+  }
+
+  private boolean reconcileBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled, boolean certifying) throws IOException {
     Path root = binding.path().toAbsolutePath().normalize();
     try (var ignoredMutation = mutationLease()) {
       SyncDirectoryOps.checkCancelled(cancelled);
@@ -1701,13 +1727,15 @@ public final class WorkerIngestService {
         throw new IOException("Committed boot root requires a writable serving successor");
       }
       RootWatcherRegistry registry = rootWatcherRegistry;
-      // Round 6 (S8): the same volume check as every other watch registration. No watcher is
-      // registered on another volume at the root's path; the watch is held and registered once a
-      // walk or sync finds the recorded volume back, and this root's reconcile stops here.
+      // Rounds 6 and 7 (S8): the same volume check as every other watch registration. No watcher
+      // is registered on another volume at the root's path; the watch is held and registered once
+      // the recorded volume is back, and the root is deferred rather than failing the boot.
+      if (rootOnAnotherVolume(root.toString()) != null) {
+        registry.watchWhenVolumeReturns(root, binding.collection());
+        return false;
+      }
       RootWatcherRegistry.WatchResult watched =
-          rootOnAnotherVolume(root.toString()) != null
-              ? registry.watchWhenVolumeReturns(root, binding.collection())
-              : registry.watch(root.toString(), binding.collection());
+          registry.watch(root.toString(), binding.collection());
       if (!watched.watching()) {
         throw new IOException("Committed boot root watcher registration failed: "
             + watched.errorMessage());
@@ -1752,8 +1780,9 @@ public final class WorkerIngestService {
         requireCandidateSubscription(registry, root, subscription);
         difference.requireCurrentRootIdentity();
       }
+      return true;
     } catch (IOException | RuntimeException failure) {
-      if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      if (certifying && mutationAdmission != null) mutationAdmission.markReplayUncertain();
       if (failure instanceof IOException incomplete) throw incomplete;
       throw new IOException("Committed boot root reconciliation failed", failure);
     }
@@ -1769,6 +1798,22 @@ public final class WorkerIngestService {
   public boolean committedBootRootConverged(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
       java.util.function.BooleanSupplier cancelled) throws IOException {
+    return bootRootConverged(binding, cancelled, true);
+  }
+
+  /**
+   * Round 7 (S8): {@link #committedBootRootConverged} for a deferred root reconciled on the
+   * running server; a failure leaves the replay certificate alone and the caller retries.
+   */
+  public boolean returnedBootRootConverged(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    return bootRootConverged(binding, cancelled, false);
+  }
+
+  private boolean bootRootConverged(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled, boolean certifying) throws IOException {
     try {
       SyncDirectoryOps.checkCancelled(cancelled);
       Path root = binding.path().toAbsolutePath().normalize();
@@ -1798,7 +1843,7 @@ public final class WorkerIngestService {
         return true;
       }
     } catch (IOException | RuntimeException failure) {
-      if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      if (certifying && mutationAdmission != null) mutationAdmission.markReplayUncertain();
       if (failure instanceof IOException incomplete) throw incomplete;
       throw new IOException("Committed boot root convergence failed", failure);
     }

@@ -683,6 +683,18 @@ because the recorded volume is back, clears that state: the root reads indexed a
 watch is registered, and the sync reconciles it as usual, pruning what was genuinely deleted.
 Removing the root forgets its record.
 
+A boot that still has the previous index generation (a stop or crash between a migration's cutover
+and the old generation's removal) reconciles every declared root against the new generation before
+it serves. A root on another volume at that boot is deferred, never a start-up failure: its watch
+is held, it is left out of the boot's convergence check, so start-up completes and every other root
+is reconciled and served, and it reads unavailable as above. Nothing under it is pruned, and the
+previous generation is kept, its removal unfinished, until the root has been reconciled on its
+recorded volume. The server checks a deferred root's volume every 10 s (one volume identity read);
+once the volume is back, without a restart, it reconciles the root, registering its watch, and
+once the index matches the root's disk it commits that and lets the previous generation's removal
+complete. A restart before then defers the root again. Any other boot-root failure, a missing root
+for example, still fails the boot.
+
 A prune keeps each document whose presence it cannot tell and goes on judging the rest, so one
 unreadable subfolder does not stop the genuine deletions beside it; a "not found" beneath a folder
 it could not list counts as "cannot tell". It re-checks the root at the first undecidable document
@@ -710,9 +722,9 @@ Accepted limits:
 - Watching and the unavailable state resume through the next accepted walk or sync, so a returned
   volume is noticed within one periodic-sync interval (60 s), or at once by a reindex. A swap is
   noticed within one interval as well, unless a walk or sync of the root refuses it sooner.
-- A migration cutover whose boot-root reconcile meets a root on another volume fails there, as it
-  does when any boot-root watch cannot be registered; the root's watch is held as above and
-  nothing of the other volume is queued.
+- While a root deferred at boot stays on another volume, the previous generation keeps its disk
+  space, however long that takes, and the root's documents are served as the new generation was
+  built.
 - Re-queuing a file (a new scan or watch event) resets its retry back-off to the first step.
 - OneDrive (and other cloud) placeholder files are not treated specially; a placeholder that cannot
   be read is handled like any other unreadable file.

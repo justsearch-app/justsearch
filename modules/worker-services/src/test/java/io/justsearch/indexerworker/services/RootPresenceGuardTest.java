@@ -8,8 +8,13 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import io.justsearch.adapters.lucene.runtime.PruneOps;
 import java.io.File;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +56,8 @@ final class RootPresenceGuardTest {
     assumeTrue(WINDOWS, "SUBST drive letters exist on Windows only");
     Path original = Files.createDirectories(tempDir.resolve("stick-a").resolve("music"));
     Path other = Files.createDirectories(tempDir.resolve("stick-b").resolve("music"));
-    String letter = freeLetter();
+    LetterLock held = holdFreeLetter();
+    String letter = held.letter;
     try {
       assertEquals(0, run("subst", letter, original.getParent().toString()));
       Path root = Path.of(letter + "\\music");
@@ -66,7 +72,11 @@ final class RootPresenceGuardTest {
       assertFalse(RootPresenceGuard.capture(root, registered).rootCurrent(),
           "a different volume at the same letter must not vouch for the original's deletions");
     } finally {
-      run("subst", letter, "/d");
+      try {
+        run("subst", letter, "/d");
+      } finally {
+        held.close();
+      }
     }
   }
 
@@ -81,8 +91,8 @@ final class RootPresenceGuardTest {
     Path ledger = base.resolve(RootVolumeLedger.FILE_NAME);
     assertTrue(Files.exists(ledger), "the volume is recorded at the first prune");
 
-    try (var ignoredLock = java.nio.channels.FileChannel.open(ledger,
-        java.nio.file.StandardOpenOption.READ,
+    try (var ignoredLock = FileChannel.open(ledger,
+        StandardOpenOption.READ,
         com.sun.nio.file.ExtendedOpenOption.NOSHARE_READ,
         com.sun.nio.file.ExtendedOpenOption.NOSHARE_WRITE,
         com.sun.nio.file.ExtendedOpenOption.NOSHARE_DELETE)) {
@@ -113,13 +123,16 @@ final class RootPresenceGuardTest {
         "a folder that merely shares the name prefix is not removed");
   }
 
-  private static String freeLetter() {
+  /** A letter no drive uses, held for the calling test until it closes the hold. */
+  private static LetterLock holdFreeLetter() throws IOException {
     Set<Character> used =
         java.util.Arrays.stream(File.listRoots())
             .map(r -> Character.toUpperCase(r.getPath().charAt(0)))
             .collect(Collectors.toSet());
     for (char c = 'Y'; c >= 'M'; c--) {
-      if (!used.contains(c)) return c + ":";
+      if (used.contains(c)) continue;
+      LetterLock held = LetterLock.tryHold(c);
+      if (held != null) return held;
     }
     assumeTrue(false, "no free drive letter for SUBST");
     throw new IllegalStateException("unreachable");
@@ -130,5 +143,51 @@ final class RootPresenceGuardTest {
     process.getInputStream().readAllBytes();
     assertTrue(process.waitFor(30, TimeUnit.SECONDS), "subst did not finish");
     return process.exitValue();
+  }
+
+  /**
+   * A hold on one SUBST drive letter shared by every test process on this machine: a lock on a
+   * per-letter file in the user's temp folder, taken before the letter is mapped and released only
+   * after it is unmapped, so SUBST tests running at once (Gradle forks, or modules built together)
+   * never pick, remap into or take over the same letter.
+   */
+  private static final class LetterLock implements AutoCloseable {
+    private final String letter;
+    private final FileChannel channel;
+    private final FileLock lock;
+
+    private LetterLock(char letter, FileChannel channel, FileLock lock) {
+      this.letter = letter + ":";
+      this.channel = channel;
+      this.lock = lock;
+    }
+
+    /** The hold on {@code letter}, or {@code null} while another test holds it. */
+    static LetterLock tryHold(char letter) throws IOException {
+      Path folder =
+          Path.of(System.getenv().getOrDefault("TEMP", System.getProperty("java.io.tmpdir")));
+      FileChannel channel = FileChannel.open(folder.resolve("justsearch-subst-" + letter + ".lock"),
+          StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      FileLock lock = null;
+      try {
+        lock = channel.tryLock();
+      } catch (OverlappingFileLockException heldInThisProcess) {
+        // Another test class in this JVM holds the letter.
+      } finally {
+        if (lock == null) {
+          channel.close();
+        }
+      }
+      return lock == null ? null : new LetterLock(letter, channel, lock);
+    }
+
+    @Override
+    public void close() throws IOException {
+      try {
+        lock.release();
+      } finally {
+        channel.close();
+      }
+    }
   }
 }

@@ -32,6 +32,8 @@ Round 5 (on top of 09a19e033): every path that adds or updates documents under a
 
 Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root at once, every periodic cycle asks each root's volume, the boot-root reconcile of a migration cutover goes through the same volume check as every other watch registration, and a restart while a root is unavailable keeps its last-indexed time (S8). Its repaired checks fail on 5a7e266a5 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-repaired.json`); the check of the Worker's new volume check runs on the candidate only (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-after-only.json`). EngineRootVolumeSwapTest was edited in round 6, so its round 5 checks were re-run against 09a19e033 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-preserved.json`).
 
+Round 7 (on top of 5c975db88): a boot that still has the previous generation defers a root on another volume instead of failing start-up, keeps the previous generation until that root is reconciled on its returned volume, and finishes the removal without a restart (S8). Its repaired checks fail on 5c975db88 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-repaired.json`). Every SUBST test now holds a machine-wide per-letter lock from mapping to unmapping, and PruneMissingDifferentVolumeTest finds its second volume like the others, so their earlier checks were re-run against the same refs as before: cf3f14655 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-preserved.json`), 6b15a8153 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r4-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r4-preserved.json`), 09a19e033 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r5-repaired.json`, `gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r5-preserved.json`), 5a7e266a5 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r6-repaired.json`), and on the candidate only (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-after-only.json`).
+
 ```json
 {
   "entries": [
@@ -64,7 +66,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-repaired.json",
       "newChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayBeforeThePruneLosesNoDocuments",
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayMidPruneStopsTheRemovals",
@@ -88,7 +90,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-preserved.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-preserved.json",
       "newChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aGenuinelyDeletedFileIsStillPrunedInOneRun"
       ]
@@ -266,7 +268,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-repaired.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#aDifferentVolumeAtTheSameLetterAfterARestartPrunesNothing"
       ],
@@ -302,7 +304,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-preserved.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-preserved.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#theSameVolumeAfterARestartStillPrunesAGenuineDelete",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere"
@@ -420,7 +422,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-repaired.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionKeepsTheSourceWhenItsDriveLetterIsUnmapped",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionKeepsTheSourceWhenItsRootWasRenamedAway",
@@ -447,7 +449,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-preserved.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-cf3f-preserved.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionStillRetiresAGenuinelyDeletedSource",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckStillRetiresAGenuinelyDeletedSource"
@@ -483,7 +485,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-after-only.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-after-only.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aPresentRootVouchesUntilItIsRenamedAway",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRootMissingAtCaptureNeverVouches",
@@ -1229,7 +1231,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r4-repaired.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#admissionKeepsTheSourceWhenItsDriveLetterNowHoldsAnotherVolume",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#theFreshnessCheckKeepsTheDocumentWhenItsDriveLetterNowHoldsAnotherVolume",
@@ -1299,7 +1301,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-preserved.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r4-preserved.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#admissionStillRetiresASourceDeletedFromTheSameVolume",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java#aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument",
@@ -1400,7 +1402,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r5-repaired.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aRestartOntoAnotherVolumeKeepsTheOriginalText",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aSwapWhileRunningAddsNothingAndShowsTheRootUnavailableAtOnce",
@@ -1432,7 +1434,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5b-preserved.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r5-preserved.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#theOriginalVolumeReturningIsIndexedAndPrunedAsBefore"
       ]
@@ -1460,7 +1462,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-r6-repaired.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aReindexRefusedOnAnotherVolumeShowsTheRootUnavailableAtOnce",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aRestartWhileUnavailableKeepsTheLastIndexedTime"
@@ -1501,7 +1503,7 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/CommittedBootRootVolumeTest.java"
       ],
       "class": "New",
-      "behaviour": "Round 6, S8 with a real SUBST drive letter: after a root was walked on one volume and the letter now holds another, the committed boot-root reconcile a migration cutover runs registers no watcher, holds the watch, queues nothing of the other volume and stops with ROOT_NOT_DIRECTORY; when the recorded volume is back, a walk of the root registers the held watch. Fail-before against 5a7e266a5 by assertion.",
+      "behaviour": "Rounds 6 and 7, S8 with a real SUBST drive letter: after a root was walked on one volume and the letter now holds another, the committed boot-root reconcile a migration cutover runs defers the root without throwing and without making the cutover's replay uncertain: it registers no watcher, holds the watch, queues nothing of the other volume, and the root reads ROOT_NOT_DIRECTORY to the Head; when the recorded volume is back, a walk of the root registers the held watch. Fail-before against 5c975db88 by assertion (the round 6 reconcile threw).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1515,13 +1517,13 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
           "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
-          "choice": "A walk the Worker refuses because the folder at a root's path is not on the volume first seen there makes the root read unavailable at once whichever walk it is: the boot walk, a re-walk, a sync, and the reindex button's recorded walk (core.reindex), whose refusal is now recorded as the root's walk error as the boot walk's is; a complete recorded walk of such a root clears it. The root's last-indexed time is kept, across a restart too. Each periodic cycle asks every root's volume with one volume identity read and no walk, and marks each refused root unavailable in that cycle; walking stays one root per cycle. The boot-root reconcile a migration cutover runs registers no watcher on another volume at a root's path: the watch is held, the reconcile of that root stops, and the watch resumes when a walk or sync finds the recorded volume back (orchestrator decisions, round 6).",
+          "choice": "A boot that still has the previous generation reconciles every declared root before it serves; a root whose folder is not on the volume first seen at its path is deferred, never a start-up failure: its watch is held, it reads unavailable with ROOT_NOT_DIRECTORY, it is left out of the convergence check so start-up completes and every other root is served, nothing under it is pruned, and the previous generation is kept until the root has been reconciled on its recorded volume. The server checks a deferred root's volume every 10 s; when the volume is back, without a restart, it reconciles the root, the watch resumes, and once the index matches the root's disk the pending removal of the previous generation completes. Any other boot-root failure fails the boot as before (orchestrator decision, round 7).",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-repaired.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-repaired.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/CommittedBootRootVolumeTest.java#theCommittedBootReconcileWatchesNothingOnAnotherVolumeUntilItReturns"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/CommittedBootRootVolumeTest.java#theCommittedBootReconcileDefersARootOnAnotherVolumeUntilItReturns"
       ],
       "repaired": true
     },
@@ -1548,10 +1550,40 @@ Round 6 (on top of 5a7e266a5): the reindex button's walk records a refused root 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r6-after-only.json",
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-relock-after-only.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java#theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootDeferredRootTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 7, S8 through KnowledgeServer.start with a real SUBST drive letter: a boot that still has the previous generation, with a declared root whose letter now holds another volume, completes start-up; the control root on the temp volume is reconciled and searchable, the root reads ROOT_NOT_DIRECTORY, its document in the new generation is kept and searchable, nothing of the other volume is indexed, and the previous generation and its folder remain past one deferred-root check. When the original volume returns without a restart, the root is reconciled against it, the previous generation's removal completes, and a file written afterwards is indexed through the resumed watch. Fail-before against 5c975db88 by assertion (start-up failed).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "A boot that still has the previous generation reconciles every declared root before it serves; a root whose folder is not on the volume first seen at its path is deferred, never a start-up failure: its watch is held, it reads unavailable with ROOT_NOT_DIRECTORY, it is left out of the convergence check so start-up completes and every other root is served, nothing under it is pruned, and the previous generation is kept until the root has been reconciled on its recorded volume. The server checks a deferred root's volume every 10 s; when the volume is back, without a restart, it reconciles the root, the watch resumes, and once the index matches the root's disk the pending removal of the previous generation completes. Any other boot-root failure fails the boot as before (orchestrator decision, round 7).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r7-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootDeferredRootTest.java#aBootWithThePreviousGenerationServesTheOtherRootsWhileARootIsOnAnotherVolume",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootDeferredRootTest.java#theOriginalVolumeReturningReconcilesTheRootAndRemovesThePreviousGeneration"
+      ],
+      "repaired": true
     }
   ]
 }

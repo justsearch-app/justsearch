@@ -1,0 +1,189 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-14T07:22:33.905Z",
+  "revision": "5c975db884e23be4deb921befafc512e118001a4",
+  "tree": "2c5bfbabff0331c5bee1ded07f109abb9ca068fb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest.admissionStillRetiresASourceDeletedFromTheSameVolume\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3843
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherDeleteDifferentVolumeTest.aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument\" --tests \"io.justsearch.indexerworker.services.DifferentVolumeRootStateTest.aRootOnTheSameVolumeStillWalksNormally\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9082
+    },
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aRootRenamedAwayMidPruneStopsTheRemovals\" --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.anUnmappedDriveLetterLosesNoDocuments\" --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aRootRenamedAwayBeforeThePruneLosesNoDocuments\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3805
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#admissionStillRetiresASourceDeletedFromTheSameVolume",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da09fb1884ed3d1557a03ee4cea3572e56d74c9a01a489d22d135db1fb086efd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admissionStillRetiresASourceDeletedFromTheSameVolume()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java#aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a2e694d3906366333c2bdbc796e2f73b8bc378bd3d15c5ea225ab8086b15c2f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java#aRootOnTheSameVolumeStillWalksNormally",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c7cd2993a58c13e854e8addd7330624a7f46b3931a5d00d03e5a2a510d0031c2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootOnTheSameVolumeStillWalksNormally()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayMidPruneStopsTheRemovals",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15e2870a6e1a2e79c45d3c2e1de58d71c8f0833fba4d718fdefc494c6ba657b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootRenamedAwayMidPruneStopsTheRemovals()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#anUnmappedDriveLetterLosesNoDocuments",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15e2870a6e1a2e79c45d3c2e1de58d71c8f0833fba4d718fdefc494c6ba657b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnmappedDriveLetterLosesNoDocuments()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayBeforeThePruneLosesNoDocuments",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15e2870a6e1a2e79c45d3c2e1de58d71c8f0833fba4d718fdefc494c6ba657b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootRenamedAwayBeforeThePruneLosesNoDocuments()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6b15a8153",
+    "revision": "6b15a81532e2a1e88070724d8db79e22936d860d",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest.admissionStillRetiresASourceDeletedFromTheSameVolume\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 29876
+      },
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherDeleteDifferentVolumeTest.aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument\" --tests \"io.justsearch.indexerworker.services.DifferentVolumeRootStateTest.aRootOnTheSameVolumeStillWalksNormally\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 24396
+      },
+      {
+        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aRootRenamedAwayMidPruneStopsTheRemovals\" --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.anUnmappedDriveLetterLosesNoDocuments\" --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aRootRenamedAwayBeforeThePruneLosesNoDocuments\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 8253
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/RootVolumeSwapGatesTest.java#admissionStillRetiresASourceDeletedFromTheSameVolume",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteDifferentVolumeTest.java#aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DifferentVolumeRootStateTest.java#aRootOnTheSameVolumeStillWalksNormally",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayMidPruneStopsTheRemovals",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#anUnmappedDriveLetterLosesNoDocuments",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayBeforeThePruneLosesNoDocuments",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:4807d814742bc7ce2b9c68c3cd3dcf33eb3046028460cd4bf7e0c57610461895"
+}

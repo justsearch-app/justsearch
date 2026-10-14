@@ -144,6 +144,17 @@ public final class KnowledgeServer implements Closeable {
   private List<RootBinding> bootRootBindings = List.of();
   private boolean bootRootBindingsBound;
   private volatile String rootReconciliationSettledGeneration;
+  /**
+   * Task t-20261013-ef3c41, round 7 (S8): the roots the committed boot deferred because the folder
+   * at their path was not on the volume recorded for them, and the generation they were deferred
+   * for. While any is left, the previous generation is kept and nothing settles this generation's
+   * root reconciliation; the deferred-root check reconciles each once its volume is back.
+   */
+  private volatile List<RootBinding> deferredBootRoots = List.of();
+  private volatile String deferredBootRootsGeneration;
+  /** Deferred roots reconciled on the running server that still await convergence. */
+  private final Set<RootBinding> reconciledDeferredBootRoots =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
   private WorkerAppServices pendingAppServices;
@@ -333,6 +344,9 @@ public final class KnowledgeServer implements Closeable {
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
   private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
+  /** How often a root the committed boot deferred is checked for its recorded volume (round 7). */
+  private static final long DEFERRED_BOOT_ROOT_CHECK_MS = 10_000L;
+  private volatile java.util.concurrent.ScheduledFuture<?> deferredBootRootTask;
   private java.util.concurrent.ExecutorService deferredModelExecutor;
   // Tempdoc 419 / T5.1 (ADR-0028): scoped reverse-lookup store. Constructed in init() against
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
@@ -6342,6 +6356,12 @@ public final class KnowledgeServer implements Closeable {
    * Head membership to B and make a complete disk/B pass while A still owns rollback capacity.
    * The last observation and admission release share the mutation fence, so a late watcher fault
    * cannot be mistaken for a clean boot.
+   *
+   * <p>A root whose folder is not on the volume recorded for it is deferred, never a start-up
+   * failure (task t-20261013-ef3c41, round 7, S8): its watch is held, it is left out of the
+   * convergence check so every other root is served, and this generation's root reconciliation
+   * stays unsettled, which keeps the previous generation until {@link #settleDeferredBootRoots}
+   * has reconciled the root on its returned volume. Every other failure fails the boot as before.
    */
   private void settleCommittedBootRoots(String expectedActive) throws IOException {
     if (!bootRootBindingsBound) {
@@ -6392,15 +6412,21 @@ public final class KnowledgeServer implements Closeable {
     }
     for (int attempt = 0; attempt < 3; attempt++) {
       if (closeStarted || System.nanoTime() >= deadline) break;
+      List<RootBinding> settling = new ArrayList<>();
+      List<RootBinding> deferred = new ArrayList<>();
       for (RootBinding binding : bootRootBindings) {
-        producer.ingestService().reconcileCommittedBootRoot(
-            binding, () -> closeStarted || System.nanoTime() >= deadline);
+        if (producer.ingestService().reconcileCommittedBootRoot(
+            binding, () -> closeStarted || System.nanoTime() >= deadline)) {
+          settling.add(binding);
+        } else {
+          deferred.add(binding);
+        }
       }
       try {
         while (true) {
           active.commitOps().maybeRefreshBlocking();
           boolean rootsMatch = true;
-          for (RootBinding binding : bootRootBindings) {
+          for (RootBinding binding : settling) {
             if (!producer.ingestService().committedBootRootConverged(
                 binding, () -> closeStarted || System.nanoTime() >= deadline)) {
               rootsMatch = false;
@@ -6435,7 +6461,7 @@ public final class KnowledgeServer implements Closeable {
               throw new IOException("Committed successor generation changed during root replay");
             }
             boolean converged = true;
-            for (RootBinding binding : bootRootBindings) {
+            for (RootBinding binding : settling) {
               if (!producer.ingestService().committedBootRootConverged(
                   binding, () -> closeStarted || System.nanoTime() >= deadline)) {
                 converged = false;
@@ -6446,7 +6472,11 @@ public final class KnowledgeServer implements Closeable {
               if (!fence.releaseCurrentOwnerIfReplayCertain()) {
                 throw new IOException("Committed successor watcher failed at final release");
               }
-              rootReconciliationSettledGeneration = expectedActive;
+              if (deferred.isEmpty()) {
+                rootReconciliationSettledGeneration = expectedActive;
+              } else {
+                deferBootRoots(expectedActive, deferred);
+              }
               return;
             }
           }
@@ -6459,6 +6489,148 @@ public final class KnowledgeServer implements Closeable {
       }
     }
     throw new IOException("Committed successor roots did not converge before publication");
+  }
+
+  private void deferBootRoots(String expectedActive, List<RootBinding> deferred) {
+    reconciledDeferredBootRoots.clear();
+    deferredBootRootsGeneration = expectedActive;
+    deferredBootRoots = List.copyOf(deferred);
+    log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path: {};"
+            + " the previous generation is kept until they are reconciled on that volume",
+        deferred.size(), deferred.stream().map(RootBinding::path).toList());
+    // The server's own maintenance scheduler, opened before the boot reconcile, runs the check
+    // only while something is deferred; it is closed with the reaper.
+    if (stuckJobReaper != null && deferredBootRootTask == null) {
+      deferredBootRootTask = stuckJobReaper.scheduleWithFixedDelay(
+          this::settleDeferredBootRootsSafely,
+          DEFERRED_BOOT_ROOT_CHECK_MS, DEFERRED_BOOT_ROOT_CHECK_MS, TimeUnit.MILLISECONDS);
+    }
+  }
+
+  /** A periodic task that throws is never run again, so a failed check only logs and waits. */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // the next check retries
+  private void settleDeferredBootRootsSafely() {
+    try {
+      settleDeferredBootRoots();
+    } catch (RuntimeException failure) {
+      log.warn("Deferred boot root check failed (will retry): {}", failure.toString());
+    }
+  }
+
+  /**
+   * Round 7 (S8): reconciles each root the committed boot deferred once the volume recorded for it
+   * is back, without a restart. A root still on another volume costs one volume read. A returned
+   * root is reconciled (its held watch registered, its difference queued or removed); once the
+   * index matches its disk, that is committed and checked again with the writer paused, as the
+   * boot does. When no deferred root is left, this generation's root reconciliation settles and
+   * the previous generation's removal completes. A failure is retried on the next check.
+   */
+  private void settleDeferredBootRoots() {
+    if (deferredBootRoots.isEmpty() || closeStarted) return;
+    boolean allSettled;
+    runtimeSwapLock.lock();
+    try {
+      List<RootBinding> pending = deferredBootRoots;
+      String expectedActive = deferredBootRootsGeneration;
+      if (pending.isEmpty() || closeStarted || indexGenerationManager == null
+          || !(appServices instanceof DefaultWorkerAppServices producer)
+          || !(ingestLifecycle instanceof RunningRuntime active)
+          || ingestLifecycle != searchLifecycle || !active.isAcceptingWrites()) return;
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state == null) return;
+      if (!expectedActive.equals(state.active_generation())) {
+        log.warn("Deferred boot roots belonged to generation {}, which is no longer active",
+            expectedActive);
+        reconciledDeferredBootRoots.clear();
+        deferredBootRoots = List.of();
+        if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
+        return;
+      }
+      List<RootBinding> converging = new ArrayList<>();
+      for (RootBinding binding : pending) {
+        if (reconcileReturnedBootRoot(producer, binding)) converging.add(binding);
+      }
+      List<RootBinding> settled = converging.isEmpty()
+          ? List.of() : commitReturnedBootRoots(producer, active, converging);
+      List<RootBinding> remaining =
+          pending.stream().filter(binding -> !settled.contains(binding)).toList();
+      settled.forEach(reconciledDeferredBootRoots::remove);
+      deferredBootRoots = remaining;
+      allSettled = remaining.isEmpty();
+      if (allSettled) {
+        if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
+        rootReconciliationSettledGeneration = expectedActive;
+        log.info("Every deferred boot root is reconciled on its recorded volume; generation {}"
+            + " may now remove its predecessor", expectedActive);
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    if (allSettled) retryCommittedGenerationRetirement();
+  }
+
+  /** Whether {@code binding} is reconciled on its recorded volume and awaits convergence. */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a failed pass is retried, never thrown
+  private boolean reconcileReturnedBootRoot(
+      DefaultWorkerAppServices producer, RootBinding binding) {
+    if (reconciledDeferredBootRoots.contains(binding)) return true;
+    try {
+      if (producer.ingestService().refusesRootVolume(binding.path().toString(),
+          io.justsearch.indexerworker.services.CallContext.none())
+          || !producer.ingestService().reconcileReturnedBootRoot(binding, () -> closeStarted)) {
+        return false;
+      }
+      reconciledDeferredBootRoots.add(binding);
+      log.info("Deferred boot root {} is on its recorded volume again and was reconciled",
+          binding.path());
+      return true;
+    } catch (IOException | RuntimeException failure) {
+      log.warn("Deferred boot root {} could not be reconciled yet (will retry): {}",
+          binding.path(), failure.toString());
+      return false;
+    }
+  }
+
+  /** The returned roots whose disk the index matches, committed and rechecked with the writer paused. */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a failed pass is retried, never thrown
+  private List<RootBinding> commitReturnedBootRoots(
+      DefaultWorkerAppServices producer, RunningRuntime active, List<RootBinding> converging) {
+    try {
+      active.commitOps().maybeRefreshBlocking();
+      List<RootBinding> matching = returnedBootRootsMatching(producer, converging);
+      if (matching.isEmpty()) return List.of();
+      if (!producer.pauseProducerForCutover(10_000)) return List.of();
+      try {
+        active.commitOps().commitAndTrack(
+            io.justsearch.adapters.lucene.runtime.CommitReason.SETTLE);
+        active.commitOps().maybeRefreshBlocking();
+        return returnedBootRootsMatching(producer, matching);
+      } finally {
+        producer.resumeProducerAfterCutover();
+      }
+    } catch (RuntimeException failure) {
+      log.warn("Deferred boot roots could not be committed yet (will retry): {}",
+          failure.toString());
+      return List.of();
+    }
+  }
+
+  private List<RootBinding> returnedBootRootsMatching(
+      DefaultWorkerAppServices producer, List<RootBinding> candidates) {
+    List<RootBinding> matching = new ArrayList<>();
+    for (RootBinding binding : candidates) {
+      try {
+        if (producer.ingestService().returnedBootRootConverged(binding, () -> closeStarted)) {
+          matching.add(binding);
+        }
+      } catch (IOException notCurrent) {
+        // Its watch or root changed since it was reconciled: reconcile it again on the next check.
+        reconciledDeferredBootRoots.remove(binding);
+        log.warn("Deferred boot root {} changed before it converged (will retry): {}",
+            binding.path(), notCurrent.toString());
+      }
+    }
+    return matching;
   }
 
   /** Reclaim a committed predecessor only after replay and every old view have settled. */
@@ -6803,6 +6975,7 @@ public final class KnowledgeServer implements Closeable {
         // the lock ourselves, just as deferred model initialization is joined above; otherwise a
         // close can own runtimeSwapLock while waiting for a reaper already queued on the same lock.
         if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
+        if (deferredBootRootTask != null) deferredBootRootTask.cancel(true);
         if (stuckJobReaper != null) {
           stuckJobReaper.shutdownNow();
           stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.

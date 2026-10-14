@@ -14,8 +14,12 @@ import io.justsearch.indexing.runtime.CommitMetadataSource;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -210,10 +214,12 @@ final class PruneUncertainAbsenceTest extends LuceneExecutorTestBase {
   /** A SUBST drive letter mapped to a folder this test created; unmapped on close. */
   private static final class SubstDrive implements AutoCloseable {
     private final String letter;
+    private final LetterLock held;
     private boolean mapped = true;
 
-    private SubstDrive(String letter) {
+    private SubstDrive(String letter, LetterLock held) {
       this.letter = letter;
+      this.held = held;
     }
 
     static SubstDrive map(Path target) throws Exception {
@@ -223,10 +229,13 @@ final class PruneUncertainAbsenceTest extends LuceneExecutorTestBase {
               .collect(Collectors.toSet());
       for (char c = 'Y'; c >= 'M'; c--) {
         if (used.contains(c)) continue;
+        LetterLock held = LetterLock.tryHold(c);
+        if (held == null) continue;
         String letter = c + ":";
         if (run("subst", letter, target.toString()) == 0) {
-          return new SubstDrive(letter);
+          return new SubstDrive(letter, held);
         }
+        held.close();
       }
       assumeTrue(false, "no free drive letter for SUBST");
       throw new IllegalStateException("unreachable");
@@ -245,7 +254,11 @@ final class PruneUncertainAbsenceTest extends LuceneExecutorTestBase {
 
     @Override
     public void close() throws Exception {
-      unmap();
+      try {
+        unmap();
+      } finally {
+        held.close();
+      }
     }
 
     private static int run(String... command) throws Exception {
@@ -253,6 +266,50 @@ final class PruneUncertainAbsenceTest extends LuceneExecutorTestBase {
       process.getInputStream().readAllBytes();
       assertTrue(process.waitFor(30, TimeUnit.SECONDS), "subst did not finish");
       return process.exitValue();
+    }
+  }
+
+  /**
+   * A hold on one SUBST drive letter shared by every test process on this machine: a lock on a
+   * per-letter file in the user's temp folder, taken before the letter is mapped and released only
+   * after it is unmapped, so SUBST tests running at once (Gradle forks, or modules built together)
+   * never pick, remap into or take over the same letter.
+   */
+  private static final class LetterLock implements AutoCloseable {
+    private final FileChannel channel;
+    private final FileLock lock;
+
+    private LetterLock(FileChannel channel, FileLock lock) {
+      this.channel = channel;
+      this.lock = lock;
+    }
+
+    /** The hold on {@code letter}, or {@code null} while another test holds it. */
+    static LetterLock tryHold(char letter) throws IOException {
+      Path folder =
+          Path.of(System.getenv().getOrDefault("TEMP", System.getProperty("java.io.tmpdir")));
+      FileChannel channel = FileChannel.open(folder.resolve("justsearch-subst-" + letter + ".lock"),
+          StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      FileLock lock = null;
+      try {
+        lock = channel.tryLock();
+      } catch (OverlappingFileLockException heldInThisProcess) {
+        // Another test class in this JVM holds the letter.
+      } finally {
+        if (lock == null) {
+          channel.close();
+        }
+      }
+      return lock == null ? null : new LetterLock(channel, lock);
+    }
+
+    @Override
+    public void close() throws IOException {
+      try {
+        lock.release();
+      } finally {
+        channel.close();
+      }
     }
   }
 }

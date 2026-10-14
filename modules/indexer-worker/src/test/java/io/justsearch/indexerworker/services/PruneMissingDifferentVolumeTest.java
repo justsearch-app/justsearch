@@ -24,9 +24,16 @@ import io.justsearch.ipc.DeleteByPathRequest;
 import io.justsearch.ipc.PruneRequest;
 import io.justsearch.ipc.PruneResponse;
 import java.io.File;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -53,6 +60,7 @@ final class PruneMissingDifferentVolumeTest
   @TempDir Path tempDir;
   private Path otherVolume;
   private String letter;
+  private LetterLock letterLock;
   private SqliteJobQueue jobQueue;
   private RunningRuntime runtime;
   private IndexGenerationManager.IndexLayout layout;
@@ -60,12 +68,10 @@ final class PruneMissingDifferentVolumeTest
   @BeforeEach
   void setUp() throws Exception {
     assumeTrue(WINDOWS, "SUBST drive letters exist on Windows only");
-    // The test JVM's temp folder and the module's build folder sit on different volumes on the
-    // machines this runs on; the scenario needs that, so it is checked rather than assumed.
-    otherVolume = Files.createDirectories(
-        Path.of("build", "ef3c41-other-volume-" + System.nanoTime()).toAbsolutePath());
-    assumeTrue(!volumeSerial(tempDir).equals(volumeSerial(otherVolume)),
-        "needs two different volumes: " + tempDir + " and " + otherVolume);
+    // The scenario needs a second volume besides the test JVM's temp folder; it is found, not
+    // assumed, and a machine without one skips the test rather than passing it.
+    otherVolume = folderOnAnotherVolumeThan(tempDir, "ef3c41-other-volume-");
+    assumeTrue(otherVolume != null, "needs a second volume besides " + tempDir);
     jobQueue = new SqliteJobQueue(tempDir.resolve("jobs.db"));
     jobQueue.open();
     layout = new IndexGenerationManager(tempDir.resolve("indexBase")).initializeOrLoad();
@@ -78,7 +84,11 @@ final class PruneMissingDifferentVolumeTest
   @AfterEach
   void tearDown() throws Exception {
     if (letter != null) {
-      run("subst", letter, "/d");
+      try {
+        run("subst", letter, "/d");
+      } finally {
+        letterLock.close();
+      }
     }
     if (runtime != null) {
       runtime.close();
@@ -190,17 +200,52 @@ final class PruneMissingDifferentVolumeTest
     return id;
   }
 
-  private static Object volumeSerial(Path path) throws Exception {
+  /**
+   * A new folder on a volume other than {@code near}'s: the module's build folder when that is on
+   * another volume, otherwise the first other local volume that takes a new folder at its root.
+   * {@code null} when this machine offers no second volume.
+   */
+  private static Path folderOnAnotherVolumeThan(Path near, String prefix) {
+    Object volume;
+    try {
+      volume = volumeSerial(near);
+    } catch (IOException | UnsupportedOperationException unknown) {
+      return null;
+    }
+    List<Path> bases = new ArrayList<>();
+    bases.add(Path.of("build").toAbsolutePath());
+    for (File drive : File.listRoots()) {
+      bases.add(drive.toPath());
+    }
+    for (Path base : bases) {
+      try {
+        if (Files.isDirectory(base) && !volume.equals(volumeSerial(base))) {
+          return Files.createTempDirectory(base, prefix);
+        }
+      } catch (IOException | UnsupportedOperationException | SecurityException notUsable) {
+        // try the next candidate
+      }
+    }
+    return null;
+  }
+
+  private static Object volumeSerial(Path path) throws IOException {
     return Files.getFileStore(path).getAttribute("volume:vsn");
   }
 
-  private static String freeLetter() {
+  /** A letter no drive uses, held for this test until {@link #tearDown} unmaps it. */
+  private String freeLetter() throws IOException {
     Set<Character> used =
         java.util.Arrays.stream(File.listRoots())
             .map(r -> Character.toUpperCase(r.getPath().charAt(0)))
             .collect(Collectors.toSet());
     for (char c = 'W'; c >= 'M'; c--) {
-      if (!used.contains(c)) return c + ":";
+      if (used.contains(c)) continue;
+      LetterLock held = LetterLock.tryHold(c);
+      if (held != null) {
+        letterLock = held;
+        return c + ":";
+      }
     }
     assumeTrue(false, "no free drive letter for SUBST");
     throw new IllegalStateException("unreachable");
@@ -211,5 +256,49 @@ final class PruneMissingDifferentVolumeTest
     process.getInputStream().readAllBytes();
     assertTrue(process.waitFor(30, TimeUnit.SECONDS), "subst did not finish");
     return process.exitValue();
+  }
+
+  /**
+   * A hold on one SUBST drive letter shared by every test process on this machine: a lock on a
+   * per-letter file in the user's temp folder, taken before the letter is mapped and released only
+   * after it is unmapped, so SUBST tests running at once (Gradle forks, or modules built together)
+   * never pick, remap into or take over the same letter.
+   */
+  private static final class LetterLock implements AutoCloseable {
+    private final FileChannel channel;
+    private final FileLock lock;
+
+    private LetterLock(FileChannel channel, FileLock lock) {
+      this.channel = channel;
+      this.lock = lock;
+    }
+
+    /** The hold on {@code letter}, or {@code null} while another test holds it. */
+    static LetterLock tryHold(char letter) throws IOException {
+      Path folder =
+          Path.of(System.getenv().getOrDefault("TEMP", System.getProperty("java.io.tmpdir")));
+      FileChannel channel = FileChannel.open(folder.resolve("justsearch-subst-" + letter + ".lock"),
+          StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      FileLock lock = null;
+      try {
+        lock = channel.tryLock();
+      } catch (OverlappingFileLockException heldInThisProcess) {
+        // Another test class in this JVM holds the letter.
+      } finally {
+        if (lock == null) {
+          channel.close();
+        }
+      }
+      return lock == null ? null : new LetterLock(channel, lock);
+    }
+
+    @Override
+    public void close() throws IOException {
+      try {
+        lock.release();
+      } finally {
+        channel.close();
+      }
+    }
   }
 }
