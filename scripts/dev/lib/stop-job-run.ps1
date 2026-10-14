@@ -37,16 +37,22 @@ function Write-Outcome([string]$Outcome, [hashtable]$Extra = @{}) {
   [Console]::Out.WriteLine(($body | ConvertTo-Json -Compress -Depth 4))
 }
 
-# Recorded identities whose end the ledger shows, as PID/birth at BirthTick precision.
-$ended = New-Object 'System.Collections.Generic.HashSet[string]'
-function Identity-Key($process) {
+# Recorded identities whose end the ledger shows, each with the precision its birth was recorded at
+# (birthTick, 100 ns ticks; the microsecond when it names none). A recorded process is one of them
+# when its PID is and its birth agrees at that precision, never coarser.
+$ended = New-Object 'System.Collections.Generic.List[object]'
+function Birth-Of($value) {
   [long]$b = 0
-  if (-not [long]::TryParse([string]$process.creationFileTimeUtc, [ref]$b)) { return $null }
-  return ('{0}/{1}' -f [int]$process.pid, ($b - $b % $BirthTick))
+  if (-not [long]::TryParse([string]$value, [ref]$b) -or $b -le 0) { return $null }
+  return $b
 }
 function Is-Ended($process) {
-  $key = Identity-Key $process
-  return ($null -ne $key -and $ended.Contains($key))
+  $b = Birth-Of $process.creationFileTimeUtc
+  if ($null -eq $b) { return $false }
+  foreach ($e in $ended) {
+    if ($e.Pid -eq [int]$process.pid -and ($b - $b % $e.Tick) -eq ($e.Birth - $e.Birth % $e.Tick)) { return $true }
+  }
+  return $false
 }
 
 function Read-Record {
@@ -62,8 +68,11 @@ try {
   if ($EndedPath) {
     $endedList = Get-Content -Raw -LiteralPath $EndedPath | ConvertFrom-Json
     foreach ($p in $endedList) {
-      $key = Identity-Key $p
-      if ($null -ne $key) { [void]$ended.Add($key) }
+      $birth = Birth-Of $p.creationFileTimeUtc
+      [long]$tick = 10
+      if ($null -ne $p.birthTick -and -not [long]::TryParse([string]$p.birthTick, [ref]$tick)) { $tick = 10 }
+      if ($tick -lt 1) { $tick = 10 }
+      if ($null -ne $birth) { [void]$ended.Add([pscustomobject]@{ Pid = [int]$p.pid; Birth = $birth; Tick = $tick }) }
     }
   }
   $record = Read-Record

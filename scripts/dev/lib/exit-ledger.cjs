@@ -347,7 +347,9 @@ function totalOf(files) {
 }
 
 /** How many times a read starts again when a rotation moves the files under it. */
-const STABLE_READ_ATTEMPTS = 4;
+const STABLE_READ_ATTEMPTS = 8;
+/** How long a read waits before starting again after it met a file moving (a rotation in progress). */
+const UNSETTLED_PAUSE_MS = 5;
 
 /**
  * readLedger for a caller that reads the same ledger more than once (a stop reads it before each of
@@ -363,7 +365,11 @@ const STABLE_READ_ATTEMPTS = 4;
  * on the handle. Then neither file's cached records are kept, and the read starts again from the
  * listing, so the moved file is read in full under its new name and the replacement in full under
  * the old. A read that ends with a listing or a file id other than the one it started from starts
- * again too. A ledger still rotating after STABLE_READ_ATTEMPTS reads is read as readLedger reads it.
+ * again too, and so does one that meets a listed file missing at its stat or its open (renamed, not
+ * yet replaced), a file shorter than its handle said when read (truncated), or a grown file whose
+ * new part does not start a line (rewritten in place under the same id). A read never lets what it
+ * cannot place stand for the ledger: a family still moving after STABLE_READ_ATTEMPTS reads (a short
+ * pause between them) throws, and the caller treats that family as unreadable.
  */
 function createIncrementalReader() {
   const cache = new Map();
@@ -381,14 +387,27 @@ function createIncrementalReader() {
   };
   // A file id, or null where the file system has none (then nothing about the file is cached).
   const idOf = (stat) => (stat.ino ? `${stat.dev}:${stat.ino}` : null);
+  // A file a rotation is moving: gone (renamed, not yet replaced) or, on Windows, being deleted or
+  // renamed under a handle that does not share that (EPERM, EBUSY, EACCES).
+  const moving = (err) => ['ENOENT', 'EPERM', 'EBUSY', 'EACCES'].includes(err?.code);
   const statOf = (file) => {
     try {
       return fs.statSync(file, { bigint: true });
     } catch (err) {
-      if (err && err.code === 'ENOENT') return null;
+      if (moving(err)) return null;
       throw err;
     }
   };
+  // A listed file opened, or null when a rotation is moving it.
+  const openOf = (file) => {
+    try {
+      return fs.openSync(file, 'r');
+    } catch (err) {
+      if (moving(err)) return null;
+      throw err;
+    }
+  };
+  const pauseSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
   const fresh = (family) => ({ family, size: 0, mtimeNs: null, offset: 0, records: [],
     tally: { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false } });
   const unchanged = (entry, family, size, mtimeNs) => Boolean(entry) && entry.family === family
@@ -407,7 +426,8 @@ function createIncrementalReader() {
       let entry = id ? cache.get(id) : null;
       let size = Number(stat.size), mtimeNs = stat.mtimeNs;
       if (!unchanged(entry, family, size, mtimeNs)) {
-        const fd = fs.openSync(file, 'r');
+        const fd = openOf(file);
+        if (fd === null) return null;
         try {
           const held = fs.fstatSync(fd, { bigint: true });
           if (idOf(held) !== id) {
@@ -420,12 +440,28 @@ function createIncrementalReader() {
           mtimeNs = held.mtimeNs;
           if (!unchanged(entry, family, size, mtimeNs)) {
             // Only a file that grew keeps what was parsed; anything else is parsed from its start.
-            if (!entry || entry.family !== family || size <= entry.size) entry = fresh(family);
+            const grew = Boolean(entry) && entry.family === family && size > entry.size;
+            if (!grew) entry = fresh(family);
+            // Every early return below drops the entry from the cache, so nothing half-read is kept.
             if (size > entry.offset) {
               const chunk = readAt(fd, entry.offset, size - entry.offset);
+              if (chunk.length < size - entry.offset) {
+                // Shorter than its handle said: truncated while read.
+                if (id) cache.delete(id);
+                return null;
+              }
               const complete = chunk.lastIndexOf(0x0a) + 1;
               if (complete > 0) {
-                readFileBytes(chunk.subarray(0, complete), family, entry.records, entry.tally);
+                const before = entry.tally.corruptLines;
+                const firstLine = chunk.indexOf(0x0a) + 1;
+                readFileBytes(chunk.subarray(0, firstLine), family, entry.records, entry.tally);
+                if (grew && entry.tally.corruptLines > before) {
+                  // The new part of a grown file starts mid-line: the file was rewritten under the
+                  // same id, so what was parsed of it no longer describes it. Read it again whole.
+                  if (id) cache.delete(id);
+                  return null;
+                }
+                readFileBytes(chunk.subarray(firstLine, complete), family, entry.records, entry.tally);
                 entry.offset += complete;
               }
             }
@@ -457,6 +493,7 @@ function createIncrementalReader() {
     familyOf(family);
     const key = `${ledgerDir}|${family}`;
     for (let attempt = 0; attempt < STABLE_READ_ATTEMPTS; attempt++) {
+      if (attempt > 0) pauseSync(UNSETTLED_PAUSE_MS);
       const out = readOnce(ledgerDir, family);
       if (!out) continue;
       const { signature, ...result } = out;
@@ -468,7 +505,9 @@ function createIncrementalReader() {
     }
     seen.delete(key);
     version += 1;
-    return readLedger(ledgerDir, family);
+    const err = new Error(`${family} ledger files still moving (or not readable) after ${STABLE_READ_ATTEMPTS} reads; not read`);
+    err.code = 'LEDGER_UNSETTLED';
+    throw err;
   }
   return { read, version: () => version };
 }

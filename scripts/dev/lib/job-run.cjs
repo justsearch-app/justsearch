@@ -102,7 +102,10 @@ function stopJobRunSync(run, { code = NON_DISTINCTIVE_KILL_CODE, waitMs = 10000,
   }
   const ended = (Array.isArray(endedIdentities) ? endedIdentities : [])
     .filter((p) => Number.isSafeInteger(Number(p?.pid)) && Number(p.pid) > 0 && /^[1-9]\d{0,19}$/.test(String(p.creationFileTimeUtc ?? '')))
-    .map((p) => ({ pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc) }));
+    // Each is compared at the precision its birth was recorded at (`birthTick`, 100 ns ticks; the
+    // microsecond when it names none), so an exact ledger birth never matches a neighbouring one.
+    .map((p) => ({ pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc),
+      birthTick: /^[1-9]\d{0,9}$/.test(String(p.birthTick ?? '')) ? String(p.birthTick) : '10' }));
   const endedPath = ended.length ? `${run.recordPath}.ended-${process.pid}-${crypto.randomUUID()}.json` : null;
   try {
     if (endedPath) fs.writeFileSync(endedPath, JSON.stringify(ended));

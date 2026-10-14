@@ -1090,13 +1090,15 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
     incarnation,
   });
   // An earlier report of the run (a stop's, or an earlier incarnation's death) is kept, not overwritten.
-  try {
-    const earlierReports = keepEarlierReports(path.dirname(runPath));
-    if (earlierReports.length) stopReport.earlierReports = earlierReports;
-  } catch (err) {
-    stopReport.errors = [...stopReport.errors, `earlier stop report not kept: ${err?.message ?? err}`];
+  const kept = await keepEarlierReports(path.dirname(runPath));
+  if (kept.earlierReports.length) stopReport.earlierReports = kept.earlierReports;
+  if (kept.earlierReportNotArchived) {
+    stopReport.earlierReportNotArchived = kept.earlierReportNotArchived;
+    stopReport.reportWrittenAs = kept.reportName;
+    stopReport.errors = [...stopReport.errors, `earlier stop report not kept under a number: ${kept.earlierReportNotArchived.error}; `
+      + `this report is ${kept.reportName}`];
   }
-  const stopReportPath = path.join(path.dirname(runPath), 'stop-report.json');
+  const stopReportPath = path.join(path.dirname(runPath), kept.reportName);
   await writeJsonAtomic(stopReportPath, stopReport);
   // Lane F stage B item B8: the report becomes a per-incarnation record rather than the runner's
   // last act. `stop-report.json` still names the LAST one, so every existing reader keeps working;
@@ -2050,23 +2052,50 @@ function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, split
 
 const EARLIER_REPORT_RE = /^stop-report\.(\d+)\.json$/;
 
+/** How long keeping an earlier report retries a rename another process's open handle refuses. */
+const REPORT_ARCHIVE_RETRY_MS = 2000;
+const REPORT_ARCHIVE_PAUSE_MS = 50;
+
 /**
  * A retried stop never overwrites an earlier report of its run: the current stop-report.json is
- * kept, as it was, as stop-report.N.json under the next free number. Returns every kept report's
- * file name (relative to the run directory), oldest first.
+ * kept, as it was, as stop-report.N.json under the next free number. A rename another process's
+ * handle refuses for a moment (Windows EBUSY, EPERM, EACCES: a reader holding the file without
+ * delete sharing) is tried again for up to REPORT_ARCHIVE_RETRY_MS. If the earlier report still
+ * cannot be renamed it stays as stop-report.json, untouched, and this report is written under the
+ * next free number instead (`reportName`, with `earlierReportNotArchived` saying why). Never throws.
+ * `earlierReports` is every numbered report kept (run-directory file names, oldest number first).
+ * @returns {Promise<{ earlierReports: string[], reportName: string,
+ *   earlierReportNotArchived?: { file: string, error: string } }>}
  */
-function keepEarlierReports(runDir) {
-  let names = [];
-  try { names = fs.readdirSync(runDir); } catch { return []; }
-  const numbered = () => names.filter((n) => EARLIER_REPORT_RE.test(n))
+async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  retryMs = REPORT_ARCHIVE_RETRY_MS, now = Date.now } = {}) {
+  const list = () => { try { return fs.readdirSync(runDir); } catch { return []; } };
+  const numbered = (names) => names.filter((n) => EARLIER_REPORT_RE.test(n))
     .sort((a, b) => Number(EARLIER_REPORT_RE.exec(a)[1]) - Number(EARLIER_REPORT_RE.exec(b)[1]));
+  const nextName = (names) => `stop-report.${Math.max(0, ...numbered(names).map((n) => Number(EARLIER_REPORT_RE.exec(n)[1]))) + 1}.json`;
+  let names = list();
+  let notArchived = null;
   if (names.includes('stop-report.json')) {
-    const numbers = numbered().map((n) => Number(EARLIER_REPORT_RE.exec(n)[1]));
-    const next = (numbers.length ? Math.max(...numbers) : 0) + 1;
-    fs.renameSync(path.join(runDir, 'stop-report.json'), path.join(runDir, `stop-report.${next}.json`));
-    names = fs.readdirSync(runDir);
+    const by = now() + retryMs;
+    for (;;) {
+      try {
+        fs.renameSync(path.join(runDir, 'stop-report.json'), path.join(runDir, nextName(names)));
+        break;
+      } catch (err) {
+        if (err?.code === 'ENOENT') break; // nothing left to keep
+        if (!['EBUSY', 'EPERM', 'EACCES'].includes(err?.code) || now() >= by) {
+          notArchived = { file: 'stop-report.json', error: `${err?.code ?? 'error'}: ${err?.message ?? err}` };
+          break;
+        }
+        await pause(REPORT_ARCHIVE_PAUSE_MS);
+        names = list();
+      }
+    }
+    names = list();
   }
-  return numbered();
+  const earlierReports = numbered(names);
+  if (!notArchived) return { earlierReports, reportName: 'stop-report.json' };
+  return { earlierReports, reportName: nextName(names), earlierReportNotArchived: notArchived };
 }
 
 /** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
@@ -3834,11 +3863,17 @@ async function stopRun(opts, {
     }
     return ledgerEnded;
   };
-  // Births agree at the coarser precision of the two records: the ledger's microsecond, or the
-  // identity's own (`birthTick`: the millisecond for a manifest helper's recorded start).
-  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && ledgerEnded.some((e) => e.pid === Number(p.pid)
-    && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc),
-      BigInt(Math.max(Number(ledgerLib.BIRTH_TICKS.MICROSECOND), Number(p.birthTick ?? ledgerLib.BIRTH_TICKS.MICROSECOND)))));
+  // Births agree at the coarser precision of the two records, never coarser: the ledger record's
+  // (`birthTick`: exact for an Engine-recorded child or witness, the microsecond for a CIM-read
+  // Engine start) and the identity's own (`birthTick`: exact for a native read, the millisecond for a
+  // manifest helper's recorded start; the microsecond, CIM's, when it names none).
+  const tickOf = (v, fallback) => (/^[1-9]\d{0,9}$/.test(String(v ?? '')) ? BigInt(v) : fallback);
+  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && ledgerEnded.some((e) => {
+    const ledgerTick = tickOf(e.birthTick, ledgerLib.BIRTH_TICKS.EXACT);
+    const ownTick = tickOf(p.birthTick, ledgerLib.BIRTH_TICKS.MICROSECOND);
+    return e.pid === Number(p.pid) && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc),
+      ledgerTick > ownTick ? ledgerTick : ownTick);
+  });
   // Each identity resolved by its ledger exit instead of a lookup, once.
   const resolvedByLedger = [];
   const noteResolved = (p) => {
@@ -4359,13 +4394,18 @@ async function stopRun(opts, {
 
   // A retried stop keeps the earlier stop's report and census and names them (run-directory file
   // names, oldest first); stop-report.json is always this stop's.
-  let earlierReports = [];
-  try { earlierReports = keepEarlierReports(runDir); } catch (err) {
-    stopReport.errors.push(`earlier stop report not kept: ${err?.message ?? err}`);
-  }
+  const kept = await keepEarlierReports(runDir);
+  const earlierReports = kept.earlierReports;
   if (exitAccounting?.earlierCensus?.length) stopReport.earlierCensus = exitAccounting.earlierCensus;
   if (earlierReports.length) stopReport.earlierReports = earlierReports;
-  const stopReportPath = path.join(runDir, 'stop-report.json');
+  if (kept.earlierReportNotArchived) {
+    // The earlier report stays as stop-report.json, as it was; this one is written beside it.
+    stopReport.earlierReportNotArchived = kept.earlierReportNotArchived;
+    stopReport.reportWrittenAs = kept.reportName;
+    stopReport.errors.push(`earlier stop report not kept under a number: ${kept.earlierReportNotArchived.error}; `
+      + `this report is ${kept.reportName}`);
+  }
+  const stopReportPath = path.join(runDir, kept.reportName);
   await writeJsonAtomic(stopReportPath, stopReport);
 
   // Append interference events to a shared NDJSON log for aggregate analysis.
@@ -4423,6 +4463,8 @@ async function stopRun(opts, {
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     ...exitAccounting,
     ...(earlierReports.length ? { earlierReports } : {}),
+    ...(kept.earlierReportNotArchived ? { earlierReportNotArchived: kept.earlierReportNotArchived,
+      reportWrittenAs: kept.reportName } : {}),
   };
 }
 
