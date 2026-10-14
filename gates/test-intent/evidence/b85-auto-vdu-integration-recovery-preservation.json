@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T12:11:48.864Z",
+  "revision": "1d23c9d9540eadd4cc798693c0f750a0840844e8",
+  "tree": "98f3f53baba6a0dd77b8e2b05f6bc1daf30e19e8",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.VduRecoveryLostComparisonTest.selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7925
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java#selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cc491216a8ccba09fda5c70587330613dcdba3f6e84d522e66eef5c0f6e3edc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0c8add21e0cfb72cd0bed500bce9687a3d9d33615b1d43de617e6fa82756bc2d"
+}

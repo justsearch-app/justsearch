@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T12:11:30.149Z",
+  "revision": "1d23c9d9540eadd4cc798693c0f750a0840844e8",
+  "tree": "13c266f86bdfaaffd66eb04117753dd3104034e6",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.VduRecoveryLostComparisonTest.selectedDocumentRemovedBeforeItsResetStaysAMissAndKeepsTheRow\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6146
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java#selectedDocumentRemovedBeforeItsResetStaysAMissAndKeepsTheRow",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cc491216a8ccba09fda5c70587330613dcdba3f6e84d522e66eef5c0f6e3edc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selectedDocumentRemovedBeforeItsResetStaysAMissAndKeepsTheRow()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1d23c9d95",
+    "revision": "1d23c9d9540eadd4cc798693c0f750a0840844e8",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.VduRecoveryLostComparisonTest.selectedDocumentRemovedBeforeItsResetStaysAMissAndKeepsTheRow\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 47567
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java#selectedDocumentRemovedBeforeItsResetStaysAMissAndKeepsTheRow",
+        "classification": "assertion",
+        "detail": "selectedDocumentRemovedBeforeItsResetStaysAMissAndKeepsTheRow(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a missing selected document is a miss and keeps the recovery row for a later replay ==> expected: <1> but was: <0>"
+      }
+    ]
+  },
+  "digest": "sha256:738d301a02244e6a25db7d6a174cf23685b448f37e7c15941432f6186b028387"
+}

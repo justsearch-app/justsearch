@@ -539,10 +539,92 @@ so the unchanged evidence producer can select every case; their oracles are iden
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#completedAttemptKeepsItsRetryWhenShutdownResetLoses",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#startupRecoveryKeepsTheClaimedRetryWhenItsOwnerWasLost"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryReplayCompletenessTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/VduGenerationBoundaryTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "whatMoved": "Retain every row, commit, ordering, acknowledgement and refusal oracle. The recovery reset is stubbed and verified on the conditional mutation the lane introduced, updateDocumentIf(docId, {vdu_status: PROCESSING}, {vdu_status: PENDING}), instead of updateDocument; the update and mark operations keep updateDocument. A missing selected document is now encoded as a lost comparison while the mocked field reader reports no stored document (its default answer), where it used to be updateDocument returning false. The empty-selection case verifies that neither mutation is called.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "choice": "Integration repair after the vdu-auto merge (bc5978095), decided by the orchestrator under the owner's delegation: the recovery reset stays the conditional PROCESSING-to-PENDING change. When it loses its comparison, a selected document that is absent stays a miss, so a replayed recovery keeps its row as before the conditional reset; a present document that is no longer PROCESSING, for example after a later success, is resolved: it is not reset, is not a miss and does not keep the row.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "On a real index, a selected PROCESSING document that is removed after recovery selects it and before its conditional reset is a miss: the replayed recovery keeps its row for a later replay.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "choice": "Integration repair after the vdu-auto merge (bc5978095), decided by the orchestrator under the owner's delegation: the recovery reset stays the conditional PROCESSING-to-PENDING change. When it loses its comparison, a selected document that is absent stays a miss, so a replayed recovery keeps its row as before the conditional reset; a present document that is no longer PROCESSING, for example after a later success, is resolved: it is not reset, is not a miss and does not keep the row.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-integration-recovery-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java#selectedDocumentRemovedBeforeItsResetStaysAMissAndKeepsTheRow"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "Preservation: on a real index, a selected PROCESSING document that completes after recovery selects it and before its conditional reset is not reset to PENDING, does not count as a miss and does not keep the recovery row.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "choice": "Integration repair after the vdu-auto merge (bc5978095), decided by the orchestrator under the owner's delegation: the recovery reset stays the conditional PROCESSING-to-PENDING change. When it loses its comparison, a selected document that is absent stays a miss, so a replayed recovery keeps its row as before the conditional reset; a present document that is no longer PROCESSING, for example after a later success, is resolved: it is not reset, is not a miss and does not keep the row.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-integration-recovery-preservation.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java#selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow"
+      ]
     }
   ]
 }
 ```
+
+## Integration repair: lost comparisons in VDU recovery (on b6d536/integration after 1d23c9d95)
+
+83f07cc4c made the recovery reset the conditional PROCESSING-to-PENDING change
+(updateDocumentIf). It also dropped the recovery's treatment of a reset that changes nothing as
+incomplete, so after bc5978095 every lost comparison counted as resolved, including a selected
+document that is gone. The indexer-worker VduRecoveryReplayCompletenessTest and
+VduGenerationBoundaryTest still stubbed updateDocument, so their recovery cases failed from
+bc5978095 on (first failing first-parent commit; they pass on a000e15c7 and on 83f07cc4c^).
+
+- WorkerIngestService.resetVduStatusToPending: after a lost comparison it reads whether the
+  document is still stored. Absent stays a miss (the recovery reports incomplete and a replay
+  keeps its row); present is resolved. The owner-scoped early return for another procedure's claim
+  is unchanged.
+- The two indexer-worker tests follow the conditional reset (Adaptation entry above).
+- VduRecoveryLostComparisonTest pins both outcomes on a real index (New entries above).
 
 ## Acceptance records
 

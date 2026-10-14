@@ -21,9 +21,11 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexing.SchemaFields;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +38,12 @@ final class VduRecoveryReplayCompletenessTest {
   private static final String BUFFER_KEY = "vdu_recovery:completeness";
   private static final List<String> SELECTED =
       List.of("processing-missing", "processing-success");
+  // Recovery resets through the conditional mutation: still PROCESSING, then PENDING. The mocked
+  // field reader reports no stored document, so a lost comparison is a missing document.
+  private static final Map<String, Object> STILL_PROCESSING =
+      Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
+  private static final Map<String, Object> RESET_TO_PENDING =
+      Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
 
   @TempDir Path tempDir;
 
@@ -45,14 +53,17 @@ final class VduRecoveryReplayCompletenessTest {
     Path dbPath = tempDir.resolve("all-missing.db");
     SwitchBufferCapableQueue.SwitchBufferOp before = seed(dbPath);
     RunningRuntime runtime = runtimeWithSelected(SELECTED);
-    when(runtime.indexingCoordinator().updateDocument(anyString(), anyMap())).thenReturn(false);
+    when(runtime.indexingCoordinator().updateDocumentIf(
+        anyString(), eq(STILL_PROCESSING), eq(RESET_TO_PENDING))).thenReturn(false);
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
       assertEquals(1, queue.switchBufferDepth());
       assertEquals(before, find(queue));
-      verify(runtime.indexingCoordinator()).updateDocument(eq("processing-missing"), anyMap());
-      verify(runtime.indexingCoordinator()).updateDocument(eq("processing-success"), anyMap());
+      verify(runtime.indexingCoordinator()).updateDocumentIf(
+          eq("processing-missing"), eq(STILL_PROCESSING), eq(RESET_TO_PENDING));
+      verify(runtime.indexingCoordinator()).updateDocumentIf(
+          eq("processing-success"), eq(STILL_PROCESSING), eq(RESET_TO_PENDING));
       verify(runtime.commitOps(), never()).commitAndTrack(CommitReason.VDU_RECOVERY);
     }
     assertRetainedAfterReopen(dbPath, before);
@@ -64,7 +75,8 @@ final class VduRecoveryReplayCompletenessTest {
     Path dbPath = tempDir.resolve("one-missing.db");
     SwitchBufferCapableQueue.SwitchBufferOp before = seed(dbPath);
     RunningRuntime runtime = runtimeWithSelected(SELECTED);
-    when(runtime.indexingCoordinator().updateDocument(anyString(), anyMap()))
+    when(runtime.indexingCoordinator().updateDocumentIf(
+            anyString(), eq(STILL_PROCESSING), eq(RESET_TO_PENDING)))
         .thenAnswer(invocation -> "processing-success".equals(invocation.getArgument(0)));
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
@@ -92,7 +104,7 @@ final class VduRecoveryReplayCompletenessTest {
               return true;
             })
         .when(indexing)
-        .updateDocument(anyString(), anyMap());
+        .updateDocumentIf(anyString(), eq(STILL_PROCESSING), eq(RESET_TO_PENDING));
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
@@ -109,7 +121,8 @@ final class VduRecoveryReplayCompletenessTest {
   void allUpdatesSuccessCommitAndClear() throws Exception {
     Path dbPath = tempDir.resolve("all-success.db");
     RunningRuntime runtime = runtimeWithSelected(SELECTED);
-    when(runtime.indexingCoordinator().updateDocument(anyString(), anyMap())).thenReturn(true);
+    when(runtime.indexingCoordinator().updateDocumentIf(
+        anyString(), eq(STILL_PROCESSING), eq(RESET_TO_PENDING))).thenReturn(true);
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       seed(queue);
@@ -134,6 +147,7 @@ final class VduRecoveryReplayCompletenessTest {
       drain(queue, runtime);
       assertEquals(0, queue.switchBufferDepth());
       verify(runtime.indexingCoordinator(), never()).updateDocument(anyString(), anyMap());
+      verify(runtime.indexingCoordinator(), never()).updateDocumentIf(anyString(), anyMap(), anyMap());
       verify(runtime.commitOps(), never()).commitAndTrack(CommitReason.VDU_RECOVERY);
     }
   }
@@ -153,8 +167,10 @@ final class VduRecoveryReplayCompletenessTest {
 
   private void verifyRecoveryAttemptOrder(RunningRuntime runtime) {
     var order = inOrder(runtime.indexingCoordinator(), runtime.commitOps());
-    order.verify(runtime.indexingCoordinator()).updateDocument(eq("processing-missing"), anyMap());
-    order.verify(runtime.indexingCoordinator()).updateDocument(eq("processing-success"), anyMap());
+    order.verify(runtime.indexingCoordinator()).updateDocumentIf(
+        eq("processing-missing"), eq(STILL_PROCESSING), eq(RESET_TO_PENDING));
+    order.verify(runtime.indexingCoordinator()).updateDocumentIf(
+        eq("processing-success"), eq(STILL_PROCESSING), eq(RESET_TO_PENDING));
     order.verify(runtime.commitOps()).commitAndTrack(CommitReason.VDU_RECOVERY);
   }
 

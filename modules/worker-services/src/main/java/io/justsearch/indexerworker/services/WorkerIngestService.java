@@ -1973,6 +1973,12 @@ public final class WorkerIngestService {
       // A lost comparison means the claimed state changed or a terminal update/removal won.
       // Retire the selected claim so its abandoned result cannot subsequently replace text.
       vduProcessingClaims.remove(docId);
+      // A lost comparison on a present document needs no reset and is resolved. An absent
+      // selected document stays a miss, so a replayed recovery keeps its row for a later retry.
+      if (!reset && !docId.equals(ingestLifecycle.documentFieldOps()
+          .getDocumentFieldOrThrow(docId, SchemaFields.DOC_ID))) {
+        throw new IllegalStateException("Selected VDU document was not recovered: " + docId);
+      }
       return reset;
     }
   }

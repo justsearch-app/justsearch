@@ -25,6 +25,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class VduGenerationBoundaryTest {
   @TempDir Path tempDir;
   private static final String DOC = "generation-document";
+  // Recovery resets through the conditional mutation: still PROCESSING, then PENDING.
+  private static final java.util.Map<String, Object> STILL_PROCESSING =
+      java.util.Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
+  private static final java.util.Map<String, Object> RESET_TO_PENDING =
+      java.util.Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
 
   @ParameterizedTest
   @ValueSource(strings = {"update", "mark", "recover"})
@@ -32,7 +37,7 @@ final class VduGenerationBoundaryTest {
     try (var fixture = new Fixture()) {
       fixture.call(operation);
       var order = inOrder(fixture.index, fixture.commits);
-      order.verify(fixture.index).updateDocument(eq(DOC), anyMap());
+      fixture.verifyMutation(order.verify(fixture.index), operation);
       order.verify(fixture.commits).commitAndTrack(any());
       order.verify(fixture.commits).maybeRefreshBlocking();
       assertEquals(0, fixture.queue.switchBufferDepth());
@@ -68,7 +73,7 @@ final class VduGenerationBoundaryTest {
         return null;
       }).when(fixture.commits).commitAndTrack(any());
       fixture.assertRefused(operation);
-      verify(fixture.index).updateDocument(eq(DOC), anyMap());
+      fixture.verifyMutation(verify(fixture.index), operation);
       verify(fixture.commits).commitAndTrack(any());
       verify(fixture.commits).maybeRefreshBlocking();
     }
@@ -92,6 +97,8 @@ final class VduGenerationBoundaryTest {
       when(runtime.indexingCoordinator()).thenReturn(index);
       when(runtime.commitOps()).thenReturn(commits);
       when(index.updateDocument(eq(DOC), anyMap())).thenReturn(true);
+      when(index.updateDocumentIf(eq(DOC), eq(STILL_PROCESSING), eq(RESET_TO_PENDING)))
+          .thenReturn(true);
       when(fields.queryDocIdsByFieldOrThrow(
           SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, 1000))
           .thenReturn(List.of(DOC));
@@ -113,6 +120,15 @@ final class VduGenerationBoundaryTest {
         case "recover" -> assertEquals(1, service.recoverVduProcessing(
             RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none()).getRecoveredCount());
         default -> throw new IllegalArgumentException(operation);
+      }
+    }
+
+    /** Update and mark mutate unconditionally; recovery uses the conditional reset. */
+    private void verifyMutation(IndexingCoordinator verifier, String operation) {
+      if ("recover".equals(operation)) {
+        verifier.updateDocumentIf(eq(DOC), eq(STILL_PROCESSING), eq(RESET_TO_PENDING));
+      } else {
+        verifier.updateDocument(eq(DOC), anyMap());
       }
     }
 
