@@ -60,6 +60,15 @@ Evidence files (all written by run-evidence.mjs):
   These test files are unchanged, so no entry below names them.
 - `b6d536-bulk-gate-e6-new.json`: checks of classes and signatures added in this change.
 
+Records phase B (batch 3) re-ran `b6d536-bulk-gate-e6-new.json` and `b6d536-e6-intent-repair.json`
+on b599d4d7e because their check files changed after the first runs. In the intent repair (entry 7),
+LlamaServerLaunchFlagsTest passes on the change (14 cases) and again fails by assertion on
+79b5e2e25. In the new-API file, every check passes except
+LlamaServerPinnedDeviceEnvironmentTest#cpuLaunchNamesNoDevice, which no longer exists: 3241289f5
+(b48) renamed it cpuLaunchDisablesDevices and changed it to expect `--device none` on a CPU launch.
+Entry 2 still names the old check and says the CPU launch names no device, so it stays invalid until
+the coordinator decides whether entry 2 follows b48.
+
 ```json
 {
   "entries": [

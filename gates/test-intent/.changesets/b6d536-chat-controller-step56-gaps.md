@@ -17,6 +17,15 @@ d3fe74ef2 order (it had published "completed" before the session closed). The se
 until Windows releases what the ended servers held before the test directory is deleted. This
 changeset covers only these files.
 
+Records phase B (batch 3) re-ran both evidence files on b599d4d7e because their check files changed
+after the first runs. The checks no longer compile against d3fe74ef2 with the ManagedChatSeam
+overlay. They now build RuntimeReconciler with the lease-free constructor that 5e4f4e698 left, and
+pass ChildControl to BootstrapInferenceFactory.createInferenceManager. At d3fe74ef2 both need
+overloads that would run real wiring, which is more than declarations. `b6d536-chat-controller-step56-install-freeze.json` holds a preservation check
+only, so it was re-run without a before-state and passes on the change. In
+`b6d536-chat-controller-step56-seam.json` both checks pass on the change, but the fail-before is a
+compile failure, so entry 1 stays invalid until the coordinator decides how to show it.
+
 ```json
 {
   "entries": [
