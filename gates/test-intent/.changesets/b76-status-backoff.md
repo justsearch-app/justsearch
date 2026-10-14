@@ -15,6 +15,8 @@ The round-7 verifier case OWN7-REFUSED-ADVANCING (at most 6 fresh reads over 200
 
 One refused fresh read per poll interval, while only fresh reads are refused, is the bounded behaviour the orchestrator accepted.
 
+The held-lane case ("a lane held after the fresh read costs one fresh read and a bounded number of ordinary follow-ups per value") was load-sensitive. It counts every ordinary status read made during its 20 actions as a follow-up, but it left the 10 s scheduled poll (statusPoll.ts INTERVAL_MS) on the real clock. On a loaded machine the 20 actions can take longer than 10 s, so the scheduled poll could fire inside the window and be counted against the bound of three follow-ups (statusInvalidation.ts MAX_FOLLOW_UPS). The case now fakes only setInterval, so the scheduled poll cannot fire during the window; timeouts and the clock stay real, and its assertions are unchanged. Entry 3 records this. The file changed after the evidence run, so b76-status-backoff-ui.json must be regenerated (with the same fail-before at ff5bb2ae9) before entry 1 is valid again.
+
 ```json
 {
   "entries": [
@@ -60,6 +62,16 @@ One refused fresh read per poll interval, while only fresh reads are refused, is
       "class": "Structural rule kept",
       "rule": "Every caller of StatusChangeCounter.changed in product code is a classified producer in StatusFieldClassification.PRODUCERS, and every classified producer still calls it (everyOwnerPublicationIsAClassifiedProducer).",
       "whySurvives": "The predicate and both assertions are unchanged; only the ArchUnit import is narrowed. Code that calls a StatusChangeCounter method has a Methodref to that class in its constant pool, so its class file contains the internal name io/justsearch/core/status/StatusChangeCounter. The new import option keeps exactly the class files that contain those bytes, plus the counter itself, so the set of call sites to the counter is the same as with the whole-product import. The second assertion would fail if the narrowing dropped a real producer. The whole-product import alone exhausted the 384m test heap: a heap dump of the full ui suite at ff5bb2ae9 shows the worker out of memory inside this test, with ArchUnit import records dominant and the heap flat across earlier tests. With the narrowed import the full ui suite completes at 384m."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/api/statusBackoff.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Repaired load-sensitive check. The case 'a lane held after the fresh read costs one fresh read and a bounded number of ordinary follow-ups per value' now starts with vi.useFakeTimers({ toFake: ['setInterval'] }), so the 10 s scheduled status poll cannot fire while the 20 actions run; before, on a loaded machine, that poll could fire inside the window and its read was counted as an ordinary follow-up. setTimeout, Date and the fetch stub stay real, and afterEach already restores real timers. Inputs, preconditions, the observation (fresh and ordinary /api/status reads during the 20 actions, then the shown state after the lane releases) and the three assertions (fresh reads 1, follow-ups at most 3, last shown state locked) are unchanged."
     }
   ]
 }
