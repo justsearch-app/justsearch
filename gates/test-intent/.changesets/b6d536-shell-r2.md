@@ -11,6 +11,8 @@ b18: repair the consumed-queue held-crash race using the actor transport no-writ
 
 b17 repair refresh: direct hold API and original P5 launch-oracle before witnesses are recorded; five actor-fixture before results remain explicitly UNVERIFIED. Native cancelled-session shell exit and held-crash installer completion have fail-before assertions against f6b5b019a. All prior entries and verifier verdicts remain history; this builder adds no acceptance.
 
+Records phase B (batch 3) re-ran `b6d536-shell-actors-b17.json` on b599d4d7e because engine_host.rs changed after the first run. The runner transplants the candidate's test module into 547b96083. That module now holds upgrade_stop_accepts_crash_before_command_consumption, which reads the private field `EngineHost.control` (19c16294d). The field does not exist at 547b96083, so the crate's tests did not compile. Besides `gates/test-intent/b6d536-shell-r2-before.patch`, the fail-before therefore applies the compat before-patch `gates/test-intent/evidence/b6d536-shell-actors-compat.patch`, after it. That patch adds only the declarations struct `Control { pending: Option<supervisor::HostQuit> }` and the field `control`, which the Default constructor initialises empty. HostQuit comes from the first patch. No 547b96083 code reads the field. All six checks pass on the change and again fail by the same panics there (the five actor checks at the `Instant::now() < until` wait, and the hold API check at "hold must preserve supervision of the live Engine").
+
 ```json
 {
   "entries": [
