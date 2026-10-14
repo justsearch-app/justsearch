@@ -2041,6 +2041,12 @@ function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, split
   return child;
 }
 
+/** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
+function describeResolved(p) {
+  return { pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc), role: p.role ?? null,
+    observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null, basis: 'exit ledger' };
+}
+
 /** The job record's identities in the shape stop reports use. */
 function jobIdentities(list) {
   return (Array.isArray(list) ? list : []).filter((p) => p?.pid)
@@ -3731,8 +3737,8 @@ async function stopRun(opts, {
   terminateProcess = engineActuator.terminateWithCode,
   portOwner = portOwnerOf,
   cliEngineRecorder = engineActuator.createCliEngineRecorder,
-  stopEngineJob = (job) => jobRun.stopJobRunSync({ recordPath: job.recordPath, host: job.host },
-    { code: engineActuator.NON_DISTINCTIVE_KILL_CODE }),
+  stopEngineJob = (job, { ended = [] } = {}) => jobRun.stopJobRunSync({ recordPath: job.recordPath, host: job.host },
+    { code: engineActuator.NON_DISTINCTIVE_KILL_CODE, endedIdentities: ended }),
   portWaitMs = 10_000,
 } = {}) {
   const { run, runPath } = await resolveTarget(opts);
@@ -4144,6 +4150,22 @@ async function stopRun(opts, {
   //    its held jobs as its own last step and reports what they ended; otherwise the job's recorded host is ended here (on a handle showing its recorded birth),
   //    which ends every member, and each recorded member is verified gone. Either way each process
   //    the job's termination ended is listed by identity.
+  // What the exit ledger proves has ended, read once here (the census's reader adds only what was
+  // appended since it armed). A recorded identity with its exit there is gone and is not probed
+  // again: a live process under that PID whose birth cannot be read never matches it.
+  let ledgerEnded = null;
+  const endedPerLedger = () => {
+    if (ledgerEnded === null) {
+      try { ledgerEnded = exitCensus?.endedIdentities?.() ?? []; } catch (err) {
+        ledgerEnded = [];
+        errors.push(`exit ledger: ${err?.message ?? err}`);
+      }
+    }
+    return ledgerEnded;
+  };
+  const provenEnded = (p) => Boolean(p?.pid) && endedPerLedger().some((e) => e.pid === Number(p.pid)
+    && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc ?? '')));
+  const resolvedByLedger = [];
   let engineJob = null;
   const answeredJob = runnerAnswer?.engineJob ?? null;
   const recordedJob = run?.engineJob?.recordPath && run.engineJob.host?.pid ? run.engineJob : null;
@@ -4156,10 +4178,11 @@ async function stopRun(opts, {
       engineJob = { source: 'record', incarnation: recordedJob.incarnation ?? null, outcome: 'gone',
         endedByJob: jobIdentities(answeredJob?.endedByJob), survivors: [] };
     } else {
-      const result = await Promise.resolve().then(() => stopEngineJob(recordedJob))
+      const result = await Promise.resolve().then(() => stopEngineJob(recordedJob, { ended: endedPerLedger() }))
         .catch(() => ({ ok: false, outcome: 'failed' }));
       engineJob = { source: 'stop', incarnation: recordedJob.incarnation ?? null, outcome: result?.outcome ?? 'failed',
-        host: result?.host ?? null, endedByJob: jobIdentities(result?.endedByJob), survivors: jobIdentities(result?.survivors) };
+        host: result?.host ?? null, endedByJob: jobIdentities(result?.endedByJob), survivors: jobIdentities(result?.survivors),
+        ...(Array.isArray(result?.endedPerLedger) ? { endedPerLedger: jobIdentities(result.endedPerLedger) } : {}) };
       if (result?.host === 'terminated') {
         for (const p of engineJob.endedByJob) if (!killedPids.includes(p.pid)) killedPids.push(p.pid);
       }
@@ -4175,7 +4198,8 @@ async function stopRun(opts, {
   const unresolvedProcesses = [];
   for (const p of tracked.values()) {
     const state = await lookupOne(p);
-    if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
+    if (state === 'unknown' && provenEnded(p)) resolvedByLedger.push(describeResolved(p));
+    else if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
   }
 
   // Tempdoc 819 §D: the marker's job is done once we reach here, whatever the outcome.
@@ -4188,7 +4212,10 @@ async function stopRun(opts, {
     .map((p) => ({ ...p, observedName: after?.get(p.pid)?.name ?? p.observedName,
       observedCreationFileTimeUtc: after?.get(p.pid)?.creationFileTime ?? p.observedCreationFileTimeUtc,
       state: checkRecordedProcess(p, after ? after.get(p.pid) ?? null : null) }))
-    .filter((p) => p.state === 'match' || p.state === 'unknown');
+    .filter((p) => {
+      if (p.state === 'unknown' && provenEnded(p)) { resolvedByLedger.push(describeResolved(p)); return false; }
+      return p.state === 'match' || p.state === 'unknown';
+    });
   for (const s of survivors) errors.push(`${s.role} pid ${s.pid} is ${s.state === 'match' ? 'still running' : 'of unknown state'} after the stop`);
 
   // Ports: wait (bounded) for the run's own listeners to close. A port owner is never killed.
@@ -4270,6 +4297,8 @@ async function stopRun(opts, {
     fallback,
     // Every process the Engine's job ended after the Engine itself, by identity.
     engineJob,
+    // Identities whose state could not be read now but whose exit the ledger records.
+    ...(resolvedByLedger.length ? { resolvedByLedger } : {}),
     ...(foreignPortOwner ? { foreignPortOwner } : {}),
   });
 

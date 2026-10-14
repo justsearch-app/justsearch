@@ -334,6 +334,76 @@ function readLedger(ledgerDir, family) {
   };
 }
 
+/** How many leading bytes of a ledger file identify it across reads (with its file id). */
+const INCREMENTAL_HEAD_BYTES = 256;
+
+/**
+ * readLedger for a caller that reads the same ledger more than once (a stop reads it when it arms
+ * its census, before it judges the Engine's job and at its verdict): each file is parsed once, and
+ * a later read parses only the complete lines appended since. A file is the same file when its file
+ * id (which a rotation's rename keeps) and its first bytes are unchanged and it has not shrunk;
+ * anything else is parsed again from its start. The result is readLedger's.
+ */
+function createIncrementalReader() {
+  const cache = new Map();
+  const readAt = (fd, position, length) => {
+    const bytes = Buffer.alloc(length);
+    let done = 0;
+    while (done < length) {
+      const n = fs.readSync(fd, bytes, done, length - done, position + done);
+      if (n === 0) break;
+      done += n;
+    }
+    return done === length ? bytes : bytes.subarray(0, done);
+  };
+  function read(ledgerDir, family) {
+    familyOf(family);
+    const total = { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false };
+    const records = [];
+    for (const file of ledgerFiles(ledgerDir, family)) {
+      let fd;
+      try {
+        fd = fs.openSync(file, 'r');
+      } catch (err) {
+        if (err && err.code === 'ENOENT') continue;
+        throw err;
+      }
+      try {
+        const stat = fs.fstatSync(fd, { bigint: true });
+        const size = Number(stat.size);
+        const key = stat.ino ? `${stat.dev}:${stat.ino}` : `path:${file}`;
+        const head = readAt(fd, 0, Math.min(size, INCREMENTAL_HEAD_BYTES));
+        let entry = cache.get(key);
+        if (!entry || entry.family !== family || size < entry.offset
+            || !head.subarray(0, entry.head.length).equals(entry.head)) {
+          entry = { family, head, offset: 0, records: [],
+            tally: { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false } };
+          cache.set(key, entry);
+        }
+        if (size > entry.offset) {
+          const chunk = readAt(fd, entry.offset, size - entry.offset);
+          const complete = chunk.lastIndexOf(0x0a) + 1;
+          if (complete > 0) {
+            readFileBytes(chunk.subarray(0, complete), family, entry.records, entry.tally);
+            entry.offset += complete;
+          }
+        }
+        if (head.length > entry.head.length) entry.head = head;
+        entry.tally.tornTail = size > entry.offset;
+        for (const r of entry.records) records.push(r);
+        total.corruptLines += entry.tally.corruptLines;
+        total.unknownSchemaLines += entry.tally.unknownSchemaLines;
+        total.unknownTypeLines += entry.tally.unknownTypeLines;
+        total.tornTail = total.tornTail || entry.tally.tornTail;
+      } finally {
+        fs.closeSync(fd);
+      }
+    }
+    return { records, ...total, skippedLines: total.corruptLines + total.unknownSchemaLines + total.unknownTypeLines };
+  }
+  return { read };
+}
+
 /** A record's string field, or null when absent, null or not a string (LedgerRecord.text). */
 function textField(record, name) {
   const v = record?.line?.[name];
@@ -708,6 +778,7 @@ module.exports = {
   knownTimestamp,
   formatTimestamp,
   readLedger,
+  createIncrementalReader,
   summarizeLedger,
   stopDetailOf,
   textField,
