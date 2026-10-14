@@ -47,6 +47,24 @@ Evidence files (all written by run-evidence.mjs):
 - `b6d536-device-lost-cpu-recourse-visible-new.json`: checks of new API (the recourse record, the
   worker health field, the Head's worker view and readiness), no before-state.
 
+Records phase B (batch 3) re-ran four of these files on b599d4d7e because their check files changed
+after the first runs:
+
+- `b6d536-device-lost-repaired.json`: NativeSessionHandleDeviceLostTest gained a method (7de3976a1)
+  that calls DeviceHealth, which e26c94d53 lacks. The fail-before applies the compat before-patch
+  `gates/test-intent/evidence/b6d536-device-lost-compat.patch`. It adds only the declaration
+  DeviceHealth with forDevice(int), which returns a new instance, and reportLost(int), which returns
+  false at once. No e26c94d53 code reads it. The check again fails by the same assertion there.
+- `b6d536-device-lost-cpu-recourse-visible-repaired.json`: WorkerSearchServiceCpuRecourseVisibilityTest
+  now reads QueryCpuRecourse.lastTakenNanos() (04368bfca), which 93a8b2038 lacks. The fail-before
+  applies `gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-visible-compat.patch`, which
+  adds only that class with lastTakenNanos() returning OptionalLong.empty() at once. No 93a8b2038
+  code reads it. Both checks again fail by the same assertions there.
+- `b6d536-device-lost-cpu-recourse-miss-preservation.json`: for the same reason, its check no longer
+  compiles on 93a8b2038. It is a preservation check, so it was re-run without a before-state and
+  passes on the change.
+- `b6d536-device-lost-cpu-recourse-visible-new.json`: passes, no before-state.
+
 ```json
 {
   "entries": [

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T12:09:59.507Z",
-  "revision": "342da67798936f4dafeaa81265acf6df6432a906",
-  "tree": "c72a35c9b83d8630f1bfdc2757c7f5e7cc4a7909",
+  "createdAt": "2026-10-14T17:24:32.871Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceBreakerTest.aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15273
+      "durationMs": 25319
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankAcquireBudgetInProcessTest.aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10917
+      "durationMs": 12907
     },
     {
-      "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-30520-1791288518864.json\"",
+      "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-8548-1791998586968.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 998
+      "durationMs": 942
     }
   ],
   "checks": [
@@ -71,7 +71,7 @@
       "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself",
       "file": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:df7575c325c749d360f36eed690f155059f9a003c18c4fdae41f5bb5989fd1f9",
+      "contentDigest": "sha256:4d2b3e76828dc90ccc7438e88461045b573e19f2604b79dd375f1334e9231309",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,24 +87,25 @@
     "ref": "342da6779",
     "revision": "342da67798936f4dafeaa81265acf6df6432a906",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceBreakerTest.aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 40753
+        "durationMs": 40332
       },
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankAcquireBudgetInProcessTest.aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 26747
+        "durationMs": 39026
       },
       {
-        "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-30520-1791288593440.json\"",
+        "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-8548-1791998669423.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1133
+        "durationMs": 1068
       }
     ],
     "checks": [
@@ -121,9 +122,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself",
         "classification": "assertion",
-        "detail": "classifyConsequence (805 §G.2) Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself:  AssertionError: expected 'unknown' to be 'retrieval-impaired' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-d21Cs7/modules/ui-web/src/shell-v0/state/readinessNotice.test.ts:401:41\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-search-gate/modules/ui-"
+        "detail": "classifyConsequence (805 §G.2) Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself:  AssertionError: expected 'unknown' to be 'retrieval-impaired' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-3/test-intent-before-Lbgsz9/modules/ui-web/src/shell-v0/state/readinessNotice.test.ts:401:41\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb-3-ui/m"
       }
     ]
   },
-  "digest": "sha256:b090630fda5a4fbd2223dae7849b4d9f90024ee3f4467700ca9bdb4030f85aec"
+  "digest": "sha256:89735ea750297ee61a4b495f2f697d0a6bb8dee9a000184cf5f23622d4741526"
 }

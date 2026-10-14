@@ -28,6 +28,17 @@ Evidence files (all written by run-evidence.mjs):
 - `b6d536-search-budget-preservation.json`: preservation checks that pass before and after. That run
   exits 1 by design, because none of them shows a repair.
 
+Records phase B (batch 3) re-ran three files on b599d4d7e because their check files changed after
+the first runs. `b6d536-search-budget-new.json` passes (no before-state). In
+`b6d536-search-budget-preservation.json`, WorkerSearchServiceSemanticBudgetTest no longer compiles
+on 68547f75a: its embedding fixture implements availability() in place of the then-abstract
+isAvailable(). The file holds preservation checks only, so it was re-run without a before-state and
+passes on the change. `b6d536-search-budget-worker-repaired.json` passes on the change, but its
+fail-before on 68547f75a is now a compile failure. The worker-services test sources do not compile
+there (that fixture, and WorkerSearchServiceReasonCodeContractTest's NoOpEmbeddingProvider.starting()),
+which also stops BulkEncodeUrgencyTest from running. A declarations-only patch cannot express the
+fixture's change, so entries 1 and 2 stay invalid until the coordinator decides how to show them.
+
 Three pre-existing files only follow a signature change (Adaptation entries). Two others gain a
 vocabulary row that S2 requires (see their entries). Repair round 1 adds the rerank stage to the head
 deadline with a new cross-encoder drop reason, SEARCH_DEADLINE_EXCEEDED; the pre-existing

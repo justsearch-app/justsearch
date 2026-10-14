@@ -37,6 +37,26 @@ Evidence files (all written by run-evidence.mjs):
 - `b6d536-search-budget-2-answer-preservation.json`: a preservation check that passes before
   (fae202403) and after. That run exits 1 by design.
 
+Records phase B (batch 3) re-ran six files on b599d4d7e because their check files changed after the
+first runs:
+
+- `b6d536-search-budget-2-new.json` and `b6d536-search-budget-2-answer-new.json` pass (no
+  before-state).
+- `b6d536-search-budget-2-answer-repaired.json`: McpAnswerModelsLoadingInProcessTest now sets
+  NoOpEmbeddingProvider.starting() (0c5159476), which fae202403 lacks. The fail-before applies the
+  compat before-patch `gates/test-intent/evidence/b6d536-search-budget-2-answer-compat.patch`. It
+  adds only the declaration starting(), which returns the existing NoOpEmbeddingProvider.INSTANCE at
+  once: the provider such a service already has when none is set, as the test had before 0c5159476.
+  No fae202403 code reads it. All three checks again fail by assertion there.
+- `b6d536-search-budget-2-contract-repaired.json`: its check calls the same starting(), so its
+  fail-before on 3d181a70c applies the same patch, and it again fails by the same assertion.
+- `b6d536-search-budget-2-rag-repaired.json`: every check passes on the change. Its fail-before on
+  3d181a70c is now a compile failure: WorkerSearchServiceRagBudgetTest implements the embedding
+  availability API (EmbeddingProvider.Availability, availability() in place of isAvailable()) and
+  reads RetrieveContextResponse.getRetrievalModeCause(). A declarations-only patch cannot express
+  that, because isAvailable() is abstract and read at 3d181a70c. Entry 1 stays invalid until the
+  coordinator decides how to show it.
+
 ```json
 {
   "entries": [

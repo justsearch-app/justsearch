@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T03:34:00.236Z",
-  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
-  "tree": "07a66d0d082e3f94af48d2fdb16c317c61418ace",
+  "createdAt": "2026-10-14T16:29:30.886Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "118c60628e0f89ddb6c6e12f06bc404c28b2164d",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RagRetrievalCauseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10656
+      "durationMs": 13512
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.RagMetaCauseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2887
+      "durationMs": 4581
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpRagCauseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3692
+      "durationMs": 5438
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DetachedRunThreadLifetimeTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5872
+      "durationMs": 8270
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagRetrievalCauseTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagRetrievalCauseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e4388c458966a993303ed8b167178dd1a5b333710e5d772ba7fb6fd2308af370",
+      "contentDigest": "sha256:457f26a692e0411c0579a4f487abe4132701c12cc46fea5ad20f37a06e67b2cc",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -129,5 +129,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:215c57e08b5d227e6d4abb6aa11a0e76db51318b505f6f386fd7df5518d7b66e"
+  "digest": "sha256:ee7357d5f977c96e7ce643a7e9efe053d3eea73c79fc4d1492a0c69890596d6e"
 }

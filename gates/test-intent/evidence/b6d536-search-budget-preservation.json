@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T10:41:17.001Z",
-  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
-  "tree": "ec6b2cf2c5e89932a18394904f9c4c8a3db74563",
+  "createdAt": "2026-10-14T16:59:42.993Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "806f127eba98166bc11776519b1c4132dfcb3626",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.deadlineTooShortForASemanticBudgetIsStillADeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchDoesNotWaitForModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchNeverTouchesTheSemanticBudget\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 11336
+      "durationMs": 8172
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.aReSearchThatKeepsItsSemanticLegsIsApplied\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9318
+      "durationMs": 8279
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#deadlineTooShortForASemanticBudgetIsStillADeadline",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchDoesNotWaitForModels",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchNeverTouchesTheSemanticBudget",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,46 +92,6 @@
       ]
     }
   ],
-  "failBefore": {
-    "ref": "68547f75a",
-    "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
-    "overlays": [],
-    "runs": [
-      {
-        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.deadlineTooShortForASemanticBudgetIsStillADeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchDoesNotWaitForModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchNeverTouchesTheSemanticBudget\" --rerun -PskipWebBuild=true --console=plain",
-        "cwd": "<before-worktree>",
-        "exitCode": 0,
-        "durationMs": 46539
-      },
-      {
-        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.aReSearchThatKeepsItsSemanticLegsIsApplied\" --rerun -PskipWebBuild=true --console=plain",
-        "cwd": "<before-worktree>",
-        "exitCode": 0,
-        "durationMs": 30683
-      }
-    ],
-    "checks": [
-      {
-        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#deadlineTooShortForASemanticBudgetIsStillADeadline",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchDoesNotWaitForModels",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchNeverTouchesTheSemanticBudget",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#aReSearchThatKeepsItsSemanticLegsIsApplied",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      }
-    ]
-  },
-  "digest": "sha256:e00b44e4bd7055b62062c05470def16604339214f4b807e018561b4ac85ded34"
+  "failBefore": null,
+  "digest": "sha256:5788a20e33ba89b12665348b130380796ffd36db19d6b32ea87a2af5f17f76e5"
 }

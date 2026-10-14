@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T03:41:11.432Z",
-  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
-  "tree": "97bf60acf93ca1c79f6dd13f3b1976bf59244658",
+  "createdAt": "2026-10-14T16:53:53.827Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "8779215cfeed36dccd1e711e6e1df0723ec274d1",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8072
+      "durationMs": 6863
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:057d5ec39c0ead955499866a484c3855104ab34110ffbf0c7433748b05756788",
+      "contentDigest": "sha256:31df94434a61fc592afd8750307e170dd2f2cd0e03b4508ec5bd45690176ae3a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -45,12 +45,18 @@
     "ref": "3d181a70c",
     "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-search-budget-2-answer-compat.patch",
+        "contentDigest": "sha256:4fc02b05fc60fbf9ef1ea3cca8f89abe1d9cee783d41e5e47a4bef336001c919"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 41734
+        "durationMs": 16586
       }
     ],
     "checks": [
@@ -61,5 +67,5 @@
       }
     ]
   },
-  "digest": "sha256:847e9b69ff6ab352a9d595c059f01122424f0a189b565212a9bc0817b943df80"
+  "digest": "sha256:02c7d2c463be37cbafbc0a9a32368b7c220632d1eb7a599e3904dfdff4f3670d"
 }

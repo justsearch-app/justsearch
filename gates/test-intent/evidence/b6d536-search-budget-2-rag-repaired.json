@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T03:32:20.833Z",
-  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
-  "tree": "ceeb40f9f7adb5afd9fcd898ecfc2de48cc34099",
+  "createdAt": "2026-10-14T16:55:00.980Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "39666971270da65f456816718ec498e5162bfef7",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.contendedQueryEmbeddingGivesBm25ContextWithTheReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.modelsLoadingGivesBm25ContextWithinTheDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.mmrWithHeldDocumentEmbeddingsAnswersWithinTheDeadline\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 50140
+      "durationMs": 12043
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RagRetrievalBudgetInProcessTest.ragTurnWithModelsLoadingGetsBm25ContextAndTheReason\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 22640
+      "durationMs": 19559
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#contendedQueryEmbeddingGivesBm25ContextWithTheReason",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:570b3598beada25ad76927cf18a689c84ff5781b91f0f96c604de9eec124cb87",
+      "contentDigest": "sha256:2522205b6d1c7ae5726a6ab04042e5a9d2e6b7f8a7de5b18888fcd3747e89083",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#modelsLoadingGivesBm25ContextWithinTheDeadline",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:570b3598beada25ad76927cf18a689c84ff5781b91f0f96c604de9eec124cb87",
+      "contentDigest": "sha256:2522205b6d1c7ae5726a6ab04042e5a9d2e6b7f8a7de5b18888fcd3747e89083",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#mmrWithHeldDocumentEmbeddingsAnswersWithinTheDeadline",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:570b3598beada25ad76927cf18a689c84ff5781b91f0f96c604de9eec124cb87",
+      "contentDigest": "sha256:2522205b6d1c7ae5726a6ab04042e5a9d2e6b7f8a7de5b18888fcd3747e89083",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RagRetrievalBudgetInProcessTest.java#ragTurnWithModelsLoadingGetsBm25ContextAndTheReason",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RagRetrievalBudgetInProcessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d72f36619314cf7beac85497e68b3073809cf51343dc504aad58cdb052fc00f7",
+      "contentDigest": "sha256:23772dd7075b2ca0102b184316c46a90780c12ed3d063bc5cda2dfd2944fbe10",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -96,42 +96,43 @@
     "ref": "3d181a70c",
     "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.contendedQueryEmbeddingGivesBm25ContextWithTheReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.modelsLoadingGivesBm25ContextWithinTheDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.mmrWithHeldDocumentEmbeddingsAnswersWithinTheDeadline\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 55431
+        "durationMs": 6524
       },
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RagRetrievalBudgetInProcessTest.ragTurnWithModelsLoadingGetsBm25ContextAndTheReason\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 53774
+        "durationMs": 8545
       }
     ],
     "checks": [
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#contendedQueryEmbeddingGivesBm25ContextWithTheReason",
-        "classification": "assertion",
-        "detail": "contendedQueryEmbeddingGivesBm25ContextWithTheReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: io.justsearch.indexerworker.services.WorkerServiceException: inference deadline exceeded"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#modelsLoadingGivesBm25ContextWithinTheDeadline",
-        "classification": "assertion",
-        "detail": "modelsLoadingGivesBm25ContextWithinTheDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: execution timed out after 3000 ms"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#mmrWithHeldDocumentEmbeddingsAnswersWithinTheDeadline",
-        "classification": "assertion",
-        "detail": "mmrWithHeldDocumentEmbeddingsAnswersWithinTheDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: io.justsearch.indexerworker.services.WorkerServiceException: inference deadline exceeded"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RagRetrievalBudgetInProcessTest.java#ragTurnWithModelsLoadingGetsBm25ContextAndTheReason",
-        "classification": "assertion",
-        "detail": "ragTurnWithModelsLoadingGetsBm25ContextAndTheReason(Path): java.lang.AssertionError java.lang.AssertionError: no rag.meta event: []"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       }
     ]
   },
-  "digest": "sha256:c8ec8d6909a5f108fc9b69c96c7e14f14dc3fd5d966bb8d0275c10306236cdbe"
+  "digest": "sha256:aa1b7797f4bbfb748e6d663ba473f198b3ca8f2abc721f5a3e3cefec19cc2566"
 }

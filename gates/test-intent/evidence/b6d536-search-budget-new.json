@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T10:43:25.533Z",
-  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
-  "tree": "0da00fa0a9e7915eac69f2d6454ac48fb01312e3",
+  "createdAt": "2026-10-14T17:21:48.792Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SearchLegCauseContractTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 17305
+      "durationMs": 20894
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDetachedRunTest\" --tests \"io.justsearch.ort.NativeSessionHandleRunThreadCapTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6098
+      "durationMs": 5977
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.SearchPerSourceCauseMergeTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineHeadDeadlineTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineRerankDeadlineTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6803
+      "durationMs": 8996
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientHeadBudgetTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2336
+      "durationMs": 2813
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpSemanticBudgetCauseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4978
+      "durationMs": 6512
     },
     {
-      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-22256-1791283403943.json\"",
+      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-35340-1791998507437.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1588
+      "durationMs": 1354
     }
   ],
   "checks": [
@@ -59,7 +59,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5d35f7b4957ce2081e52f54dce8fc4826c189fd681b55223e783478f009dc09f",
+      "contentDigest": "sha256:54d59cfee58b0a6d55fce9c67ab05acd04777334f6f7fa0f6fe5295263f3edd0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -94,11 +94,19 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:22064452022fa6f9380a0d10a26e1e97711c5a9fe270d4a86bf1ef8fc769df96",
+      "contentDigest": "sha256:6a2108eac7291ef1ae567f9653a9c0904f651b817f8ca255fe793f11105ae191",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "abandonedPendingDispatchDoesNotStartNativeWork()",
+          "status": "passed"
+        },
+        {
+          "name": "expiredRunDeadlineDoesNotStartNativeWork()",
+          "status": "passed"
+        },
         {
           "name": "theRunReadsItsOwnCopyOfTheInputsAfterTheCallerClosedThem()",
           "status": "passed"
@@ -144,7 +152,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/SearchPerSourceCauseMergeTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/SearchPerSourceCauseMergeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c9ac3b6f94b7499e0ecec870b33918dbe8735d980fb14e167e6099878462e405",
+      "contentDigest": "sha256:af33aac648f6f8b86c5cc888edab7e8f8dc6ac509365175c9014a0dd0a626339",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -163,6 +171,10 @@
         },
         {
           "name": "aBudgetMissIsNotOverwrittenByALaterReasonWithoutACause()",
+          "status": "passed"
+        },
+        {
+          "name": "contributingBackfillKeepsItsStrongestCause()",
           "status": "passed"
         }
       ]
@@ -271,7 +283,7 @@
       "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
       "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:43bd4335c7d704d5c58728ac46cb949e0255f6ba16686f2e9763d3a90c5a59db",
+      "contentDigest": "sha256:7f669cb7ba9a6fb9f7105ad2737d2599d165413945d00597c0db4694af0cce5f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -348,5 +360,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:52cd8dfc7ad6f5d0ab40875a9efb9168ea95998de11ec0e12ccec06fdd9dc9e0"
+  "digest": "sha256:62483ef2cc0621a48843d14319742d236cf5869f485caf490588cbbec902a7d2"
 }
