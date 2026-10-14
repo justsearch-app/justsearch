@@ -11,6 +11,10 @@
 // Ctrl+Break: it outlives its root, and only its stopper or its own parent's job ends it early.
 // With newProcessGroup the root starts a new process group, so neither it nor anything it starts
 // receives the console's Ctrl+C; the starter then asks the root to quit through its own channel.
+// With holdAfterRoot the host does not end what the root left: it records the root's exit (state
+// root-exited, rootExitCode) and keeps the job, still recording members, until the job empties by
+// itself (state ended; the host exits with the root's code) or its stopper ends the host, which
+// closes the job. The starter's own ordered steps then run before the job ends anything.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -205,6 +209,11 @@ public static class JustSearchJobRun {
   }
 
   public static int Host(string application, string commandLine, string directory, string recordPath, bool newProcessGroup) {
+    return Host(application, commandLine, directory, recordPath, newProcessGroup, false);
+  }
+
+  public static int Host(string application, string commandLine, string directory, string recordPath, bool newProcessGroup,
+      bool holdAfterRoot) {
     SetConsoleCtrlHandler(IgnoreInterrupts, true);
     IntPtr job = CreateJobObjectW(IntPtr.Zero, null);
     if (job == IntPtr.Zero) throw new InvalidOperationException("CreateJobObjectW failed: " + Marshal.GetLastWin32Error());
@@ -242,6 +251,19 @@ public static class JustSearchJobRun {
       uint code;
       if (!GetExitCodeProcess(info.hProcess, out code)) code = 1;
       RefreshMembers(job, members, order);
+      if (holdAfterRoot) {
+        // The root has ended; what it left stays until the starter's stop reaches the job.
+        string rootExit = code.ToString();
+        WriteRecord(recordPath, RecordJson(hostPid, hostBirth, info.dwProcessId, rootBirth, members, order,
+            ActiveProcesses(job) == 0 ? "ended" : "root-exited", rootExit));
+        while (ActiveProcesses(job) > 0) {
+          Thread.Sleep(50);
+          if (RefreshMembers(job, members, order))
+            WriteRecord(recordPath, RecordJson(hostPid, hostBirth, info.dwProcessId, rootBirth, members, order, "root-exited", rootExit));
+        }
+        WriteRecord(recordPath, RecordJson(hostPid, hostBirth, info.dwProcessId, rootBirth, members, order, "ended", rootExit));
+        return (int)code;
+      }
       // The root has ended: what it left in its job is ended with it, and each such member is listed.
       List<int> leftovers = new List<int>();
       int[] listed = ListedPids(job);

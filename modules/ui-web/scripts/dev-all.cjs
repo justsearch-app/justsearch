@@ -5,7 +5,9 @@
  *
  * The Engine's data and home folder is modules/ui-web/.dev-data unless --data-dir names another
  * (JUSTSEARCH_DATA_DIR and JUSTSEARCH_HOME are both set to it, as dev-runner does), so a dev stack
- * never reads the person's own settings or writes into their data. Ctrl+C, or either child ending,
+ * never reads the person's own settings or writes into their data. Each start cleans that folder,
+ * so it must be one a dev tool created and marked (scripts/dev/lib/dev-data-folder.cjs); any other
+ * non-empty folder is refused unchanged. Ctrl+C, or either child ending,
  * stops the stack in order: the Engine is asked to quit (POST /api/lifecycle/shutdown) and given
  * its quit deadline plus a margin to exit, then whatever is left in each child's job is ended.
  */
@@ -20,6 +22,7 @@ const detLib = require("./lib/determinism-budget.cjs");
 // gradlew.bat runs through cmd.exe, its interpreter, inside the job.
 const jobRun = require("../../../scripts/dev/lib/job-run.cjs");
 const engineActuator = require("../../../scripts/dev/lib/engine-actuator.cjs");
+const devDataFolder = require("../../../scripts/dev/lib/dev-data-folder.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const uiWebDir = path.resolve(rootDir, "modules", "ui-web");
@@ -81,8 +84,9 @@ function cleanDataDir(dir) {
   //   - non-zero indexedDocuments (index still present)
   //   - empty roots list in the UI library (roots file gone)
   // ui/ holds the Engine's settings (JUSTSEARCH_HOME is this folder), kept as dev-runner keeps it.
+  // The marker stays: it is what makes this folder one a dev tool may clean.
   const keep = new Set([
-    "config", "index", "watched_roots.json", "ui",
+    devDataFolder.MARKER, "config", "index", "watched_roots.json", "ui",
     "models", "installed-packs.v1.json", "policy.v1.json",
   ]);
   if (!fs.existsSync(dir)) {
@@ -333,8 +337,10 @@ try {
 }
 if (opts.help) {
   console.log("Usage: npm run dev:all [-- --data-dir <path>]\n"
-    + "  --data-dir  the Engine's data and home folder (default modules/ui-web/.dev-data); each start removes\n"
-    + "              everything in it except config, index, ui, watched_roots.json, models and the pack and policy files");
+    + "  --data-dir  the Engine's data and home folder (default modules/ui-web/.dev-data). Each start removes\n"
+    + "              everything in it except config, index, ui, watched_roots.json, models and the pack and policy\n"
+    + "              files, so only a folder a dev tool created and marked is used: a new or empty folder is marked,\n"
+    + "              any other folder is refused unchanged.");
   process.exit(0);
 }
 // Only an explicit --data-dir leaves the isolated dev folder; an inherited variable does not.
@@ -342,6 +348,18 @@ dataDir = opts.dataDir ? path.resolve(opts.dataDir) : path.join(uiWebDir, ".dev-
 if (!opts.dataDir && process.env.JUSTSEARCH_DATA_DIR && path.resolve(process.env.JUSTSEARCH_DATA_DIR) !== dataDir) {
   console.log("[dev-all] Not using JUSTSEARCH_DATA_DIR from the environment; pass --data-dir to choose a folder.");
 }
+// Each start cleans the data folder: only one a dev tool created and marked, before anything starts.
+const claim = devDataFolder.claimDevDataFolder(dataDir, {
+  tool: "dev-all",
+  isDefault: dataDir === path.join(uiWebDir, ".dev-data"),
+  registerPath: path.join(rootDir, "governance", "store-recoverability.v1.json"),
+  defaultHint: "modules/ui-web/.dev-data",
+});
+if (!claim.ok) {
+  console.error(`[dev-all] ${claim.message}`);
+  process.exit(2);
+}
+if (claim.action === "adopt") console.log(`[dev-all] Marked ${dataDir} as the dev data folder (it held only dev-data contents).`);
 
 (async () => {
   try {

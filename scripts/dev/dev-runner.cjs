@@ -24,6 +24,7 @@ const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
 const { engineIdentityAsync, startStopExitCensus } = require('./lib/stop-exit-census.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
+const devDataFolder = require('./lib/dev-data-folder.cjs');
 const ledgerLib = require('./lib/exit-ledger.cjs');
 const processIdentity = require('./lib/process-identity.cjs');
 
@@ -332,6 +333,8 @@ function printUsage() {
       'Notes:',
       '  - start is a long-running supervisor (foreground). Use Ctrl+C or run stop/cleanup to tear down the stack.',
       '  - When --json is used, stdout prints exactly one JSON object (no extra human logs).',
+      '  - --clean soft|hard cleans only a data folder a dev tool created and marked (.justsearch-dev-data.json): a new or',
+      '    empty folder is marked; any other non-empty folder is refused unchanged (DATA_DIR_NOT_OURS).',
       '',
       'State:',
       `  ${toPosix(activePath)}`,
@@ -392,7 +395,7 @@ async function cleanDataDir(dir, mode) {
     // Preserve ui/ so llmModelPath and other UI settings survive a hard reset.
     // Without this, AI activation fails with MODEL_PATH_REQUIRED until the user
     // reconfigures the model path manually.
-    const hardKeep = new Set(['ui']);
+    const hardKeep = new Set(['ui', devDataFolder.MARKER]);
     await mkdirp(dir);
     const entries = await fsp.readdir(dir).catch(() => []);
     for (const ent of entries) {
@@ -403,7 +406,7 @@ async function cleanDataDir(dir, mode) {
   }
   // soft: preserve config/index/watched roots/ui settings + AI models/packs/policy + GPL data.
   const keep = new Set([
-    'config', 'index', 'watched_roots.json', 'ui',
+    devDataFolder.MARKER, 'config', 'index', 'watched_roots.json', 'ui',
     'models', 'installed-packs.v1.json', 'policy.v1.json',
     'gpl-training-triples.ndjson',     // GPL training data (hours of LLM work)
     'gpl-eval-snapshot.json',          // GPL eval snapshot (revalidation baseline)
@@ -431,6 +434,45 @@ async function cleanDataDir(dir, mode) {
     }
     await fsp.rm(path.join(dir, ent), { recursive: true, force: true }).catch(() => { });
   }
+}
+
+/**
+ * A soft or hard clean deletes most of a data folder, so it runs only on a folder a dev tool
+ * created and marked (lib/dev-data-folder.cjs): a missing folder is created and marked, an empty
+ * one marked, the default dev folder adopted only when it holds nothing but dev-data contents.
+ * Any other folder is refused unchanged (DATA_DIR_NOT_OURS); `--clean none` deletes nothing and
+ * checks nothing.
+ */
+function dataFolderOptions(dir) {
+  return {
+    tool: 'dev-runner',
+    isDefault: path.resolve(dir) === resolveDataDir(null),
+    registerPath: path.join(repoRoot, 'governance', 'store-recoverability.v1.json'),
+    defaultHint: toPosix(path.relative(repoRoot, resolveDataDir(null))),
+  };
+}
+
+function dataFolderRefusal(dir, verdict) {
+  const err = new Error(verdict.message);
+  err.code = 'DATA_DIR_NOT_OURS';
+  err.details = { dataDir: toPosix(path.resolve(dir)), reason: verdict.reason, marker: devDataFolder.MARKER,
+    ...(verdict.unknown ? { unknown: verdict.unknown.slice(0, 20) } : {}) };
+  return err;
+}
+
+/** Throws DATA_DIR_NOT_OURS when a clean of `dir` would not be allowed; changes nothing. */
+function assertCleanableDataDir(dir, mode) {
+  if (mode === 'none') return;
+  const verdict = devDataFolder.inspectDevDataFolder(dir, dataFolderOptions(dir));
+  if (!verdict.ok) throw dataFolderRefusal(dir, verdict);
+}
+
+/** The clean, on this tool's own folder only: it is claimed (marked) first, or refused unchanged. */
+async function cleanOwnDataDir(dir, mode) {
+  if (mode === 'none') return;
+  const claim = devDataFolder.claimDevDataFolder(dir, dataFolderOptions(dir));
+  if (!claim.ok) throw dataFolderRefusal(dir, claim);
+  await cleanDataDir(dir, mode);
 }
 
 async function getRunDirectoryTimestamp(runDir) {
@@ -1979,14 +2021,16 @@ function spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter) 
  * kill-on-close job with no breakaway, so every process the Engine starts is a member at its
  * creation, including a detached one that Node's own job would let go. The Engine's nested job
  * (WindowsEngineJob) sits inside this one. The returned child is the root as seen through its host
- * (rootAsChild): the root's PID, the host's streams and exit, the root's code. When the root exits
- * the host ends what is left in the job and lists each by identity in the run record. Off Windows,
- * or for a shell command, the plain spawn.
+ * (rootAsChild): the root's PID, the host's streams, the root's exit and code. When the root exits
+ * the host keeps what is left in the job (holdAfterRoot) until the runner's stop reaches its last
+ * step (endEngineJobs), after the registered-helper step and the recorded identities, so nothing a
+ * step before it would stop in order is ended first by the job. Off Windows, or for a shell
+ * command, the plain spawn.
  */
 function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, splitter, { recordDir, label }) {
   if (process.platform !== 'win32' || opts?.shell) return spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter);
   const run = jobRun.startInJob({ command, args, cwd: opts.cwd, env: opts.env, stdio: opts.stdio, label, recordDir,
-    capture: () => null });
+    holdAfterRoot: true, capture: () => null });
   const record = jobRun.waitForRootSync(run);
   // The host's identity as it recorded it on its own handle: what a stop's job step checks first.
   if (record) run.host = { pid: Number(record.pid), creationFileTimeUtc: String(record.creationFileTimeUtc) };
@@ -2279,6 +2323,9 @@ async function cmdStart(opts) {
   const uiPort = opts.uiPort;
   const apiPortRequested = opts.apiPort;
   const dataDir = resolveDataDir(opts.dataDir);
+  // Before admission: a start that would clean a folder that is not a dev tool's own is refused
+  // before anything is stopped, started or changed.
+  assertCleanableDataDir(dataDir, opts.clean);
   const runDir = path.join(runsRoot, runId);
   const logsDir = path.join(runDir, 'logs');
   const runPath = path.join(runDir, 'run.json');
@@ -2468,7 +2515,7 @@ async function runAdmittedStart(opts, ctx) {
   const frontendStderr = fs.createWriteStream(frontendStderrPath, { flags: 'a' });
 
   // The clean gate is the admission above: a non-owner reaches this line only by taking over.
-  await cleanDataDir(dataDir, opts.clean);
+  await cleanOwnDataDir(dataDir, opts.clean);
 
   const aiEnv = resolveAiDevEnv();
 
@@ -2813,6 +2860,42 @@ async function runAdmittedStart(opts, ctx) {
   const startupSettled = new Promise((resolve) => { markStartupSettled = resolve; });
   let onExit = () => {};
 
+  /** Each incarnation's Engine job not yet ended (rootAsChild children), by incarnation. */
+  const engineJobs = new Map();
+  /** The registered-helper step's outcomes for the incarnation a host quit ended (the stop answer). */
+  let quitHelperCleanup = null;
+  /**
+   * The stop's last step: ends every Engine job still held, after the ordered quit, the
+   * registered-helper step and the recorded identities. A job that emptied by itself is only
+   * retired; otherwise its recorded host is ended on a handle showing its recorded birth, which
+   * closes the job, and each member is verified gone. Each process the job's termination ended is
+   * listed by identity.
+   */
+  const endEngineJobs = () => {
+    const summary = { state: 'ended', incarnations: [], endedByJob: [], survivors: [] };
+    for (const [n, child] of [...engineJobs]) {
+      engineJobs.delete(n);
+      let result;
+      try {
+        result = jobRun.settleRunRecord(child.jobRun, { code: engineActuator.NON_DISTINCTIVE_KILL_CODE });
+      } catch (err) {
+        result = { ok: false, outcome: 'failed', reason: err?.message ?? String(err) };
+      }
+      const ended = jobIdentities(result?.endedByJob), survivors = jobIdentities(result?.survivors);
+      summary.incarnations.push({ incarnation: n, host: child.jobRun.host ?? null, outcome: result?.outcome ?? 'failed',
+        endedByJob: ended, survivors });
+      summary.endedByJob.push(...ended);
+      summary.survivors.push(...survivors);
+      if (!result?.ok) summary.state = 'incomplete';
+      if (ended.length) {
+        narrate(`Engine incarnation ${n}: its job ended ${ended.length} process(es) the Engine left running: `
+          + ended.map((p) => `pid ${p.pid} (born ${p.creationFileTimeUtc})`).join(', '));
+      }
+      if (!result?.ok) narrate(`Engine incarnation ${n}: its job stop was ${result?.outcome ?? 'failed'}`);
+    }
+    return summary;
+  };
+
   /**
    * One incarnation's death record, written on EVERY death (lane F item B8): the per-incarnation
    * engine.log copy lands before the next incarnation can append to the shared file, then the stop
@@ -2828,15 +2911,19 @@ async function runAdmittedStart(opts, ctx) {
     if (hostQuit && !shuttingDown) {
       const killedPids = [], errors = [];
       const childCleanup = terminal ? await cleanupTerminalChildren(dataDir, killedPids, errors) : [];
+      quitHelperCleanup = { incarnation: n, childCleanup };
       return { engineLog, killedPids, childCleanup, errors };
     }
     if (!runJson) {
       await recordDiscoveryExit({ decision, dataDir, runId, runPath, backendExitCode: code, incarnation: n })
         .catch((err) => narrate(`discovery exit report failed: ${err?.message ?? err}`));
+      if (terminal && !quitCallerActive) endEngineJobs();
       return { engineLog };
     }
     const killedPids = [], errors = [];
     const childCleanup = terminal ? await cleanupTerminalChildren(dataDir, killedPids, errors) : [];
+    // A terminal death no stop caller owns: the Engine's jobs end after the registered-helper step.
+    if (terminal && !quitCallerActive) endEngineJobs();
     await writeSelfExitStopReport({ runId, runPath, run: runJson, backendExitCode: code,
       interactive: shuttingDown, incarnation: n, killedPids, childCleanup, errors }).catch(() => { });
     return { engineLog, killedPids, childCleanup, errors };
@@ -2855,20 +2942,9 @@ async function runAdmittedStart(opts, ctx) {
     policy: supervisionPolicy,
     spawnChild: (n, port, incarnationEnv) => {
       backend = spawnEngineChild(port, incarnationEnv, n);
-      const engineChild = backend;
-      // The job record is read at the host's exit (rootAsChild); whatever the job ended after the
-      // Engine exited is named here, and a record its host closed as `ended` is then retired.
-      engineChild.once?.('exit', () => {
-        const final = engineChild.jobFinal;
-        if (!engineChild.jobRun) return;
-        const ended = jobIdentities(final?.endedByJob);
-        if (ended.length) {
-          narrate(`Engine incarnation ${n}: its job ended ${ended.length} process(es) the Engine left running: `
-            + ended.map((p) => `pid ${p.pid} (born ${p.creationFileTimeUtc})`).join(', '));
-        }
-        if (final?.state && final.state !== 'ended') narrate(`Engine incarnation ${n}: its job closed ${final.state}`);
-        jobRun.retireRunRecord(engineChild.jobRun);
-      });
+      // Held until endEngineJobs: a restart keeps what the dead incarnation left (as it keeps its
+      // registered helpers), and a stop ends it only after its ordered steps.
+      if (backend.jobRun) engineJobs.set(n, backend);
       return backend;
     },
     describeExit: (code) => engineSupervisor.describeExit(code, supervisionPolicy),
@@ -2960,6 +3036,7 @@ async function runAdmittedStart(opts, ctx) {
         // asked for in this process is ended by its caller.
         if (!outcome.firstReadyDone || quitCallerActive || reaping) return;
         await startupSettled;
+        endEngineJobs();
         onExit();
         process.exit(outcome.code != null && outcome.code !== 0 ? outcome.code : 0);
       },
@@ -3027,16 +3104,18 @@ async function runAdmittedStart(opts, ctx) {
     ]);
     await actuator.flush();
     const frontendStopped = await frontendStop;
-    // The Engine's job, once the Engine has exited: its host ended what the Engine left in it and
-    // named each by identity. A job whose host has not closed it is left to the stop's job step.
-    const engineChild = backend;
-    const final = engineChild?.jobRun ? engineChild.jobFinal : null;
-    const engineJob = engineChild?.jobRun ? {
+    // Last, the Engine's jobs: after the quit, the registered-helper step (run with the Engine's
+    // exit report) and the frontend's recorded identity. Each process they end is listed.
+    const heldJobs = engineJobs.size > 0;
+    const ending = endEngineJobs();
+    const engineJob = heldJobs ? {
       incarnation: outcome?.incarnation ?? null,
-      host: engineChild.jobRun.host ?? null,
-      state: final?.state ?? 'running',
-      rootExitCode: final?.rootExitCode ?? null,
-      endedByJob: jobIdentities(final?.endedByJob),
+      host: backend?.jobRun?.host ?? null,
+      state: ending.state,
+      rootExitCode: backend?.jobFinal?.rootExitCode ?? null,
+      endedByJob: ending.endedByJob,
+      survivors: ending.survivors,
+      incarnations: ending.incarnations,
     } : null;
     const stopped = Boolean(outcome) && frontendStopped && (!engineJob || engineJob.state === 'ended');
     await writeJsonAtomic(stopResultPath, {
@@ -3047,6 +3126,8 @@ async function runAdmittedStart(opts, ctx) {
       engine: outcome ? { state: outcome.state, code: outcome.code ?? null, incarnation: outcome.incarnation ?? null } : null,
       frontendStopped,
       engineJob,
+      // What the registered-helper step ended, before the recorded identities and the job.
+      registeredHelpers: quitHelperCleanup?.childCleanup ?? [],
       at: nowIso(),
     }).catch((err) => narrate(`stop result write failed: ${err?.message ?? err}`));
     if (!ctx.settled) return; // a start in progress reports its own end (cmdStart)
@@ -3324,8 +3405,9 @@ async function runAdmittedStart(opts, ctx) {
     Promise.race([
       supervision.hostQuit({ detail: 'interrupted', deadlineMs: boundMs }),
       new Promise((resolve) => setTimeout(resolve, boundMs)),
-    ]).finally(() => {
-      stopFrontendTree();
+    ]).finally(async () => {
+      await Promise.resolve(stopFrontendTree()).catch(() => false);
+      endEngineJobs();
       onExit();
       process.exit(0);
     });
@@ -3371,6 +3453,7 @@ async function runAdmittedStart(opts, ctx) {
           actor: { source: 'dev-runner', agentSessionId: current?.holder?.agentSessionId ?? null },
           victim: { runId, holder: current?.holder ?? null },
         }).catch(() => {});
+        endEngineJobs();
         process.exit(0); // cleanup done (active.json removed + stop-report written)
         return;
       }
@@ -3419,6 +3502,7 @@ async function runAdmittedStart(opts, ctx) {
       supervision.hostQuit({}),
       new Promise((resolve) => setTimeout(resolve, engineActuator.QUIT_DEADLINE_MS + 2000)),
     ]).finally(() => {
+      endEngineJobs();
       onExit();
       process.exit(code != null && code !== 0 ? code : 0);
     });
@@ -3836,6 +3920,51 @@ async function stopRun(opts, {
   let pendingEngineExit = null;
   // Whether the fallback already took the post-kill identity lookup the exit checks below read.
   let identitiesRefreshed = false;
+  let childCleanup;
+  // The registered-helper step: each helper the Engine registered, ended on a handle showing its
+  // recorded start. It comes after the ordered quit and before the recorded identities and the
+  // Engine's job, so nothing it would stop in order is ended first by a job closing.
+  const runHelperStep = async () => {
+    if (dataDirAbs && inspectChild === inspectProcessIdentity && terminateChild === terminatePid) {
+      // One shared snapshot before helper actions and one shared verification after the batch.
+      const childCleanup = [];
+      const pending = [];
+      for (let i = 0; i < registered.length; i++) {
+        const child = registered[i], p = helperProcesses[i];
+        const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
+        const record = { id: child.id, ...p };
+        const state = await lookupOne(p);
+        if (state === 'gone' || state === 'reused') {
+          childCleanup.push({ ...record, outcome: state === 'gone' ? 'dead' : 'identity-mismatch' }); continue;
+        }
+        const expected = Date.parse(child.startedAt);
+        const actual = engineActuator.fileTimeToMs(row?.creationFileTime);
+        if (state !== 'match' || !Number.isFinite(expected) || actual === null
+            || !normalizeExecutable(child.executable) || !normalizeExecutable(row?.executable)) {
+          childCleanup.push({ ...record, outcome: 'unknown-identity' }); continue;
+        }
+        if (expected !== actual || normalizeExecutable(child.executable) !== normalizeExecutable(row.executable)) {
+          childCleanup.push({ ...record, outcome: 'identity-mismatch' }); continue;
+        }
+        let accepted = false;
+        try { accepted = await terminateChild(p.pid, { startedAtMs: actual }); } catch { /* verification below */ }
+        pending.push({ ...record, killAccepted: accepted });
+      }
+      if (pending.length) await lookupPhase(allEntries());
+      for (const child of pending) {
+        const state = await lookupOne(child);
+        const outcome = state === 'gone' || state === 'reused' ? 'terminated'
+          : state === 'unknown' ? 'unknown-exit' : 'termination-failed';
+        childCleanup.push({ ...child, outcome });
+        if (outcome === 'terminated' && child.killAccepted && !killedPids.includes(child.pid)) killedPids.push(child.pid);
+      }
+      for (const child of childCleanup) if (!['dead', 'terminated', 'identity-mismatch'].includes(child.outcome)) {
+        errors.push(`registered helper pid ${child.pid}: ${child.outcome}`);
+      }
+      return childCleanup;
+    }
+    return dataDirAbs ? cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
+  };
   if (runnerStopped) {
     gracefulBackendShutdown = { outcome: 'exited', reason: 'runner_quit', requested: true, httpStatus: null,
       error: null, waitedMs: runnerAnswer.waitedMs };
@@ -3910,6 +4039,13 @@ async function stopRun(opts, {
       return killedPids.includes(p.pid);
     };
 
+    // The registered-helper step before any identity is ended: killing the runner closes its job,
+    // and with it the Engine's job host, which would end the helpers out of order. A quit that was
+    // asked for is a new phase (the Engine may have ended its helpers), so it gets a fresh batch;
+    // without one, the fallback's batch above still describes every helper.
+    if (gracefulBackendShutdown?.requested) await lookupPhase(allEntries());
+    childCleanup = await runHelperStep();
+
     // 2. The runner (never this process), only its recorded identity. A current runner's children
     //    are in its job; the Engine and the frontend are each ended by their own recorded identity
     //    in the next steps, never through the runner's parent links.
@@ -3982,50 +4118,29 @@ async function stopRun(opts, {
     }
   }
   if (!identitiesRefreshed) await lookupPhase(allEntries());
-  let childCleanup;
-  if (dataDirAbs && inspectChild === inspectProcessIdentity && terminateChild === terminatePid) {
-    // One shared snapshot before helper actions and one shared verification after the batch.
-    childCleanup = [];
-    const pending = [];
-    for (let i = 0; i < registered.length; i++) {
-      const child = registered[i], p = helperProcesses[i];
-      const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
-      const record = { id: child.id, ...p };
-      const state = await lookupOne(p);
-      if (state === 'gone' || state === 'reused') {
-        childCleanup.push({ ...record, outcome: state === 'gone' ? 'dead' : 'identity-mismatch' }); continue;
-      }
-      const expected = Date.parse(child.startedAt);
-      const actual = engineActuator.fileTimeToMs(row?.creationFileTime);
-      if (state !== 'match' || !Number.isFinite(expected) || actual === null
-          || !normalizeExecutable(child.executable) || !normalizeExecutable(row?.executable)) {
-        childCleanup.push({ ...record, outcome: 'unknown-identity' }); continue;
-      }
-      if (expected !== actual || normalizeExecutable(child.executable) !== normalizeExecutable(row.executable)) {
-        childCleanup.push({ ...record, outcome: 'identity-mismatch' }); continue;
-      }
-      let accepted = false;
-      try { accepted = await terminateChild(p.pid, { startedAtMs: actual }); } catch { /* verification below */ }
-      pending.push({ ...record, killAccepted: accepted });
+  if (childCleanup === undefined) childCleanup = await runHelperStep();
+  // A runner that answered the stop ran the registered-helper step itself, right after the
+  // Engine's exit: a helper this step then finds gone is reported as that step ended it.
+  if (runnerStopped && Array.isArray(runnerAnswer?.registeredHelpers)) {
+    const byRunner = runnerAnswer.registeredHelpers.filter((c) => c?.pid);
+    childCleanup = childCleanup.map((c) => {
+      const earlier = c.outcome === 'dead' && byRunner.find((r) => Number(r.pid) === Number(c.pid)
+        && (r.startedAt ?? null) === (c.startedAt ?? null));
+      return earlier ? { ...c, outcome: earlier.outcome, killAccepted: earlier.killAccepted ?? null, stoppedBy: 'runner' } : c;
+    });
+    for (const r of byRunner) {
+      if (!childCleanup.some((c) => Number(c.pid) === Number(r.pid))) childCleanup.push({ ...r, stoppedBy: 'runner' });
     }
-    if (pending.length) await lookupPhase(allEntries());
-    for (const child of pending) {
-      const state = await lookupOne(child);
-      const outcome = state === 'gone' || state === 'reused' ? 'terminated'
-        : state === 'unknown' ? 'unknown-exit' : 'termination-failed';
-      childCleanup.push({ ...child, outcome });
-      if (outcome === 'terminated' && child.killAccepted && !killedPids.includes(child.pid)) killedPids.push(child.pid);
+    for (const c of childCleanup) {
+      if (c.stoppedBy === 'runner' && c.outcome === 'terminated' && c.killAccepted && !killedPids.includes(Number(c.pid))) {
+        killedPids.push(Number(c.pid));
+      }
     }
-    for (const child of childCleanup) if (!['dead', 'terminated', 'identity-mismatch'].includes(child.outcome)) {
-      errors.push(`registered helper pid ${child.pid}: ${child.outcome}`);
-    }
-  } else {
-    childCleanup = dataDirAbs ? await cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
   }
 
-  // 5. Last, the Engine's job: whatever the Engine left running after the ordered quit and the
-  //    recorded identities. A runner that saw its Engine exit reports what the job's host ended;
-  //    otherwise the job's recorded host is ended here (on a handle showing its recorded birth),
+  // 5. Last, the Engine's job: whatever the Engine left running after the ordered quit, the
+  //    registered-helper step and the recorded identities. A runner that answered the stop ended
+  //    its held jobs as its own last step and reports what they ended; otherwise the job's recorded host is ended here (on a handle showing its recorded birth),
   //    which ends every member, and each recorded member is verified gone. Either way each process
   //    the job's termination ended is listed by identity.
   let engineJob = null;
@@ -4259,7 +4374,7 @@ async function cmdCleanup(opts) {
   }
   if (opts.clean !== 'none') {
     const dir = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
-    if (dir) await cleanDataDir(dir, opts.clean);
+    if (dir) await cleanOwnDataDir(dir, opts.clean);
   }
   process.stdout.write(JSON.stringify({ ok: true, runId: run.runId, portsClosed: stopRes.portsClosed }) + '\n');
   if (!stopRes.portsClosed && !opts.force) process.exit(1);
@@ -4388,6 +4503,8 @@ if (require.main === module) {
       pruneHistoricRuns,
       resolveDataDir,
       cleanDataDir,
+      cleanOwnDataDir,
+      assertCleanableDataDir,
       authoredStoreTopLevelNames,
       acquireAdmission,
       readActiveOpLeases,

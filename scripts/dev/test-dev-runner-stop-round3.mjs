@@ -123,6 +123,9 @@ test('real default CLI start refuses forgotten live processes without cleaning, 
   const runId = 'forgotten-live-cli', dir = path.join(state, 'runs', runId);
   fs.mkdirSync(dir, { recursive: true });
   const sentinel = path.join(data, 'derived-still-in-use'); fs.writeFileSync(sentinel, 'preserve');
+  // The run's own data folder, as the start that created it marked it: the refusal under test is
+  // the forgotten processes, not a folder no dev tool owns.
+  fs.writeFileSync(path.join(data, '.justsearch-dev-data.json'), JSON.stringify({ schema: 'justsearch-dev-data.v1', tool: 'dev-runner', createdAt: new Date().toISOString() }));
   function launch(args, env = process.env) {
     const child = spawn(process.execPath, args, { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     const birth = spawnSync(identityExe, [String(child.pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim();

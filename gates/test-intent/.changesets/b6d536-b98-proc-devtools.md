@@ -219,6 +219,28 @@ isolation, serve-worktree-fe Ctrl+C record removal). Each of the seven new check
 worktree, new check files copied in) and passes after; the nested-job check's containment and exit-code parts already pass on
 bc5978095, as a confirmation should, and it fails there only on the stop's listing of what the job ended.
 
+Follow-up (fix(b6d536): dev tools clean only their own data folders and stop helpers in order): a soft or hard clean, and
+dev-all's clean at every start, runs only on a data folder a dev tool created and marked (scripts/dev/lib/dev-data-folder.cjs,
+marker .justsearch-dev-data.json naming the tool and the creation time). A missing folder is created and marked, an empty one
+marked; the default modules/ui-web/.dev-data without a marker is adopted only when every top-level entry is a known dev-data
+name (the Engine's own names plus the recoverability register's); any other folder is refused before anything starts, with a
+message naming it and how to proceed, and nothing in it changes (dev-runner: DATA_DIR_NOT_OURS, checked before admission and
+again at the clean; `--clean none` deletes nothing and is not checked). The stop keeps the decided order: ordered Engine quit,
+the registered-helper step, the recorded identities, and only then the job. The Engine's job no longer ends with the Engine:
+its host holds the job after the root exits (job-run.cs holdAfterRoot, state root-exited) and the job is closed by the stop's
+last step, or when the run ends without a stop; in the runner's fallback the registered-helper step runs before the runner is
+ended (with a fresh identity batch only when the ordered quit was asked for, so a stop still takes one lookup per phase).
+The forgotten-run fixtures of test-dev-runner-stop-round3.mjs ('real default CLI start refuses forgotten live processes') and
+test-dev-runner-stop-round4.mjs ('forgotten cleanup ...') now mark their data folder, as the start that created it would:
+the refusal and the clean they check are unchanged. test-dev-runner-engine-job.mjs's first check now expects the Engine's exit record to show its job still holding the
+detached process (jobEmpty false), because the job is no longer closed at the Engine's exit. New script checks:
+test-dev-runner-data-folder.mjs (the real dev-all in a scratch repository with a stub Gradle, and the real dev-runner CLI,
+each refusing a non-empty unmarked --data-dir and leaving it byte-identical; marking, adoption and the marker kept through
+dev-all's clean) and a registered-helper case in test-dev-runner-engine-job.mjs (stopped by the registered-helper step and
+recorded there, not as DEV_RUNNER_JOB). The two refusal checks and the registered-helper check fail by assertion on 280d21c19
+(detached worktree, new check files copied in: the folder was cleaned; the helper was already dead when its step came) and
+pass after; the marking and adoption checks fail there because the module does not exist.
+
 ## Acceptance records
 
 Pending the orchestrator's independent verifier and the owner's behavior verdict.

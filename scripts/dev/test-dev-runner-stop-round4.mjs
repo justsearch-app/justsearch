@@ -19,6 +19,8 @@ function forgotten(id, leftBehind) {
   fs.mkdirSync(path.join(repo, 'tmp'), { recursive: true });
   const data = fs.mkdtempSync(path.join(repo, 'tmp', 'round4-forgotten-'));
   const sentinel = path.join(data, 'derived-in-use'); fs.writeFileSync(sentinel, 'preserve');
+  // The run's own data folder, marked as the start that created it marks it: a clean may run on it.
+  fs.writeFileSync(path.join(data, '.justsearch-dev-data.json'), JSON.stringify({ schema: 'justsearch-dev-data.v1', tool: 'dev-runner', createdAt: new Date().toISOString() }));
   const dir = path.join(root, 'runs', id); fs.mkdirSync(dir, { recursive: true });
   const run = { runId: id, holder: owner, pids: {}, identities: {}, dataDir: data };
   fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify(run));

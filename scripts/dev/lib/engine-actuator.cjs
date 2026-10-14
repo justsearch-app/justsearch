@@ -604,8 +604,9 @@ function createEngineActuator({
           exitClass: decision.exitClass ?? 'TRANSIENT',
           counted: decision.counted === true,
         },
-        // A runner-started job holds the Engine and everything it starts (job-run.cjs); its host
-        // reports whether the job was empty once it ended what the Engine left. Otherwise Node's.
+        // A runner-started job holds the Engine and everything it starts (job-run.cjs); jobEmpty is
+        // whether the Engine left nothing in it when it exited (what it left is held until the
+        // stop's last step, after the registered-helper step). Otherwise Node's job.
         containment: state.child?.jobRun ? 'DEV_RUNNER_JOB' : 'LIBUV_JOB',
         jobEmpty: state.child?.jobRun && state.child.jobFinal ? state.child.jobFinal.state === 'ended' : null,
       };

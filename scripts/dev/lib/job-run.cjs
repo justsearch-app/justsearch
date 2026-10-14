@@ -57,11 +57,16 @@ function recordDirectory(env = process.env) {
  * it nor anything it starts; the caller then ends the run through the root's own quit channel or
  * the job. The host itself never acts on Ctrl+C.
  *
+ * `holdAfterRoot`: when the root exits the host records it (state `root-exited`, `rootExitCode`)
+ * and keeps what the root left in the job until the job empties by itself (state `ended`) or the
+ * caller's stop ends the host (stopJobRunSync), so the caller's ordered steps run before the job
+ * ends anything.
+ *
  * @returns {{ child: import('child_process').ChildProcess, recordPath: string|null,
  *   host: {pid: number, creationFileTimeUtc: string}|null, contained: boolean }}
  */
 function startInJob({ command, args = [], cwd, env = process.env, stdio, label = 'run', newProcessGroup = false,
-  recordDir = null, platform = process.platform, spawnImpl = spawn, capture = captureSpawnedIdentity } = {}) {
+  holdAfterRoot = false, recordDir = null, platform = process.platform, spawnImpl = spawn, capture = captureSpawnedIdentity } = {}) {
   if (platform !== 'win32') {
     return { child: spawnImpl(command, args, { cwd, env, stdio, shell: false }), recordPath: null, host: null, contained: false };
   }
@@ -69,7 +74,8 @@ function startInJob({ command, args = [], cwd, env = process.env, stdio, label =
   fs.mkdirSync(dir, { recursive: true });
   const recordPath = path.join(dir, `${label}-${process.pid}-${crypto.randomUUID()}.json`);
   const spec = Buffer.from(JSON.stringify({ ...windowsCommand(command, args, env), cwd: cwd ?? null,
-    ...(newProcessGroup ? { newProcessGroup: true } : {}) }), 'utf8').toString('base64');
+    ...(newProcessGroup ? { newProcessGroup: true } : {}), ...(holdAfterRoot ? { holdAfterRoot: true } : {}) }),
+  'utf8').toString('base64');
   const child = spawnImpl('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', HOST_SCRIPT, '-Spec', spec, '-RecordPath', recordPath],
   { cwd, env, stdio, windowsHide: true, shell: false });
@@ -148,26 +154,49 @@ function waitForRootSync(run, { timeoutMs = 20000, intervalMs = 10 } = {}) {
 
 /**
  * The root of a job run, seen as a child process: its PID and recorded birth are the root's, its
- * streams and exit are the host's (the host passes its standard handles to the root and exits with
- * the root's code once the job is empty). It has no kill(): a stop goes through a recorded identity
- * or the job. `jobRun` is the run; `jobFinal` is the record its host left, read at its exit.
+ * streams are the host's (the host passes its standard handles to the root). 'exit' is the root's:
+ * the root's code once the host records it (a held job, holdAfterRoot) or the host exits with it.
+ * It has no kill(): a stop goes through a recorded identity or the job. `jobRun` is the run;
+ * `jobFinal` is the record as it stood when the root's exit was seen (state `ended` when nothing
+ * was left in the job, `root-exited` when the host holds what was left); 'job-closed' follows when
+ * the host itself exits.
  */
-function rootAsChild(run, record, { spawnfile } = {}) {
+function rootAsChild(run, record, { spawnfile, pollMs = 25 } = {}) {
   const host = run.child;
   const facade = new EventEmitter();
+  let exited = false, rootCode = null;
+  const emitExit = (latest, code, signal) => {
+    if (exited) return;
+    exited = true;
+    clearInterval(poll);
+    facade.jobFinal = latest;
+    rootCode = code;
+    facade.emit('exit', code, signal);
+  };
+  // A held job outlives its root: the root's exit is read from the record its host writes.
+  const poll = setInterval(() => {
+    const latest = readRunRecord(run);
+    if (latest && Number.isInteger(latest.rootExitCode) && Number(latest.pid) === host.pid) {
+      emitExit(latest, latest.rootExitCode, null);
+    }
+  }, pollMs);
   Object.defineProperties(facade, {
     pid: { value: record?.root?.pid ?? undefined, enumerable: true },
     rootIdentity: { value: record?.root ? { pid: record.root.pid, creationFileTimeUtc: String(record.root.creationFileTimeUtc) } : null },
     stdin: { get: () => host.stdin }, stdout: { get: () => host.stdout }, stderr: { get: () => host.stderr },
-    exitCode: { get: () => host.exitCode }, signalCode: { get: () => host.signalCode },
+    exitCode: { get: () => (exited ? rootCode ?? host.exitCode : null) },
+    signalCode: { get: () => (exited && rootCode === null ? host.signalCode : null) },
     spawnfile: { value: spawnfile ?? host.spawnfile },
     jobRun: { value: run },
   });
   facade.jobFinal = null;
   host.on('error', (err) => facade.emit('error', err));
   host.on('exit', (code, signal) => {
-    facade.jobFinal = readRunRecord(run);
-    facade.emit('exit', code, signal);
+    clearInterval(poll);
+    const latest = readRunRecord(run);
+    emitExit(latest, Number.isInteger(latest?.rootExitCode) ? latest.rootExitCode : code,
+      Number.isInteger(latest?.rootExitCode) ? null : signal);
+    facade.emit('job-closed', latest);
   });
   host.on('close', (code, signal) => facade.emit('close', code, signal));
   return facade;

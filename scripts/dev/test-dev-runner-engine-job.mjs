@@ -107,10 +107,66 @@ test('dev-runner stop: a detached process the Engine started is ended by the Eng
   assert.equal(report.runner?.engine?.code, 0, 'the Engine itself quit with 0: ' + JSON.stringify(report.runner));
   const exits = fs.readFileSync(path.join(data, 'runtime', 'exit-ledger', 'engine.v1.jsonl'), 'utf8').split(/\r?\n/)
     .filter(Boolean).map(l => JSON.parse(l)).filter(r => r.type === 'engine-exit');
-  assert.deepEqual(exits.map(r => [r.code, r.containment, r.jobEmpty]), [[0, 'DEV_RUNNER_JOB', true]],
-    'one exit, code 0, in the runner\'s job, which its host left empty');
+  assert.deepEqual(exits.map(r => [r.code, r.containment, r.jobEmpty]), [[0, 'DEV_RUNNER_JOB', false]],
+    'one exit, code 0, in the runner\'s job, in which the Engine left its detached process');
   assert.deepEqual(await stillRunning([decoy.recordedIdentity], 0), [decoy.recordedIdentity],
     'a process outside the run with the same image name is never touched');
+  await until(() => start.exitCode !== null, 15000, () => 'the runner did not exit');
+});
+
+// An Engine that registers a helper in its manifest (as llama-server is registered) and whose
+// ordered close leaves it running and listed: the fake Engine, wrapped.
+const REGISTERING_ENGINE = (identityExe, fakeEngine, out) => `const fs=require('fs'),cp=require('child_process'),path=require('path');
+const manifest=path.join(process.env.JUSTSEARCH_DATA_DIR,'runtime','manifest.json');
+const helper=cp.spawn(process.execPath,['-e','setInterval(()=>{},60000)'],{detached:true,stdio:'ignore',windowsHide:true});helper.unref();
+const birth=cp.spawnSync(${JSON.stringify(identityExe)},[String(helper.pid)],{encoding:'utf8',windowsHide:true}).stdout.trim();
+const startedAt=new Date(Number(BigInt(birth)/10000n-11644473600000n)).toISOString();
+const child={id:'fixture-helper',kind:'llama-server',pid:helper.pid,executable:process.execPath,startedAt};
+fs.writeFileSync(${JSON.stringify(out)},JSON.stringify({pid:helper.pid,creationFileTimeUtc:birth}));
+let last=null;
+const write=m=>{fs.writeFileSync(manifest+'.tmp',JSON.stringify(m));fs.renameSync(manifest+'.tmp',manifest)};
+setInterval(()=>{try{const m=JSON.parse(fs.readFileSync(manifest,'utf8'));if(!m.children){m.children=[child];write(m)}last=m}catch{}},50);
+const exit=process.exit.bind(process);
+process.exit=code=>{if(last)try{write({...last,children:[child]})}catch{};exit(code)};
+import(${JSON.stringify('file:///' + fakeEngine.replaceAll('\\', '/'))});`;
+
+test('dev-runner stop: a helper registered with the Engine is ended by the registered-helper step, before the job, and reported as such', async () => {
+  const state = path.join(root, 'registered'); fs.mkdirSync(state, { recursive: true });
+  const plan = path.join(state, 'plan.json');
+  fs.writeFileSync(plan, JSON.stringify({ incarnations: [{ mode: 'honour' }] }));
+  const helperFile = path.join(state, 'helper.json');
+  const wrapper = path.join(state, 'registering-engine.cjs');
+  fs.writeFileSync(wrapper, REGISTERING_ENGINE(identityExecutable(), path.join(repo, 'scripts/supervisor-conformance/fake-engine.mjs'), helperFile));
+  const data = path.join(dataRoot, 'registered');
+  const env = { ...process.env, NODE_OPTIONS: '', JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state, JUSTSEARCH_SUPERVISOR_HARNESS: '1',
+    JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', JUSTSEARCH_FAKE_ENGINE_PLAN: plan, CI: '',
+    JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, wrapper]),
+    JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([process.execPath, '-e', 'setInterval(()=>{},60000)']) };
+  const start = spawn(process.execPath, [path.join(repo, 'scripts/dev/dev-runner.cjs'), 'start', '--json', '--skip-build',
+    '--clean', 'none', '--api-port', '0', '--ui-port', String(await freePort()), '--data-dir', data, '--session-id', 'registered'],
+  { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  owned.push(start.recordedIdentity);
+  let output = ''; start.stdout.on('data', b => { output += b; }); start.stderr.on('data', b => { output += b; });
+  const live = await until(() => {
+    if (start.exitCode !== null) assert.fail('dev-runner start exited: ' + output);
+    const active = read(path.join(state, 'active.json'));
+    const run = active?.runId ? read(path.join(state, 'runs', active.runId, 'run.json')) : null;
+    const manifest = read(path.join(data, 'runtime', 'manifest.json'));
+    return active?.phase !== 'starting' && run?.pids?.frontendRootPid && manifest?.children?.length ? { active, run } : null;
+  }, 90000, () => 'the stack did not start: ' + output);
+  const helper = read(helperFile);
+  owned.push(helper);
+
+  const stop = spawnSync(process.execPath, [path.join(repo, 'scripts/dev/dev-runner.cjs'), 'stop', '--json', '--session-id', 'registered'],
+    { cwd: repo, env, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+  const result = JSON.parse(stop.stdout.trim().split(/\r?\n/).at(-1));
+  assert.deepEqual(await stillRunning([helper]), [], 'the registered helper must not outlive the stop: ' + JSON.stringify(result));
+  assert.equal(result.outcome, 'STOPPED', JSON.stringify(result));
+  const report = read(path.join(state, 'runs', live.active.runId, 'stop-report.json'));
+  const step = (report?.childCleanup ?? []).find(c => Number(c.pid) === helper.pid);
+  assert.equal(step?.outcome, 'terminated', 'the registered-helper step ended it: ' + JSON.stringify(report?.childCleanup));
+  assert.equal(lists(result.engineJob?.endedByJob, helper) || lists(report?.engineJob?.endedByJob, helper), false,
+    'the job did not end it first (it is not listed as ended by the job): ' + JSON.stringify(report?.engineJob));
   await until(() => start.exitCode !== null, 15000, () => 'the runner did not exit');
 });
 
