@@ -125,9 +125,15 @@ check):
   | Engine incarnation | `engine-owner-died` osCheck GONE naming another PID | false |
   | Engine incarnation | `engine-owner-died` ALIVE_MATCH (any class), IDENTITY_UNKNOWN, REUSED, or no osCheck | false |
   | Engine incarnation | `engine-intent`, `ledger-gap` | false |
+  | Engine incarnation | an exit or GONE reconciliation of another incarnation, or one naming another birth than the start (at the start's measured tick) | false |
+  | Engine incarnation with two start identities | an exit or GONE reconciliation not naming the start's PID and birth | false |
+  | Engine incarnation | two exits with different codes | true, and a `ledger_codes_disagree` gap |
   | Ledger child | `child-exit` REQUESTED, UNEXPECTED with a code, or UNKNOWN without a code | true |
   | Ledger child | `child-exit` marked reconciled, naming another PID, or naming its PID with another birth | false |
-  | Ledger child | `owner-died` osCheck GONE (any class) | true |
+  | Ledger child | `owner-died` osCheck GONE (any class) naming the owner its spawn named (PID, birth and instance) | true |
+  | Ledger child | `owner-died` osCheck GONE naming another owner PID, birth or instance, or no `previousOwner` when its spawn named one | false |
+  | Ledger child | `child-exit` or `owner-died` naming another incarnation than its spawn | false |
+  | Ledger child | two `child-exit` with different codes | true, and a `ledger_codes_disagree` gap |
   | Ledger child | `owner-died` ALIVE_MATCH, IDENTITY_UNKNOWN, REUSED, or no osCheck (any class) | false |
   | Ledger child | `child-survived`, `stop-intent`, `stop-escalate`, `child-note`, `gpu-release` | false |
   | Ledger child | a second `child-start` with another identity under its childId: then no record naming only the childId proves either start | false |
@@ -165,7 +171,8 @@ check):
 - Known limit: a file rewritten in place under the same file id, longer than before, whose old
   length happens to end on a line boundary of the new content, reads as grown. The reader cannot
   tell it from an append. A rewrite whose old length falls inside a line is detected (its first
-  new line does not parse) and read again in full. The ledger writers only append and rotate.
+  new line does not parse): since round 6 that line is a `ledger-damaged` gap read from the tail,
+  not a reason to read the file again in full. The ledger writers only append and rotate.
 
 Follow-up decisions after the independent verifier rejected e2939b0ed:
 
@@ -197,6 +204,32 @@ Follow-up decisions after the independent verifier rejected e2939b0ed:
   retry reported complete without the first census's `ledger_os_disagree`; a held
   stop-report.json was left out of `earlierReports`.)
 
+Follow-up decisions after the independent verifier rejected 7c67eb5d3 (decided by the
+orchestrator):
+
+- Identity: "a record proves or matches a start only when it agrees with every identity field both
+  carry: PID, birth at measured precision (native FILETIME on both sides is exact, whatever a
+  declaration says), childId, owner instance and incarnation. A missing field on the record is
+  never a wildcard for a field the start carries, except birth precision where the record genuinely
+  measured less. If anything is ambiguous, it's not proof." (On 7c67eb5d3 a child's `owner-died`
+  GONE naming another owner instance proved its exit while it ran; a second Engine start in a
+  shared incarnation took the first start's exit; a target's stale declared `birthTick` 10 let a
+  held handle one tick off a native birth match.)
+- Evidence: "gaps and disagreements found by any earlier stop of the run are carried forward and
+  keep accounting incomplete until a person forgets the run. No later record clears them. A
+  ledger that holds two different exit codes for one identity is itself a disagreement. An earlier
+  report or census that can't be read is a gap." The findings carried are every gap whose reason
+  names a disagreement (`ledger_os_disagree`, `ledger_codes_disagree`, `owner_witness_disagree`,
+  ...), `evidence_lost`, `ledger-damaged` other than a torn last line alone, and
+  `earlier-census-unreadable` / `earlier-report-unreadable`. A gap that only says an exit was not
+  seen yet (`unrecorded_exit`, an identity-bound OS exit unavailable, `exit_unproven`,
+  `ledger-unreadable`, a torn last line) is looked for again by the retry and not carried. (On
+  7c67eb5d3 an unreadable earlier report, or a disagreement only an earlier report held, left no
+  gap, and a later receipt naming the OS code cleared the first census's `ledger_os_disagree`.)
+- Performance: "read the tail only. The damaged line gives a gap from the tail; the earlier content
+  stays cached." (On 7c67eb5d3 one corrupt appended line made the reader read the whole file
+  again.)
+
 What changed:
 
 - `scripts/dev/lib/stop-exit-census.cjs`: `proofOfRecord` and `provenExitOf` decide exit proof
@@ -224,8 +257,8 @@ What changed:
   taken from the open handle (`fstat`). If that differs from the stat's, a rotation has replaced
   it, so neither identity's cache is kept and the read starts again from the listing. A read whose
   listing or file identities changed by its end starts again too, as does one that met a missing
-  or moving file (ENOENT, EPERM, EBUSY, EACCES), a short read, or a grown file whose first new
-  line does not parse. After 8 attempts, 5 ms apart, it throws `LEDGER_UNSETTLED`, which
+  or moving file (ENOENT, EPERM, EBUSY, EACCES) or a short read (a grown file whose new bytes
+  hold a damaged line keeps its cache and counts the line as damaged). After 8 attempts, 5 ms apart, it throws `LEDGER_UNSETTLED`, which
   `readRunLedger` records as the family's `error`. The verdict replaces the arming read's ledger gaps with the
   final read's. The ledger view reads each helper window's instants once and finds windows,
   owner records, owning children, console parents and report rows through PID and image indexes
@@ -258,14 +291,29 @@ What changed:
   report carries the census's `earlierCensus` and `earlierCensusFiles`. The census keeps its earlier files the same way
   (40 attempts, 50 ms apart). stop-report.json is always the latest stop's, so its readers
   (including the forget check) are unchanged.
+- Round 6, `stop-exit-census.cjs`: `recordAgrees` matches a record to a start on every identity
+  field both carry (PID, birth at the start's measured tick, childId, owner PID, birth and
+  instance, incarnation), and an `owner-died` must name the owner its child's spawn named.
+  `birthTickOf` works a target's tick out from its source and the ledger view, never from a
+  declared `birthTick`; the census arming view also serves the OS exits handed to `beforeVerdict`.
+  `ledgerExitFor` gives an Engine target only its own start's exit. `provenExitOf` reports
+  `conflictingCodes`, and `exitResult` adds a `ledger_codes_disagree` gap for them. `isFinding`
+  and `carryFindings` carry an earlier stop's findings (with `carriedFrom`) and keep accounting
+  incomplete; the census writes its findings into its `process-exits` file and reads them back
+  from every kept earlier census. `dev-runner.cjs` `keepEarlierReports` returns `earlierFindings`
+  (each readable report's gaps, and `earlier-report-unreadable` for one that cannot be read), and
+  `stopRun` carries them into the report. `exit-ledger.cjs` `createIncrementalReader` parses the
+  appended tail only; a line there that does not parse is damage, not a reason to reread.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (31 cases). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (41 cases). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
 pass on b599d4d7e, as preservation; 21 passes on e3f82e1a9 and fails on b599d4d7e, as
 preservation of the coarser matching), cases 17, 19, 25, 26 and 27 to 31 on e2939b0ed (29
-passes on b599d4d7e, as preservation), and all pass after:
+passes on b599d4d7e, as preservation), cases 32 to 34 and 36 to 41 on 7c67eb5d3 (32 and 33 pass
+on b599d4d7e, as preservation; 35 passes on 7c67eb5d3 and b599d4d7e, as preservation of the
+dev-runner Engine's microsecond birth through this round's change), and all pass after:
 
 1. Real `stop-job-run.ps1`: a job member whose PID now names a running process whose birth
    cannot be read (found at run time, query rights only) is a survivor without the ledger and is
@@ -349,8 +397,9 @@ passes on b599d4d7e, as preservation), and all pass after:
 22. The incremental reader with the current file missing, renamed and replaced, grown, truncated,
    deleted and recreated, or rewritten in place, at its stat, open, fstat and first read, cold and
    with the file cached (48 combinations): it never throws, keeps generation 0 where a file still
-   holds it, reads no record twice, and its next read equals `readLedger`. On e3f82e1a9 the
-   missing file threw ENOENT at the stat and the open.
+   holds it, reads no record twice, and its next read equals `readLedger`, except a rewrite in
+   place under the same id, which now shows as damage (round 6). On e3f82e1a9 the missing file
+   threw ENOENT at the stat and the open.
 23. A family rotated at every stat: the reader throws `LEDGER_UNSETTLED`; `readRunLedger` records
    the family's error and the verdict has a `ledger-unreadable` gap and is not complete. On
    e3f82e1a9 the read returned.
@@ -399,6 +448,44 @@ passes on b599d4d7e, as preservation), and all pass after:
    archives them as `.3`, still reports the disagreement, and lists every file archived. A census
    file held with FileShare.None (unreadable) is an `earlier-census-unreadable` gap. On e2939b0ed
    the first retry was complete with no gap.
+32. Real `stopRun`: a child whose only record after its start is an `owner-died` GONE naming
+   another owner instance than its spawn, the child still running with its birth. It is looked
+   up, the stop is `STOP_INCOMPLETE` and accounting is not complete. On 7c67eb5d3 it was never
+   looked up.
+33. Two Engine starts under one incarnation, the exit naming only the first, the OS seeing both
+   exit 0: not complete. Preserved from b599d4d7e.
+34. The same ledger: only the second start is armed, a gap names it and its row is not an
+   expected termination. On 7c67eb5d3 it took the first start's exit and was complete; b599d4d7e
+   armed neither.
+35. The census's OS exits handed to `beforeVerdict` match a dev runner's microsecond Engine birth
+   to the exact held handle (the stop writes its Engine exit from them). It failed with this
+   round's tick change until the arming view was passed (the real-CLI stop-ownership file found
+   it).
+36. A child and an Engine start the Engine wrote, each target declared `birthTick` 10 after
+   arming, the held handle one tick off in the same microsecond: not complete, a gap names it.
+   On 7c67eb5d3 both were complete.
+37. A corrupt line appended to a cached children file: exactly one read of the 6 new bytes, one
+   damaged line, earlier records kept. On 7c67eb5d3 the file was read again in full.
+38. Real `stopRun` after an earlier stop-report.json: none, complete; corrupt, an
+   `earlier-report-unreadable` gap naming stop-report.1.json; one holding `ledger_os_disagree`,
+   carried from stop-report.1.json, and once only through a further retry; one holding only
+   `unrecorded_exit`, complete. On 7c67eb5d3 the corrupt and disagreeing reports left it complete.
+39. A running child of the test as the Engine exits 7, its ledger exit says 0: the first real
+   census finds `ledger_os_disagree`. A later `engine-exit` code 7 for the same identity is
+   appended; the retry is not complete and its only gaps are the carried `ledger_os_disagree`
+   (from process-exits.1.json) and `ledger_codes_disagree`. On 7c67eb5d3 the retry was complete.
+40. Generated: 3,000 record sets from seed 0xB6D536 (Engine or child; one or two starts,
+   duplicate, same PID one tick off, or another; up to three exits or reconciliations naming or
+   omitting PID and birth, right, wrong or one tick off, another incarnation or childId, owner
+   same, another instance, PID or birth, without instance or none; osCheck variants, reconciled,
+   codes 0 and 3, every order; OS rows with own or neighbouring birth, codes 0 and 3, or none, and
+   declared ticks 1, 10, 10000 or none), each judged by `endedIdentitiesOf` and the verdict and by
+   an oracle in the test that is the identity rule alone. A mismatch prints the seed, case and
+   input; `STOP_CENSUS_GEN_CASE=<n>` runs one case. On 7c67eb5d3, 186 cases disagree.
+41. Generated: 250 histories through real `stopRun` with a stand-in observer, up to three earlier
+   stop reports or census files, each unreadable or holding up to three gaps from a table of
+   findings and not-yet-seen gaps. Complete exactly when no earlier file is unreadable and none
+   holds a finding, and every unreadable file and finding is named. On 7c67eb5d3, 140 disagree.
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -446,4 +533,23 @@ the same cases fail by assertion as the verifier recorded (`rotation-race.cjs`,
 `rotation-edges.cjs` and `writer-and-named-limit.cjs` pass there too). Cases 6 and 14 took 1,202
 and 2,004 ms in the full run of the check.
 
-Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r5/).
+After the 7c67eb5d3 fixes, every verifier harness of rounds 2 to 6 was run again from copies with
+fresh folders, against this change and b599d4d7e. Round 6's `proof-extra.cjs` (5) and
+`r6-retention.cjs` (6), round 5's `proof-probes.cjs` (5) and `r5-retention.cjs` (3), the r2, r3
+and r4 `independent.cjs` (19 each), r3 and r4 `independent-extra.cjs` (22 each), the two
+`independent-edges.cjs` retention scenarios, `audit-edges.cjs` (19), `audit-more.cjs` (23),
+`rotation-race.cjs`, `rotation-edges.cjs`, `rotation-read-retry.cjs` (cold and warm),
+`rotation-rename-gap.cjs`, `torn-engine.cjs`, the four `enoent-states.cjs` states,
+`writer-and-named-limit.cjs` and `incremental-tail-probe.cjs` (plain and corrupt: one 6-byte read
+at the old end, one damaged line) all pass. On b599d4d7e they fail by assertion as before
+(independent 5/19, independent-extra 6/22, audit-edges 11/19, audit-more 15/23, proof-probes and
+proof-extra 3/5, both retention files none), with `rotation-race.cjs`, `rotation-edges.cjs` and
+`writer-and-named-limit.cjs` passing there too. On the 17 MB harness, interleaved three times:
+b599d4d7e 13,535 / 12,982 / 13,505 ms, 120,178 parses, not complete; this change 1,917 / 1,805 /
+1,798 ms, 60,089 parses, complete; `assert-perf.cjs` and `assert-file-reads.cjs` pass. Its
+`lifecycle-perf.cjs` census took 13,975 ms on b599d4d7e and 1,353 ms with this change. The 41
+`test-dev-runner-*.mjs` files and `e-pair-identity.test.mjs` pass (200 tests). In the full run of
+the check, cases 6 and 14 took 1,151 and 1,924 ms, and the generated cases 40 and 41 took 11,031
+and 9,954 ms (they run last in the file).
+
+Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r6/).

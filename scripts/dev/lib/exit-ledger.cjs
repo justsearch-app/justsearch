@@ -357,8 +357,11 @@ const UNSETTLED_PAUSE_MS = 5;
  * (which a rotation's rename keeps), size and modification time. A file unchanged since the last
  * read is not opened again; a file that grew is read from where the last read ended, so only its
  * new tail is read and parsed, and a line still being written then (a torn tail) is parsed whole
- * once it is complete; any other change parses the file again from its start. The result is
- * readLedger's. `version()` changes whenever a read finds anything different.
+ * once it is complete; any other change parses the file again from its start. A line of the tail
+ * that cannot be read (a corrupt append, or the tail of a file rewritten in place under the same id,
+ * which starts mid-line) is counted damaged like any other, and what was read before stays: the
+ * tail is never a reason to read the whole file again. The result is readLedger's, but for such a
+ * rewrite, which it reports as damage. `version()` changes whenever a read finds anything different.
  *
  * What is read is known by the handle it is read through, never by the stat before the open: a
  * rotation between the two (the path now names the replacement file) shows as a different file id
@@ -366,8 +369,7 @@ const UNSETTLED_PAUSE_MS = 5;
  * listing, so the moved file is read in full under its new name and the replacement in full under
  * the old. A read that ends with a listing or a file id other than the one it started from starts
  * again too, and so does one that meets a listed file missing at its stat or its open (renamed, not
- * yet replaced), a file shorter than its handle said when read (truncated), or a grown file whose
- * new part does not start a line (rewritten in place under the same id). A read never lets what it
+ * yet replaced), or a file shorter than its handle said when read (truncated). A read never lets what it
  * cannot place stand for the ledger: a family still moving after STABLE_READ_ATTEMPTS reads (a short
  * pause between them) throws, and the caller treats that family as unreadable.
  */
@@ -452,16 +454,10 @@ function createIncrementalReader() {
               }
               const complete = chunk.lastIndexOf(0x0a) + 1;
               if (complete > 0) {
-                const before = entry.tally.corruptLines;
-                const firstLine = chunk.indexOf(0x0a) + 1;
-                readFileBytes(chunk.subarray(0, firstLine), family, entry.records, entry.tally);
-                if (grew && entry.tally.corruptLines > before) {
-                  // The new part of a grown file starts mid-line: the file was rewritten under the
-                  // same id, so what was parsed of it no longer describes it. Read it again whole.
-                  if (id) cache.delete(id);
-                  return null;
-                }
-                readFileBytes(chunk.subarray(firstLine, complete), family, entry.records, entry.tally);
+                // Only the tail is read. A line of it that cannot be read (a corrupt append, or a
+                // file rewritten in place so that the tail starts mid-line) is counted damaged, a
+                // gap; what was read before it stays as it was read.
+                readFileBytes(chunk.subarray(0, complete), family, entry.records, entry.tally);
                 entry.offset += complete;
               }
             }

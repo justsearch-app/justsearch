@@ -21,7 +21,8 @@ const { spawn, spawnSync, execFile } = require('child_process');
 // can't break the build/Engine JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
-const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, endedIdentitiesOf } = require('./lib/stop-exit-census.cjs');
+const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, endedIdentitiesOf,
+  carryFindings } = require('./lib/stop-exit-census.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
 const devDataFolder = require('./lib/dev-data-folder.cjs');
@@ -2066,9 +2067,12 @@ const REPORT_ARCHIVE_PAUSE_MS = 50;
  * next free number instead (`reportName`, with `earlierReportNotArchived` saying why). Never throws.
  * `earlierReports` is every earlier report kept, archived or not (run-directory file names: the
  * numbered ones, oldest number first, then a stop-report.json that stayed where it was);
- * `earlierReportFiles` gives each with whether it was archived and can be read.
+ * `earlierReportFiles` gives each with whether it was archived and can be read. `earlierFindings` is
+ * what those reports found that no later stop clears, for exitCensus.carryFindings: each readable
+ * report's accounting gaps, and an `earlier-report-unreadable` gap for each report that cannot be read.
  * @returns {Promise<{ earlierReports: string[], earlierReportFiles: Array<{ name: string, archived: boolean,
- *   readable: boolean }>, reportName: string, earlierReportNotArchived?: { file: string, error: string } }>}
+ *   readable: boolean }>, earlierFindings: Array<{ gap: object, from: string }>, reportName: string,
+ *   earlierReportNotArchived?: { file: string, error: string } }>}
  */
 async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   retryMs = REPORT_ARCHIVE_RETRY_MS, now = Date.now } = {}) {
@@ -2098,14 +2102,25 @@ async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve
   }
   const kept = [...numbered(names).map((name) => ({ name, archived: true })),
     ...(notArchived && names.includes('stop-report.json') ? [{ name: 'stop-report.json', archived: false }] : [])];
+  const earlierFindings = [];
   const earlierReportFiles = kept.map(({ name, archived }) => {
     let readable = true;
-    try { JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, '')); } catch { readable = false; }
+    try {
+      const report = JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, ''));
+      for (const gap of Array.isArray(report?.exitAccountingGaps) ? report.exitAccountingGaps : []) {
+        earlierFindings.push({ gap, from: name });
+      }
+    } catch (err) {
+      readable = false;
+      // What that stop found cannot be read, so it cannot be carried: the report itself is the gap.
+      earlierFindings.push({ from: name, gap: { reason: 'earlier-report-unreadable', file: name, archived,
+        detail: `${name} could not be read (${err?.code ?? err?.name ?? 'error'}); what that stop found is not accounted` } });
+    }
     return { name, archived, readable };
   });
   const earlierReports = kept.map((k) => k.name);
-  if (!notArchived) return { earlierReports, earlierReportFiles, reportName: 'stop-report.json' };
-  return { earlierReports, earlierReportFiles, reportName: nextName(names), earlierReportNotArchived: notArchived };
+  if (!notArchived) return { earlierReports, earlierReportFiles, earlierFindings, reportName: 'stop-report.json' };
+  return { earlierReports, earlierReportFiles, earlierFindings, reportName: nextName(names), earlierReportNotArchived: notArchived };
 }
 
 /** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
@@ -4362,11 +4377,17 @@ async function stopRun(opts, {
   const engineLog = await preserveEngineLog(run, runPath);
   // The Engine exit this stop records is written from the census's OS observation and before the
   // census reads the ledger for its verdict, so the report reads every record of the stop.
-  const exitAccounting = await exitCensus.finish({
+  const censusAccounting = await exitCensus.finish({
     beforeVerdict: pendingEngineExit ? (osExits) => {
       pendingEngineExit((osExits ?? []).find((e) => e.role === 'engine' && e.pid === byRole.backend.pid) ?? null);
     } : null,
   });
+  // A retried stop keeps the earlier stop's report and names it (run-directory file names, oldest
+  // first); stop-report.json is always this stop's. What an earlier stop found (a disagreement, lost
+  // or unreadable evidence, or a report that cannot be read at all) is carried into this stop's
+  // accounting: no later record or stop clears it (exitCensus.carryFindings).
+  const kept = await keepEarlierReports(runDir);
+  const exitAccounting = carryFindings(censusAccounting, kept.earlierFindings);
 
   const stopReport = buildStopReport({
     ...exitAccounting,
@@ -4402,9 +4423,7 @@ async function stopRun(opts, {
     ...(foreignPortOwner ? { foreignPortOwner } : {}),
   });
 
-  // A retried stop keeps the earlier stop's report and census and names them (run-directory file
-  // names, oldest first); stop-report.json is always this stop's.
-  const kept = await keepEarlierReports(runDir);
+  // The earlier census and reports this stop kept, by name.
   const earlierReports = kept.earlierReports;
   if (exitAccounting?.earlierCensus?.length) Object.assign(stopReport, { earlierCensus: exitAccounting.earlierCensus,
     earlierCensusFiles: exitAccounting.earlierCensusFiles });
