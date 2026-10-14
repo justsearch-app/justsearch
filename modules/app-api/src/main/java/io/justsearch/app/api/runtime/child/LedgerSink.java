@@ -14,7 +14,20 @@ public interface LedgerSink {
 
   boolean append(LedgerRecordType type, Map<String, ?> fields);
 
+  /** A record whose loss a reader reconstructs; written without its own forced flush where supported. */
+  default boolean appendUnforced(LedgerRecordType type, Map<String, ?> fields) {
+    return append(type, fields);
+  }
+
   static LedgerSink of(ExitLedgerWriter writer) {
-    return writer::append;
+    return new LedgerSink() {
+      @Override public boolean append(LedgerRecordType type, Map<String, ?> fields) {
+        return writer.append(type, fields);
+      }
+
+      @Override public boolean appendUnforced(LedgerRecordType type, Map<String, ?> fields) {
+        return writer.appendUnforced(type, fields);
+      }
+    };
   }
 }

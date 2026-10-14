@@ -107,6 +107,9 @@
         "diskEncryption" : {
           "type" : "string"
         },
+        "probedAtMs" : {
+          "type" : "integer"
+        },
         "qualityKnown" : {
           "type" : "boolean"
         },

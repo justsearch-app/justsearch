@@ -74,6 +74,7 @@ export interface StatusResponse {
   atRestProtection?: {
     confidence?: string;
     diskEncryption?: string;
+    probedAtMs?: number;
     qualityKnown?: boolean;
     source?: string;
   };
@@ -507,6 +508,7 @@ export const statusResponseSchema = z.strictObject({
   "atRestProtection": z.strictObject({
     "confidence": z.string().optional(),
     "diskEncryption": z.string().optional(),
+    "probedAtMs": z.number().int().optional(),
     "qualityKnown": z.boolean().optional(),
     "source": z.string().optional(),
   }).optional(),

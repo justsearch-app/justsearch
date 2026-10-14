@@ -307,6 +307,8 @@ public final class DefaultChildControl implements ChildControl {
 
     Optional<Instant> startedAt = process.info().startInstant();
     Held held = new Held(childId, spec, process, os, startedAt.orElse(clock.instant()));
+    // The Engine job's witness classifies this member's exit from what this owner records.
+    ProcessIntents.owned(held.pid, os.creationFileTime().orElse(null));
     if (held.descendants != null) {
       chatScopes.put(childId, held);
     }
@@ -653,6 +655,8 @@ public final class DefaultChildControl implements ChildControl {
     }
     if (begin) {
       noteDurability(held, append(LedgerRecordType.STOP_INTENT, intentFields(held, intent)));
+      ProcessIntents.intent(held.pid, held.os.creationFileTime().orElse(null),
+          intent.request().reason().name());
       launch(held, () -> runStop(held, false, sharedGrace));
     } else if (retry) {
       launch(held, () -> runStop(held, true, Optional.empty()));
@@ -823,6 +827,9 @@ public final class DefaultChildControl implements ChildControl {
         Optional.ofNullable(terminateCalledAt), terminateResult, forced, phase, true);
     boolean durable = append(LedgerRecordType.CHILD_EXIT, exitFields(outcome,
         intent == null ? null : intent.intentId(), cooperativeAt, terminator.codeDistinctive()));
+    ProcessIntents.outcome(held.pid, held.os.creationFileTime().orElse(null), exitClass.name(),
+        outcome.reason().map(Enum::name).orElse(
+            exitClass == ExitClass.UNEXPECTED ? ProcessIntents.NO_INTENT : null));
     CompletableFuture<ExitOutcome> stopFuture;
     boolean allDurable;
     String registryId;

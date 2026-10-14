@@ -30,7 +30,8 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <ul>
  *   <li>Each record is one append of the whole line, then {@code FileChannel.force(false)}, before
- *       the caller acts. The file is opened per append, so a rename between appends is safe.
+ *       the caller acts. {@link #appendUnforced} skips the force for a record whose loss readers
+ *       reconstruct from earlier forced records. The file is opened per append, so a rename between appends is safe.
  *   <li>A write failure never stops the caller: {@link #append} returns {@code false}, the writer
  *       turns {@link #healthy() unhealthy}, and a {@code ledger-gap} record is appended before the
  *       next record that can be written.
@@ -142,7 +143,20 @@ public final class ExitLedgerWriter {
    * @throws IllegalArgumentException if the record is of another family, names an envelope field,
    *     or exceeds {@link ExitLedger#MAX_RECORD_BYTES} (caller bugs, not I/O conditions)
    */
-  public synchronized boolean append(LedgerRecordType type, Map<String, ?> fields) {
+  public boolean append(LedgerRecordType type, Map<String, ?> fields) {
+    return append(type, fields, true);
+  }
+
+  /**
+   * Appends one record without forcing it: the line reaches the operating system before this
+   * returns, so it survives this process ending, but not necessarily a host crash. For records
+   * whose loss a reader reconstructs from earlier forced records (a helper window's end).
+   */
+  public boolean appendUnforced(LedgerRecordType type, Map<String, ?> fields) {
+    return append(type, fields, false);
+  }
+
+  private synchronized boolean append(LedgerRecordType type, Map<String, ?> fields, boolean force) {
     Objects.requireNonNull(type, "type");
     Objects.requireNonNull(fields, "fields");
     if (!type.belongsTo(family)) {
@@ -177,7 +191,7 @@ public final class ExitLedgerWriter {
     if (endsTorn(current)) lines.set(0, lines.get(0).afterNewline());
     for (Line line : lines) {
       try {
-        writeLine(current, line.bytes());
+        writeLine(current, line.bytes(), force);
       } catch (IOException e) {
         noteGap(LedgerGapReason.WRITE_FAILED, now);
         healthy = false;
@@ -203,7 +217,7 @@ public final class ExitLedgerWriter {
    */
   public synchronized boolean probeWritable() {
     try {
-      writeLine(family.current(ledgerDir), new byte[] {'\n'});
+      writeLine(family.current(ledgerDir), new byte[] {'\n'}, true);
       return true;
     } catch (IOException failure) {
       Instant now = clock.instant();
@@ -239,7 +253,7 @@ public final class ExitLedgerWriter {
   private void repairTornTail(Path current) {
     if (!endsTorn(current)) return;
     try {
-      writeLine(current, new byte[] {'\n'});
+      writeLine(current, new byte[] {'\n'}, true);
     } catch (IOException e) {
       healthy = false; // the next append closes it in the same write as its record
     }
@@ -263,14 +277,14 @@ public final class ExitLedgerWriter {
     }
   }
 
-  private void writeLine(Path file, byte[] bytes) throws IOException {
+  private void writeLine(Path file, byte[] bytes, boolean force) throws IOException {
     Files.createDirectories(ledgerDir);
     try (FileChannel channel =
         FileChannel.open(
             file, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
       ByteBuffer buffer = ByteBuffer.wrap(bytes);
       while (buffer.hasRemaining()) channel.write(buffer);
-      channel.force(false);
+      if (force) channel.force(false);
     }
   }
 

@@ -24,6 +24,7 @@ function fileTimeFromInstant(instant) {
   if (fraction.slice(7) !== '00') return null; // Windows process starts have 100 ns precision.
   return (BigInt(Date.parse(instant)) * 10000n + 116444736000000000n + BigInt(fraction.slice(3, 7))).toString();
 }
+const WITNESS_INTENT_BASES = new Set(['owner exit record', 'owner intent', 'owner window', 'console client']);
 const isFileTime = (v) => typeof v === 'string' && /^[1-9][0-9]{0,19}$/.test(v);
 /** The shared birth-identity rule (exit-ledger.cjs `sameBirth`): equal at the coarser clock's precision. */
 const { sameBirth, BIRTH_TICKS } = ledgerLib;
@@ -199,7 +200,10 @@ function ledgerView(ledger, runId) {
       const exit = exitOf(r);
       if (line.forced !== false || (!Number.isInteger(exit.code) && exit.exitClass !== 'UNKNOWN')
         || !['REQUESTED', 'UNEXPECTED', 'UNKNOWN'].includes(exit.exitClass)
-        || (exit.exitClass === 'REQUESTED' && (!w.awaited || w.expectedCode !== 0 || exit.code !== 0
+        // A witness line may carry the class of the owner intent it read (intentBasis); the
+        // census still derives the class from the owner's own records below, never from it.
+        || (exit.exitClass === 'REQUESTED' && !WITNESS_INTENT_BASES.has(line.intentBasis)
+          && (!w.awaited || w.expectedCode !== 0 || exit.code !== 0
           || w.reason !== exit.reason || exit.reason !== 'HELPER_COMPLETION'))) { w.invalid = true; continue; }
       w.exit = exit.exitClass === 'UNKNOWN' ? { ...exit, reason: exit.reason ?? 'native exit identity/code unavailable' } : exit;
     }
@@ -349,7 +353,7 @@ function ledgerView(ledger, runId) {
   }
   const reportIdentities = (ledger?.children?.records ?? []).filter(r => r.type === 'job-process-start'
     && r.line.incarnation?.session === runId).map(r => ({ pid: r.line.pid,
-    creationFileTimeUtc: r.line.creationFileTime, role: CONSOLE_HOST_RE.test(r.line.executable ?? '') ? 'console-host' : 'job-helper' }));
+    creationFileTimeUtc: r.line.creationFileTime, role: witnessRole(r.line.pid, r.line.creationFileTime, r.line.executable, children) }));
   return { engines, children, witnesses: valid, reportIdentities };
 
 }
@@ -396,6 +400,12 @@ const isConsoleHost = (row) => row.role === 'console-host' || CONSOLE_HOST_RE.te
 /** Spec B step 6: the activation self-test's candidate is a llama child of its own kind. */
 const ROLE_OF_KIND = { LLAMA_SERVER: 'llama-server', LLAMA_SELF_TEST: 'llama-self-test', EXTRACTION: 'extraction-child' };
 const roleOfKind = (kind) => ROLE_OF_KIND[kind] ?? 'child';
+/** A witnessed identity that is a ledger child keeps its own role (llama-server, extraction child). */
+function witnessRole(pid, birth, executable, children) {
+  if (CONSOLE_HOST_RE.test(executable ?? '')) return 'console-host';
+  const child = (children ?? []).find(c => c.pid === Number(pid) && sameBirth(c.creationFileTimeUtc, birth));
+  return child ? roleOfKind(child.kind) : 'job-helper';
+}
 
 /**
  * The census targets, armed before the stop. Ledger first (Spec F §6.1): the run's open Engine
@@ -534,7 +544,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
       || (witnessedEnd != null && witnessedEnd > jobEnd + CONHOST_EXIT_GRACE_MS))) {
       rejectedWitnesses.add(p); continue;
     }
-    const role = isConsoleHost(p) ? 'console-host' : 'job-helper';
+    const role = isConsoleHost(p) ? 'console-host' : witnessRole(w.pid, w.creationFileTimeUtc, w.executable, view.children);
     if (w.exit) {
       const end = recordedEndMs(w.exit);
       if (end != null && Number.isFinite(p.lastSeenAtMs) && p.lastSeenAtMs > end + CONHOST_EXIT_GRACE_MS) {
@@ -876,7 +886,7 @@ function exitResult(input, output, source, ledger = null) {
   for (const item of [...view.engines, ...view.children, ...(view.witnesses ?? [])]) {
     if (!item.pid || !isFileTime(item.creationFileTimeUtc) || processExits.some(p => p.pid === item.pid
       && sameBirth(p.creationFileTimeUtc, item.creationFileTimeUtc))) continue;
-    const role = item.witnessId ? (CONSOLE_HOST_RE.test(item.executable ?? '') ? 'console-host' : 'job-helper')
+    const role = item.witnessId ? witnessRole(item.pid, item.creationFileTimeUtc, item.executable, view.children)
       : item.childId ? roleOfKind(item.kind) : 'engine';
     const outside = lateTargets.some(t => t.pid === item.pid && sameBirth(t.creationFileTimeUtc, item.creationFileTimeUtc)
       && t.ledgerClass == null && item.exit);

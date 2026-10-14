@@ -15,11 +15,21 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * non-elevated Head, is always (629 confidence-probe P1). The frontend renders configuration
  * quality as "unknown — needs admin" in that case, so the surface never over-claims.
  *
+ * <p>{@code probedAtMs} (task b6d536 b101) is when the probe that produced this value read the
+ * volume, in epoch milliseconds. The state is read at most once per volume per ten minutes, and a
+ * value kept after a failed probe keeps the time of the read that gave it, so a reader can tell how
+ * old the value is.
+ *
  * <p>Fields are nullable; {@code @JsonInclude(NON_NULL)} drops absent fields from the wire.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record AtRestProtectionView(
-    String diskEncryption, String source, String confidence, boolean qualityKnown) {
+    String diskEncryption, String source, String confidence, boolean qualityKnown, Long probedAtMs) {
+
+  /** A view without a read time. */
+  public AtRestProtectionView(String diskEncryption, String source, String confidence, boolean qualityKnown) {
+    this(diskEncryption, source, confidence, qualityKnown, null);
+  }
 
   /** A view indicating the at-rest state could not be determined. */
   public static AtRestProtectionView unknown() {

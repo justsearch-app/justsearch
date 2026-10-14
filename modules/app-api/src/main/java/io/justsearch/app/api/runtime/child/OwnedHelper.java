@@ -19,12 +19,16 @@ import java.util.concurrent.TimeUnit;
 public final class OwnedHelper extends Process {
   private record Recorder(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory, boolean nestedContainment) {
     boolean append(LedgerRecordType type, Map<String, Object> fields) {
+      return append(type, fields, true);
+    }
+
+    boolean append(LedgerRecordType type, Map<String, Object> fields, boolean force) {
       fields.put("owner", Map.of("pid", owner.pid(), "creationFileTime", owner.creationFileTime(),
           "instanceId", owner.instanceId()));
       if (nestedContainment) fields.put("ownerContainment", "KILL_ON_CLOSE");
       fields.put("incarnation", RuntimeManifest.IncarnationInfo.parse(
           SystemAccess.rawEnvVar(RuntimeManifest.IncarnationInfo.ENVIRONMENT)));
-      return sink.append(type, fields);
+      return force ? sink.append(type, fields) : sink.appendUnforced(type, fields);
     }
   }
 
@@ -45,7 +49,8 @@ public final class OwnedHelper extends Process {
   private boolean cooperative;
   private TerminateResult terminated;
   private boolean recorded;
-  private boolean handled;
+  private boolean awaited;
+  private int waiters;
   private java.util.Optional<Instant> exitTime = java.util.Optional.empty();
 
   public static void recordTo(LedgerSink sink, EngineIdentity owner) {
@@ -175,11 +180,8 @@ public final class OwnedHelper extends Process {
       Map<String, Object> fields = identity();
       fields.put("purpose", purpose);
       append(LedgerRecordType.HELPER_START, fields);
-      process.onExit().thenRun(() -> {
-        synchronized (this) {
-          complete(false);
-        }
-      });
+      ProcessIntents.owned(process.pid(), birth);
+      process.onExit().thenRun(this::exitObserved);
     } catch (RuntimeException failure) { held.close(); throw failure; }
   }
 
@@ -200,6 +202,7 @@ public final class OwnedHelper extends Process {
     if (stopReason != null || !process.isAlive()) return;
     stopReason = purpose + ": " + reason;
     cooperative = inputClose;
+    ProcessIntents.intent(process.pid(), birth, stopReason);
     Map<String, Object> fields = identity();
     fields.put("reason", stopReason);
     fields.put("requestedAt", Instant.now());
@@ -207,32 +210,65 @@ public final class OwnedHelper extends Process {
   }
 
   private synchronized void stop(String reason) {
-    if (!process.isAlive()) { complete(true); return; }
+    if (!process.isAlive()) { awaited = true; complete(); return; }
     intent(reason, false); // durable attempt before acting
     // A caller's catch/finally may cancel again while the first native stop is completing.
     // Preserve the successful call; a later ALREADY_EXITED cannot erase its provenance.
     if (!TerminateResult.OK.equals(terminated)) terminated = held.terminate(terminator.ourCode());
-    if (!process.isAlive()) complete(false);
+    if (!process.isAlive()) complete();
   }
 
-  private synchronized void complete(boolean awaited) {
-    if (process.isAlive() || (recorded && (!awaited || handled || (stopReason != null && !cooperative)))) return;
-    if (!recorded) exitTime = held.exitedAt();
-    handled |= awaited;
+  /** How long an exit nobody awaits or stopped waits for its owner before it is recorded. */
+  static final long UNAWAITED_EXIT_GRACE_MS = 2_000;
+
+  /**
+   * The OS reports the exit, possibly before the owner's wait returns. Record it now only when a
+   * forced stop intent already decides its class; otherwise let a waiting owner record it, or
+   * give a late owner a short grace before recording an exit no one asked for.
+   */
+  private synchronized void exitObserved() {
+    if (recorded) return;
+    if (stopReason != null && !cooperative) { complete(); return; }
+    if (waiters > 0) return;
+    java.util.concurrent.CompletableFuture.delayedExecutor(UNAWAITED_EXIT_GRACE_MS, TimeUnit.MILLISECONDS)
+        .execute(() -> { synchronized (this) { if (waiters == 0) complete(); } });
+  }
+
+  /** A wait that ended without observing the exit leaves it to the OS notification path. */
+  private synchronized void waitEnded() {
+    waiters--;
+    if (waiters == 0 && !recorded && !process.isAlive()) exitObserved();
+  }
+
+  private synchronized void awaitedExit() {
+    awaited = true;
+    complete();
+  }
+
+  /** Writes the one helper-exit record, with its final class and reason. */
+  private synchronized void complete() {
+    if (recorded || process.isAlive()) return;
+    exitTime = held.exitedAt();
     int code = process.exitValue();
     boolean forced = stopReason != null && TerminateResult.OK.equals(terminated)
         && code == terminator.ourCode();
-    boolean intended = !crashCode(code) && (stopReason == null ? awaited
-        : forced || (cooperative && awaited && code == 0));
+    // A recorded stop intent, or an owner that awaited the helper, makes the exit intended; a
+    // cooperative stop also needs the child's clean code. A crash code is never intended.
+    boolean intended = !crashCode(code) && (stopReason == null ? awaited : !cooperative || code == 0);
+    String reason = intended ? (stopReason != null ? stopReason : purpose + ": awaited completion")
+        : crashCode(code) ? purpose + ": crash exit code"
+        : stopReason != null ? stopReason + "; exit code " + code + " was not the expected clean exit"
+        : purpose + ": exited with no owner wait or stop request";
     Map<String, Object> fields = identity();
     fields.put("code", code);
     fields.put("exitClass", intended ? "REQUESTED" : "UNEXPECTED");
-    fields.put("reason", intended ? (stopReason != null ? stopReason : purpose + ": awaited completion") : null);
+    fields.put("reason", reason);
     fields.put("exitedAt", exitTime.map(Instant::toString));
     fields.put("observedAt", Instant.now());
     fields.put("forced", forced);
     append(LedgerRecordType.HELPER_EXIT, fields);
     recorded = true;
+    ProcessIntents.outcome(process.pid(), birth, intended ? "REQUESTED" : "UNEXPECTED", reason);
     held.close();
   }
 
@@ -256,9 +292,14 @@ public final class OwnedHelper extends Process {
 
   // Finite config probes run before ChildControl opens under the data-directory lock.
   // Retain their owner receipts, including closed windows, until that writer attaches.
-  private static synchronized void record(Recorder selected, LedgerRecordType type, Map<String, Object> fields) {
+  private static void record(Recorder selected, LedgerRecordType type, Map<String, Object> fields) {
+    record(selected, type, fields, true);
+  }
+
+  private static synchronized void record(Recorder selected, LedgerRecordType type,
+      Map<String, Object> fields, boolean force) {
     Recorder target = selected == null ? recorder : selected;
-    if (target != null) target.append(type, fields);
+    if (target != null) target.append(type, fields, force);
     else if (beforeRecorder.size() < 4096) beforeRecorder.addLast(new Pending(type, fields));
     else {
       if (pendingLost++ == 0) pendingLostSince = Instant.now();
@@ -283,6 +324,7 @@ public final class OwnedHelper extends Process {
       this.image = image;
       this.purpose = purpose;
       deadline = started.plus(max);
+      ProcessIntents.windowOpened(id, image, purpose, started, deadline);
       append(LedgerRecordType.HELPER_WINDOW_START, started);
     }
     private void append(LedgerRecordType type, Instant at) {
@@ -297,25 +339,188 @@ public final class OwnedHelper extends Process {
       record(records, type, fields);
     }
     @Override public synchronized void close() {
-      if (!closed) { append(LedgerRecordType.HELPER_WINDOW_END, nativePrecisionNow()); closed = true; }
+      if (!closed) {
+        Instant at = nativePrecisionNow();
+        append(LedgerRecordType.HELPER_WINDOW_END, at);
+        ProcessIntents.windowClosed(id, at);
+        closed = true;
+      }
     }
   }
 
   private static Instant nativePrecisionNow() {
-    Instant now = Instant.now();
+    return nativePrecision(Instant.now());
+  }
+
+  private static Instant nativePrecision(Instant now) {
     return Instant.ofEpochSecond(now.getEpochSecond(), now.getNano() / 100 * 100L);
+  }
+
+  /** The idle period after which a shared window with no leases ends. */
+  public static final Duration SHARED_WINDOW_IDLE = Duration.ofSeconds(30);
+
+  /**
+   * One window shared by every caller that may let a launch of {@code image} happen (task b6d536
+   * b101). The first {@link SharedWindow#acquire lease} opens it, forcing its start record once;
+   * consecutive and concurrent leases share it; it ends {@link #SHARED_WINDOW_IDLE} after the last
+   * lease is released, and at {@link SharedWindow#close}. Records scale with bursts of activity,
+   * not with calls. A caller that cannot launch {@code image} takes no lease.
+   *
+   * @param leaseMax the longest a lease may hold; a lease that could outlive the open window's
+   *     deadline opens a fresh window, and the earlier window ends when its own leases are released
+   */
+  public static SharedWindow sharedWindow(String image, String purpose, Duration leaseMax) {
+    return sharedWindow(image, purpose, leaseMax, SHARED_WINDOW_IDLE, java.time.Clock.systemUTC(),
+        (delay, task) -> java.util.concurrent.CompletableFuture.delayedExecutor(
+            delay.toMillis(), TimeUnit.MILLISECONDS).execute(task));
+  }
+
+  /** Test seam: a chosen clock and a scheduler that runs the idle check after a delay. */
+  static SharedWindow sharedWindow(String image, String purpose, Duration leaseMax, Duration idle,
+      java.time.Clock clock, java.util.function.BiConsumer<Duration, Runnable> after) {
+    return new SharedWindow(image, purpose, leaseMax, idle, clock, after);
+  }
+
+  /** See {@link OwnedHelper#sharedWindow}. Thread-safe. */
+  public static final class SharedWindow implements AutoCloseable {
+    private final String image;
+    private final String purpose;
+    private final Duration leaseMax;
+    private final Duration span;
+    private final Duration idle;
+    private final java.time.Clock clock;
+    private final java.util.function.BiConsumer<Duration, Runnable> after;
+    private final java.util.List<Open> draining = new java.util.ArrayList<>();
+    private Open current;
+    private long generation;
+    private boolean closing;
+
+    private SharedWindow(String image, String purpose, Duration leaseMax, Duration idle,
+        java.time.Clock clock, java.util.function.BiConsumer<Duration, Runnable> after) {
+      this.image = java.util.Objects.requireNonNull(image, "image");
+      this.purpose = java.util.Objects.requireNonNull(purpose, "purpose");
+      this.leaseMax = leaseMax;
+      this.span = leaseMax.multipliedBy(2);
+      this.idle = idle;
+      this.clock = clock;
+      this.after = after;
+    }
+
+    private final class Open {
+      private final Recorder records = recorder;
+      private final String id = "i-" + UUID.randomUUID();
+      private final Instant started;
+      private final Instant deadline;
+      private int leases;
+
+      private Open(Instant started) {
+        this.started = started;
+        this.deadline = started.plus(span);
+        ProcessIntents.windowOpened(id, image, purpose, started, deadline);
+        // Forced once: it gates attribution of every launch made under this window.
+        record(records, LedgerRecordType.HELPER_WINDOW_START, fields(null), true);
+      }
+
+      private void end() {
+        Instant at = nativePrecision(clock.instant());
+        // Not forced: a lost end is reconstructed from the forced start and its deadline.
+        record(records, LedgerRecordType.HELPER_WINDOW_END, fields(at), false);
+        ProcessIntents.windowClosed(id, at);
+      }
+
+      private Map<String, Object> fields(Instant closedAt) {
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("intentId", id);
+        fields.put("image", image);
+        fields.put("reason", purpose);
+        fields.put("requestedAt", started.toString());
+        fields.put("deadlineAt", deadline.toString());
+        fields.put("closedAt", closedAt == null ? null : closedAt.toString());
+        return fields;
+      }
+    }
+
+    /** Opens a window if none can cover this lease; its start record precedes any launch. */
+    public synchronized Lease acquire() {
+      Instant now = nativePrecision(clock.instant());
+      closing = false;
+      if (current != null && now.plus(leaseMax).isAfter(current.deadline)) {
+        if (current.leases == 0) current.end();
+        else draining.add(current);
+        current = null;
+      }
+      if (current == null) current = new Open(now);
+      current.leases++;
+      generation++;
+      return new Lease(current);
+    }
+
+    private synchronized void release(Open window) {
+      window.leases--;
+      if (window.leases > 0) return;
+      if (window != current) {
+        draining.remove(window);
+        window.end();
+      } else if (closing) {
+        current = null;
+        window.end();
+      } else {
+        long expected = ++generation;
+        after.accept(idle, () -> idleExpired(expected));
+      }
+    }
+
+    private synchronized void idleExpired(long expected) {
+      if (expected != generation || current == null || current.leases > 0) return;
+      Open window = current;
+      current = null;
+      window.end();
+    }
+
+    /** Shutdown: ends an idle window now; a leased window ends when its last lease is released. */
+    @Override public synchronized void close() {
+      closing = true;
+      generation++;
+      if (current != null && current.leases == 0) {
+        Open window = current;
+        current = null;
+        window.end();
+      }
+    }
+
+    /** One caller's hold on the shared window; release it when the caller can no longer launch. */
+    public final class Lease implements AutoCloseable {
+      private final Open window;
+      private boolean released;
+
+      private Lease(Open window) {
+        this.window = window;
+      }
+
+      @Override public void close() {
+        synchronized (SharedWindow.this) {
+          if (released) return;
+          released = true;
+          release(window);
+        }
+      }
+    }
   }
 
   @Override public OutputStream getOutputStream() { return process.getOutputStream(); }
   @Override public InputStream getInputStream() { return process.getInputStream(); }
   @Override public InputStream getErrorStream() { return process.getErrorStream(); }
   @Override public int waitFor() throws InterruptedException {
-    try { int code = process.waitFor(); complete(true); return code; }
+    synchronized (this) { waiters++; }
+    try { int code = process.waitFor(); awaitedExit(); return code; }
     catch (InterruptedException interrupted) { stop("interrupted"); throw interrupted; }
+    finally { waitEnded(); }
   }
   @Override public boolean waitFor(long timeout, TimeUnit unit) throws InterruptedException {
-    try { boolean exited = process.waitFor(timeout, unit); if (exited) complete(true); return exited; }
+    synchronized (this) { waiters++; }
+    try { boolean exited = process.waitFor(timeout, unit); if (exited) awaitedExit(); return exited; }
     catch (InterruptedException interrupted) { stop("interrupted"); throw interrupted; }
+    finally { waitEnded(); }
   }
   @Override public int exitValue() { return process.exitValue(); }
   @Override public boolean isAlive() { return process.isAlive(); }

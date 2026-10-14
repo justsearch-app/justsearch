@@ -134,8 +134,8 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     StructuredContentExtractor.configureTesseractSkipOcr(context);
     Metadata metadata = input.metadata();
 
-    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract extraction and availability", java.time.Duration.ofMinutes(5));
-        InputStream is = input.openParserStream(tika)) {
+    // No owner window: this parser graph cannot launch Tesseract (OwnedTikaParsers excludes it).
+    try (InputStream is = input.openParserStream(tika)) {
       org.apache.tika.sax.BodyContentHandler handler =
           new org.apache.tika.sax.BodyContentHandler(maxContentLength);
       context.set(org.apache.tika.parser.Parser.class, tika.getParser());

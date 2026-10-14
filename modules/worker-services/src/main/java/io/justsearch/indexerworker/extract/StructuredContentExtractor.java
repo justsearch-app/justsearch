@@ -194,8 +194,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // Falls back gracefully for untagged PDFs (no additional cost).
     // PDFParserConfig is in tika-parsers-standard (runtimeOnly), so we configure via reflection
     // to avoid a compile-time dependency.
-    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract extraction and availability", java.time.Duration.ofMinutes(5));
-        InputStream is = input.openParserStream(tika)) {
+    // No owner window: this parser graph cannot launch Tesseract (OwnedTikaParsers excludes it).
+    try (InputStream is = input.openParserStream(tika)) {
       parser.parse(is, handler, metadata, parseContext);
     }
 
@@ -281,8 +281,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
 
   static void configureTesseractSkipOcr(ParseContext parseContext) {
     // Keep first-pass OCR disabled even if an embedded parser consults the parse context.
-    try (var intent = OwnedHelper.window("tesseract.exe", "Tika first-pass OCR configuration and availability",
-        java.time.Duration.ofSeconds(30))) {
+    // A configuration object only; it launches nothing, so it needs no owner window.
+    try {
       Class<?> configClass = Class.forName("org.apache.tika.parser.ocr.TesseractOCRConfig");
       Object tesseract = configClass.getDeclaredConstructor().newInstance();
       invokeIfPresent(configClass, tesseract, "setSkipOcr", boolean.class, true);

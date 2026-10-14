@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:56:29.713Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "5b78da4e6afe66db87fa76059ea4f322c34c8ad2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.GpuSnapshotNvidiaSmiRateTest.snapshotsStartNoNvidiaSmiWhenNvmlAnswersInProcess\" --tests \"io.justsearch.gpu.GpuSnapshotNvidiaSmiRateTest.withoutNvmlConcurrentSnapshotsShareOneReadingPerFiveSeconds\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4180
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuSnapshotNvidiaSmiRateTest.java#snapshotsStartNoNvidiaSmiWhenNvmlAnswersInProcess",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuSnapshotNvidiaSmiRateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f6f67d4d65d74c81efd96f210ac09b94f9322fe704bc79096c50de696989e21",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "snapshotsStartNoNvidiaSmiWhenNvmlAnswersInProcess()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuSnapshotNvidiaSmiRateTest.java#withoutNvmlConcurrentSnapshotsShareOneReadingPerFiveSeconds",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuSnapshotNvidiaSmiRateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f6f67d4d65d74c81efd96f210ac09b94f9322fe704bc79096c50de696989e21",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withoutNvmlConcurrentSnapshotsShareOneReadingPerFiveSeconds()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.GpuSnapshotNvidiaSmiRateTest.snapshotsStartNoNvidiaSmiWhenNvmlAnswersInProcess\" --tests \"io.justsearch.gpu.GpuSnapshotNvidiaSmiRateTest.withoutNvmlConcurrentSnapshotsShareOneReadingPerFiveSeconds\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 10251
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuSnapshotNvidiaSmiRateTest.java#snapshotsStartNoNvidiaSmiWhenNvmlAnswersInProcess",
+        "classification": "assertion",
+        "detail": "snapshotsStartNoNvidiaSmiWhenNvmlAnswersInProcess(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: NVML answered: no nvidia-smi process for 20 snapshots ==> expected: <[]> but was: <[22884, 25488, 13984, 14080, 27396, 13864, 10388, 37900, 7780, 26360, 21984, 24524, 25312, 28764, 30628, 25208, 26852, 31328, 36612, 29052, 22356, 29880, 3832, 27244, 23504, 14504,"
+      },
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuSnapshotNvidiaSmiRateTest.java#withoutNvmlConcurrentSnapshotsShareOneReadingPerFiveSeconds",
+        "classification": "assertion",
+        "detail": "withoutNvmlConcurrentSnapshotsShareOneReadingPerFiveSeconds(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: 20 snapshots by 4 readers over 711 ms may start at most 1 nvidia-smi processes, started 44 ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:c17a165fdc4583afda9ac007db3d22b0f69a6b9dbe99f471df3f93b392d1c7eb"
+}

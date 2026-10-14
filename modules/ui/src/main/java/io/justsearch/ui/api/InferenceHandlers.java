@@ -209,8 +209,9 @@ final class InferenceHandlers {
     // both as a diagnostic signal and to preserve frontend compatibility for
     // callers that explicitly want the legacy answer.
     // Tempdoc 374 alpha.27: read nvidia-smi availability from the snapshot's
-    // nvidiaSmi() accessor instead of a direct VramDetector reference. The
-    // snapshot's NvidiaSmi probe runs the same nvidia-smi shell-out internally.
+    // nvidiaSmi() accessor instead of a direct VramDetector reference. Task b6d536
+    // b101: where NVML answers, that section carries NVML's figures (source
+    // "read in-process (NVML)") and no nvidia-smi process starts.
     GpuCapabilities snapshot = null;
     try {
       snapshot = gpuCapabilitiesService.snapshot();

@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:01:30.532Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1aa00d239db822ae156e9ee29a3c7093f6b04332",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperStopRecordTest.aStoppedHelperIsRecordedOnceAsRequestedWithTheStopReason\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9116
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperStopRecordTest.java#aStoppedHelperIsRecordedOnceAsRequestedWithTheStopReason",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperStopRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:084c69e7db91cd832cc30db4c6f69b33f2d334432f1a775cc07137ef1e9a52fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStoppedHelperIsRecordedOnceAsRequestedWithTheStopReason()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:32d7e3e7f9fee2a9fe77616bc57a80743c9d0c29ef584e89f27d2e0c28e6b7ff"
+}

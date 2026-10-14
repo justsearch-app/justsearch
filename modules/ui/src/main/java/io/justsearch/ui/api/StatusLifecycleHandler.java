@@ -1361,8 +1361,10 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         diskEncryptionProbe = probe;
       }
       io.justsearch.app.services.atrest.AtRestProtection p = probe.current();
-      result =
-          new AtRestProtectionView(p.state().name(), p.source(), p.confidence().name(), false);
+      // When the value was read: the probe just answered from (or refreshed) this reading.
+      var reading = probe.reading();
+      result = new AtRestProtectionView(p.state().name(), p.source(), p.confidence().name(), false,
+          reading == null ? null : reading.probedAtMs());
     } catch (RuntimeException e) {
       log.debug("at-rest probe failed: {}", e.getMessage());
       result = AtRestProtectionView.unknown();

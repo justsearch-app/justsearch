@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.gpu;
 
-import io.justsearch.gpu.VramDetector;
-
-/** v3: Produces a merged GPU capability snapshot (NVML-first, with nvidia-smi fallback). */
+/** v3: Produces a merged GPU capability snapshot (NVML-first, with a shared nvidia-smi fallback). */
 public final class GpuCapabilitiesService {
+  /** Why a figure is absent from a section NVML supplied. */
+  static final String NOT_FROM_NVML = "not reported by NVML";
+
   private final NvmlService nvml;
   private final VramDetector vramDetector;
 
@@ -18,9 +19,9 @@ public final class GpuCapabilitiesService {
   }
 
   /**
-   * Invalidates the nvidia-smi fallback cache so the next {@link #snapshot()} call
-   * re-shells nvidia-smi on systems where NVML is unavailable. No-op on NVML systems
-   * where the snapshot doesn't consult VramDetector. Tempdoc 374 alpha.27 — exposed
+   * Invalidates the shared nvidia-smi reading so the next {@link #snapshot()} call takes one
+   * fresh reading on systems where NVML is unavailable (concurrent callers share it). On NVML
+   * systems the snapshot reads NVML in-process and starts no nvidia-smi. Tempdoc 374 alpha.27 — exposed
    * so callers don't need a direct {@code VramDetector} reference.
    */
   public void invalidateNvidiaSmiCache() {
@@ -76,33 +77,61 @@ public final class GpuCapabilitiesService {
               null);
     }
 
-    // nvidia-smi fallback (best-effort).
-    Long smiTotal = null;
-    long total = vramDetector.getTotalVramBytes();
-    if (total >= 0) smiTotal = total;
-    Long smiFree = null;
-    long free = vramDetector.getAvailableVramBytes();
-    if (free >= 0) smiFree = free;
-    String smiDesc = vramDetector.getVramDescription();
-
-    String smiDriver = vramDetector.getDriverVersion();
-    int[] smiParsed = DriverVersionParser.parse(smiDriver);
-    Integer smiMajor = smiParsed != null ? smiParsed[0] : null;
-    Integer smiMinor = smiParsed != null ? smiParsed[1] : null;
-
-    boolean smiAvailable = (smiTotal != null && smiTotal > 0) || (smiDriver != null && !smiDriver.isBlank());
-    GpuCapabilities.NvidiaSmi smiSnap =
-        new GpuCapabilities.NvidiaSmi(
-            smiAvailable,
-            null,
-            smiDriver,
-            smiMajor,
-            smiMinor,
-            smiTotal,
-            smiFree,
-            smiDesc);
+    // The nvidia-smi section. When NVML reports a GPU no nvidia-smi process starts: the section
+    // carries the same figures read in-process from NVML and names that source. Without an NVML GPU
+    // the shared nvidia-smi reading is used, probed at most once per 5 s.
+    boolean nvmlHasGpu = nvmlSnap.available() && nvmlSnap.deviceCount() != null && nvmlSnap.deviceCount() > 0;
+    GpuCapabilities.NvidiaSmi smiSnap = nvmlHasGpu ? fromNvml(nvmlSnap) : nvidiaSmi(vramDetector.reading());
 
     return mergeEffective(nvmlSnap, smiSnap, cudaAxis);
+  }
+
+  /** The nvidia-smi section for one shared nvidia-smi reading. */
+  static GpuCapabilities.NvidiaSmi nvidiaSmi(NvidiaSmiReadings.Reading reading) {
+    if (reading == null) {
+      return new GpuCapabilities.NvidiaSmi(false, "no nvidia-smi reading", null, null, null, null, null,
+          "Unknown (nvidia-smi not available)");
+    }
+    int[] parsed = DriverVersionParser.parse(reading.driverVersion());
+    Long total = reading.totalBytes();
+    return new GpuCapabilities.NvidiaSmi(
+        reading.available(),
+        reading.error(),
+        reading.driverVersion(),
+        parsed != null ? parsed[0] : null,
+        parsed != null ? parsed[1] : null,
+        total,
+        reading.freeBytes(),
+        total == null ? "Unknown (nvidia-smi not available)" : gigabytes(total));
+  }
+
+  /**
+   * The nvidia-smi section's figures as NVML read them in-process, with no nvidia-smi process:
+   * the same driver and memory fields, the source named, and each figure NVML did not give listed.
+   */
+  static GpuCapabilities.NvidiaSmi fromNvml(GpuCapabilities.Nvml nvml) {
+    java.util.Map<String, String> unavailable = new java.util.LinkedHashMap<>();
+    if (nvml.driverVersion() == null) unavailable.put("driverVersion", NOT_FROM_NVML);
+    if (nvml.driverVersionMajor() == null) unavailable.put("driverVersionMajor", NOT_FROM_NVML);
+    if (nvml.driverVersionMinor() == null) unavailable.put("driverVersionMinor", NOT_FROM_NVML);
+    if (nvml.totalVramBytes() == null) unavailable.put("totalVramBytes", NOT_FROM_NVML);
+    if (nvml.freeVramBytes() == null) unavailable.put("freeVramBytes", NOT_FROM_NVML);
+    Long total = nvml.totalVramBytes();
+    return new GpuCapabilities.NvidiaSmi(
+        true,
+        null,
+        nvml.driverVersion(),
+        nvml.driverVersionMajor(),
+        nvml.driverVersionMinor(),
+        total,
+        nvml.freeVramBytes(),
+        total == null ? "Unknown (" + NOT_FROM_NVML + ")" : gigabytes(total),
+        GpuCapabilities.NvidiaSmi.SOURCE_NVML,
+        unavailable);
+  }
+
+  private static String gigabytes(long bytes) {
+    return String.format(java.util.Locale.ROOT, "%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0));
   }
 
   /**
