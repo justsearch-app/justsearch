@@ -172,6 +172,7 @@ public final class ChatServerControllerImpl
   private boolean vduRestorePending;
   private long vduRetryAtNanos;
   private long vduRetryDelaySeconds = 5;
+  private int vduRestoreFailures;
   private Pending vduRestoreAttempt;
 
   /** The pressure last reported (Spec E feeds it; the dev trigger too). */
@@ -346,6 +347,7 @@ public final class ChatServerControllerImpl
       synchronized (monitor) {
         bootWaiting = false;
         vduRestorePending = false;
+        vduRestoreFailures = 0;
         // Chat switched off is OFF, not unloaded; nothing waits for a reload any more.
         waiters = clearLatchLocked();
         deferred = false;
@@ -458,11 +460,16 @@ public final class ChatServerControllerImpl
             if (vduRestorePending && holds.isEmpty() && vduRestoreAttempt == null) {
               if (actuator.serverRunning()) {
                 vduRestorePending = false;
+                vduRestoreFailures = 0;
                 continue;
               }
               PressureSignal restorePressure = restorationPressureLocked();
               if (restorePressure != PressureSignal.NONE && forcedUnder != restorePressure) {
                 if (latchRestorationPressureLocked(restorePressure)) continue;
+                monitor.wait();
+                continue;
+              }
+              if (vduRestoreFailures >= 5) {
                 monitor.wait();
                 continue;
               }
@@ -586,6 +593,15 @@ public final class ChatServerControllerImpl
   }
 
   private void execute(Pending pending, ChatActuator.DrainHold drained) {
+    if (pending.step.kind() == ChatActuation.Kind.APPLY
+        || pending.step.kind() == ChatActuation.Kind.PREPARED_RETIRE) {
+      synchronized (monitor) {
+        if (vduRestorePending) {
+          resetVduRetryBudgetLocked();
+          monitor.notifyAll();
+        }
+      }
+    }
     complete(pending, () -> actuator.execute(pending.step, drained));
   }
 
@@ -666,7 +682,12 @@ public final class ChatServerControllerImpl
   public VduHold holdVdu(String owner) throws ChatRefusal {
     OpenHold hold = open(Kind.VDU, owner);
     try {
-      routeHeld(actuator.activation(new Activation(true, TransitionReason.VDU_ENTER)), true);
+      Pending restoration;
+      synchronized (monitor) {
+        restoration = vduRestorePending ? queueVduRestoreLocked() : null;
+      }
+      if (restoration != null) awaitHeld(restoration, false, false);
+      else routeHeld(actuator.activation(new Activation(true, TransitionReason.VDU_ENTER)), true);
       routeHeld(actuator.vduEnter(), false);
     } catch (ChatRefusal refused) {
       // A failed entry may have restarted the server already; return it to its configuration.
@@ -963,7 +984,18 @@ public final class ChatServerControllerImpl
   private <T> T routeHeld(ChatActuation<T> step, boolean supersededIsDone, boolean uninterruptible)
       throws ChatRefusal {
     try {
-      return uninterruptible ? (T) awaitUninterruptibly(enqueue(step)) : route(step);
+      return (T) awaitHeld(enqueue(step), supersededIsDone, uninterruptible);
+    } catch (RefusedException refused) {
+      throw refusal(RefusalReason.ENGINE_STOPPING, refused);
+    } catch (RuntimeException failure) {
+      throw refusal(RefusalReason.FAILED, failure);
+    }
+  }
+
+  private Object awaitHeld(Pending pending, boolean supersededIsDone, boolean uninterruptible)
+      throws ChatRefusal {
+    try {
+      return uninterruptible ? awaitUninterruptibly(pending) : await(pending);
     } catch (ChatRefusal refused) {
       throw refused;
     } catch (SupersededException superseded) {
@@ -1045,6 +1077,7 @@ public final class ChatServerControllerImpl
       if (refused.reason() != RefusalReason.ENGINE_STOPPING) {
         synchronized (monitor) {
           vduRestorePending = true;
+          vduRestoreFailures = 1;
           vduRetryDelaySeconds = 5;
           vduRetryAtNanos = nanoTime.getAsLong() + TimeUnit.SECONDS.toNanos(vduRetryDelaySeconds);
           monitor.notifyAll();
@@ -1072,14 +1105,30 @@ public final class ChatServerControllerImpl
       vduRestoreAttempt = null;
       if (failure == null) {
         vduRestorePending = false;
+        vduRestoreFailures = 0;
         vduRetryDelaySeconds = 5;
         CompletableFuture<Void> waiters = clearLatchLocked();
         if (waiters != null) waiters.complete(null);
       } else if (vduRestorePending) {
+        vduRestoreFailures++;
         vduRetryDelaySeconds = Math.min(30, vduRetryDelaySeconds * 2);
         vduRetryAtNanos = nanoTime.getAsLong() + TimeUnit.SECONDS.toNanos(vduRetryDelaySeconds);
       }
       monitor.notifyAll();
+    }
+  }
+
+  /** A person's action permits a fresh bounded series; called under monitor. */
+  private void resetVduRetryBudgetLocked() {
+    vduRestoreFailures = 0;
+    vduRetryDelaySeconds = 5;
+    vduRetryAtNanos = nanoTime.getAsLong();
+  }
+
+  @Override
+  public boolean vduRestorationRetriesStopped() {
+    synchronized (monitor) {
+      return vduRestorePending && vduRestoreAttempt == null && vduRestoreFailures >= 5;
     }
   }
 
@@ -1537,6 +1586,7 @@ public final class ChatServerControllerImpl
         Duration dwellLeft = dwellLeftLocked();
         if (dwellLeft.isPositive()) throw new ChatRefusal(RefusalReason.RELOAD_BACKOFF,
             java.util.Optional.of(dwellLeft), true);
+        resetVduRetryBudgetLocked();
         return queueVduRestoreLocked().result.thenApply(ignored -> null);
       }
       if (kind == DemandKind.BACKGROUND) {
@@ -1599,6 +1649,7 @@ public final class ChatServerControllerImpl
       if (vduRestorePending) {
         if (!holds.isEmpty()) throw heldRefusalLocked();
         forcedUnder = signal == PressureSignal.NONE ? null : signal;
+        resetVduRetryBudgetLocked();
         return queueVduRestoreLocked().result.thenApply(ignored -> null);
       }
       if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);

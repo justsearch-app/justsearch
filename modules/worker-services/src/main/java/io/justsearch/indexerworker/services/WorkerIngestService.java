@@ -163,7 +163,10 @@ public final class WorkerIngestService {
   private static final int RECOVER_VDU_QUERY_LIMIT = 1000;
   /** VDU claims are process-local work authority, never durable document identity. */
   private final Object vduMutationMonitor = new Object();
-  private final Map<String, java.util.UUID> vduProcessingOwners = new HashMap<>();
+  private final Map<String, VduProcessingClaim> vduProcessingClaims = new HashMap<>();
+
+  private record VduProcessingClaim(
+      java.util.UUID owner, int previousRetryCount, int claimedRetryCount) {}
 
   /**
    * Creates a new WorkerIngestService backed by the specified lifecycle managers.
@@ -1173,15 +1176,16 @@ public final class WorkerIngestService {
         }
         requireServingVduTarget();
         var procedureOwner = ctx.engineContext().workId();
+        VduProcessingClaim claim = vduProcessingClaims.get(docId);
         if (procedureOwner.isPresent()
-            && !procedureOwner.get().equals(vduProcessingOwners.get(docId))) {
+            && (claim == null || !procedureOwner.get().equals(claim.owner()))) {
           return updateVduErrorResponse("VDU procedure no longer owns this document: " + docId);
         }
         try {
           if (!VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled())) {
             return updateVduErrorResponse("Document not found: " + docId);
           }
-          vduProcessingOwners.remove(docId);
+          vduProcessingClaims.remove(docId);
           ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
           ingestLifecycle.commitOps().maybeRefreshBlocking();
           requireServingVduTarget();
@@ -1871,7 +1875,7 @@ public final class WorkerIngestService {
       if (!ingestLifecycle.indexingCoordinator().updateDocument(docId, updates)) {
         return markVduErrorResponse("Document not found: " + docId);
       }
-      vduProcessingOwners.remove(docId);
+      vduProcessingClaims.remove(docId);
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
       requireServingVduTarget();
@@ -1886,9 +1890,10 @@ public final class WorkerIngestService {
     boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
     if (updated) {
       if (procedureOwner == null) {
-        vduProcessingOwners.remove(docId);
+        vduProcessingClaims.remove(docId);
       } else {
-        vduProcessingOwners.put(docId, procedureOwner);
+        vduProcessingClaims.put(docId,
+            new VduProcessingClaim(procedureOwner, currentCount, decision.retryCount()));
       }
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
@@ -1911,15 +1916,26 @@ public final class WorkerIngestService {
   private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner)
       throws Exception {
     synchronized (vduMutationMonitor) {
-      if (procedureOwner != null && !procedureOwner.equals(vduProcessingOwners.get(docId))) {
+      VduProcessingClaim claim = vduProcessingClaims.get(docId);
+      if (procedureOwner != null
+          && (claim == null || !procedureOwner.equals(claim.owner()))) {
         return false;
       }
+      Map<String, Object> expected = new HashMap<>();
+      expected.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
+      Map<String, Object> updates = new HashMap<>();
+      updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
+      if (procedureOwner != null) {
+        // An orderly cancellation abandons this attempt without spending its retry budget.
+        // Match the exact claimed count as well as PROCESSING before returning that budget.
+        expected.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(claim.claimedRetryCount()));
+        updates.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(claim.previousRetryCount()));
+      }
       boolean reset = ingestLifecycle.indexingCoordinator().updateDocumentIf(
-          docId, Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING),
-          Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING));
-      // A lost comparison means a terminal update or removal already won. Either outcome
-      // retires the selected claim, so its abandoned result cannot subsequently replace text.
-      vduProcessingOwners.remove(docId);
+          docId, expected, updates);
+      // A lost comparison means the claimed state changed or a terminal update/removal won.
+      // Retire the selected claim so its abandoned result cannot subsequently replace text.
+      vduProcessingClaims.remove(docId);
       return reset;
     }
   }
@@ -1937,7 +1953,7 @@ public final class WorkerIngestService {
     Exception firstFailure = null;
     for (String docId : processingDocIds) {
       try {
-        // Reset to PENDING (retry count already incremented, so won't loop forever).
+        // Scoped cancellation returns the retry budget; startup recovery keeps the spent count.
         if (resetOp.resetToPending(docId)) {
           recovered++;
         }

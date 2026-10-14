@@ -317,20 +317,6 @@ public final class WritePathOps {
   }
 
   /**
-   * Read-modify-write: loads existing stored fields, applies the caller's updates, and re-indexes.
-   * Non-stored, non-docValues data-bearing fields the caller omits (vectors, SPLADE) are preserved
-   * per their declared {@code rmwPolicy} in the field catalog (tempdoc 711) — a subset-field RMW can
-   * no longer silently destroy the rest. The caller provides a leased searcher (via
-   * ReadPathOps.withSearcher) so it stays valid for the read and the subsequent write.
-   *
-   * @return true if the document was found and updated, false if not found
-   */
-  boolean readModifyWrite(IndexSearcher searcher, String docId, Map<String, Object> updates)
-      throws IOException {
-    return readModifyWrite(searcher, docId, updates, new ParentSliceCache());
-  }
-
-  /**
    * Per-batch memo of the parent documents a chunk RMW re-slices from: the stored content, and the
    * SHA-256 revision identity {@link #preserveChunkContent} compares against the chunk's own
    * (tempdoc 931 §C.1). Both are keyed by parent doc id so a batch of sibling chunks reads and

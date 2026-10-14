@@ -1,0 +1,280 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-14T00:06:56.992Z",
+  "revision": "83f07cc4cdef58a63b043979e4c480390314a7d8",
+  "tree": "9c55e75775e1a8684455109b497cb29fe78b6c1d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.automaticRestorationStopsAfterFiveFailuresAndReportsStoppedRetries\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.humanRequestStartsAFreshFiveAttemptBudget\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.recordedSettingsStartAFreshFiveAttemptBudget\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.preparedSettingsStartAFreshFiveAttemptBudget\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.turningChatOffAndOnMakesTheNextAttemptAfterRetriesStop\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.explicitPendingPassEntersAfterTwoHealthyStartsWithoutAnotherEvent\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.recordOnlyPreparedSettingsRetainTheNewestRestorationTarget\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 93466
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.shutdownReturnsTheUnusedRetryAndAllowsTheNextPass\" --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.shutdownReturnsTheFinalRetryAndAllowsTheNextPass\" --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.completedAttemptKeepsItsRetryWhenShutdownResetLoses\" --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.startupRecoveryKeepsTheClaimedRetryWhenItsOwnerWasLost\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20254
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#automaticRestorationStopsAfterFiveFailuresAndReportsStoppedRetries",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e88d82cd30825e1e67d1e65ffddf8f2b463af0a29a0fdf12fcaa4f2aaed69d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automaticRestorationStopsAfterFiveFailuresAndReportsStoppedRetries()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#humanRequestStartsAFreshFiveAttemptBudget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e88d82cd30825e1e67d1e65ffddf8f2b463af0a29a0fdf12fcaa4f2aaed69d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "humanRequestStartsAFreshFiveAttemptBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#recordedSettingsStartAFreshFiveAttemptBudget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e88d82cd30825e1e67d1e65ffddf8f2b463af0a29a0fdf12fcaa4f2aaed69d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordedSettingsStartAFreshFiveAttemptBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#preparedSettingsStartAFreshFiveAttemptBudget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e88d82cd30825e1e67d1e65ffddf8f2b463af0a29a0fdf12fcaa4f2aaed69d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedSettingsStartAFreshFiveAttemptBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#turningChatOffAndOnMakesTheNextAttemptAfterRetriesStop",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e88d82cd30825e1e67d1e65ffddf8f2b463af0a29a0fdf12fcaa4f2aaed69d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "turningChatOffAndOnMakesTheNextAttemptAfterRetriesStop()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#explicitPendingPassEntersAfterTwoHealthyStartsWithoutAnotherEvent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e88d82cd30825e1e67d1e65ffddf8f2b463af0a29a0fdf12fcaa4f2aaed69d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitPendingPassEntersAfterTwoHealthyStartsWithoutAnotherEvent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#recordOnlyPreparedSettingsRetainTheNewestRestorationTarget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e88d82cd30825e1e67d1e65ffddf8f2b463af0a29a0fdf12fcaa4f2aaed69d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordOnlyPreparedSettingsRetainTheNewestRestorationTarget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#shutdownReturnsTheUnusedRetryAndAllowsTheNextPass",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:45d1274ecfe70fe50ba68ae24e3820842d7632d3183d6490848917e610e1043d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownReturnsTheUnusedRetryAndAllowsTheNextPass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#shutdownReturnsTheFinalRetryAndAllowsTheNextPass",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:45d1274ecfe70fe50ba68ae24e3820842d7632d3183d6490848917e610e1043d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownReturnsTheFinalRetryAndAllowsTheNextPass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#completedAttemptKeepsItsRetryWhenShutdownResetLoses",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:45d1274ecfe70fe50ba68ae24e3820842d7632d3183d6490848917e610e1043d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedAttemptKeepsItsRetryWhenShutdownResetLoses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#startupRecoveryKeepsTheClaimedRetryWhenItsOwnerWasLost",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:45d1274ecfe70fe50ba68ae24e3820842d7632d3183d6490848917e610e1043d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "startupRecoveryKeepsTheClaimedRetryWhenItsOwnerWasLost()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "83f07cc4c",
+    "revision": "83f07cc4cdef58a63b043979e4c480390314a7d8",
+    "overlays": [
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.automaticRestorationStopsAfterFiveFailuresAndReportsStoppedRetries\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.humanRequestStartsAFreshFiveAttemptBudget\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.recordedSettingsStartAFreshFiveAttemptBudget\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.preparedSettingsStartAFreshFiveAttemptBudget\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.turningChatOffAndOnMakesTheNextAttemptAfterRetriesStop\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.explicitPendingPassEntersAfterTwoHealthyStartsWithoutAnotherEvent\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest.recordOnlyPreparedSettingsRetainTheNewestRestorationTarget\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 74332
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.shutdownReturnsTheUnusedRetryAndAllowsTheNextPass\" --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.shutdownReturnsTheFinalRetryAndAllowsTheNextPass\" --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.completedAttemptKeepsItsRetryWhenShutdownResetLoses\" --tests \"io.justsearch.indexerworker.services.VduCancellationRetryTest.startupRecoveryKeepsTheClaimedRetryWhenItsOwnerWasLost\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 24123
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#automaticRestorationStopsAfterFiveFailuresAndReportsStoppedRetries",
+        "classification": "assertion",
+        "detail": "automaticRestorationStopsAfterFiveFailuresAndReportsStoppedRetries(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: automatic retries stop after five consecutive failures ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#humanRequestStartsAFreshFiveAttemptBudget",
+        "classification": "assertion",
+        "detail": "humanRequestStartsAFreshFiveAttemptBudget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: automatic retries stop after five consecutive failures ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#recordedSettingsStartAFreshFiveAttemptBudget",
+        "classification": "assertion",
+        "detail": "recordedSettingsStartAFreshFiveAttemptBudget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: automatic retries stop after five consecutive failures ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#preparedSettingsStartAFreshFiveAttemptBudget",
+        "classification": "assertion",
+        "detail": "preparedSettingsStartAFreshFiveAttemptBudget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: automatic retries stop after five consecutive failures ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#turningChatOffAndOnMakesTheNextAttemptAfterRetriesStop",
+        "classification": "assertion",
+        "detail": "turningChatOffAndOnMakesTheNextAttemptAfterRetriesStop(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: automatic retries stop after five consecutive failures ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#explicitPendingPassEntersAfterTwoHealthyStartsWithoutAnotherEvent",
+        "classification": "assertion",
+        "detail": "explicitPendingPassEntersAfterTwoHealthyStartsWithoutAnotherEvent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the accepted explicit pass must enter without a timer tick, manual activation or new activity ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java#recordOnlyPreparedSettingsRetainTheNewestRestorationTarget",
+        "classification": "assertion",
+        "detail": "recordOnlyPreparedSettingsRetainTheNewestRestorationTarget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a person's demand must start the newly published normal configuration ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#shutdownReturnsTheUnusedRetryAndAllowsTheNextPass",
+        "classification": "assertion",
+        "detail": "shutdownReturnsTheUnusedRetryAndAllowsTheNextPass(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: shutdown abandons the attempt without spending a document retry ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#shutdownReturnsTheFinalRetryAndAllowsTheNextPass",
+        "classification": "assertion",
+        "detail": "shutdownReturnsTheFinalRetryAndAllowsTheNextPass(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: shutdown abandons the attempt without spending a document retry ==> expected: <2> but was: <3>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#completedAttemptKeepsItsRetryWhenShutdownResetLoses",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCancellationRetryTest.java#startupRecoveryKeepsTheClaimedRetryWhenItsOwnerWasLost",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:eb4163b35e6699cfb322e6901ccf6cb4800296444880ba15d78ff17bd33d53ab"
+}

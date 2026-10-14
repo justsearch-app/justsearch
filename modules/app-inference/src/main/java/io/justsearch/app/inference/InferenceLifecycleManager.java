@@ -1981,6 +1981,7 @@ public class InferenceLifecycleManager
     private final LlamaServerOps.StartResult candidate;
     private final Mode priorMode;
     private final boolean enabled;
+    private final boolean requestedEnabled;
     private final ChatActuator.DrainHold admissionHold;
     private TransitionRunner.PreparedPublication logicalPublication;
     private volatile State state = State.PREPARED;
@@ -1994,6 +1995,7 @@ public class InferenceLifecycleManager
         LlamaServerOps.StartResult candidate,
         Mode priorMode,
         boolean enabled,
+        boolean requestedEnabled,
         ChatActuator.DrainHold admissionHold) {
       this.owner = owner;
       this.incumbentConfiguration = incumbentConfiguration;
@@ -2002,6 +2004,7 @@ public class InferenceLifecycleManager
       this.candidate = candidate;
       this.priorMode = priorMode;
       this.enabled = enabled;
+      this.requestedEnabled = requestedEnabled;
       this.admissionHold = admissionHold;
     }
 
@@ -2047,7 +2050,8 @@ public class InferenceLifecycleManager
      */
     public void installAfterSettingsCommit() {
       owner.configured = candidateConfiguration;
-      owner.preVduConfig = null;
+      owner.preVduConfig = requestedEnabled && !enabled && owner.preVduConfig != null
+          ? candidateConfiguration : null;
       // A newly published configuration clears the failure latch (Spec A §2.2).
       if (!Objects.equals(candidateConfiguration.inference(), incumbentConfiguration.inference())) {
         owner.lastChatFailedCode = null;
@@ -2204,6 +2208,7 @@ public class InferenceLifecycleManager
             null,
             priorMode,
             false,
+            enabled,
             admissionHold);
         preparedConfigApply = prepared;
         transferred = true;
@@ -2244,6 +2249,7 @@ public class InferenceLifecycleManager
             started,
             priorMode,
             true,
+            enabled,
             admissionHold);
         preparedConfigApply = prepared;
         transferred = true;
