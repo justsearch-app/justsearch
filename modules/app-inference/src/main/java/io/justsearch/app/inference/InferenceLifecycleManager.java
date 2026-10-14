@@ -1327,7 +1327,7 @@ public class InferenceLifecycleManager
       // A stop of the serving server waits for replies only while one serves: with no server
       // serving, nothing can be in flight against it, so admission just closes.
       if (policy.onlyWhileServing() && runner.currentMode() != Mode.ONLINE) {
-        return generation.closeNow();
+        return generation.closeNow(policy.reason());
       }
       return generation.drain(policy);
     }
@@ -1398,6 +1398,11 @@ public class InferenceLifecycleManager
     public boolean idleForAutomaticVdu() {
       return runner.currentMode() == Mode.ONLINE && !serverOps.isExternalServerActive()
           && generation.idleForAutomaticVdu();
+    }
+
+    @Override
+    public long serverLaunches() {
+      return serverOps.launchAttempts();
     }
 
     @Override

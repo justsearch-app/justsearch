@@ -43,6 +43,49 @@ Explicit passes and automatic passes with chat already off keep their existing e
 paths, including the explicit pass's generation drain. The stricter AC-only admission and the
 one-attempt rule apply to borrowing loaded chat.
 
+## Pausing automatic passes that make no progress
+
+An automatic pass counts against picture reading when it launched or relaunched llama-server for
+picture reading and completed no document. There are two causes, reported apart:
+
+- every document was turned away because the Engine held generation closed while a settings
+  change was in progress or during settings recovery: `vdu.breaker_open.refused`;
+- the vision entry itself failed after the pass launched or relaunched llama-server (for example
+  the server refuses its vision configuration): `vdu.breaker_open.entry_failed`. A refusal of the
+  entry that launched nothing (a reload back-off, a load in progress, GPU pressure) neither counts
+  nor resets.
+
+A pass that completes or fails at least one document resets the count; a refusal mixed with a real
+failure therefore counts as progress. A pass cancelled by quit or interrupted by activity, a loaded
+chat BUSY deferral (no launch attempt) and a pass with nothing to do neither count nor reset.
+
+After three counted passes in a row automatic picture reading pauses. While paused no automatic
+pass enters picture-reading mode, so llama-server is not relaunched for vision. Document states and
+retry counts are unchanged and refusals still spend no attempt. Status shows the reason code above
+in the existing VDU blocked-reason field. The `/api/status` readiness component has no message
+field, so the time of the next try is not in it. The `vdu.unavailable` health condition asserted
+from that component carries it in its existing `message` field, for example "Next try at 14:05",
+together with the refusal or entry failure the passes saw. The text is built when status is read:
+the time is rounded up to the minute so it is never early, and once it has passed without a probe
+(the computer stayed busy) the text says the next try is when the computer is next idle.
+
+After a pause of 5 minutes one automatic pass may try (a half-open probe). If it makes progress the
+pause ends and the next pause starts again at 5 minutes; if it counts again the pause doubles: 10,
+20, 40 and at most 60 minutes. A probe that neither counts nor makes progress leaves the pause in
+place and the next eligible tick probes again.
+
+The pause ends at once, with the count reset, on a person's explicit pass, a committed settings
+apply (including a record-only prepared publish) and a person switching chat off or on. Explicit
+passes are never paused and behave as before. The pause is held in memory only: an Engine restart
+starts unpaused. It is separate from the restoration retry budget below (five failed restorations)
+and from the per-document `vdu.circuit_open`, which keep their behaviour. The loaded-chat path's
+five-minute failure back-off also stays; the chat-off path gains no second back-off.
+
+A chat-off automatic pass that starts llama-server under the settings-recovery fence and then
+cannot enter picture reading no longer leaves that server running: the fence still refuses drains
+that would start or relaunch a server, but admits the deactivation that stops it. A person's
+chat-off under the fence now stops the server too.
+
 ## Restoration, startup and shutdown
 
 A failed exit never rolls back to the temporary vision configuration. It retains the latest normal configuration and profile offline, with `config_apply_failed`. The controller retries after 5 seconds, then 10, 20 and at most 30 seconds between failures. After five consecutive failed attempts, counting the failed return from the pass, automatic retries stop. Status retains `config_apply_failed` and says “Automatic retries stopped after five failed attempts.” A person's next chat request, applying settings, or switching chat off and on resets the budget and permits the next attempt. A chat request requests an immediate serialized restoration attempt, subject to residency admission. Any normal configuration applied after the pass began supersedes the saved restore target. A restarted normal configuration ends restoration; a record-only apply becomes its next target. Turning chat off clears the controller's pending retry. For GPU chat, GPU and game pressure defer restoration with the existing pressure reason and two-minute reload dwell; a human request receives the usual refusal and load-anyway option. CPU chat retains its normal residency exemption. Sampler ticks and ordinary activation forwarding cannot bypass that backoff. This shared exit repair applies to explicit passes too.

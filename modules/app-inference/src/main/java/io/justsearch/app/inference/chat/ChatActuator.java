@@ -134,6 +134,12 @@ public interface ChatActuator {
   }
 
   /**
+   * Attempts so far to launch a managed llama-server process, or {@code -1} when this actuator does
+   * not count them. Only the difference between two readings means anything.
+   */
+  default long serverLaunches() { return -1; }
+
+  /**
    * True when the next start of the server loads its model onto a CUDA device (GPU layers above
    * zero on a machine with CUDA). Only such a start waits behind the boot-order gate (Spec A §6.2);
    * CPU chat and machines without CUDA skip it.

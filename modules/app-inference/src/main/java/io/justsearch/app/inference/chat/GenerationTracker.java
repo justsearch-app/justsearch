@@ -5,6 +5,7 @@ import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.chat.GenerationActivity;
 import io.justsearch.app.api.chat.GenerationLease;
 import io.justsearch.app.api.chat.GenerationUnavailableException;
+import io.justsearch.app.api.runtime.child.StopReason;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -266,13 +267,13 @@ public final class GenerationTracker implements GenerationActivity {
    *
    * @throws IllegalStateException when the policy refuses: an AFTER_IDLE drain with {@link
    *     ChatDrainPolicy.Expiry#REFUSE_BUSY} whose bound ran out (admission reopened), an IF_IDLE
-   *     drain with a lease open, or a drain after the recovery fence
+   *     drain with a lease open, or a drain after the recovery fence other than a deactivation
    * @throws InterruptedException when interrupted while waiting (admission reopened)
    */
   public ChatActuator.DrainHold drain(ChatDrainPolicy policy) throws InterruptedException {
     Objects.requireNonNull(policy, "policy");
     return switch (policy.waiting()) {
-      case NOW -> closeNow();
+      case NOW -> closeNow(policy.reason());
       case IF_IDLE -> {
         ChatActuator.DrainHold hold = closeIfIdle();
         if (hold == null) {
@@ -281,14 +282,22 @@ public final class GenerationTracker implements GenerationActivity {
         }
         yield hold;
       }
-      case AFTER_IDLE -> closeAndDrain(policy.bound(), policy.onExpiry());
+      case AFTER_IDLE -> closeAndDrain(policy.bound(), policy.onExpiry(), policy.reason());
     };
   }
 
   /** Closes admission without waiting; open leases end with the server. */
   public ChatActuator.DrainHold closeNow() {
+    return closeNow(null);
+  }
+
+  /**
+   * Closes admission without waiting, for a stop or relaunch for {@code reason}. After the recovery
+   * fence only a deactivation is admitted: it stops the server, it never starts one.
+   */
+  public ChatActuator.DrainHold closeNow(StopReason reason) {
     synchronized (monitor) {
-      requireNotFencedLocked();
+      requireNotFencedLocked(reason);
       closers++;
       return new Hold();
     }
@@ -302,19 +311,19 @@ public final class GenerationTracker implements GenerationActivity {
    */
   public ChatActuator.DrainHold closeIfIdle() {
     synchronized (monitor) {
-      requireNotFencedLocked();
+      requireNotFencedLocked(null);
       if (generateLeases + auxLeases != 0) return null;
       closers++;
       return new Hold();
     }
   }
 
-  private ChatActuator.DrainHold closeAndDrain(Duration bound, ChatDrainPolicy.Expiry onExpiry)
-      throws InterruptedException {
+  private ChatActuator.DrainHold closeAndDrain(Duration bound, ChatDrainPolicy.Expiry onExpiry,
+      StopReason reason) throws InterruptedException {
     long remaining = bound == null ? Long.MAX_VALUE : bound.toNanos();
     long deadline = bound == null ? 0 : nanoTime.getAsLong() + remaining;
     synchronized (monitor) {
-      requireNotFencedLocked();
+      requireNotFencedLocked(reason);
       closers++;
       Hold hold = new Hold();
       boolean returned = false;
@@ -339,8 +348,15 @@ public final class GenerationTracker implements GenerationActivity {
     }
   }
 
-  private void requireNotFencedLocked() {
-    if (recoveryFenced) {
+  /**
+   * The recovery fence keeps a model from serving as a committed target that could not be
+   * reconstructed: no step that drains in order to start or relaunch a server may run. A
+   * deactivation only stops the server and admission stays closed by the fence, so it is admitted;
+   * without it a server started under the fence (for example for a picture-reading entry that the
+   * fence then refused) could never be stopped again and would hold memory for nothing.
+   */
+  private void requireNotFencedLocked(StopReason reason) {
+    if (recoveryFenced && reason != StopReason.DEACTIVATE) {
       throw new IllegalStateException("Generative replacement already owns admission");
     }
   }

@@ -1024,6 +1024,24 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   /**
+   * b100: the message a health condition carries for a readiness reason code. While automatic
+   * picture reading is paused, it says why and when the next try is; otherwise there is none.
+   */
+  private java.util.Optional<String> conditionMessage(String reasonCode) {
+    if (!LifecycleReasonCode.VDU_BREAKER_OPEN_REFUSED.code().equals(reasonCode)
+        && !LifecycleReasonCode.VDU_BREAKER_OPEN_ENTRY_FAILED.code().equals(reasonCode)) {
+      return java.util.Optional.empty();
+    }
+    io.justsearch.app.services.vdu.VduCapabilityState.Snapshot snapshot = value("vdu", null);
+    if (snapshot == null || !reasonCode.equals(snapshot.blockedReason())) {
+      return java.util.Optional.empty();
+    }
+    String detail = snapshot.detail();
+    return detail == null || detail.isBlank()
+        ? java.util.Optional.empty() : java.util.Optional.of(detail);
+  }
+
+  /**
    * Reconciles every health tap from one observation. The single home for tap feeding (tempdoc 885
    * item 6): the sampler is the only caller, so "does the sampler feed the same taps the request
    * path used?" is answered by there being exactly one such path.
@@ -1037,7 +1055,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     var tap = lifecycleSnapshotTap;
     if (tap != null) {
       try {
-        tap.accept(readiness);
+        tap.accept(readiness, this::conditionMessage);
       } catch (RuntimeException e) {
         log.warn("LifecycleSnapshotTap failed during a readiness snapshot; substrate broadcast suppressed", e);
       }
@@ -2175,6 +2193,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       case "vdu.insufficient_vram" -> LifecycleReasonCode.VDU_INSUFFICIENT_VRAM.code();
       case "vdu.missing_mmproj" -> LifecycleReasonCode.VDU_MISSING_MMPROJ.code();
       case "vdu.circuit_open" -> LifecycleReasonCode.VDU_CIRCUIT_OPEN.code();
+      case "vdu.breaker_open.refused" -> LifecycleReasonCode.VDU_BREAKER_OPEN_REFUSED.code();
+      case "vdu.breaker_open.entry_failed" -> LifecycleReasonCode.VDU_BREAKER_OPEN_ENTRY_FAILED.code();
       default -> LifecycleReasonCode.OCR_ENGINE_MISSING.code();
     };
   }

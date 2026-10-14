@@ -305,6 +305,18 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'Visual document understanding is paused after repeated failures',
     severity: 'warn',
   },
+  {
+    code: 'vdu.breaker_open.refused',
+    wording:
+      'Automatic picture reading is paused because a settings change or settings recovery kept the AI model closed; it tries again later',
+    severity: 'info',
+  },
+  {
+    code: 'vdu.breaker_open.entry_failed',
+    wording:
+      'Automatic picture reading is paused because the vision model could not start; it tries again later',
+    severity: 'info',
+  },
   { code: 'index.throughput_stalled', wording: 'Indexing throughput has stalled' },
   {
     code: 'index.throughput_degraded',

@@ -49,13 +49,28 @@ public final class OfflineCoordinator implements AutoCloseable {
   private final java.util.concurrent.atomic.AtomicReference<CompletableFuture<String>> activeExit =
       new java.util.concurrent.atomic.AtomicReference<>();
 
+  private final AutomaticVduBreaker automaticBreaker;
+  private final AutoCloseable breakerResets;
+
   public OfflineCoordinator(EngineExecutorRegistry executors, EngineAdmissionService admission,
       VduBatchProcessor vduBatchProcessor, Supplier<KnowledgeClient> knowledgeClientSupplier,
       VduCapabilityState vduCapabilityState) {
+    this(executors, admission, vduBatchProcessor, knowledgeClientSupplier, vduCapabilityState,
+        System::nanoTime);
+  }
+
+  /**
+   * @param breakerClock monotonic nanosecond clock of the automatic-pass breaker's back-off
+   */
+  public OfflineCoordinator(EngineExecutorRegistry executors, EngineAdmissionService admission,
+      VduBatchProcessor vduBatchProcessor, Supplier<KnowledgeClient> knowledgeClientSupplier,
+      VduCapabilityState vduCapabilityState, java.util.function.LongSupplier breakerClock) {
     this.admission = Objects.requireNonNull(admission, "admission");
     this.vduBatchProcessor = Objects.requireNonNull(vduBatchProcessor, "vduBatchProcessor");
     this.knowledgeClientSupplier = Objects.requireNonNull(knowledgeClientSupplier, "knowledgeClientSupplier");
     this.vduCapabilityState = Objects.requireNonNull(vduCapabilityState, "vduCapabilityState");
+    this.automaticBreaker = new AutomaticVduBreaker(vduCapabilityState,
+        Objects.requireNonNull(breakerClock, "breakerClock"));
     var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
     procedureOwner = executors.register(new EngineExecutorSpec(
         "head.offline-procedure", EngineExecutorSpec.Kind.BACKGROUND,
@@ -68,23 +83,45 @@ public final class OfflineCoordinator implements AutoCloseable {
       catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
       throw failure;
     }
+    // A committed settings apply or a person switching chat off or on closes the breaker at once.
+    var holds = vduBatchProcessor.chatHolds();
+    AutoCloseable resets = null;
+    if (holds != null) {
+      try {
+        resets = holds.addAutomaticVduResetListener(automaticBreaker::close);
+      } catch (RuntimeException | Error failure) {
+        try { procedureOwner.close(); }
+        catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
+        throw failure;
+      }
+    }
+    breakerResets = resets;
   }
 
   /** The returned stage finishes after mode cleanup, cancellation detachment and admission release. */
   public CompletionStage<OfflineProcessingOutcome> startOfflineProcessing(
       EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
-    return startProcessing(context, progress, null);
+    return startProcessing(context, progress, null, false);
+  }
+
+  /**
+   * A person's explicit pass. It is never gated by the automatic-pass breaker and, once accepted,
+   * closes it with the count and back-off reset.
+   */
+  public CompletionStage<OfflineProcessingOutcome> startExplicitProcessing(
+      EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
+    return startProcessing(context, progress, null, true);
   }
 
   /** An idle loaded-chat pass, bounded and owned exactly like an explicit pass. */
   public CompletionStage<OfflineProcessingOutcome> startAutomaticProcessing(
       EngineContext context, java.util.function.BooleanSupplier stillEligible) {
-    return startProcessing(context, outcome -> {}, Objects.requireNonNull(stillEligible));
+    return startProcessing(context, outcome -> {}, Objects.requireNonNull(stillEligible), false);
   }
 
   private CompletionStage<OfflineProcessingOutcome> startProcessing(
       EngineContext context, Consumer<OfflineProcessingOutcome> progress,
-      java.util.function.BooleanSupplier automaticEligibility) {
+      java.util.function.BooleanSupplier automaticEligibility, boolean explicit) {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(progress, "progress");
     // FutureTask's cancel result precedes actual body exit and discards later body failures.
@@ -103,6 +140,7 @@ public final class OfflineCoordinator implements AutoCloseable {
       activeExit.set(exited);
       activeProcedure.set(submitted);
     }
+    if (explicit) automaticBreaker.close("an explicit pass");
     EngineWorkHandle work;
     try { work = admission.attach(context); }
     catch (RuntimeException | Error failure) {
@@ -289,6 +327,8 @@ public final class OfflineCoordinator implements AutoCloseable {
 
   public boolean isProcessing() { return processing.get(); }
   public VduCapabilityState vduCapabilityState() { return vduCapabilityState; }
+  /** Pauses automatic passes after repeated passes without progress (memory only). */
+  public AutomaticVduBreaker automaticBreaker() { return automaticBreaker; }
 
   /** Fence new passes and let the chat owner become terminal before an active pass is cancelled. */
   public boolean prepareForShutdown(Runnable beforeCancellation) {
@@ -316,6 +356,14 @@ public final class OfflineCoordinator implements AutoCloseable {
   }
 
   @Override public void close() {
+    if (breakerResets != null) {
+      try { breakerResets.close(); }
+      catch (Exception failure) {
+        // Removing the listener only stops later resets; ownership below must still close.
+        org.slf4j.LoggerFactory.getLogger(OfflineCoordinator.class)
+            .warn("Breaker reset listener did not close", failure);
+      }
+    }
     procedureOwner.close();
     if (!procedureExecutor.isTerminated()) {
       throw new IllegalStateException("Enrichment procedure did not terminate; dependencies must remain open");

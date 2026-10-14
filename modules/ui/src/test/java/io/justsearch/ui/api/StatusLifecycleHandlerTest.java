@@ -506,6 +506,26 @@ final class StatusLifecycleHandlerTest {
     assertTrue(env.composites().get("aiFeatures").reasonCodes().contains("vdu.missing_mmproj"));
   }
 
+  /** b100: paused automatic picture reading reports its own reason code. */
+  @Test
+  void pausedAutomaticPictureReadingReportsItsOwnReason() {
+    StatusLifecycleHandler handler = newHandler();
+    for (String code : java.util.List.of("vdu.breaker_open.refused", "vdu.breaker_open.entry_failed")) {
+      WorkerOperationalView view =
+          withVisualExtraction(
+              compatWorkerView(CompatibilityStatusView.empty()),
+              new VisualExtractionView(true, true, "tesseract", null, 0L, 4L, code, false));
+      ReadinessEnvelopeView env =
+          handler.buildReadinessEnvelope(view, readyProjection(), freshContact(), false);
+
+      assertEquals("DEGRADED", env.components().get("visualDocumentUnderstanding").state(), code);
+      assertEquals(code, env.components().get("visualDocumentUnderstanding").reasonCode(),
+          "the pause is not reported as a missing OCR engine");
+      assertTrue(env.composites().get("aiFeatures").reasonCodes().contains(code), code);
+      assertFalse(env.composites().get("retrieval").reasonCodes().contains(code), code);
+    }
+  }
+
   @Test
   @DisplayName("tempdoc 837: an orderly shutdown reaches INDEX_SERVING as NOT_CONFIGURED, not an error")
   void workerShutDownIsANotConfiguredVerdictNotAnError() {

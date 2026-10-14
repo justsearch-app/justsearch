@@ -280,7 +280,7 @@ public final class ServicePhase {
 
     // §31 Phase 3: offlineProcessingTrigger derived from offlineCoordinator (computed above).
     java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger =
-        offlineCoordinator != null ? offlineCoordinator::startOfflineProcessing : null;
+        offlineCoordinator != null ? offlineCoordinator::startExplicitProcessing : null;
 
     AgentToolFactory.Output agentTools =
         AgentToolFactory.build(
