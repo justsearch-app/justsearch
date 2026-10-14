@@ -634,3 +634,16 @@ This is unchanged behavior, not a new health guarantee.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-lifecycle-20261014",
+  "verdict": "accept",
+  "digest": "sha256:1a85e4882d2b8520be5a3daa7cf64cb8e0f5fff72f3fc33941e38c53a83c17d4",
+  "note": "VC-lifecycle (independent Claude verifier) over four rounds, accepting 2e7a2c8fb vs 61ff9b955 (rejected c4f2405b4 because EngineRoot's wrapper dropped the two-step restart request): on the real device-loss chain through EngineRoot and HeadlessApp, a refused restart keeps chat latched and retryable with a visible reason, no halt, no hand-off and no budget spent; a committed restart commits, then chat ends, then the hand-off, with one restart counted; nothing reaches the uncaught handler; a later quit records only QUIT and exits 0; the diagnostics ledger export keeps every complete record, skips and counts malformed lines and stays within 8 MiB with exact omitted bytes; restored text changed no literal's meaning. Each repaired check fails on c4f2405b4 by assertion. Suites show only baseline failures; UnreferencedCodeTest passes; PMD adds nothing; dev-runner lifecycle script 10/10. Named limit: on a single-slot server a reply with no token for the probe timeout may be probed and relaunched. Unverified: a live device loss (cannot be triggered on this machine). Digest bound with --base 61ff9b955, the lane's base."
+}
+```
