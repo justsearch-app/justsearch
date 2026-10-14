@@ -115,7 +115,12 @@ check):
   in either order: proven if either one proves. Each child-start is its own identity (PID and
   birth), proven on its own; a childId is never the unit of proof. When a childId has two or more
   different starts, a record naming only the childId proves none of them, and a record naming a
-  start's PID and birth proves that start alone.
+  start's PID and birth proves that start alone. Round 8: a record naming more than its key (a
+  PID, a birth, or a child's incarnation) proves a start only when it carries and agrees on every field the start carries
+  (PID, birth, childId, owner instance, incarnation); a key-only record proves the one start of its
+  key only when its owner or writer is the start's owner instance and no record of the key
+  contradicts the start (names another PID, birth or owner), which then also undoes any key-only
+  proof in a pair.
 
   | Subject | Record and fields | Proves |
   | --- | --- | --- |
@@ -128,7 +133,8 @@ check):
   | Engine incarnation | an exit or GONE reconciliation of another incarnation, or one naming another birth than the start (at the start's measured tick) | false |
   | Engine incarnation with two start identities | an exit or GONE reconciliation not naming the start's PID and birth | false |
   | Engine incarnation | two exits with different codes | true, and a `ledger_codes_disagree` gap |
-  | Ledger child | `child-exit` REQUESTED, UNEXPECTED with a code, or UNKNOWN without a code | true |
+  | Ledger child | `child-exit` REQUESTED, UNEXPECTED with a code, or UNKNOWN without a code, naming only the childId, written by its owning Engine | true |
+  | Ledger child | `child-exit` naming only the childId, written by another Engine (round 8) | false |
   | Ledger child | `child-exit` marked reconciled, naming another PID, or naming its PID with another birth | false |
   | Ledger child | `owner-died` osCheck GONE (any class) naming the owner its spawn named (PID, birth and instance) | true |
   | Ledger child | `owner-died` osCheck GONE naming another owner PID, birth or instance, or no `previousOwner` when its spawn named one | false |
@@ -137,7 +143,9 @@ check):
   | Ledger child | `owner-died` ALIVE_MATCH, IDENTITY_UNKNOWN, REUSED, or no osCheck (any class) | false |
   | Ledger child | `child-survived`, `stop-intent`, `stop-escalate`, `child-note`, `gpu-release` | false |
   | Ledger child | a second `child-start` with another identity under its childId: then no record naming only the childId proves either start | false |
-  | Ledger child, its childId shared with another start | `child-exit`, or `owner-died` osCheck GONE, naming its PID and birth | true |
+  | Ledger child, its childId shared with another start | `child-exit` naming its PID, birth, owner and incarnation, or `owner-died` osCheck GONE naming its PID, birth, incarnation and its owner as `previousOwner` (round 8) | true |
+  | Ledger child | `child-exit` naming its PID and birth only, or without its owner or its incarnation (round 8) | false |
+  | Ledger child | a start whose spawn, later spawn or second record names another owner or incarnation: an `identity_metadata_conflict` (round 8) | false |
   | Job witness | its own `job-process-exit`, with or without a code | true |
   | Job witness | its own exit that lost track of the birth, or one tick off its start | false |
   | Job witness | its own exit marked reconciled, without osCheck | false |
@@ -230,6 +238,71 @@ orchestrator):
   stays cached." (On 7c67eb5d3 one corrupt appended line made the reader read the whole file
   again.)
 
+Follow-up decisions after the independent verifier rejected a2c0400b3 (decided by the
+orchestrator):
+
+- One identity value per start: "PID, birth with its measured precision and source, childId,
+  owner instance and incarnation", built when the start's record is read and never overwritten.
+  Later metadata that disagrees with it (a later `child-spawn` of the childId naming another owner or
+  incarnation, a `child-start` naming another than its spawn, the same process recorded again under
+  other metadata) is itself a finding: an `identity_metadata_conflict` gap naming the start, and no
+  record proves that start. (On a2c0400b3 an exit that left out the start's owner or incarnation
+  proved it, as a missing field matched anything, and the latest `child-spawn` of a childId was
+  applied to every start under it, so an exit naming the later owner proved an earlier start.)
+- One comparison function, `compareIdentity` (`scripts/dev/lib/ledger-identity.cjs`), with the
+  whole value on both sides; no consumer compares a PID or a birth itself. Its rules: `same` (one
+  process: PID, birth at the coarser of the two measured ticks, and every other field both carry),
+  `proves` (a ledger record proving a start's end), `contradicts` (a field both carry disagrees),
+  `exact` (one start, every field equal, births to the tick) and `native` (PID and birth alone, for
+  pairing records whose other fields describe a different relation, such as a receipt's creator;
+  never a proof). Its consumers: exit proof (`proofOfRecord`, `provenExitOf`, the witness proofs in
+  `ledgerView`); receipt and owner selection in `ledgerView` (`createdBy`, `sameOwner`, a helper's
+  owner Engine or parser); the start index of `ledgerView` (one start per process under a childId,
+  the conflicts above); the ended-identity list (`endedIdentitiesOf`); lookup suppression
+  (`ledgerResolution(view).isEnded`, the dev runner's `provenEnded`, for every lookup phase, the
+  post-kill wait, the Engine job stop and the port-owner candidates); runner matching (the dev
+  runner's `checkRecordedProcess`, a tracked record against its OS row); the Engine exit the stop
+  takes from the census (`pendingEngineExit`); target building, arming and the verdict
+  (`exitTargets`, `exitResult`, `ledgerExitFor`, `ledgerSummaryOf`); and GONE and witness
+  reconciliation (`reconcileCrashedHelpers`). The dev runner's three places are marked
+  `// <ledger-resolution>`; a structural check reads the census and those regions, comments
+  stripped, and fails on any PID or birth comparison, a birth taken as a number, an identity
+  keyed by a PID/birth string, or a read of the birth-precision table outside the module.
+- The rule for `proves`: a record that names more than its key (a PID, a birth, or a child's
+  incarnation) must carry and agree on every field the start carries (PID, birth at the start's measured tick, childId or witnessId,
+  owner instance, incarnation). A missing field is never a wildcard. A key-only record (a
+  `child-exit` or `owner-died` naming only the childId; an Engine record naming only the
+  incarnation) proves a start only when exactly one start in the run has that key, the record's
+  owner (`owner`, `previousOwner`), or else its writer (an Engine writer whose PID and `startedAt`
+  are the owner's PID and birth to the millisecond), is the start's owner instance, and no other
+  record of the key contradicts the start. A child start with no owner is never proven by a
+  key-only record. When two starts share the key it proves neither.
+- Edge 1 (`missing-child-exit-native-fields`, a key-only exit of the one start under a childId)
+  was corrected on evidence: the real writers emit key-only exits (DefaultChildControl,
+  LedgerReconciler, PredecessorChildStop, `engine-actuator.cjs`), the schema allows them, and S1
+  (zero lookups for a ledger-ended identity) needs them. Such an exit, written by the start's
+  owning Engine or naming its owner, still proves that start, so the stop never looks it up.
+  Adding PID and birth to the exit writers is a follow-up after part 1, not done here.
+- An Engine incarnation's key-only record has no birth; the dev runner's `engine-owner-died` names
+  the PID, which must then agree with the start's. (This reading lets `engine-owner-died` GONE
+  with `{ incarnation, pid }` prove the one start of its incarnation, as the proof table already
+  had it.)
+- Carry by default: every gap a stop reports is a finding, carried into every later stop of the
+  run (`carriedFrom`), keeping accounting incomplete until a person forgets the run, unless its kind
+  is on the short not-seen-yet list (`NOT_SEEN_YET`): `unrecorded_exit`, and a `ledger-damaged`
+  gap that is a torn last line of one line. Those only say an exit was not yet seen, and a later
+  record or read can account it. Everything else is carried, a kind added later included; so
+  `exit_unproven`, `ledger-unreadable`, an identity-bound OS exit that was unavailable,
+  `identity_metadata_conflict` and `unaccounted_process` (a contradicted containment) are now
+  carried, which the 7c67eb5d3 decision above had looked for again. (On a2c0400b3 a stop that
+  observed a child alive after its owner's job had closed, against recorded containment, was
+  followed by a retry that dropped the contradiction and was complete.) Two edges of the same rule
+  that the verifier's exploratory `sticky-edges.cjs` cases found on a2c0400b3 are fixed with it: a
+  self-exit report, which takes no census, carries the earlier stops' findings too (it is the
+  latest `stop-report.json`, so it never reads as if they had not been found); and an earlier
+  report or census file that parses to anything but a report (`null`, a list, a number) cannot be
+  read, which is a gap, like one that does not parse.
+
 What changed:
 
 - `scripts/dev/lib/stop-exit-census.cjs`: `proofOfRecord` and `provenExitOf` decide exit proof
@@ -304,8 +377,47 @@ What changed:
   (each readable report's gaps, and `earlier-report-unreadable` for one that cannot be read), and
   `stopRun` carries them into the report. `exit-ledger.cjs` `createIncrementalReader` parses the
   appended tail only; a line there that does not parse is damage, not a reason to reread.
+- Round 8, new `scripts/dev/lib/ledger-identity.cjs`: `identityOf` (the identity value of any
+  record, target, OS row or tracked record: PID, birth, its tick and source, childId, witnessId,
+  owner instance, owner, incarnation), `startIdentity` (a ledger start's value, frozen),
+  `noteConflict`, `compareIdentity` with the five rules above, `writerIsOwner`, and the precision and
+  ordering helpers (`TICK`, `birthMs`, `birthFileTime`, `birthOrder`, `bornNotAfter`, `bornAfter`,
+  `bornAt`, `identityKey`, `namedBy`, `hasPid`). An object's value is cached against the fields it
+  was read from, owner included, so an object changed in place is read again.
+  `stop-exit-census.cjs` is rewritten onto it: `ledgerView` builds each start's identity from its
+  own record (its spawn's owner and incarnation only where the start names none) and notes
+  conflicts; `provenExitOf` takes the run's count of starts per key and whether a record of the key
+  contradicts the start; `exitResult` adds an `identity_metadata_conflict` gap per conflicting start;
+  `ledgerResolution(view)` gives `ended` and `isEnded(tracked)` (ended only when some start agrees
+  with the tracked identity and every start that agrees is proven ended), indexed by PID;
+  `NOT_SEEN_YET` and `isFinding` carry every other gap. `dev-runner.cjs`: lookup suppression,
+  `checkRecordedProcess` and the Engine exit match go through `ledgerResolution` and
+  `compareIdentity`. `checkRecordedProcess` now reads the OS row as what it is, a CIM read of the
+  process table (the microsecond, unless the lookup names its tick); before, it declared the row
+  exact, so a tracked identity recorded to the tick whose birth is not a whole microsecond was
+  called `reused` against its own row and a live process was taken as gone (also on b599d4d7e).
+- Round 8 test fixtures: the writers in `test-dev-runner-exit-census.mjs`,
+  `test-dev-runner-exit-census-evidence.mjs`, `test-dev-runner-ix-lifecycle.mjs` and
+  `test-dev-runner-witness-classification.mjs` now carry a PID and a `startedAt` equal to their
+  owner Engine's birth in milliseconds, as the real `LedgerWriterId` does (`startedAt` is the
+  ProcessHandle start instant; see `governance/fixtures/exit-ledger/engine-written/`). Their
+  key-only exits had proven the child through writers with no PID or start time, or a start time
+  other than the owner's birth; nothing binds such a writer to the child's owner, so the round-8
+  rule refuses them.
+- Round 8, cost: the census matched each ledger item against every gap (`denied`), and each earlier
+  census record against every other (`keepEarlierCensus`, the verdict's merge), by scanning. With
+  the identity rule each of those comparisons builds or checks an identity value, so a stop with
+  thousands of gaps took minutes (537 s on the verifier's 17 MB fixture, where no child's exit is
+  proven). They now go through indexes with the same answers: the denying gaps kept apart as they
+  are added, earlier records by their key (`keysOf`, `namedIn`), and the OS exits by the key they
+  echo (`osExitOf`).
+- Round 8, carry: `dev-runner.cjs` `writeSelfExitStopReport` carries the earlier reports' findings
+  (`carryFindings`; `exitAccountingComplete: false` and the carried gaps when there are any, left
+  unset otherwise, as before); `keepEarlierReports` and the census's `keepEarlierCensus` treat a
+  file that parses to no object as unreadable.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (41 cases). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (58 cases; 40 and 41 rewritten and
+42 to 58 added in round 8, with their own before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -474,18 +586,78 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    census finds `ledger_os_disagree`. A later `engine-exit` code 7 for the same identity is
    appended; the retry is not complete and its only gaps are the carried `ledger_os_disagree`
    (from process-exits.1.json) and `ledger_codes_disagree`. On 7c67eb5d3 the retry was complete.
-40. Generated: 3,000 record sets from seed 0xB6D536 (Engine or child; one or two starts,
-   duplicate, same PID one tick off, or another; up to three exits or reconciliations naming or
-   omitting PID and birth, right, wrong or one tick off, another incarnation or childId, owner
-   same, another instance, PID or birth, without instance or none; osCheck variants, reconciled,
-   codes 0 and 3, every order; OS rows with own or neighbouring birth, codes 0 and 3, or none, and
-   declared ticks 1, 10, 10000 or none), each judged by `endedIdentitiesOf` and the verdict and by
-   an oracle in the test that is the identity rule alone. A mismatch prints the seed, case and
-   input; `STOP_CENSUS_GEN_CASE=<n>` runs one case. On 7c67eb5d3, 186 cases disagree.
-41. Generated: 250 histories through real `stopRun` with a stand-in observer, up to three earlier
-   stop reports or census files, each unreadable or holding up to three gaps from a table of
-   findings and not-yet-seen gaps. Complete exactly when no earlier file is unreadable and none
-   holds a finding, and every unreadable file and finding is named. On 7c67eb5d3, 140 disagree.
+40. Generated (rewritten in round 8): 2,000 ledgers from seed 0xB6D536, Engine or child. Starts
+   carry owner and incarnation fields of their own or none; spawns name them, later spawns,
+   restarts and second starts of the same process name others; exits and reconciliations name or
+   leave out a PID, a birth, a childId, an owner (whole, without its instance, another instance,
+   PID or birth) and an incarnation, each right, wrong or one tick off, written by the owning Engine
+   or another, in every order. Each is judged by the census (`endedIdentitiesOf` and the verdict of
+   a census armed before any exit, the OS reporting what it saw) and by a whole `stopRun` (the real
+   census behind a stand-in for the PowerShell observer) of a run tracking one identity in some
+   form (whole, bare, another owner, incarnation or childId, coarse, one tick off), its OS lookup
+   stubbed with CIM-like rows (alive, reused, unreadable, gone): whether the stop looks it up, its
+   outcome and accounting. The oracle in the test is the round-8 identity rule alone, written
+   independently of `ledger-identity.cjs`. A mismatch prints the seed, case and input and names
+   the kinds misjudged (census, lookup, outcome, accounting); `STOP_CENSUS_GEN_CASE=<n>` runs one
+   case and `STOP_CENSUS_GEN_DUMP=<dir>` writes the mismatches as JSON. On a2c0400b3, 559 of the
+   2,000 are misjudged (census 178, lookup 170, outcome 409, accounting 144; a case can be
+   misjudged several ways): 178 prove a start the rule does not (a missing field taken as a
+   wildcard, owner or incarnation lost), 170 skip the lookup of a tracked identity the ledger does
+   not end, and 371 call a running tracked identity reused against its CIM row (case 52). On
+   b599d4d7e the check cannot run: there is no `endedIdentitiesOf`.
+41. Generated (rewritten in round 8): 250 histories, 378 real `stopRun` stops with the stand-in
+   observer: up to three earlier stop reports or census files, each unreadable or holding up to
+   three gaps from a table of findings (`identity-bound`, `exit_unproven`, `ledger-unreadable`,
+   `identity_metadata_conflict`, a kind added later, the disagreements) and not-seen-yet gaps
+   (`unrecorded_exit`, a torn last line), then one to three stops, each of which may find a
+   contained child alive after its owner's job closed. Complete exactly when no earlier file is
+   unreadable or holds a finding and no stop so far found the containment contradicted; every
+   unreadable file and finding is named, and a contradiction an earlier stop found is carried
+   from it. On a2c0400b3, 148 of the 250 disagree: 30 drop a containment contradiction an earlier
+   stop of the history found, the rest drop a finding that is no longer on the not-seen-yet list.
+42. to 50. Round 8 identity edges, each through the real census (its PowerShell observer) and a
+   whole real `stopRun` of a run tracking a running child of the test, the OS lookups the real ones:
+   an exit naming the child's PID, birth and owner but not the incarnation its start carries (42),
+   or PID, birth and incarnation but not its owner (43); a `child-start` naming another owner
+   instance (44) or incarnation (45) than its spawn; a later `child-spawn` naming another owner,
+   with an exit naming that owner (46); the same PID and birth under a second childId whose start
+   no exit names (47); a childId-only exit with two starts under the childId (48), written by
+   another Engine (49), or naming another owner instance (50). Each time the stop looks the child
+   up, finds it running, is `STOP_INCOMPLETE`, and accounting is not complete. 42 to 47 are the
+   verifier's reproductions and fail by assertion on a2c0400b3 (the child was taken as ended and
+   never looked up), as does 49; 48 and 50 pass on a2c0400b3. All pass on b599d4d7e, as
+   preservation.
+51. A tracked record naming another owner instance than the child's start, the child's own exit in
+   the ledger: the child is looked up and blocks the stop. The verifier's reproduction; fails on
+   a2c0400b3 (no lookup), passes on b599d4d7e.
+52. Runner matching: a tracked identity recorded to the tick, its birth not a whole microsecond,
+   running: the stop finds it running and is `STOP_INCOMPLETE`. On a2c0400b3 and b599d4d7e it was
+   called reused against its own CIM row and the stop was `STOPPED`.
+53. Edge 1 corrected: the owning Engine's `child-exit` naming only the childId of the one start
+   under it proves that start (S1): the stop never looks it up, `stop-report.json` lists it in
+   `resolvedByLedger`, the stop is `STOPPED` and accounting complete. Passes on a2c0400b3; on
+   b599d4d7e it was looked up.
+54. Sticky containment: a running child recorded as contained, its owner's job closed more than
+   the grace period before the observation; the first real stop reports `unaccounted_process`
+   ("contradicts recorded containment"). The child ends and a retry runs with an empty scope: it
+   carries the gap (`carriedFrom`) and is not complete. Fails by assertion on a2c0400b3 (the retry
+   was complete) and on b599d4d7e (no carried gap).
+55. Real `stopRun` after an earlier stop-report.json, or an earlier process-exits.json, holding
+   `null`, `[]` or `7`: accounting is not complete and an `earlier-report-unreadable` (or
+   `earlier-census-unreadable`) gap names the file. Fails by assertion on a2c0400b3 (complete) and
+   on b599d4d7e.
+56. `writeSelfExitStopReport` after an earlier report holding `ledger_os_disagree`: the report, and
+   stop-report.json on disk, are not complete and carry it from stop-report.1.json; after one
+   holding only `unrecorded_exit`, accounting is left unset. Fails by assertion on a2c0400b3 and
+   b599d4d7e.
+57. Structural: the census, and the dev runner's three `<ledger-resolution>` regions, comments
+   stripped, hold no PID or birth comparison, no birth taken as a number, no PID/birth key string
+   and no read of the birth-precision table. Fails on a2c0400b3 and b599d4d7e.
+58. Real `stopRun` over a 17 MB ledger of 19,195 Engine children whose key-only exits prove
+   nothing (their writer records a start a year after the owner's birth): every child is an
+   `exit_unproven` gap, each ledger file is read once, and the stop takes under 30 s. Before the
+   round-8 indexing below it failed by assertion after 561,570 ms. b599d4d7e took about 13 s on the verifier's
+   fixture of the same shape.
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -552,4 +724,40 @@ b599d4d7e 13,535 / 12,982 / 13,505 ms, 120,178 parses, not complete; this change
 the check, cases 6 and 14 took 1,151 and 1,924 ms, and the generated cases 40 and 41 took 11,031
 and 9,954 ms (they run last in the file).
 
-Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r6/).
+After the a2c0400b3 fixes, every verifier harness of rounds 2 to 7 was run again from copies with
+fresh folders (verifier-r8/harness-logs), against this change and b599d4d7e. On this change: the
+r2, r3 and r4 `independent.cjs` (19 each), r3 and r4 `independent-extra.cjs` (22 each),
+`independent-edges.cjs` (21, S1-zero-lookup included), `proof-probes.cjs` and `proof-extra.cjs`
+(5 each), `r5-retention.cjs` (3), `r6-retention.cjs` (6), `audit-edges.cjs` (19), `audit-more.cjs`
+(23), `sticky-edges.cjs` (3, the two exploratory cases included) and `incremental-tail-probe.cjs`
+(plain and corrupt: one 6-byte read at offset 791, one damaged line) pass. Round 7's
+`r7-identity-edges.cjs` passes 7 of 8: `missing-child-exit-native-fields` fails, as decided (edge 1,
+case 53). On b599d4d7e they fail by assertion as before (independent 5/19, independent-extra
+6/22, independent-edges 5/21, proof-probes and proof-extra 3/5, both retention files none,
+audit-edges 11/19, audit-more 15/23, sticky-edges 1/3, both tail probes), and
+`r7-identity-edges.cjs` passes 8 of 8 there, as preservation.
+On the 17 MB harness, interleaved three times (CPU load 0 to 85 %): b599d4d7e 16,622 / 14,754 /
+16,263 ms, 120,178 parses, not complete; this change 17,912 / 16,934 / 16,708 ms, 60,089 parses, 1
+read call per file, not complete. `assert-perf.cjs` and `assert-file-reads.cjs` pass on it;
+`assert-comparison.cjs` fails (this change up to 2.2 s slower, and not complete). That fixture's
+Engine writer records `startedAt` 2026-10-14T07:00:00Z for an owner born 2025-10-14T07:00:00Z, so
+under the round-8 rule no key-only `child-exit` proves its child: all 20,029 children are
+`exit_unproven` gaps and observer targets (its `lifecycle-perf.cjs` census armed in 15,560 ms
+against b599d4d7e's 5,127 ms, and finished in 1,249 ms against 9,925 ms). With only that
+`startedAt` set to the owner's birth (`perf/writer-matched/`), interleaved three times: b599d4d7e
+14,658 / 15,635 / 17,014 ms, not complete; this change 2,453 / 2,524 / 2,780 ms, complete. Before
+the round-8 indexing (case 58) the unmatched fixture took 537,043 ms on this change
+(`perf/run1-before-indexing/`). Of the boundary harnesses, `rotation-edges.cjs`,
+`rotation-read-retry.cjs` (cold and warm), `rotation-race.cjs`, `writer-and-named-limit.cjs`, the
+two permanent `enoent-states.cjs` states, `torn-engine.cjs` and the legacy r2 and r3 torn and
+rotation probes pass. `rotation-rename-gap.cjs` and the two transient `enoent-states.cjs` states
+fail by assertion for the same reason (their writer records 12:00:00Z for an owner born
+14:56:55.399Z, and the child is `exit_unproven`), and pass with only that `startedAt` set to the
+owner's birth. The legacy r2 and r3 perf harnesses took 15,748 and 11,794 ms on b599d4d7e and
+14,639 and 12,864 ms with this change (`assert-perf.cjs` passes), not complete for the same reason.
+The 41 `test-dev-runner-*.mjs` files and `e-pair-identity.test.mjs` pass (205 tests). In the full run of the
+check, cases 6 and 14 took 2,882 and 2,647 ms, case 58 15,317 ms, and the generated cases 40 and
+41 took 109,378 and 36,013 ms, with other work loading the machine (47,299 and 20,270 ms in the
+run before the indexing).
+
+Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r8/).

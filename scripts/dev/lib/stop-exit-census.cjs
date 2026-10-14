@@ -24,9 +24,23 @@ function fileTimeFromInstant(instant) {
   if (fraction.slice(7) !== '00') return null; // Windows process starts have 100 ns precision.
   return (BigInt(Date.parse(instant)) * 10000n + 116444736000000000n + BigInt(fraction.slice(3, 7))).toString();
 }
-const isFileTime = (v) => typeof v === 'string' && /^[1-9][0-9]{0,19}$/.test(v);
-/** The shared birth-identity rule (exit-ledger.cjs `sameBirth`): equal at the coarser clock's precision. */
-const { sameBirth, BIRTH_TICKS } = ledgerLib;
+/**
+ * Every identity comparison goes through the one rule (ledger-identity.cjs compareIdentity), with the
+ * whole value it compares: a ledger start, a record, a target, an OS row. Nothing here compares a
+ * PID or a birth itself (a structural check in test-dev-runner-stop-census.mjs holds it to that).
+ */
+const { TICK, isFileTime, identityOf, startIdentity, noteConflict, compareIdentity, identityKey, namedBy, hasPid,
+  writerIsOwner, birthMs, birthFileTime, birthOrder, bornNotAfter, bornAfter, bornAt } = require('./ledger-identity.cjs');
+/** Records by PID: an index only, each candidate in a bucket is then matched by compareIdentity. */
+const byPid = (list, of = x => x) => {
+  const index = new Map();
+  for (const x of list) {
+    const pid = identityOf(of(x))?.pid ?? null;
+    if (!index.has(pid)) index.set(pid, []);
+    index.get(pid).push(x);
+  }
+  return index;
+};
 /**
  * The tick a target's recorded birth was measured at, by where it was read: a B11 startInstant, the
  * millisecond; a CIM read (Win32_Process CreationDate), the microsecond; a ledger birth, what its
@@ -40,15 +54,15 @@ const { sameBirth, BIRTH_TICKS } = ledgerLib;
  * through CIM), and exact when the view has no such start (an unknown precision is never coarser).
  */
 const birthTickOf = (target, view = null) => {
-  if (target.creationTimeSource === 'B11.startInstant') return BIRTH_TICKS.MILLISECOND;
-  if (target.creationTimeSource === 'CIM') return BIRTH_TICKS.MICROSECOND;
+  if (target.creationTimeSource === 'B11.startInstant') return TICK.MILLISECOND;
+  if (target.creationTimeSource === 'CIM') return TICK.MICROSECOND;
   if (target.creationTimeSource === 'ledger') {
-    if (target.role !== 'engine' || target.childId || target.witnessId) return BIRTH_TICKS.EXACT;
-    const start = (view?.engines ?? []).find(e => e.pid === target.pid && e.creationFileTimeUtc === target.creationFileTimeUtc
-      && (!target.incarnation || (e.incarnation.session === target.incarnation.session && e.incarnation.n === target.incarnation.n)));
-    return start ? BigInt(start.birthTick) : BIRTH_TICKS.EXACT;
+    if (target.role !== 'engine' || target.childId || target.witnessId) return TICK.EXACT;
+    const start = (view?.engines ?? []).find(e => compareIdentity(e, { pid: target.pid,
+      creationFileTimeUtc: target.creationFileTimeUtc, incarnation: target.incarnation ?? null }, 'exact'));
+    return start ? BigInt(start.birthTick) : TICK.EXACT;
   }
-  return BIRTH_TICKS.MICROSECOND;
+  return TICK.MICROSECOND;
 };
 const sameExe = (a, b) => Boolean(a && b) && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 const birthOf = (p) => p?.creationFileTimeUtc ?? p?.CreationFileTimeUtc ?? null;
@@ -62,7 +76,7 @@ const knownExitMs = (ms) => (Number.isFinite(ms) && ms >= ledgerLib.EARLIEST_KNO
 
 function engineIdentity(pid, dataDir, table = identity.readProcessTable()) {
   if (!table.ok || !dataDir) return null;
-  const row = table.table.find(p => Number(p.ProcessId) === Number(pid));
+  const row = table.table.find(p => hasPid(p, pid));
   const command = row?.CommandLine ?? '';
   if (!row?.CreationFileTimeUtc || !command.includes('HeadlessApp')
     || !command.replaceAll('\\', '/').toLowerCase().includes(dataDir.replaceAll('\\', '/').toLowerCase())) return null;
@@ -114,12 +128,12 @@ function readRunLedger(dataDir, reader = null) {
   for (const ref of refs) {
     if (!ref || !isFileTime(ref.creationFileTime) || !/^[\w-]+$/.test(ref.instanceId ?? '')) continue;
     // Each owner reference is looked up once: every child-spawn of an Engine names the same owner.
-    const refKey = `${ref.pid}/${ref.creationFileTime}/${ref.instanceId}`;
+    const refKey = `${identityKey(ref)}/${ref.instanceId}`;
     if (refKeys.has(refKey)) continue;
     refKeys.add(refKey);
     try {
       const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime/instances', ref.instanceId, 'manifest.json'), 'utf8'));
-      if (manifest.instanceId !== ref.instanceId || Number(manifest.pid) !== Number(ref.pid)) continue;
+      if (manifest.instanceId !== ref.instanceId || !hasPid(ref, manifest.pid)) continue;
       out.engineContainment.push({ ...ref, incarnation: manifest.incarnation, status: containmentOf(manifest) });
     } catch { /* Absent/unreadable history is unknown containment, never evidence of membership. */ }
   }
@@ -144,76 +158,39 @@ function exitOf(record) {
 }
 
 /**
- * Whether one ledger record proves that the identity it is read for has ended (the proof table in
- * the b102 changeset). Only explicit facts prove: an exit its writer saw (engine-exit, child-exit),
- * or a reconciliation that looked for the process and found it gone (engine-owner-died or owner-died
- * with osCheck GONE). A reconciliation that found it alive (ALIVE_MATCH), could not tell
- * (IDENTITY_UNKNOWN), found its PID reused (REUSED) or names no check proves nothing; nor does an
- * exit class, reason or flag on any record. A record proves a start only when it agrees with every
- * identity field both carry (recordAgrees): the PID, the birth, the childId, the owner and the
- * incarnation. `ambiguous` (two different starts for one Engine incarnation or child) admits only a
- * record naming both the PID and the birth. Job witnesses: witnessProofOf.
+ * Whether one ledger record proves that the start it is read for has ended (the proof table in the
+ * b102 changeset). Only explicit facts prove: an exit its writer saw (engine-exit, child-exit), or a
+ * reconciliation that looked for the process and found it gone (engine-owner-died or owner-died with
+ * osCheck GONE). A reconciliation that found it alive (ALIVE_MATCH), could not tell (IDENTITY_UNKNOWN),
+ * found its PID reused (REUSED) or names no check proves nothing; nor does an exit class, reason or
+ * flag on any record. Whether the record is about the start at all is the one identity rule
+ * (compareIdentity 'proves'): a key-only record (a childId, an Engine incarnation) proves only the one
+ * start of its key, unconflicted and uncontested, and a child's only through the owner it names or its
+ * writer; any other record must carry and agree on every field the start carries.
  */
-function proofOfRecord(record, identity, ambiguous = false) {
+function proofOfRecord(record, identity, ctx) {
   const line = record?.line ?? {};
-  if (!recordAgrees(line, identity)) return null;
-  // A reconciliation names the owner it found dead; one that names none is about no owner's child.
-  if (record.type === 'owner-died' && identity.owner && !ownerAgrees(line.previousOwner, identity.owner)) return null;
-  if (ambiguous && (line.pid == null || line.creationFileTime == null)) return null;
+  if (!compareIdentity(line, identity, 'proves', { ...ctx, writer: record?.writer ?? null })) return null;
   if (record.type === 'engine-exit' || record.type === 'child-exit') return line.reconciled === true ? null : 'direct';
   if ((record.type === 'engine-owner-died' || record.type === 'owner-died') && line.osCheck === 'GONE') return 'gone';
   return null;
 }
 
 /**
- * The owner a record names (a reconciliation's `previousOwner`, a receipt's `owner`) agrees with the
- * owner a start was recorded under: every field the start's owner carries (PID, birth, instance) is
- * on the record and the same, the birth exactly (both are read natively). A field the record leaves
- * out is never a wildcard for one the start carries.
- */
-function ownerAgrees(named, owner) {
-  if (!owner) return true;
-  if (!named || typeof named !== 'object') return false;
-  if (owner.pid != null && !(named.pid != null && Number(named.pid) === Number(owner.pid))) return false;
-  if (owner.creationFileTime != null && !(isFileTime(String(named.creationFileTime ?? ''))
-    && sameBirth(String(named.creationFileTime), String(owner.creationFileTime), BIRTH_TICKS.EXACT))) return false;
-  if (owner.instanceId != null && named.instanceId !== owner.instanceId) return false;
-  return true;
-}
-
-/**
- * One rule for whether a record is about a start (the round-6 decision): it agrees with every
- * identity field both carry. The PID; the birth at the precision the two were measured at (a record's
- * birth is native, so exactly, unless the start itself was read at a coarser tick, `birthTick`); the
- * childId; the owner (ownerAgrees: a reconciliation's previousOwner, a receipt's owner); and the
- * incarnation (session and number). The record types that carry a field are the schema's; within one
- * a field left out is never a wildcard (an owner without its instance names no owner).
- */
-function recordAgrees(line, identity) {
-  if (line.pid != null && Number(line.pid) !== identity.pid) return false;
-  if (line.creationFileTime != null) {
-    const tick = /^[1-9][0-9]*$/.test(String(identity.birthTick ?? '')) ? BigInt(identity.birthTick) : BIRTH_TICKS.EXACT;
-    if (!(isFileTime(line.creationFileTime) && isFileTime(identity.creationFileTimeUtc)
-      && sameBirth(line.creationFileTime, identity.creationFileTimeUtc, tick))) return false;
-  }
-  if (line.childId != null && identity.childId != null && line.childId !== identity.childId) return false;
-  if ('previousOwner' in line && !ownerAgrees(line.previousOwner, identity.owner)) return false;
-  if ('owner' in line && !ownerAgrees(line.owner, identity.owner)) return false;
-  if (line.incarnation != null && identity.incarnation != null && (line.incarnation?.session !== identity.incarnation.session
-    || line.incarnation?.n !== identity.incarnation.n)) return false;
-  return true;
-}
-/**
- * The exit an identity's records prove, from all of them at once (so their order never matters, and
- * no later record can take a proof back): the last exit its writer saw, else the last reconciliation
- * that found it gone. `exit` is that record (the class read from it), or null when nothing proves the
- * identity ended; `unproven` is then the last record that did not. `conflictingCodes` lists the
- * different exit codes two or more of the identity's exits name: a ledger that holds two codes for
- * one identity disagrees with itself, and exitResult makes that a gap no later record clears.
+ * The exit a start's records prove, from all of them at once (so their order never matters, and no
+ * later record can take a proof back): the last exit its writer saw, else the last reconciliation that
+ * found it gone. `exit` is that record (the class read from it), or null when nothing proves the start
+ * ended; `unproven` is then the last record that did not. `keyStarts` is how many starts share the
+ * key the records were read by (the childId, the incarnation); a record of the key that contradicts the
+ * start (another PID, birth, owner or incarnation) leaves the key contested, and then no key-only record
+ * proves it. `conflictingCodes` lists the different exit codes two or more of its proving exits name:
+ * a ledger that holds two codes for one identity disagrees with itself, and exitResult makes that a
+ * gap no later record clears.
  */
 const unprovenDetail = (exit) => `${exit.type}${exit.osCheck ? ` ${exit.osCheck}` : ''} does not prove the exit`;
-function provenExitOf(records, identity, ambiguous) {
-  const judged = records.map(r => ({ r, proof: proofOfRecord(r, identity, ambiguous) }));
+function provenExitOf(records, identity, keyStarts) {
+  const contested = records.some(r => compareIdentity(r.line ?? {}, identity, 'contradicts', { tick: TICK.EXACT }));
+  const judged = records.map(r => ({ r, proof: proofOfRecord(r, identity, { keyStarts, contested }) }));
   const chosen = judged.filter(j => j.proof === 'direct').at(-1) ?? judged.filter(j => j.proof === 'gone').at(-1);
   if (!chosen) return { exit: null, proof: null, unproven: exitOf(records.at(-1)) };
   const codes = [...new Set(judged.filter(j => j.proof === 'direct' && Number.isInteger(j.r.line.code))
@@ -238,16 +215,15 @@ const jobClosedByMs = (engine) => closedByMs(engine?.exit);
 
 // The creator was identified from the held helper while it was alive. Engine ancestry is
 // insufficient: concurrent parsers in the same job must never borrow one another's intent.
-const createdBy = (w, owner) => Number(owner?.pid) === w.parentPid
-  && isFileTime(owner?.creationFileTime) && isFileTime(w.parentCreationFileTime)
-  && sameBirth(owner.creationFileTime, w.parentCreationFileTime, BIRTH_TICKS.EXACT)
-  && BigInt(owner.creationFileTime) <= BigInt(w.creationFileTimeUtc);
-const sameOwner = (a, b) => a?.pid === b?.pid && a?.instanceId === b?.instanceId
-  && sameBirth(a?.creationFileTime, b?.creationFileTime, BIRTH_TICKS.EXACT);
-const receiptCreator = (w, c) => createdBy(w, c.owner) || (c.helperId
-  && c.creatorPid === c.owner?.pid && isFileTime(c.creatorCreationFileTime)
-  && sameBirth(c.creatorCreationFileTime, c.owner.creationFileTime, BIRTH_TICKS.EXACT)
-  && BigInt(c.creatorCreationFileTime) <= BigInt(w.creationFileTimeUtc));
+// The parent a witness recorded for its process, as an identity (read natively: exact).
+const recordedParent = (w) => identityOf({ pid: w.parentPid, creationFileTime: w.parentCreationFileTime ?? null, birthTick: '1' });
+const createdBy = (w, owner) => Boolean(owner) && compareIdentity(recordedParent(w), owner, 'same', { tick: TICK.EXACT })
+  && bornNotAfter(owner, w, TICK.EXACT);
+const sameOwner = (a, b) => Boolean(a && b) && compareIdentity(a, b, 'exact', { tick: TICK.EXACT });
+const receiptCreator = (w, c) => createdBy(w, c.owner) || Boolean(c.helperId && c.owner
+  && compareIdentity({ pid: c.creatorPid, creationFileTime: c.creatorCreationFileTime ?? null, birthTick: '1' }, c.owner, 'same',
+    { tick: TICK.EXACT })
+  && bornNotAfter(bornAt(c.creatorCreationFileTime), w, TICK.EXACT));
 
 /** A wire instant as a BigInt FILETIME, or null (fileTimeFromInstant's rule). */
 const fileTimeOf = (instant) => {
@@ -257,117 +233,151 @@ const fileTimeOf = (instant) => {
 
 /**
  * The run's Engine incarnations (`engine-start` with `incarnation.session = runId`) and the children
- * whose `child-spawn` owner is one of them, each with its exit record (or null).
+ * whose owner is one of them, each with its exit record (or null).
+ *
+ * Each start's identity (ledger-identity.cjs) is built once, from its own record, when it is read: an
+ * Engine start's PID, birth (at the tick its writer measured it), and incarnation; a child-start's PID,
+ * birth, childId, and its owner and incarnation (its own, else the latest child-spawn before it for its
+ * childId). Nothing read later rewrites it. A child-spawn, or a second child-start of the same process,
+ * that disagrees with it is a conflict on it (`identityConflicts`, which the census reports as finding
+ * `identity_metadata_conflict`), and a start with a conflict is proven by no record.
  */
 function ledgerView(ledger, runId) {
   const engines = [];
   const engineStarts = (ledger?.engine?.records ?? []).filter(r => r.type === 'engine-start' && runId
     && r.line?.incarnation?.session === runId && Number.isInteger(r.line?.incarnation?.n));
+  // A dev runner or dev CLI reads an Engine's birth through CIM (the microsecond); any other writer exactly.
+  const engineIds = [];
   for (const r of engineStarts) {
+    const cim = ['dev-runner', 'dev-cli'].includes(r.writer?.role);
+    const id = startIdentity({ pid: r.line.pid, creationFileTime: r.line.creationFileTime ?? null, kind: 'engine',
+      incarnation: r.line.incarnation, tick: cim ? TICK.MICROSECOND : TICK.EXACT, source: cim ? 'CIM' : 'native' });
+    // The same start recorded twice is one start.
+    if (engineIds.some(e => compareIdentity(e.id, id, 'exact'))) continue;
+    engineIds.push({ r, id });
+  }
+  for (const { r, id } of engineIds) {
     const inc = r.line.incarnation;
-    const identity = { pid: Number(r.line.pid), creationFileTimeUtc: r.line.creationFileTime ?? null };
-    // Two starts naming one incarnation with different identities: a record naming only the
-    // incarnation cannot say which of them it is about.
-    const ambiguous = engineStarts.some(s => s !== r && s.line.incarnation.n === inc.n
-      && (Number(s.line.pid) !== identity.pid || s.line.creationFileTime !== identity.creationFileTimeUtc));
+    // Two starts naming one incarnation: a record naming only the incarnation cannot say which it is about.
+    const keyStarts = engineIds.filter(e => e.id.incarnation.n === inc.n).length;
     const exits = (ledger.engine.records).filter(e => EXIT_TYPES.has(e.type)
       && e.line?.incarnation?.session === inc.session && e.line?.incarnation?.n === inc.n);
-    // A dev runner or dev CLI reads an Engine's birth through CIM (the microsecond); any other writer exactly.
-    const birthTick = ['dev-runner', 'dev-cli'].includes(r.writer?.role) ? BIRTH_TICKS.MICROSECOND : BIRTH_TICKS.EXACT;
-    const { exit, proof, unproven, conflictingCodes } = provenExitOf(exits,
-      { ...identity, incarnation: { session: inc.session, n: inc.n }, birthTick: String(birthTick) }, ambiguous);
-    engines.push({ incarnation: { session: inc.session, n: inc.n }, ...identity, executable: r.line.executable || null,
-      exit, proof, unproven, ...(conflictingCodes ? { conflictingCodes } : {}), birthTick: String(birthTick),
-      contained: (ledger.engineContainment ?? []).some(c => Number(c.pid) === Number(r.line.pid)
-        && sameBirth(c.creationFileTime, r.line.creationFileTime)
-        && c.incarnation?.session === inc.session && c.incarnation?.n === inc.n && c.status === 'CONTAINED') });
+    const { exit, proof, unproven, conflictingCodes } = provenExitOf(exits, id, keyStarts);
+    engines.push({ incarnation: { session: inc.session, n: inc.n }, pid: Number(r.line.pid),
+      creationFileTimeUtc: r.line.creationFileTime ?? null, executable: r.line.executable || null,
+      exit, proof, unproven, ...(conflictingCodes ? { conflictingCodes } : {}), birthTick: id.tick,
+      contained: (ledger.engineContainment ?? []).some(c => c.status === 'CONTAINED' && compareIdentity(c, id, 'same')),
+      identity: id });
   }
   const byId = new Map();
   for (const r of ledger?.children?.records ?? []) {
-    const id = r.line?.childId;
-    if (typeof id !== 'string') continue;
-    const c = byId.get(id) ?? { childId: id, starts: [], exits: [] };
-    if (r.type === 'child-spawn') Object.assign(c, { kind: r.line.kind ?? null, owner: r.line.owner ?? null,
-      ...(r.line.incarnation ? { incarnation: r.line.incarnation } : {}) });
-    else if (r.type === 'child-start') {
+    const childId = r.line?.childId;
+    if (typeof childId !== 'string') continue;
+    const c = byId.get(childId) ?? { childId, kind: null, spawn: null, starts: [], exits: [] };
+    if (r.type === 'child-spawn') {
+      const spawn = { kind: r.line.kind ?? null, owner: r.line.owner ?? null, incarnation: r.line.incarnation ?? null };
+      // A later spawn of the childId never rewrites a start already read; one that disagrees with it is a conflict on it.
+      const meta = identityOf({ owner: spawn.owner, incarnation: spawn.incarnation, childId });
+      for (const s of c.starts) {
+        if (compareIdentity(meta, s.identity, 'contradicts')) noteConflict(s.identity, { field: 'later-spawn',
+          detail: 'a later child-spawn of its childId names another owner or incarnation', value: JSON.stringify(spawn) });
+      }
+      c.spawn = spawn;
+      c.kind = spawn.kind ?? c.kind;
+    } else if (r.type === 'child-start') {
+      const spawn = c.spawn;
+      const own = { owner: r.line.owner ?? null, incarnation: r.line.incarnation ?? null };
+      const identity = startIdentity({ pid: r.line.pid, creationFileTime: r.line.creationFileTime ?? null, childId,
+        kind: 'child', owner: own.owner ?? spawn?.owner ?? null, incarnation: own.incarnation ?? spawn?.incarnation ?? null });
+      // Its own owner and incarnation, where it records them, must be its spawn's; the start keeps its own.
+      if (spawn && compareIdentity(identityOf({ owner: spawn.owner, incarnation: spawn.incarnation, childId }), identity,
+        'contradicts')) noteConflict(identity, { field: 'spawn', value: JSON.stringify(spawn),
+        detail: 'its child-spawn names another owner or incarnation than the child-start' });
       const start = { pid: Number(r.line.pid), creationFileTimeUtc: r.line.creationFileTime ?? null,
-        executable: r.line.executable ?? null, contained: r.line.contained ?? null };
-      // The same process recorded twice is one start; its latest record describes it.
-      const same = c.starts.findIndex(s => s.pid === start.pid && s.creationFileTimeUtc === start.creationFileTimeUtc);
-      if (same >= 0) c.starts[same] = start; else c.starts.push(start);
-    } else if (CHILD_EXIT_TYPES.has(r.type)) {
-      c.exits.push(r);
-      if (r.type === 'owner-died' && !c.owner) c.owner = r.line.previousOwner ?? null;
-    }
-    byId.set(id, c);
+        executable: r.line.executable ?? null, contained: r.line.contained ?? null, kind: spawn?.kind ?? c.kind,
+        owner: own.owner ?? spawn?.owner ?? null, incarnation: identity.incarnation, identity };
+      // The same process recorded twice is one start; its latest record describes it. The same process
+      // recorded with other metadata keeps its first identity, and the disagreement is a conflict on it.
+      const same = c.starts.findIndex(s => compareIdentity(s.identity, identity, 'native', { tick: TICK.EXACT }));
+      if (same < 0) c.starts.push(start);
+      else if (compareIdentity(c.starts[same].identity, identity, 'exact')) {
+        c.starts[same] = { ...c.starts[same], executable: start.executable, contained: start.contained };
+      } else {
+        noteConflict(c.starts[same].identity, { field: 'restart', value: JSON.stringify(own),
+          detail: 'a second child-start of the same process names another owner or incarnation' });
+        for (const conflict of identity.conflicts) noteConflict(c.starts[same].identity, conflict);
+      }
+    } else if (CHILD_EXIT_TYPES.has(r.type)) c.exits.push(r);
+    byId.set(childId, c);
   }
-  const ownedBy = (child, engine) => Number(child.owner?.pid) === engine.pid
-    && sameBirth(String(child.owner?.creationFileTime ?? ''), engine.creationFileTimeUtc);
-  // Each child-start is its own identity (PID and birth), proven on its own: a childId is never the
-  // unit of proof. Under a childId with two or more different starts, a record naming only the
-  // childId cannot say which process ended, so only a record naming a start's PID and birth proves
-  // that start. A child-spawn without a start has no identity, and nothing proves it ended.
+  // A child is the run's when the owner its own identity names is a run Engine.
+  const ownedBy = (child, engine) => {
+    const owner = identityOf(child)?.owner;
+    return Boolean(owner) && compareIdentity(owner, engine, 'same');
+  };
+  // Each child-start is its own identity, proven on its own: a childId is never the unit of proof.
+  // Under a childId with two or more starts, a record naming only the childId cannot say which process
+  // ended (compareIdentity 'proves', keyStarts). A child-spawn without a start has no identity, and
+  // nothing proves it ended.
   const children = [];
-  for (const { starts, exits, ...c } of byId.values()) {
-    if (!engines.some(e => ownedBy(c, e))) continue;
-    if (!starts.length) { children.push({ ...c, exit: null, proof: null, unproven: exitOf(exits.at(-1)) }); continue; }
-    const ambiguous = starts.length > 1;
-    // The Engine reads a child's birth natively (GetProcessTimes): exact. A record is about this start
-    // only when it agrees with the start's PID, birth, childId, owner and incarnation (recordAgrees).
+  const identityConflicts = [];
+  for (const { starts, exits, spawn, ...c } of byId.values()) {
+    if (!starts.length) {
+      const owner = spawn?.owner ? identityOf({ owner: spawn.owner }) : null;
+      if (owner && engines.some(e => ownedBy(owner, e))) {
+        children.push({ ...c, owner: spawn.owner, incarnation: spawn.incarnation, exit: null, proof: null,
+          unproven: exitOf(exits.at(-1)) });
+      }
+      continue;
+    }
     for (const start of starts) {
-      const identity = { ...start, childId: c.childId, owner: c.owner ?? null, incarnation: c.incarnation ?? null,
-        birthTick: String(BIRTH_TICKS.EXACT) };
-      children.push({ ...c, ...start, ...provenExitOf(exits, identity, ambiguous),
-        ...(ambiguous ? { sharedChildId: true } : {}), birthTick: String(BIRTH_TICKS.EXACT) });
+      if (!engines.some(e => ownedBy(start, e))) continue;
+      const item = { ...c, ...start, ...provenExitOf(exits, start.identity, starts.length),
+        ...(starts.length > 1 ? { sharedChildId: true } : {}), birthTick: String(TICK.EXACT) };
+      children.push(item);
+      if (start.identity.conflicts.length) identityConflicts.push(item);
     }
   }
   const witnesses = new Map();
-  // Job witness proofs, by witness and identity: what the Engine's witness saw exit through the
-  // handle it held (its own job-process-exit, never one marked reconciled), and what a later owner's
-  // reconciliation found gone (osCheck GONE). Each names the PID and exact birth of a start the
-  // same witness recorded. Kept apart from the classification below, which can still reject a
-  // receipt or reclassify it: neither takes the proof back.
-  const witnessStarts = new Map(), witnessProofs = new Map();
-  const witnessKey = (inc, witnessId, pid, birth) => `${inc?.session}/${inc?.n}/${witnessId}/${pid}/${birth}`;
-  // Candidates, judged once every start is known (so record order never matters): each must name a
-  // start of the same witness with the same owner (PID, birth and instance).
+  // Job witness proofs: what the Engine's witness saw exit through the handle it held (its own
+  // job-process-exit, never one marked reconciled), and what a later owner's reconciliation found gone
+  // (osCheck GONE). Each must carry and agree on every field of a start the same witness recorded (its
+  // PID, exact birth, witnessId, owner and incarnation: compareIdentity 'proves'). Kept apart from the
+  // classification below, which can still reject a receipt or reclassify it: neither takes the proof back.
+  const witnessStartsById = new Map();
+  // Candidates, judged once every start is known (so record order never matters).
   const witnessProofCandidates = [];
   const proveWitness = (line, by, type, writer) => {
-    if (!Number.isSafeInteger(line.pid) || !isFileTime(line.creationFileTime)) return;
-    witnessProofCandidates.push({ key: witnessKey(line.incarnation, line.witnessId, line.pid, line.creationFileTime),
-      owner: line.owner, writer, proof: { type, osCheck: line.osCheck ?? null, by } });
+    if (!isFileTime(line.creationFileTime) || !identityOf(line, { defaultTick: TICK.EXACT }).pid) return;
+    witnessProofCandidates.push({ line, writer, proof: { type, osCheck: line.osCheck ?? null, by } });
   };
   for (const r of ledger?.children?.records ?? []) {
     const line = r.line, inc = line?.incarnation, owner = line?.owner;
-    const engine = engines.find(e => e.incarnation.session === inc?.session && e.incarnation.n === inc?.n
-      && e.pid === Number(owner?.pid) && sameBirth(e.creationFileTimeUtc, owner?.creationFileTime));
-    if (!engine || r.writer?.role !== 'engine' || Number(r.writer.pid) !== engine.pid
+    const engine = inc && owner && engines.find(e => compareIdentity({ ...owner, incarnation: inc }, e, 'same'));
+    if (!engine || !writerIsOwner(r.writer, engine, { unknownBirth: true })
       || !/^[\w-]+$/.test(owner?.instanceId ?? '') || !/^[\w-]+$/.test(line?.witnessId ?? '')) continue;
-    const writerBirthMs = Number.isFinite(r.writer.startedAt) ? r.writer.startedAt : ledgerLib.knownTimestamp(r.writer.startedAt);
-    const engineBirthMs = Number((BigInt(engine.creationFileTimeUtc) - 116444736000000000n) / 10000n);
-    if (writerBirthMs != null && writerBirthMs !== engineBirthMs) continue;
     const key = `${inc.session}/${inc.n}/${line.witnessId}`;
     const engineConsole = line.consoleClient === true && CONSOLE_HOST_RE.test(line.executable ?? '')
-      && Number(line.parentPid) === engine.pid
-      && sameBirth(line.parentCreationFileTime, owner?.creationFileTime, BIRTH_TICKS.EXACT);
-    if (r.type === 'job-process-start' && (line.contained === true || engineConsole) && Number.isSafeInteger(line.pid)
-      && line.pid > 0 && isFileTime(line.creationFileTime) && BigInt(line.creationFileTime) > 0n
-      && BigInt(line.creationFileTime) >= BigInt(engine.creationFileTimeUtc)) {
-      witnessStarts.set(witnessKey(inc, line.witnessId, line.pid, line.creationFileTime),
-        { pid: line.pid, creationFileTimeUtc: line.creationFileTime, owner, executable: line.executable });
+      && compareIdentity(recordedParent(line), owner, 'same', { tick: TICK.EXACT });
+    const start = r.type === 'job-process-start' ? startIdentity({ pid: line.pid, creationFileTime: line.creationFileTime ?? null,
+      kind: 'witness', witnessId: line.witnessId, owner, incarnation: inc }) : null;
+    if (start && (line.contained === true || engineConsole) && start.pid !== null && start.birth !== null
+      && bornNotAfter(engine, start, TICK.EXACT)) {
+      if (!witnessStartsById.has(line.witnessId)) witnessStartsById.set(line.witnessId, []);
+      witnessStartsById.get(line.witnessId).push({ pid: start.pid, creationFileTimeUtc: line.creationFileTime, owner,
+        executable: line.executable, witnessId: line.witnessId, incarnation: inc, identity: start });
       if (witnesses.has(key)) { witnesses.get(key).invalid = true; continue; }
-      witnesses.set(key, { witnessId: line.witnessId, incarnation: inc, owner, pid: line.pid,
+      witnesses.set(key, { witnessId: line.witnessId, incarnation: inc, owner, pid: start.pid,
         creationFileTimeUtc: line.creationFileTime, executable: line.executable, contained: line.contained === true,
         awaited: line.awaited === true, expectedCode: line.expectedCode, reason: line.reason,
         engine, consoleClient: engineConsole, parentPid: line.parentPid,
-        parentCreationFileTime: line.parentCreationFileTime, exit: null });
+        parentCreationFileTime: line.parentCreationFileTime, exit: null, identity: start });
     } else if (r.type === 'job-process-exit' && line.reconciled !== true) {
       // The witness's own receipt: it waited on the handle it held, so the process has ended.
       proveWitness(line, 'direct', r.type, r.writer);
       if (!witnesses.has(key)) continue;
       const w = witnesses.get(key);
-      if (w.exit || w.pid !== line.pid || w.owner.instanceId !== owner.instanceId
-        || !sameBirth(w.creationFileTimeUtc, line.creationFileTime, BIRTH_TICKS.EXACT)) { w.invalid = true; continue; }
+      if (w.exit || !compareIdentity(line, w.identity, 'proves', { family: 'witness' })) { w.invalid = true; continue; }
       const exit = exitOf(r);
       if (line.forced !== false || (!Number.isInteger(exit.code) && exit.exitClass !== 'UNKNOWN')
         || !['REQUESTED', 'UNEXPECTED', 'UNKNOWN'].includes(exit.exitClass)
@@ -377,7 +387,7 @@ function ledgerView(ledger, runId) {
     }
   }
   const receipts = new Map(), windows = new Map();
-  // The run's children by PID, in ledger order, for the owner a record names.
+  // The run's children by PID (an index only: each is matched by compareIdentity), for the owner a record names.
   const childrenByPid = new Map();
   for (const c of children) {
     if (!childrenByPid.has(c.pid)) childrenByPid.set(c.pid, []);
@@ -385,17 +395,12 @@ function ledgerView(ledger, runId) {
   }
   for (const r of ledger?.children?.records ?? []) {
     const line = r.line, inc = line?.incarnation, owner = line?.owner;
-    const direct = engines.find(e => e.incarnation.session === inc?.session && e.incarnation.n === inc?.n
-      && e.pid === Number(owner?.pid) && sameBirth(e.creationFileTimeUtc, owner?.creationFileTime));
-    const parser = (childrenByPid.get(Number(owner?.pid)) ?? [])
-      .find(c => sameBirth(c.creationFileTimeUtc, owner?.creationFileTime));
+    if (!inc || !owner) continue;
+    const direct = engines.find(e => compareIdentity({ ...owner, incarnation: inc }, e, 'same'));
+    const parser = (childrenByPid.get(identityOf(owner).pid) ?? []).find(c => c.identity && compareIdentity(owner, c, 'native'));
     const engine = direct ?? (parser && engines.find(e => ownedBy(parser, e)
-      && e.incarnation.session === inc?.session && e.incarnation.n === inc?.n));
-    if (!engine || r.writer?.role !== 'engine' || Number(r.writer.pid) !== Number(owner.pid)) continue;
-    const writerBirth = Number.isFinite(r.writer.startedAt) ? r.writer.startedAt : ledgerLib.knownTimestamp(r.writer.startedAt);
-    const ownerBirth = isFileTime(owner.creationFileTime)
-      ? Number((BigInt(owner.creationFileTime) - 116444736000000000n) / 10000n) : null;
-    if (writerBirth != null && writerBirth !== ownerBirth) continue;
+      && e.incarnation.session === inc.session && e.incarnation.n === inc.n));
+    if (!engine || !writerIsOwner(r.writer, owner, { unknownBirth: true })) continue;
     if (r.type === 'helper-start' && isFileTime(line.creationFileTime))
       receipts.set(line.helperId, { ...line, engine, parentPid: line.parentPid, parentCreationFileTime: line.parentCreationFileTime, exit: null });
     if (r.type === 'helper-exit') {
@@ -405,8 +410,7 @@ function ledgerView(ledger, runId) {
         && Number.isSafeInteger(line.pid) && isFileTime(line.creationFileTime))
         receipts.set(line.helperId, { ...line, engine, exit: null });
       const receipt = receipts.get(line.helperId);
-      if (receipt && sameOwner(receipt.owner, owner) && receipt.pid === line.pid
-        && sameBirth(receipt.creationFileTime, line.creationFileTime, BIRTH_TICKS.EXACT))
+      if (receipt && sameOwner(receipt.owner, owner) && compareIdentity(receipt, line, 'same', { tick: TICK.EXACT }))
         receipt.exit = exitOf(r);
     }
     // A window's instants are read once here, not once per helper compared with it.
@@ -437,28 +441,31 @@ function ledgerView(ledger, runId) {
       || !['dev-runner', 'dev-cli', 'engine'].includes(r.writer?.role)) continue;
     // A later owner found the witnessed identity gone. The witness's own Engine cannot reconcile it.
     if (line.osCheck === 'GONE') proveWitness(line, 'gone', r.type, r.writer);
-    const w = valid.find(w => w.witnessId === line.witnessId && w.pid === line.pid
-      && sameBirth(w.creationFileTimeUtc, line.creationFileTime, BIRTH_TICKS.EXACT)
-      && sameOwner(w.owner, line.owner) && w.incarnation.session === line.incarnation?.session
-      && w.incarnation.n === line.incarnation?.n);
+    const w = valid.find(w => compareIdentity(line, w.identity, 'proves', { family: 'witness' }));
     const crashReceipt = w?.engine.exit?.exitClass === 'UNEXPECTED' && line.cause === 'ENGINE_CRASH';
     const intendedConsole = w?.consoleClient && w.engine.exit?.exitClass === 'REQUESTED' && line.cause === 'ENGINE_EXIT';
     if (!w || w.exit || (!crashReceipt && !intendedConsole)) continue;
-    if (r.writer.role === 'engine' && Number(r.writer.pid) === w.engine.pid) continue;
+    if (writerIsOwner(r.writer, w.engine, { unknownBirth: true })) continue;
     if ((line.osCheck === 'GONE' && line.exitClass === (intendedConsole ? 'REQUESTED' : 'OWNER_DIED'))
       || (line.osCheck === 'IDENTITY_UNKNOWN' && line.exitClass === 'UNKNOWN')) w.exit = exitOf(r);
   }
-  for (const { key, owner, writer, proof } of witnessProofCandidates) {
-    const started = witnessStarts.get(key);
-    if (!started || !sameOwner(started.owner, owner)) continue;
-    // A later owner found it gone; the witness's own Engine cannot reconcile what it held.
-    if (proof.by === 'gone' && writer?.role === 'engine' && Number(writer.pid) === Number(started.owner?.pid)) continue;
-    if (witnessProofs.get(key)?.by !== 'direct') witnessProofs.set(key, proof);
+  // Each witnessed start, once (the same start recorded twice is one), with what proves its end.
+  const witnessStarts = [];
+  for (const starts of witnessStartsById.values()) {
+    for (const s of starts) if (!witnessStarts.some(x => compareIdentity(x.identity, s.identity, 'exact'))) witnessStarts.push(s);
   }
-  for (const w of valid) w.proof = witnessProofs.get(witnessKey(w.incarnation, w.witnessId, w.pid, w.creationFileTimeUtc)) ?? null;
+  for (const { line, writer, proof } of witnessProofCandidates) {
+    for (const started of witnessStartsById.get(line.witnessId) ?? []) {
+      const s = witnessStarts.find(x => compareIdentity(x.identity, started.identity, 'exact'));
+      if (!compareIdentity(line, s.identity, 'proves', { family: 'witness' })) continue;
+      // A later owner found it gone; the witness's own Engine cannot reconcile what it held.
+      if (proof.by === 'gone' && writerIsOwner(writer, s.owner, { unknownBirth: true })) continue;
+      if (s.proof?.by !== 'direct') s.proof = proof;
+    }
+  }
+  for (const w of valid) w.proof = witnessStarts.find(s => compareIdentity(s.identity, w.identity, 'exact'))?.proof ?? null;
   // Every witnessed identity whose end is proven, including one whose receipts the classification rejected.
-  const provenWitnesses = [...witnessStarts.entries()].filter(([key]) => witnessProofs.has(key))
-    .map(([key, s]) => ({ ...s, proof: witnessProofs.get(key) }));
+  const provenWitnesses = witnessStarts.filter(s => s.proof);
   // Owner records by PID, in the order they are looked for: ledger children, then helper receipts.
   const receiptsByPid = new Map(), ownerRecordsByPid = new Map();
   const index = (map, c) => { if (!map.has(c.pid)) map.set(c.pid, []); map.get(c.pid).push(c); };
@@ -469,18 +476,19 @@ function ledgerView(ledger, runId) {
     if (!w.exit) continue;
     if (w.exit.code === null && (['OWNER_DIED', 'UNKNOWN'].includes(w.exit.exitClass)
       || (w.consoleClient && w.exit.exitClass === 'REQUESTED'))) continue;
+    // The owner's record of the same process (a ledger child, a helper receipt): its own fields name
+    // its creator, not the witness's Engine, so they are paired by the process alone.
     const ownerExit = (ownerRecordsByPid.get(w.pid) ?? []).find(c =>
-      (c.engine === w.engine || ownedBy(c, w.engine)) && receiptCreator(w, c) && c.pid === w.pid
-      && sameBirth(c.creationFileTimeUtc ?? c.creationFileTime, w.creationFileTimeUtc) && c.exit)?.exit;
+      (c.engine === w.engine || ownedBy(c, w.engine)) && receiptCreator(w, c)
+      && compareIdentity(c, w, 'native') && c.exit)?.exit;
     if (ownerExit) {
       // An owner record wins only when the independent code receipt confirms it.
       w.exit = sameCode(ownerExit.code, w.exit.code) ? { ...w.exit, ...ownerExit }
         : { ...w.exit, exitClass: 'UNKNOWN', reason: 'owner_witness_disagree' };
       if ((receiptsByPid.get(w.pid) ?? []).some(c => c.engine === w.engine && receiptCreator(w, c)
-        && c.pid === w.pid && sameBirth(c.creationFileTime, w.creationFileTimeUtc)
-        && c.exit === ownerExit)) ownedHelpers.add(w);
+        && compareIdentity(c, w, 'native') && c.exit === ownerExit)) ownedHelpers.add(w);
     } else {
-      const born = BigInt(w.creationFileTimeUtc);
+      const born = birthFileTime(w);
       const exited = w.exit.exitedFileTime != null ? BigInt(w.exit.exitedFileTime) : null;
       const intent = windowsFor(w).find(i => {
         const start = i.startFt, deadline = i.deadlineFt, close = i.closeFt;
@@ -501,20 +509,19 @@ function ledgerView(ledger, runId) {
   // an open owner window/receipt and native exit timing/code; Engine membership alone is not enough.
   for (const w of valid) {
     if (!w.exit || w.exit.exitClass !== 'UNEXPECTED' || w.exit.code !== 0) continue;
-    const parser = children.find(c => c.kind === 'EXTRACTION' && ownedBy(c, w.engine)
-      && createdBy(w, { pid: c.pid, creationFileTime: c.creationFileTimeUtc }) && c.exit);
+    const parser = children.find(c => c.kind === 'EXTRACTION' && ownedBy(c, w.engine) && createdBy(w, c) && c.exit);
     if (!parser || !['REQUESTED', 'UNEXPECTED'].includes(parser.exit.exitClass)) continue;
     if (parser.exit.exitClass === 'REQUESTED' && (!parser.exit.forced || !parser.exit.reason)) continue;
     const end = recordedEndMs(parser.exit), helperEnd = recordedEndMs(w.exit);
     if (end == null || helperEnd == null || helperEnd < end || helperEnd > end + CONHOST_EXIT_GRACE_MS) continue;
     const declares = (receiptsByPid.get(w.pid) ?? []).some(c => c.engine === w.engine
       && c.ownerContainment === 'KILL_ON_CLOSE' && createdBy(w, c.owner)
-      && c.pid === w.pid && sameBirth(c.creationFileTime, w.creationFileTimeUtc, BIRTH_TICKS.EXACT))
+      && compareIdentity(c, w, 'native', { tick: TICK.EXACT }))
       || windowsFor(w).some(i => i.engine === w.engine && i.ownerContainment === 'KILL_ON_CLOSE'
         && createdBy(w, i.owner) && !i.closedAt
         && i.startFt != null && i.deadlineFt != null
-        && BigInt(w.creationFileTimeUtc) >= i.startFt
-        && BigInt(w.creationFileTimeUtc) <= i.deadlineFt);
+        && birthFileTime(w) >= i.startFt
+        && birthFileTime(w) <= i.deadlineFt);
     if (!declares) continue;
     w.exit = { ...w.exit, exitClass: parser.exit.exitClass === 'REQUESTED' ? 'REQUESTED' : 'OWNER_DIED',
       reason: parser.exit.exitClass === 'REQUESTED' ? parser.exit.reason : 'parser owner died' };
@@ -529,10 +536,9 @@ function ledgerView(ledger, runId) {
     for (const w of valid) {
       if (ownedHelpers.has(w) || CONSOLE_HOST_RE.test(w.executable ?? '')
         || !w.exit || w.exit.exitClass !== 'UNEXPECTED' || crashCode(w.exit.code)) continue;
-      const parent = [...ownedHelpers].find(p => p.engine === w.engine
-        && createdBy(w, { pid: p.pid, creationFileTime: p.creationFileTimeUtc })
+      const parent = [...ownedHelpers].find(p => p.engine === w.engine && createdBy(w, p)
         && p.exit?.exitClass === 'REQUESTED' && p.exit.reason
-        && (p.exit.exitedFileTime == null || BigInt(w.creationFileTimeUtc) <= BigInt(p.exit.exitedFileTime)));
+        && (p.exit.exitedFileTime == null || birthFileTime(w) <= BigInt(p.exit.exitedFileTime)));
       if (!parent) continue;
       w.exit = { ...w.exit, exitClass: 'REQUESTED', reason: parent.exit.reason };
       ownedHelpers.add(w);
@@ -546,9 +552,10 @@ function ledgerView(ledger, runId) {
     byPid.get(p.pid).push(p);
   }
   for (const w of valid.filter(w => path.win32.basename(w.executable ?? '').toLowerCase() === 'conhost.exe')) {
-    const parent = (byPid.get(w.parentPid) ?? []).find(p => sameBirth(p.creationFileTimeUtc, w.parentCreationFileTime));
+    const parent = (byPid.get(w.parentPid) ?? []).find(p => compareIdentity(identityOf({ pid: w.parentPid,
+      creationFileTime: w.parentCreationFileTime ?? null }), p, 'same'));
     const end = recordedEndMs(parent?.exit), hostEnd = recordedEndMs(w.exit);
-    const born = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
+    const born = birthMs(w);
     // Unknown times cannot establish a late exit. Preserve the identity-bound client's class
     // unless known native times contradict it; an unknown identity/code receipt stays unknown.
     if (parent?.exit && w.exit && w.exit.exitClass !== 'UNKNOWN' && Number.isInteger(w.exit.code)
@@ -561,7 +568,7 @@ function ledgerView(ledger, runId) {
   const reportIdentities = (ledger?.children?.records ?? []).filter(r => r.type === 'job-process-start'
     && r.line.incarnation?.session === runId).map(r => ({ pid: r.line.pid,
     creationFileTimeUtc: r.line.creationFileTime, role: CONSOLE_HOST_RE.test(r.line.executable ?? '') ? 'console-host' : 'job-helper' }));
-  return { engines, children, witnesses: valid, provenWitnesses, reportIdentities };
+  return { engines, children, witnesses: valid, provenWitnesses, witnessStarts, reportIdentities, identityConflicts };
 
 }
 
@@ -582,7 +589,7 @@ function withSeen(row, atMs) {
 function uniqueProcesses(rows) {
   const byKey = new Map();
   for (const row of rows) {
-    const key = `${pidOf(row)}/${birthOf(row)}`;
+    const key = identityKey(row);
     const seen = byKey.get(key);
     if (!seen) { byKey.set(key, row); continue; }
     const first = [seen.firstSeenAtMs, row.firstSeenAtMs].filter(Number.isFinite);
@@ -622,12 +629,17 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
   view = view ?? (ledger ? ledgerView(ledger, run?.runId) : { engines: [], children: [] });
   // Only a child's own membership record can bind it to its owner's job. The owner's exit
   // bounds that job even when the child's exit record is missing or claims a later exit.
-  const jobEndOf = (child) => child.contained === true ? jobClosedByMs(view.engines.find(e =>
-    e.pid === Number(child.owner?.pid) && sameBirth(e.creationFileTimeUtc, child.owner?.creationFileTime))) : null;
-  const jobEnds = new Map(view.children.map(c => [`${c.pid}/${c.creationFileTimeUtc}`, jobEndOf(c)]));
-  for (const w of view.witnesses ?? []) jobEnds.set(`${w.pid}/${w.creationFileTimeUtc}`, jobClosedByMs(w.engine));
-  const contradictsJob = (row, pid, birth) => {
-    const end = jobEnds.get(`${pid}/${birth}`);
+  const jobEndOf = (child) => {
+    const owner = identityOf(child)?.owner;
+    return child.contained === true && owner ? jobClosedByMs(view.engines.find(e => compareIdentity(owner, e, 'same'))) : null;
+  };
+  // The job end bounding each recorded process: its witness's Engine, else its own owner's when the
+  // child records itself contained. PIDs only index; each match is compareIdentity's.
+  const jobBound = byPid([...(view.witnesses ?? []).map(w => ({ item: w, end: jobClosedByMs(w.engine) })),
+    ...view.children.map(c => ({ item: c, end: jobEndOf(c) }))], x => x.item);
+  const jobEndFor = (x) => (jobBound.get(identityOf(x)?.pid) ?? []).find(b => compareIdentity(b.item, x, 'same'))?.end ?? null;
+  const contradictsJob = (row, recorded) => {
+    const end = jobEndFor(recorded);
     return end != null && Number.isFinite(row.lastSeenAtMs) && row.lastSeenAtMs > end + CONHOST_EXIT_GRACE_MS;
   };
   // Spec F §3.2: an Engine names its incarnation in the manifest; one naming another session was
@@ -647,14 +659,14 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
     const engine = run.exitCensusEngine;
     if (foreignManifest) {
       gaps.push({ role: 'engine', pid: run.pids?.backendRootPid, reason: 'manifest from another run', manifestSession });
-    } else if (engine && engine.pid === Number(run.pids?.backendRootPid) && manifest?.pid === engine.pid) {
+    } else if (engine && hasPid(engine, run.pids?.backendRootPid) && hasPid(engine, manifest?.pid)) {
       targets.push({ ...engine, targetSource: 'spawn' });
       gaps.push({ role: 'engine', pid: engine.pid, reason: 'ledger-unavailable', family: 'engine' });
     } else gaps.push({ role: 'engine', pid: run.pids?.backendRootPid, reason: 'missing spawn-bound Engine identity or manifest PID mismatch' });
   }
   const engineTargets = targets.filter(t => t.role === 'engine');
   const knownChildIds = [...new Set(view.children.map(c => c.childId))];
-  const knownChildren = view.children.map(c => `${c.childId}/${c.pid}/${c.creationFileTimeUtc}`);
+  const knownChildren = view.children.map(c => `${c.childId}/${identityKey(c)}`);
   if (ledger?.children?.present) {
     for (const c of view.children) {
       if (c.exit || !(c.pid > 0) || !isFileTime(c.creationFileTimeUtc) || !path.isAbsolute(c.executable ?? '')) continue;
@@ -676,8 +688,8 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
       }
       // Java startInstant can have millisecond precision. Bind to the collector's exact
       // owned CIM identity at that same represented millisecond; never add a tolerance.
-      const owned = observed.filter(p => pidOf(p) === child.pid
-        && sameBirth(birthOf(p), creationFileTimeUtc, BIRTH_TICKS.MILLISECOND) && sameExe(exeOf(p), child.executable));
+      const owned = observed.filter(p => compareIdentity(p, { pid: child.pid, creationFileTimeUtc,
+        creationTimeSource: 'B11.startInstant' }, 'same') && sameExe(exeOf(p), child.executable));
       const births = [...new Set(owned.map(birthOf))];
       if (births.length > 1) { gaps.push({ pid: child.pid, reason: 'multiple owned births in B11 startInstant precision; cannot attribute child' }); continue; }
       targets.push({ ...child, creationFileTimeUtc: births[0] ?? creationFileTimeUtc,
@@ -687,38 +699,36 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
   }
   // CH9: a console host belongs to its console parent (a target, born no later than the host at the
   // shared birth precision: an exact parent birth and the host's CIM birth can share a microsecond).
-  const tick = BIRTH_TICKS.MICROSECOND;
+  const tick = TICK.MICROSECOND;
   // A known later holder supersedes an earlier parent identity at the child's birth, even if
   // that holder is outside this run. Observation is negative evidence, not an ownership grant.
-  const superseded = (parent, birth) => observed.some(p => pidOf(p) === parent.pid && isFileTime(birthOf(p))
-    && BigInt(birthOf(p)) / tick > BigInt(parent.creationFileTimeUtc) / tick
-    && BigInt(birthOf(p)) / tick <= BigInt(birth) / tick);
+  const observedByPid = byPid(observed);
+  const superseded = (parent, row) => (observedByPid.get(identityOf(parent).pid) ?? [])
+    .some(p => bornAfter(p, parent, tick) && bornNotAfter(p, row, tick));
+  // A parent link names a PID only; the parent is the identity of that PID born no later than the row.
+  const parentPidOf = (row) => row.ParentProcessId ?? row.parentPid;
   for (const row of observed) {
     if (!isConsoleHost(row)) continue;
     const birth = birthOf(row);
-    const parent = targets.find(t => t.pid === Number(row.ParentProcessId ?? row.parentPid)
-      && isFileTime(t.creationFileTimeUtc) && isFileTime(birth) && BigInt(t.creationFileTimeUtc) / tick <= BigInt(birth) / tick
-      && !superseded(t, birth) && !contradictsJob(row, t.pid, t.creationFileTimeUtc));
+    const parent = targets.find(t => hasPid(t, parentPidOf(row)) && bornNotAfter(t, row, tick)
+      && !superseded(t, row) && !contradictsJob(row, t));
     if (!parent) continue;
     // A console host's command line starts `\??\C:\...`; the held handle reports the System32 path.
     targets.push({ pid: pidOf(row), creationFileTimeUtc: birth,
       executable: path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'conhost.exe'),
-      role: 'console-host', consoleParent: `${parent.pid}/${parent.creationFileTimeUtc}`, creationTimeSource: 'CIM' });
+      role: 'console-host', consoleParent: identityKey(parent), creationTimeSource: 'CIM' });
   }
-  const unique = [...new Map(targets.map(t => [`${t.pid}/${t.creationFileTimeUtc}`,
-    { ...t, birthTick: String(birthTickOf(t, view)) }])).values()];
+  const unique = [...new Map(targets.map(t => [identityKey(t), { ...t, birthTick: String(birthTickOf(t, view)) }])).values()];
   // The Engine's own console predates its job and may never reach the sampler. Its native
   // client witness is sufficient to arm a read handle; it grants no right to terminate it.
   for (const w of view.witnesses ?? []) {
     if (!w.consoleClient || w.exit || w.engine.exit) continue;
-    const parent = engineTargets.find(t => t.pid === w.engine.pid
-      && sameBirth(t.creationFileTimeUtc, w.engine.creationFileTimeUtc));
+    const parent = engineTargets.find(t => compareIdentity(t, w.engine, 'same'));
     if (!parent) continue;
     const target = { pid: w.pid, creationFileTimeUtc: w.creationFileTimeUtc, executable: w.executable,
       role: 'console-host', consoleClient: true, witnessId: w.witnessId, incarnation: w.incarnation,
-      consoleParent: `${parent.pid}/${parent.creationFileTimeUtc}`, creationTimeSource: 'ledger',
-      birthTick: String(BIRTH_TICKS.EXACT) };
-    const existing = unique.findIndex(t => t.pid === w.pid && sameBirth(t.creationFileTimeUtc, w.creationFileTimeUtc));
+      consoleParent: identityKey(parent), creationTimeSource: 'ledger', birthTick: String(TICK.EXACT) };
+    const existing = unique.findIndex(t => compareIdentity(t, w, 'same'));
     if (existing < 0) unique.push(target);
     else unique[existing] = target;
   }
@@ -727,21 +737,20 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
   // lifetime the ledger records for them.
   const closed = [
     ...view.engines.filter(e => e.exit).map(e => ({ pid: e.pid, creationFileTimeUtc: e.creationFileTimeUtc, exit: e.exit,
-      role: 'engine', contained: e.contained })),
+      role: 'engine', contained: e.contained, identity: e.identity })),
     ...view.children.filter(c => c.exit).map(c => ({ pid: c.pid, creationFileTimeUtc: c.creationFileTimeUtc, exit: c.exit,
-      role: roleOfKind(c.kind), contained: c.contained === true })),
+      role: roleOfKind(c.kind), contained: c.contained === true, identity: c.identity })),
   ];
   // An exact job witness can account any image, including nested helpers and their hosts.
   // Never use ancestry as a substitute for this identity-bound record.
   const witnessed = [];
   const rejectedWitnesses = new Set(), unprovenRows = new Set();
   for (const p of observed) {
-    const w = (view.witnesses ?? []).find(w => w.pid === pidOf(p)
-      && sameBirth(w.creationFileTimeUtc, birthOf(p)));
+    const w = (view.witnesses ?? []).find(w => compareIdentity(w, p, 'same'));
     if (!w || isTargetAlready(p)) continue;
-    if (contradictsJob(p, w.pid, w.creationFileTimeUtc)) { rejectedWitnesses.add(p); continue; }
+    if (contradictsJob(p, w)) { rejectedWitnesses.add(p); continue; }
     const jobEnd = jobClosedByMs(w.engine);
-    const bornMs = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
+    const bornMs = birthMs(w);
     const witnessedEnd = recordedEndMs(w.exit);
     if (jobEnd != null && (bornMs > jobEnd
       || (witnessedEnd != null && witnessedEnd > jobEnd + CONHOST_EXIT_GRACE_MS))) {
@@ -765,15 +774,15 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
       // Live witnessed processes need their OS exit and owner exit compared at finish.
       unique.push({ pid: w.pid, creationFileTimeUtc: w.creationFileTimeUtc, executable: w.executable,
         role, witnessConsole: role === 'console-host', witnessId: w.witnessId, incarnation: w.incarnation,
-        creationTimeSource: 'ledger', birthTick: String(BIRTH_TICKS.EXACT) });
+        creationTimeSource: 'ledger', birthTick: String(TICK.EXACT) });
     } else rejectedWitnesses.add(p);
   }
   function isTargetAlready(p) {
-    return unique.some(t => t.pid === pidOf(p) && sameBirth(t.creationFileTimeUtc, birthOf(p)));
+    return unique.some(t => compareIdentity(t, p, 'same'));
   }
-  const closedOf = (pid, birth) => closed.find(c => c.pid === pid && sameBirth(c.creationFileTimeUtc, birth));
-  const isTarget = (pid, birth) => unique.some(t => t.pid === pid && sameBirth(t.creationFileTimeUtc, birth,
-    BigInt(t.birthTick) > BIRTH_TICKS.MICROSECOND ? BigInt(t.birthTick) : BIRTH_TICKS.MICROSECOND));
+  const closedOf = (row) => closed.find(c => compareIdentity(c, row, 'same'));
+  // An observed row is a target at the coarser of the target's measured tick and its own (CIM's).
+  const isTarget = (row) => unique.some(t => compareIdentity(t, row, 'same'));
   // A parent the row can belong to: same pid, born no later than the row at the shared birth
   // precision, and (when its exit is recorded) the row last seen within its recorded lifetime.
   const parents = [
@@ -783,10 +792,8 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
   for (const parent of parents) {
     // A witnessed host may be the Engine's own console host. Its witness binds the job's
     // closure even when the Engine's exit time is unknown; ancestry alone supplies no bound.
-    const ownerWitness = witnessed.find(x => x.witness.engine.pid === parent.pid
-      && sameBirth(x.witness.engine.creationFileTimeUtc, parent.creationFileTimeUtc));
-    const jobEndMs = jobEnds.get(`${parent.pid}/${parent.creationFileTimeUtc}`)
-      ?? (ownerWitness ? jobClosedByMs(ownerWitness.witness.engine) : null);
+    const ownerWitness = witnessed.find(x => compareIdentity(x.witness.engine, parent, 'same'));
+    const jobEndMs = jobEndFor(parent) ?? (ownerWitness ? jobClosedByMs(ownerWitness.witness.engine) : null);
     if (jobEndMs != null) {
       const end = recordedEndMs(parent.exit);
       parent.closedByMs = end == null ? jobEndMs : Math.min(end, jobEndMs);
@@ -794,15 +801,13 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
     }
   }
   const parentOf = (row) => {
-    const birth = birthOf(row), ppid = Number(row.ParentProcessId ?? row.parentPid);
+    const birth = birthOf(row), ppid = Number(parentPidOf(row));
     if (!isFileTime(birth)) return { parent: null, why: 'no birth' };
-    const tick = BIRTH_TICKS.MICROSECOND;
-    const candidates = parents.filter(t => t.pid === ppid && isFileTime(t.creationFileTimeUtc)
-      && BigInt(t.creationFileTimeUtc) / tick <= BigInt(birth) / tick);
+    const candidates = parents.filter(t => hasPid(t, ppid) && bornNotAfter(t, row, tick));
     if (!candidates.length) return { parent: null, why: 'parent is not a run Engine or one of its ledger children' };
     // A reused pid: the latest parent born no later than the row.
-    const parent = candidates.sort((a, b) => (BigInt(a.creationFileTimeUtc) < BigInt(b.creationFileTimeUtc) ? -1 : 1)).at(-1);
-    if (superseded(parent, birth)) return { parent: null, why: `parent ${ppid} PID held by a newer observed identity at child birth` };
+    const parent = candidates.sort((a, b) => (birthOrder(a, b, TICK.EXACT) < 0 ? -1 : 1)).at(-1);
+    if (superseded(parent, row)) return { parent: null, why: `parent ${ppid} PID held by a newer observed identity at child birth` };
     if (parent.open) return { parent };
     // CH9's legacy console-parent attribution uses the confirmed-dead upper bound to reject
     // later sightings. It never compares a helper receipt's observation with the job's end,
@@ -810,7 +815,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
     const endMs = parent.closedByMs ?? closedByMs(parent.exit);
     if (endMs === null) return { parent: null, why: `parent ${parent.pid} exit time unknown in the ledger` };
     if (!Number.isFinite(row.lastSeenAtMs)) return { parent: null, why: 'observed time unknown' };
-    const bornMs = Number((BigInt(birth) - 116444736000000000n) / 10000n);
+    const bornMs = birthMs(row);
     if (bornMs > endMs) return { parent: null, why: `born after its parent ${parent.pid}'s recorded exit` };
     if (row.lastSeenAtMs > endMs + CONHOST_EXIT_GRACE_MS) {
       return { parent: null, why: `seen ${row.lastSeenAtMs - endMs} ms after its parent ${parent.pid}'s recorded exit` };
@@ -818,21 +823,21 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
     return { parent };
   };
   const account = (row, role, parent, basis) => {
-    accountedProcesses.push({ pid: pidOf(row), creationFileTimeUtc: birthOf(row), role, parent: `${parent.pid}/${parent.creationFileTimeUtc}`,
+    accountedProcesses.push({ pid: pidOf(row), creationFileTimeUtc: birthOf(row), role, parent: identityKey(parent),
       basis, ledgerClass: parent.exit?.exitClass, ledgerReason: parent.exit?.reason,
       ...(Number.isFinite(row.lastSeenAtMs) ? { lastSeenAtMs: row.lastSeenAtMs } : {}) });
   };
   for (const host of unique.filter(t => t.witnessConsole)) {
-    const row = observed.find(p => pidOf(p) === host.pid && sameBirth(birthOf(p), host.creationFileTimeUtc));
+    const row = observed.find(p => compareIdentity(p, host, 'same'));
     const { parent } = parentOf(row);
-    if (parent) host.consoleParent = `${parent.pid}/${parent.creationFileTimeUtc}`;
+    if (parent) host.consoleParent = identityKey(parent);
   }
   const allLosses = [...(ledger?.children?.records ?? []), ...(ledger?.engine?.records ?? [])]
     .filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST').map(r => r.line);
   const relevantLoss = loss => {
     if (loss.incarnation?.session) return loss.incarnation.session === run?.runId;
     if (loss.scopeComplete === true) return loss.affectedSessions?.includes(run?.runId) === true;
-    if (observed.some(p => pidOf(p) === loss.pid && sameBirth(birthOf(p), loss.creationFileTime))) return true;
+    if (observed.some(p => compareIdentity(p, loss, 'same'))) return true;
     // Evicted evidence was written before its eviction, so a row's `at` (the eviction time for
     // summaries and compacted rows, the evidence time for identity rows) bounds a range that is
     // unknown, including rows written before scope fields existed.
@@ -847,13 +852,13 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
   const pending = [];
   for (const p of observed) {
     const pid = pidOf(p), birth = birthOf(p);
-    const child = view.children.find(c => c.pid === pid && sameBirth(c.creationFileTimeUtc, birth));
-    if (child && contradictsJob(p, child.pid, child.creationFileTimeUtc)) {
+    const child = view.children.find(c => compareIdentity(c, p, 'same'));
+    if (child && contradictsJob(p, child)) {
       gaps.push({ pid, creationFileTimeUtc: birth, role: roleOfKind(child.kind), reason: 'unaccounted_process',
         detail: 'observed alive after its owner job closed plus grace; contradicts recorded containment' });
       continue;
     }
-    if (isTarget(pid, birth) || unprovenRows.has(p)) continue;
+    if (isTarget(p) || unprovenRows.has(p)) continue;
     const witness = witnessed.find(x => x.row === p);
     if (witness) {
       // Hosts must also stay within the client's recorded lifetime; membership alone cannot
@@ -878,14 +883,15 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
         atMs: w.exit.exitedAtMs, exitTimeSource: w.exit.exitedAtMs == null ? 'unknown' : 'owner-process-handle' });
       continue;
     }
-    const ended = closedOf(pid, birth);
+    const ended = closedOf(p);
     if (!ended) {
-      const loss = losses.find(l => (l.pid === pid && sameBirth(l.creationFileTime, birth))
-        || (isFileTime(birth) && isFileTime(l.birthFrom) && isFileTime(l.birthThrough)
-          && BigInt(birth) >= BigInt(l.birthFrom) && BigInt(birth) <= BigInt(l.birthThrough)));
+      // A loss names the identity it lost, or the range of births whose evidence it lost.
+      const named = (l) => compareIdentity(l, p, 'same');
+      const loss = losses.find(l => named(l) || (isFileTime(l.birthFrom) && isFileTime(l.birthThrough)
+        && bornNotAfter(bornAt(l.birthFrom), p, TICK.EXACT) && bornNotAfter(p, bornAt(l.birthThrough), TICK.EXACT)));
       if (loss) {
         evidenceLost.push({ pid, creationFileTimeUtc: birth, evidenceClass: 'evidence-lost',
-          droppedFile: loss.droppedFile ?? null, membership: loss.pid === pid ? 'previously-recorded' : 'unknown' });
+          droppedFile: loss.droppedFile ?? null, membership: hasPid(loss, pid) ? 'previously-recorded' : 'unknown' });
         gaps.push({ pid, creationFileTimeUtc: birth, reason: 'evidence_lost', detail: loss.droppedFile ?? loss.detail });
       } else pending.push(p);
       continue;
@@ -903,8 +909,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null, view = nul
   // Processes with owner-written child-start/exit records were handled above, including the
   // directly queried `contained` flag. Do not promote unproven helpers into console parents.
   for (const loss of losses) {
-    if (loss.pid > 0 && isFileTime(loss.creationFileTime) && !observed.some(p => pidOf(p) === loss.pid
-      && sameBirth(birthOf(p), loss.creationFileTime))) {
+    if (loss.pid > 0 && isFileTime(loss.creationFileTime) && !observed.some(p => compareIdentity(p, loss, 'same'))) {
       evidenceLost.push({ pid: loss.pid, creationFileTimeUtc: loss.creationFileTime,
         evidenceClass: 'evidence-lost', membership: 'previously-recorded', droppedFile: loss.droppedFile });
       gaps.push({ pid: loss.pid, creationFileTimeUtc: loss.creationFileTime, reason: 'evidence_lost', detail: loss.droppedFile });
@@ -944,24 +949,22 @@ function containmentOf(manifest) {
 
 /** The ledger exit record for one target, read at finish (so an exit recorded during the stop counts). */
 function ledgerExitFor(target, view) {
-  if (target.witnessId) return (view.witnesses ?? []).find(w => w.witnessId === target.witnessId
-    && w.incarnation.session === target.incarnation?.session && w.incarnation.n === target.incarnation?.n
-    && w.pid === target.pid && sameBirth(w.creationFileTimeUtc, target.creationFileTimeUtc))?.exit ?? null;
+  // The target at the tick its birth was measured at (birthTickOf), never one it declares.
+  const measured = { ...target, birthTick: String(birthTickOf(target, view)) };
+  if (target.witnessId) return (view.witnesses ?? []).find(w => target.incarnation
+    && compareIdentity(w, measured, 'same'))?.exit ?? null;
   if (target.role === 'engine') {
     // The start the target is: its PID and birth (at the coarser of the start's and the target's
     // measured precision), and its incarnation when the target names one. An incarnation alone never
     // picks a start: two starts can share one, and each has only its own exit. The start recorded with
     // the target's own birth is the one; failing that, only a single start that matches at the coarser
     // precision is (two that do are ambiguous, and an ambiguous match proves nothing).
-    const tick = (x) => { const a = BigInt(x.birthTick ?? BIRTH_TICKS.EXACT), b = birthTickOf(target, view); return a > b ? a : b; };
-    const matches = view.engines.filter(x => x.pid === target.pid && sameBirth(x.creationFileTimeUtc, target.creationFileTimeUtc, tick(x))
-      && (!target.incarnation || (x.incarnation.session === target.incarnation.session && x.incarnation.n === target.incarnation.n)));
-    const e = matches.find(x => x.creationFileTimeUtc === target.creationFileTimeUtc) ?? (matches.length === 1 ? matches[0] : null);
+    const matches = view.engines.filter(x => compareIdentity(x, measured, 'same'));
+    const e = matches.find(x => namedBy(x, identityKey(target))) ?? (matches.length === 1 ? matches[0] : null);
     return e?.exit ?? null;
   }
-  const c = view.children.find(x => x.pid === target.pid && (target.childId
-    ? x.childId === target.childId && x.creationFileTimeUtc === target.creationFileTimeUtc
-    : sameBirth(x.creationFileTimeUtc, target.creationFileTimeUtc)));
+  // A ledger child target names its childId; a manifest one (the ledger-unavailable fallback) does not.
+  const c = view.children.find(x => compareIdentity(x, measured, 'same'));
   return c?.exit ?? null;
 }
 
@@ -990,25 +993,52 @@ function exitResult(input, output, source, ledger = null, view = null) {
       reason: 'ledger_codes_disagree', codes: item.conflictingCodes,
       detail: `the ledger records exit codes ${item.conflictingCodes.join(' and ')} for one identity` });
   }
-  // The rows by PID, kept current as rows are added (rows are only ever appended).
+  // A start whose own record and later metadata (a child-spawn, a second child-start) disagree on its
+  // owner or incarnation: which process the ledger's records are about is in doubt, and nothing proves it.
+  for (const item of view.identityConflicts ?? []) {
+    gaps.push({ pid: item.pid, creationFileTimeUtc: item.creationFileTimeUtc, role: roleOfKind(item.kind), childId: item.childId,
+      reason: 'identity_metadata_conflict', conflicts: item.identity.conflicts.map(c => ({ field: c.field, detail: c.detail })),
+      detail: `the ledger names child ${item.childId} with conflicting metadata: ${item.identity.conflicts.map(c => c.detail).join('; ')}` });
+  }
+  // The rows by PID (an index only), kept current as rows are added (rows are only ever appended).
   const rowsByPid = new Map();
   let indexed = 0;
   const rowsOf = (pid) => {
     for (; indexed < processExits.length; indexed++) {
       const row = processExits[indexed];
-      if (!rowsByPid.has(row.pid)) rowsByPid.set(row.pid, []);
-      rowsByPid.get(row.pid).push(row);
+      const key = identityOf(row)?.pid ?? null;
+      if (!rowsByPid.has(key)) rowsByPid.set(key, []);
+      rowsByPid.get(key).push(row);
     }
     return rowsByPid.get(pid) ?? [];
   };
-  const hasRow = (pid, birth) => rowsOf(pid).some(p => sameBirth(p.creationFileTimeUtc, birth));
+  const hasRow = (x) => rowsOf(identityOf(x)?.pid ?? null).some(p => compareIdentity(p, x, 'same'));
+  // A gap names an identity (its PID and birth), or only a PID when it records no birth.
+  const gapNames = (g, x) => (g.creationFileTimeUtc ? compareIdentity(g, x, 'same') : hasPid(g, identityOf(x)?.pid));
   // The observer echoes the target's birth as the key and reports the held handle's own birth
   // (`osCreationFileTimeUtc`), which must be the target's at the precision the target's birth was
   // measured at (birthTickOf: worked out from its source, never a tick the target declares).
-  const osExitOf = (target) => output.processExits?.find(e => e.pid === target.pid && e.creationFileTimeUtc === target.creationFileTimeUtc
-    && (e.osCreationFileTimeUtc == null
-      || sameBirth(String(e.osCreationFileTimeUtc), target.creationFileTimeUtc, birthTickOf(target, view)))
-    );
+  // The OS exits by the key they echo (an index only, in their order; each is then matched as before).
+  let exitsByKey = null;
+  const exitsNamed = (key) => {
+    if (!exitsByKey) {
+      exitsByKey = new Map();
+      for (const e of output.processExits ?? []) {
+        const k = identityKey(e);
+        if (!exitsByKey.has(k)) exitsByKey.set(k, []);
+        exitsByKey.get(k).push(e);
+      }
+    }
+    return exitsByKey.get(key) ?? [];
+  };
+  const osExitOf = (target) => {
+    if (!output.processExits) return undefined;
+    const measured = { ...target, birthTick: String(birthTickOf(target, view)) };
+    const key = identityKey(target);
+    return exitsNamed(key).find(e => namedBy(e, key) && (e.osCreationFileTimeUtc == null
+      || compareIdentity({ pid: e.pid, creationFileTimeUtc: String(e.osCreationFileTimeUtc), birthTick: String(TICK.EXACT) },
+        measured, 'native')));
+  };
   const accounted = new Map();
   for (const target of input.targets.filter(t => t.role !== 'console-host')) {
     const exit = osExitOf(target);
@@ -1018,8 +1048,7 @@ function exitResult(input, output, source, ledger = null, view = null) {
     const atMs = knownExitMs(exit.atMs);
     const base = { ...exit, atMs, exitTimeSource: atMs === null ? 'unknown' : (exit.exitTimeSource ?? 'os'), role: target.role, source };
     const record = ledgerExitFor(target, view);
-    const witness = (view.witnesses ?? []).find(w => w.witnessId === target.witnessId
-      && w.pid === target.pid && sameBirth(w.creationFileTimeUtc, target.creationFileTimeUtc));
+    const witness = target.witnessId ? (view.witnesses ?? []).find(w => compareIdentity(w, target, 'same')) : null;
     const jobEnd = jobClosedByMs(witness?.engine);
     if (jobEnd != null && atMs != null && atMs > jobEnd + CONHOST_EXIT_GRACE_MS) {
       gaps.push({ pid: target.pid, role: target.role, reason: 'unaccounted_process',
@@ -1072,7 +1101,7 @@ function exitResult(input, output, source, ledger = null, view = null) {
   // parent's exit + CONHOST_EXIT_GRACE_MS.
   for (const host of input.targets.filter(t => t.role === 'console-host')) {
     const exit = osExitOf(host);
-    const parent = [...accounted.entries()].find(([t]) => `${t.pid}/${t.creationFileTimeUtc}` === host.consoleParent)?.[1];
+    const parent = [...accounted.entries()].find(([t]) => namedBy(t, host.consoleParent))?.[1];
     const atMs = knownExitMs(exit?.atMs);
     const late = exit && parent && atMs !== null && parent.atMs !== null && atMs > parent.atMs + CONHOST_EXIT_GRACE_MS;
     if (!exit || !parent || late) {
@@ -1115,18 +1144,20 @@ function exitResult(input, output, source, ledger = null, view = null) {
       ...(ledger?.children?.sourceFiles ? { ledgerSources: ledger.children.sourceFiles } : {}) });
   }
   const knownChildren = input.knownChildren ? new Set(input.knownChildren) : null;
-  const lateTargets = view.children.filter(c => (knownChildren ? !knownChildren.has(`${c.childId}/${c.pid}/${c.creationFileTimeUtc}`)
-    : !known.has(c.childId)) && !input.targets.some(t => t.childId === c.childId && t.pid === c.pid
-    && t.creationFileTimeUtc === c.creationFileTimeUtc)).map(c => ({ childId: c.childId, pid: c.pid,
+  const lateTargets = view.children.filter(c => (knownChildren ? !knownChildren.has(`${c.childId}/${identityKey(c)}`)
+    : !known.has(c.childId)) && !input.targets.some(t => t.childId != null && compareIdentity(t, c, 'same')))
+    .map(c => ({ childId: c.childId, pid: c.pid,
     creationFileTimeUtc: c.creationFileTimeUtc, role: roleOfKind(c.kind), ledgerClass: c.exit?.exitClass ?? null,
     code: c.exit?.code ?? null }));
   for (const w of view.witnesses ?? []) {
-    if (view.engines.some(e => e.pid === w.pid && sameBirth(e.creationFileTimeUtc, w.creationFileTimeUtc))
-      || view.children.some(c => c.pid === w.pid && sameBirth(c.creationFileTimeUtc, w.creationFileTimeUtc))
-      || input.targets.some(t => t.pid === w.pid && sameBirth(t.creationFileTimeUtc, w.creationFileTimeUtc))
-      || input.accountedProcesses?.some(p => p.pid === w.pid && sameBirth(p.creationFileTimeUtc, w.creationFileTimeUtc))) continue;
+    // A witnessed process the ledger also records as an Engine or child, or that is a target or
+    // accounted already: the same process, whatever relation each record names.
+    if (view.engines.some(e => compareIdentity(e, w, 'native'))
+      || view.children.some(c => c.identity && compareIdentity(c, w, 'native'))
+      || input.targets.some(t => compareIdentity(t, w, 'native'))
+      || input.accountedProcesses?.some(p => compareIdentity(p, w, 'native'))) continue;
     const end = jobClosedByMs(w.engine);
-    const born = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
+    const born = birthMs(w);
     const receiptEnd = recordedEndMs(w.exit);
     const outsideLifetime = end != null && (born > end || (receiptEnd != null && receiptEnd > end + CONHOST_EXIT_GRACE_MS));
     lateTargets.push({ witnessId: w.witnessId, pid: w.pid, creationFileTimeUtc: w.creationFileTimeUtc,
@@ -1134,18 +1165,23 @@ function exitResult(input, output, source, ledger = null, view = null) {
   }
   // The ledger is an inventory, including unsampled rapid processes and crash casualties.
   // Every identity has a row even when no observer could retain its final native receipt.
-  const lateByPid = new Map();
-  for (const t of lateTargets) {
-    if (!lateByPid.has(t.pid)) lateByPid.set(t.pid, []);
-    lateByPid.get(t.pid).push(t);
-  }
+  const lateByPid = byPid(lateTargets);
+  // The gaps that deny an identity its record, in their order, kept current as gaps are added (gaps
+  // are only ever appended): each item asks only these, never every gap.
+  const DENYING = new Set(['unaccounted_process', 'orphan_console_host']);
+  const denying = [];
+  let scanned = 0;
+  const denyingGaps = () => {
+    for (; scanned < gaps.length; scanned++) if (DENYING.has(gaps[scanned].reason)) denying.push(gaps[scanned]);
+    return denying;
+  };
   for (const item of [...view.engines, ...view.children, ...(view.witnesses ?? [])]) {
-    if (!item.pid || !isFileTime(item.creationFileTimeUtc) || hasRow(item.pid, item.creationFileTimeUtc)) continue;
+    if (!item.pid || !isFileTime(item.creationFileTimeUtc) || hasRow(item)) continue;
     const role = item.witnessId ? (CONSOLE_HOST_RE.test(item.executable ?? '') ? 'console-host' : 'job-helper')
       : item.childId ? roleOfKind(item.kind) : 'engine';
-    const outside = (lateByPid.get(item.pid) ?? []).some(t => sameBirth(t.creationFileTimeUtc, item.creationFileTimeUtc)
+    const outside = (lateByPid.get(identityOf(item).pid) ?? []).some(t => compareIdentity(t, item, 'same')
       && t.ledgerClass == null && item.exit);
-    const denied = gaps.find(g => g.pid === item.pid && ['unaccounted_process', 'orphan_console_host'].includes(g.reason));
+    const denied = denyingGaps().find(g => gapNames(g, item));
     // Only a proven exit accounts an identity (proofOfRecord); a record that proves nothing names why.
     const unproven = item.exit && !item.proof ? item.exit : !item.exit ? item.unproven ?? null : null;
     const record = outside || denied || unproven ? null : item.exit;
@@ -1162,15 +1198,15 @@ function exitResult(input, output, source, ledger = null, view = null) {
       creationFileTimeUtc: item.creationFileTimeUtc, role, reason: record?.reason ?? 'final_owner_receipt_unavailable' });
   }
   for (const gap of gaps) {
-    if (!gap.pid || !gap.creationFileTimeUtc || hasRow(gap.pid, gap.creationFileTimeUtc)) continue;
+    if (!gap.pid || !gap.creationFileTimeUtc || hasRow(gap)) continue;
     processExits.push({ pid: gap.pid, creationFileTimeUtc: gap.creationFileTimeUtc, role: gap.role ?? 'unknown',
       ledgerClass: 'UNKNOWN', ledgerReason: gap.reason, atMs: null, exitTimeSource: 'unknown',
       expectedTermination: false, accounted: false, source });
   }
   for (const p of [...(input.accountedProcesses ?? []), ...(input.observedIdentities ?? []), ...input.targets,
     ...(view.reportIdentities ?? [])]) {
-    if (hasRow(p.pid, p.creationFileTimeUtc)) continue;
-    let gap = gaps.find(g => g.pid === p.pid && (!g.creationFileTimeUtc || sameBirth(g.creationFileTimeUtc, p.creationFileTimeUtc)));
+    if (hasRow(p)) continue;
+    let gap = gaps.find(g => gapNames(g, p));
     if (!gap && !p.ledgerClass) {
       gap = { pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, role: p.role,
         reason: 'witness_identity_or_membership_unproven' }; gaps.push(gap);
@@ -1202,7 +1238,7 @@ function exitResult(input, output, source, ledger = null, view = null) {
     // whose recorded identities then has its exit (an identity without one is a gap above).
     exitAccountingComplete: (input.targets.length > 0 || view.engines.length > 0) && !gaps.length,
     exitAccountingGaps: gaps, exitCensusFile: source, ledgerSummary: ledgerSummaryOf({ ...view, witnesses: (view.witnesses ?? []).map(w => {
-      const host = consoleRowsOf(w.pid).find(p => sameBirth(p.creationFileTimeUtc, w.creationFileTimeUtc));
+      const host = consoleRowsOf(w.pid).find(p => compareIdentity(p, w, 'same'));
       return host ? { ...w, consoleClass: host.expectedTermination === true || host.ledgerClass === 'REQUESTED'
         ? 'REQUESTED' : host.ledgerClass ?? 'UNKNOWN' } : w;
     }) }, gaps),
@@ -1217,7 +1253,7 @@ function ledgerSummaryOf(view, gaps) {
   const summary = { incarnations: view.engines.length, children: view.children.length,
     requested: 0, unexpected: 0, ownerDied: 0, unknown: 0, gaps: gaps.length };
   const helpers = (view.witnesses ?? []).filter(w => ![...view.engines, ...view.children].some(c =>
-    c.pid === w.pid && sameBirth(c.creationFileTimeUtc, w.creationFileTimeUtc)));
+    c.identity && compareIdentity(c, w, 'native')));
   if (helpers.length) summary.jobProcesses = helpers.length;
   for (const item of [...view.engines, ...view.children, ...helpers]) {
     const console = path.win32.basename(item.executable ?? '').toLowerCase() === 'conhost.exe';
@@ -1236,28 +1272,29 @@ async function reconcileCrashedHelpers(dataDir, runId, lookup, append) {
   const view = ledgerView(readRunLedger(dataDir), runId);
   const open = (view.witnesses ?? []).filter(w => !w.exit && (w.engine.exit?.exitClass === 'UNEXPECTED'
     || (w.consoleClient && w.engine.exit?.exitClass === 'REQUESTED'))
-    && w.pid !== w.engine.pid && !view.children.some(c => c.pid === w.pid
-      && sameBirth(c.creationFileTimeUtc, w.creationFileTimeUtc)));
+    && !hasPid(w, w.engine.pid) && !view.children.some(c => c.identity && compareIdentity(c, w, 'native')));
   if (!open.length) return [];
   let identities;
+  // The OS row a lookup returned for a witnessed PID, as an identity (the PID is the one looked up).
+  const osRow = (w) => {
+    const seen = identities?.get(w.pid);
+    return seen ? { present: seen.present, pid: w.pid, creationFileTime: seen.creationFileTime ?? null } : null;
+  };
+  const stillThere = (w) => { const row = osRow(w); return Boolean(row?.present) && compareIdentity(row, w, 'native'); };
   try {
     identities = await lookup(open.map(w => w.pid));
     // Job closure can trail the Engine's own exit receipt. Observe that transition before
     // deciding which original identities the surviving supervisor must reconcile.
-    for (let attempt = 0; attempt < 20 && open.some(w => {
-      const seen = identities?.get(w.pid);
-      return seen?.present && sameBirth(w.creationFileTimeUtc, seen.creationFileTime);
-    }); attempt++) {
+    for (let attempt = 0; attempt < 20 && open.some(stillThere); attempt++) {
       await new Promise(resolve => setTimeout(resolve, 50));
       identities = await lookup(open.map(w => w.pid));
     }
   } catch { identities = null; }
   const outcomes = [];
   for (const w of open) {
-    const seen = identities?.get(w.pid);
-    const gone = seen && (seen.present === false || (isFileTime(seen.creationFileTime)
-      && !sameBirth(w.creationFileTimeUtc, seen.creationFileTime)));
-    if (seen?.present && sameBirth(w.creationFileTimeUtc, seen.creationFileTime)) continue;
+    const seen = osRow(w);
+    const gone = seen && (seen.present === false || (isFileTime(seen.creationFileTime) && !compareIdentity(seen, w, 'native')));
+    if (stillThere(w)) continue;
     const intendedConsole = w.consoleClient && w.engine.exit.exitClass === 'REQUESTED';
     const fields = { witnessId: w.witnessId, owner: w.owner, incarnation: w.incarnation,
       pid: w.pid, creationFileTime: w.creationFileTimeUtc, reconciled: true,
@@ -1274,52 +1311,93 @@ async function reconcileCrashedHelpers(dataDir, runId, lookup, append) {
 }
 
 /**
- * The identities the ledger proves have ended (proofOfRecord, witnessProofs in ledgerView): each
- * Engine incarnation, ledger child and job-witnessed process of the run whose records prove its end.
- * Nothing else is one: a process alive under such a PID whose birth cannot be read is never decided
- * here. `birthTick` is the precision its birth was recorded at (the microsecond for an Engine start
- * a dev runner or dev CLI read through CIM, else exact); a recorded identity matches it at the
- * coarser of that and its own, never coarser.
+ * Every start of the run the ledger records, each with its identity value and what proves its end
+ * (`proof`, or null): its Engine incarnations, its children's starts, and the processes its job
+ * witnesses recorded.
  */
-function endedIdentitiesOf(view) {
+function ledgerStartsOf(view) {
+  return [...(view.engines ?? []).map(e => ({ item: e, role: 'engine' })),
+    ...(view.children ?? []).filter(c => c.identity).map(c => ({ item: c, role: roleOfKind(c.kind) })),
+    ...(view.witnessStarts ?? view.provenWitnesses ?? []).map(w => ({ item: w,
+      role: CONSOLE_HOST_RE.test(w.executable ?? '') ? 'console-host' : 'job-helper' }))]
+    .filter(({ item }) => item.identity || identityOf(item));
+}
+
+/**
+ * The identities the ledger proves have ended (proofOfRecord, the witness proofs in ledgerView): each
+ * Engine incarnation, ledger child and job-witnessed process of the run whose records prove its end,
+ * as its whole identity value (PID, birth and the tick it was measured at, childId, witnessId, owner,
+ * incarnation). A process another start of the run names and nothing proves ended (the same PID and
+ * birth under another childId, say) is not one: the PID and birth alone cannot say which of them
+ * ended. Nothing else is one either: a process alive under such a PID whose birth cannot be read is
+ * never decided here.
+ */
+function endedIdentitiesOf(view, starts = ledgerStartsOf(view)) {
   const ended = [];
-  const add = (item, role) => {
-    if (!item.proof || !Number.isSafeInteger(item.pid) || item.pid <= 0 || !isFileTime(item.creationFileTimeUtc)) return;
-    if (ended.some(e => e.pid === item.pid && e.creationFileTimeUtc === item.creationFileTimeUtc)) return;
-    ended.push({ pid: item.pid, creationFileTimeUtc: item.creationFileTimeUtc, role,
-      birthTick: String(item.birthTick ?? BIRTH_TICKS.EXACT), ledgerType: item.proof.type,
-      proof: item.proof.by, exitedAtMs: item.exit?.exitedAtMs ?? null });
-  };
-  for (const e of view.engines ?? []) add(e, 'engine');
-  for (const c of view.children ?? []) add(c, roleOfKind(c.kind));
-  for (const w of view.provenWitnesses ?? view.witnesses ?? []) {
-    add(w, CONSOLE_HOST_RE.test(w.executable ?? '') ? 'console-host' : 'job-helper');
+  const startsByPid = byPid(starts, s => s.item), endedByPid = new Map();
+  for (const { item, role } of starts) {
+    const id = identityOf(item);
+    if (!item.proof || id.pid === null || id.birth === null) continue;
+    if ((startsByPid.get(id.pid) ?? []).some(o => !o.item.proof && compareIdentity(o.item, item, 'native'))) continue;
+    if ((endedByPid.get(id.pid) ?? []).some(e => compareIdentity(e.identity, id, 'exact'))) continue;
+    if (!endedByPid.has(id.pid)) endedByPid.set(id.pid, []);
+    endedByPid.get(id.pid).push({ identity: id });
+    ended.push({ pid: id.pid, creationFileTimeUtc: id.birth, role, birthTick: id.tick, ledgerType: item.proof.type,
+      proof: item.proof.by, exitedAtMs: item.exit?.exitedAtMs ?? null,
+      ...(id.childId ? { childId: id.childId } : {}), ...(id.witnessId ? { witnessId: id.witnessId } : {}),
+      ...(item.owner ? { owner: item.owner } : {}), ...(id.incarnation ? { incarnation: id.incarnation } : {}),
+      identity: id });
   }
   return ended;
+}
+
+/**
+ * What the ledger says of the identities a stop tracks (the runner's lookup suppression and job stop).
+ * `ended` is endedIdentitiesOf. `isEnded(tracked)` is true only when at least one start of the run is
+ * the tracked identity (compareIdentity 'same': its PID and birth at the coarser of their ticks, and
+ * every other field both carry, the childId, owner and incarnation included) and every such start is
+ * proven ended; a tracked record no start agrees with, or one an unended start also agrees with, is
+ * looked up.
+ */
+function ledgerResolution(view) {
+  const starts = ledgerStartsOf(view);
+  const index = byPid(starts, s => s.item);
+  return {
+    ended: endedIdentitiesOf(view, starts),
+    isEnded(tracked) {
+      const id = identityOf(tracked);
+      if (!id || id.pid === null || id.birth === null) return false;
+      const agreeing = (index.get(id.pid) ?? []).filter(s => compareIdentity(s.item, tracked, 'same'));
+      return agreeing.length > 0 && agreeing.every(s => s.item.proof);
+    },
+  };
 }
 
 /** How long the verdict waits before reading a torn ledger line again. */
 const TORN_TAIL_SETTLE_MS = 250;
 const EARLIER_TARGETS_RE = /^exit-targets\.(\d+)\.json$/;
 const EARLIER_EXITS_RE = /^process-exits\.(\d+)\.json$/;
-const sameIdentity = (a, b) => Number(a?.pid) === Number(b?.pid) && a?.creationFileTimeUtc === b?.creationFileTimeUtc;
+/** One census record (a target, an OS exit) of an earlier census is this one's when it names the same key. */
+const sameIdentity = (a, b) => Boolean(a && b) && namedBy(a, identityKey(b));
+/** The keys of a list's records, for asking sameIdentity of each record against all of them at once. */
+const keysOf = (list) => new Set((list ?? []).filter(Boolean).map(identityKey));
+/** `x` names the same key as one of `keys` (keysOf): sameIdentity against every record of the list. */
+const namedIn = (keys, x) => Boolean(x) && keys.has(identityKey(x));
 
 /**
- * The findings of a stop that no later stop or record clears (the round-6 decision): a disagreement
- * (the ledger and the OS on one identity's exit, the ledger with itself, an owner record and its
- * witness) and evidence that is gone (records a rotation dropped, ledger lines that could not be
- * read, an earlier census or stop report that could not be read). A retry carries every one of them
- * forward, and accounting stays incomplete until a person forgets the run. A gap that only says an
- * exit was not yet seen (no record yet, an identity not yet observed) is not a finding: the retry
- * looks again, and a later record can account it. Only a torn last line is not lost evidence: its
- * writer completes it, and a later read reads it whole.
+ * The findings of a stop that no later stop or record clears (the round-8 decision: carry by default).
+ * Every gap a stop reports is a finding, carried into every later stop of the run, and accounting
+ * stays incomplete until a person forgets the run, unless its kind only says an exit was not yet seen
+ * (NOT_SEEN_YET): the retry looks again, and a later record or observation can account it. A torn last
+ * line is not lost evidence either: its writer completes it, and a later read reads it whole. Any other
+ * kind, a disagreement, lost or unreadable evidence, a contradicted containment, a conflict in the
+ * ledger's metadata, and any kind added later, is carried forever.
  */
-const FINDING_REASONS = new Set(['evidence_lost', 'ledger-damaged', 'earlier-census-unreadable', 'earlier-report-unreadable']);
+const NOT_SEEN_YET = new Set(['unrecorded_exit']);
 function isFinding(gap) {
   if (!gap || typeof gap !== 'object') return false;
-  if (/disagree/.test(String(gap.reason ?? ''))) return true;
-  if (!FINDING_REASONS.has(gap.reason)) return false;
-  return gap.reason !== 'ledger-damaged' || !gap.tornTail || (gap.lines ?? 0) > 1;
+  if (gap.reason === 'ledger-damaged') return !gap.tornTail || (gap.lines ?? 0) > 1;
+  return !NOT_SEEN_YET.has(gap.reason);
 }
 /** A gap without where it was carried from, with its keys sorted: two equal findings have one key. */
 const findingKey = (gap) => JSON.stringify(Object.keys(gap).filter(k => k !== 'carriedFrom').sort().map(k => [k, gap[k]]));
@@ -1393,11 +1471,20 @@ async function keepEarlierCensus(runDir, read, pause = ms => new Promise(resolve
     [EARLIER_EXITS_RE, 'process-exits.json', 'processExits', osExits]]) {
     // The numbered (archived) files, then the one that stayed where it was (the latest earlier census).
     const kept = [...byNumber(re).map(name => ({ name, archived: true })), ...(held.has(canonical) ? [{ name: canonical, archived: false }] : [])];
+    const seen = keysOf(into);
     for (const { name, archived } of kept) {
       let readable = true;
       try {
         const kept = read(path.join(runDir, name));
-        for (const item of kept[field] ?? []) if (!into.some(x => sameIdentity(x, item))) into.push(item);
+        // A file that parses to anything but a census record (null, a list, a number) is not readable either.
+        if (!kept || typeof kept !== 'object' || Array.isArray(kept)) {
+          throw Object.assign(new Error('not a census file'), { code: 'NOT_A_CENSUS' });
+        }
+        for (const item of kept[field] ?? []) {
+          if (namedIn(seen, item)) continue;
+          into.push(item);
+          if (item) seen.add(identityKey(item));
+        }
         // What that census found that no later record clears (its verdict wrote them; carryFindings).
         for (const gap of Array.isArray(kept.findings) ? kept.findings : []) findings.push({ gap, from: name });
       } catch (err) {
@@ -1449,10 +1536,12 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   // writes the stop's own records from them (the dev-cli Engine exit), so the report reads them too.
   const verdict = async (observerOutput, beforeVerdict) => {
     // An earlier census of this run adds its OS exits, and the targets it observed them for.
+    const observerKeys = keysOf(observerOutput.processExits);
     const output = earlier.files.length ? { ...observerOutput, processExits: [...(observerOutput.processExits ?? []),
-      ...earlier.osExits.filter(e => !(observerOutput.processExits ?? []).some(x => sameIdentity(x, e)))] } : observerOutput;
-    const armed = { ...input, targets: [...input.targets, ...earlier.targets.filter(t => !input.targets.some(x => sameIdentity(x, t))
-      && (output.processExits ?? []).some(e => sameIdentity(e, t)))] };
+      ...earlier.osExits.filter(e => !namedIn(observerKeys, e))] } : observerOutput;
+    const targetKeys = keysOf(input.targets), exitKeys = keysOf(output.processExits);
+    const armed = { ...input, targets: [...input.targets, ...earlier.targets.filter(t => !namedIn(targetKeys, t)
+      && namedIn(exitKeys, t))] };
     if (beforeVerdict) await beforeVerdict(exitResult(armed, output, outputFile, null, armingView).processExits);
     let finalLedger = dataDir ? readLedger(dataDir) : null;
     // A line its writer is still writing is read again once; torn then, it is a gap like any other.
@@ -1470,9 +1559,8 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     // records too, while every OS target a handle was armed for is kept.
     const finalInput = { ...armed, evidenceLost: refreshed.evidenceLost,
       gaps: [...armed.gaps.slice(armingReadGaps), ...refreshed.gaps.filter(g => !membershipGap(g)
-        || !armed.targets.some(t => t.pid === g.pid && sameBirth(t.creationFileTimeUtc, g.creationFileTimeUtc)))],
-      accountedProcesses: refreshed.accountedProcesses.filter(p => !armed.targets.some(t =>
-        t.pid === p.pid && sameBirth(t.creationFileTimeUtc, p.creationFileTimeUtc))) };
+        || !armed.targets.some(t => compareIdentity(t, g, 'same')))],
+      accountedProcesses: refreshed.accountedProcesses.filter(p => !armed.targets.some(t => compareIdentity(t, p, 'same'))) };
     // What an earlier census of the run found is carried forward: no later record clears it.
     const result = carryFindings(exitResult(finalInput, output, outputFile, finalLedger, finalView), earlier.findings);
     // An earlier census file that could not be renamed stays as it was; this census names where it went.
@@ -1523,6 +1611,6 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     return verdict(output, beforeVerdict);
   } };
 }
-module.exports = { CONHOST_EXIT_GRACE_MS, fileTimeFromInstant, isFinding, carryFindings,
+module.exports = { CONHOST_EXIT_GRACE_MS, NOT_SEEN_YET, fileTimeFromInstant, isFinding, carryFindings,
   engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult,
-  endedIdentitiesOf, reconcileCrashedHelpers, startStopExitCensus };
+  endedIdentitiesOf, ledgerResolution, reconcileCrashedHelpers, startStopExitCensus };

@@ -6,7 +6,8 @@ const instant = n => new Date(Date.UTC(2026, 9, 8, 10, 0, n)).toISOString();
 const birth = n => census.fileTimeFromInstant(instant(n));
 const incarnation = { session: 'classify', n: 1 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'engine' };
-const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100 } });
+// The Engine (pid 100) writes as itself: its PID and its start, to the millisecond (the owner's birth).
+const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100, startedAt: instant(0) } });
 const run = { runId: 'classify', pids: { backendRootPid: 100 } };
 function history(code, extra = [], image = 'tesseract.exe') {
   return { engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100,

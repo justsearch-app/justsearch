@@ -21,8 +21,9 @@ const { spawn, spawnSync, execFile } = require('child_process');
 // can't break the build/Engine JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
-const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, endedIdentitiesOf,
+const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, ledgerResolution,
   carryFindings } = require('./lib/stop-exit-census.cjs');
+const { TICK, compareIdentity, hasPid, birthOrder, bornAfter } = require('./lib/ledger-identity.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
 const devDataFolder = require('./lib/dev-data-folder.cjs');
@@ -1094,6 +1095,12 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
   const kept = await keepEarlierReports(path.dirname(runPath));
   if (kept.earlierReports.length) Object.assign(stopReport, { earlierReports: kept.earlierReports,
     earlierReportFiles: kept.earlierReportFiles });
+  // This report takes no census, but what an earlier stop of the run found is carried into it, as into
+  // a stop's (carry by default): the latest report never reads as if it had not been found.
+  const carried = carryFindings({ exitAccountingGaps: [] }, kept.earlierFindings);
+  if (carried.exitAccountingComplete === false) {
+    Object.assign(stopReport, { exitAccountingComplete: false, exitAccountingGaps: carried.exitAccountingGaps });
+  }
   if (kept.earlierReportNotArchived) {
     stopReport.earlierReportNotArchived = kept.earlierReportNotArchived;
     stopReport.reportWrittenAs = kept.reportName;
@@ -2107,7 +2114,12 @@ async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve
     let readable = true;
     try {
       const report = JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, ''));
-      for (const gap of Array.isArray(report?.exitAccountingGaps) ? report.exitAccountingGaps : []) {
+      // A file that parses to anything but a report (null, a list, a number) says nothing of what that
+      // stop found: it is read no better than one that does not parse.
+      if (!report || typeof report !== 'object' || Array.isArray(report)) {
+        throw Object.assign(new Error('not a stop report'), { code: 'NOT_A_REPORT' });
+      }
+      for (const gap of Array.isArray(report.exitAccountingGaps) ? report.exitAccountingGaps : []) {
         earlierFindings.push({ gap, from: name });
       }
     } catch (err) {
@@ -3714,13 +3726,19 @@ function recordedProcesses(run, recordWrittenMs) {
  * failed): 'match' (alive, the recorded birth), 'gone', 'reused' (the pid now names another process)
  * or 'unknown'. Only 'match' may be killed; 'unknown' is never read as dead (S17).
  */
+// <ledger-resolution> Every identity comparison in this region is compareIdentity's (ledger-identity.cjs);
+// the structural check in test-dev-runner-stop-census.mjs holds it to that.
 function checkRecordedProcess(recorded, seen) {
   if (!recorded?.pid) return 'gone';
   if (!seen) return 'unknown';
   if (!seen.present) return 'gone';
   if (!seen.creationFileTime) return 'unknown';
   if (recorded.creationFileTimeUtc) {
-    if (!engineActuator.sameBirth(recorded.creationFileTimeUtc, String(seen.creationFileTime), BigInt(recorded.birthTick ?? 10))) return 'reused';
+    // The OS row read for the recorded PID: a CIM read (lookupProcessIdentities, the process table),
+    // to the microsecond unless the lookup names its tick; compared at the coarser of the two.
+    const row = { pid: recorded.pid, creationFileTime: String(seen.creationFileTime),
+      birthTick: String(seen.birthTick ?? TICK.MICROSECOND) };
+    if (!compareIdentity(recorded, row, 'same')) return 'reused';
     const want = normalizeExecutable(recorded.executable);
     const got = normalizeExecutable(seen.executable);
     return want && got && want !== got ? 'reused' : 'match';
@@ -3754,23 +3772,23 @@ function forgetGuidance(runId) {
  * descendant of one: every link up to the root is a parent born no later than its child.
  */
 function isRunProcess(pid, processes, rows) {
-  const ft = (row) => (/^\d+$/.test(String(row?.CreationFileTimeUtc ?? '')) ? BigInt(row.CreationFileTimeUtc) : null);
   const byPid = new Map(rows.map((row) => [Number(row.ProcessId), row]));
   let row = byPid.get(Number(pid));
   const visited = new Set();
   while (row && !visited.has(Number(row.ProcessId))) {
     visited.add(Number(row.ProcessId));
-    const isRoot = processes.some((p) => p.pid === Number(row.ProcessId) && checkRecordedProcess(p,
-      { present: true, creationFileTime: row.CreationFileTimeUtc ?? null, executable: null }) === 'match');
+    const current = row;
+    const isRoot = processes.some((p) => hasPid(p, current.ProcessId) && checkRecordedProcess(p,
+      { present: true, creationFileTime: current.CreationFileTimeUtc ?? null, executable: null }) === 'match');
     if (isRoot) return true;
     const parent = byPid.get(Number(row.ParentProcessId));
-    const childBorn = ft(row);
-    const parentBorn = ft(parent);
-    if (!parent || childBorn === null || parentBorn === null || parentBorn > childBorn) return false;
+    // Each link up is a parent born no later than its child (both read from one process table: exact).
+    if (!parent || birthOrder(parent, row, TICK.EXACT) === null || bornAfter(parent, row, TICK.EXACT)) return false;
     row = parent;
   }
   return false;
 }
+// </ledger-resolution>
 
 /**
  * Spec F §5.3 (X09-F3): who holds a port. Never kills. `ownedByRun` is true only for a recorded
@@ -3872,7 +3890,13 @@ async function stopRun(opts, {
   // by now, possibly one whose birth cannot be read, which never makes it ours. One reader serves
   // the stop and its census, so each ledger file is parsed once and later reads add what was appended.
   const ledgerReader = dataDirAbs ? ledgerLib.createIncrementalReader() : null;
+  // <ledger-resolution> What the ledger says of the tracked identities (exitCensus.ledgerResolution):
+  // `ledgerEnded` the identities it proves ended (for the job stop), `provenEnded(p)` whether the
+  // tracked record `p` is one of them. The whole tracked record is compared (compareIdentity 'same'):
+  // its PID and birth at the coarser of its own and the ledger's measured tick, and its childId, owner
+  // and incarnation where it records them; and every start of the run it agrees with must be proven.
   let ledgerEnded = [];
+  let ledgerResolved = null;
   let ledgerVersion = null;
   const readLedgerEnded = () => {
     if (!ledgerReader) return ledgerEnded;
@@ -3881,31 +3905,21 @@ async function stopRun(opts, {
       // Judged again only when a ledger file changed since the last judgement.
       if (ledgerReader.version() !== ledgerVersion) {
         ledgerVersion = ledgerReader.version();
-        ledgerEnded = endedIdentitiesOf(ledgerView(ledger, runId));
+        ledgerResolved = ledgerResolution(ledgerView(ledger, runId));
+        ledgerEnded = ledgerResolved.ended;
       }
     } catch (err) {
       errors.push(`exit ledger: ${err?.message ?? err}`);
     }
     return ledgerEnded;
   };
-  // Births agree at the coarser precision of the two records, never coarser: the ledger record's
-  // (`birthTick`: exact for an Engine-recorded child or witness, the microsecond for a CIM-read
-  // Engine start) and the identity's own (`birthTick`: exact for a native read, the millisecond for a
-  // manifest helper's recorded start; the microsecond, CIM's, when it names none).
-  const tickOf = (v, fallback) => (/^[1-9]\d{0,9}$/.test(String(v ?? '')) ? BigInt(v) : fallback);
-  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && ledgerEnded.some((e) => {
-    const ledgerTick = tickOf(e.birthTick, ledgerLib.BIRTH_TICKS.EXACT);
-    const ownTick = tickOf(p.birthTick, ledgerLib.BIRTH_TICKS.MICROSECOND);
-    return e.pid === Number(p.pid) && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc),
-      ledgerTick > ownTick ? ledgerTick : ownTick);
-  });
+  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && Boolean(ledgerResolved?.isEnded(p));
   // Each identity resolved by its ledger exit instead of a lookup, once.
   const resolvedByLedger = [];
   const noteResolved = (p) => {
-    if (!resolvedByLedger.some((r) => r.pid === Number(p.pid) && r.creationFileTimeUtc === String(p.creationFileTimeUtc))) {
-      resolvedByLedger.push(describeResolved(p));
-    }
+    if (!resolvedByLedger.some((r) => compareIdentity(r, p, 'same'))) resolvedByLedger.push(describeResolved(p));
   };
+  // </ledger-resolution>
   readLedgerEnded();
 
   /**
@@ -4379,7 +4393,11 @@ async function stopRun(opts, {
   // census reads the ledger for its verdict, so the report reads every record of the stop.
   const censusAccounting = await exitCensus.finish({
     beforeVerdict: pendingEngineExit ? (osExits) => {
-      pendingEngineExit((osExits ?? []).find((e) => e.role === 'engine' && e.pid === byRole.backend.pid) ?? null);
+      // <ledger-resolution> The census's OS exit of the run's Engine: its whole recorded identity, or
+      // its PID where the run recorded no birth.
+      pendingEngineExit((osExits ?? []).find((e) => e.role === 'engine' && (byRole.backend.creationFileTimeUtc
+        ? compareIdentity(e, byRole.backend, 'same') : hasPid(e, byRole.backend.pid))) ?? null);
+      // </ledger-resolution>
     } : null,
   });
   // A retried stop keeps the earlier stop's report and names it (run-directory file names, oldest

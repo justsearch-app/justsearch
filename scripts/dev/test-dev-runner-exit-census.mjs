@@ -22,6 +22,12 @@ const input = () => census.exitTargets(run, manifest);
 const STOP = ledgerLib.JS_CHILD_STOP;
 const llamaBirth = census.fileTimeFromInstant('2026-10-01T00:00:01.0000000Z');
 const extractionBirth = census.fileTimeFromInstant('2026-10-01T00:00:02.0000000Z');
+/**
+ * The writer block of a record the Engine `pid` born at `fileTime` writes: its PID and its start to
+ * the millisecond (LedgerWriterId: ProcessHandle startInstant, the owner's birth as the Engine names it).
+ */
+const engineWriterAt = (pid, fileTime) => ({ role: 'engine', pid,
+  startedAt: new Date(Number((BigInt(fileTime) - 116444736000000000n) / 10000n)).toISOString() });
 const reasons = gaps => gaps.map(g => g.reason);
 
 /** Writes the run's ledger the way its writers do: the dev runner (engine family), the Engine (children). */
@@ -29,8 +35,9 @@ function ledger(dataDir) {
   const ledgerDir = ledgerLib.ledgerDirectory(dataDir);
   const devRunner = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine',
     writer: { role: 'dev-runner', pid: 4000, startedAt: Date.UTC(2026, 9, 1) } });
+  // The Engine writes as itself: its PID and its start, to the millisecond (the owner's birth).
   const engineWriter = ledgerLib.createLedgerWriter({ ledgerDir, family: 'children',
-    writer: { role: 'engine', pid: 10, startedAt: Date.UTC(2026, 9, 1) } });
+    writer: { role: 'engine', pid: 10, startedAt: Date.parse(start) } });
   const owner = { pid: 10, creationFileTime: birth, instanceId: 'inst-1' };
   return {
     engineStart(session = run.runId, n = 1, pid = 10) {
@@ -122,7 +129,8 @@ test('Spec B step 2: the children ledger the Engine writes accounts for every ex
     .split('\n').filter(Boolean).map(line => JSON.parse(line));
   const pids = new Map();
   const rebound = fixture.map(r => {
-    const out = { ...r, writer: { ...r.writer, pid: 10 } };
+    // Rebound as a whole: the writer is the owner (its PID and its start, to the millisecond), as written.
+    const out = { ...r, writer: { ...r.writer, pid: 10, startedAt: new Date(Date.parse(start)).toISOString() } };
     if (r.owner) out.owner = { ...r.owner, pid: 10, creationFileTime: birth };
     if (r.type === 'child-start') {
       pids.set(r.childId, 20 + pids.size);
@@ -433,7 +441,8 @@ test('Spec F §6.1: one birth rule: an exact ledger birth is the CIM birth of th
 
 test('Spec F §6.1: a ledger child is observed under the shared rule: its CIM row binds to it and the held handle\'s exact birth must be its own', () => {
   const [exact, cim] = RECORDED_BIRTHS[0];
-  const records = (family, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line, writer: { role: family } })) });
+  const records = (family, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line,
+    writer: family === 'engine' ? engineWriterAt(10, birth) : { role: family } })) });
   const ledgerOf = exits => ({
     engine: records('dev-runner', [['engine-start', { incarnation: { session: run.runId, n: 1 }, pid: 10, creationFileTime: birth, executable: exe }]]),
     children: records('engine', [['child-spawn', { childId: 'c-x', kind: 'EXTRACTION', owner: { pid: 10, creationFileTime: birth } }],
@@ -528,7 +537,8 @@ test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exac
 
 /** An in-memory run ledger: the run's Engine (pid 10) and the given children records. */
 function memoryLedger(childRecords, engineRecords = []) {
-  const records = (role, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line, writer: { role } })) });
+  const records = (role, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line,
+    writer: role === 'engine' ? engineWriterAt(10, birth) : { role } })) });
   return {
     engine: records('dev-runner', [['engine-start', { incarnation: { session: run.runId, n: 1 }, pid: 10, creationFileTime: birth,
       executable: exe }], ...engineRecords]),
@@ -691,7 +701,7 @@ test('S15 census repair: historical Engine job evidence does not prove an indivi
 
 test('S15 census repair O2 verbatim: helper PID reused by an unrelated cmd: its tesseract child must stay a gap', () => {
   const b = t => census.fileTimeFromInstant(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`);
-  const rec = (type, line) => ({ type, line, writer: { role: type.startsWith('engine') ? 'dev-runner' : 'engine' } });
+  const rec = (type, line) => ({ type, line, writer: type.startsWith('engine') ? { role: 'dev-runner' } : engineWriterAt(100, b(0)) });
   const run = { runId: 'own-census', pids: { backendRootPid: 100 } };
   const manifest = { pid: 100, containment: { status: 'CONTAINED' }, incarnation: { session: run.runId } };
   const ledger = { engine: { present: true, records: [rec('engine-start', { incarnation: { session: run.runId, n: 1 },
@@ -776,7 +786,10 @@ test('S15 replay (verifier b56 run2): owner-recorded exits stay accounted, unpro
   const ledgerDir = ledgerLib.ledgerDirectory(dir);
   const writers = {
     engine: ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', writer: { role: 'dev-runner', pid: 16, startedAt: Date.UTC(2026, 9, 6) } }),
-    children: ledgerLib.createLedgerWriter({ ledgerDir, family: 'children', writer: { role: 'engine', pid: 2596, startedAt: Date.UTC(2026, 9, 6) } }),
+    // The Engine writes as itself: its start is the birth its records name it by (the replay's owner).
+    children: ledgerLib.createLedgerWriter({ ledgerDir, family: 'children', writer: { role: 'engine', pid: 2596,
+      startedAt: Date.parse(engineWriterAt(2596, fixture.beforeArming.children
+        .find(([type, f]) => type === 'child-spawn' && f.owner?.pid === 2596)[1].owner.creationFileTime).startedAt) } }),
   };
   const write = (phase) => {
     for (const family of ['engine', 'children']) for (const [type, fields] of phase[family] ?? []) writers[family].append(type, fields);
