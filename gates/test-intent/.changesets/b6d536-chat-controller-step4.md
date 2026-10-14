@@ -51,7 +51,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java"
       ],
       "class": "New",
-      "behaviour": "I4 (preservation, reconciliation F15), aWindowThatDoesNotFitStepsDownOneRungAndServes: the fake refuses any -c above 16384 with the real llama-server allocation failure ('alloc_buffer: allocating 16604.75 MiB on device 0: cudaMalloc failed: out of memory') and exit 1. The start launches 32768, then exactly one step-down to 16384; the window is rung 16384 with reason stepped-from:32768, and the server there is alive. This passes on 7edc726dd as well (recorded in the preserved evidence's fail-before run); it pins that a real fit failure still costs one rung, not inference, now that only RESOURCE steps down.",
+      "behaviour": "I4 (preservation, reconciliation F15), aWindowThatDoesNotFitStepsDownOneRungAndServes: the fake refuses any -c above 16384 with the real llama-server allocation failure ('alloc_buffer: allocating 16604.75 MiB on device 0: cudaMalloc failed: out of memory') and exit 1. The start launches 32768, then exactly one step-down to 16384; the window is rung 16384 with reason stepped-from:32768, and the server there is alive. It passed on 7edc726dd as well in the original record. The evidence regenerated on b599d4d7e has no fail-before run: the current HealthyFakeLlamaServer uses ProcessTerminator, which 7edc726dd lacks, so the check no longer compiles there. It pins that a real fit failure still costs one rung, not inference, now that only RESOURCE steps down.",
       "sources": [
         {
           "kind": "delegated-choice",

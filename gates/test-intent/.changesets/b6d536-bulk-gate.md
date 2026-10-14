@@ -20,7 +20,10 @@ Evidence files (all written by run-evidence.mjs):
 
 - `b6d536-bulk-gate-repaired.json`: repaired behaviour, failing by assertion on 5f91835f3.
 - `b6d536-bulk-gate-preservation.json`: checks that pass on 5f91835f3 and on the change. That run
-  exits 1 by design, because none of them shows a repair.
+  exits 1 by design, because none of them shows a repair. In the run regenerated on b599d4d7e,
+  EnergyStatePollerTest's later method energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot
+  (added by ea0c311cb, b6d536-b64-status-counter) fails on 5f91835f3 by assertion; it was reported
+  to the coordinator, not changed.
 - `b6d536-bulk-gate-new.json`: checks whose expectations use API added in this change, so they
   have no before-state.
 
