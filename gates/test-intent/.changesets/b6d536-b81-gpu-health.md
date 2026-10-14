@@ -23,19 +23,21 @@ GpuResidencyGameTest#gameOutranksExternalMemory keeps its inputs, ticks and gate
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b81 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b81 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a stalled Health listener holds a publisher at most 1 s once per stall, where a stall ends only when the listener has caught up with its backlog, not when it finishes one frame; it does not stall delivery to others; no publisher is ever interrupted or left with an interrupt it did not have; per-listener order is kept.",
-          "label": "agent choice (orchestrator decision in the b81 builder brief)"
+          "label": "agent choice (orchestrator decision in the b81 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "process ownership and exit accounting",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b81 builder brief addition G4 under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 6 (process ownership and exit accounting); the orchestrator decided the b81 builder brief addition G4 under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 6: \"Process ownership and exit accounting (Q15, S8, SUP).\" (task request).",
           "choice": "a listener Error that arrives after the publisher's 1 s wait has returned is made visible to the channel's owner through the existing logging, without interrupting or failing any publisher and without changing the other Health guarantees.",
-          "label": "agent choice (orchestrator decision in the b81 builder brief)"
+          "label": "agent choice (orchestrator decision in the b81 builder brief)",
+          "provenance": "delegationQuote was 'process ownership and exit accounting' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "HealthPublisherInterruptTest (blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder included), SseStreamChannelPublisherInterruptTest, SseStreamChannelDeliveryOwnerTest, HealthProducerInterruptTest, CapabilityHealthBridgeObserverLifetimeTest, SseAdmissionShutdownTest and SseTransportOwnerShutdownTest keep their expectations; no decision record governs when a stalled Health observer is waited for or where a late observer Error is reported.",
@@ -62,16 +64,18 @@ GpuResidencyGameTest#gameOutranksExternalMemory keeps its inputs, ticks and gate
         },
         {
           "kind": "owner-words",
-          "quote": "GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.",
-          "location": "task t-20261005-b6d536 request"
+          "quote": "Design and implement a VRAM-budget-aware policy for the chat model and the encoders, plus a semantic time budget that falls back to lexical search with a reason code. Coordinate with the inference lane's host contract (priority and aging).",
+          "location": "task t-20261005-b6d536 request (item 5)",
+          "provenance": "quote corrected to the owner's exact words; it was paraphrased as \"GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.\""
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 5; the orchestrator decided the b81 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 5; the orchestrator decided the b81 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5: \"Design and implement a VRAM-budget-aware policy for the chat model and the encoders, plus a semantic time budget that falls back to lexical search with a reason code. Coordinate with the inference lane's host contract (priority and aging).\" (task request).",
           "choice": "a game signal does not hide simultaneous external memory pressure: with a game active and enough low-free-memory samples to raise external pressure, chat unloads with the memory-pressure reason on P16_PLUS; an unload deferred by a tokenization or query-assistance lease is retried once the lease closes while pressure stays unchanged; no unload while a lease that must not be interrupted is open, no unload storms, user-visible residency reasons stay correct.",
-          "label": "agent choice (orchestrator decision in the b81 builder brief)"
+          "label": "agent choice (orchestrator decision in the b81 builder brief)",
+          "provenance": "delegationQuote was 'GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "docs/decisions/0050-gpu-co-residence-by-prevention.md (chat unloads under external pressure with chat idle; a detected game is also a trigger) agrees. ChatResidencyTest (P3/O4: a game alone on P16_PLUS or unresolved keeps chat; T22 and the lease-at-drain case), GpuResidencySamplerTest, GenerationTrackerTest (U7: an AUX close is no edge) and EngineGpuResidencyWitnessTest keep their expectations.",
@@ -100,11 +104,12 @@ GpuResidencyGameTest#gameOutranksExternalMemory keeps its inputs, ticks and gate
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 5; the orchestrator decided the b81 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 5; the orchestrator decided the b81 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5: \"Design and implement a VRAM-budget-aware policy for the chat model and the encoders, plus a semantic time budget that falls back to lexical search with a reason code. Coordinate with the inference lane's host contract (priority and aging).\" (task request).",
           "choice": "user-visible residency reasons stay correct.",
-          "label": "agent choice (orchestrator decision in the b81 builder brief)"
+          "label": "agent choice (orchestrator decision in the b81 builder brief)",
+          "provenance": "delegationQuote was 'GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "ChatResidencyTest#aGameUnloadsChatBelowSixteenGigabytesWithTheGameModeDetail keeps its expectation; no decision record conflicts.",
@@ -128,11 +133,12 @@ GpuResidencyGameTest#gameOutranksExternalMemory keeps its inputs, ticks and gate
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.",
-          "delegationLocation": "task t-20261005-b6d536 request",
-          "delegationScope": "task item 5; the orchestrator decided the b81 builder brief under this delegation",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "task item 5; the orchestrator decided the b81 builder brief under this delegation. The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5: \"Design and implement a VRAM-budget-aware policy for the chat model and the encoders, plus a semantic time budget that falls back to lexical search with a reason code. Coordinate with the inference lane's host contract (priority and aging).\" (task request).",
           "choice": "a game signal does not hide simultaneous external memory pressure from the chat controller (the sampler no longer emits only GAME, discarding the memory-pressure state); user-visible residency reasons stay correct.",
-          "label": "agent choice (orchestrator decision in the b81 builder brief)"
+          "label": "agent choice (orchestrator decision in the b81 builder brief)",
+          "provenance": "delegationQuote was 'GPU co-residence, a VRAM-budget-aware policy, a semantic time budget that falls back to lexical with a reason code, and coordination with the inference lane's priority and aging.' at 'task t-20261005-b6d536 request', which is item wording, not a delegation"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none. docs/decisions/0050-gpu-co-residence-by-prevention.md unloads chat under external pressure and names a detected game as a trigger, and no record says a game hides memory pressure. The obsolete expectation was that, with external pressure raised first, the receiver hears plain GAME when the game raises. It now hears GAME_AND_EXTERNAL_MEMORY. The rest of gameOutranksExternalMemory is unchanged: EXTERNAL_MEMORY before the game, EXTERNAL_MEMORY again after it, and the gate reasons GAME_MODE then GPU_BUSY_EXTERNAL. The other cases of the file are unchanged."

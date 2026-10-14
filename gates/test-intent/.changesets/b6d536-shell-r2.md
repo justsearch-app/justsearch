@@ -375,9 +375,13 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "quote": "Read it, then build steps 6, 7, 8 and 12 with it, including its new checks.",
-          "location": "task t-20261005-b6d536 request second-run addendum"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Read it, then build steps 6, 7, 8 and 12 with it, including its new checks.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request second-run addendum'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "Binding amendment 1 explicitly replaces hold joining/cancellation and requires release after failed prepare; earlier Spec F hold interpretation and the previous builder report conflict and are superseded. No stronger conflicting owner instruction found. Specifically replaced: hold_linearizes_with_supervisor_installation_and_joins_that_generation and replacement_hold_joins_old_supervisor_blocks_spawn_and_resumes_once require an immediate admission hold with the actor still running; handoff_failures_keep_hold_explicit_and_never_invent_a_dead_engine_fallback changes the prepare arm to released admission and one resume. These are the changed earlier oracles; installer/job-empty oracles are retained."
@@ -575,9 +579,13 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "quote": "The outcome must not depend on scheduling. The decision rests on facts the updater and actor can establish, not on queue state",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "The outcome must not depend on scheduling. The decision rests on facts the updater and actor can establish, not on queue state",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-shell-held-crash-b18.json",
@@ -602,9 +610,13 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "quote": "The outcome must not depend on scheduling. The decision rests on facts the updater and actor can establish, not on queue state",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "The outcome must not depend on scheduling. The decision rests on facts the updater and actor can establish, not on queue state",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-shell-held-crash-boundaries-b18.json",
@@ -689,6 +701,11 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
 ```
 
 ## Prior builder record (history, b14u-shell-r2)
+
+Provenance note (records repair, 2026-10-14): the `owner-words` sources quoted in this history
+("Read it, then build steps 6, 7, 8 and 12 with it, including its new checks.") are orchestrator
+brief wording, not the owner's words; the current entries above cite that wording as delegated
+choices. The history is kept as written.
 
 > ---
 > schema: test-intent.v1

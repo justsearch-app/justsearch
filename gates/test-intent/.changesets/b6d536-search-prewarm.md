@@ -65,7 +65,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A query session is warm when a GPU session exists, is not being released and a foreground run that was allowed to create it has completed on it; a CPU session needs no prior run. A query leg with a keyword fallback never creates or retries a session: it uses a warm GPU session, else the existing CPU session, else reports LOADING. One prewarm runner runs one foreground encode through each configured query encoder (embedding, SPLADE unless the IDF query path is used, or BGE-M3) before the models are reported ready, again after any session of those encoders is created or released, and checks every second. Model initialization waits for its first pass at most the query warm-up budget (30 s). Until a query encoder is first warm (or its readiness bound passes), health reports embeddingReady false, so the EMBEDDING readiness component carries its existing reason encoders.health.embedding_not_ready; no new reason code.",
           "label": "agent choice"
@@ -100,7 +100,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "Readiness waits only on query encoders that are not warm: a CPU-only boot, whose CPU session exists, and a boot with semantic search disabled, which has no query encoder, do not wait on prewarm.",
           "label": "agent choice"
@@ -131,7 +131,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The prewarm runs on its own Engine-registered executor, index.query-prewarm (background, scheduled, one thread, one instance), acquired last and closed first, rather than on a raw thread or on the deferred-model-init executor, which ends with initialization.",
           "label": "agent choice"
@@ -168,7 +168,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The readiness bound is KnowledgeServer.QUERY_READINESS_BOUND_MS = 45 s from the start of the prewarm: the measured activation times (design b6d536 measure M3: 8.8-16.2 s per re-activation, 29.6 s for the slowest first activation, queued behind startup) plus half again as margin. Past it, a prewarm that keeps failing no longer holds the embedding readiness; the prewarm keeps retrying, and searches fall back with cause loading or run on CPU as before. Readiness is one-way per process (QueryEncoderReadiness, shared by every service set that replaces the first): once embeddingReady was reported, a GPU release or session re-creation changes only the component state, carried as a new additive Worker health field query_encoders_cold. The Head maps it to an embedding component DEGRADED with the existing reason encoders.reloading (worded 'Semantic search models are reloading'), rather than a new reason code, so the readiness vocabulary and its wording rows are unchanged.",
           "label": "agent choice"

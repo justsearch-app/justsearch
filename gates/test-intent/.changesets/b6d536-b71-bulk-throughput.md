@@ -20,9 +20,13 @@ Independent verifier acceptance remains pending. The private execution adapter c
       "behaviour": "The production bulk writer declares each parent's chunk set in the parent document it writes: indexing 43 parents (3 chunked) refreshes the searcher at most once, leaves no superseded parent version, and every parent still certifies its complete chunk set and unchanged-file admission.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-12 (b71 builder brief)",
-          "quote": "Writing a parent must not need a blocking refresh or a read-back per document"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Writing a parent must not need a blocking refresh or a read-back per document",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-12 (b71 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "ChunkCompletenessAdmissionTest, ChunkUnchangedAdmissionTest, LegacyChunkBackfillTest, ChunkAdmissionCostTest, ChunkAdmissionRefreshRetentionTest and RecoverableChunkCompletenessTest retain their expectations; declaration semantics and stored fields are unchanged.",
@@ -40,9 +44,13 @@ Independent verifier acceptance remains pending. The private execution adapter c
       "behaviour": "Completeness preparation on searcher reopen reads only segments the cache has not seen: adding one parent reads at most its own rows, a reopen that only adds deletions reads no stored rows, and completeness stays correct for the deleted chunk.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-12 (b71 builder brief)",
-          "quote": "Any completeness work on searcher reopen must cost in proportion to what changed, not to the index size."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Any completeness work on searcher reopen must cost in proportion to what changed, not to the index size.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-12 (b71 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "ChunkCompletenessAdmissionTest, ChunkAdmissionCostTest and ChunkAdmissionRefreshRetentionTest retain their expectations; liveness is applied from each reader, never cached.",

@@ -106,7 +106,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "Spec A step 9 as the builder implements it: a residency unload is published on the generative component as UNAVAILABLE with inference.unloaded_gpu_pressure or inference.unloaded_game_mode (TRANSIENT, info, outside the ai-unavailable set), which the operating block reads as chat UNLOADED with reason RESIDENCY_PRESSURE and the StopDetail; the indexing yield keeps inference.gpu_yielded_to_indexing and stays OFF. A chat refusal on MCP carries the same errorCode, retryAfterMs, reason and forceAllowed as the HTTP body.",
           "label": "agent choice"
@@ -138,7 +138,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "Reconciliation v2 F8/CH1 as the builder implements it in the app: only the chat window's own send to /api/chat/dispatch carries allowLoad true; the shared body builder never adds it, and the search window's ask is left unmarked in this step. The two residency codes get their own calm wording at info severity.",
           "label": "agent choice"
@@ -170,7 +170,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "An unexpected RuntimeException or Error from a step (its drain included) or from the boot-gate replay is logged and given to that step's caller; the controller loop keeps serving. Only a VirtualMachineError still ends the loop.",
           "label": "agent choice"
@@ -201,7 +201,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "The chat window reads 'unloaded for another GPU user' from the AI readiness reason codes (the lifecycle_inference dimension of the aiFeatures composite), keeps the chat tiers sendable then (the agent tier, which sends no allowLoad, is not), shows a calm notice with Load anyway, and handles a typed refusal like the locked refusal: bubble taken back, text restored; Load anyway resends a refused turn. The shared stream-error words use the refusal's message, so the search window's ask, which sends no allowLoad (CH1), says why it was refused.",
           "label": "agent choice"
@@ -227,7 +227,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "One pure module holds the residency codes, the refusal parser and the load-anyway request; the AI state store derives chatUnloadedReason from it.",
           "label": "agent choice"
@@ -255,7 +255,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "The residency unload has its own codes, so the indexing yield's projection and the shared request body are left as they were.",
           "label": "agent choice"
@@ -294,7 +294,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "Spec A step 9 under reconciliation v2 as the builder implements it: the unload is an IF_IDLE drain on the controller thread that a reply or an open lease defers to the next idle edge (or the next pressure report); a pressure that clears before the stop cancels it; the 120 s reload dwell is kept in memory only; the token bucket and the force window are not built, and after a load anyway only a new pressure edge unloads again; a GPU start refused under pressure (CH7) latches UNLOADED without a dwell; an agent under pressure is refused with retryAfter the longer of the dwell left and 30 s; the machine profile has no producer yet (Spec E E7), so it stays UNRESOLVED, which keeps today's behaviour for a game alone (chat stays loaded, Spec A O4/C8, Spec E's UNRESOLVED row); a game unloads chat only on P12 or P8, while VDU and bulk work yield to any reported pressure.",
           "label": "agent choice"
@@ -348,7 +348,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 9) end to end within the agreed scenarios.",
           "choice": "The residency unload is a manager step that stops only an idle server, re-checks the pressure just before the stop, and records the unload detail until the next start; the status wiring publishes it as the TRANSIENT residency reason codes on the generative component.",
           "label": "agent choice"
@@ -384,7 +384,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 9) end to end within the agreed scenarios.",
           "choice": "Reconciliation v2 F8/CH1 at the routes as the builder implements it: a demand is a person's only with body allowLoad true and client kind WEBVIEW or PAIRED_DEVICE, and load anyway needs the same evidence; an agent's wait is capped at 30 s and lowered by waitForReadyMs; api-error-response.v1 gains the optional reason and forceAllowed fields; the dev trigger answers only in eval mode.",
           "label": "agent choice"

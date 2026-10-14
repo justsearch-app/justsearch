@@ -7,7 +7,8 @@ author-session: b62-batch-health-race
 
 # Health publication and committed-reader regression checks
 
-Owner brief requires R1 current-state publication under blocked mapping/delivery, R2 durable
+The orchestrator's b62 brief (agent wording under the owner's end-to-end delegation, cited below as
+delegated choices) requires R1 current-state publication under blocked mapping/delivery, R2 durable
 chunk completeness, and preservation of R3/R4. Independent verifier acceptance remains pending.
 
 ```json
@@ -21,9 +22,13 @@ chunk completeness, and preservation of R3/R4. Independent verifier acceptance r
       "behaviour": "Health conditions publish atomically with the component; a blocked mapper or Health observer cannot retain a stale failure, delay recovery, or gate another subscriber.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)",
-          "quote": "Condition state and component state must be published together so that no reader of the Health snapshot or stream can observe a combination that never existed"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Condition state and component state must be published together so that no reader of the Health snapshot or stream can observe a combination that never existed",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "Existing R1-R4 checks retain their expectations; no conflicting rule found.",
@@ -43,9 +48,13 @@ chunk completeness, and preservation of R3/R4. Independent verifier acceptance r
       "behaviour": "Unchanged admission rejects a durably deleted child before background search reader refresh, while unchanged cost stays independent of child count.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)",
-          "quote": "The unchanged decision must be made against state at least as new as the last committed write that affects that parent, without giving back R3's bounded cost"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "The unchanged decision must be made against state at least as new as the last committed write that affects that parent, without giving back R3's bounded cost",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "Existing R1-R4 checks retain their expectations; no conflicting rule found.",
@@ -68,9 +77,13 @@ chunk completeness, and preservation of R3/R4. Independent verifier acceptance r
       "behaviour": "Use explicitly owned closeable resource declarations to remove unused-resource PMD findings; preserve the same work budgets and Health attachment assertions with thread-safe observed-state storage.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)",
-          "quote": "Fix the PMD findings without suppressions."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Fix the PMD findings without suppressions.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "Existing R1-R4 checks retain their expectations; no conflicting rule found."
@@ -83,9 +96,13 @@ chunk completeness, and preservation of R3/R4. Independent verifier acceptance r
       "behaviour": "The first unchanged decision for a complete 5,000-chunk parent after another parent loses a committed child performs zero child metadata reads and zero parent content-block reads. This is a preservation scenario; the baseline already meets it.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)",
-          "quote": "without giving back R3's bounded cost (no per-chunk work for an unchanged parent)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "without giving back R3's bounded cost (no per-chunk work for an unchanged parent)",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-11 (b62 builder brief)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "R3 and existing work-counter checks require bounded admission. Metadata preparation remains a commit publication cost; no assertion on extraction, splitting or legacy preservation is changed.",

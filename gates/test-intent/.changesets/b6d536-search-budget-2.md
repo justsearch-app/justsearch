@@ -66,7 +66,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A RAG retrieval that embeds the question (rag.retrieve.mode hybrid or auto) gets the same semantic sub-budget as a search, min(start + device cap, D - lexical reserve - margin), and waits for models at most until it. On a miss the retrieval answers with BM25 context and retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED. MMR whose document embeddings miss the remaining budget falls back to position diversification, recorded on the span and log only. A BM25-only retrieval keeps today's models wait and has no sub-budget. RETRIEVAL_TIMEOUT now means only that D itself passed.",
           "label": "agent choice"
@@ -98,7 +98,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "VECTOR-only has no keyword fallback, so its semantic budget is D - margin (margin 500 ms) and a miss is a typed DEADLINE_EXCEEDED (HTTP 504, MCP DEADLINE_EXCEEDED) with the detail 'SEMANTIC_BUDGET_EXCEEDED (cause: <cause>)'.",
           "label": "agent choice"
@@ -134,7 +134,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "RAG query encodes stay inside RAGContext.inject, before generation, so a turn's query encode never overlaps its own generation. VECTOR-only requests wait for their encoder within D - margin rather than failing early.",
           "label": "agent choice"
@@ -165,7 +165,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The RAG retrieval carries its cause in a new RetrieveContextResponse field retrieval_mode_cause (contended, loading or stuck; empty otherwise), projected as rag.meta retrieval_mode_cause and MCP retrievalModeCause only alongside SEMANTIC_BUDGET_EXCEEDED.",
           "label": "agent choice"
@@ -196,7 +196,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "One reason code, SEMANTIC_BUDGET_EXCEEDED, is also the RAG retrieval_mode_reason for a semantic budget miss, so the RAG contract allowlist lists it.",
           "label": "agent choice"
@@ -224,7 +224,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "Detached native runs use one bare platform thread each, from a daemon thread factory named ort-query-run-, rather than an engine-registered executor, because ort-common does not reach the engine's executor registry. A run that never returns keeps its thread, seat and GPU memory until the process exits (named limitation).",
           "label": "agent choice"
@@ -261,7 +261,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The open retrieval (RemoteDocumentService.retrieveContext with no document ids, reached by the MCP answer, /api/retrieve-context and a chat turn without documents) fixes one head deadline D when it starts: the client's request deadline from now, or the caller's own D when earlier. Its pre-search and its retrieval both run inside D (HeadSearchDeadline), so each call's budget and each step's semantic sub-budget are carved from what is left of D. A scoped retrieval (document ids given) is one step and keeps its own category budget.",
           "label": "agent choice"
@@ -292,7 +292,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A new RetrieveContextRequest field, bool semantic_loading_observed = 26, set by the head only when the open retrieval's pre-search reports a semantic leg (dense or SPLADE) that missed with cause loading. The worker then checks the models latch without waiting: still closed, the retrieval answers with BM25, SEMANTIC_BUDGET_EXCEEDED and cause loading at once; open, the field changes nothing. A contended miss does not set it, because the device may be free for the retrieval.",
           "label": "agent choice"
@@ -324,7 +324,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "Only the two-step open retrieval shares one head deadline; a single-step scoped retrieval keeps today's RERANK category budget.",
           "label": "agent choice"

@@ -90,7 +90,7 @@ re-run here.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "label": "agent choice",
           "choice": "Reads the integrated slices made outside the configuration funnel go through it. The supervised Engine incarnation (Spec F section 3.2) is the EnvRegistry key justsearch.engine.incarnation / JUSTSEARCH_ENGINE_INCARNATION, the variable name the supervisors already set. The process PATH is not registered, because that would print the machine's PATH in the effective-config output; instead a launch names the directories to put in front of PATH (ChildSpec.pathPrefix) and DefaultChildControl joins them to the PATH the child inherits, so no launch site reads the process environment."
@@ -113,7 +113,7 @@ re-run here.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "label": "agent choice",
           "choice": "On Windows the inherited variable is spelled Path or PATH and a second spelling would be a second variable, so child control reuses the inherited key whatever its case. Eval mode, which the step 9 dev pressure route read with Boolean.getBoolean, is the EnvRegistry key justsearch.eval.mode / JUSTSEARCH_EVAL_MODE; the incarnation key keeps the supervisors' variable name."
@@ -133,9 +133,13 @@ re-run here.
       "class": "New",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "the integrate changeset's packaged-count oracle moved 282 to 284 under an Adaptation/signature class: reclassify it correctly with the reason (the merge union adds two integration keys).",
-          "location": "task t-20261005-b6d536 request: batch-1 repair builder brief, item 5, 2026-10-09"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "the integrate changeset's packaged-count oracle moved 282 to 284 under an Adaptation/signature class: reclassify it correctly with the reason (the merge union adds two integration keys).",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: batch-1 repair builder brief, item 5, 2026-10-09'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "behaviour": "The packaged register retains the byte-identity and scope assertions and expects the complete merge union: 282 incoming keys plus justsearch.engine.incarnation and justsearch.eval.mode, giving 284. This changes a concrete expected value; it is a new oracle with the owner authority quoted below, not a signature adaptation. Fresh execution evidence covers the merged packaged register check and fails by assertion on incoming 75e70d488: 284 expected, 282 actual.",

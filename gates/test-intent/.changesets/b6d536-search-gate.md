@@ -74,7 +74,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "One device gate per CUDA device, shared by every GPU session handle on it (CPU is not gated), with one seat; a session never holds two seats. A freed seat goes to the oldest waiting foreground call whose session is free, else the oldest background call. The oldest background waiter is seated ahead of foreground after 4 foreground seatings since it queued or after 2000 ms of waiting; the foreground calls it passes are not passed again while they wait. The gate never refuses: a caller leaves only at its own deadline (phase GATE, cause contended), on cancellation or on interrupt.",
           "label": "agent choice"
@@ -108,7 +108,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A GPU release waits at most recompositionWaitMs (10 000 ms), interruptibly, for the session's in-flight runs. Past that the session is retired to its run: the handle drops it at once, and the last lease release closes it (lifecycle callback, run options, then the session) before freeing the device seat. Until then its seat still counts against the device.",
           "label": "agent choice"
@@ -144,7 +144,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A bulk producer runs at most bulkPaceTargetMs (1000 ms) of GPU work between two pace() calls. The combined backfill paces at every phase boundary (embedding, SPLADE, NER) and every bulkPhaseDocs documents within a phase (SPLADE 64, embedding 128 documents or encoder windows, NER 192, from M5's per-document costs); its SPLADE phase is encoded in 64-document calls. The idle SPLADE backfill (200 documents a batch) is encoded in 64-document calls with a pace point between them. The other bulk loops stay as they are: at M5's costs their batches are under the target.",
           "label": "agent choice"
@@ -175,7 +175,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "One device gate per CUDA device with one seat. A freed seat goes to the oldest waiting foreground call whose session is free, else the oldest background call. The oldest background waiter is seated ahead of foreground after 4 foreground seatings since it queued or after 2000 ms of waiting; the foreground calls it passes are not passed again while they wait. A caller leaves only at its own deadline (GATE), on cancellation or on interrupt, and is removed from the queue under the gate's lock; a seat granted in the same instant is released at once. The pace slice of each bulk phase is the bulkPhaseDocs value its parameter names.",
           "label": "agent choice"
@@ -205,7 +205,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A pace() interval's work is its wall time less the time the thread waited for a seat at any device gate. Its wall-clock pause is the yield that work owes at the duty (work x (100 - duty) / duty) less the gate wait already spent, never below zero and at most 2000 ms.",
           "label": "agent choice"
@@ -233,7 +233,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The oldest background waiter is seated ahead of foreground after agingSeatings (4) foreground seatings since it queued or after 2000 ms of waiting, so a bulk producer under a constant foreground stream is guaranteed one seat in agingSeatings + 2. A pace() interval's work excludes its gate wait.",
           "label": "agent choice"
@@ -262,7 +262,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "An engine admission slot is held only while its caller is in flight. A native run that outlives its caller (released at the semantic deadline) holds no admission slot.",
           "label": "agent choice"
@@ -349,7 +349,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A device's breaker is open while a seat held by a run that is not its session's first has been held at least stuckAfterMs (10 000 ms), at any urgency; it closes in the same step as that seat's release, with no timer. While it is open only foreground calls that release their caller at the deadline and may not create a GPU session (the hybrid dense and SPLADE legs, which have a keyword fallback) are turned away at once, as a RUN-phase deadline miss reported with cause stuck. Vector-only searches, the reranker, prewarm and background work still queue, and CPU legs never reach the gate.",
           "label": "agent choice"
@@ -382,7 +382,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A rerank that gets no session before its acquisition deadline is skipped, not failed. When the rerank's own budget bounded that wait, the skip cause is ACQUIRE_BUDGET_EXCEEDED, carried on the wire as the existing DEADLINE_EXCEEDED; when the search's deadline bounded it, the cause is RUN_DEADLINE_EXCEEDED, carried as the existing SEARCH_DEADLINE_EXCEEDED. Any other acquisition failure is still a failed call.",
           "label": "agent choice"
@@ -411,7 +411,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "A breaker open for breakerStandingMs (5000 ms) is a standing state: the embedding component is DEGRADED with encoders.health.semantic_stuck (in the aiFeatures composite), which the shell shows as retrieval-impaired with warn severity and the wording 'The semantic search encoder is stalled'. A shorter opening is reported per search only.",
           "label": "agent choice"
@@ -448,7 +448,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
           "choice": "The breaker opens only for a run that is not its session's first (a session that has released a seat before), held at least stuckAfterMs (10 000 ms), and closes in the release step, with no timer. Only foreground fallback legs are turned away. The worker's health response carries the earliest open-since time across devices as epoch ms (0 when closed); once that is breakerStandingMs (5000 ms) old, the Head degrades the embedding component with encoders.health.semantic_stuck, a transient code.",
           "label": "agent choice"

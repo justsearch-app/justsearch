@@ -50,7 +50,7 @@ candidate, recorded in the adapted evidence.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 12) end to end within the agreed scenarios.",
           "choice": "Spec A step 12, option B as the orchestrator accepted it under this delegation: delete RuntimeReconciler's three deprecated controller-less constructors (with their switch adapter and its DetachAction and ReasonedSwitch interfaces) and the passive RuntimeGpuLease mirror with its unused grant logic. /api/status inference.leaseHolder stays on the wire with the same values, now derived from the observed mode by RuntimeStatus.leaseHolderFor (ONLINE CHAT, INDEXING INDEXING, OFFLINE NONE; TRANSITIONING keeps the last committed holder). The RR procedure overlay, RR chat convergence and the ILM transition entry points are deferred as a follow-up: they still carry live behaviour (the overlay feeds inference.procedure and the soft-off engine reason the UI reads; convergence re-sends the intent when the last hold closes, forwards boot and spec writes and retries a failed stop) or would need 50+ test migrations. That is a departure from Spec A row 12.",
           "label": "agent choice"
@@ -75,7 +75,7 @@ candidate, recorded in the adapted evidence.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 12) end to end within the agreed scenarios.",
           "choice": "Spec A step 12, option B as the orchestrator accepted it under this delegation: delete RuntimeReconciler's three deprecated controller-less constructors (with their switch adapter and its DetachAction and ReasonedSwitch interfaces) and the passive RuntimeGpuLease mirror with its unused grant logic. /api/status inference.leaseHolder stays on the wire with the same values, now derived from the observed mode by RuntimeStatus.leaseHolderFor (ONLINE CHAT, INDEXING INDEXING, OFFLINE NONE; TRANSITIONING keeps the last committed holder). The RR procedure overlay, RR chat convergence and the ILM transition entry points are deferred as a follow-up: they still carry live behaviour (the overlay feeds inference.procedure and the soft-off engine reason the UI reads; convergence re-sends the intent when the last hold closes, forwards boot and spec writes and retries a failed stop) or would need 50+ test migrations. That is a departure from Spec A row 12.",
           "label": "agent choice"
@@ -96,7 +96,7 @@ candidate, recorded in the adapted evidence.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 12) end to end within the agreed scenarios.",
           "choice": "Spec A step 12, option B as the orchestrator accepted it under this delegation: delete RuntimeReconciler's three deprecated controller-less constructors (with their switch adapter and its DetachAction and ReasonedSwitch interfaces) and the passive RuntimeGpuLease mirror with its unused grant logic. /api/status inference.leaseHolder stays on the wire with the same values, now derived from the observed mode by RuntimeStatus.leaseHolderFor (ONLINE CHAT, INDEXING INDEXING, OFFLINE NONE; TRANSITIONING keeps the last committed holder). The RR procedure overlay, RR chat convergence and the ILM transition entry points are deferred as a follow-up: they still carry live behaviour (the overlay feeds inference.procedure and the soft-off engine reason the UI reads; convergence re-sends the intent when the last hold closes, forwards boot and spec writes and retries a failed stop) or would need 50+ test migrations. That is a departure from Spec A row 12.",
           "label": "agent choice"

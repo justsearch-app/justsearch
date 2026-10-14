@@ -29,19 +29,31 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before o
       "behaviour": "Each status producer publishes independently through real loopback HTTP with production StatusRoutes and security/admission filters. A held or failed producer only invalidates its own status fields; Worker contact and head-local AI stay current. Idle GPU stays fresh through two ten-second periods. A newer healthy Worker observation survives an older pending status-owned failure publication, while external component transitions remain protected by the full-registry conditional update. The real health monitor shortens an already scheduled idle tick when asynchronous reconciliation adopts the busy cadence, before healthy observations expire. The operating response uses the same current component reason and actual assembly time as the top-level response, while preserving measurement timestamps and monotonic content sequences without the sampler lock. Overlapping status occupies and releases its fairness slot and is refused at capacity. Post-action refresh requests fresh=true and observes the changed owner while periodic reconciliation is occupied. Deadlines, coalescing, freeze refusals, recovery and status contents are preserved.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Staleness for each component follows from that component's own sampling period, not a shared constant.",
-          "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Staleness for each component follows from that component's own sampling period, not a shared constant.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b53 builder brief, task item 5)'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "quote": "Each status component is produced and published independently, so a slow or failed producer marks only its own component stale or unknown and every other component stays current.",
-          "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Each status component is produced and published independently, so a slow or failed producer marks only its own component stale or unknown and every other component stays current.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b53 builder brief, task item 5)'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "quote": "After a user action, the UI's refresh shows the post-action state. Do not raise the client timeout, add retries or reintroduce blocking.",
-          "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "After a user action, the UI's refresh shows the post-action state. Do not raise the client timeout, add retries or reintroduce blocking.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b53 builder brief, task item 5)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b53-status-isolation.json",
@@ -62,9 +74,13 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before o
       "whatMoved": "The coalescing check now observes the actual independent Worker lane and its publication instead of requiring a second sampler thread to contend on the removed sampler-wide RPC lock. It waits for both contact and lifecycle publication before checking recovery. Original contact counts, component states, refusal, conditional-publication ownership, recovery and cached-read assertions remain.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Preservation: b50's own non-blocking checks, specC status-surface checks, lane F status consumers, frontend status tests.",
-          "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Preservation: b50's own non-blocking checks, specC status-surface checks, lane F status consumers, frontend status tests.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b53 builder brief, task item 5)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ]
     },
@@ -81,14 +97,22 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before o
       "whatMoved": "GPU projection checks pass the same existing six-second window explicitly after the producer now receives its own cadence. Readiness checks explicitly select the same direct-observation mode they previously selected implicitly; production selects cached inputs through the same envelope assembler. Redundant test-only wrapper methods are removed. These three files retain every prior assertion, fixture value, contact provenance and expected reason. Original suites execute on ff0c00f5e; adapted suites execute on the candidate.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Staleness for each component follows from that component's own sampling period, not a shared constant.",
-          "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Staleness for each component follows from that component's own sampling period, not a shared constant.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b53 builder brief, task item 5)'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "quote": "Preservation: b50's own non-blocking checks, specC status-surface checks, lane F status consumers, frontend status tests.",
-          "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Preservation: b50's own non-blocking checks, specC status-surface checks, lane F status consumers, frontend status tests.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b53 builder brief, task item 5)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ]
     },
@@ -97,7 +121,7 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before o
       "class": "New",
       "repaired": false,
       "behaviour": "Independent component publications retain their own real observation timestamps. Two real-sampler checks replace shared response-timestamp equality with present observation timestamps bounded by sampling start and response return. Stale flags, zero fresh staleness, and lost-contact provenance assertions remain. Direct envelope calls explicitly retain their former mode. The original common-timestamp oracle passes on ff0c00f5e but is deliberately replaced because independent publications occur at different times; candidate observations are never restamped to imitate a shared pass.",
-      "sources": [{"kind": "owner-words", "quote": "Each status component is produced and published independently, so a slow or failed producer marks only its own component stale or unknown and every other component stays current.", "location": "task t-20261005-b6d536 request (b53 builder brief, task item 5)"}],
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "Each status component is produced and published independently, so a slow or failed producer marks only its own component stale or unknown and every other component stays current.", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b53 builder brief, task item 5)'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b53-status-provenance.json",
       "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java"]
     },
@@ -124,11 +148,12 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before o
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.",
-          "delegationLocation": "task t-20261005-b6d536 request (task item 5)",
-          "delegationScope": "how the UI keeps its status display current for task item 5 (S20)",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "how the UI keeps its status display current for task item 5 (S20). The delegation is the owner's end-to-end takeover grant (repeated 2026-10-06T21:10Z: \"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"); the choice serves item 5's completion condition: \"Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.\" (task request).",
           "choice": "Orchestrator decision in the b82 brief, S3: \"Repair so a read that does not settle cannot stop the polling schedule or leave the display stuck, without raising any timeout as a fix for server slowness, without more than one read in flight per kind beyond what the existing rules allow, and without read storms (an abandoned read is aborted, not left running in parallel indefinitely). Decide the bound from the existing poll interval and justify.\"",
-          "label": "agent choice"
+          "label": "agent choice",
+          "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ]
     }

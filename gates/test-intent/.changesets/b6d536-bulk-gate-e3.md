@@ -60,7 +60,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "BGE-M3 processes one batch per call, so the raise for that path lands between the content fetch and the encode, and the oracle is that the encode does not start; the sampler classes are overlaid on the before-state so the pressure source exists there.",
           "label": "agent choice"
@@ -97,7 +97,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "The PAUSED code is indexing.paused_gpu_busy, TRANSIENT, registered in the readiness reason-code registry like indexing.paused_energy_saver.",
           "label": "agent choice"
@@ -166,7 +166,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "The Engine owns the sampler and its scheduler and closes both with its process resources; the reader opens without a pinned adapter (pinning by LUID is E6); a receiver bound after a raise hears the raised pressure.",
           "label": "agent choice"
@@ -228,7 +228,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "Our processes are the Engine and its descendants (the llama child); closing the sampler clears a pressure it published.",
           "label": "agent choice"

@@ -46,7 +46,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A steps 5 and 6 with reconciliation v2 (F11, F17) as the builder implements them: the chat controller owns four hold kinds (freeze, self-test session, VDU, running) with the admission precedence of Spec A section 2.2; while any hold is open activations are superseded and the last close tells the forwarder to replan; taking a hold drains for at most 30 s and refuses BUSY when replies do not finish; the self-test session stops the main server first (SELF_TEST), runs the candidate on the controller thread and starts nothing on close; holds are refused after shutdown and an open VDU hold is asked to finish.",
           "label": "agent choice"
@@ -86,7 +86,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 5 (U11, I6) as the builder implements it: runtime activation is a client of the chat controller; it begins a self-test session, which stops the main server first, the candidate is launched by the controller through a SelfTestLauncher seam (where Spec B step 6 can plug in ChildControl), the commit happens inside the session, and the main server loads once, on the configuration committed, after the session closes; the activation's own launcher is removed. A refused session fails the activation with SELF_TEST_FAILED.",
           "label": "agent choice"
@@ -117,7 +117,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 (U12 without the residency signal, U13) as the builder implements it: a VDU batch takes one VDU hold on the chat controller instead of switching modes itself, finishes early and leaves the rest pending when the controller asks, and the automatic VDU trigger reads the controller's vduMayStart, so a server that is down for a self-test, a latched failure or an open hold never triggers a pass.",
           "label": "agent choice"
@@ -141,7 +141,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 rows 10 and 11 as the builder implements them: the post-install smoke test runs inside a running hold on the chat controller instead of a reconciler procedure with procedureRequireEngine, and releases it on every exit; install acquisition takes a freeze. Without a controller wired the legacy direct switch remains.",
           "label": "agent choice"
@@ -164,7 +164,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 as the builder implements it: the reconciler's procedures become the chat controller's holds; the reconciler keeps publishing the PROCEDURE axis by mirroring each open hold kind as the procedure it replaced and forwards deferred intent when the last hold closes.",
           "label": "agent choice"
@@ -185,7 +185,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 as the builder implements it: the chat controller, not the reconciler, starts the server for a VDU, running or self-test hold; the reconciler's procedureRequireEngine and its embedding-phase park are deleted (O2: the VDU embedding hand-off stop is removed).",
           "label": "agent choice"
@@ -210,7 +210,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 as the builder implements it: the chat controller, not the reconciler, starts the server for a VDU, running or self-test hold; the reconciler only forwards spec when the last hold closes, so with spec on it makes no switch and with spec off it makes exactly one stop.",
           "label": "agent choice"
@@ -238,7 +238,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 and O2 as the builder implements them: the offline coordinator no longer brackets a pass in a reconciler procedure or requests the engine; the VDU batch holds the chat controller itself; the embedding hand-off that stopped chat after VDU is removed on every profile, because the index half's own backfill embeds beside chat.",
           "label": "agent choice"
@@ -279,7 +279,7 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 and O2 as the builder implements them: the offline coordinator runs recovery, selection and the VDU batch under its guard and admission without a reconciler procedure; the batch's VDU hold on the chat controller is the procedure's cleanup; a pass with embeddings pending is complete and never stops chat.",
           "label": "agent choice"

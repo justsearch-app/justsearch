@@ -30,7 +30,7 @@ safety wrapper are recorded in the builder report.
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "Normal chat launches llama-server with a bounded host prompt cache of 1024 MiB by default.",
           "label": "agent choice"
@@ -38,7 +38,7 @@ safety wrapper are recorded in the builder report.
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "When the head runs in evaluation mode (justsearch.eval.mode=true, the mode evaluation and scripted-agent runs use), the prompt cache is disabled (0), so measurements do not depend on what earlier requests left in the cache.",
           "label": "agent choice"
@@ -46,7 +46,7 @@ safety wrapper are recorded in the builder report.
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "VDU mode keeps 0, unchanged.",
           "label": "agent choice"
@@ -54,7 +54,7 @@ safety wrapper are recorded in the builder report.
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "One explicit override for development (for example a system property or setting read through the existing inference configuration, plus a dev-runner option that passes it), validated: a non-negative integer number of MiB; an invalid value is refused with a clear message, not silently ignored.",
           "label": "agent choice"
@@ -62,7 +62,7 @@ safety wrapper are recorded in the builder report.
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "Every relaunch path (mode changes, profile changes, crash restart, VDU enter and exit) must apply the rule for the mode it relaunches into.",
           "label": "agent choice"
@@ -84,7 +84,7 @@ safety wrapper are recorded in the builder report.
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "the bound on llama-server's host prompt cache (task item 5, inference lane), which the owner asked about with \"whats best for development ?\" after the orchestrator recommended 1 GiB for chat, 0 for evaluation and scripted runs, VDU unchanged and a development override",
           "choice": "Normal chat launches llama-server with a bounded host prompt cache of 1024 MiB by default.",
           "label": "agent choice"

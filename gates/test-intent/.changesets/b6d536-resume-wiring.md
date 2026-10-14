@@ -42,7 +42,7 @@ was: <false>".
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 10 and 11, and the merges they need) end to end within the agreed scenarios.",
           "choice": "Spec A §7.4's resume source, wired at the merge of b6d536/one-quit (d20c300d1, Spec F §3.5 SystemPowerEvents) into b6d536/integrate as the step-10 changeset named it: HeadlessApp binds the boot power events into the Engine root, which subscribes once, when both the power events and the chat controller's device-loss input are bound, forwards each RESUME to the latest bound controller's reportResume, ignores SUSPEND, and closes the subscription with the process resources.",
           "label": "agent choice"

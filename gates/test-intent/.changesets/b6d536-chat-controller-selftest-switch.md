@@ -41,7 +41,7 @@ self-test) is unchanged. This changeset covers only these files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A §2.2 rule 3 and T39 as the builder implements them at the activation commit: when the settings changed since the candidate was read in the chat switch alone, the activation rebases onto the newer settings, keeping the user's chatEnabled (applied after) and committing the runtime fields, retrying a bounded three times if another write races it; any other change keeps the stale-witness refusal.",
           "label": "agent choice"
@@ -63,7 +63,7 @@ self-test) is unchanged. This changeset covers only these files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Only the chat switch is a deferred desired-state input; a configuration change during the self-test invalidates what the self-test validated, so the commit is still refused.",
           "label": "agent choice"

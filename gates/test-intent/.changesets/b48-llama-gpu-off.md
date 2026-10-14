@@ -21,9 +21,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "A CPU chat launch must disable all devices and vision projector offload, even when projector offload defaults to true. Merely setting zero transformer layers leaves CUDA compute and CLIP buffers allocated.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-repaired.json",
@@ -40,9 +44,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "No chat or self-test launch owner may construct device-selection flags or CUDA visibility outside LlamaDevicePlan.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "the launch plan must derive every device-related flag and environment variable from the one effective device policy",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "the launch plan must derive every device-related flag and environment variable from the one effective device policy",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-repaired.json",
@@ -59,9 +67,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "The full CPU argv adds device none while preserving CPU context, zero layers, slots, unified KV, quantization and fit flags. All GPU, VDU, context and reasoning checks retain their oracles.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-repaired.json",
@@ -78,9 +90,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "The former CPU no-device expectation was wrong: CPU must explicitly disable offload devices. GPU pin flags and environment expectations are unchanged.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-repaired.json",
@@ -97,9 +113,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "Effective explicit master GPU-off or policy GPU-off wins over requested layers, pinning and projector defaults; explicitly resolved layers also win over caller or activation defaults. Zero layers hides CUDA; pinned and unpinned GPU behavior is preserved.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-new.json",
@@ -116,9 +136,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "The self-test child receives the plan environment together with its matching argv and GPU ownership, for CPU and pinned GPU launches.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "GPU on must keep today's placement (pinned device, layers, projector placement per profile); the self-test must follow the same plan.",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "GPU on must keep today's placement (pinned device, layers, projector placement per profile); the self-test must follow the same plan.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-new.json",
@@ -135,9 +159,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "A GPU-off activation self-test submits zero layers, device none, CPU projector and hidden CUDA to the session; it can pass without NVML or a GPU-memory delta and does not rewrite requested layers. Automatic activation probes its 99-layer candidate; explicit zero, positive layers and higher-priority environment settings remain effective.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "make \"GPU off\" mean no CUDA use by the chat server and its self-test",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-new.json",
@@ -154,9 +182,13 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
       "behaviour": "Actual Engine contributions for P16_PLUS, P12 and P8 preserve 99 layers, pinned CUDA0 and per-profile projector placement. These preservation checks also run on f6d579a86.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "GPU on must keep today's placement (pinned device, layers, projector placement per profile); the self-test must follow the same plan.",
-          "location": "task t-20261005-b6d536 request (b48 builder role contract)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "GPU on must keep today's placement (pinned device, layers, projector placement per profile); the self-test must follow the same plan.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-new.json",

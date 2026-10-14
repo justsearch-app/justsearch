@@ -20,9 +20,13 @@ The status-change counter advances on state, never on measurement; fresh canonic
       "behaviour": "Every canonical status field and owner publication is classified as state, measurement or time, and the completeness check fails for an unclassified field or producer. Over real HTTP, GPU utilisation, VRAM, history arrays, telemetry throughput and its HEALTHY/UNKNOWN window, counts and clocks never advance the counter, while a state change still does; a failed 422 action after measurement-only changes carries no counter above the displayed reflection. Indexing-job counts and watched-root timestamps are not state.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "classify every canonical status field as state, measurement or time; measurements, gauges, rates, history arrays, clocks and ages never advance the counter",
-          "location": "task t-20261005-b6d536 request (b73 builder brief, Fix 1 / S20)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "classify every canonical status field as state, measurement or time; measurements, gauges, rates, history arrays, clocks and ages never advance the counter",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b73 builder brief, Fix 1 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b73-status-state-fields-java.json",
@@ -48,14 +52,22 @@ The status-change counter advances on state, never on measurement; fresh canonic
       "behaviour": "At most one fresh canonical read is in flight and at most one is started per observed counter value; a held lane cannot turn ordinary requests into fresh reads; refused or failed fresh reads back off, honouring Retry-After, while ordinary polling continues and the display catches up at the next successful read. A body without metadata may replace the display only when it answers a read issued after the displayed body and no newer epoch contradicts it, so the UI converges within the poll interval when the server supplies no metadata. The round-6 verifier cases (hung storm, refused storm, metadata loss, out-of-order, epoch invalidation, idle) are copied with their assertions kept. statusCounterSignal's 'a later request may retry the pending publication' expectation is replaced: the same value is not read again, a later value is.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "at most one fresh read in flight; at most one fresh read per observed counter value (a fresh read that returns without reaching that value does not start another for the same value)",
-          "location": "task t-20261005-b6d536 request (b73 builder brief, Fix 3 / S20)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "at most one fresh read in flight; at most one fresh read per observed counter value (a fresh read that returns without reaching that value does not start another for the same value)",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b73 builder brief, Fix 3 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "quote": "a body without metadata may replace the display only if it answers a request issued after the displayed body was received and no newer epoch or revision is known to contradict it",
-          "location": "task t-20261005-b6d536 request (b73 builder brief, Fix 2 / S20)"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "a body without metadata may replace the display only if it answers a request issued after the displayed body was received and no newer epoch or revision is known to contradict it",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b73 builder brief, Fix 2 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b73-status-state-fields-ui.json",

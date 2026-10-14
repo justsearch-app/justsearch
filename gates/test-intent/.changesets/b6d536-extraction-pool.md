@@ -42,7 +42,7 @@ fail-before is claimed for it.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The pool's reasons map to stop requests asked by extraction-pool: a request timeout is TIMEOUT, an interrupted caller CANCELLED, a protocol failure RECYCLE with detail protocol, the request budget RECYCLE with detail request_budget, all NOW; pool close is one cooperative QUIT for all children (close stdin, one shared 2 s grace, then terminate); JVM shutdown without close is QUIT NOW. A child that ends by itself is not stopped: its own recorded exit is read, and the pool adds the note oom when the child's stderr shows OutOfMemoryError. One still running 2 s after it broke the protocol by itself is stopped as RECYCLE with detail protocol.",
           "label": "agent choice"
@@ -70,7 +70,7 @@ fail-before is claimed for it.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "Extraction children are ended only by the child control's terminate, never by the JDK's destroyForcibly, so on Windows a forced extraction child always exits 0x4A530001, a code no child exits with by itself.",
           "label": "agent choice"
@@ -127,7 +127,7 @@ fail-before is claimed for it.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "A child whose manifest registration fails is rolled back by the child control that started it, which also keeps a survivor's handle and retries it on its close; the termination intent of every pool stop is the control's ledger record, not a stderr line.",
           "label": "agent choice"

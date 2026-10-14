@@ -24,9 +24,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "behaviour": "HTTP settings partial context 131072 commits, survives a fresh store load, retains index ownership, and status exposes user_setting_unmet / inference.setting_unmet with chat enabled or disabled. The harness adds a real KnowledgeServer query owner with empty model roles and a fake chat actuator whose publication callback runs; native loading is absent. Automatic caps can vary through the real query guard while explicit index caps remain guarded. The test-only module dependency makes this integration seam compile; existing harness callers keep their original defaults.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Afterwards, the update is accepted and persisted, and where the plan cannot meet it, status carries user_setting_unmet / inference.setting_unmet (P4).",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Afterwards, the update is accepted and persisted, and where the plan cannot meet it, status carries user_setting_unmet / inference.setting_unmet (P4).",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b15-e7b-repairs.json",
@@ -44,9 +48,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "behaviour": "A user-pinned COMPACT 16k with CPU projector fits P16_PLUS on 12282 MiB: C=3703, A_run=4713, embedding cap=5311.3. Profile selection uses the explicit footprint for every candidate. An already-unplanned device retains and explains context 131072 without raising its device class.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Repeat §2.2 with the explicit values, so encoder caps account for a user-pinned chat size, and report unmet settings.",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Repeat §2.2 with the explicit values, so encoder caps account for a user-pinned chat size, and report unmet settings.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b15-e7b-repairs.json",
@@ -61,9 +69,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "class": "Obsolete",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "On P8 without COMPACT (the 9B on 8,068-11,083 MiB), status must carry the over-commit notice",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "On P8 without COMPACT (the 9B on 8,068-11,083 MiB), status must carry the over-commit notice",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "conflictSearch": "Decision records and binding r4 other rows, revision 3 §2.2 and Q7 searched: the empty P8 degradation oracle conflicts with the required notice; no conflicting owner scenario."
@@ -77,9 +89,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "behaviour": "Unplanned P8 without COMPACT publishes device_memory_overcommit / inference.device_memory_overcommit while preserving the 9B launch and constants; below-P8 and unresolved notices still clear correctly.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "On P8 without COMPACT (the 9B on 8,068-11,083 MiB), status must carry the over-commit notice",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "On P8 without COMPACT (the 9B on 8,068-11,083 MiB), status must carry the over-commit notice",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b15-e7b-repairs.json",
@@ -96,9 +112,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "behaviour": "The CPU BGE-M3 plan publishes bge_m3_unmeasured / indexing.bge_m3_unmeasured as a standing episode and clears it when the role disappears.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "When the plan puts BGE-M3 on the CPU with bge_m3_unmeasured, operating status must publish that reason",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "When the plan puts BGE-M3 on the CPU with bge_m3_unmeasured, operating status must publish that reason",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b15-e7b-repairs.json",
@@ -115,9 +135,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "behaviour": "A 1000 MiB unmeasured PADDLE file contributes 2450 MiB including KV and fixed overhead, and that full term is subtracted from the encoder activation budget at the resolver adapter.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "An explicit unmeasured model such as PADDLE_OCR_VL must count its file size plus the fixed term (file + 1,450 MiB).",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "An explicit unmeasured model such as PADDLE_OCR_VL must count its file size plus the fixed term (file + 1,450 MiB).",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b15-e7b-repairs.json",
@@ -134,9 +158,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "behaviour": "Both bulk documents complete after the admitting deadline expires during the first CPU fallback; every CPU step releases the seat and each bulk reacquisition has a fresh bounded wait. Query authorities preserve their deadlines and cancellation remains live.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "A bulk (indexing) ladder must never be cut short by a request deadline. Query calls keep their deadline semantics.",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "A bulk (indexing) ladder must never be cut short by a request deadline. Query calls keep their deadline semantics.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b15-e7b-repairs.json",
@@ -154,9 +182,13 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "behaviour": "Preservation: explicit index caps still require index ownership; query ladder deadline misses stay typed; a pinned 9B that cannot fit remains selected with context/chat_profile/encoder_memory reported unmet.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Explicit user settings (context, layers, GPU off) win over profiles and are never silently changed; where they cannot be met, the app says so.",
-          "location": "task t-20261005-b6d536 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Explicit user settings (context, layers, GPU off) win over profiles and are never silently changed; where they cannot be met, the app says so.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b15-e7b-guards.json",

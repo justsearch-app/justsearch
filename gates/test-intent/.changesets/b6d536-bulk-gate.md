@@ -53,7 +53,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "IDLE needs an empty queue and, for each enrichment stage that is enabled and available (embedding with its chunk count, SPLADE or BGE-M3 sparse with its chunk count, NER, VDU), nothing pending. A status view that does not report availability is read as available, so a reported backlog is never hidden. The energy-saver reason code is indexing.paused_energy_saver, set when the block is PAUSED with energy saver as its primary reason; it is TRANSIENT and never enters the readiness envelope, so it is registered as exempt from readiness wording.",
           "label": "agent choice"
@@ -136,7 +136,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "BulkWorkGate lives in core beside GpuSchedulingGauge, one per Engine, owned by KnowledgeServerBootstrap; core has no project dependencies, so it declares its own Reason and Profile enums mirroring IndexingReason and Profile, pinned by a test. The hold rule is the same on every profile except NO_GPU (Spec E 1.2), so UNRESOLVED can hold, but only a known GPU profile gets the 50% generation duty; UNRESOLVED and NO_GPU keep today's 20% and 2 s. The operating block takes energy saver from the same pass's power view, so it agrees with the power card, and every other reason from the gate. Stage availability comes from BackfillScheduler.stageAvailability(), the same checks the combined backfill pass uses; VDU availability is computed on the Head from a wired VDU coordinator, no blocked capability reason and a vision-capable chat runtime.",
           "label": "agent choice"
@@ -182,7 +182,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "The S5 rate counts whole documents (not chunks) with a completed embedding and a completed or completed-empty sparse encoding, as one Lucene count published on the status enrichment block as embeddedAndSparseCount.",
           "label": "agent choice"

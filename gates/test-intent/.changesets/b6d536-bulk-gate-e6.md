@@ -81,7 +81,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "The argv builder writes the single-device flags after -c and -ngl on a GPU line; the memory-plan block stays the tail of the line; a launch with no UUID for llama-server removes the four flags.",
           "label": "agent choice"
@@ -109,7 +109,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "Without a pinned UUID the inherited environment is kept; the CPU launch names no device.",
           "label": "agent choice"
@@ -140,7 +140,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "Candidates are DXGI hardware NVIDIA adapters that a CUDA device maps to by LUID; the pinned ordinal reaches ORT as an auto-detected default so explicit per-role ids win; the driver gate applies to llama-server's UUID only; the explicit device key and its unmet status wait for step E7.",
           "label": "agent choice"
@@ -180,7 +180,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "A GPU launch with no UUID for llama-server keeps E4's unpinned line rather than naming a device the runtime may not see.",
           "label": "agent choice"

@@ -120,7 +120,7 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for Spec B steps 7 to 9",
           "choice": "child-start's contained is the Engine job's own answer for the started process (IsProcessInJob), read once at start; it is null when the Engine has no job or the answer cannot be read, never assumed true.",
           "label": "agent choice"
@@ -148,7 +148,7 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for Spec B steps 7 to 9",
           "choice": "A predecessor child the children ledger records inside its Engine's job is left to the ledger (child-survived) and keeps its manifest record; every other identity-matched live child, and every one while this Engine has no job, is still ended at boot (Spec F step 13 keeps that fallback until one release after the Engine job). Containment is read from the ledger's child-start (contained true, matched by PID and birth); an unreadable ledger means no child is known to be contained.",
           "label": "agent choice"
@@ -176,7 +176,7 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for Spec B steps 7 to 9",
           "choice": "The Engine writes one engine-self-intent per exit, before the close, with the exit code it will end with; the escalated restart is recorded as ENGINE_RESTART with detail escalated (the ledger schema's reason enum has no CRASH_RECOVERY for the Engine); a fatal exit records none; a failed record never changes the exit.",
           "label": "agent choice"

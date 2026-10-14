@@ -86,7 +86,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "Every stop of the main llama-server goes through ChildControl with a known reason: the lifecycle manager maps its transition reason to a stop reason and refuses UNKNOWN; its stops are asked for by chat-controller. The crash monitor stays armed through a stop: the stop's own exit is REQUESTED and ignored, an exit the server makes by itself is UNEXPECTED and handled as a crash.",
           "label": "agent choice"
@@ -114,7 +114,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The self-test candidate is a LLAMA_SELF_TEST child of the Engine's ChildControl, launched by the chat controller's SelfTestLauncher seam; it is stopped with SELF_TEST, and the launcher returns only after the candidate's recorded exit, after every process the candidate started has exited, and after the GPU barrier (at most one 5 s release poll), so the main server never loads while the candidate still holds adapter memory.",
           "label": "agent choice"
@@ -144,7 +144,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "llama-server is ended only by the child control's terminate, never by the JDK's destroy or a taskkill, so on Windows every planned stop of it exits 0x4A530001, a code it never exits with by itself.",
           "label": "agent choice"
@@ -174,7 +174,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "ChildControl owns its children's manifest entries for their whole life: an entry registered for a child that has already exited is removed by start itself before it returns (removal is idempotent), so a dead child never stays in the manifest.",
           "label": "agent choice"
@@ -203,7 +203,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The llama-server's terminal stop is one ChildControl stop of exactly the servers still owned, with the Engine's first recorded reason (QUIT when none was recorded); an exited server is no longer owned and is not stopped again; a survivor reported by the control fails the terminal stop at once instead of waiting out its deadline.",
           "label": "agent choice"
@@ -235,7 +235,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "At terminal shutdown the main llama-server is stopped with the Engine's own reason: the Engine records its shutdown reason before the head is closed, and the lifecycle manager's terminal stop uses the first recorded reason (QUIT when none was recorded).",
           "label": "agent choice"
@@ -399,7 +399,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "label": "agent choice",
           "choice": "A chat-server child (LLAMA_SERVER or LLAMA_SELF_TEST) whose stop failed may still hold the chat port and adapter memory, so no chat-server child starts beside it. The start first retries that stop under its first intent, or awaits a stop still running, and is refused while the child is not confirmed gone. This restores the base behaviour of ManagedLlamaAdoptionTest repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup for every path that starts a chat server."
@@ -438,7 +438,7 @@ on this branch.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "label": "agent choice",
           "choice": "A server that survived the rollback of its refused registration is handed back to LlamaServerOps (ChildRegistrationRefusedException.survivor) and owned for the terminal stop. It blocks the next start as any survivor does."

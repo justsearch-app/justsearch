@@ -85,7 +85,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 10) end to end within the agreed scenarios.",
           "choice": "Spec A §7.3 and reconciliation F10 as the builder implements them: the controller acts on a device loss on its own thread ahead of every queued step and interrupts the step in progress; one step stops the server now with DEVICE_LOST and only then reads the Engine's earlier DEVICE_LOST self-intents (Spec A §7.3 order); within the limit (none in the last 10 minutes and at most two in the last hour, so the new restart is at most the third) the controller then stops for good with DEVICE_LOST and asks the Engine to restart; otherwise, and whenever the history cannot be read or a self-intent write of this incarnation failed (F10: 'a write failed this incarnation'), the step latches FAILED device_lost_limit without a terminal, so the controller stays operable for an operator retry or a resume. Further reports while one is handled are logged and ignored.",
           "label": "agent choice"
@@ -122,7 +122,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 10) end to end within the agreed scenarios.",
           "choice": "Spec A §7.4 as the builder implements it on the controller: a resume restarts a running reload dwell and a closed boot-order deadline in full, resets the server's timers at once from the caller's thread (not queued behind a running step), clears a latched FAILED and sends the activation intent again through the boot replay (T34), then runs one probe step ahead of the queue; a probe that finds device-lost text reports RESUME_PROBE with its code. No production resume source is built here (Spec A O8): reportResume has no caller yet; its source, the Engine power events (SystemPowerEvents) on branch b6d536/one-quit (d20c300d1), is wired at that merge.",
           "label": "agent choice"
@@ -158,7 +158,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 10) end to end within the agreed scenarios.",
           "choice": "Spec A §7.3 source 2 and §7.4 in the manager as the builder implements them: a llama-server line that mentions CUDA and names a code of Spec E §6.1's closed list by number, CUDA runtime or driver name, or cudaGetErrorString text is DEVICE_SUSPECT and device loss with that code (reconciliation F17: the list is Spec E's, the same set as the encoder side's DeviceLostClassifier); the classifier's other DEVICE_SUSPECT strings without a listed code stay DEVICE_SUSPECT (never retried in place) but are not device loss; the resume probe waits for a reply in progress, then asks /health within 5 s and one token from /completion within 10 s inside an AUX lease; a dead process is left to the crash path, device-lost text is returned to the controller, and any other failure stops the server with TIMEOUT and relaunches it once with the same request; the device-lost step stops the server first and then asks the controller's ledger decision; without a restart it latches device_lost_limit before going offline; an external server is left alone and never latched; a resume restarts a start's health deadline in full and clears the latch and the spent same-configuration restart.",
           "label": "agent choice"
@@ -204,7 +204,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 10) end to end within the agreed scenarios.",
           "choice": "Reconciliation F10 as the builder implements it: the Engine counts its own DEVICE_LOST engine-self-intent records in the engine ledger (any skipped line or a missing timestamp makes the count unreadable; a torn tail does not), fails closed when a self-intent write of this incarnation failed, and restarts through the requested-restart dispatch with a DEVICE_LOST self-intent expecting exit 4. The encoder reporter is started once per incarnation by the Engine root when the chat controller binds its device-loss input, and closes with the process resources.",
           "label": "agent choice"
@@ -240,7 +240,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 10) end to end within the agreed scenarios.",
           "choice": "Spec A step 10's probe and deadline checks run against the same stand-in process as the crash checks, extended only with opt-in behaviours.",
           "label": "agent choice"

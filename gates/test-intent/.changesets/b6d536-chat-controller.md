@@ -38,7 +38,7 @@ only this task's files; the other flagged files on the branch belong to other ta
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 3.5 as the builder implements it in step 2: one controller thread runs every start, stop and relaunch; a waiting request with the same coalescing key is replaced by the later one (the later configuration is complete, not a delta; the merged apply keeps the stronger restart policy), so requests that pile up during a relaunch launch only the final target once, and each replaced caller is told it was superseded (ModeTransitionException ALREADY_TRANSITIONING).",
           "label": "agent choice"
@@ -61,7 +61,7 @@ only this task's files; the other flagged files on the branch belong to other ta
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 3.5 item 5 as the builder implements it in step 2: TransitionRunner holds its lock only to begin and to finish a transition; the body (stop, start, health wait) runs unlocked, one lifecycle step at a time through an exclusive-step guard that waits on the monitor; drains run on the controller thread before any step, also unlocked; failure signals and close wait for the transition in progress to settle.",
           "label": "agent choice"
@@ -117,7 +117,7 @@ only this task's files; the other flagged files on the branch belong to other ta
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Spec A section 3.5 and tests U1-U4 as the builder implements them in step 2: one non-daemon registered thread named chat-controller; an immutable DesiredInputs with version++ per request; coalescing re-evaluated after a drain so A then B then C during a drain launches C only, superseded callers told so; a request from the controller thread throws; shutdown goes terminal first, refuses waiting and later steps, stops through the fence and interrupts the step in progress; callers that block on the controller may hold the settings lock, which the controller never takes.",
           "label": "agent choice"
@@ -159,7 +159,7 @@ only this task's files; the other flagged files on the branch belong to other ta
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Reconciliation F6 and Spec A section 4.1/4.2 as the builder implements them in step 2: the reconciler's boot, spec and procedure requests become one setActivation(active, reason) on the controller, a coalescing step sharing the mode switches' key (inactive detaches an adopted external server, as before); setActivation returns a CompletionStage that the reconciler thread waits on; superseded or refused activations settle without retry. Step 2 keeps its own Activation record because the app-api type carries no transition reason, and completes with Void because ChatStatus publication arrives in a later step.",
           "label": "agent choice"
@@ -215,7 +215,7 @@ only this task's files; the other flagged files on the branch belong to other ta
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Reconciliation F6 as the builder implements it in step 2: the reconciler forwards intent, as setActivation on the chat controller, only on boot, spec write and procedure end; an observed mode change only republishes status, so an unload made elsewhere (a pressure unload, in the later steps) is never undone by a reload behind the controller's back. The ManualClock form of F6's test needs a clock seam the reconciler does not have; with convergence gone nothing in it depends on time, so repeated foreign parks stand in for the 10 minutes.",
           "label": "agent choice"
@@ -237,7 +237,7 @@ only this task's files; the other flagged files on the branch belong to other ta
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Reconciliation F4 as the builder implements it: the controller replaces the reconciler as the guarded single writer and RuntimeReconcilerGuardrailsTest is updated in the same change; the switch-caller rules stay, keeping the reconciler the only forwarder of spec and procedure intent.",
           "label": "agent choice"
@@ -254,7 +254,7 @@ only this task's files; the other flagged files on the branch belong to other ta
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 2-4) end to end within the agreed scenarios.",
           "choice": "Reconciliation F4 as the builder implements it: the controller in app-services is the guarded single writer and the lifecycle manager's actuation primitives are called only by it; the guard is two ArchUnit rules in RuntimeReconcilerGuardrailsTest and a ChatServerController row in governance/runtime-state.v1.json.",
           "label": "agent choice"

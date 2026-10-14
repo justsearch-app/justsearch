@@ -49,9 +49,13 @@ Only additional expectations from the authorised repair brief; existing checks a
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request",
-          "quote": "Keep loading for the case FP3 does not cover: a request that reaches its seat in time and then waits for loading models."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Keep loading for the case FP3 does not cover: a request that reaches its seat in time and then waits for loading models.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b26-fp3-cause.json",
@@ -76,9 +80,13 @@ Only additional expectations from the authorised repair brief; existing checks a
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 request",
-          "quote": "Project reason and cause on HTTP the way MCP does, keeping the existing API contract style."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Project reason and cause on HTTP the way MCP does, keeping the existing API contract style.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "evidence": "gates/test-intent/evidence/b26-fp3-cause.json",

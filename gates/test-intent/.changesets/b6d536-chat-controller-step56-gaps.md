@@ -46,7 +46,7 @@ changeset covers only these files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A steps 5 and 6 as the builder implements them, seen at the process seam: an activation stops the main chat server before its candidate launches, the two are never alive together, and the main server loads once afterwards; an offline pass with embeddings pending never stops chat (O2).",
           "label": "agent choice"
@@ -68,7 +68,7 @@ changeset covers only these files.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A steps 5-6) end to end within the agreed scenarios.",
           "choice": "Spec A step 6 row 11 as the builder implements it: install acquisition takes one convergence freeze on the chat controller instead of a reconciler procedure; it shows as the INSTALL_ACQUISITION procedure, spec writes inside it are not acted on, and the engine follows the spec once when it ends, as before.",
           "label": "agent choice"

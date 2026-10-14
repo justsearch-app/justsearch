@@ -23,7 +23,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "VDU ownership refuses preparation before drain and across entry/prepared transaction windows; external self-tests name the external owner; split-device placement does not apply another adapter's reduced caps.",
@@ -49,7 +49,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; preserve round-2 B1/M1/M2/S-a repairs under the round-3 actual-allocation decision. The M1 fixture now uses context 1,048,576 to produce a real encoder shortfall while preserving its registered-key CPU-off expectations.",
           "choice": "Installed profile paths retain verified profile identity and measured co-residence, with automatic compact selection for installer paths and honest operator locks; registered GPU-off keys disable every automatic role when chat truly exhausts the device budget; foreign devices retain scoped unplanned policies; planner failures degrade visibly and unchanged results do not repeat INFO logs.",
@@ -78,7 +78,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Replacement admission credits the realized GPU artifact weights (including an actual FP32 fallback), not zero or unused cap ceilings; unknown free memory beside resident GPU sources refuses with free_device_memory_unknown. Index and query owners contribute only their retained GPU weights.",
@@ -104,7 +104,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "One item remains runnable through CPU when GPU weights or padding cannot fit. Planned non-FP16 CPU placement carries its reason and logs once per model.",
@@ -128,7 +128,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "The real SPLADE batch entry produces CPU output for one 512-token text when its unused GPU cap is infeasible.",
@@ -150,7 +150,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "The real reranker returns CPU scores for one 512-token pair under an infeasible GPU cap, and retained GPU leases keep their packing snapshot when the device plan is withdrawn.",
@@ -174,7 +174,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Environment-only and boolean-alias evaluation resolve consistently across system mode, debug endpoints and prompt cache; external-server refusal has its named wire reason.",
@@ -198,7 +198,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Preserve explicit encoder pressure protection with the master GPU setting off, exercising the registered keys through preparation.",
@@ -220,7 +220,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Preserve CPU-source P12 replacement admission and prevent unused allocator ceilings from becoming source release credit.",
@@ -243,7 +243,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Preserve CPU placement when the live arbiter changes after an unbounded CPU packing shape is chosen.",
@@ -265,7 +265,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Preserve every existing chat refusal wire code and require the additive external-server reason to conform to the public schema.",
@@ -286,7 +286,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       ],
       "sources": [
         {
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Owner items 5 (GPU co-residence and a VRAM-budget-aware policy) and 6 (process ownership and exit accounting); assigned llama findings.",
           "choice": "Evaluation mode resolves registered environment and boolean aliases and forces zero prompt cache; explicit JVM false retains precedence. Child cleanup verifies the recorded creation time.",
           "label": "agent choice",
@@ -310,7 +310,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       ],
       "sources": [
         {
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Owner items 5 (GPU co-residence and a VRAM-budget-aware policy) and 6 (process ownership and exit accounting); assigned llama findings.",
           "choice": "A held VDU configuration refuses both enabled and disabled ordinary settings preparation without replacing its server; an adopted external server refuses self-test before candidate launch.",
           "label": "agent choice",
@@ -333,7 +333,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       ],
       "sources": [
         {
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Owner items 5 (GPU co-residence and a VRAM-budget-aware policy) and 6 (process ownership and exit accounting); assigned llama findings.",
           "choice": "The real settings owner refuses changes during a held picture-reading batch and leaves the recording child and held configuration intact for either chat-enabled candidate.",
           "label": "agent choice",
@@ -355,7 +355,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       ],
       "sources": [
         {
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Owner items 5 (GPU co-residence and a VRAM-budget-aware policy) and 6 (process ownership and exit accounting); assigned llama findings.",
           "choice": "A native GPU candidate returning after device loss is neither published READY nor leased nor closed through the lost driver.",
           "label": "agent choice",
@@ -377,7 +377,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       ],
       "sources": [
         {
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Owner items 5 (GPU co-residence and a VRAM-budget-aware policy) and 6 (process ownership and exit accounting); assigned llama findings.",
           "choice": "Status preserves sampler-time ownership after a child exits and keeps empty process attribution unknown.",
           "label": "agent choice",
@@ -399,7 +399,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       ],
       "sources": [
         {
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Assigned evaluation-mode finding; preserve existing supported precedence.",
           "choice": "Preserve registered system-property-over-environment precedence.",
           "label": "agent choice",
@@ -432,7 +432,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Preserve the exact existing chat vocabulary and append the external-server refusal reason required by S-c.",
@@ -454,7 +454,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Register the additive derived per-role device-planning key in the encoder apply scope and preserve packaged register identity.",
@@ -476,7 +476,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "A planned non-FP16 encoder whose captured policy disables GPU prepares, validates and serves CPU query results; the target manifest EP alone must not reject its intentional placement.",
@@ -498,7 +498,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
           "choice": "Preserve captured variant identity through CPU composition and strict CUDA warmup/publication whenever policy is unknown or has a positive GPU cap.",
@@ -529,7 +529,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; round-3 P7 preservation repairs and consistent retained-memory admission.",
           "choice": "Keep planned query candidate and retiring-source estimates on retained weights, preserve headroom and unplanned behavior, and admit the plan's own supported replacements while the old chat is resident.",
@@ -552,7 +552,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner item 5; preserve refusal of a real device-memory shortfall and conservative admission for externally stored ONNX tensors during the P7 repair.",
           "choice": "Do not authorize replacement when candidate retained weights and headroom exceed actual free memory plus demonstrably retained source weights. Retain the existing arena estimate when external tensor storage prevents the graph-file size from proving retained weights.",
@@ -574,7 +574,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Round-3 instruction to restore same-policy admission with activation above zero and record it as an Adaptation.",
           "choice": "Restore the nonzero-activation precondition and observe real estimator admission without weakening the original successful-replacement or real-shortfall outcomes.",
@@ -599,7 +599,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner item 5; round-3 P4 decisions for custom, CPU-run and missing saved chat paths through the real settings rebuild.",
           "choice": "Budget the actual possible chat allocation, reserve zero for CPU or unavailable chat, keep encoders in the remaining budget and expose the actual chat availability or measurement reason.",
@@ -619,7 +619,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner item 5; round-3 stored relative-path availability check through the real settings rebuild, with independent fixture state and unchanged placement expectations.",
           "choice": "Give the relative saved-path fixture its intended base directory at the registered JVM source, restore the prior value after preparation and retain every existing outcome assertion.",
@@ -641,7 +641,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Round-3 boot-path decision: identify installed artifacts cheaply and move any necessary full hash off synchronous boot.",
           "choice": "Count reads through the model input seam and reject a boot-time full-file hash with a deterministic byte-bound assertion rather than a timing threshold.",
@@ -664,7 +664,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; round-3 placement-reason and missing-file availability decisions.",
           "choice": "Project the planner's named chat diagnostic through operating status and keep encoder_memory exclusive to actual encoder memory shortage.",
@@ -686,7 +686,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner item 6; preserve observed runtime ownership while adding desired-model diagnostics.",
           "choice": "Only report the missing model as unavailable when there is no READY serving chat; preserve an already observed serving child and its status evidence.",
@@ -708,7 +708,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Round-3 request to make the existing CPU-dispatch check assert dispatch rather than only a one-item count.",
           "choice": "Observe the selected CPU lease/session and verify GPU acquisition never occurs; classify the existing working behavior as preservation against the round-3 starting revision.",
@@ -730,7 +730,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Round-3 boot-read decision and stored-path boundary requirement; retain the budgeted unmeasured fallback until cheap or persisted file identity confirms a measured model.",
           "choice": "Count model reads after real installer verification and promotion, and preserve the measured shipped-model identity through the boot settings rebuild without another full SHA-256.",
@@ -757,7 +757,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; round-3 requirements to preserve all default plans, retain M1 registered-key behavior, distinguish genuinely custom content from installed identity and preserve round-1 external-server ownership when local chat settings select CPU or a missing file.",
           "choice": "Keep the existing shipped-profile, operator precedence and real-shortfall outcomes; changed content keeps an empty measured-model identity and an extrapolated footprint while the separate stored-path checks establish its revised allocation policy. Budget a selected local external server independently of unused local launch settings, keeping its existing GPU reservation and excluding false local missing-file diagnostics.",
@@ -775,7 +775,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Round-3 P4 decision for custom chat allocations and preservation of M1's actual registered-key failure under a genuine shortfall.",
           "choice": "A custom GPU model spends its file, projector, configured-context KV and 770 MiB, so only a real remaining-budget shortfall disables encoders. Supersede the old blanket-custom CPU policy instead of describing its changed input as mere re-encoding.",
@@ -793,7 +793,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Round-3 allocation decision replaces the whole-device reservation for unmeasured chat while preserving round-2 protection against lending a profile measurement to different content.",
           "choice": "A changed artifact remains custom but may coexist with planned encoders when the specification's unmeasured allocation fits; file identity and co-residence admission are distinct facts.",
@@ -813,7 +813,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Round-3 boot-path decision to persist verified path/size/modification-time identity and keep default shipped plans unchanged.",
           "choice": "Seed the same identity an installer records after verifying its output so profile tests exercise cheap persisted identity rather than relying on a boot-time full hash.",

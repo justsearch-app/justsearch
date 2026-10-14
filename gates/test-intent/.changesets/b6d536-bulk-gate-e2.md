@@ -57,7 +57,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "The chat server's GenerationActivity (open GENERATE leases) is the gate's generation input, for every urgency (ruling F1). The 4 s bound is the spec's E-S7a window.",
           "label": "agent choice"
@@ -87,7 +87,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "Ruling F1: generation of every urgency holds the duty floor, so the background scenario now paces; generation leaves the search gauge, so the search duty governs only search.",
           "label": "agent choice"
@@ -117,7 +117,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "The SLOWED code is indexing.slowed_chat_generating, TRANSIENT, outside the readiness envelope and registered as exempt from readiness wording, like indexing.paused_energy_saver.",
           "label": "agent choice"
@@ -145,7 +145,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "NO_GPU and UNRESOLVED keep today's search-load duty (20%) and 2 s debt cap while chat generates; only a known GPU profile gets 50% and 1 s.",
           "label": "agent choice"
@@ -180,7 +180,7 @@ Evidence files (all written by run-evidence.mjs):
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
           "choice": "One governor: effective duty = search duty while search is busy, else the generation duty while the duty floor holds, else 100; the debt cap follows the same choice; each 100 ms yield chunk re-reads both inputs and re-caps the remaining debt.",
           "label": "agent choice"

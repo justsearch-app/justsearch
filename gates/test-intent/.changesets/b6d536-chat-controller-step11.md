@@ -50,7 +50,7 @@ before and after; the gate's "does not show a repair" note is expected for prese
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 11) end to end within the agreed scenarios.",
           "choice": "Spec A step 11, option B as the orchestrator accepted it under this delegation: a llama-server stop's reason originates at the chat controller's step, not at a mapping from the transition reason. Each step kind names one known, specific StopReason (ACTIVATE, APPLY, PREPARE and DETACH RECONFIGURE; DEACTIVATE and PREPARED_RETIRE DEACTIVATE; PREPARED_ABORT ROLLBACK; VDU_ENTER and VDU_EXIT themselves; RECOVER CRASH_RECOVERY; SELF_TEST, SELF_TEST_RUN and SELF_TEST_END SELF_TEST; RESIDENCY_UNLOAD RESIDENCY_PRESSURE; DEVICE_LOST DEVICE_LOST; RESUME_PROBE TIMEOUT), stopped NOW and requested by chat-controller; a reconfiguring step whose model file changes stops with MODEL_SWITCH; sub-events a step handles itself keep their own reason (ROLLBACK, TIMEOUT, CRASH_RECOVERY, DEVICE_LOST). There is no fallback: a stop outside a controller step is refused. This departs from Spec A row 11's 'LSO keeps the launch argv, log rotation and health probing only': LlamaServerOps keeps its start/stop lifecycle through ChildControl; moving it into the controller is a named follow-up.",
           "label": "agent choice"
@@ -75,7 +75,7 @@ before and after; the gate's "does not show a repair" note is expected for prese
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 11) end to end within the agreed scenarios.",
           "choice": "Spec A step 11, option B as the orchestrator accepted it under this delegation: a llama-server stop's reason originates at the chat controller's step, not at a mapping from the transition reason. Each step kind names one known, specific StopReason (ACTIVATE, APPLY, PREPARE and DETACH RECONFIGURE; DEACTIVATE and PREPARED_RETIRE DEACTIVATE; PREPARED_ABORT ROLLBACK; VDU_ENTER and VDU_EXIT themselves; RECOVER CRASH_RECOVERY; SELF_TEST, SELF_TEST_RUN and SELF_TEST_END SELF_TEST; RESIDENCY_UNLOAD RESIDENCY_PRESSURE; DEVICE_LOST DEVICE_LOST; RESUME_PROBE TIMEOUT), stopped NOW and requested by chat-controller; a reconfiguring step whose model file changes stops with MODEL_SWITCH; sub-events a step handles itself keep their own reason (ROLLBACK, TIMEOUT, CRASH_RECOVERY, DEVICE_LOST). There is no fallback: a stop outside a controller step is refused. This departs from Spec A row 11's 'LSO keeps the launch argv, log rotation and health probing only': LlamaServerOps keeps its start/stop lifecycle through ChildControl; moving it into the controller is a named follow-up.",
           "label": "agent choice"
@@ -103,7 +103,7 @@ before and after; the gate's "does not show a repair" note is expected for prese
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "Deciding the chat controller design of item 5 (Spec A step 11) end to end within the agreed scenarios.",
           "choice": "Spec A step 11, option B as the orchestrator accepted it under this delegation: a llama-server stop's reason originates at the chat controller's step, not at a mapping from the transition reason. Each step kind names one known, specific StopReason (ACTIVATE, APPLY, PREPARE and DETACH RECONFIGURE; DEACTIVATE and PREPARED_RETIRE DEACTIVATE; PREPARED_ABORT ROLLBACK; VDU_ENTER and VDU_EXIT themselves; RECOVER CRASH_RECOVERY; SELF_TEST, SELF_TEST_RUN and SELF_TEST_END SELF_TEST; RESIDENCY_UNLOAD RESIDENCY_PRESSURE; DEVICE_LOST DEVICE_LOST; RESUME_PROBE TIMEOUT), stopped NOW and requested by chat-controller; a reconfiguring step whose model file changes stops with MODEL_SWITCH; sub-events a step handles itself keep their own reason (ROLLBACK, TIMEOUT, CRASH_RECOVERY, DEVICE_LOST). There is no fallback: a stop outside a controller step is refused. This departs from Spec A row 11's 'LSO keeps the launch argv, log rotation and health probing only': LlamaServerOps keeps its start/stop lifecycle through ChildControl; moving it into the controller is a named follow-up.",
           "label": "agent choice"

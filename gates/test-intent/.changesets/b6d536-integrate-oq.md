@@ -8,7 +8,7 @@ author-session: codex-b29-integrate-oq-20261008
 # Integration writer checks
 
 Q2 already uses the shared addressed shell writer. Source contracts follow that existing design.
-Historical one-quit legacy expectations are superseded by the owner Q2 ruling in the original changeset; the corresponding stale evidence is regenerated using the repository runner. No acceptance record is added.
+Historical one-quit legacy expectations are superseded by the Q2 ruling of the 2026-10-08 integration brief recorded in the original changeset (orchestrator wording under the owner's end-to-end delegation, not the owner's words); the corresponding stale evidence is regenerated using the repository runner. No acceptance record is added.
 
 ```json
 {
@@ -25,9 +25,13 @@ Historical one-quit legacy expectations are superseded by the owner Q2 ruling in
       "whatMoved": "The old three Rust writer source checks now inspect the production shared ShellActuator, host admission and the graphical/conformance callers. Identity equality, pre-spawn environment installation and fresh UUID nonce assertions remain explicit. The relocated writer oracle is shared and each caller is separately checked; no duplicate legacy writer is accepted. Existing Rust files are unchanged from 9e8c7fae2.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261005-b6d536 user turn 2026-10-08 integration builder brief",
-          "quote": "If the newer shell already addresses its requests, keep its mechanism and drop the duplicate."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "If the newer shell already addresses its requests, keep its mechanism and drop the duplicate.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2026-10-08 integration builder brief'; the text does not appear in the owner's turns of session 886833dd"
         }
       ]
     }

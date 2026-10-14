@@ -28,14 +28,22 @@ acceptance belongs to the verifier or orchestrator.
       "behaviour": "Expired or cancelled completions waiting for chat actually exit and release their owner before chat exits. Status remains available when search and chat exhaust client work admission; simultaneous status reads retain typed bounded back-pressure. Native MCP status uses independent observation admission. Deferred publication lets a watcher finish its serving read before taking publication locks, and transfers same-queue admission without draining an accepted root scan. Native generation cutovers still drain that scan.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task b58 request",
-          "quote": "Fix it at the cause so that a scripted agent within the documented client concurrency gets answers (semantic or keyword with a reason) within its deadline, and a client beyond it gets a typed, documented refusal; an MCP status read is never refused because searches are in flight."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Fix it at the cause so that a scripted agent within the documented client concurrency gets answers (semantic or keyword with a reason) within its deadline, and a client beyond it gets a typed, documented refusal; an MCP status read is never refused because searches are in flight.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task b58 request'; the text does not appear in the owner's turns of session 886833dd"
         },
         {
-          "kind": "owner-words",
-          "location": "task b58 request",
-          "quote": "Reproduce the cold restart on a large corpus and find the cause of the watcher handoff timeout and the repeated encoder-owner recovery."
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Reproduce the cold restart on a large corpus and find the cause of the watcher handoff timeout and the repeated encoder-owner recovery.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task b58 request'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "newChecks": [

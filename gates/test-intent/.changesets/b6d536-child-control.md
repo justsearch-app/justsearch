@@ -56,7 +56,7 @@ the classes and the manifest field it exercises do not exist there.
         {
           "kind": "delegated-choice",
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for items 5 and 6",
           "choice": "The intent is appended before the terminate on the caller's thread; the exit class is decided by whether an intent preceded an exit we caused, never by the exit code. A child-exit records the intent's stop mode, and an escalation is its own stop-escalate record. Terminate is tried twice with a 5 s wait each before SURVIVED. The GPU poll samples every 250 ms for at most 5 s.",
           "label": "agent choice"

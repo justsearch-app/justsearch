@@ -21,9 +21,13 @@ This repair implements the supplied builder brief. Fresh detached evidence uses 
       "behaviour": "An actual parser and Engine recorded-unit path index a large file while its root is watched. An uninterrupted control persists 5,557 chunks. A real child JVM commits at mutation 1,000 and exits 1 during the recorded attempt; durable RUNNING parent and child replay once after restart to COMPLETE only with all declared chunks, unique IDs and ordinals, one DONE job and no failed units. Real Lucene timestamp admission rejects missing rows, duplicate ordinals, wrong content revisions and wrong totals. The new checks fail by assertion on 1e333857b and 9e8c7fae2; separate f648453b5 evidence identifies the earlier behavior and any compatibility scaffolding.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "A unit must never be COMPLETE while its declared chunk total is not persisted.",
-          "location": "task t-20261005-b6d536 request: batch-1 repair builder brief, 2026-10-09"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "A unit must never be COMPLETE while its declared chunk total is not persisted.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: batch-1 repair builder brief, 2026-10-09'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "repaired": true,
@@ -41,9 +45,13 @@ This repair implements the supplied builder brief. Fresh detached evidence uses 
       "behaviour": "The actual CapabilityHealthBridge subscribes to the real component registry and writes ConditionStore: after model_load_failed, READY with a null reason clears inference.capability. The baseline retains the condition and fails by assertion.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Recovery must clear the condition.",
-          "location": "task t-20261005-b6d536 request: batch-1 repair builder brief, 2026-10-09"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Recovery must clear the condition.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: batch-1 repair builder brief, 2026-10-09'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "repaired": true,
@@ -63,9 +71,13 @@ This repair implements the supplied builder brief. Fresh detached evidence uses 
       "behaviour": "Lease selection preserves CPU recourse trace detail but cannot publish CPU-served status. Two real NativeSessionHandle deadline misses project through WorkerHealthService into the real status assembler without query_on_cpu; one successful CPU leg then earns query_on_cpu. The worker search miss retains its fallback reason and leaves the process success marker unchanged. A native lease acquired without running leaves the marker unchanged. Baseline checks fail by assertion; successful CPU worker and status cases are preservation checks in the full suites. Changed intent of the earlier worker health timestamp case: acquisition alone leaves the success marker unchanged, then an actual successful CPU run and the encoding notification publish the timestamp through the real WorkerHealthService. The timestamp range assertion is retained after that success.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Only a successful CPU leg may mark searches as served on the CPU; a miss keeps its fallback reason and does not.",
-          "location": "task t-20261005-b6d536 request: batch-1 repair builder brief, 2026-10-09"
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.",
+          "choice": "Only a successful CPU leg may mark searches as served on the CPU; a miss keeps its fallback reason and does not.",
+          "label": "agent choice",
+          "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: batch-1 repair builder brief, 2026-10-09'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
       "repaired": true,
