@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T16:52:02.285Z",
-  "revision": "be59f4664efc7c8d0fdf4ae947940901d89aedb0",
-  "tree": "565c612b688938f3f71f7d32317cacd26eab04cc",
+  "createdAt": "2026-10-14T15:32:11.365Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "d2a6aa090ce087ace6b8b84f846b2079b562432e",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --tests \"io.justsearch.ui.api.IndependentObserverHttpTest\" --tests \"io.justsearch.ui.api.IndependentUiFeedsTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 28846
+      "durationMs": 9875
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4613d74611fd6c9748fc1f243db7867d5450cd1d9ddb03cd90694b777cdd27fb",
+      "contentDigest": "sha256:5f96bd3da5bb76cfb1c7fd92f4b8897444241fdc48883684b9cf03764d39c4a3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -127,12 +127,13 @@
     "ref": "be59f4664",
     "revision": "be59f4664efc7c8d0fdf4ae947940901d89aedb0",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --tests \"io.justsearch.ui.api.IndependentObserverHttpTest\" --tests \"io.justsearch.ui.api.IndependentUiFeedsTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 74612
+        "durationMs": 26935
       }
     ],
     "checks": [
@@ -153,5 +154,5 @@
       }
     ]
   },
-  "digest": "sha256:7ef6e6fe33d0f90532fd589625dcbf8d462f4bc1919804e7aa843b5921c73cfc"
+  "digest": "sha256:fc13b0601403dee53fa6546b331e87d98ad7c4004c8b2da00aae743ff8635d12"
 }
