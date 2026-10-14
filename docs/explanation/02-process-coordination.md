@@ -95,6 +95,31 @@ the Head and index close, and retains process resources until all stateful owner
 updater reads the named `index-half` outcome rather than a positional step. (`modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java:1643-1819`,
 `modules/app-engine/src/main/java/io/justsearch/app/engine/EngineShutdownSequence.java:59-65`)
 
+## Device-loss refusal and diagnostic bounds
+
+A device-loss restart checks the actual ledger's writability without publishing an exit intent.
+The committing DEVICE_LOST record must be durable before chat becomes terminal or the restart
+hand-off is published. If that write fails, the Engine stays running, chat is latched with
+`device_lost_limit` for an operator retry, and exit-ledger health plus
+`device_lost_restart_commit_failed` explain the refusal. No restart budget is spent. A later quit
+or upgrade may record its own intent after storage recovers.
+The Engine's recovery adapter forwards both commit callbacks to that recorder. An adapter that
+does not implement the commit handshake refuses with
+`device_lost_restart_commit_handshake_unavailable`, leaving chat available for a retry.
+
+Diagnostics include at most 8 MiB of redacted exit-ledger records across both families and their
+retained files, selecting file suffixes in descending modification-time order. The export states
+the number of omitted source bytes in `runtime/exit-ledger/truncation.txt`; collection failures
+remain separately visible. Path redaction still applies to every selected record.
+Malformed UTF-8 lines and an unterminated final line are skipped individually, preserving the
+complete records around them. `runtime/exit-ledger/skipped-lines.txt` states how many such lines
+were skipped in the bounded suffixes inspected for export; they also count as omitted source bytes.
+
+Named resume limit: on a single-slot server (`slots=1`, including VDU mode), a generation that
+produces no token for the 10-second probe timeout is probed and may be relaunched. This includes
+long prompt processing and non-streaming replies. That behavior is unchanged; fresh tokens from a
+streaming generation prove health and avoid queuing a probe behind its occupied slot.
+
 ## Historical appendix: the former Head/Worker transport
 
 Before ADR-0049, the application half and index half were separate JVMs. That historical

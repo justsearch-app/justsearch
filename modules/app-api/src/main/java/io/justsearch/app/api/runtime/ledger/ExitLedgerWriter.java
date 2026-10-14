@@ -181,17 +181,37 @@ public final class ExitLedgerWriter {
       } catch (IOException e) {
         noteGap(LedgerGapReason.WRITE_FAILED, now);
         healthy = false;
+        ExitLedgerHealth.failed(this, ledgerDir, now, e);
         return false;
       }
       if (line.gap() != null) pendingGaps.remove(line.gap());
     }
     healthy = true;
+    ExitLedgerHealth.recovered(this);
     return true;
   }
 
   /** Whether the last write succeeded and no gap is waiting to be written. */
   public boolean healthy() {
     return healthy;
+  }
+
+  /**
+   * Forces a blank delimiter to the actual ledger file to check reservation storage. Blank lines
+   * are ignored by every v1 reader: this proves write readiness without publishing an exit intent.
+   * A successful probe does not clear gaps; the next real record must durably flush them first.
+   */
+  public synchronized boolean probeWritable() {
+    try {
+      writeLine(family.current(ledgerDir), new byte[] {'\n'});
+      return true;
+    } catch (IOException failure) {
+      Instant now = clock.instant();
+      noteGap(LedgerGapReason.WRITE_FAILED, now);
+      healthy = false;
+      ExitLedgerHealth.failed(this, ledgerDir, now, failure);
+      return false;
+    }
   }
 
   private void rotateIfOverCap(Path current, int recordBytes, Instant now) {

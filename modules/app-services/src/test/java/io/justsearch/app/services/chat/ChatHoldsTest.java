@@ -70,6 +70,53 @@ final class ChatHoldsTest {
     return controller(ChatActuationRouter.DRAIN_BOUND);
   }
 
+  @Test
+  void equivalentRunningHoldsWaitForTheActualStart() throws Exception {
+    equivalentHolds(false);
+  }
+
+  @Test
+  void equivalentRunningHoldsBothObserveStartFailure() throws Exception {
+    equivalentHolds(true);
+  }
+
+  private void equivalentHolds(boolean fail) throws Exception {
+    var c = controller();
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    var blocker = CompletableFuture.runAsync(() -> {
+      try { c.route(ChatActuation.of(ChatActuation.Kind.RESUME_PROBE, ignored -> {
+        entered.countDown(); release.await(); return null;
+      })); } catch (Exception e) { throw new java.util.concurrent.CompletionException(e); }
+    });
+    assertTrue(entered.await(5, TimeUnit.SECONDS));
+    actuator.failStart = fail;
+    var first = CompletableFuture.supplyAsync(() -> takeRunning(c, "first"));
+    long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (c.desiredInputs().version() < 2 && System.nanoTime() < end) Thread.sleep(5);
+    var second = CompletableFuture.supplyAsync(() -> takeRunning(c, "second"));
+    try {
+      end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (c.desiredInputs().version() < 3 && System.nanoTime() < end) Thread.sleep(5);
+      Thread.sleep(100);
+      assertFalse(first.isDone(), "supersession is not startup completion");
+      assertFalse(second.isDone());
+    } finally { release.countDown(); }
+    blocker.get(5, TimeUnit.SECONDS);
+    if (fail) {
+      assertThrows(ExecutionException.class, () -> first.get(5, TimeUnit.SECONDS));
+      assertThrows(ExecutionException.class, () -> second.get(5, TimeUnit.SECONDS));
+    } else {
+      first.get(5, TimeUnit.SECONDS).close(); second.get(5, TimeUnit.SECONDS).close();
+      assertTrue(actuator.running.get());
+    }
+  }
+
+  private static io.justsearch.app.api.chat.Hold takeRunning(ChatServerControllerImpl c, String owner) {
+    try { return c.holdRunning(owner); }
+    catch (ChatRefusal e) { throw new java.util.concurrent.CompletionException(e); }
+  }
+
   // ==================== admission: every hold kind in every state ====================
 
   @Test
@@ -393,6 +440,7 @@ final class ChatHoldsTest {
     final AtomicBoolean failVduEnter = new AtomicBoolean();
     final AtomicBoolean lockSeenOnControllerThread = new AtomicBoolean();
     final CountDownLatch drainEntered = new CountDownLatch(1);
+    volatile boolean failStart;
     volatile FailedCode latch;
     volatile Object forbiddenLock;
     private volatile boolean selfTestHeld;
@@ -447,6 +495,8 @@ final class ChatHoldsTest {
               throw new ModeTransitionException(
                   ModeTransitionException.Reason.ALREADY_TRANSITIONING, "self-test");
             }
+            if (failStart && activation.active()) throw new ModeTransitionException(
+                ModeTransitionException.Reason.ONLINE_START_FAILED, "injected start failure");
             running.set(activation.active());
             log.add((activation.active() ? "up:" : "down:") + activation.reason());
             return null;

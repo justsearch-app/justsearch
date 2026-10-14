@@ -52,6 +52,42 @@ final class DiagnosticsServiceImplRedactionTest {
   }
 
   @Test
+  void zipExplainsUnavailableExitEvidence() throws Exception {
+    Files.createDirectories(tempHome.resolve("runtime/exit-ledger/children.v1.jsonl"));
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile contents = new ZipFile(zip.toFile())) {
+      var entry = contents.getEntry("runtime/exit-ledger/collection-failures.txt");
+      assertNotNull(entry, "unavailable ledger evidence must be explained in the export");
+      String text = new String(contents.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
+      assertTrue(text.contains("children.v1.jsonl"));
+    }
+  }
+
+  @Test
+  void zipIncludesRetainedExitEvidenceAndLossRecords() throws Exception {
+    Path ledger = Files.createDirectories(tempHome.resolve("runtime/exit-ledger"));
+    for (String name : java.util.List.of("engine.v1.jsonl", "children.v1.jsonl",
+        "children.v1.1.jsonl", "engine.v1.2.jsonl", "children.v1.lost.jsonl")) {
+      Files.writeString(ledger.resolve(name), "{\"exitClass\":\"UNEXPECTED\",\"pid\":123,"
+          + "\"creationFileTime\":\"134000000000000000\",\"path\":\"/home/test/private\"}\n");
+    }
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile contents = new ZipFile(zip.toFile())) {
+      for (String name : java.util.List.of("engine.v1.jsonl", "children.v1.jsonl",
+          "children.v1.1.jsonl", "engine.v1.2.jsonl", "children.v1.lost.jsonl")) {
+        var entry = contents.getEntry("runtime/exit-ledger/" + name);
+        assertNotNull(entry, "authoritative exit evidence: " + name);
+        String body = new String(contents.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(body.contains("134000000000000000"));
+        assertTrue(body.contains("UNEXPECTED"));
+        assertFalse(body.contains("/home/test/private"));
+      }
+    }
+  }
+
+  @Test
   void zipRedactionRemovesWindowsPathsContainingSpaces() throws Exception {
     String input =
         "{\"path\":\"C:\\\\Users\\\\Alice Smith\\\\Private, Folder\\\\secret.txt\","

@@ -749,6 +749,9 @@ final class OnlineModeOps {
                                   }
                                 }
                                 JsonNode delta = node.path("choices").path(0).path("delta");
+                                if (io.justsearch.app.inference.chat.CompletionTokenProgress.hasToken(node)) {
+                                  task.tokenProduced();
+                                }
 
                                 String content = delta.path("content").asText("");
                                 if (!content.isEmpty()) {
@@ -1154,6 +1157,9 @@ final class OnlineModeOps {
                                 }
 
                                 JsonNode delta = node.path("choices").path(0).path("delta");
+                                if (io.justsearch.app.inference.chat.CompletionTokenProgress.hasToken(node)) {
+                                  task.tokenProduced();
+                                }
 
                                 // Text content
                                 String content = delta.path("content").asText("");
@@ -1266,6 +1272,11 @@ final class OnlineModeOps {
         throw new IllegalStateException("generation already queued");
       }
       if (closed.get()) close();
+    }
+
+    private void tokenProduced() {
+      var queued = ticket.get();
+      if (queued != null) queued.tokenProduced();
     }
 
     private GenerationLease admit() {

@@ -1,0 +1,128 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:44:27.935Z",
+  "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+  "tree": "b45857ffcfc9af4a25f76c7ebb98f7e446040134",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aQuitWinningAfterReservationDoesNotSpendTheRestartBudget\" --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount\" --tests \"io.justsearch.ui.HeadlessAppWitnessFailureTest.aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit\" --tests \"io.justsearch.ui.api.OpenAiCompatTokenProgressTest.proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20200
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aQuitWinningAfterReservationDoesNotSpendTheRestartBudget",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5fe94bbc2aabc72828c7b5b6f609e5920fbcbabedda0984109635424b4ab16dc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQuitWinningAfterReservationDoesNotSpendTheRestartBudget(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5fe94bbc2aabc72828c7b5b6f609e5920fbcbabedda0984109635424b4ab16dc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureTest.java#aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6765fea8ceebe03a5a2e38d785f677c18127851cf0bf6814c5e55da3fad9ea21",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatTokenProgressTest.java#proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatTokenProgressTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ce12c022eafbce4f3b1fd8e2547acffb77f3ca307b65c19258bfa07b87eb0948",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "32d00dda8",
+    "revision": "32d00dda8bf9f5f03951fc6f6618a9f1380e852c",
+    "overlays": [
+      "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureProbe.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aQuitWinningAfterReservationDoesNotSpendTheRestartBudget\" --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount\" --tests \"io.justsearch.ui.HeadlessAppWitnessFailureTest.aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit\" --tests \"io.justsearch.ui.api.OpenAiCompatTokenProgressTest.proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 47762
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aQuitWinningAfterReservationDoesNotSpendTheRestartBudget",
+        "classification": "assertion",
+        "detail": "aQuitWinningAfterReservationDoesNotSpendTheRestartBudget(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unused DEVICE_LOST reservation is not a restart ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount",
+        "classification": "assertion",
+        "detail": "aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the real main binding must permit a device-loss restart before writer readiness ==> Unexpected exception thrown: java.lang.reflect.InvocationTargetException"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureTest.java#aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit",
+        "classification": "assertion",
+        "detail": "aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: main finally must catch the witness refusal and reach System.exit, rather than its uncaught halt: OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended&#10;JUSTSEARCH_ENGINE_STARTUP_FAILU"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatTokenProgressTest.java#proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas",
+        "classification": "assertion",
+        "detail": "proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a proxied reasoning token is server health evidence ==> expected: <1> but was: <0>"
+      }
+    ]
+  },
+  "digest": "sha256:c5fda09773430a3731e43df1dba3c2a15036e49b3f31242f3dc350d74c476ba8"
+}

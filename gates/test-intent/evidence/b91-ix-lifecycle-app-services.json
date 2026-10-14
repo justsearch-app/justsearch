@@ -1,0 +1,146 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T08:04:40.293Z",
+  "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+  "tree": "0d574542db89b8606a03d3f60dad357689bd0d16",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.aReservationFailureLatchesChatInsteadOfRequestingRestart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsWaitForTheActualStart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsBothObserveStartFailure\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipIncludesRetainedExitEvidenceAndLossRecords\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipExplainsUnavailableExitEvidence\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 30416
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#aReservationFailureLatchesChatInsteadOfRequestingRestart",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReservationFailureLatchesChatInsteadOfRequestingRestart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#equivalentRunningHoldsWaitForTheActualStart",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac1c4e1ce9b9f79d9848c79c8ca0c5bb341d8d02c1b3d5790c5a9fdd65851a03",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "equivalentRunningHoldsWaitForTheActualStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#equivalentRunningHoldsBothObserveStartFailure",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac1c4e1ce9b9f79d9848c79c8ca0c5bb341d8d02c1b3d5790c5a9fdd65851a03",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "equivalentRunningHoldsBothObserveStartFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplRedactionTest.java#zipIncludesRetainedExitEvidenceAndLossRecords",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplRedactionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b647945683692d6074dd508f8a2d4707f9d60f8bebe6bf5ff936f91c98ad7d56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "zipIncludesRetainedExitEvidenceAndLossRecords()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplRedactionTest.java#zipExplainsUnavailableExitEvidence",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplRedactionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b647945683692d6074dd508f8a2d4707f9d60f8bebe6bf5ff936f91c98ad7d56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "zipExplainsUnavailableExitEvidence()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.aReservationFailureLatchesChatInsteadOfRequestingRestart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsWaitForTheActualStart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsBothObserveStartFailure\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipIncludesRetainedExitEvidenceAndLossRecords\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipExplainsUnavailableExitEvidence\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 260797
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#aReservationFailureLatchesChatInsteadOfRequestingRestart",
+        "classification": "assertion",
+        "detail": "aReservationFailureLatchesChatInsteadOfRequestingRestart(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: failed persistence must enter the existing recovery-failure state ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#equivalentRunningHoldsWaitForTheActualStart",
+        "classification": "assertion",
+        "detail": "equivalentRunningHoldsWaitForTheActualStart(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: supersession is not startup completion ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#equivalentRunningHoldsBothObserveStartFailure",
+        "classification": "assertion",
+        "detail": "equivalentRunningHoldsBothObserveStartFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: supersession is not startup completion ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplRedactionTest.java#zipIncludesRetainedExitEvidenceAndLossRecords",
+        "classification": "assertion",
+        "detail": "zipIncludesRetainedExitEvidenceAndLossRecords(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: authoritative exit evidence: engine.v1.jsonl ==> expected: not <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplRedactionTest.java#zipExplainsUnavailableExitEvidence",
+        "classification": "assertion",
+        "detail": "zipExplainsUnavailableExitEvidence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unavailable ledger evidence must be explained in the export ==> expected: not <null>"
+      }
+    ]
+  },
+  "digest": "sha256:096c552aaf6c90c91487df7d79dd40d641e49a1d0548ab2144c8fc29d9b01d0e"
+}

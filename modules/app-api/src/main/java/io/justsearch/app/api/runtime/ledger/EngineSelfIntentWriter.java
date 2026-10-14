@@ -47,6 +47,18 @@ public final class EngineSelfIntentWriter {
    * @return whether the record is durable
    */
   public boolean record(StopReason reason, Optional<StopDetail> detail, int expectedCode) {
+    return writer.append(LedgerRecordType.ENGINE_SELF_INTENT, intentFields(reason, detail, expectedCode));
+  }
+
+  /**
+   * Proves storage readiness before chat becomes terminal, without an exit intent that a supervisor
+   * could mistake for a committed restart. Only a committed DEVICE_LOST record spends the budget.
+   */
+  public boolean reserveDeviceLostRestart() {
+    return writer.probeWritable();
+  }
+
+  private Map<String, Object> intentFields(StopReason reason, Optional<StopDetail> detail, int expectedCode) {
     Objects.requireNonNull(reason, "reason");
     Objects.requireNonNull(detail, "detail");
     if (!reason.endsEngine()) {
@@ -64,7 +76,7 @@ public final class EngineSelfIntentWriter {
     fields.put("reason", reason);
     fields.put("detail", detail);
     fields.put("expectedCode", expectedCode);
-    return writer.append(LedgerRecordType.ENGINE_SELF_INTENT, fields);
+    return fields;
   }
 
   /** Whether every self-intent this incarnation wrote is durable. */

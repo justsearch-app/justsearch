@@ -17,10 +17,11 @@ import java.util.concurrent.TimeUnit;
 
 /** Owner receipts for finite helpers. A witness proves membership; it never supplies intent. */
 public final class OwnedHelper extends Process {
-  private record Recorder(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory) {
+  private record Recorder(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory, boolean nestedContainment) {
     boolean append(LedgerRecordType type, Map<String, Object> fields) {
       fields.put("owner", Map.of("pid", owner.pid(), "creationFileTime", owner.creationFileTime(),
           "instanceId", owner.instanceId()));
+      if (nestedContainment) fields.put("ownerContainment", "KILL_ON_CLOSE");
       fields.put("incarnation", RuntimeManifest.IncarnationInfo.parse(
           SystemAccess.rawEnvVar(RuntimeManifest.IncarnationInfo.ENVIRONMENT)));
       return sink.append(type, fields);
@@ -31,6 +32,7 @@ public final class OwnedHelper extends Process {
   private record Pending(LedgerRecordType type, Map<String, Object> fields) {}
   private static final java.util.ArrayDeque<Pending> beforeRecorder = new java.util.ArrayDeque<>();
   private static int pendingLost;
+  private static Instant pendingLostSince;
   private final Process process;
   private final ProcessTerminator terminator;
   private final ProcessTerminator.OsProcess held;
@@ -51,15 +53,17 @@ public final class OwnedHelper extends Process {
   }
 
   public static synchronized void recordTo(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory) {
-    recorder = new Recorder(sink, owner, directory);
+    recorder = new Recorder(sink, owner, directory, false);
     while (!beforeRecorder.isEmpty()) {
       Pending pending = beforeRecorder.removeFirst();
       recorder.append(pending.type(), pending.fields());
     }
     if (pendingLost > 0) {
       recorder.append(LedgerRecordType.LEDGER_GAP, new LinkedHashMap<>(Map.of(
-          "reason", "EVIDENCE_LOST", "count", pendingLost, "source", "helper_boot_buffer")));
+          "reason", "EVIDENCE_LOST", "count", pendingLost, "since", pendingLostSince,
+          "source", "helper_boot_buffer")));
       pendingLost = 0;
+      pendingLostSince = null;
     }
   }
 
@@ -71,6 +75,11 @@ public final class OwnedHelper extends Process {
 
   /** A managed parser owns its helpers; its parent Engine remains the sole rotating writer. */
   public static void recordChild(String[] args) {
+    recordChild(args, false);
+  }
+
+  /** Called only after the parser established its own kill-on-close boundary. */
+  public static synchronized void recordChild(String[] args, boolean nestedContainment) {
     for (String arg : args) {
       if (!arg.startsWith("--helper-ledger=")) continue;
       java.nio.file.Path dir = java.nio.file.Path.of(arg.substring("--helper-ledger=".length()));
@@ -83,12 +92,13 @@ public final class OwnedHelper extends Process {
               self.info().startInstant().orElse(Instant.now())), java.time.Clock.systemUTC());
       recordTo(LedgerSink.of(writer), new EngineIdentity(self.pid(),
           ProcessTerminator.forCurrentOs().creationFileTime(self.pid()), "parser-" + UUID.randomUUID()), dir);
+      recorder = new Recorder(recorder.sink(), recorder.owner(), dir, nestedContainment);
       return;
     }
   }
 
   public static Process start(ProcessBuilder builder, String purpose) throws IOException {
-    return new OwnedHelper(builder.start(), purpose);
+    return acquire(builder.start(), purpose);
   }
 
   /** Also usable at a caller-owned spawn seam; never accepts a PID or a ProcessHandle. */
@@ -96,7 +106,61 @@ public final class OwnedHelper extends Process {
     if (process instanceof OwnedHelper) return process;
     try { if (process.pid() <= 0) return process; process.toHandle(); }
     catch (UnsupportedOperationException fake) { return process; }
-    return new OwnedHelper(process, purpose);
+    return acquire(process, purpose);
+  }
+
+  private static final java.util.Set<Process> rollbackSurvivors =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /** Failed admission retains the spawn object until its death is confirmed. */
+  private static Process acquire(Process process, String purpose) throws IOException {
+    try { return new OwnedHelper(process, purpose); }
+    catch (IOException | RuntimeException failure) {
+      Instant failureAt = Instant.now();
+      boolean interrupted = Thread.interrupted();
+      boolean ended = false;
+      try {
+        process.destroyForcibly(); // original spawn object, never a fresh PID lookup
+        ended = process.waitFor(2, TimeUnit.SECONDS);
+      } catch (InterruptedException cancelled) {
+        interrupted = true;
+        failure.addSuppressed(cancelled);
+      } catch (RuntimeException cleanup) {
+        failure.addSuppressed(cleanup);
+      } finally {
+        if (interrupted) Thread.currentThread().interrupt();
+      }
+      if (!ended) {
+        rollbackSurvivors.add(process);
+        try { process.onExit().thenRun(() -> rollbackSurvivors.remove(process)); }
+        catch (RuntimeException watching) { failure.addSuppressed(watching); }
+      }
+      Map<String, Object> fields = new LinkedHashMap<>();
+      fields.put("reason", "WRITE_FAILED");
+      fields.put("source", "helper_ownership_failed");
+      fields.put("since", failureAt);
+      fields.put("purpose", purpose);
+      fields.put("pid", process.pid());
+      fields.put("count", 1);
+      fields.put("surviving", !ended);
+      fields.put("code", ended ? process.exitValue() : null);
+      boolean recordingInterrupted = Thread.interrupted();
+      try { record(null, LedgerRecordType.LEDGER_GAP, fields); }
+      catch (RuntimeException recording) { failure.addSuppressed(recording); }
+      finally { if (recordingInterrupted) Thread.currentThread().interrupt(); }
+      throw new OwnershipFailure(purpose, failure, ended ? null : process);
+    }
+  }
+
+  /** The caller can inspect/retry the exact survivor; a global owner also retains it until exit. */
+  public static final class OwnershipFailure extends IOException {
+    private final Process survivor;
+    private OwnershipFailure(String purpose, Throwable cause, Process survivor) {
+      super("Could not own helper (" + purpose + "); rollback "
+          + (survivor == null ? "confirmed exit" : "did not confirm exit"), cause);
+      this.survivor = survivor;
+    }
+    public java.util.Optional<Process> survivor() { return java.util.Optional.ofNullable(survivor); }
   }
 
   private OwnedHelper(Process process, String purpose) throws IOException {
@@ -105,16 +169,18 @@ public final class OwnedHelper extends Process {
     records = recorder;
     terminator = ProcessTerminator.forCurrentOs();
     held = terminator.open(process);
-    birth = held.creationFileTime().orElse(null);
-    creatorBirth = terminator.creationFileTime(ProcessHandle.current().pid()).orElse(null);
-    Map<String, Object> fields = identity();
-    fields.put("purpose", purpose);
-    append(LedgerRecordType.HELPER_START, fields);
-    process.onExit().thenRun(() -> {
-      synchronized (this) {
-        complete(false);
-      }
-    });
+    try {
+      birth = held.creationFileTime().orElse(null);
+      creatorBirth = terminator.creationFileTime(ProcessHandle.current().pid()).orElse(null);
+      Map<String, Object> fields = identity();
+      fields.put("purpose", purpose);
+      append(LedgerRecordType.HELPER_START, fields);
+      process.onExit().thenRun(() -> {
+        synchronized (this) {
+          complete(false);
+        }
+      });
+    } catch (RuntimeException failure) { held.close(); throw failure; }
   }
 
   /** NTSTATUS severity ERROR, including access violation; a stop never excuses a real crash. */
@@ -194,7 +260,9 @@ public final class OwnedHelper extends Process {
     Recorder target = selected == null ? recorder : selected;
     if (target != null) target.append(type, fields);
     else if (beforeRecorder.size() < 4096) beforeRecorder.addLast(new Pending(type, fields));
-    else pendingLost++;
+    else {
+      if (pendingLost++ == 0) pendingLostSince = Instant.now();
+    }
   }
 
   /** Third-party helper admission is limited to the declared image and this closed time window. */

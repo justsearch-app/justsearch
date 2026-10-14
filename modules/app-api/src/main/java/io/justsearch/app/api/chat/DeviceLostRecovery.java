@@ -26,6 +26,20 @@ public interface DeviceLostRecovery {
    */
   void requestRestart();
 
+  /**
+   * Requests the restart with a commit handshake. Only durable acceptance makes chat terminal;
+   * refusal leaves chat latched and available for an operator retry. An implementation must
+   * override this form to acknowledge its durable commit. A legacy adapter cannot prove that
+   * commit, so the default refuses without ending chat or dispatching a plain request.
+   */
+  default void requestRestart(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+    refused.accept(new IllegalStateException("device_lost_restart_commit_handshake_unavailable"));
+  }
+
+  /** Durably reserves the admitted restart before chat commits to terminal shutdown. */
+  default void reserveRestart() throws IOException {}
+
+
   /** No restart path: every device loss fails closed. */
   DeviceLostRecovery UNAVAILABLE =
       new DeviceLostRecovery() {

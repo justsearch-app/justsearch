@@ -153,6 +153,7 @@ public final class EngineShutdownSequence {
   private final AtomicBoolean selfIntentRecorded = new AtomicBoolean();
   private final AtomicReference<Result> result = new AtomicReference<>();
   private final Object exitAuthority = new Object();
+  private boolean selfIntentDurable;
   private boolean exitRequested;
   private boolean fatalExitRequested;
   private boolean exitSelected;
@@ -224,14 +225,17 @@ public final class EngineShutdownSequence {
         EngineExit.ESCALATED_RESTART);
   }
 
-  private void recordSelfIntent(SelfIntentRecord intent) {
-    if (!selfIntentRecorded.compareAndSet(false, true)) return;
+  private synchronized boolean recordSelfIntent(SelfIntentRecord intent) {
+    if (!selfIntentRecorded.compareAndSet(false, true)) return selfIntentDurable;
     try {
       selfIntent.record(intent.reason(), intent.detail(), intent.expectedCode());
+      selfIntentDurable = true;
     } catch (Exception e) {
-      // The intent is evidence, never a gate: the exit proceeds and is classified without it.
+      // Ordinary quit still proceeds. Device-loss restart requires durable budget accounting.
+      selfIntentRecorded.set(false);
       log.warn("Could not record the Engine's self-intent: {}", e.toString());
     }
+    return selfIntentDurable;
   }
 
   /**
@@ -377,14 +381,26 @@ public final class EngineShutdownSequence {
    * the requested-restart code, so the supervisor starts a new Engine that probes the device again.
    */
   public void runAndExitDeviceLost() {
-    if (!claimExit(false)) {
-      return;
+    runAndExitDeviceLost(() -> {});
+  }
+
+  /** Commits before the hand-off/chat terminal callback; a failed write leaves exit authority free. */
+  public boolean runAndExitDeviceLost(Runnable beforeClose) {
+    Objects.requireNonNull(beforeClose, "beforeClose");
+    synchronized (exitAuthority) {
+      if (exitRequested) return false;
+      if (!recordSelfIntent(deviceLostSelfIntent())) {
+        log.warn("Device-loss restart refused: device_lost_restart_commit_failed");
+        return false;
+      }
+      if (!claimExit(false)) return false;
     }
-    recordSelfIntent(deviceLostSelfIntent());
+    beforeClose.run();
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.REQUESTED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
     terminate(shutdown, selectExitCode(completedCode));
+    return true;
   }
 
   /**

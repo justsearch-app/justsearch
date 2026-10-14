@@ -34,6 +34,24 @@ import org.junit.jupiter.api.io.TempDir;
 final class HeadlessAppDeviceLostRestartTest {
 
   @Test
+  void failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart(@TempDir Path dataDir) throws Exception {
+    Path dir = java.nio.file.Files.createDirectories(dataDir.resolve("runtime/exit-ledger"));
+    Path blocked = java.nio.file.Files.createDirectory(dir.resolve("engine.v1.jsonl"));
+    var code = new AtomicInteger(-1);
+    var recorder = HeadlessApp.engineSelfIntent(dataDir, "failed-reservation");
+    var sequence = new EngineShutdownSequence(dataDir, List.of(), code::set, code::set,
+        () -> NativeQuiescence.QUIESCED, result -> {}, recorder);
+    try {
+      try { sequence.runAndExitDeviceLost(); } catch (IllegalStateException refused) { /* refused */ }
+      assertEquals(-1, code.get(), "unwritten DEVICE_LOST must not become an uncounted restart");
+    } finally { java.nio.file.Files.delete(blocked); }
+    var durable = HeadlessApp.engineSelfIntent(dataDir, "durable-reservation");
+    durable.record(StopReason.DEVICE_LOST, Optional.empty(), EngineExit.REQUESTED_RESTART);
+    assertEquals(1, recovery(dataDir, durable, () -> {}).priorRestarts().size(),
+        "reopening the history must count the durable reservation");
+  }
+
+  @Test
   void theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents(@TempDir Path dataDir)
       throws Exception {
     var recorder = HeadlessApp.engineSelfIntent(dataDir, "inst-1");
@@ -41,15 +59,18 @@ final class HeadlessAppDeviceLostRestartTest {
     recorder.record(StopReason.ENGINE_RESTART, Optional.of(StopDetail.HANG), 0);
     recorder.record(StopReason.DEVICE_LOST, Optional.empty(), EngineExit.REQUESTED_RESTART);
 
-    var recovery = HeadlessApp.deviceLostRecovery(dataDir, () -> true, () -> { });
+    var recovery = recovery(dataDir, recorder, () -> { });
     List<Instant> prior = recovery.priorRestarts();
 
     assertEquals(2, prior.size(), prior.toString());
   }
 
   @Test
-  void aFailedSelfIntentWriteFailsTheCountClosed(@TempDir Path dataDir) {
-    var recovery = HeadlessApp.deviceLostRecovery(dataDir, () -> false, () -> { });
+  void aFailedSelfIntentWriteFailsTheCountClosed(@TempDir Path dataDir) throws Exception {
+    var recorder = HeadlessApp.engineSelfIntent(dataDir, "failed-history");
+    java.nio.file.Files.createDirectories(dataDir.resolve("runtime/exit-ledger/engine.v1.jsonl"));
+    recorder.record(StopReason.ENGINE_RESTART, Optional.empty(), EngineExit.REQUESTED_RESTART);
+    var recovery = recovery(dataDir, recorder, () -> { });
 
     assertThrows(IOException.class, recovery::priorRestarts);
   }
@@ -60,12 +81,13 @@ final class HeadlessAppDeviceLostRestartTest {
     List<String> events = Collections.synchronizedList(new ArrayList<>());
     var exitCode = new AtomicInteger(-1);
     var halted = new AtomicBoolean();
+    var recorder = HeadlessApp.engineSelfIntent(dataDir, "inst-1");
     var sequence = new EngineShutdownSequence(dataDir, List.of(
         new EngineShutdownSequence.Step(EngineShutdownSequence.INDEX_HALF_STEP, reason -> {
           events.add("close " + reason.wire());
           return "GRACEFUL";
         })), exitCode::set, exitCode::set, () -> NativeQuiescence.QUIESCED, preliminary -> { },
-        HeadlessApp.engineSelfIntent(dataDir, "inst-1"));
+        recorder);
     Runnable restart = HeadlessApp.deviceLostRestartAction(
         CompletableFuture.completedFuture(sequence),
         reason -> {
@@ -74,7 +96,7 @@ final class HeadlessAppDeviceLostRestartTest {
         },
         code -> halted.set(true),
         Runnable::run);
-    var recovery = HeadlessApp.deviceLostRecovery(dataDir, () -> true, restart);
+    var recovery = recovery(dataDir, recorder, restart);
     assertEquals(List.of(), recovery.priorRestarts());
 
     recovery.requestRestart();
@@ -82,7 +104,23 @@ final class HeadlessAppDeviceLostRestartTest {
     assertEquals(List.of("publish restart", "close restart"), events);
     assertEquals(EngineExit.REQUESTED_RESTART, exitCode.get());
     assertFalse(halted.get(), "no fatal halt");
-    assertEquals(1, HeadlessApp.deviceLostRecovery(dataDir, () -> true, () -> { })
+    assertEquals(1, recovery(dataDir, recorder, () -> { })
         .priorRestarts().size(), "the next incarnation counts this restart");
+  }
+
+  /** Uses production's recorder binding; the fallback runs the same entry point on 61ff9b955. */
+  private static io.justsearch.app.api.chat.DeviceLostRecovery recovery(
+      Path dir, HeadlessApp.LedgerSelfIntent recorder, Runnable restart) throws Exception {
+    java.lang.reflect.Method bind;
+    Object owner;
+    try {
+      bind = HeadlessApp.class.getDeclaredMethod("deviceLostRecovery", Path.class, recorder.getClass(), Runnable.class);
+      owner = recorder;
+    } catch (NoSuchMethodException beforeRecorderBinding) {
+      bind = HeadlessApp.class.getDeclaredMethod("deviceLostRecovery", Path.class, java.util.function.BooleanSupplier.class, Runnable.class);
+      owner = (java.util.function.BooleanSupplier) recorder::healthy;
+    }
+    bind.setAccessible(true);
+    return (io.justsearch.app.api.chat.DeviceLostRecovery) bind.invoke(null, dir, owner, restart);
   }
 }

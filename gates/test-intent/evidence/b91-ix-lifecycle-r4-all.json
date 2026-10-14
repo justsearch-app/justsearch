@@ -1,0 +1,170 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T07:47:14.556Z",
+  "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+  "tree": "e07657f5e0e69d4031acaf58655d90ddf7bd0dd3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.DeviceLostRecoveryHandshakeTest.aLegacyAdapterCannotAcceptBeforeCommit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31060
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.diagnostics.DiagnosticsExitLedgerTornLineTest.exportKeepsCompleteRecordsAroundMalformedAndTornLines\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 42068
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppEngineDeviceLossChainTest.aRefusedCommitThroughEngineRootKeepsChatRetryable\" --tests \"io.justsearch.ui.HeadlessAppEngineDeviceLossChainTest.aCommittedRestartThroughEngineRootCommitsThenEndsChatThenHandsOff\" --tests \"io.justsearch.ui.api.VerifierStatus4Test.olderPendingFailureCannotOverrideQueuedHealthyConversation\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 1,
+      "durationMs": 31264
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/DeviceLostRecoveryHandshakeTest.java#aLegacyAdapterCannotAcceptBeforeCommit",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/DeviceLostRecoveryHandshakeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bf35ec31709af24c94eeb7fafbe624623d3e8b3ab37deec0d73fde2608404acc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLegacyAdapterCannotAcceptBeforeCommit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerTornLineTest.java#exportKeepsCompleteRecordsAroundMalformedAndTornLines",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerTornLineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3a923df40d1554441d1be584d1b2dffd0cf80eadbbbb907226f5754612fceae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exportKeepsCompleteRecordsAroundMalformedAndTornLines(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java#aRefusedCommitThroughEngineRootKeepsChatRetryable",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:62d38623c833b350a339f5d7a4b34ad89e3779c81cf182610153d0fbe1582762",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedCommitThroughEngineRootKeepsChatRetryable(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java#aCommittedRestartThroughEngineRootCommitsThenEndsChatThenHandsOff",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:62d38623c833b350a339f5d7a4b34ad89e3779c81cf182610153d0fbe1582762",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCommittedRestartThroughEngineRootCommitsThenEndsChatThenHandsOff(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java#olderPendingFailureCannotOverrideQueuedHealthyConversation",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0e9adcbb2c04c0a041afc32215ac645ca3f276a76b061747e2e94a9385909b39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "olderPendingFailureCannotOverrideQueuedHealthyConversation()",
+          "status": "failed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c4f2405b4",
+    "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.DeviceLostRecoveryHandshakeTest.aLegacyAdapterCannotAcceptBeforeCommit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 47207
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.diagnostics.DiagnosticsExitLedgerTornLineTest.exportKeepsCompleteRecordsAroundMalformedAndTornLines\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 56055
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppEngineDeviceLossChainTest.aRefusedCommitThroughEngineRootKeepsChatRetryable\" --tests \"io.justsearch.ui.HeadlessAppEngineDeviceLossChainTest.aCommittedRestartThroughEngineRootCommitsThenEndsChatThenHandsOff\" --tests \"io.justsearch.ui.api.VerifierStatus4Test.olderPendingFailureCannotOverrideQueuedHealthyConversation\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 37204
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/DeviceLostRecoveryHandshakeTest.java#aLegacyAdapterCannotAcceptBeforeCommit",
+        "classification": "assertion",
+        "detail": "aLegacyAdapterCannotAcceptBeforeCommit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an adapter without a commit handshake cannot make chat terminal ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerTornLineTest.java#exportKeepsCompleteRecordsAroundMalformedAndTornLines",
+        "classification": "assertion",
+        "detail": "exportKeepsCompleteRecordsAroundMalformedAndTornLines(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a torn final character must not lose the complete ledger records ==> expected: not <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java#aRefusedCommitThroughEngineRootKeepsChatRetryable",
+        "classification": "assertion",
+        "detail": "aRefusedCommitThroughEngineRootKeepsChatRetryable(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: EngineRoot must deliver refusal before chat becomes terminal DEVICE_LOST ==> expected: <null> but was: <DEVICE_LOST>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java#aCommittedRestartThroughEngineRootCommitsThenEndsChatThenHandsOff",
+        "classification": "assertion",
+        "detail": "aCommittedRestartThroughEngineRootCommitsThenEndsChatThenHandsOff(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the durable DEVICE_LOST commit must precede terminal chat shutdown ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java#olderPendingFailureCannotOverrideQueuedHealthyConversation",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:62c94ab88ffb642fa6e231c750ba988e038e1f23dfbe52105aa8cea40d8a6b5e"
+}

@@ -278,6 +278,8 @@ public final class ChatServerControllerImpl
 
   /** The controller thread is acting on a device loss (monitor). */
   private boolean deviceLostHandling;
+  private boolean deviceLostRestartPending;
+  private boolean deviceLostRestartRefused;
 
   /** A resume probe is to run (monitor). */
   private boolean resumeProbePending;
@@ -540,10 +542,14 @@ public final class ChatServerControllerImpl
         DeviceLostEvidence lost = null;
         boolean probe = false;
         boolean recheckResidency = false;
+        boolean restartRefused = false;
         synchronized (monitor) {
-          while (queue.isEmpty() && desired.terminal() == null && replay == null
-              && deviceLost == null && !resumeProbePending && !residencyRecheckPending) {
-            if (vduRestorePending && holds.isEmpty() && vduRestoreAttempt == null) {
+          while (desired.terminal() == null && replay == null && !deviceLostRestartRefused
+              && (deviceLostRestartPending || (queue.isEmpty() && deviceLost == null
+                  && !resumeProbePending && !residencyRecheckPending))) {
+            // A pending device-loss restart holds every start, the VDU restore included.
+            if (!deviceLostRestartPending && vduRestorePending && holds.isEmpty()
+                && vduRestoreAttempt == null) {
               if (actuator.serverRunning()) {
                 vduRestorePending = false;
                 vduRestoreFailures = 0;
@@ -568,7 +574,7 @@ public final class ChatServerControllerImpl
               TimeUnit.NANOSECONDS.timedWait(monitor, remaining);
               continue;
             }
-            if (bootGate != BootGate.CLOSED) {
+            if (deviceLostRestartPending || bootGate != BootGate.CLOSED) {
               monitor.wait();
               continue;
             }
@@ -579,7 +585,10 @@ public final class ChatServerControllerImpl
             }
             TimeUnit.NANOSECONDS.timedWait(monitor, remaining);
           }
-          if (replay == null && desired.terminal() == null && deviceLost != null) {
+          if (replay == null && desired.terminal() == null && deviceLostRestartRefused) {
+            deviceLostRestartRefused = false;
+            restartRefused = true;
+          } else if (replay == null && desired.terminal() == null && deviceLost != null) {
             // A lost device goes before every waiting step (Spec A §7.3).
             lost = deviceLost;
             deviceLost = null;
@@ -605,7 +614,10 @@ public final class ChatServerControllerImpl
           }
           continue;
         }
-        if (lost != null) {
+        if (restartRefused) {
+          next = internalStep(actuator.deviceLostStop(() -> false));
+          if (next == null) continue;
+        } else if (lost != null) {
           next = deviceLostStep(lost);
           if (next == null) continue;
         } else if (probe) {
@@ -804,7 +816,7 @@ public final class ChatServerControllerImpl
       synchronized (monitor) {
         restoration = vduRestorePending ? queueVduRestoreLocked() : null;
       }
-      if (restoration != null) awaitHeld(restoration, false, false);
+      if (restoration != null) awaitHeld(restoration, false);
       else routeHeld(actuator.activation(new Activation(true, TransitionReason.VDU_ENTER)), true);
       routeHeld(actuator.vduEnter(), false);
     } catch (ChatRefusal refused) {
@@ -1087,8 +1099,8 @@ public final class ChatServerControllerImpl
 
   /**
    * Runs a hold's own step, which the held-out gate lets through, and maps its failure onto a
-   * refusal. {@code supersededIsDone}: a later step with the same key replaced it (another hold's
-   * identical start), so the server is being brought where this step would have brought it.
+   * refusal. Starts required by a hold are serialized readiness barriers; they never complete
+   * merely because a later activation replaced a queued step.
    */
   private <T> T routeHeld(ChatActuation<T> step, boolean supersededIsDone) throws ChatRefusal {
     return routeHeld(step, supersededIsDone, false);
@@ -1102,7 +1114,11 @@ public final class ChatServerControllerImpl
   private <T> T routeHeld(ChatActuation<T> step, boolean supersededIsDone, boolean uninterruptible)
       throws ChatRefusal {
     try {
-      return (T) awaitHeld(enqueue(step), supersededIsDone, uninterruptible);
+      // A running hold promises completed readiness. Keep its start as a serialized
+      // barrier: replacing a queued activation cannot complete the hold early.
+      ChatActuation<T> ready = supersededIsDone
+          ? ChatActuation.of(step.kind(), drained -> actuator.execute(step, drained)) : step;
+      return (T) awaitHeld(enqueue(ready), uninterruptible);
     } catch (RefusedException refused) {
       throw refusal(RefusalReason.ENGINE_STOPPING, refused);
     } catch (RuntimeException failure) {
@@ -1110,14 +1126,13 @@ public final class ChatServerControllerImpl
     }
   }
 
-  private Object awaitHeld(Pending pending, boolean supersededIsDone, boolean uninterruptible)
+  private Object awaitHeld(Pending pending, boolean uninterruptible)
       throws ChatRefusal {
     try {
       return uninterruptible ? awaitUninterruptibly(pending) : await(pending);
     } catch (ChatRefusal refused) {
       throw refused;
     } catch (SupersededException superseded) {
-      if (supersededIsDone) return null;
       throw refusal(RefusalReason.BUSY, superseded);
     } catch (RefusedException refused) {
       throw refusal(RefusalReason.ENGINE_STOPPING, refused);
@@ -2107,17 +2122,18 @@ public final class ChatServerControllerImpl
     return stop;
   }
 
-  /** Reads the device-lost limit after the stop; false when over it or unreadable (F10). */
+  /** Checks and durably reserves a restart; false when the limit or storage refuses it (F10). */
   private boolean restartWithinLimit(DeviceLostEvidence evidence) {
     boolean restart;
     String why;
     try {
       List<Instant> prior = deviceLostRecovery.priorRestarts();
       restart = withinDeviceLostLimit(prior, wallClock.instant());
+      if (restart) deviceLostRecovery.reserveRestart();
       why = restart ? "within the device-lost limit" : "over the device-lost limit";
     } catch (IOException | RuntimeException unreadable) {
       restart = false;
-      why = "the device-lost limit cannot be read (" + unreadable.getMessage() + ")";
+      why = "device-lost restart accounting failed (" + unreadable.getMessage() + ")";
     }
     if (restart) {
       LOG.error("GPU device lost ({} {}): {}; the Engine restarts", evidence.source(),
@@ -2135,15 +2151,25 @@ public final class ChatServerControllerImpl
    */
   private void deviceLostEnded(Pending stop) {
     if (!Boolean.TRUE.equals(stop.result.getNow(null))) return;
+    synchronized (monitor) { deviceLostRestartPending = true; }
     try {
-      shutdown(StopReason.DEVICE_LOST, CLOSE_BUDGET);
-    } catch (RuntimeException stopFailure) {
-      LOG.warn("Stopping chat for the lost device failed; the Engine restart stops it", stopFailure);
-    }
-    try {
-      deviceLostRecovery.requestRestart();
+      deviceLostRecovery.requestRestart(() -> {
+        try { shutdown(StopReason.DEVICE_LOST, CLOSE_BUDGET); }
+        catch (RuntimeException stopFailure) {
+          LOG.warn("Stopping chat for the lost device failed; the Engine restart stops it", stopFailure);
+        }
+      }, this::deviceLostRestartRefused);
     } catch (RuntimeException failure) {
-      LOG.error("The Engine restart for the lost device could not be requested", failure);
+      deviceLostRestartRefused(failure);
+    }
+  }
+
+  private void deviceLostRestartRefused(RuntimeException failure) {
+    LOG.error("Device-loss restart refused; chat remains FAILED (device_lost_limit): {}", failure.getMessage());
+    synchronized (monitor) {
+      deviceLostRestartPending = false;
+      deviceLostRestartRefused = true;
+      monitor.notifyAll();
     }
   }
 

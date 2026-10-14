@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T14:53:03.826Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "cc79df401052a018ebea6197b7b693fb3965cb51",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownDeviceLostTest.failedDeviceLossReservationDoesNotCloseOrRequestRestart\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23423
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java#failedDeviceLossReservationDoesNotCloseOrRequestRestart",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a049e82e92dc13242d2c55191460c9a4739405bf3398f96b19834bbc8e3df70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedDeviceLossReservationDoesNotCloseOrRequestRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownDeviceLostTest.failedDeviceLossReservationDoesNotCloseOrRequestRestart\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 74416
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java#failedDeviceLossReservationDoesNotCloseOrRequestRestart",
+        "classification": "assertion",
+        "detail": "failedDeviceLossReservationDoesNotCloseOrRequestRestart(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a restart without a durable reservation bypasses the limit ==> expected: <-1> but was: <4>"
+      }
+    ]
+  },
+  "digest": "sha256:0a0bc514bd080f61c41aa2632ba26acd10e9a7fd21fc06deafe15adb8654c473"
+}

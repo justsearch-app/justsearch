@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:40:51.232Z",
+  "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+  "tree": "7a9098660ce3e1f7fb9f871ae410455001c5f090",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.diagnostics.DiagnosticsExitLedgerBudgetTest.exportKeepsNewestRecordsWithinOneEightMiBBudget\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 30403
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerBudgetTest.java#exportKeepsNewestRecordsWithinOneEightMiBBudget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:427c2f82e10ef49386d48075e7df4c7862468bef2e0fc3706a6a9195fe83327f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exportKeepsNewestRecordsWithinOneEightMiBBudget(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1ec622289",
+    "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.diagnostics.DiagnosticsExitLedgerBudgetTest.exportKeepsNewestRecordsWithinOneEightMiBBudget\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 34470
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerBudgetTest.java#exportKeepsNewestRecordsWithinOneEightMiBBudget",
+        "classification": "assertion",
+        "detail": "exportKeepsNewestRecordsWithinOneEightMiBBudget(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: exit-ledger records have one 8 MiB budget, not an unbounded budget per file: 10485760 ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:31915b9c600c0e789c220f01638a38f72697db2d4ce3b23a6ea15e2cf47c9ab3"
+}

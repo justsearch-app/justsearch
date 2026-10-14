@@ -84,6 +84,7 @@ public final class GenerationTracker implements GenerationActivity {
   private volatile boolean generating;
   private volatile long epoch;
   private volatile long idleSinceNanos;
+  private volatile long lastTokenNanos = Long.MIN_VALUE;
 
   private final List<EdgeListener> listeners = new CopyOnWriteArrayList<>();
   private final ArrayDeque<Edge> pendingEdges = new ArrayDeque<>();
@@ -182,6 +183,9 @@ public final class GenerationTracker implements GenerationActivity {
     }
   }
 
+  /** Monotonic time of the last token on an open GENERATE lease. */
+  public long lastTokenNanos() { return lastTokenNanos; }
+
   // ==================== Admission ====================
 
   /**
@@ -215,7 +219,7 @@ public final class GenerationTracker implements GenerationActivity {
       ticket.close();
       throw refused;
     }
-    return ticket::close;
+    return ticket;
   }
 
   /** @throws GenerationUnavailableException when admission is closed */
@@ -365,7 +369,7 @@ public final class GenerationTracker implements GenerationActivity {
    * One exchange from queueing to its end. EngineFutures closes it only on actual producer exit,
    * including cancellation; closing it closes an open lease and releases the pacing lifetime, once.
    */
-  public final class Ticket implements AutoCloseable {
+  public final class Ticket implements GenerationLease {
     private final Kind kind;
     private Runnable lifetime;
     private boolean queued = true;
@@ -398,7 +402,16 @@ public final class GenerationTracker implements GenerationActivity {
         edge = openLeaseLocked(kind);
       }
       if (edge) deliverEdges();
-      return this::closeLease;
+      return new GenerationLease() {
+        @Override public void close() { closeLease(); }
+        @Override public void tokenProduced() { Ticket.this.tokenProduced(); }
+      };
+    }
+
+    @Override public void tokenProduced() {
+      synchronized (monitor) {
+        if (leaseOpen && kind == Kind.GENERATE) lastTokenNanos = nanoTime.getAsLong();
+      }
     }
 
     private void closeLease() {
@@ -447,6 +460,7 @@ public final class GenerationTracker implements GenerationActivity {
     if (generateLeases++ != 0) return false;
     long next = epoch + 1;
     epoch = next;
+    lastTokenNanos = Long.MIN_VALUE;
     generating = true;
     pendingEdges.add(new Edge(true, next));
     return true;

@@ -289,6 +289,31 @@ function ledgerView(ledger, runId) {
     }
     if (crashCode(w.exit.code)) w.exit = { ...w.exit, exitClass: 'UNEXPECTED', reason: 'helper crash' };
   }
+  // A parser's own kill-on-close boundary can end an active helper before that parser
+  // writes its exit receipt. Require its explicit boundary declaration, exact parent birth,
+  // an open owner window/receipt and native exit timing/code; Engine membership alone is not enough.
+  for (const w of valid) {
+    if (!w.exit || w.exit.exitClass !== 'UNEXPECTED' || w.exit.code !== 0) continue;
+    const parser = children.find(c => c.kind === 'EXTRACTION' && ownedBy(c, w.engine)
+      && createdBy(w, { pid: c.pid, creationFileTime: c.creationFileTimeUtc }) && c.exit);
+    if (!parser || !['REQUESTED', 'UNEXPECTED'].includes(parser.exit.exitClass)) continue;
+    if (parser.exit.exitClass === 'REQUESTED' && (!parser.exit.forced || !parser.exit.reason)) continue;
+    const end = recordedEndMs(parser.exit), helperEnd = recordedEndMs(w.exit);
+    if (end == null || helperEnd == null || helperEnd < end || helperEnd > end + CONHOST_EXIT_GRACE_MS) continue;
+    const declares = [...receipts.values()].some(c => c.engine === w.engine
+      && c.ownerContainment === 'KILL_ON_CLOSE' && createdBy(w, c.owner)
+      && c.pid === w.pid && sameBirth(c.creationFileTime, w.creationFileTimeUtc, BIRTH_TICKS.EXACT))
+      || [...windows.values()].some(i => i.engine === w.engine && i.ownerContainment === 'KILL_ON_CLOSE'
+        && createdBy(w, i.owner) && !i.closedAt
+        && path.win32.basename(w.executable ?? '').toLowerCase() === i.image?.toLowerCase()
+        && fileTimeFromInstant(i.requestedAt) != null && fileTimeFromInstant(i.deadlineAt) != null
+        && BigInt(w.creationFileTimeUtc) >= BigInt(fileTimeFromInstant(i.requestedAt))
+        && BigInt(w.creationFileTimeUtc) <= BigInt(fileTimeFromInstant(i.deadlineAt)));
+    if (!declares) continue;
+    w.exit = { ...w.exit, exitClass: parser.exit.exitClass === 'REQUESTED' ? 'REQUESTED' : 'OWNER_DIED',
+      reason: parser.exit.exitClass === 'REQUESTED' ? parser.exit.reason : 'parser owner died' };
+    ownedHelpers.add(w);
+  }
   // A launcher is an owned helper, not another declaring process. Credit only its direct
   // child with a parent PID/birth captured natively while that child was alive. Repeated
   // passes make receipt order irrelevant and support nested wrappers without ancestry credit.

@@ -321,7 +321,7 @@ const tests = [
       return [r.written, r.exitClass, r.code, r.observedBy];
     };
     const crash = -1073741819;
-    assert.deepEqual(exitOf(1, { endedBy: 'terminate' }), [true, 'REQUESTED', ledgerLib.JS_ENGINE_STOP, 'dev-cli']);
+    assert.deepEqual(exitOf(1, { endedBy: 'terminate' }), [true, 'UNKNOWN', null, 'dev-cli']);
     assert.deepEqual(exitOf(2, { endedBy: 'runner', observed: { exitCode: 0, atMs: Date.now() } }),
       [true, 'REQUESTED', 0, 'census']);
     assert.deepEqual(exitOf(3, { endedBy: 'runner', observed: { exitCode: crash, atMs: Date.now() } }),
@@ -329,14 +329,16 @@ const tests = [
     assert.deepEqual(exitOf(4, { endedBy: 'cooperative' }), [true, 'UNKNOWN', null, 'dev-cli']);
     assert.deepEqual(exitOf(5, { endedBy: 'cooperative', observed: { exitCode: 1, atMs: Date.now() } }),
       [true, 'UNEXPECTED', 1, 'census']);
-    assert.deepEqual(exitOf(6, { endedBy: 'taskkill' }), [true, 'REQUESTED', 1, 'dev-cli']);
+    assert.deepEqual(exitOf(6, { endedBy: 'taskkill' }), [true, 'UNKNOWN', null, 'dev-cli']);
     assert.deepEqual(exitOf(1, { endedBy: 'terminate' }), [false, undefined, undefined, undefined],
       'an incarnation with an exit record gets no second one');
     const exits = engineExits(dataDir);
     assert.deepEqual(exits.map((r) => r.line.incarnation.n), [1, 2, 3, 4, 5, 6]);
     assert.ok(exits.every((r) => r.line.writer.role === 'dev-cli'));
+    assert.deepEqual([exits[0].line.attemptedEnding, exits[5].line.attemptedEnding], ['terminate', 'taskkill'],
+      'the attempted ending is separate from an unobserved exit code');
     assert.deepEqual(exits.map((r) => r.line.forced), [true, true, true, false, false, true]);
-    assert.deepEqual(exits.map((r) => r.line.codeDistinctive), [true, false, true, false, true, false]);
+    assert.deepEqual(exits.map((r) => r.line.codeDistinctive), [false, false, true, false, true, false]);
     assert.ok(exits[1].line.exitedAt && exits[3].line.exitedAt === null, 'the exit time is known only when observed');
   }],
 

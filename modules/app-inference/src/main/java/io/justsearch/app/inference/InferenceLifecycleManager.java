@@ -1518,13 +1518,17 @@ public class InferenceLifecycleManager
       }
     }
     if (generation.generating()) {
-      // A reply in progress that finishes counts as a pass; so does one still streaming.
-      long deadline = System.nanoTime() + ChatActuationRouter.DRAIN_BOUND.toNanos();
+      // Admission alone and lease closure prove no health. A fresh token after this resume
+      // check does: probing the occupied slot would queue and interrupt a healthy long reply.
+      long started = System.nanoTime();
+      long deadline = started + LlamaServerOps.RESUME_TOKEN_TIMEOUT.toNanos();
       while (generation.generating() && System.nanoTime() - deadline < 0) {
+        if (generation.lastTokenNanos() - started >= 0 && generation.lastTokenNanos() != Long.MIN_VALUE) {
+          LOG.info("Resume health proved by generation token progress");
+          return ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.PASSED);
+        }
         Thread.sleep(50);
       }
-      LOG.info("Resume probe: a reply in progress answered; the server is trusted");
-      return ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.PASSED);
     }
     LlamaServerOps.ResumeProbeFinding finding = serverOps.probeAfterResume(onlineOps::probeOneToken);
     return switch (finding.result()) {

@@ -36,6 +36,34 @@ final class ExitLedgerWriterTest {
   @TempDir Path dataDir;
 
   @Test
+  void persistenceFailureWarnsOnceAndRecoveryIsReported() throws Exception {
+    Path dir = LedgerFamily.directory(dataDir);
+    Files.createDirectories(dir);
+    Path blocked = LedgerFamily.CHILDREN.current(dir);
+    Files.createDirectory(blocked);
+    var messages = new java.util.concurrent.CopyOnWriteArrayList<java.util.logging.LogRecord>();
+    var logger = java.util.logging.Logger.getLogger("io.justsearch.app.api.runtime.ledger.ExitLedgerHealth");
+    var handler = new java.util.logging.Handler() {
+      @Override public void publish(java.util.logging.LogRecord record) { messages.add(record); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    };
+    logger.addHandler(handler);
+    ExitLedgerWriter writer = ExitLedgerWriter.rotating(dir, LedgerFamily.CHILDREN, ENGINE, CLOCK);
+    try {
+      assertFalse(writer.append(LedgerRecordType.CHILD_NOTE, Map.of("childId", "test", "token", "first")));
+      assertFalse(writer.append(LedgerRecordType.CHILD_NOTE, Map.of("childId", "test", "token", "second")));
+      Files.delete(blocked);
+      assertTrue(writer.append(LedgerRecordType.CHILD_NOTE, Map.of("childId", "test", "token", "recovered")));
+      assertEquals(1, messages.stream().filter(m -> m.getMessage().contains("EXIT_LEDGER_UNWRITABLE")).count(),
+          "one visible warning per failure episode");
+      assertEquals(1, messages.stream().filter(m -> m.getMessage().contains("Exit ledger recovered")).count());
+      assertTrue(ExitLedgerReader.read(dir, LedgerFamily.CHILDREN).records().stream()
+          .anyMatch(record -> record.type() == LedgerRecordType.LEDGER_GAP));
+    } finally { logger.removeHandler(handler); }
+  }
+
+  @Test
   @DisplayName("records round-trip with the v1 envelope, seq from 1, and land under runtime/exit-ledger")
   void roundTrip() throws IOException {
     Path dir = LedgerFamily.directory(dataDir);

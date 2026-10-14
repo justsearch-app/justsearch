@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T15:14:37.289Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "2d66ee85d63a8b13f47c463990a7cc0663114b03",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatResumeProbeTest.anOpenGenerationCannotPassAFailingResumeProbe\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aClosedGenerationCannotPassAFailingResumeProbe\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 72284
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#anOpenGenerationCannotPassAFailingResumeProbe",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOpenGenerationCannotPassAFailingResumeProbe()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aClosedGenerationCannotPassAFailingResumeProbe",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aClosedGenerationCannotPassAFailingResumeProbe()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatResumeProbeTest.anOpenGenerationCannotPassAFailingResumeProbe\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aClosedGenerationCannotPassAFailingResumeProbe\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 104814
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#anOpenGenerationCannotPassAFailingResumeProbe",
+        "classification": "assertion",
+        "detail": "anOpenGenerationCannotPassAFailingResumeProbe(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an open exchange is not proof that the server answered after resume ==> expected: <RELAUNCHED> but was: <PASSED>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aClosedGenerationCannotPassAFailingResumeProbe",
+        "classification": "assertion",
+        "detail": "aClosedGenerationCannotPassAFailingResumeProbe(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: closing a lease also happens on cancellation or failed generation ==> expected: <RELAUNCHED> but was: <PASSED>"
+      }
+    ]
+  },
+  "digest": "sha256:9d2ac496a92c70da1884f63b05757f49f261fd51295708ea1396b35f2d8b56b8"
+}

@@ -208,6 +208,13 @@ final class OperatingStateAssembler {
   private List<OperatingDegradationView> degradations(
       GpuProfileResolver.Resolution plan, String assembledAt) {
     List<OperatingDegradationView> out = new ArrayList<>();
+    io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.current(
+        io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(
+            io.justsearch.configuration.PlatformPaths.resolveDataDir())).ifPresent(f ->
+        out.add(new OperatingDegradationView(DegradationCode.EXIT_LEDGER_UNWRITABLE,
+            f.cause(), DegradationScope.RUNTIME, "runtime.exit_ledger_unwritable",
+            f.since().toString(), f.lastSeen().toString(), f.count())));
+
     String unmetCause = plan == null || plan.unmetSettings().isEmpty()
         ? null : String.join(",", new java.util.TreeSet<>(plan.unmetSettings()));
     unmet.see(unmetCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(

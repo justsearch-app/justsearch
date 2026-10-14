@@ -62,7 +62,7 @@ public class HeadlessApp {
     return io.justsearch.core.execution.EngineFutures.supplyAsync(bootstrap, executor);
   }
 
-  // Tempdoc 502 Â§3.3: Typed phase outputs. Each record captures the outputs of one boot phase,
+  // Tempdoc 502 §3.3: Typed phase outputs. Each record captures the outputs of one boot phase,
   // enabling independent testing of each phase.
   record ConfigPhaseResult(
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
@@ -74,7 +74,7 @@ public class HeadlessApp {
   record InfraPhaseResult(
       ConfigPhaseResult config,
       Telemetry telemetry,
-      // Tempdoc 518 Appendix G W4.2 â€” present when HEAD_TRACING_LEVEL is non-none.
+      // Tempdoc 518 Appendix G W4.2 — present when HEAD_TRACING_LEVEL is non-none.
       io.justsearch.telemetry.TracingBootstrap tracingBootstrap) {}
 
   record ApiPhaseResult(
@@ -94,7 +94,7 @@ public class HeadlessApp {
    */
   private static volatile ConfigStore configStore;
 
-  // Tempdoc 519 Â§9 Block B3.0.e: contributeUiSettings moved to
+  // Tempdoc 519 §9 Block B3.0.e: contributeUiSettings moved to
   // io.justsearch.app.services.config.ConfigStoreRebuilder so it lives in
   // the same place as ConfigStoreRebuilder.rebuild (which also calls it).
   // HeadlessApp's L539 callsite now invokes
@@ -108,7 +108,7 @@ public class HeadlessApp {
    * <p>Two operations, both predicated on user override absence:
    *
    * <ol>
-   *   <li><b>Phase E â€” sysprop-mirror.</b> Each entry written by the probe
+   *   <li><b>Phase E — sysprop-mirror.</b> Each entry written by the probe
    *       (e.g. {@code justsearch.gpu.enabled = "true"}) is also set as a
    *       system property, but only when {@code EnvRegistry.<key>.get()} is
    *       empty (no user sysprop or env var override exists). The mirror
@@ -116,20 +116,20 @@ public class HeadlessApp {
    *       {@link io.justsearch.app.services.config.ConfigStoreRebuilder#rebuild},
    *       which only re-contributes sysprops via env-registry, not the
    *       transient ord-150 autoDetected map.
-   *       <p>It used to have a second reason â€” {@code GPU_ENABLED} and
+   *       <p>It used to have a second reason — {@code GPU_ENABLED} and
    *       {@code ORT_NATIVE_PATH} were forwarded as {@code -D} args to the
    *       Worker child process, and {@code GPU_LAYERS} reached it through the
    *       ordinal-450 worker-config snapshot. Lane F stage A deleted the child
    *       process (item A11), the {@code -D} forwarding set and the snapshot
    *       tier (item A19). There is one JVM and one {@code ResolvedConfig}, so
    *       the rebuild survival above is now the whole reason.
-   *   <li><b>Phase F â€” VRAM-tier auto-populate of gpu_layers.</b> If "GPU
+   *   <li><b>Phase F — VRAM-tier auto-populate of gpu_layers.</b> If "GPU
    *       should be used" (probe said true AND user didn't explicitly say
    *       false) AND no explicit {@code gpu.layers} is set, query NVML for
    *       total VRAM. If &ge; 7.5&nbsp;GB (matches
    *       {@link io.justsearch.configuration.model.HardwareProfile#MINIMUM_VRAM_FOR_GGUF}),
    *       put {@code justsearch.gpu.layers = "99"} into the returned map
-   *       (full offload â€” Qwen3.5-9B Q4_K_M is ~5.5&nbsp;GB, fits
+   *       (full offload — Qwen3.5-9B Q4_K_M is ~5.5&nbsp;GB, fits
    *       comfortably). Below threshold, leave at 0; the chat model wouldn't
    *       fit anyway and partial offload is an OOM hazard. The user can still
    *       force layers via env var, settings, or {@code -D}.
@@ -137,14 +137,14 @@ public class HeadlessApp {
    *
    * <p><b>Phase F does NOT mirror to a system property, and the name says
    * "ProbeFlags" for that reason</b> (tempdoc 883 decision 4 slice 2). A
-   * sysprop write lands at ordinal 500, above the user's own value at 300 â€”
+   * sysprop write lands at ordinal 500, above the user's own value at 300 —
    * which is fine for the Phase-E boolean/path FLAGS, where the loop skips any
    * key the user set, but wrong for a NUMBER the user may have chosen a
    * different value for. Phase F's contribution therefore lives only in the
    * returned map, at ordinal 150, where the ordinal chain can rank it honestly.
    *
    * <p>The augmented map is returned so the caller can pass it to
-   * {@link ResolvedConfigBuilder#contributeAutoDetected} â€” for Phase E that
+   * {@link ResolvedConfigBuilder#contributeAutoDetected} — for Phase E that
    * keeps the ord-150 contribution and the sysprop write in lockstep; for
    * Phase F the map is the only carrier.
    *
@@ -166,7 +166,7 @@ public class HeadlessApp {
       EnvRegistry envKey = lookupEnvRegistryBySysProp(key);
       Optional<String> userOverride = envKey != null ? envKey.get() : Optional.empty();
       if (userOverride.isPresent()) {
-        // User has an explicit sysprop or env var â€” respect it; don't mirror.
+        // User has an explicit sysprop or env var — respect it; don't mirror.
         continue;
       }
       SystemPropertyUtils.setSysPropIfBlank(key, entry.getValue());
@@ -175,7 +175,7 @@ public class HeadlessApp {
     // Phase F: VRAM-tier auto-populate gpu_layers when GPU should be used.
     if (shouldUseGpu(augmented)) {
       // LLM_GPU_LAYERS was a dead duplicate of GPU_LAYERS (resolved, documented, read by
-      // nothing) â€” removed in tempdoc 799 Â§N.2, so only the live key is consulted here.
+      // nothing) — removed in tempdoc 799 §N.2, so only the live key is consulted here.
       // Deliberately NOT also checking settings.json: contributing an auto-detected 99 at ordinal
       // 150 is harmless when the user set a value at 300, because 300 wins.
       boolean alreadySet = EnvRegistry.GPU_LAYERS.get().isPresent();
@@ -189,16 +189,16 @@ public class HeadlessApp {
         if (vramBytes
             >= io.justsearch.configuration.model.HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
           String layers = "99";
-          // Tempdoc 883 decision 4 slice 2: the map ONLY â€” no sysprop mirror. A sysprop write puts
+          // Tempdoc 883 decision 4 slice 2: the map ONLY — no sysprop mirror. A sysprop write puts
           // this DERIVED hardware-probe number at ordinal 500, where it outranks the user's own GPU
           // setting at 300. It was masked only because the settingsâ†’sysprop promotion ran first and
           // setSysPropIfBlank then no-opped; with that promotion deleted, mirroring here would let
           // an auto-detected 99 silently override the user's choice on exactly the hardware where
           // the choice matters. The map is contributed at ordinal 150 and kept across rebuilds by
-          // ConfigStoreRebuilder.rememberAutoDetected â€” a probe value reported as a probe value.
+          // ConfigStoreRebuilder.rememberAutoDetected — a probe value reported as a probe value.
           augmented.put("justsearch.gpu.layers", layers);
-          // justsearch.llm.gpu_layers was a dead duplicate of the key above â€” resolved,
-          // documented, and read by nothing. Removed in tempdoc 799 Â§N.2.
+          // justsearch.llm.gpu_layers was a dead duplicate of the key above — resolved,
+          // documented, and read by nothing. Removed in tempdoc 799 §N.2.
           log.info(
               "VRAM auto-populate: gpu.layers={} (vramBytes={}, threshold={})",
               layers,
@@ -206,7 +206,7 @@ public class HeadlessApp {
               io.justsearch.configuration.model.HardwareProfile.MINIMUM_VRAM_FOR_GGUF);
         } else {
           log.info(
-              "VRAM auto-populate: skipped â€” vramBytes={} below threshold {} (Qwen3.5-9B Q4_K_M"
+              "VRAM auto-populate: skipped — vramBytes={} below threshold {} (Qwen3.5-9B Q4_K_M"
                   + " ~5.5 GB wouldn't fit safely)",
               vramBytes,
               io.justsearch.configuration.model.HardwareProfile.MINIMUM_VRAM_FOR_GGUF);
@@ -216,7 +216,7 @@ public class HeadlessApp {
       // Tempdoc 374 alpha.16 fix D (defensive backstop): per-encoder gpu.enabled
       // sysprop-mirror when shouldUseGpu and no user override exists. The round-6
       // sandbox agent observed embed/splade/ner gpuEnabled=false at the worker even
-      // though master justsearch.gpu.enabled=true was in the snapshot â€” the
+      // though master justsearch.gpu.enabled=true was in the snapshot — the
       // master-fallback chain in ResolvedConfigBuilder.resolveEmbedGpuEnabled looks
       // correct from a static read but isn't producing the expected value at the
       // worker. Sysprop-mirroring at boot makes the per-feature value explicit at
@@ -241,16 +241,16 @@ public class HeadlessApp {
    * explains GPU detection instead of a promotion that reported a GUI value as {@code jvm_arg}.
    *
    * <p>Runs AFTER {@link #augmentGpuAutoDetectionAndMirrorProbeFlags} on purpose: the top rung depends on
-   * whether layers ended up on the GPU, which that pass is what decides (Phase F) â€” reading
+   * whether layers ended up on the GPU, which that pass is what decides (Phase F) — reading
    * {@code gpu.layers} before it would derive the CPU rung on every GPU machine.
    *
    * <p>Unconditional by design, including when the GPU probe returned nothing: a fresh data dir
-   * with no GPU must still get a window with a legible provenance. Every higher ordinal â€” YAML 200,
-   * {@code settings.json} 300, env 400, {@code -D} 500 â€” still wins by the ordinal chain, so the
+   * with no GPU must still get a window with a legible provenance. Every higher ordinal — YAML 200,
+   * {@code settings.json} 300, env 400, {@code -D} 500 — still wins by the ordinal chain, so the
    * headless-eval {@code JUSTSEARCH_CONTEXT_SIZE} path is unaffected.
    *
    * @param settingsGpuLayers the user's {@code UiSettings.gpuLayers} (ordinal 300), {@code null} when
-   *     unset â€” see {@link #gpuLayersAfterAutoDetect} for why it has to be passed in
+   *     unset — see {@link #gpuLayersAfterAutoDetect} for why it has to be passed in
    */
   static Map<String, String> augmentDerivedContextWindow(
       Map<String, String> autoDetected, Integer settingsGpuLayers) {
@@ -268,7 +268,7 @@ public class HeadlessApp {
   }
 
   /**
-   * GPU layers as they stand after auto-detection â€” the resolver's ordinal chain in miniature.
+   * GPU layers as they stand after auto-detection — the resolver's ordinal chain in miniature.
    *
    * <p>Walks {@code -D} / env (500 / 400) â†’ {@code settings.json} (300) â†’ the auto-detected probe
    * map (150) â†’ 0, which is the order {@link ResolvedConfigBuilder} will apply to the same key a few
@@ -309,7 +309,7 @@ public class HeadlessApp {
    */
   private static void mirrorPerEncoderGpuEnabled(EnvRegistry key) {
     if (key.get().isPresent()) {
-      // User has an explicit value at sysprop or env var â€” respect it.
+      // User has an explicit value at sysprop or env var — respect it.
       return;
     }
     SystemPropertyUtils.setSysPropIfBlank(key.sysProp(), "true");
@@ -334,7 +334,7 @@ public class HeadlessApp {
   /**
    * Reverse-lookup an EnvRegistry entry by its sysprop key. Returns null if no
    * matching entry exists (e.g. a probe key that isn't an EnvRegistry-managed
-   * config â€” currently {@code justsearch.gpu.enabled} and
+   * config — currently {@code justsearch.gpu.enabled} and
    * {@code justsearch.onnxruntime.native_path} are managed; future probe keys
    * may not be).
    */
@@ -360,7 +360,7 @@ public class HeadlessApp {
    * and all 4 ONNX encoders fall back to CPU even though the runtime DLLs are right
    * there in {@code <homeDir>/native-bin/llama-server/variants/cuda12/}.
    *
-   * <p>The home directory is resolved via {@link PlatformPaths#resolveDataDir()} â€”
+   * <p>The home directory is resolved via {@link PlatformPaths#resolveDataDir()} —
    * matches the same source {@code AiInstallService.resolveHomeDir} uses to write
    * the cuda12 dir during Install AI, so this read paired with that write produces a
    * matching path. (An earlier draft used {@code cs.get().paths().home()}, but that
@@ -377,7 +377,7 @@ public class HeadlessApp {
     Telemetry telemetry = new LocalTelemetry(
         executors, dataDir, 5_000, "justsearch-headless", "phase3", "metrics.ndjson",
         List.of(
-            // Tempdoc 626 Â§Axis-A â€” the Head-side file watcher was removed; the `index.watcher.*`
+            // Tempdoc 626 §Axis-A — the Head-side file watcher was removed; the `index.watcher.*`
             // metric is emitted only by the Worker (WorkerWatcherMetricCatalog), so the Head no
             // longer registers it.
             io.justsearch.telemetry.catalog.MetricCatalog.of(
@@ -409,7 +409,7 @@ public class HeadlessApp {
                 io.justsearch.app.services.inference.InferenceMetricCatalog.DEFINITIONS),
             io.justsearch.telemetry.JvmMetricCatalog.catalogFor("head")));
 
-    // Tempdoc 518 Appendix G W4.2 â€” initialize head-side OTel tracing. Mirrors the worker
+    // Tempdoc 518 Appendix G W4.2 — initialize head-side OTel tracing. Mirrors the worker
     // pattern at KnowledgeServer.java:335-347. Gated on HEAD_TRACING_LEVEL; default "none"
     // means GlobalOpenTelemetry stays no-op and the existing head-side span-authoring sites
     // (AgentLoopService, KnowledgeHttpApiAdapter) emit into the void as before. When
@@ -482,7 +482,7 @@ public class HeadlessApp {
         settingsReconciled.completeExceptionally(failure);
         throw failure;
       }
-      log.info("HeadAssembly started (degraded â€” Worker connecting in background).");
+      log.info("HeadAssembly started (degraded — Worker connecting in background).");
 
       var headInfra = bootstrap.headInfraRegistry();
       GplStatusProvider gplCoordinator = headInfra.gplJobCoordinator();
@@ -619,7 +619,7 @@ public class HeadlessApp {
       healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer,
           componentRegistry, null, encoderComponent, componentEscalation);
       if (bootstrap.capabilities().worker().available()) {
-        log.info("Knowledge Server connected â€” search and indexing now available");
+        log.info("Knowledge Server connected — search and indexing now available");
       } else {
         log.info(
             "Knowledge Server connected (health: {}); search and indexing will be available once"
@@ -640,7 +640,7 @@ public class HeadlessApp {
       // code it actually knows to be true: index.failed or either fatal index code
       // (index.corrupt / index.schema_open_refused). The fatal-index latch carries the
       // specific cause across the three
-      // SUPPRESSED start attempts that each consumed the one-shot marker â€” without it this branch
+      // SUPPRESSED start attempts that each consumed the one-shot marker — without it this branch
       // logged, and /api/health served, the generic spawn failure for a deliberate refusal.
       // Re-stamping the generic code here would destroy that specific cause all over again.
       healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer,
@@ -697,7 +697,7 @@ public class HeadlessApp {
   /**
    * The worker handover: the two late-binding seams the API surfaces need, in the order
    * {@code LocalApiServer.lateBindKnowledgeServer} documents (HeadAssembly is the single owner of the
-   * reference and is connected first). Tempdoc 825 makes this callable twice â€” once at boot when the
+   * reference and is connected first). Tempdoc 825 makes this callable twice — once at boot when the
    * bootstrap came up, and once from the monitor's boot-recovery arm when a re-attempt succeeded.
    */
   private static void connectAndBind(
@@ -753,11 +753,11 @@ public class HeadlessApp {
     monitor.onRecoveryOccurrence(occurrence ->
         io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridge.emitRecoveryOccurrence(
             occurrence, health.occurrenceLog(), health.changes(), health.headSource()));
-    // Tempdoc 876 Â§C.8: reconcile the readiness snapshot on the poll the head already runs, so a
+    // Tempdoc 876 §C.8: reconcile the readiness snapshot on the poll the head already runs, so a
     // dimension that settles WITHOUT a capability transition (INDEX_SERVING â†’ DEGRADED /
     // index.dense_unavailable) still reaches the ConditionStore for a client that never calls
     // GET /api/status. Without this the trigger's capability-transition arm can leave a boot-time
-    // index.unavailable standing, and core.search-index â€” gated on Not(index.unavailable) â€” stays
+    // index.unavailable standing, and core.search-index — gated on Not(index.unavailable) — stays
     // hidden from the model for the life of the process.
     if (bootstrap != null && bootstrap.substrate() != null && bootstrap.substrate().health() != null) {
       var readinessTrigger = bootstrap.substrate().health().readinessReconciliationTrigger();
@@ -789,11 +789,11 @@ public class HeadlessApp {
     var settingsStore = new io.justsearch.app.services.settings.UiSettingsStore(mode);
     UiSettings settings = settingsStore.load();
 
-    // Tempdoc 883 decision 4 + its Â§C.5c residue: there is no settingsâ†’sysprop promotion left here
-    // for a resolver-backed key â€” not context-size (slice 1), not server.exe / exclude-patterns /
+    // Tempdoc 883 decision 4 + its §C.5c residue: there is no settingsâ†’sysprop promotion left here
+    // for a resolver-backed key — not context-size (slice 1), not server.exe / exclude-patterns /
     // gpu.layers (slice 2), and no longer index.base_path or llm.model_path. Every one of those
     // rides settings.json at ordinal 300 via ConfigStoreRebuilder.contributeUiSettings; the derived
-    // window rides auto_detected at 150. An operator's -D / env var still wins at 500 / 400 â€” by
+    // window rides auto_detected at 150. An operator's -D / env var still wins at 500 / 400 — by
     // the ordinal chain, not by a sysprop write that made a GUI value report as `jvm_arg` and then
     // needed a `.source` marker to un-tell it.
 
@@ -888,7 +888,7 @@ public class HeadlessApp {
 
   /**
    * Points ONNX Runtime at the consent-gated CUDA native pack, if one is installed and
-   * version-matched (tempdoc 772 Â§J item 2).
+   * version-matched (tempdoc 772 §J item 2).
    *
    * <p><b>Why this is here and not in the Worker any more.</b> This is the second half of
    * {@link #maybeMirrorOrtNativePath(ConfigStore)}. That method resolves <em>JustSearch's</em> config key
@@ -899,21 +899,21 @@ public class HeadlessApp {
    * applied the ORT property in its own JVM before building the {@code KnowledgeServer}. Lane F
    * item A6 moved the index half into this JVM without moving the apply, so from A6 until the
    * review caught it the property was never set in the Engine: every ONNX encoder silently ran on
-   * CPU on a machine with a complete CUDA pack installed. Nothing failed â€” ORT falls back â€” which
+   * CPU on a machine with a complete CUDA pack installed. Nothing failed — ORT falls back — which
    * is why only a wiring test can see it.
    *
    * <p><b>Why after the rebuild.</b> {@link #maybeMirrorOrtNativePath(ConfigStore)} writes a system property at
    * config ordinal 500, and the {@code ResolvedConfig} built above it was built before that write.
    * Reading {@code paths().ortNativePath()} off the pre-rebuild config would reproduce the tempdoc
-   * 883 Â§C.5c defect one field over â€” a boot-time pack detection that the reader never sees. The
+   * 883 §C.5c defect one field over — a boot-time pack detection that the reader never sees. The
    * argument is deliberately {@code snapshot.config()}, the config
    * {@link #rebuildAfterPostBuildWrites} produced, so the ordering is in the signature rather than
    * in a comment.
    *
    * <p><b>Why this is the last safe point.</b> Everything before it in {@code resolveConfig} is
    * settings, config assembly and {@code GpuAutoDetection.probe}, none of which loads ORT; every
-   * ORT session in the Engine â€” the index half's encoders under {@code EngineRoot}, the
-   * application half's reranker and capability probes â€” is created later, in a phase that runs
+   * ORT session in the Engine — the index half's encoders under {@code EngineRoot}, the
+   * application half's reranker and capability probes — is created later, in a phase that runs
    * after this one. Moving the call later than the config phase would put it after the point where
    * an ORT class-init becomes possible.
    *
@@ -972,7 +972,7 @@ public class HeadlessApp {
   }
 
   /**
-   * Parses the variant id out of a llama-server exe path â€” the segment after
+   * Parses the variant id out of a llama-server exe path — the segment after
    * {@code native-bin/llama-server/variants}. Returns {@code null} for anything else, including a
    * path that does not contain the marker at all.
    */
@@ -1015,7 +1015,7 @@ public class HeadlessApp {
       var missing = io.justsearch.ort.OrtCudaHelper.checkMissingCudaRuntimeDlls(cuda12Dir);
       if (!missing.isEmpty()) {
         log.warn(
-            "ORT native_path mirror: cuda12 dir {} is missing runtime DLLs {} â€”"
+            "ORT native_path mirror: cuda12 dir {} is missing runtime DLLs {} —"
                 + " not setting sysprop; user can re-run Install AI to repair",
             cuda12Dir,
             missing);
@@ -1035,7 +1035,7 @@ public class HeadlessApp {
       // WorkerSpawner.resolveOnnxRuntimeNativePathBestEffort, which set the same key on the Worker
       // CHILD's command line under the same "only if unset" guard. Deleting the spawner deleted
       // the only reader of ResolvedConfig.ai().onnxruntimeVariantId, which is how the
-      // config-surface gate found it â€” an operator override that resolved, was reachable, and
+      // config-surface gate found it — an operator override that resolved, was reachable, and
       // changed nothing. Re-homed rather than deleted, because a machine with a
       // native-bin/onnxruntime/variants/<id> pack silently stopped using it at A11 and would go on
       // silently not using it.
@@ -1196,7 +1196,7 @@ public class HeadlessApp {
         io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
             io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE,
             self.info().startInstant().orElse(java.time.Instant.now())),
-        java.time.Clock.systemUTC()));
+        java.time.Clock.systemUTC()), dataDir);
   }
 
   /**
@@ -1205,20 +1205,70 @@ public class HeadlessApp {
    */
   static final class LedgerSelfIntent
       implements io.justsearch.app.engine.EngineShutdownSequence.SelfIntent {
-    private final io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer;
+    private io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer;
+    private final Path dataDir;
+    private java.time.Instant deviceLostReserved;
+    private final List<java.time.Instant> unpersistedRestarts = new java.util.ArrayList<>();
 
-    LedgerSelfIntent(io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer) {
-      this.writer = java.util.Objects.requireNonNull(writer, "writer");
+    LedgerSelfIntent(io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer, Path dataDir) {
+      this.writer = writer;
+      this.dataDir = java.util.Objects.requireNonNull(dataDir, "dataDir");
+    }
+
+    synchronized void attach(LedgerSelfIntent ready) { writer = ready.writer; }
+
+    private synchronized void cancelDeviceLostReservation() {
+      deviceLostReserved = null;
+      if (unpersistedRestarts.isEmpty()) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.deviceLostRestartCountPersisted(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
     }
 
     @Override
-    public void record(io.justsearch.app.api.runtime.child.StopReason reason,
+    public synchronized void record(io.justsearch.app.api.runtime.child.StopReason reason,
         Optional<io.justsearch.app.api.runtime.child.StopDetail> detail, int expectedCode) {
-      writer.record(reason, detail, expectedCode);
+      if (reason == io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST && writer == null) {
+        unpersistedRestarts.add(deviceLostReserved == null ? java.time.Instant.now() : deviceLostReserved);
+        if (deviceLostReserved == null) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.unpersistedDeviceLostRestart(
+            io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+        deviceLostReserved = null;
+        return; // Boot still restarts; this incarnation's memory keeps the budget honest.
+      }
+      cancelDeviceLostReservation(); // A different exit or a failed commit abandons the reservation.
+      if (writer == null) {
+        if (unpersistedRestarts.isEmpty()) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.deviceLostRestartCountPersisted(
+            io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+        return;
+      }
+      boolean durable = writer.record(reason, detail, expectedCode);
+      if (durable && unpersistedRestarts.isEmpty()) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.deviceLostRestartCountPersisted(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+      if (!durable && reason == io.justsearch.app.api.runtime.child.StopReason.DEVICE_LOST) {
+        throw new IllegalStateException("Device-loss restart reservation could not be persisted");
+      }
     }
 
-    boolean healthy() {
-      return writer.healthy();
+    synchronized void reserveDeviceLost() {
+      if (deviceLostReserved != null) return;
+      if (!healthy()) throw new IllegalStateException("Device-loss restart accounting is not durable");
+      if (writer != null && !writer.reserveDeviceLostRestart()) {
+        throw new IllegalStateException("Device-loss restart reservation could not be persisted");
+      }
+      deviceLostReserved = java.time.Instant.now();
+      if (writer == null) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.unpersistedDeviceLostRestart(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+      // Write DEVICE_LOST only when the shutdown sequence accepts the restart under exit authority.
+      // Until then a quit may win, so this reservation must not spend the persistent budget.
+    }
+
+    synchronized boolean healthy() { return writer == null || writer.healthy(); }
+
+    synchronized List<java.time.Instant> priorRestarts(Path directory) throws java.io.IOException {
+      if (!healthy()) throw new java.io.IOException("an Engine self-intent write failed in this incarnation");
+      var history = new java.util.ArrayList<>(io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistory.read(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(directory)));
+      history.addAll(unpersistedRestarts);
+      if (deviceLostReserved != null) history.add(deviceLostReserved);
+      return List.copyOf(history);
     }
   }
 
@@ -1322,7 +1372,7 @@ public class HeadlessApp {
       final var newerDataNotice = io.justsearch.app.engine.DataVersionMarker.recordBoot(
           bootDataDir);
       operations = openOperationsForStartup(bootDataDir.resolve("operations.db"), operationsCleanupOwner);
-      // Phase 0: resolve config (tempdoc 502 Â§3.3)
+      // Phase 0: resolve config (tempdoc 502 §3.3)
       ConfigPhaseResult configPhase = resolveConfig(operations);
       settingsStore = configPhase.settingsStore();
       configStore = configPhase.configStore();
@@ -1438,10 +1488,9 @@ public class HeadlessApp {
       processRoot = engineRoot;
       // Spec A step 10: the chat controller restarts the Engine after a lost GPU, within the limit
       // its own self-intent records allow.
-      engineRoot.bindDeviceLostRecovery(deviceLostRecovery(configPhase.dataDir(), () -> {
-        var writer = selfIntentWriter.get();
-        return writer == null || writer.healthy();
-      }, deviceLostRestart));
+      selfIntentWriter.set(new LedgerSelfIntent(null, configPhase.dataDir()));
+      engineRoot.bindDeviceLostRecovery(deviceLostRecovery(
+          configPhase.dataDir(), selfIntentWriter.get(), deviceLostRestart));
       // Spec A §7.4: the machine's resumes reach the chat controller (timers reset, a probe).
       engineRoot.bindPowerEvents(powerEvents);
       // Spec E step E3: the Engine owns the one GPU memory reader and its residency sampler (the
@@ -1497,7 +1546,7 @@ public class HeadlessApp {
         return;
       }
 
-      // Start Knowledge Server asynchronously â€” startup runs in parallel with API construction.
+      // Start Knowledge Server asynchronously — startup runs in parallel with API construction.
       var settingsReconciled = new java.util.concurrent.CompletableFuture<Void>();
       var bootstrapLimits = engineRoot.executors().limits(
           io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
@@ -1542,7 +1591,7 @@ public class HeadlessApp {
           });
       pendingIndexStartup = workerFuture;
 
-      // Phase 2: Build API server (degraded mode â€” no Worker yet)
+      // Phase 2: Build API server (degraded mode — no Worker yet)
       ApiPhaseResult apiPhase;
       try {
         apiPhase = buildApi(
@@ -1561,10 +1610,10 @@ public class HeadlessApp {
       apiServer = apiPhase.apiServer();
 
       // Tempdoc 627 (N1): if the previous app session ended uncleanly (a leftover runtime manifest
-      // with a dead PID â€” the Head cannot observe its own crash in-life), narrate it now as a calm
+      // with a dead PID — the Head cannot observe its own crash in-life), narrate it now as a calm
       // occurrence on the existing RECENT EVENTS substrate. The substrate is up (buildApi above);
       // the publisher classified the leftover at construction, before publishHead overwrites it.
-      // Best-effort â€” never blocks boot.
+      // Best-effort — never blocks boot.
       if (manifestPublisher.detectedUncleanPreviousShutdown()) {
         try {
           var health = bootstrap.substrate().health();
@@ -1608,7 +1657,7 @@ public class HeadlessApp {
                     settingsHealth.conditionStore(), settingsHealth.changes()));
       }
 
-      // Tempdoc 501 Phase 1: first manifest write â€” head-only readiness. The lock file
+      // Tempdoc 501 Phase 1: first manifest write — head-only readiness. The lock file
       // is acquired here. Worker fields populated after Phase 3 below.
       try {
         manifestPublisher.publishHead(apiPhase.port(), apiPhase.sessionToken());
@@ -1650,7 +1699,7 @@ public class HeadlessApp {
           settingsMs, telemetryMs, apiMs, workerMs, totalMs);
       log.info("Local API Server started on port {}", apiPhase.port());
 
-      // Boot contract validation moved to before API server construction (tempdoc 502 Â§6).
+      // Boot contract validation moved to before API server construction (tempdoc 502 §6).
 
       final LocalApiServer apiServerRef = apiServer;
       final HeadAssembly bootstrapRef = bootstrap;
@@ -1667,11 +1716,10 @@ public class HeadlessApp {
               io.justsearch.app.engine.ShutdownRequestWatcher>
           shutdownRequestWatcherRef = new java.util.concurrent.atomic.AtomicReference<>();
       // Spec B §6.1 self-intents; kept for the writer's health (Spec A step 10, F10).
-      final LedgerSelfIntent selfIntent =
-          engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId());
-      selfIntentWriter.set(selfIntent);
+      final LedgerSelfIntent selfIntent = selfIntentWriter.get();
+      selfIntent.attach(engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId()));
       // Item B4: the ordered close is the composition root's (design 7.3). What is bound here is
-      // each step to the object it closes â€” those objects live in this module and app-services, so
+      // each step to the object it closes — those objects live in this module and app-services, so
       // they cannot move into the root without inverting the ui -> app-engine edge.
       final io.justsearch.app.engine.EngineShutdownSequence shutdownSequence =
           new io.justsearch.app.engine.EngineShutdownSequence(
@@ -1866,9 +1914,19 @@ public class HeadlessApp {
         }
         // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
         // (AppInstanceLock.close() returns silently if already closed).
-        containment.finishProcessRecording(java.time.Duration.ofSeconds(2));
+        boolean processRecordingComplete = false;
+        try {
+          containment.finishProcessRecording(java.time.Duration.ofSeconds(2));
+          processRecordingComplete = true;
+        } catch (RuntimeException recordingFailure) {
+          fatalStartup = true;
+          log.error("Unclean Engine exit: process witness recording failed; retaining instance lock", recordingFailure);
+          System.err.println("JUSTSEARCH_ENGINE_EXIT_UNCLEAN: exit_witness_recording_failed");
+          recordingFailure.printStackTrace(System.err);
+        }
         closeStartupResourcesAndInstanceLock(processResources, appInstanceLock,
-            workCleanupComplete && headCleanupComplete && indexCleanupComplete && operationsCleanupComplete);
+            processRecordingComplete && workCleanupComplete && headCleanupComplete
+                && indexCleanupComplete && operationsCleanupComplete);
       }
       // Tempdoc 501 Phase 18: api-port.txt is gone; the ordered sequence or fallback manifest
       // close above owns the remaining file cleanup.
@@ -2416,13 +2474,13 @@ public class HeadlessApp {
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "app-instance-lock",
-            reason -> {
+            (reason, budget) -> {
               if (!workDrained.get() || !headClosed.get() || !indexClosed.get()
                   || !operationsClosed.get() || !processResourcesClosed.get()) {
                 throw new IllegalStateException("Instance lock retained until stateful owners close");
               }
               io.justsearch.app.api.runtime.containment.EngineContainment.current()
-                  .finishProcessRecording(java.time.Duration.ofSeconds(2));
+                  .finishProcessRecording(budget.waitFor(java.time.Duration.ofSeconds(2), 2000));
               if (appInstanceLock != null) appInstanceLock.close();
               return null;
             }));
@@ -2434,7 +2492,7 @@ public class HeadlessApp {
       java.util.function.Consumer<KnowledgeServerBootstrap> onConstructed) {
     // Tempdoc 825: held outside the try so a failed start still RETURNS the instance. The pre-825
     // code manufactured the null that connectWorker then turned into a permanent DEGRADED pin with
-    // no monitor â€” the "boot brick" of 821 Â§O.4. The instance is restartable by construction
+    // no monitor — the "boot brick" of 821 §O.4. The instance is restartable by construction
     // (close() resets the started guard), which is what makes the recovery arm possible at all.
     KnowledgeServerBootstrap bootstrap = null;
     try {
@@ -2478,8 +2536,8 @@ public class HeadlessApp {
       log.error("Indexing and search features will be UNAVAILABLE.");
       log.error("Cause:", e);
       // Lane F stage A item A11: the "To fix: <hint>" line is gone with WorkerStartFailures. Every
-      // hint it produced named a process-start symptom â€” a missing worker JAR, a signal file that
-      // never carried a port, a pid that failed validation â€” and none of those can occur now that
+      // hint it produced named a process-start symptom — a missing worker JAR, a signal file that
+      // never carried a port, a pid that failed validation — and none of those can occur now that
       // the index half is composed in this JVM. Nothing replaces it: the line above already logs
       // the exception's own message, and the sentence the user is shown is startErrorFor()'s,
       // which prefers the bootstrap's latched index-fatal reason over the symptom seen here.
@@ -2553,8 +2611,61 @@ public class HeadlessApp {
       io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
       java.util.function.IntConsumer fatalHalt,
       java.util.function.Consumer<Runnable> launch) {
-    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch,
-        io.justsearch.app.engine.EngineShutdownSequence::runAndExitDeviceLost);
+    return new DeviceLostRestartAction(shutdown, publishPending, fatalHalt, launch);
+  }
+
+  /** Device-loss commit refusal is recoverable; hand-off and terminal chat follow acceptance. */
+  private static final class DeviceLostRestartAction implements Runnable {
+    private final java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown;
+    private final io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending;
+    private final java.util.function.IntConsumer fatalHalt;
+    private final java.util.function.Consumer<Runnable> launch;
+    private final java.util.concurrent.atomic.AtomicBoolean scheduled = new java.util.concurrent.atomic.AtomicBoolean();
+
+    private DeviceLostRestartAction(
+        java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+        io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+        java.util.function.IntConsumer fatalHalt, java.util.function.Consumer<Runnable> launch) {
+      this.shutdown = shutdown; this.publishPending = publishPending;
+      this.fatalHalt = fatalHalt; this.launch = launch;
+    }
+
+    @Override public void run() { request(() -> {}, failure -> {}); }
+
+    private void request(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+      if (!scheduled.compareAndSet(false, true)) return;
+      try {
+        launch.accept(() -> {
+          boolean[] committed = {false};
+          try {
+            var sequence = shutdown.join();
+            if (!sequence.runAndExitDeviceLost(() -> {
+              committed[0] = true;
+              accepted.run();
+              try { publishPending.run(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART); }
+              catch (Exception failure) { throw new IllegalStateException("Cannot publish device-loss restart hand-off", failure); }
+            })) refuse(refused, new IllegalStateException("device_lost_restart_commit_failed"));
+          } catch (RuntimeException | Error failure) {
+            if (!committed[0]) {
+              refuse(refused, new IllegalStateException("device_lost_restart_commit_failed", failure));
+            } else {
+              // A fault after durable acceptance retains the existing fatal-close policy.
+              log.error("Device-loss restart failed after commit; terminating Engine", failure);
+              fatalHalt.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+            }
+          }
+        });
+      } catch (RuntimeException | Error dispatchFailure) {
+        refuse(refused, new IllegalStateException("device_lost_restart_dispatch_failed", dispatchFailure));
+      }
+    }
+
+    private void refuse(java.util.function.Consumer<RuntimeException> refused, RuntimeException failure) {
+      scheduled.set(false);
+      log.error("Device-loss restart refused; Engine remains running: {}", failure.getMessage());
+      try { refused.accept(failure); }
+      catch (RuntimeException notificationFailure) { log.warn("Device-loss refusal notification failed", notificationFailure); }
+    }
   }
 
   /**
@@ -2563,24 +2674,27 @@ public class HeadlessApp {
    * of this incarnation failed, the count cannot be trusted, so the history is unreadable and the
    * controller fails closed.
    */
-  static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(Path dataDir,
-      java.util.function.BooleanSupplier ledgerWritesHealthy, Runnable restart) {
-    java.util.Objects.requireNonNull(dataDir, "dataDir");
-    java.util.Objects.requireNonNull(ledgerWritesHealthy, "ledgerWritesHealthy");
-    java.util.Objects.requireNonNull(restart, "restart");
+  static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(
+      Path dataDir, LedgerSelfIntent intent, Runnable restart) {
     return new io.justsearch.app.api.chat.DeviceLostRecovery() {
-      @Override
-      public List<java.time.Instant> priorRestarts() throws java.io.IOException {
-        if (!ledgerWritesHealthy.getAsBoolean()) {
-          throw new java.io.IOException("an Engine self-intent write failed in this incarnation");
-        }
-        return io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistory.read(
-            io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+      @Override public List<java.time.Instant> priorRestarts() throws java.io.IOException {
+        return intent.priorRestarts(dataDir);
       }
-
-      @Override
-      public void requestRestart() {
-        restart.run();
+      @Override public void reserveRestart() throws java.io.IOException {
+        try { intent.reserveDeviceLost(); }
+        catch (RuntimeException failure) { throw new java.io.IOException("Restart reservation failed", failure); }
+      }
+      @Override public void requestRestart() { requestRestart(() -> {}, failure -> {}); }
+      @Override public void requestRestart(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+        java.util.function.Consumer<RuntimeException> cancel = failure -> {
+          intent.cancelDeviceLostReservation();
+          refused.accept(failure);
+        };
+        if (restart instanceof DeviceLostRestartAction action) action.request(accepted, cancel);
+        else {
+          try { accepted.run(); restart.run(); }
+          catch (RuntimeException failure) { cancel.accept(failure); }
+        }
       }
     };
   }
@@ -2643,8 +2757,8 @@ public class HeadlessApp {
 
   /**
    * Tempdoc 915 R1: when the worker refused deterministically it wrote a fatal index reason before
-   * exiting, and the bootstrap latched it. That sentence â€” not the spawn symptom the Head happened to
-   * observe â€” is what {@code knowledgeServerStartError} must carry, because the string is rendered
+   * exiting, and the bootstrap latched it. That sentence — not the spawn symptom the Head happened to
+   * observe — is what {@code knowledgeServerStartError} must carry, because the string is rendered
    * verbatim to the user. Live arm 2 showed the alternative: "Worker process crashed (exit code 1)
    * before writing port to signal file" for an index the worker had deliberately left untouched. The
    * exception itself is still logged above at ERROR with its stack, so nothing is lost.
