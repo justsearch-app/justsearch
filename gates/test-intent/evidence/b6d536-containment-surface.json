@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T07:33:51.293Z",
-  "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
-  "tree": "7c2c20c5d3b6b7958e9f329af314184cae8ae950",
+  "createdAt": "2026-10-14T16:18:00.190Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "0eeec00fe8c8051e46fcfa43252c6e7c2eac3721",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4061
+      "durationMs": 5511
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired\" --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.containedOrInapplicableNeverRefuses\" --tests \"io.justsearch.ui.runtime.RuntimeManifestContainmentTest.manifestCarriesTheBootContainmentFromTheFirstWrite\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4552
+      "durationMs": 4591
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall\" --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.containedOrInapplicableEnginePublishesNothing\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4242
+      "durationMs": 4515
     }
   ],
   "checks": [
@@ -101,7 +101,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java#unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7bce920f861c7593d57259afcfc2d7509cd170141c477c11e4880b0e9c9d57ee",
+      "contentDigest": "sha256:250010b68869998fe5f58e34ccfcdacc8143cb7465210b01d1f5806b9a9aaf8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -116,7 +116,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java#containedOrInapplicableEnginePublishesNothing",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7bce920f861c7593d57259afcfc2d7509cd170141c477c11e4880b0e9c9d57ee",
+      "contentDigest": "sha256:250010b68869998fe5f58e34ccfcdacc8143cb7465210b01d1f5806b9a9aaf8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -129,5 +129,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:10932a83700d8550ecbb5d96833ef72e7a5f2c47b7919a07e2fcda8cfb4631a9"
+  "digest": "sha256:caea6472f525ea9a2136d2b5145050af0e616967db5d2316ed460f88fae42c0e"
 }

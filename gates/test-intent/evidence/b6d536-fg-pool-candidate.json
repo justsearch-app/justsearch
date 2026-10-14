@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T05:46:27.601Z",
-  "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
-  "tree": "b2a18649217085870f66dffa3f5c24760365728e",
+  "createdAt": "2026-10-14T16:48:06.709Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ApiErrorHandlerResolveTest.wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay\" --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6095
+      "durationMs": 5920
     },
     {
-      "command": "npx vitest run \"src/api/admissionFetch.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-26144-1791351985941.json\"",
+      "command": "npx vitest run \"src/api/admissionFetch.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-29560-1791996485487.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1658
+      "durationMs": 1221
     }
   ],
   "checks": [
@@ -50,7 +50,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8620b4f8db0d86bdf4964e8f516f3f3a8b11aecca08327946386779cc40d094e",
+      "contentDigest": "sha256:d1b27c531f2a0eaac0a6868d62f5637b8e3f7d83890be4adefb2d25d9c972860",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java#downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0c89197c9ead5b58bb28526909f7f9061f3bbdde40228b24b1ad19ddba1a4a16",
+      "contentDigest": "sha256:09bc57a9c8a58c3920cb5fb2902bf1c34e0b51790817f0de59821e45782fe03c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,5 +108,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:5d74631369004b137b180fd0e70e7cdda91ec91021de8cec484505071997c0f9"
+  "digest": "sha256:0e6ca5e065156ada57dba07a09ad587ca2154e19cd90bbdb76368de53df00cce"
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T22:03:57.140Z",
-  "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
-  "tree": "b77a92b653cc11b0ef68625475cf08e53248b648",
+  "createdAt": "2026-10-14T16:45:56.396Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "133f5e7f9b4252bf871ea2eaa700635879121a97",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.installedProfilePathKeepsItsMeasuredPlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.customChatDisablesEveryAutomaticGpuRoleThroughPrepare\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aDeviceOverrideLeavesTheOtherRolesAndChatPlanned\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.unchangedPlanningDoesNotRepeatInfoLogs\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anOperatorLockedProfileIsBudgetedAsTheActualLaunch\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anInstallerStandardPathFollowsTheCompactDevicePlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChangedArtifactAtTheShippedPathIsStillCustom\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.anExternalServerRefusalNamesTheExternalServer\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.heldVduRefusesPreparationBeforeAnyDrain\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.pendingVduEntryRefusesPreparationBetweenItsTwoSteps\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aPreparedConfigurationRetainsOwnershipUntilCommitOrAbort\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.explicitGpuEncodersKeepPressureProtectionWithMasterOff\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 20440
+      "durationMs": 5444
     }
   ],
   "checks": [
@@ -29,11 +29,15 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#installedProfilePathKeepsItsMeasuredPlan",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(24564)",
+          "status": "passed"
+        },
         {
           "name": "installedProfilePathKeepsItsMeasuredPlan(16376)",
           "status": "passed"
@@ -52,7 +56,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#customChatDisablesEveryAutomaticGpuRoleThroughPrepare",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -67,7 +71,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aDeviceOverrideLeavesTheOtherRolesAndChatPlanned",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -98,7 +102,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -113,7 +117,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -128,7 +132,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#unchangedPlanningDoesNotRepeatInfoLogs",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -143,7 +147,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anOperatorLockedProfileIsBudgetedAsTheActualLaunch",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -158,7 +162,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -173,7 +177,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChangedArtifactAtTheShippedPathIsStillCustom",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:85407f167579cba6c73ce39205a2658e5524e73541e6639f9a6b3756e7dadcf8",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -188,7 +192,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#anExternalServerRefusalNamesTheExternalServer",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ef63a603a37f0a2fc7bde19471b2935ac49d131631d56346e29704f73c2fda84",
+      "contentDigest": "sha256:e808f39f7d9c82c679a3e27d6d6d2e4c91ac804b1b93d6cdbdf93690828faec8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -203,7 +207,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#heldVduRefusesPreparationBeforeAnyDrain",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ef63a603a37f0a2fc7bde19471b2935ac49d131631d56346e29704f73c2fda84",
+      "contentDigest": "sha256:e808f39f7d9c82c679a3e27d6d6d2e4c91ac804b1b93d6cdbdf93690828faec8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -218,7 +222,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#pendingVduEntryRefusesPreparationBetweenItsTwoSteps",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ef63a603a37f0a2fc7bde19471b2935ac49d131631d56346e29704f73c2fda84",
+      "contentDigest": "sha256:e808f39f7d9c82c679a3e27d6d6d2e4c91ac804b1b93d6cdbdf93690828faec8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -233,7 +237,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aPreparedConfigurationRetainsOwnershipUntilCommitOrAbort",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ef63a603a37f0a2fc7bde19471b2935ac49d131631d56346e29704f73c2fda84",
+      "contentDigest": "sha256:e808f39f7d9c82c679a3e27d6d6d2e4c91ac804b1b93d6cdbdf93690828faec8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -304,14 +308,14 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.installedProfilePathKeepsItsMeasuredPlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.customChatDisablesEveryAutomaticGpuRoleThroughPrepare\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aDeviceOverrideLeavesTheOtherRolesAndChatPlanned\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.unchangedPlanningDoesNotRepeatInfoLogs\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anOperatorLockedProfileIsBudgetedAsTheActualLaunch\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anInstallerStandardPathFollowsTheCompactDevicePlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChangedArtifactAtTheShippedPathIsStillCustom\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.anExternalServerRefusalNamesTheExternalServer\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.heldVduRefusesPreparationBeforeAnyDrain\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.pendingVduEntryRefusesPreparationBetweenItsTwoSteps\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aPreparedConfigurationRetainsOwnershipUntilCommitOrAbort\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.explicitGpuEncodersKeepPressureProtectionWithMasterOff\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 31274
+        "durationMs": 55758
       }
     ],
     "checks": [
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#installedProfilePathKeepsItsMeasuredPlan",
         "classification": "assertion",
-        "detail": "installedProfilePathKeepsItsMeasuredPlan(16376): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the installer's absolute path identifies the shipped profile file ==> expected: <true> but was: <false> | installedProfilePathKeepsItsMeasuredPlan(12282): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the installer's absolute path identifies the shipped profile file ==> expected: <true> but was: <false> | installedProfilePathKeepsItsMeasuredPlan(817"
+        "detail": "installedProfilePathKeepsItsMeasuredPlan(24564): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the installer's absolute path identifies the shipped profile file ==> expected: <true> but was: <false> | installedProfilePathKeepsItsMeasuredPlan(16376): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the installer's absolute path identifies the shipped profile file ==> expected: <true> but was: <false> | installedProfilePathKeepsItsMeasuredPlan(122"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#customChatDisablesEveryAutomaticGpuRoleThroughPrepare",
@@ -385,5 +389,5 @@
       }
     ]
   },
-  "digest": "sha256:beb16b3d5bc7a80ed0f344425332898dd6b066b7d47ff042a617b5e251433ea4"
+  "digest": "sha256:ffbce0e27ce1893ba2f5d82b81bff2624d052f6be4f44fdb6e8214d787a07bc7"
 }

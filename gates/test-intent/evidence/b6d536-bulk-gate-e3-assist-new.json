@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T14:38:14.279Z",
-  "revision": "f5c7df712a6cf7e4ba1c8bf560f6a62738bd352e",
-  "tree": "5f987a6d4cdfa97d6f85f27b32bc86692549de7d",
+  "createdAt": "2026-10-14T15:55:51.759Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "e0323b9177c82412a43ca8a9c7f18a72cea3a175",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.chat.AssistLeaseTest.assistLeasesHoldDrainsAndFailFastButNeverGenerateOrPace\" --tests \"io.justsearch.app.inference.chat.AssistLeaseTest.vduLeasesHoldDrainsButAreNeverCountedAsGenerating\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3687
+      "durationMs": 6027
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java#assistLeasesHoldDrainsAndFailFastButNeverGenerateOrPace",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7c6a2f84ef4f4d41b7d9f4467bb1002eb9ede96e8ab391d800856aeb9d8df410",
+      "contentDigest": "sha256:c19b250a1f6eb120f700449c7f2aa72eb913d1f198ae0e49029939d61055f26f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java#vduLeasesHoldDrainsButAreNeverCountedAsGenerating",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7c6a2f84ef4f4d41b7d9f4467bb1002eb9ede96e8ab391d800856aeb9d8df410",
+      "contentDigest": "sha256:c19b250a1f6eb120f700449c7f2aa72eb913d1f198ae0e49029939d61055f26f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:c68a7ff46997b0bcf7115644beae0ec6d40f248b855e0dda7caaa74060f1ab34"
+  "digest": "sha256:6696eeebfcc2c2cc76833ce9c8eae371f2773ccff1af5dded2f893a0d73194b3"
 }
