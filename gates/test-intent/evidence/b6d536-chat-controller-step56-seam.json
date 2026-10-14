@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:35:52.864Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "b4c620e389d2f7c5b8e52f209822db38a3869b33",
+  "createdAt": "2026-10-14T17:35:01.134Z",
+  "revision": "228c9da66221dd21e9ded4debbd9efc4a2c20584",
+  "tree": "4a2354163bf6d721f4dc0931fdad20d6005dc6fa",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest.theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter\" --tests \"io.justsearch.app.services.vdu.OfflinePassChatSeamTest.aPassWithEmbeddingsPendingLeavesChatRunning\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 28258
+      "durationMs": 11938
     }
   ],
   "checks": [
@@ -59,30 +59,33 @@
   "failBefore": {
     "ref": "d3fe74ef2",
     "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
-    "overlays": [
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java"
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-step56-seam-compat.patch",
+        "contentDigest": "sha256:be36287b29e997a6a6a7bc80a818366fbe86d966a4704602ea538ff6558571bc"
+      }
     ],
-    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest.theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter\" --tests \"io.justsearch.app.services.vdu.OfflinePassChatSeamTest.aPassWithEmbeddingsPendingLeavesChatRunning\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 15437
+        "durationMs": 49092
       }
     ],
     "checks": [
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java#theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: U11: the main server is stopped before the candidate launches ==> expected: <false> but was: <true>"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java#aPassWithEmbeddingsPendingLeavesChatRunning",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "assertion",
+        "detail": "aPassWithEmbeddingsPendingLeavesChatRunning(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat stays up through the pass ==> expected: <0> but was: <1775>"
       }
     ]
   },
-  "digest": "sha256:28c1df14019efae2f9eddf415b3ae059910d535704c194da2b71afbaeac8c1c5"
+  "digest": "sha256:15e56e001d9e85afdd9cbbfd63c73996a2b9d52a433085ce4053ccbbc938baaa"
 }

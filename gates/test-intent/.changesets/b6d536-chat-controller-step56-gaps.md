@@ -18,13 +18,23 @@ until Windows releases what the ended servers held before the test directory is 
 changeset covers only these files.
 
 Records phase B (batch 3) re-ran both evidence files on b599d4d7e because their check files changed
-after the first runs. The checks no longer compile against d3fe74ef2 with the ManagedChatSeam
-overlay. They now build RuntimeReconciler with the lease-free constructor that 5e4f4e698 left, and
-pass ChildControl to BootstrapInferenceFactory.createInferenceManager. At d3fe74ef2 both need
-overloads that would run real wiring, which is more than declarations. `b6d536-chat-controller-step56-install-freeze.json` holds a preservation check
-only, so it was re-run without a before-state and passes on the change. In
-`b6d536-chat-controller-step56-seam.json` both checks pass on the change, but the fail-before is a
-compile failure, so entry 1 stays invalid until the coordinator decides how to show it.
+after the first runs. The checks now build RuntimeReconciler with the lease-free constructor that
+5e4f4e698 left, and ManagedChatSeam can pass ChildControl to
+BootstrapInferenceFactory.createInferenceManager, so they no longer compile on d3fe74ef2 with the
+ManagedChatSeam overlay alone.
+
+- `b6d536-chat-controller-step56-seam.json` keeps its before ref d3fe74ef2, the parent of the lane
+  commit 0b7b9df44 that introduced the behaviour. In place of the overlay, the fail-before applies
+  the compat before-patch `gates/test-intent/evidence/b6d536-chat-controller-step56-seam-compat.patch`.
+  It adds one production constructor: RuntimeReconciler without the lease, delegating to that
+  state's own Engine constructor with a fresh RuntimeGpuLease, as ServicePhase builds it. It also
+  carries a before-API variant of ManagedChatSeam: the candidate's file without its ChildControl
+  branch, which the named checks never use, so no assertion changes. No d3fe74ef2 code calls the
+  constructor. Both checks pass on the change and again fail on d3fe74ef2 by the same assertions as
+  the first record: the main server alive at the candidate's launch, and chat stopped for the
+  embedding hand-off.
+- `b6d536-chat-controller-step56-install-freeze.json` holds a preservation check only, so it was
+  re-run without a before-state and passes on the change.
 
 ```json
 {
