@@ -215,6 +215,11 @@ public final class EngineRoot implements WorkerHost {
         public void requestRestart() {
           deviceLostRecovery.requestRestart();
         }
+
+        @Override
+        public void requestRestart(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+          deviceLostRecovery.requestRestart(accepted, refused);
+        }
       };
 
   private final Object deviceLossLock = new Object();

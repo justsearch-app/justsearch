@@ -116,6 +116,13 @@ final class ChatDeviceLossTest {
       restarts.incrementAndGet();
       restarted.countDown();
     }
+
+    // No @Override: this fixture also compiles before the commit-handshake API exists.
+    public void requestRestart(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+      // This in-memory fixture has no commit I/O; it always accepts before signaling the observer.
+      accepted.run();
+      requestRestart();
+    }
   }
 
   private static void barrier(ChatServerControllerImpl c) throws Exception {

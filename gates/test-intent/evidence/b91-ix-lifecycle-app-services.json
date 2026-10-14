@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T15:08:43.818Z",
-  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
-  "tree": "56593013d794ce7e40cbceb7e2bde8877fe24d0b",
+  "createdAt": "2026-10-14T08:04:40.293Z",
+  "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+  "tree": "0d574542db89b8606a03d3f60dad357689bd0d16",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.aReservationFailureLatchesChatInsteadOfRequestingRestart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsWaitForTheActualStart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsBothObserveStartFailure\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipIncludesRetainedExitEvidenceAndLossRecords\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipExplainsUnavailableExitEvidence\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 76940
+      "durationMs": 30416
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#aReservationFailureLatchesChatInsteadOfRequestingRestart",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:04b784448226c168e8e011ea1e2640ac7f18b0d6d04b0a738671d7d1e2a2d923",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -111,7 +111,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.aReservationFailureLatchesChatInsteadOfRequestingRestart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsWaitForTheActualStart\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.equivalentRunningHoldsBothObserveStartFailure\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipIncludesRetainedExitEvidenceAndLossRecords\" --tests \"io.justsearch.app.services.diagnostics.DiagnosticsServiceImplRedactionTest.zipExplainsUnavailableExitEvidence\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 86746
+        "durationMs": 260797
       }
     ],
     "checks": [
@@ -142,5 +142,5 @@
       }
     ]
   },
-  "digest": "sha256:2ec303d24d3fb86feffde75bb1deab206ec6d5f3e7b3c79db968f433d1df7a50"
+  "digest": "sha256:096c552aaf6c90c91487df7d79dd40d641e49a1d0548ab2144c8fc29d9b01d0e"
 }

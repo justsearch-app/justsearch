@@ -45,19 +45,19 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Production implementation of {@link DiagnosticsService}, extracted from
- * {@code DiagnosticsController.exportDiagnostics} as part of tempdoc 519 Â§9 Block B3 / Step 3.
+ * {@code DiagnosticsController.exportDiagnostics} as part of tempdoc 519 §9 Block B3 / Step 3.
  *
  * <p>Composes:
  * <ul>
- *   <li>{@link EnterprisePolicyService} (B1) â€” policy snapshot included in the zip.</li>
- *   <li>{@link GpuCapabilitiesService} (gpu-bridge module) â€” GPU capability snapshot.</li>
- *   <li>{@link DebugStateProvider} â€” debug-state snapshot SPI (impl in
+ *   <li>{@link EnterprisePolicyService} (B1) — policy snapshot included in the zip.</li>
+ *   <li>{@link GpuCapabilitiesService} (gpu-bridge module) — GPU capability snapshot.</li>
+ *   <li>{@link DebugStateProvider} — debug-state snapshot SPI (impl in
  *       {@code modules/ui/.../api/DebugStateController}).</li>
- *   <li>{@link StatusSnapshotProvider} â€” status snapshot SPI (impl in
+ *   <li>{@link StatusSnapshotProvider} — status snapshot SPI (impl in
  *       {@code modules/ui/.../api/StatusLifecycleHandler}).</li>
  * </ul>
  *
- * <p>The DebugStateProvider / StatusSnapshotProvider SPI extraction follows the Â§9 module-
+ * <p>The DebugStateProvider / StatusSnapshotProvider SPI extraction follows the §9 module-
  * inversion pattern (B1 precedent): rather than depending on the ui-side concrete classes,
  * this app-services impl depends on app-api interfaces, and the ui classes implement them.
  */
@@ -82,7 +82,7 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
   private final Supplier<StatusSnapshotProvider> statusSnapshotProviderSupplier;
 
   /**
-   * Â§31 Phase 2: SPI providers passed as suppliers so ServicePhase can construct
+   * §31 Phase 2: SPI providers passed as suppliers so ServicePhase can construct
    * DiagnosticsServiceImpl before the ui-side controllers exist. The suppliers resolve at
    * use-time (export-diagnostics request), by which point the controllers + their SPI impls
    * are wired in via the BootstrapLateBindings AtomicReferences from LocalApiServer.
@@ -120,7 +120,7 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
 
     try (OutputStream fos = Files.newOutputStream(outZip);
         ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
-      // Core state files (redacted â€” may contain configured paths)
+      // Core state files (redacted — may contain configured paths)
       addFileRedacted(zos, aiHome.resolve("install-state.json"), "ai/install-state.json");
       addFileRedacted(zos, aiHome.resolve("pack-import-state.json"), "ai/pack-import-state.json");
       addFileRedacted(zos, aiHome.resolve("installed-packs.v1.json"), "ai/installed-packs.v1.json");
@@ -227,29 +227,34 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     }).reversed().thenComparing(file -> file.getFileName().toString()));
     int exported = 0;
     long omitted = 0;
+    int skippedLines = 0;
     for (Path file : retained) {
       try {
         LedgerTail tail = exitLedgerTail(file, MAX_EXIT_LEDGER_BYTES - exported);
         addBytesRedacted(zos, tail.bytes(), "runtime/exit-ledger/" + file.getFileName());
         exported += tail.bytes().length;
         omitted += tail.omitted();
+        skippedLines += tail.skippedLines();
       } catch (IOException unavailable) { failures.add(file.getFileName() + ": collection failed"); }
     }
     if (omitted > 0) addBytesRedacted(zos,
         ("Truncated exit-ledger export: " + omitted + " source bytes omitted; newest records retained within 8388608 bytes.\n")
             .getBytes(StandardCharsets.UTF_8), "runtime/exit-ledger/truncation.txt");
+    if (skippedLines > 0) addBytesRedacted(zos,
+        ("Skipped " + skippedLines + " malformed or incomplete lines in the bounded exit-ledger suffixes.\n")
+            .getBytes(StandardCharsets.UTF_8), "runtime/exit-ledger/skipped-lines.txt");
     if (!failures.isEmpty()) addBytesRedacted(zos,
         String.join("\n", failures).getBytes(StandardCharsets.UTF_8),
         "runtime/exit-ledger/collection-failures.txt");
   }
 
-  private record LedgerTail(byte[] bytes, long omitted) {}
+  private record LedgerTail(byte[] bytes, long omitted, int skippedLines) {}
 
   /** Reads only a bounded suffix, drops a partial leading record, then enforces the redacted byte cap. */
   private static LedgerTail exitLedgerTail(Path file, int budget) throws IOException {
     try (RandomAccessFile input = new RandomAccessFile(file.toFile(), "r")) {
       long size = input.length(), start = Math.max(0, size - budget);
-      if (budget == 0) return new LedgerTail(new byte[0], size);
+      if (budget == 0) return new LedgerTail(new byte[0], size, 0);
       input.seek(start == 0 ? 0 : start - 1);
       if (start > 0 && input.read() != '\n') {
         byte[] scan = new byte[8192];
@@ -265,22 +270,35 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
       }
       byte[] raw = new byte[(int) (size - input.getFilePointer())];
       input.readFully(raw);
-      String text = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(raw)).toString();
-      String[] lines = text.split("\n", -1);
       List<byte[]> records = new ArrayList<>();
-      int used = 0;
+      int used = 0, skippedLines = 0, end = raw.length;
       long sourceKept = 0;
-      for (int i = lines.length - 1; i >= 0; i--) {
-        if (i == lines.length - 1 && lines[i].isEmpty()) continue;
-        String line = lines[i].endsWith("\r") ? lines[i].substring(0, lines[i].length() - 1) : lines[i];
+      // A writer may be appending the last record. Only newline-terminated records are complete.
+      if (end > 0 && raw[end - 1] != '\n') {
+        while (end > 0 && raw[end - 1] != '\n') end--;
+        skippedLines++;
+      }
+      while (end > 0) {
+        int startLine = end - 1;
+        while (startLine > 0 && raw[startLine - 1] != '\n') startLine--;
+        int length = end - startLine - 1;
+        if (length > 0 && raw[startLine + length - 1] == '\r') length--;
+        final String line;
+        try {
+          line = StandardCharsets.UTF_8.newDecoder()
+              .decode(java.nio.ByteBuffer.wrap(raw, startLine, length)).toString();
+        } catch (java.nio.charset.CharacterCodingException malformed) {
+          skippedLines++; end = startLine; continue;
+        }
         byte[] redacted = (redactPaths(line) + "\n").getBytes(StandardCharsets.UTF_8);
         if (used + redacted.length > budget) break;
         records.add(redacted); used += redacted.length;
-        sourceKept += lines[i].getBytes(StandardCharsets.UTF_8).length + (i < lines.length - 1 ? 1 : 0);
+        sourceKept += end - startLine;
+        end = startLine;
       }
       var bytes = new java.io.ByteArrayOutputStream(used);
       for (int i = records.size() - 1; i >= 0; i--) bytes.writeBytes(records.get(i));
-      return new LedgerTail(bytes.toByteArray(), size - sourceKept);
+      return new LedgerTail(bytes.toByteArray(), size - sourceKept, skippedLines);
     }
   }
 

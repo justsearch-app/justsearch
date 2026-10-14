@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T22:42:39.393Z",
-  "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
-  "tree": "ed86f3401dab2911063aeb0b2462712f6f1441fb",
+  "createdAt": "2026-10-14T07:58:39.388Z",
+  "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+  "tree": "bc74fe67a84e1cf429c760fd9f0cc57339fa7284",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest.ledgerWriteFailureIsVisibleUntilDurableRecovery\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.aFailedSelfIntentWriteFailsTheCountClosed\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 21325
+      "durationMs": 22578
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4876fb71f3db335830b97d9269d1cd6ed56a2471109e3349c19b6f00a75ebf8c",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4876fb71f3db335830b97d9269d1cd6ed56a2471109e3349c19b6f00a75ebf8c",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#aFailedSelfIntentWriteFailsTheCountClosed",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4876fb71f3db335830b97d9269d1cd6ed56a2471109e3349c19b6f00a75ebf8c",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4876fb71f3db335830b97d9269d1cd6ed56a2471109e3349c19b6f00a75ebf8c",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -111,7 +111,7 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest.ledgerWriteFailureIsVisibleUntilDurableRecovery\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.aFailedSelfIntentWriteFailsTheCountClosed\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 36090
+        "durationMs": 100595
       }
     ],
     "checks": [
@@ -142,5 +142,5 @@
       }
     ]
   },
-  "digest": "sha256:37ef0396e1e75c57953ab09bd677571cb9d811eda043a84229b4dbe798833ebc"
+  "digest": "sha256:82b29b72fc814749ebe7b682abc9c3a18e5587792ec9bed7778ae4c9408cf84d"
 }

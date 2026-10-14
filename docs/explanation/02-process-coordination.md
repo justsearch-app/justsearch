@@ -103,11 +103,17 @@ hand-off is published. If that write fails, the Engine stays running, chat is la
 `device_lost_limit` for an operator retry, and exit-ledger health plus
 `device_lost_restart_commit_failed` explain the refusal. No restart budget is spent. A later quit
 or upgrade may record its own intent after storage recovers.
+The Engine's recovery adapter forwards both commit callbacks to that recorder. An adapter that
+does not implement the commit handshake refuses with
+`device_lost_restart_commit_handshake_unavailable`, leaving chat available for a retry.
 
 Diagnostics include at most 8 MiB of redacted exit-ledger records across both families and their
 retained files, selecting file suffixes in descending modification-time order. The export states
 the number of omitted source bytes in `runtime/exit-ledger/truncation.txt`; collection failures
 remain separately visible. Path redaction still applies to every selected record.
+Malformed UTF-8 lines and an unterminated final line are skipped individually, preserving the
+complete records around them. `runtime/exit-ledger/skipped-lines.txt` states how many such lines
+were skipped in the bounded suffixes inspected for export; they also count as omitted source bytes.
 
 Named resume limit: on a single-slot server (`slots=1`, including VDU mode), a generation that
 produces no token for the 10-second probe timeout is probed and may be relaunched. This includes

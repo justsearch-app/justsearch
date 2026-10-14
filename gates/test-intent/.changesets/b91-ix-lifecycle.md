@@ -541,6 +541,95 @@ This is unchanged behavior, not a new health guarantee.
           "choice": "Drive device-loss history and write-refusal tests through the same recorder binding production uses, preserving their expectations and before-state assertion failures."
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/chat/DeviceLostRecoveryHandshakeTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "An adapter that cannot acknowledge a durable commit refuses the two-step restart request without making chat terminal or issuing an unverified plain request.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-4 orchestrator decisions under this delegation.",
+          "label": "agent choice",
+          "choice": "An adapter that cannot acknowledge a durable commit refuses the two-step restart request without making chat terminal or issuing an unverified plain request."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r4-all.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/chat/DeviceLostRecoveryHandshakeTest.java#aLegacyAdapterCannotAcceptBeforeCommit"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The actual EngineRoot/executors/inference-factory/chat chain forwards commit callbacks: a refused second write leaves chat latched, visibly failed and retryable with no halt, hand-off or spent budget; success commits first, ends chat second and publishes the hand-off third.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-4 orchestrator decisions under this delegation.",
+          "label": "agent choice",
+          "choice": "The actual EngineRoot/executors/inference-factory/chat chain forwards commit callbacks: a refused second write leaves chat latched, visibly failed and retryable with no halt, hand-off or spent budget; success commits first, ends chat second and publishes the hand-off third."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r4-all.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java#aRefusedCommitThroughEngineRootKeepsChatRetryable",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java#aCommittedRestartThroughEngineRootCommitsThenEndsChatThenHandsOff"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerTornLineTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Diagnostics retain complete UTF-8 ledger records around malformed or incomplete lines, state how many selected lines were skipped, and retain exact source-byte omission accounting within the existing 8 MiB budget.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-4 orchestrator decisions under this delegation.",
+          "label": "agent choice",
+          "choice": "Diagnostics retain complete UTF-8 ledger records around malformed or incomplete lines, state how many selected lines were skipped, and retain exact source-byte omission accounting within the existing 8 MiB budget."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r4-all.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerTornLineTest.java#exportKeepsCompleteRecordsAroundMalformedAndTornLines"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDeviceLossWitnessTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Recovery test doubles explicitly accept the commit handshake while keeping restart, shutdown, history and fail-closed expectations unchanged. Restore damaged UTF-8 comment characters in the existing device-loss test; its expectations stay unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-4 orchestrator decisions under this delegation.",
+          "label": "agent choice",
+          "choice": "Recovery test doubles explicitly accept the commit handshake while keeping restart, shutdown, history and fail-closed expectations unchanged. Restore damaged UTF-8 comment characters in the existing device-loss test; its expectations stay unchanged."
+        }
+      ]
     }
   ]
 }

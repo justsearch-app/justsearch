@@ -52,6 +52,13 @@ final class EngineDeviceLossWitnessTest {
       public void requestRestart() {
         restarted.countDown();
       }
+
+      @Override
+      public void requestRestart(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+        // This fixture accepts every request; signal only after the terminal step completes.
+        accepted.run();
+        requestRestart();
+      }
     });
     try (var manager = BootstrapInferenceFactory.createInferenceManager(root.executors(), true,
         inferenceConfig(tempDir), tempDir.toString(), null,

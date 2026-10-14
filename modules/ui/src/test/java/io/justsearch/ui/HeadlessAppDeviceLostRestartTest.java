@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Spec A Ã‚Â§7.3 and reconciliation F10 at the composition root: the chat controller's device-lost
+ * Spec A §7.3 and reconciliation F10 at the composition root: the chat controller's device-lost
  * restart path counts this data directory's earlier DEVICE_LOST self-intents, fails closed when a
  * self-intent write failed, and its restart records the DEVICE_LOST self-intent the next
  * incarnation counts, closes in restart order and exits 4.
