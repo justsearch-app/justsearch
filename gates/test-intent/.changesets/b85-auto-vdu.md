@@ -15,6 +15,35 @@ Independent verification supplies acceptance; the builder does not accept this c
 The new round-4 cases use named regular methods instead of parameterized display names
 so the unchanged evidence producer can select every case; their oracles are identical.
 
+Phase B refresh on b599d4d7e. When b6d536/vdu-auto merged (bc5978095), the checks were adapted to
+the integration line: QuitBudget, ProcessTerminator.open(ProcessHandle), the lease-less
+RuntimeReconciler constructor and the budgeted shutdown sequence. None of these exist on the
+vdu-auto lane. Each evidence file keeps its lane before-state, the parent of the commit that added
+its checks, and applies a compat patch:
+
+- r4-r1 runs on 0a79303bb (parent of 13524ddf0) with b85-auto-vdu-r4-r1-refresh-compat.patch.
+- r4-r2 runs on 13524ddf0 (parent of 14a7eb8a2) with b85-auto-vdu-r4-r2-refresh-compat.patch.
+- r3-java runs on 14a7eb8a2 (parent of 83f07cc4c) with b85-auto-vdu-r3-java-compat.patch.
+
+The patches add three kinds of code:
+
+- QuitBudget, unchanged, with the two EngineSupervisionPolicy constants it reads.
+- Delegating overloads:
+  - RuntimeReconciler without a lease, which creates one.
+  - EngineShutdownSequence.run with a budget, which ignores it.
+  - HeadlessApp.orderedShutdownSteps with a Duration-taking producer drain. It is varargs, so
+    existing callers that pass null keep their binding.
+- Immediate no-op returns for API that arrived with the checks:
+  - HeadAssembly.cancelEnrichmentForQuit and awaitEnrichmentCancelForQuit, plus
+    quiesceEnrichmentForTerminalShutdown on 13524ddf0.
+  - KnowledgeClient.recoverVduProcessingForOwner.
+  - InferenceLifecycleManager.beginTerminalShutdown.
+  - OfflineCoordinator.cancelForShutdown.
+
+SlowStartFakeLlamaServer and the app-services test dependency on app-engine come from the commit
+that added the checks, instead of overlaying today's fixture and build file. Nothing at those
+before-states calls the added code. Every repaired check fails by assertion.
+
 ```json
 {
   "entries": [
@@ -24,7 +53,7 @@ so the unchanged evidence producer can select every case; their oracles are iden
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Idle loaded chat lends its managed process to one captured VDU batch, restores exactly once, yields to a human demand or activity at the current document boundary, refuses a racing lease without draining it, rolls back failed entry without retry loops, and shuts down without relaunching or admitting waiting chat. The real controller/lifecycle/tracker/pacing/coordinator/processor wiring is exercised through controlled process endpoints.",
+      "behaviour": "Idle loaded chat lends its managed process to one captured VDU batch, restores exactly once, yields to a human demand or activity at the current document boundary, refuses a racing lease without draining it, rolls back failed entry without retry loops, and shuts down without relaunching or admitting waiting chat. The real controller/lifecycle/tracker/pacing/coordinator/processor wiring is exercised through controlled process endpoints. Fail-before: 0a79303bb with b85-auto-vdu-r4-r1-refresh-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -116,7 +145,7 @@ so the unchanged evidence producer can select every case; their oracles are iden
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Failed normal restoration leaves the normal snapshot offline, with bounded backoff or immediate human retry. Automatic BUSY entry defers without a false offline reason. Shutdown abandons the current document for all pass kinds without FAILED acknowledgement or normal relaunch; the five-second live-work drain follows the normal terminal stop allowance. Both automatic paths wait the full process startup idle interval. Status identifies only loaded automatic borrowing. Later rounds retain these oracles and add the repairs documented below.",
+      "behaviour": "Failed normal restoration leaves the normal snapshot offline, with bounded backoff or immediate human retry. Automatic BUSY entry defers without a false offline reason. Shutdown abandons the current document for all pass kinds without FAILED acknowledgement or normal relaunch; the five-second live-work drain follows the normal terminal stop allowance. Both automatic paths wait the full process startup idle interval. Status identifies only loaded automatic borrowing. Later rounds retain these oracles and add the repairs documented below. Fail-before: 13524ddf0 with b85-auto-vdu-r4-r2-refresh-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -147,7 +176,7 @@ so the unchanged evidence producer can select every case; their oracles are iden
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "When enrichment is active, production shutdown fences and cancels it before closing admission and waiting for durable live work. The round-3 fixture adaptation explicitly selects an active pass and preserves this order oracle.",
+      "behaviour": "When enrichment is active, production shutdown fences and cancels it before closing admission and waiting for durable live work. The round-3 fixture adaptation explicitly selects an active pass and preserves this order oracle. Fail-before: 13524ddf0 with b85-auto-vdu-r4-r2-refresh-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -309,7 +338,7 @@ so the unchanged evidence producer can select every case; their oracles are iden
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "New normal configuration supersedes a pending restore, both restarted and record-only. Restoration timer and human demand obey game/GPU pressure, including load-anyway and reload dwell. An explicit pass during pending restoration retains its original demand gate. A start race rearms at the next full idle window without human activity. A three-second owned-process stop during a cancelled pass retains PENDING and drains within the normal terminal allowance. An explicit entry waiting on normal chat preserves that exchange until ordinary interactive cancellation; terminal preparation fences every later process launch.",
+      "behaviour": "New normal configuration supersedes a pending restore, both restarted and record-only. Restoration timer and human demand obey game/GPU pressure, including load-anyway and reload dwell. An explicit pass during pending restoration retains its original demand gate. A start race rearms at the next full idle window without human activity. A three-second owned-process stop during a cancelled pass retains PENDING and drains within the normal terminal allowance. An explicit entry waiting on normal chat preserves that exchange until ordinary interactive cancellation; terminal preparation fences every later process launch. Fail-before: 14a7eb8a2 with b85-auto-vdu-r3-java-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -342,7 +371,7 @@ so the unchanged evidence producer can select every case; their oracles are iden
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "No-pass shutdown preserves the original cancellation/drain/terminal-stop order. An active pass receives the normal twelve-second terminal allowance; a three-second stop remains clean and later steps all execute.",
+      "behaviour": "No-pass shutdown preserves the original cancellation/drain/terminal-stop order. An active pass receives the normal twelve-second terminal allowance; a three-second stop remains clean and later steps all execute. Fail-before: 14a7eb8a2 with b85-auto-vdu-r3-java-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -365,7 +394,7 @@ so the unchanged evidence producer can select every case; their oracles are iden
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Success and shutdown reset serialize in both orders. A selected processing document cannot reset a later success; reset retires the same owner and refuses its late result. Scoped reset cannot change another procedure's claim.",
+      "behaviour": "Success and shutdown reset serialize in both orders. A selected processing document cannot reset a later success; reset retires the same owner and refuses its late result. Scoped reset cannot change another procedure's claim. Fail-before: 14a7eb8a2 with b85-auto-vdu-r3-java-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",

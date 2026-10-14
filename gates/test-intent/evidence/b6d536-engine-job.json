@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T17:22:49.316Z",
-  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
-  "tree": "68ec43b0699340f176fd5373863e6370cf619ab4",
+  "createdAt": "2026-10-14T17:01:03.521Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "84837e1b207cba166dfc6f864dbcd75f0107b10b",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobHelperContainmentTest.killedEngineLeavesNoHelperOrConsoleHost\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2543
+      "durationMs": 4328
     },
     {
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.bootJoinsAKillOnCloseJobWithExactlyThatLimit\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2431
+      "durationMs": 4557
     },
     {
       "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.engineMainJoinsItsJobBeforeAnyOtherCall\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3965
+      "durationMs": 7162
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java#killedEngineLeavesNoHelperOrConsoleHost",
       "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:35e1fe36ccbb8feed8579e9ac3d67253312c5e603343ec8dcf2663fe690e29d4",
+      "contentDigest": "sha256:98ccfe7e349ca33c08ebc264e01512fcbf2e673d34ad708eff69b857ae4591f6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,24 +87,30 @@
     "ref": "f75486245",
     "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-engine-job-compat.patch",
+        "contentDigest": "sha256:614033eb10aa050b2e606a39aee7366ad6943bc8eb2b99c77ad712e631854076"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobHelperContainmentTest.killedEngineLeavesNoHelperOrConsoleHost\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 18261
+        "durationMs": 8899
       },
       {
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.bootJoinsAKillOnCloseJobWithExactlyThatLimit\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5022
+        "durationMs": 3292
       },
       {
         "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.engineMainJoinsItsJobBeforeAnyOtherCall\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 26969
+        "durationMs": 65565
       }
     ],
     "checks": [
@@ -125,5 +131,5 @@
       }
     ]
   },
-  "digest": "sha256:e53f58a548e76eed36f6c7fcc6bac2697c26918db4c36190ad7653a00bb51686"
+  "digest": "sha256:5accd49748f0452c920a317b719128255484f30aa205e178c24a5af2b9f5e458"
 }

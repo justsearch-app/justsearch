@@ -13,6 +13,15 @@ a kill-on-close job of its own as the first statement of `HeadlessApp.main`, so 
 starts ends with it. This changeset covers only this slice's files; the other flagged files on the
 branch belong to other tasks.
 
+Evidence regenerated on b599d4d7e. The fail-before of b6d536-engine-job.json runs on f75486245, the
+parent of 624dcfc92, which added the checks. It applies
+`gates/test-intent/evidence/b6d536-engine-job-compat.patch`, because the containment check now kills
+its holder through the later `ProcessTerminator`. The patch adds that interface, reduced to what the
+check calls. Its terminate is the `taskkill /F /PID` the check itself used at 624dcfc92. No
+production code at f75486245 reads it. All three checks fail there by assertion. The before-state
+run leaves behind the 600-second ping helper of the containment check, which nothing contains there;
+the helper ends on its own.
+
 ```json
 {
   "entries": [
@@ -56,7 +65,7 @@ branch belong to other tasks.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Spec F step 1. killedEngineLeavesNoHelperOrConsoleHost (T23): a JVM that boots Engine containment and starts a ping helper, then is killed with taskkill /F, leaves nothing it started alive 3000 ms later, its console host included, and reported CONTAINED. bootJoinsAKillOnCloseJobWithExactlyThatLimit: after EngineContainment.installAtBoot() the process is in a job whose extended limit flags are exactly KILL_ON_JOB_CLOSE (0x2000), a second call returns the same installed containment, current() is it, and before install current() reads UNAVAILABLE not_installed. engineMainJoinsItsJobBeforeAnyOtherCall: the first call HeadlessApp.main makes is EngineContainment.installAtBoot(). onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: CreateJobObjectW appears in Java main only in WindowsEngineJob and WindowsParserContainment, TerminateJobObject in no Java main source, and TerminateJobObject( in no shell source but containment.rs.",
+      "behaviour": "Spec F step 1. killedEngineLeavesNoHelperOrConsoleHost (T23): a JVM that boots Engine containment and starts a ping helper, then is killed with taskkill /F, leaves nothing it started alive 3000 ms later, its console host included, and reported CONTAINED. bootJoinsAKillOnCloseJobWithExactlyThatLimit: after EngineContainment.installAtBoot() the process is in a job whose extended limit flags are exactly KILL_ON_JOB_CLOSE (0x2000), a second call returns the same installed containment, current() is it, and before install current() reads UNAVAILABLE not_installed. engineMainJoinsItsJobBeforeAnyOtherCall: the first call HeadlessApp.main makes is EngineContainment.installAtBoot(). onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: CreateJobObjectW appears in Java main only in WindowsEngineJob and WindowsParserContainment, TerminateJobObject in no Java main source, and TerminateJobObject( in no shell source but containment.rs. Fail-before: f75486245 with b6d536-engine-job-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

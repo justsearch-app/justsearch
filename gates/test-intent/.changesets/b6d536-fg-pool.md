@@ -14,6 +14,22 @@ and the search's semantic deadline, which both count from the start of the call;
 refuses with ADMISSION_INFERENCE_BUSY, and a closed call pool is reported as closed, not as a
 capacity refusal. This changeset covers only this task's files.
 
+Evidence regenerated on b599d4d7e. The fail-before of b6d536-fg-pool-before.json runs on f648453b5,
+the parent of f8c4967ed, which added the checks. It applies
+`gates/test-intent/evidence/b6d536-fg-pool-before-compat.patch`, because the test provider in
+EngineKnowledgeClientInferenceQueueTest now uses the later provider-availability API and the checks
+name `Reason.INFERENCE_BUSY`. The patch makes these changes:
+
+- It adds `EmbeddingProvider.Availability` and a default `availability()` that returns null.
+- It turns `isAvailable()` into a default that reads `availability()`. Every production provider
+  at f648453b5 implements `isAvailable()` itself.
+- It appends `INFERENCE_BUSY` to `EngineAdmissionException.Reason`.
+- It gives the three exhaustive switches over that enum (ConversationEngine, RequestEngineWork and
+  ApiErrorHandler) an arm that throws, because nothing there raises it.
+
+The repaired check closedExecutorsAreReportedAsClosedNotAsCapacity fails there by assertion: the
+closed pool reads as ENGINE_LIMIT, not CLOSED.
+
 ```json
 {
   "entries": [
@@ -111,7 +127,7 @@ capacity refusal. This changeset covers only this task's files.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "closedExecutorsAreReportedAsClosedNotAsCapacity: with the inference lane pool or the text lane pool shut down, as the client close does before it stops its deadline timer, a search is answered with EngineExecutorRejectedException reason CLOSED (which ApiErrorHandler reports as SERVICE_UNAVAILABLE), never an EngineAdmissionException; no admission slot stays held and the body never runs. Before, withBudget answered every rejection with ENGINE_LIMIT.",
+      "behaviour": "closedExecutorsAreReportedAsClosedNotAsCapacity: with the inference lane pool or the text lane pool shut down, as the client close does before it stops its deadline timer, a search is answered with EngineExecutorRejectedException reason CLOSED (which ApiErrorHandler reports as SERVICE_UNAVAILABLE), never an EngineAdmissionException; no admission slot stays held and the body never runs. Before, withBudget answered every rejection with ENGINE_LIMIT. Fail-before: f648453b5 with b6d536-fg-pool-before-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

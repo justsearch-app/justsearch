@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T10:10:35.814Z",
-  "revision": "7edc726ddb8eb169e511c5cb8754bc9b07d4d059",
-  "tree": "d21b2b651516fcf712001d49e5df478384bc5366",
+  "createdAt": "2026-10-14T16:54:47.970Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "a03e5a0f5ac093127a4176e8b429031d0948fe23",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anOverrideThatDoesNotFitFailsWithoutAStepDown\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anUnknownArchitectureFailsAfterExactlyOneLaunch\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anUnclassifiedExitWhileStartingFailsAtOnce\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.anOutOfMemoryWhileServingStepsDownOneRungAndServesThere\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15979
+      "durationMs": 35363
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.GenerativeRecoveryAdmissionTest.theMonitorStartsNoGenerativeAttemptAndEachOperatorRetryIsOne\" --tests \"io.justsearch.app.services.supervision.SupervisionContractTest.brainRowDeclaresTheChatCrashPolicy\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3377
+      "durationMs": 6638
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7f3d8fa55e7850a8a060813c3d7f0033c6c79002aee687e716a4d3f767009619",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anOverrideThatDoesNotFitFailsWithoutAStepDown",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7f3d8fa55e7850a8a060813c3d7f0033c6c79002aee687e716a4d3f767009619",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anUnknownArchitectureFailsAfterExactlyOneLaunch",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7f3d8fa55e7850a8a060813c3d7f0033c6c79002aee687e716a4d3f767009619",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anUnclassifiedExitWhileStartingFailsAtOnce",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7f3d8fa55e7850a8a060813c3d7f0033c6c79002aee687e716a4d3f767009619",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -170,28 +170,32 @@
   "failBefore": {
     "ref": "7edc726dd",
     "revision": "7edc726ddb8eb169e511c5cb8754bc9b07d4d059",
-    "overlays": [
-      "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java"
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-step4-repaired-compat.patch",
+        "contentDigest": "sha256:925872921e5f98cb6a4adb13ca4ac968b28e692f4039748f912ee0da61803fb9"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anOverrideThatDoesNotFitFailsWithoutAStepDown\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anUnknownArchitectureFailsAfterExactlyOneLaunch\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anUnclassifiedExitWhileStartingFailsAtOnce\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.anOutOfMemoryWhileServingStepsDownOneRungAndServesThere\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 79709
+        "durationMs": 54602
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.GenerativeRecoveryAdmissionTest.theMonitorStartsNoGenerativeAttemptAndEachOperatorRetryIsOne\" --tests \"io.justsearch.app.services.supervision.SupervisionContractTest.brainRowDeclaresTheChatCrashPolicy\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 22804
+        "durationMs": 9625
       }
     ],
     "checks": [
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins",
         "classification": "assertion",
-        "detail": "theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the second start begins at the rung the first one reached: [[-m, C:\\Users\\Elias\\AppData\\Local\\Temp\\junit-1919368645626688191\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 49180, -c, 32768, -ngl,"
+        "detail": "theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the second start begins at the rung the first one reached: [[-m, F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-3206975799052397789\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 64168, -c, 327"
       },
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anOverrideThatDoesNotFitFailsWithoutAStepDown",
@@ -201,12 +205,12 @@
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anUnknownArchitectureFailsAfterExactlyOneLaunch",
         "classification": "assertion",
-        "detail": "anUnknownArchitectureFailsAfterExactlyOneLaunch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unknown architecture is not retried: [[-m, C:\\Users\\Elias\\AppData\\Local\\Temp\\junit-8521706218745657428\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 49240, -c, 32768, -ngl, 99, -np, 2, -kvu, -"
+        "detail": "anUnknownArchitectureFailsAfterExactlyOneLaunch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unknown architecture is not retried: [[-m, F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-10469195246303643143\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 64229, -c, 32768, -ngl, 99, -np,"
       },
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anUnclassifiedExitWhileStartingFailsAtOnce",
         "classification": "assertion",
-        "detail": "anUnclassifiedExitWhileStartingFailsAtOnce(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unclassified exit is not retried: [[-m, C:\\Users\\Elias\\AppData\\Local\\Temp\\junit-14913529444450446787\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 49207, -c, 32768, -ngl, 99, -np, 2, -kvu, -ct"
+        "detail": "anUnclassifiedExitWhileStartingFailsAtOnce(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unclassified exit is not retried: [[-m, F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-11535832406271848049\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 64194, -c, 32768, -ngl, 99, -np, 2,"
       },
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java#aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration",
@@ -235,5 +239,5 @@
       }
     ]
   },
-  "digest": "sha256:2d9793a0796dde484fbb15dea9b6135ab58500efcea036c8f4937378519aeac0"
+  "digest": "sha256:549d71a63e992d3e20fb02012d957d632098197884af7ff40d929b6b3ddf7c1e"
 }

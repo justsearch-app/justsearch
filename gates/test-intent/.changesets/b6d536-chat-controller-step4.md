@@ -18,6 +18,16 @@ generative action is operator-only), so the harness barrier that held its first 
 the installed exhaustion fixture and their store-register row are removed. The supervision contract's brain row declares this policy,
 with a gate in SupervisionContractTest. This changeset covers only this slice's files.
 
+Evidence regenerated on b599d4d7e. The fail-before of b6d536-chat-controller-step4-repaired.json
+runs on 7edc726dd, the parent of d3fe74ef2, which added these checks. It applies
+`gates/test-intent/evidence/b6d536-chat-controller-step4-repaired-compat.patch`. The patch makes two
+changes. It sets the HealthyFakeLlamaServer test fixture to its d3fe74ef2 version, which does not
+use the later ProcessTerminator. It also gives the later
+`stopLlamaServer(LlamaServerTestAccess.TEST_STOP)` call a form that works before: TEST_STOP is an
+opaque token, and a new `LlamaServerOps.stopLlamaServer(Object)` overload calls the existing
+`stopLlamaServer()`. That is what the check called at d3fe74ef2. No production code at 7edc726dd
+calls the overload. All nine checks fail there by assertion.
+
 ```json
 {
   "entries": [
@@ -27,7 +37,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "U9, U10 (STARTING) and I5 against a real launch: LlamaServerOps launches HealthyFakeLlamaServer as a separate process on the GPU-derived ladder (32768, 16384, ...), and the fake records each argv in launches.txt. theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins (T6, sticky): with --max-ctx 16384 the first start steps down once; after a stop, the second start of the same configuration launches at 16384 directly (launches 32768, 16384, 16384; reason stepped-from:32768). anOverrideThatDoesNotFitFailsWithoutAStepDown (T7, P4): with justsearch.context.size 32768 set as an override, the RESOURCE exit fails after exactly one launch, PROCESS_EXITED, failed code RESOURCE_EXHAUSTED. anUnknownArchitectureFailsAfterExactlyOneLaunch (I5, T9): the real b8571 line 'error loading model architecture: unknown model architecture: 'qwen35'' fails after exactly one launch with MODEL_LOAD_FAILED, and the message names the architecture. anUnclassifiedExitWhileStartingFailsAtOnce (T10): an unclassified exit 1 fails after one launch with START_FAILED. On 7edc726dd the second start began at 32768 again, the architecture and unclassified exits walked the ladder, and no failure carried a code (failedCode is looked up reflectively).",
+      "behaviour": "U9, U10 (STARTING) and I5 against a real launch: LlamaServerOps launches HealthyFakeLlamaServer as a separate process on the GPU-derived ladder (32768, 16384, ...), and the fake records each argv in launches.txt. theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins (T6, sticky): with --max-ctx 16384 the first start steps down once; after a stop, the second start of the same configuration launches at 16384 directly (launches 32768, 16384, 16384; reason stepped-from:32768). anOverrideThatDoesNotFitFailsWithoutAStepDown (T7, P4): with justsearch.context.size 32768 set as an override, the RESOURCE exit fails after exactly one launch, PROCESS_EXITED, failed code RESOURCE_EXHAUSTED. anUnknownArchitectureFailsAfterExactlyOneLaunch (I5, T9): the real b8571 line 'error loading model architecture: unknown model architecture: 'qwen35'' fails after exactly one launch with MODEL_LOAD_FAILED, and the message names the architecture. anUnclassifiedExitWhileStartingFailsAtOnce (T10): an unclassified exit 1 fails after one launch with START_FAILED. On 7edc726dd the second start began at 32768 again, the architecture and unclassified exits walked the ladder, and no failure carried a code (failedCode is looked up reflectively). Fail-before: 7edc726dd with b6d536-chat-controller-step4-repaired-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -73,7 +83,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "U10 (READY) and T27 on the real seam: an InferenceLifecycleManager on the CPU ladder (8192, 4096) runs HealthyFakeLlamaServer as a separate process, with no component monitor present; the test advances the launcher's monotonic clock (its monotonicNanos field, set reflectively) and ends the process the way a crash ends it (crashLatest kills only a descendant of this JVM). aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration (T28 then T29): after 11 minutes of READY a crash relaunches once at the same -c and the manager is online again; after 11 more minutes a second crash gives no relaunch (2 launches), the manager is offline and the latched chat failed code is CRASH_LOOP. aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch: at 9 min 59 s there is no relaunch and the code is CRASH_LOOP. anOutOfMemoryWhileServingStepsDownOneRungAndServesThere (T27): the fake prints 'CUDA error: out of memory' and the ggml-cuda.cu line and exits 1 while serving; the manager relaunches at 4096 (stepped-from:8192) and is online. On 7edc726dd the manager relaunched nothing on its own (it left that to the component monitor) and had no failed code.",
+      "behaviour": "U10 (READY) and T27 on the real seam: an InferenceLifecycleManager on the CPU ladder (8192, 4096) runs HealthyFakeLlamaServer as a separate process, with no component monitor present; the test advances the launcher's monotonic clock (its monotonicNanos field, set reflectively) and ends the process the way a crash ends it (crashLatest kills only a descendant of this JVM). aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration (T28 then T29): after 11 minutes of READY a crash relaunches once at the same -c and the manager is online again; after 11 more minutes a second crash gives no relaunch (2 launches), the manager is offline and the latched chat failed code is CRASH_LOOP. aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch: at 9 min 59 s there is no relaunch and the code is CRASH_LOOP. anOutOfMemoryWhileServingStepsDownOneRungAndServesThere (T27): the fake prints 'CUDA error: out of memory' and the ggml-cuda.cu line and exits 1 while serving; the manager relaunches at 4096 (stepped-from:8192) and is online. On 7edc726dd the manager relaunched nothing on its own (it left that to the component monitor) and had no failed code. Fail-before: 7edc726dd with b6d536-chat-controller-step4-repaired-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -97,7 +107,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Spec A section 4.2 and O6, theMonitorStartsNoGenerativeAttemptAndEachOperatorRetryIsOne: the generative action is the one HeadAssembly builds (generativeRecoveryAction over a mocked InferenceLifecycleManager), bound to a real KnowledgeServerHealthMonitor with a FAILED generative component (component budget 2). Four ticks a minute apart start no attempt and the reason is not component_recovery_exhausted; then three operator requests are each ACCEPTED and each make exactly one attempt (3 in total, past the old budget of two), with no escalation. On 7edc726dd the ticks started two automatic attempts.",
+      "behaviour": "Spec A section 4.2 and O6, theMonitorStartsNoGenerativeAttemptAndEachOperatorRetryIsOne: the generative action is the one HeadAssembly builds (generativeRecoveryAction over a mocked InferenceLifecycleManager), bound to a real KnowledgeServerHealthMonitor with a FAILED generative component (component budget 2). Four ticks a minute apart start no attempt and the reason is not component_recovery_exhausted; then three operator requests are each ACCEPTED and each make exactly one attempt (3 in total, past the old budget of two), with no escalation. On 7edc726dd the ticks started two automatic attempts. Fail-before: 7edc726dd with b6d536-chat-controller-step4-repaired-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -119,7 +129,7 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Spec A C9 gate, brainRowDeclaresTheChatCrashPolicy (a new method; the class's other checks are unchanged): the brain row of governance/supervision-contract.v1.json declares stabilityWindowMs, sameConfigRestartsPerStableWindow, startingSameConfigRetries and periodicHealthScheduling equal to BrainSupervisionPolicy's constants (read reflectively); no clean-exit, hang, oom or partial-boot text still promises the monitor retry loop ('two same-applied', 'up to two attempts', 'monitor budget', 'component budget', 'common component monitor'); and each of those four modes names the chat controller's policy. On 7edc726dd the policy record declared none of the constants and the row promised the monitor's two-attempt budget.",
+      "behaviour": "Spec A C9 gate, brainRowDeclaresTheChatCrashPolicy (a new method; the class's other checks are unchanged): the brain row of governance/supervision-contract.v1.json declares stabilityWindowMs, sameConfigRestartsPerStableWindow, startingSameConfigRetries and periodicHealthScheduling equal to BrainSupervisionPolicy's constants (read reflectively); no clean-exit, hang, oom or partial-boot text still promises the monitor retry loop ('two same-applied', 'up to two attempts', 'monitor budget', 'component budget', 'common component monitor'); and each of those four modes names the chat controller's policy. On 7edc726dd the policy record declared none of the constants and the row promised the monitor's two-attempt budget. Fail-before: 7edc726dd with b6d536-chat-controller-step4-repaired-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
