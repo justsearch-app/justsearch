@@ -2,6 +2,7 @@
 package io.justsearch.app.services.vdu;
 
 import java.util.Set;
+import java.util.function.Supplier;
 
 /** Head-owned global VDU capability state for status/readiness projection. */
 public final class VduCapabilityState {
@@ -18,14 +19,22 @@ public final class VduCapabilityState {
       Set.of(REASON_AI_OFFLINE, REASON_INSUFFICIENT_VRAM, REASON_MISSING_MMPROJ, REASON_CIRCUIT_OPEN,
           REASON_BREAKER_OPEN_REFUSED, REASON_BREAKER_OPEN_ENTRY_FAILED);
 
-  private volatile Snapshot snapshot = Snapshot.empty();
+  /** The current block, with the supplier that builds its detail on read when there is one. */
+  private record Entry(Snapshot snapshot, Supplier<String> liveDetail) {}
+
+  private static final Entry NONE = new Entry(Snapshot.empty(), null);
+
+  private volatile Entry entry = NONE;
 
   public Snapshot snapshot() {
-    return snapshot;
+    Entry current = entry;
+    Snapshot snapshot = current.snapshot();
+    if (current.liveDetail() == null) return snapshot;
+    return new Snapshot(snapshot.blockedReason(), snapshot.updatedAtMs(), current.liveDetail().get());
   }
 
   public void block(String reasonCode) {
-    block(reasonCode, null);
+    block(reasonCode, (String) null);
   }
 
   /** Blocks with a human-readable detail (for example the refusal the pass saw). */
@@ -33,18 +42,30 @@ public final class VduCapabilityState {
     if (reasonCode == null || !KNOWN_REASONS.contains(reasonCode)) {
       return;
     }
-    snapshot = new Snapshot(reasonCode, System.currentTimeMillis(), detail);
+    entry = new Entry(new Snapshot(reasonCode, System.currentTimeMillis(), detail), null);
+  }
+
+  /**
+   * Blocks with a detail built each time status is read, so text that depends on the time (when
+   * paused picture reading tries again) is never older than the read.
+   */
+  public void block(String reasonCode, Supplier<String> detail) {
+    if (reasonCode == null || !KNOWN_REASONS.contains(reasonCode)) {
+      return;
+    }
+    java.util.Objects.requireNonNull(detail, "detail");
+    entry = new Entry(new Snapshot(reasonCode, System.currentTimeMillis(), null), detail);
   }
 
   public void clear(String reasonCode) {
-    Snapshot current = snapshot;
-    if (reasonCode != null && reasonCode.equals(current.blockedReason())) {
-      snapshot = Snapshot.empty();
+    Entry current = entry;
+    if (reasonCode != null && reasonCode.equals(current.snapshot().blockedReason())) {
+      entry = NONE;
     }
   }
 
   public void clearAll() {
-    snapshot = Snapshot.empty();
+    entry = NONE;
   }
 
   /** @param detail optional human-readable cause; {@code null} when none was recorded */

@@ -97,6 +97,7 @@ public final class AutomaticVduBreaker {
   private long probeAtNanos;
   /** Wall-clock time of the next probe, for status text only; timing uses {@link #nanoTime}. */
   private Instant probeAt;
+  private final java.util.function.Supplier<String> statusDetail = this::currentDetail;
 
   public AutomaticVduBreaker(VduCapabilityState status, LongSupplier nanoTime) {
     this(status, nanoTime, Clock.system(java.time.ZoneId.systemDefault()));
@@ -200,9 +201,13 @@ public final class AutomaticVduBreaker {
       probeAtNanos = nanoTime.getAsLong() + backoff.toNanos();
       probeAt = wallClock.instant().plus(backoff);
     }
-    String text = describe();
-    status.block(cause.reasonCode(), text);
-    if (announce) LOG.warn("Automatic picture reading paused: {}", text);
+    status.block(cause.reasonCode(), statusDetail);
+    if (announce) LOG.warn("Automatic picture reading paused: {}", describe());
+  }
+
+  /** The status detail as of now, or {@code null} once the breaker has closed. */
+  private synchronized String currentDetail() {
+    return state == State.CLOSED ? null : describe();
   }
 
   private String describe() {
@@ -211,13 +216,25 @@ public final class AutomaticVduBreaker {
         ? "the Engine held generation closed (a settings change in progress or settings recovery),"
             + " so every document was turned away"
         : "picture-reading mode could not be entered";
-    String next = nanoTime.getAsLong() - probeAtNanos < 0
-        ? "Next try at " + NEXT_TRY.format(probeAt.atZone(wallClock.getZone()))
-        : "Next try when the computer is next idle";
+    String next = nextTry();
     return "Automatic picture reading is paused after " + OPEN_AFTER
         + " automatic passes in a row made no progress: " + what + seen
         + ". " + next + "; a manual run, applying settings or switching chat off or on"
         + " resumes it now.";
+  }
+
+  /**
+   * Built from the state and both clocks at the time of reading: before the deadline, the probe's
+   * local time rounded up to the minute (never early); once the deadline has passed, the next
+   * idle check, so no past time is ever named.
+   */
+  private String nextTry() {
+    Instant now = wallClock.instant();
+    boolean due = nanoTime.getAsLong() - probeAtNanos >= 0 || probeAt == null || !now.isBefore(probeAt);
+    if (due) return "Next try when the computer is next idle";
+    Instant minute = probeAt.truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+    if (minute.isBefore(probeAt)) minute = minute.plus(Duration.ofMinutes(1));
+    return "Next try at " + NEXT_TRY.format(minute.atZone(wallClock.getZone()));
   }
 
   private void closeLocked() {

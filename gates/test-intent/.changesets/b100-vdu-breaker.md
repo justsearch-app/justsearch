@@ -268,6 +268,37 @@ changeset.
     },
     {
       "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Over the real breaker and the Head's VDU capability state, with the monotonic and wall clocks driven by the test (UTC): opened at 14:00, the detail names the real probe time 14:05; read at 14:30 with no probe, it names no past time and no clock time, and says the next try is when the computer is next idle, while still paused. Opened at 14:00:40, the deadline 14:05:40 is shown as 14:06, never 14:05. Fail-before is against the round-2 commit 184dc8963, which wrote the text once at opening and truncated the minute; the breaker does not exist on bc5978095.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Build the next-try text when status is read, from the breaker's state and the clock: before the deadline 'Next try at HH:mm', rounded up to the minute so it is never early; once the deadline has passed, the next try is when the computer is next idle. Nothing cached can outlive its truth. (Round-3 decision after the verifier found the round-2 text, written once at opening, kept naming a past time.)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "label": "agent choice",
+          "choice": "Put the time of the next try into the existing message field of the vdu.unavailable health condition the status handler asserts for the paused component ('Next try at HH:mm', local time). The /api/status readiness component has no message field, so no wire field is added and that gap stays named."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b100-vdu-breaker-next-try-java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java#aPauseReadAfterItsDeadlineWithNoProbeNamesNoPastTime",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java#aDeadlineBetweenMinutesIsShownRoundedUpSoItIsNeverEarly"
+      ]
+    },
+    {
+      "items": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java"
       ],
       "class": "New",

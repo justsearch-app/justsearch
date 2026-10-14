@@ -65,7 +65,9 @@ retry counts are unchanged and refusals still spend no attempt. Status shows the
 in the existing VDU blocked-reason field. The `/api/status` readiness component has no message
 field, so the time of the next try is not in it. The `vdu.unavailable` health condition asserted
 from that component carries it in its existing `message` field, for example "Next try at 14:05",
-together with the refusal or entry failure the passes saw.
+together with the refusal or entry failure the passes saw. The text is built when status is read:
+the time is rounded up to the minute so it is never early, and once it has passed without a probe
+(the computer stayed busy) the text says the next try is when the computer is next idle.
 
 After a pause of 5 minutes one automatic pass may try (a half-open probe). If it makes progress the
 pause ends and the next pause starts again at 5 minutes; if it counts again the pause doubles: 10,
