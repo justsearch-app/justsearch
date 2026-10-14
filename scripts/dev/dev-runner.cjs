@@ -2041,6 +2041,27 @@ function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, split
   return child;
 }
 
+const EARLIER_REPORT_RE = /^stop-report\.(\d+)\.json$/;
+
+/**
+ * A retried stop never overwrites an earlier report of its run: the current stop-report.json is
+ * kept, as it was, as stop-report.N.json under the next free number. Returns every kept report's
+ * file name (relative to the run directory), oldest first.
+ */
+function keepEarlierReports(runDir) {
+  let names = [];
+  try { names = fs.readdirSync(runDir); } catch { return []; }
+  const numbered = () => names.filter((n) => EARLIER_REPORT_RE.test(n))
+    .sort((a, b) => Number(EARLIER_REPORT_RE.exec(a)[1]) - Number(EARLIER_REPORT_RE.exec(b)[1]));
+  if (names.includes('stop-report.json')) {
+    const numbers = numbered().map((n) => Number(EARLIER_REPORT_RE.exec(n)[1]));
+    const next = (numbers.length ? Math.max(...numbers) : 0) + 1;
+    fs.renameSync(path.join(runDir, 'stop-report.json'), path.join(runDir, `stop-report.${next}.json`));
+    names = fs.readdirSync(runDir);
+  }
+  return numbered();
+}
+
 /** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
 function describeResolved(p) {
   return { pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc), role: p.role ?? null,
@@ -4302,6 +4323,14 @@ async function stopRun(opts, {
     ...(foreignPortOwner ? { foreignPortOwner } : {}),
   });
 
+  // A retried stop keeps the earlier stop's report and census and names them (run-directory file
+  // names, oldest first); stop-report.json is always this stop's.
+  let earlierReports = [];
+  try { earlierReports = keepEarlierReports(runDir); } catch (err) {
+    stopReport.errors.push(`earlier stop report not kept: ${err?.message ?? err}`);
+  }
+  if (exitAccounting?.earlierCensus?.length) stopReport.earlierCensus = exitAccounting.earlierCensus;
+  if (earlierReports.length) stopReport.earlierReports = earlierReports;
   const stopReportPath = path.join(runDir, 'stop-report.json');
   await writeJsonAtomic(stopReportPath, stopReport);
 
@@ -4359,6 +4388,7 @@ async function stopRun(opts, {
     unresolvedProcesses: unresolved,
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     ...exitAccounting,
+    ...(earlierReports.length ? { earlierReports } : {}),
   };
 }
 

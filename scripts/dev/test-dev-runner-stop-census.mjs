@@ -1,7 +1,8 @@
 // A stop's exit census after a long scripted-agent run (item 6 of the quiet-machine measurement):
 // a recorded identity whose exit is in the Engine's exit ledger is gone, even when its PID now
 // names a process whose birth cannot be read; a retried stop keeps the earlier census and adds to
-// it, and completes from the ledger once the Engine is gone; the census reads each ledger file
+// it (and the earlier stop report), and completes from the ledger once the Engine is gone; the
+// census reads each ledger file
 // once per stop, so a stop over a 17 MB ledger stays well inside the 60 s stop limit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -196,6 +197,50 @@ test('a tracked identity the lookup cannot read stays unresolved unless the ledg
   const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
   assert.deepEqual(report.resolvedByLedger?.map((p) => [p.pid, p.creationFileTimeUtc, p.basis]),
     [[tracked.pid, tracked.creationFileTimeUtc, 'exit ledger']]);
+});
+
+test('a retried stop keeps every earlier stop report and names the reports and census it kept', async () => {
+  const runId = 'stop-census-reports';
+  const engine = noProcess(970601, '134364632933610725');
+  const tracked = { ...noProcess(970602 + 1, '134364634153991105'), role: 'Engine job member' };
+  const dataDir = freshDir('reports-data');
+  const ledger = runLedger(dataDir, runId, engine, process.execPath);
+  ledger.engineStart();
+  ledger.engineExit();
+  const fixture = stopFixture({ runId, dataDir, engine });
+  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: [tracked] }));
+  const reportPath = (name = 'stop-report.json') => path.join(fixture.dir, name);
+  const lookup = (present) => ({ ...fixture.io, lookupIdentities: async (ids) => new Map(ids.map((pid) => [pid,
+    pid === tracked.pid && present ? { present: true, creationFileTime: null } : { present: false }])) });
+
+  // The first stop cannot read the tracked identity and nothing proves it ended: incomplete.
+  const first = await api.stopRun({}, lookup(true));
+  assert.equal(first.outcome, 'STOP_INCOMPLETE');
+  const firstReport = fs.readFileSync(reportPath(), 'utf8');
+  assert.equal(JSON.parse(firstReport).earlierReports, undefined, 'a first stop has no earlier report');
+
+  // The retry finds it gone: its report is stop-report.json, and the first is kept as it was.
+  const retry = await api.stopRun({}, lookup(false));
+  assert.equal(retry.outcome, 'STOPPED', JSON.stringify(retry.errors));
+  assert.equal(fs.existsSync(reportPath('stop-report.1.json')), true, 'the earlier stop report is kept');
+  assert.equal(fs.readFileSync(reportPath('stop-report.1.json'), 'utf8'), firstReport);
+  const retryText = fs.readFileSync(reportPath(), 'utf8');
+  const retryReport = JSON.parse(retryText);
+  assert.equal(retryReport.outcome, 'STOPPED');
+  assert.deepEqual(retryReport.earlierReports, ['stop-report.1.json']);
+  assert.deepEqual(retry.earlierReports, ['stop-report.1.json']);
+  if (windows) {
+    // The census the first stop armed is kept beside its report, and the retry's report names it.
+    assert.deepEqual(retryReport.earlierCensus, ['exit-targets.1.json', 'process-exits.1.json']);
+    for (const name of retryReport.earlierCensus) assert.equal(fs.existsSync(reportPath(name)), true, name);
+  }
+
+  // Each further stop keeps the one before it under the next number.
+  const third = await api.stopRun({}, lookup(false));
+  assert.equal(third.outcome, 'STOPPED');
+  assert.equal(fs.readFileSync(reportPath('stop-report.1.json'), 'utf8'), firstReport);
+  assert.equal(fs.readFileSync(reportPath('stop-report.2.json'), 'utf8'), retryText);
+  assert.deepEqual(JSON.parse(fs.readFileSync(reportPath(), 'utf8')).earlierReports, ['stop-report.1.json', 'stop-report.2.json']);
 });
 
 /** The census entry point with a stand-in for the PowerShell observer (as test-dev-runner-exit-census). */

@@ -38,6 +38,9 @@ b599d4d7e (run 8f60c4e7, item 6 defects of the dev-runner stop and census):
 - A retried stop never overwrites an earlier census; it keeps it and adds to it. With the Engine
   already gone, the retry still completes the census from the ledger, and reports it complete
   when every recorded identity has an exit.
+- A retried stop never overwrites the earlier stop-report.json either: it is kept as
+  stop-report.1.json (then .2, and so on), and the new stop-report.json records `earlierCensus`
+  and `earlierReports`, naming the kept files.
 
 What changed:
 
@@ -59,10 +62,14 @@ What changed:
   ended are skipped by the job stop's probes and reported as `endedPerLedger`.
 - `scripts/dev/dev-runner.cjs` `stopRun`: the Engine job stop gets the ledger's ended identities;
   a tracked or recorded identity whose state is unknown is resolved when the ledger records its
-  exit, and listed in the stop report as `resolvedByLedger`.
+  exit, and listed in the stop report as `resolvedByLedger`. Before writing its report, a stop
+  renames an existing stop-report.json to the next free stop-report.N.json; the report and the
+  stop's output list the kept reports as `earlierReports` (oldest first), and the report carries
+  the census's `earlierCensus`. stop-report.json is always the latest stop's, so its readers
+  (including the forget check) are unchanged.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (6 cases). Each fails by
-assertion on b599d4d7e and passes after:
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (7 cases). Cases 1 to 6 fail by
+assertion on b599d4d7e, case 7 on ccd687b2d, and all pass after:
 
 1. Real `stop-job-run.ps1`: a job member whose PID now names a running process whose birth
    cannot be read (found at run time, query rights only) is a survivor without the ledger and is
@@ -80,5 +87,9 @@ assertion on b599d4d7e and passes after:
    receipts, helper windows, rotated files): b599d4d7e took 167,572 ms and read 71,308,464
    ledger bytes; after, 4,614 ms and 17,832,236 bytes (ledger 17,827,116 bytes). It asserts at
    most 20 s and at most one read of each ledger file.
+7. Three stops of one run (incomplete, then two that complete): the first report is kept
+   byte-for-byte as stop-report.1.json, the second as stop-report.2.json; each later report names
+   them in `earlierReports`, and the retry's report names the kept census files in
+   `earlierCensus`. On ccd687b2d: "the earlier stop report is kept" fails.
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/.
