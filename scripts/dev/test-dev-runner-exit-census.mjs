@@ -444,7 +444,8 @@ test('Spec F §6.1: a ledger child is observed under the shared rule: its CIM ro
     { pid: 26524, Name: 'conhost.exe', ParentProcessId: 24284, creationFileTimeUtc: hostBirth, executable: conhostExe }];
   const i = census.exitTargets(run, { pid: 10, children: [] }, observedRows, ledgerOf([]));
   const child = i.targets.find(x => x.pid === 24284);
-  assert.deepEqual([child?.creationFileTimeUtc, child?.creationTimeSource, child?.birthTick], [exact, 'ledger', '10']);
+  // The Engine read the child's birth natively (exact), as the held handle reads its own: compared exactly.
+  assert.deepEqual([child?.creationFileTimeUtc, child?.creationTimeSource, child?.birthTick], [exact, 'ledger', '1']);
   assert.equal(i.targets.find(x => x.pid === 26524)?.consoleParent, `24284/${exact}`);
   assert.deepEqual(i.gaps, []);
   const exitsAs = osBirth => i.targets.map(x => ({ pid: x.pid, creationFileTimeUtc: x.creationFileTimeUtc, executable: x.executable,

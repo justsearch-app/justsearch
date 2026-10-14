@@ -112,7 +112,10 @@ check):
   later non-proving reconciliation was un-proven; a witness's owner receipt replaced its native
   exit; and an exit marked reconciled without osCheck proved it.)
 - The proof table (record, as the only record of the identity; `true` = ended). Any two records,
-  in either order: proven if either one proves, unless their identities conflict.
+  in either order: proven if either one proves. Each child-start is its own identity (PID and
+  birth), proven on its own; a childId is never the unit of proof. When a childId has two or more
+  different starts, a record naming only the childId proves none of them, and a record naming a
+  start's PID and birth proves that start alone.
 
   | Subject | Record and fields | Proves |
   | --- | --- | --- |
@@ -122,15 +125,17 @@ check):
   | Engine incarnation | `engine-owner-died` osCheck GONE naming another PID | false |
   | Engine incarnation | `engine-owner-died` ALIVE_MATCH (any class), IDENTITY_UNKNOWN, REUSED, or no osCheck | false |
   | Engine incarnation | `engine-intent`, `ledger-gap` | false |
-  | Ledger child | `child-exit` REQUESTED or UNEXPECTED | true |
-  | Ledger child | `child-exit` marked reconciled, or naming another PID | false |
+  | Ledger child | `child-exit` REQUESTED, UNEXPECTED with a code, or UNKNOWN without a code | true |
+  | Ledger child | `child-exit` marked reconciled, naming another PID, or naming its PID with another birth | false |
   | Ledger child | `owner-died` osCheck GONE (any class) | true |
   | Ledger child | `owner-died` ALIVE_MATCH, IDENTITY_UNKNOWN, REUSED, or no osCheck (any class) | false |
   | Ledger child | `child-survived`, `stop-intent`, `stop-escalate`, `child-note`, `gpu-release` | false |
-  | Ledger child | a second `child-start` with another identity: the childId is ambiguous, and no record naming only the childId proves | false |
+  | Ledger child | a second `child-start` with another identity under its childId: then no record naming only the childId proves either start | false |
+  | Ledger child, its childId shared with another start | `child-exit`, or `owner-died` osCheck GONE, naming its PID and birth | true |
   | Job witness | its own `job-process-exit`, with or without a code | true |
   | Job witness | its own exit that lost track of the birth, or one tick off its start | false |
   | Job witness | its own exit marked reconciled, without osCheck | false |
+  | Job witness | its own exit, or a reconciled osCheck GONE, naming another owner instance than its start | false |
   | Job witness | reconciled `job-process-exit` osCheck GONE, written by the dev runner or the next Engine | true |
   | Job witness | reconciled osCheck GONE written by the witness's own Engine | false |
   | Job witness | reconciled IDENTITY_UNKNOWN, ALIVE_MATCH, or no osCheck | false |
@@ -162,14 +167,48 @@ check):
   tell it from an append. A rewrite whose old length falls inside a line is detected (its first
   new line does not parse) and read again in full. The ledger writers only append and rotate.
 
+Follow-up decisions after the independent verifier rejected e2939b0ed:
+
+- Precision is what each side actually measured, declared truthfully where it is recorded. A
+  census target carries the tick of its recorded birth: exact for a birth the Engine read natively
+  (its own `engine-start`, every `child-start`, a witness's `job-process-start`), the microsecond
+  for a CIM read (a dev runner's or the CLI's `engine-start`, the stop's own scope), the
+  millisecond for a manifest helper. The census's held handle is native, so a native ledger birth
+  is compared with it exactly. (On e2939b0ed, and on b599d4d7e, every ledger target was declared
+  microsecond: the real observer accepted a running child whose native birth was one tick off its
+  exact ledger birth, and the census was complete.)
+- Each start is its own identity (PID and birth) and needs its own proof: the ledger view has one
+  child per distinct start under a childId, each proven by `provenExitOf` (ambiguous when the
+  childId has another start), each armed and judged on its own; a census target's ledger exit is
+  only its own start's. (On e2939b0ed two starts under one childId collapsed into the later one:
+  its exit, naming it, hid the earlier start, still running, and the census was complete with no
+  gap. b599d4d7e reported incomplete.)
+- A witness's exit proves it only when it names the same owner (PID, birth and instance) as the
+  witness's start; proofs are judged after every start is read, so record order never matters.
+  (On e2939b0ed the witness's own exit naming another owner instance skipped the lookup while the
+  process ran; b599d4d7e looked it up.)
+- Earlier census and report evidence is read and merged whether or not it could be archived. A
+  file that stays held (not renamed) is read where it is, and its targets and OS exits are merged,
+  so an earlier OS-vs-ledger disagreement is carried into every retry and never dropped. A file
+  that cannot be read makes accounting incomplete with an `earlier-census-unreadable` gap naming
+  it. Every earlier file is listed, archived or held: `earlierCensusFiles` and
+  `earlierReportFiles` give each `{ name, readable, archived }`. (On e2939b0ed a held
+  exit-targets.json and process-exits.json were left out of the lists and the merge, so the
+  retry reported complete without the first census's `ledger_os_disagree`; a held
+  stop-report.json was left out of `earlierReports`.)
+
 What changed:
 
 - `scripts/dev/lib/stop-exit-census.cjs`: `proofOfRecord` and `provenExitOf` decide exit proof
   per the table above, from all of an identity's records. `ledgerView` gives each Engine
   incarnation and ledger child `exit` (proven only), `proof` and `unproven`, and each witness a
-  `proof` (`provenWitnesses`); a childId or incarnation with two different start identities is
-  ambiguous. `endedIdentitiesOf(view)` lists the identities with a proof, with their `birthTick`
-  (the microsecond for an Engine start a dev runner or the CLI wrote, else exact). `exitResult`
+  `proof` (`provenWitnesses`, from an exit naming the start's owner); an incarnation with two
+  different start identities is ambiguous, and a childId with two or more different starts gives
+  one child per start, proven only by a record naming its PID and birth.
+  `endedIdentitiesOf(view)` lists the identities with a proof, with their `birthTick` (the
+  microsecond for an Engine start a dev runner or the CLI wrote, else exact). Census targets carry
+  the same `birthTick` (exact for the Engine's own records, children and witnesses), so the
+  PowerShell observer compares a native ledger birth with the held handle's exactly. `exitResult`
   adds `exit_unproven` for exit records without a proof and `ledger-unreadable` for a family that
   did not settle. `readRunLedger` reports each family's `damage`: the
   files with corrupt, unknown-schema, unknown-type or torn lines, with their counts
@@ -195,7 +234,9 @@ What changed:
   to b599d4d7e apart from `exitAccountingComplete`. A retried stop renames the earlier
   `exit-targets.json` and `process-exits.json` to the next free `.N.json`, merges every kept
   census's OS exits (and the targets it observed them for) into its verdict, and writes the
-  merged OS exits back to `process-exits.json`. `exitAccountingComplete` is true with no gap
+  merged OS exits back to `process-exits.json`. An earlier census that stayed held is read in
+  place and merged too; one that cannot be read is an `earlier-census-unreadable` gap, and
+  `earlierCensusFiles` lists each file with `readable` and `archived`. `exitAccountingComplete` is true with no gap
   when a target was armed or the run's Engine incarnations are in the ledger.
 - `scripts/dev/lib/stop-job-run.ps1` and `job-run.cjs` (`stopJobRunSync` option
   `endedIdentities`, passed through a temporary `-EndedPath` file): identities the ledger shows
@@ -212,17 +253,19 @@ What changed:
   way as a stop does. Before writing its report, a stop
   renames an existing stop-report.json to the next free stop-report.N.json (retrying a sharing
   error for 2 s; if it stays, the report is written under the next free number instead); the
-  report and the stop's output list the kept reports as `earlierReports` (oldest first), and the
-  report carries the census's `earlierCensus`. The census keeps its earlier files the same way
+  report and the stop's output list the kept reports as `earlierReports` (oldest first, then a
+  held stop-report.json) and `earlierReportFiles` (`{ name, archived, readable }`), and the
+  report carries the census's `earlierCensus` and `earlierCensusFiles`. The census keeps its earlier files the same way
   (40 attempts, 50 ms apart). stop-report.json is always the latest stop's, so its readers
   (including the forget check) are unchanged.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (26 cases). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (31 cases). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
 pass on b599d4d7e, as preservation; 21 passes on e3f82e1a9 and fails on b599d4d7e, as
-preservation of the coarser matching), and all pass after:
+preservation of the coarser matching), cases 17, 19, 25, 26 and 27 to 31 on e2939b0ed (29
+passes on b599d4d7e, as preservation), and all pass after:
 
 1. Real `stop-job-run.ps1`: a job member whose PID now names a running process whose birth
    cannot be read (found at run time, query rights only) is a survivor without the ledger and is
@@ -273,11 +316,14 @@ preservation of the coarser matching), and all pass after:
    On bd198cc98 it was never looked up.
 17. The proof table: each row's record alone, and every ordered pair of rows, written as a real
    ledger for an Engine incarnation, a ledger child and a job witness, through `readRunLedger`,
-   `ledgerView`, `endedIdentitiesOf` and the census verdict. Proven exactly as the table says;
-   when unproven, accounting is not complete, a gap names the identity (except for a conflict)
-   and its row is UNKNOWN. On e3f82e1a9 it fails for ALIVE_MATCH, IDENTITY_UNKNOWN and no-osCheck
+   `ledgerView`, `endedIdentitiesOf` and the census verdict. Proven exactly as the table says
+   (a pair with a second start under the childId is proven only by a record naming the child's
+   PID and birth); when unproven, accounting is not complete, a gap names the identity and its
+   row is UNKNOWN. On e3f82e1a9 it fails for ALIVE_MATCH, IDENTITY_UNKNOWN and no-osCheck
    reconciliations classed OWNER_DIED, for an exit followed by a non-proving record, for the
-   witness's owner receipt, and for exits marked reconciled.
+   witness's owner receipt, and for exits marked reconciled. On e2939b0ed it fails for the
+   witness's exit naming another owner instance and for every pair with a second start (no gap
+   named the subject).
 18. Real `stopRun` with two manifest helpers whose PIDs are present but whose births cannot be
    read. The ledger has their births with sub-millisecond parts and their exits. The one whose
    manifest start matches its ledger birth at the millisecond is never looked up and is resolved
@@ -287,9 +333,12 @@ preservation of the coarser matching), and all pass after:
    ALIVE_MATCH, IDENTITY_UNKNOWN, REUSED or without osCheck, all classed OWNER_DIED, then a pair;
    `child-survived`; `child-exit` naming another PID; Engine incarnation 1, with incarnation 2
    ended: `engine-owner-died` ALIVE_MATCH, IDENTITY_UNKNOWN or no osCheck; witness: its own exit
-   marked reconciled without osCheck, reconciled IDENTITY_UNKNOWN, its exit one tick off). Each is
-   looked up, unresolved, the stop is `STOP_INCOMPLETE` and the report's accounting is not
-   complete. On e3f82e1a9 the child and Engine owner-class cases were complete.
+   marked reconciled without osCheck, reconciled IDENTITY_UNKNOWN, its exit one tick off, its
+   exit naming another owner instance; child: a second start under its childId that exits by its
+   own identity). Each is looked up, unresolved, the stop is `STOP_INCOMPLETE` and the report's
+   accounting is not complete. On e3f82e1a9 the child and Engine owner-class cases were
+   complete; on e2939b0ed the witness owner-instance case was `STOPPED` without a lookup and the
+   second-start case was complete.
 20. Real `stopRun`: an exact native identity one tick after an exact ledger child birth with an
    exit is looked up and blocks the stop; real `stop-job-run.ps1`: a job member at birth X+1 with
    a ledger-ended identity at X, exact, stays a survivor. On e3f82e1a9 it was never looked up.
@@ -311,12 +360,45 @@ preservation of the coarser matching), and all pass after:
 25. Real Windows sharing: a PowerShell process holds stop-report.json open without delete sharing.
    Released 650 ms after the first refused rename: the earlier report is kept byte-for-byte as
    stop-report.1.json. Held through the stop: stop-report.json is untouched and the new report is
-   stop-report.1.json, with `reportWrittenAs` and `earlierReportNotArchived`. On e3f82e1a9 the
-   earlier report was overwritten.
+   stop-report.1.json, with `reportWrittenAs` and `earlierReportNotArchived`, and the held report
+   is listed in `earlierReports` and `earlierReportFiles` (`archived: false, readable: true`). A
+   second stop while it is still held writes stop-report.2.json and lists stop-report.1.json
+   (archived) and stop-report.json (held). On e3f82e1a9 the earlier report was overwritten; on
+   e2939b0ed the held report was not listed.
 26. An earlier census whose targets file is torn (`{"targets":[TORN`) is kept byte-for-byte,
    named in `earlierCensus` and marked `readable: false` in `earlierCensusFiles`; an earlier
-   census held open is left untouched and the new one is written under the next number
-   (`censusWrittenAs`). On e3f82e1a9 `earlierCensus` left out `exit-targets.1.json`.
+   census held open is left untouched, listed with `archived: false, readable: true`, and the new
+   one is written under the next number (`censusWrittenAs`). The torn file makes accounting
+   incomplete with an `earlier-census-unreadable` gap naming it. On e3f82e1a9 `earlierCensus` left
+   out `exit-targets.1.json`; on e2939b0ed the torn file left no gap and the held file was not
+   listed.
+27. Native precision: a ledger child target is `birthTick` 1 and a dev runner's Engine start 10
+   (an Engine start the Engine wrote, 1); a held handle one tick off the child's exact birth, in
+   the same microsecond, is a mismatch and the census is incomplete. With the real PowerShell
+   observer and a running child of the test: its exact ledger birth is observed and complete; a
+   ledger birth one tick off it, same microsecond, is an identity mismatch and incomplete. On
+   e2939b0ed every target was 10 and both were complete.
+28. Starts under one childId, judged through `ledgerView`, `endedIdentitiesOf`, `exitTargets` and
+   the verdict: two starts with the later ending by its identity (either record order), an exit
+   naming only the childId, three starts with the middle ending by its identity (with and
+   without a childId-only exit), a reconciliation finding the first gone by its identity, all
+   three ending by their identities, and the same start recorded twice. Exactly the starts with
+   their own proof are ended; every other start is armed, named by a gap, and accounting is
+   incomplete. On e2939b0ed the earlier starts were lost.
+29. Preserved from b599d4d7e: the real census of two running children of the test under one
+   childId, the later ended with an exit naming it, is not complete. On e2939b0ed it was complete.
+30. The same real census names the running start in a gap and not the ended one; with three
+   starts, the middle ended by its identity and one childId-only exit, the first and third are
+   named; with all three ended by their identities it is complete. On e2939b0ed and b599d4d7e no
+   gap named the running start.
+31. Real Windows sharing over a real disagreement: a running child of the test is the run's
+   Engine and exits 7 while its ledger exit records 0; the first census reports
+   `ledger_os_disagree`. Both census files are held open (FileShare.Read) through two retries:
+   each is written under the next number, keeps the disagreement, lists both held files
+   (`archived: false, readable: true`), and the held bytes are unchanged. Released, the next retry
+   archives them as `.3`, still reports the disagreement, and lists every file archived. A census
+   file held with FileShare.None (unreadable) is an `earlier-census-unreadable` gap. On e2939b0ed
+   the first retry was complete with no gap.
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -348,4 +430,20 @@ folders. On the same 17 MB harness, interleaved three times: b599d4d7e 14,235 / 
 and 5 rotations, held-before-read, final-stat, no-file-ids), `rotation-rename-gap.cjs`,
 `rotation-read-retry.cjs` (cold and warm), `rotation-race.cjs` and both `torn-engine.cjs` pass.
 
-Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r4/).
+After the e2939b0ed fixes, the verifier's round-5 harnesses were run again from copies with fresh
+folders, against this change and b599d4d7e. Round 5's `proof-probes.cjs` (5) and
+`r5-retention.cjs` (3) pass; on b599d4d7e the two native-neighbour probes and all three retention
+cases fail by assertion, and the two-starts probe passes there too, as preservation. On the 17 MB
+harness, interleaved three times: b599d4d7e 12,374 / 12,681 / 12,397 ms, 120,178 parses, not
+complete; this change 1,868 / 1,907 / 1,799 ms, 60,089 parses, 1 read call per file, complete;
+`assert-perf.cjs` and `assert-file-reads.cjs` pass. Its `lifecycle-perf.cjs` census took
+12,389 ms on b599d4d7e and 1,195 ms with this change. The r2, r3 and r4 `independent.cjs` (19
+each), r3 and r4 `independent-extra.cjs` (22 each), the two `independent-edges.cjs` retention
+scenarios, `audit-edges.cjs` (19), `audit-more.cjs` (23), the four `enoent-states.cjs` states,
+`rotation-race.cjs`, `rotation-edges.cjs`, `rotation-read-retry.cjs` (cold and warm),
+`rotation-rename-gap.cjs`, `torn-engine.cjs` and `writer-and-named-limit.cjs` pass; on b599d4d7e
+the same cases fail by assertion as the verifier recorded (`rotation-race.cjs`,
+`rotation-edges.cjs` and `writer-and-named-limit.cjs` pass there too). Cases 6 and 14 took 1,202
+and 2,004 ms in the full run of the check.
+
+Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r5/).

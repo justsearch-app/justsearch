@@ -1091,7 +1091,8 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
   });
   // An earlier report of the run (a stop's, or an earlier incarnation's death) is kept, not overwritten.
   const kept = await keepEarlierReports(path.dirname(runPath));
-  if (kept.earlierReports.length) stopReport.earlierReports = kept.earlierReports;
+  if (kept.earlierReports.length) Object.assign(stopReport, { earlierReports: kept.earlierReports,
+    earlierReportFiles: kept.earlierReportFiles });
   if (kept.earlierReportNotArchived) {
     stopReport.earlierReportNotArchived = kept.earlierReportNotArchived;
     stopReport.reportWrittenAs = kept.reportName;
@@ -2063,9 +2064,11 @@ const REPORT_ARCHIVE_PAUSE_MS = 50;
  * delete sharing) is tried again for up to REPORT_ARCHIVE_RETRY_MS. If the earlier report still
  * cannot be renamed it stays as stop-report.json, untouched, and this report is written under the
  * next free number instead (`reportName`, with `earlierReportNotArchived` saying why). Never throws.
- * `earlierReports` is every numbered report kept (run-directory file names, oldest number first).
- * @returns {Promise<{ earlierReports: string[], reportName: string,
- *   earlierReportNotArchived?: { file: string, error: string } }>}
+ * `earlierReports` is every earlier report kept, archived or not (run-directory file names: the
+ * numbered ones, oldest number first, then a stop-report.json that stayed where it was);
+ * `earlierReportFiles` gives each with whether it was archived and can be read.
+ * @returns {Promise<{ earlierReports: string[], earlierReportFiles: Array<{ name: string, archived: boolean,
+ *   readable: boolean }>, reportName: string, earlierReportNotArchived?: { file: string, error: string } }>}
  */
 async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   retryMs = REPORT_ARCHIVE_RETRY_MS, now = Date.now } = {}) {
@@ -2093,9 +2096,16 @@ async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve
     }
     names = list();
   }
-  const earlierReports = numbered(names);
-  if (!notArchived) return { earlierReports, reportName: 'stop-report.json' };
-  return { earlierReports, reportName: nextName(names), earlierReportNotArchived: notArchived };
+  const kept = [...numbered(names).map((name) => ({ name, archived: true })),
+    ...(notArchived && names.includes('stop-report.json') ? [{ name: 'stop-report.json', archived: false }] : [])];
+  const earlierReportFiles = kept.map(({ name, archived }) => {
+    let readable = true;
+    try { JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, '')); } catch { readable = false; }
+    return { name, archived, readable };
+  });
+  const earlierReports = kept.map((k) => k.name);
+  if (!notArchived) return { earlierReports, earlierReportFiles, reportName: 'stop-report.json' };
+  return { earlierReports, earlierReportFiles, reportName: nextName(names), earlierReportNotArchived: notArchived };
 }
 
 /** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
@@ -4396,8 +4406,9 @@ async function stopRun(opts, {
   // names, oldest first); stop-report.json is always this stop's.
   const kept = await keepEarlierReports(runDir);
   const earlierReports = kept.earlierReports;
-  if (exitAccounting?.earlierCensus?.length) stopReport.earlierCensus = exitAccounting.earlierCensus;
-  if (earlierReports.length) stopReport.earlierReports = earlierReports;
+  if (exitAccounting?.earlierCensus?.length) Object.assign(stopReport, { earlierCensus: exitAccounting.earlierCensus,
+    earlierCensusFiles: exitAccounting.earlierCensusFiles });
+  if (earlierReports.length) Object.assign(stopReport, { earlierReports, earlierReportFiles: kept.earlierReportFiles });
   if (kept.earlierReportNotArchived) {
     // The earlier report stays as stop-report.json, as it was; this one is written beside it.
     stopReport.earlierReportNotArchived = kept.earlierReportNotArchived;
@@ -4462,7 +4473,7 @@ async function stopRun(opts, {
     unresolvedProcesses: unresolved,
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     ...exitAccounting,
-    ...(earlierReports.length ? { earlierReports } : {}),
+    ...(earlierReports.length ? { earlierReports, earlierReportFiles: kept.earlierReportFiles } : {}),
     ...(kept.earlierReportNotArchived ? { earlierReportNotArchived: kept.earlierReportNotArchived,
       reportWrittenAs: kept.reportName } : {}),
   };

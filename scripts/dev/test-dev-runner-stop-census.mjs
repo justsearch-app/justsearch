@@ -619,7 +619,9 @@ const helperReceipt = [
 /**
  * The proof table (b102 changeset, "Proof of an exit"): every record kind and field combination a
  * ledger can hold about one identity, with whether it proves that identity ended. `conflict` marks
- * a record that makes the identity itself ambiguous (another start for the same child).
+ * a record that puts another identity under the same childId (another start), so that a record
+ * naming only the childId no longer proves either; `specific` marks a record naming the identity's
+ * PID and birth, which proves it whatever else shares its childId.
  */
 const PROOF_TABLE = {
   // The children family is present (one note), so its absence is not what leaves accounting incomplete.
@@ -644,6 +646,7 @@ const PROOF_TABLE = {
     childStart()], rows: [
     ['child-exit (REQUESTED)', true, [childExit()]],
     ['child-exit (UNEXPECTED, code 3)', true, [childExit({ exitClass: 'UNEXPECTED', reason: null, code: 3 })]],
+    ['child-exit (UNKNOWN, no code)', true, [childExit({ exitClass: 'UNKNOWN', reason: null, code: null })]],
     ['child-exit marked reconciled', false, [childExit({ reconciled: true })]],
     ['child-exit naming another PID', false, [childExit({ pid: 971017 })]],
     ['owner-died GONE', true, [ownerDied('GONE')]],
@@ -659,6 +662,12 @@ const PROOF_TABLE = {
     ['child-note', false, [childRecord('child-note', { note: 'fixture' })]],
     ['gpu-release', false, [childRecord('gpu-release', { released: true })]],
     ['a second child-start naming another process', false, [childStart(noProcess(971021, '134364634163991105'))], 'conflict'],
+    ['child-exit naming its PID and birth', true, [childExit({ pid: proofChild.pid, creationFileTime: proofChild.creationFileTimeUtc })],
+      'specific'],
+    ['child-exit naming its PID and another birth', false, [childExit({ pid: proofChild.pid,
+      creationFileTime: nextTick(proofChild.creationFileTimeUtc) })]],
+    ['owner-died GONE naming its PID and birth', true, [ownerDied('GONE', { pid: proofChild.pid,
+      creationFileTime: proofChild.creationFileTimeUtc })], 'specific'],
   ] },
   witness: { subject: proofWitness, setup: [engineStart, engineExit(), witnessStart], rows: [
     ['its own job-process-exit', true, [witnessExit()]],
@@ -673,6 +682,9 @@ const PROOF_TABLE = {
     ['reconciled ALIVE_MATCH', false, [reconciledExit(by.runner, 'ALIVE_MATCH')]],
     ['reconciled without osCheck, classed OWNER_DIED', false, [reconciledExit(by.runner, null, { exitClass: 'OWNER_DIED' })]],
     ['helper-start and helper-exit (an owner receipt alone)', false, helperReceipt],
+    ['its own job-process-exit naming another owner instance', false, [witnessExit({ owner: { ...proofOwner, instanceId: 'inst-2' } })]],
+    ['reconciled GONE by the dev runner, naming another owner instance', false,
+      [reconciledExit(by.runner, 'GONE', { owner: { ...proofOwner, instanceId: 'inst-2' } })]],
   ] },
 };
 
@@ -694,23 +706,23 @@ function judgeLedger(records, subject) {
 test('an exit is proven only by an exit its writer saw or a reconciliation that found the process gone, from all of its records in any order', () => {
   const misjudged = [];
   for (const [kind, { subject, setup, rows }] of Object.entries(PROOF_TABLE)) {
-    // `conflict`: the child is known by its later start, so a gap names that process instead.
-    const judge = (label, records, expected, conflict = false) => {
+    const judge = (label, records, expected) => {
       const { ended, result, row } = judgeLedger([...setup, ...records], subject);
       if (ended !== expected) misjudged.push(`${kind}: ${label}: proven ${ended}, the table says ${expected}`);
       if (!expected && result.exitAccountingComplete !== false) misjudged.push(`${kind}: ${label}: accounting complete without a proof`);
-      if (!expected && !conflict && !result.exitAccountingGaps.some((g) => g.pid === subject.pid)) {
+      if (!expected && !result.exitAccountingGaps.some((g) => g.pid === subject.pid)) {
         misjudged.push(`${kind}: ${label}: no gap names the unproven identity`);
       }
       if (!expected && row && row.ledgerClass !== 'UNKNOWN') misjudged.push(`${kind}: ${label}: unproven, yet classed ${row.ledgerClass}`);
     };
-    for (const [label, proves, records, conflict] of rows) judge(label, records, proves, Boolean(conflict));
-    // Every two records in both orders: a proof stands whatever else is recorded, before or after it.
-    for (const [a, aProves, aRecords, aConflict] of rows) {
-      for (const [b, bProves, bRecords, bConflict] of rows) {
+    for (const [label, proves, records] of rows) judge(label, records, proves);
+    // Every two records in both orders: a proof stands whatever else is recorded, before or after it,
+    // except that another start under the same childId leaves only a record naming the identity.
+    const proves = ([, p, , flag], other) => p && (flag === 'specific' || other[3] !== 'conflict');
+    for (const a of rows) {
+      for (const b of rows) {
         if (a === b) continue;
-        judge(`${a}, then ${b}`, [...aRecords, ...bRecords], (aProves || bProves) && !aConflict && !bConflict,
-          Boolean(aConflict || bConflict));
+        judge(`${a[0]}, then ${b[0]}`, [...a[2], ...b[2]], proves(a, b) || proves(b, a));
       }
     }
   }
@@ -798,6 +810,9 @@ test('an identity whose records do not prove its exit is looked up, and keeps th
     ['witness', 'its own job-process-exit marked reconciled, no osCheck', [reconciledExit(by.engine, null, { exitClass: 'OWNER_DIED' })]],
     ['witness', 'reconciled IDENTITY_UNKNOWN', [reconciledExit(by.runner, 'IDENTITY_UNKNOWN')]],
     ['witness', 'its own job-process-exit one tick off the start', [witnessExit({ creationFileTime: nextTick(proofWitness.creationFileTimeUtc) })]],
+    ['witness', 'its own job-process-exit naming another owner instance', [witnessExit({ owner: { ...proofOwner, instanceId: 'inst-2' } })]],
+    ['child', 'a second start under its childId, which exits by its identity', [childStart(noProcess(971021, '134364634163991105')),
+      childExit({ pid: 971021, creationFileTime: '134364634163991105' })]],
   ];
   const wrong = [];
   for (const [kind, label, records] of cases) {
@@ -1039,13 +1054,14 @@ test('a rotation that renames the current file and has not yet replaced it, at t
 });
 
 /**
- * A real Windows reader holding `file` open without delete sharing (FileShare.Read), as an editor,
- * scanner or indexer can, until released. Only this test's own process is started and it ends itself.
+ * A real Windows reader holding `file` open without delete sharing (FileShare.Read, or `share`: None
+ * also refuses other readers), as an editor, scanner or indexer can, until released. Only this
+ * test's own process is started and it ends itself.
  */
-function holdOpen(file) {
+function holdOpen(file, share = 'Read') {
   const ready = `${file}.held`, release = `${file}.release`;
   const quote = (p) => `'${p.replaceAll("'", "''")}'`;
-  const script = `$f = [System.IO.File]::Open(${quote(file)}, 'Open', 'Read', 'Read'); New-Item -ItemType File -Path ${quote(ready)} | Out-Null; `
+  const script = `$f = [System.IO.File]::Open(${quote(file)}, 'Open', 'Read', '${share}'); New-Item -ItemType File -Path ${quote(ready)} | Out-Null; `
     + `$until = (Get-Date).AddSeconds(60); while (-not (Test-Path -LiteralPath ${quote(release)}) -and (Get-Date) -lt $until) `
     + `{ Start-Sleep -Milliseconds 10 }; $f.Close()`;
   const proc = cp.spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { stdio: 'ignore', windowsHide: true });
@@ -1087,8 +1103,12 @@ test('a stop report another reader holds open is kept: archived once the reader 
         throw err;
       }
     };
-    let out;
-    try { out = await api.stopRun({}, fixture.io).catch((err) => ({ thrown: String(err) })); } finally {
+    let out, again;
+    try {
+      out = await api.stopRun({}, fixture.io).catch((err) => ({ thrown: String(err) }));
+      // Still held: a second stop keeps it too, and lists every earlier report.
+      if (!holdMs) again = await api.stopRun({}, fixture.io).catch((err) => ({ thrown: String(err) }));
+    } finally {
       fs.renameSync = renameSync;
       await reader.release();
     }
@@ -1110,6 +1130,16 @@ test('a stop report another reader holds open is kept: archived once the reader 
       assert.ok(fs.existsSync(path.join(fixture.dir, 'stop-report.1.json')), 'this report is where the result says');
       const written = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.1.json'), 'utf8'));
       assert.deepEqual([written.runId, written.reportWrittenAs], [runId, 'stop-report.1.json']);
+      const heldReport = { name: 'stop-report.json', archived: false, readable: true };
+      assert.deepEqual([out.earlierReports, out.earlierReportFiles], [['stop-report.json'], [heldReport]], 'the held report is listed');
+      assert.deepEqual([written.earlierReports, written.earlierReportFiles], [['stop-report.json'], [heldReport]]);
+      assert.equal(again.thrown, undefined, again.thrown);
+      assert.equal(again.reportWrittenAs, 'stop-report.2.json');
+      assert.deepEqual(again.earlierReports, ['stop-report.1.json', 'stop-report.json']);
+      assert.deepEqual(again.earlierReportFiles, [{ name: 'stop-report.1.json', archived: true, readable: true }, heldReport]);
+      assert.ok(fs.readFileSync(reportPath).equals(prior), 'still never overwritten');
+      assert.equal(JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.1.json'), 'utf8')).reportWrittenAs,
+        'stop-report.1.json', 'the first stop\'s report is kept');
     }
   }
 });
@@ -1127,9 +1157,12 @@ test('every earlier census file is kept and named, one that cannot be read or re
   fs.writeFileSync(path.join(dataDir, 'process-exits.json'), JSON.stringify({ processExits: [] }));
   const result = await (await arm({ runId, pids: { backendRootPid: engine.pid } }, dataDir, [])).observer.finish();
   assert.deepEqual(result.earlierCensus, ['exit-targets.1.json', 'process-exits.1.json']);
-  assert.deepEqual(result.earlierCensusFiles, [{ name: 'exit-targets.1.json', readable: false },
-    { name: 'process-exits.1.json', readable: true }]);
+  assert.deepEqual(result.earlierCensusFiles, [{ name: 'exit-targets.1.json', readable: false, archived: true },
+    { name: 'process-exits.1.json', readable: true, archived: true }]);
   assert.ok(fs.readFileSync(path.join(dataDir, 'exit-targets.1.json')).equals(torn), 'kept as it was');
+  assert.equal(result.exitAccountingComplete, false, 'what the unreadable census observed is not accounted');
+  assert.ok(result.exitAccountingGaps.some((g) => g.reason === 'earlier-census-unreadable' && g.file === 'exit-targets.1.json'),
+    JSON.stringify(result.exitAccountingGaps));
   if (!windows) return;
   // An earlier census file another reader holds open: left untouched, and this census written beside it.
   const heldDir = freshDir('held-census');
@@ -1153,6 +1186,234 @@ test('every earlier census file is kept and named, one that cannot be read or re
   assert.deepEqual(census2.censusWrittenAs, ['exit-targets.1.json', 'process-exits.1.json']);
   assert.equal(census2.earlierCensusNotArchived?.[0]?.file, 'exit-targets.json');
   assert.ok(fs.existsSync(path.join(heldDir, 'process-exits.1.json')), 'this census is where it says');
+});
+
+/** A live child of this test that exits with `code` when told to (`end`); its exact native birth. */
+async function liveChild(code = 0) {
+  const proc = cp.spawn(process.execPath, ['-e', `process.on('message', () => process.exit(${code})); setTimeout(() => process.exit(${code}), 120000)`],
+    { stdio: ['ignore', 'ignore', 'ignore', 'ipc'], windowsHide: true });
+  const exited = new Promise((resolve) => proc.once('exit', resolve));
+  await new Promise((resolve) => proc.once('spawn', resolve));
+  const out = cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `[Diagnostics.Process]::GetProcessById(${proc.pid}).StartTime.ToUniversalTime().ToFileTimeUtc()`],
+    { encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  const birth = String(out.stdout).trim();
+  assert.match(birth, /^[1-9][0-9]+$/, `the child's native birth: ${out.stderr}`);
+  return { pid: proc.pid, creationFileTimeUtc: birth, exited,
+    end: async () => {
+      if (proc.exitCode === null && proc.signalCode === null) { try { proc.send('end'); } catch { /* already ending */ } }
+      return exited;
+    } };
+}
+/** A birth one tick from `ft` inside the same microsecond: what a coarsened comparison cannot tell apart. */
+const sameMicrosecondNeighbour = (ft) => String(BigInt(ft) % 10n === 9n ? BigInt(ft) - 1n : BigInt(ft) + 1n);
+/** One more ledger line, appended as its writer would. */
+let appendedSeq = 10000;
+function appendLedger(dataDir, { family, writer, type, fields }) {
+  fs.appendFileSync(path.join(ledgerLib.ledgerDirectory(dataDir), `${family}.v1.jsonl`), JSON.stringify({ schemaVersion: 1, type,
+    seq: ++appendedSeq, at: new Date().toISOString(), writer, ...fields }) + '\n');
+}
+/** The real census, with the real PowerShell observer, of the proof run's ledger in `dataDir`. */
+async function realCensus(dataDir, runDir) {
+  return census.startStopExitCensus({ runId: PROOF_RUN, pids: { backendRootPid: proofEngine.pid } }, dataDir, runDir, scope);
+}
+
+test('a native ledger birth is compared exactly: a child recorded one tick off its own birth is not observed, and accounting is not complete', async () => {
+  // Each target's birth carries the precision its source measured.
+  const ledger = (records) => { const dataDir = freshDir('ticks'); writeLedger(dataDir, records); return census.readRunLedger(dataDir); };
+  const childSpawn = PROOF_TABLE.child.setup[2];
+  const ticks = census.exitTargets({ runId: PROOF_RUN, pids: { backendRootPid: proofEngine.pid } }, null, [],
+    ledger([engineStart, childSpawn, childStart()])).targets.map((t) => [t.role, t.birthTick]);
+  const wrong = [];
+  const check = (ok, what) => { if (!ok) wrong.push(what); };
+  check(JSON.stringify(ticks.sort()) === JSON.stringify([['engine', '10'], ['extraction-child', '1']]),
+    `a dev runner's Engine start is CIM (10), the Engine's child native (1): ${JSON.stringify(ticks)}`);
+  const selfWritten = rec('engine', { role: 'engine', pid: proofEngine.pid, startedAt: proofStartedAt }, 'engine-start', engineStart.fields);
+  const selfTicks = census.exitTargets({ runId: PROOF_RUN, pids: {} }, null, [], ledger([selfWritten])).targets.map((t) => t.birthTick);
+  check(JSON.stringify(selfTicks) === '["1"]', `an Engine start the Engine wrote is native: ${selfTicks}`);
+  // A held handle one tick off the exact ledger birth names another process.
+  const dataDir = freshDir('exact-held');
+  writeLedger(dataDir, [...PROOF_TABLE.child.setup]);
+  const input = census.exitTargets({ runId: PROOF_RUN, pids: { backendRootPid: proofEngine.pid } }, null, [], census.readRunLedger(dataDir));
+  appendLedger(dataDir, childExit());
+  const verdict = (osBirth) => census.exitResult(input, { processExits: input.targets.map((t) => ({ pid: t.pid,
+    creationFileTimeUtc: t.creationFileTimeUtc, osCreationFileTimeUtc: t.pid === proofChild.pid ? osBirth : t.creationFileTimeUtc,
+    exitCode: 0, atMs: Date.now() })) }, 'exact', census.readRunLedger(dataDir));
+  const own = verdict(proofChild.creationFileTimeUtc);
+  check(own.exitAccountingComplete === true, `its own birth is observed: ${JSON.stringify(own.exitAccountingGaps)}`);
+  const neighbour = verdict(sameMicrosecondNeighbour(proofChild.creationFileTimeUtc));
+  check(neighbour.exitAccountingComplete === false && neighbour.exitAccountingGaps.some((g) => g.pid === proofChild.pid),
+    `a held handle one tick off is not the child: ${JSON.stringify(neighbour.exitAccountingGaps)}`);
+  if (!windows) { assert.deepEqual(wrong, []); return; }
+  // The real observer: a running child whose ledger birth is its own, then one recorded one tick off.
+  for (const offByOne of [false, true]) {
+    const child = await liveChild();
+    const recorded = { pid: child.pid, creationFileTimeUtc: offByOne ? sameMicrosecondNeighbour(child.creationFileTimeUtc)
+      : child.creationFileTimeUtc };
+    const data = freshDir(offByOne ? 'real-neighbour' : 'real-own');
+    writeLedger(data, [engineStart, engineExit(), childSpawn, childStart(recorded)]);
+    let result;
+    try {
+      const armed = await realCensus(data, data);
+      const target = JSON.parse(fs.readFileSync(path.join(data, 'exit-targets.json'), 'utf8')).targets.find((t) => t.pid === child.pid);
+      check(target?.birthTick === '1', `the real observer's target is exact: ${JSON.stringify(target)}`);
+      await child.end();
+      appendLedger(data, rec('children', by.engine, 'child-exit', { childId: 'c1', exitClass: 'REQUESTED', reason: 'QUIT', code: 0,
+        forced: false, exitedAt: new Date().toISOString() }));
+      result = await armed.finish();
+    } finally { await child.end(); }
+    if (!offByOne) {
+      check(result.exitAccountingComplete === true, `the real observer, its own birth: ${JSON.stringify(result.exitAccountingGaps)}`);
+    } else {
+      check(result.exitAccountingComplete === false && result.exitAccountingGaps.some((g) => g.pid === child.pid
+        && /identity mismatch/.test(g.reason)), `the real observer, a ledger birth one tick off the process: complete `
+        + `${result.exitAccountingComplete}, ${JSON.stringify(result.exitAccountingGaps)}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('each start under one childId is its own identity: an exit naming one start never accounts another', async () => {
+  const p = [noProcess(971501, '134364634153991105'), noProcess(971505, '134364634153993105'), noProcess(971509, '134364634153995105')];
+  const startOf = (x) => childStart(x);
+  const exitOf = (x, fields = {}) => childExit({ pid: x.pid, creationFileTime: x.creationFileTimeUtc, ...fields });
+  const judge = (records) => {
+    const dataDir = freshDir('shared-child-id');
+    writeLedger(dataDir, [engineStart, engineExit(), PROOF_TABLE.child.setup[2], ...records]);
+    const ledger = census.readRunLedger(dataDir);
+    const view = census.ledgerView(ledger, PROOF_RUN);
+    const run = { runId: PROOF_RUN, pids: { backendRootPid: proofEngine.pid } };
+    const input = census.exitTargets(run, null, [], ledger, view);
+    const result = census.exitResult(input, { processExits: [], gaps: [] }, 'shared childId', ledger, view);
+    return { ended: census.endedIdentitiesOf(view).filter((e) => e.role !== 'engine').map((e) => e.pid).sort(), targets: input.targets.map((t) => t.pid).sort(),
+      gapped: [...new Set(result.exitAccountingGaps.map((g) => g.pid).filter(Boolean))].sort(), complete: result.exitAccountingComplete };
+  };
+  const wrong = [];
+  const expect = (label, records, ended) => {
+    const got = judge(records);
+    const open = p.filter((x) => records.some((r) => r.type === 'child-start' && r.fields.pid === x.pid) && !ended.includes(x.pid))
+      .map((x) => x.pid).sort();
+    if (JSON.stringify(got.ended) !== JSON.stringify([...ended].sort())) wrong.push(`${label}: ended ${got.ended}, expected ${ended}`);
+    // Every start not proven ended is armed (it may be running) and keeps accounting incomplete.
+    if (JSON.stringify(got.targets) !== JSON.stringify(open)) wrong.push(`${label}: armed ${got.targets}, expected ${open}`);
+    if (open.some((pid) => !got.gapped.includes(pid))) wrong.push(`${label}: no gap names ${open.filter((pid) => !got.gapped.includes(pid))}`);
+    if (got.complete !== !open.length) wrong.push(`${label}: complete ${got.complete}`);
+  };
+  expect('two starts, the later exits by its identity', [startOf(p[0]), startOf(p[1]), exitOf(p[1])], [p[1].pid]);
+  expect('two starts, the later exits by its identity, recorded first', [startOf(p[1]), exitOf(p[1]), startOf(p[0])], [p[1].pid]);
+  expect('two starts, an exit naming only the childId', [startOf(p[0]), startOf(p[1]), childExit()], []);
+  expect('three starts, the middle exits by its identity', [startOf(p[0]), startOf(p[1]), startOf(p[2]), exitOf(p[1])], [p[1].pid]);
+  expect('three starts, the middle by its identity and one by the childId only',
+    [startOf(p[0]), startOf(p[1]), startOf(p[2]), exitOf(p[1]), childExit()], [p[1].pid]);
+  expect('three starts, a reconciliation finds the first gone by its identity',
+    [startOf(p[0]), startOf(p[1]), startOf(p[2]), ownerDied('GONE', { pid: p[0].pid, creationFileTime: p[0].creationFileTimeUtc })], [p[0].pid]);
+  expect('three starts, each exits by its identity', [startOf(p[0]), startOf(p[1]), startOf(p[2]), exitOf(p[0]), exitOf(p[1]), exitOf(p[2])],
+    p.map((x) => x.pid));
+  expect('the same start recorded twice, an exit naming only the childId', [startOf(p[0]), startOf(p[0]), childExit()], [p[0].pid]);
+  assert.deepEqual(wrong, []);
+});
+
+/**
+ * The real census of `count` running children recorded under one childId. `ending`: the starts that
+ * exit, each with an exit naming its PID and birth; `childIdOnly`: one more exit naming only the
+ * childId. Returns what is wrong: a complete verdict while one still runs, or (unless `verdictOnly`)
+ * a running start no gap names, or an ended one a gap names.
+ */
+async function sharedChildIdCensus(label, count, ending, childIdOnly = false, verdictOnly = false) {
+  const kids = [];
+  try {
+    for (let i = 0; i < count; i++) kids.push(await liveChild());
+    const dataDir = freshDir('shared-child-id-real');
+    writeLedger(dataDir, [engineStart, engineExit(), PROOF_TABLE.child.setup[2], ...kids.map((k) => childStart(k))]);
+    for (const i of ending) {
+      await kids[i].end();
+      appendLedger(dataDir, childExit({ pid: kids[i].pid, creationFileTime: kids[i].creationFileTimeUtc,
+        exitedAt: new Date().toISOString() }));
+    }
+    if (childIdOnly) appendLedger(dataDir, childExit({ exitedAt: new Date().toISOString() }));
+    const result = await (await realCensus(dataDir, dataDir)).finish();
+    const running = kids.filter((_, i) => !ending.includes(i));
+    const wrong = [];
+    if (result.exitAccountingComplete !== !running.length) wrong.push(`${label}: complete ${result.exitAccountingComplete}`);
+    if (!verdictOnly) {
+      for (const k of running) if (!result.exitAccountingGaps.some((g) => g.pid === k.pid)) wrong.push(`${label}: no gap names running ${k.pid}`);
+      for (const i of ending) {
+        if (result.exitAccountingGaps.some((g) => g.pid === kids[i].pid)) wrong.push(`${label}: a gap names ended ${kids[i].pid}`);
+      }
+    }
+    return wrong.length ? [...wrong, JSON.stringify(result.exitAccountingGaps)] : [];
+  } finally { for (const k of kids) await k.end(); }
+}
+
+test('preserved from b599d4d7e: two running children under one childId, the later ended by its own exit, leave accounting incomplete', { skip: !windows && 'Windows processes' }, async () => {
+  assert.deepEqual(await sharedChildIdCensus('two starts, the later exits by its identity', 2, [1], false, true), []);
+});
+
+test('the real census of running children under one childId: only a start whose own exit is recorded is accounted, and each running one is named', { skip: !windows && 'Windows processes' }, async () => {
+  assert.deepEqual(await sharedChildIdCensus('two starts, the later exits by its identity', 2, [1]), []);
+  assert.deepEqual(await sharedChildIdCensus('three starts, the middle by its identity, one exit by the childId only', 3, [1], true), []);
+  assert.deepEqual(await sharedChildIdCensus('three starts, each exits by its identity', 3, [0, 1, 2]), []);
+});
+
+test('an earlier census another reader holds open is read where it is: its OS disagreement is carried through every retry, and it is listed', { skip: !windows && 'Windows sharing' }, async () => {
+  // The run's Engine is a real process; it exits 7 while its ledger exit records code 0.
+  const engine = await liveChild(7);
+  const runId = 'stop-census-held-disagreement';
+  const run = { runId, pids: { backendRootPid: engine.pid } };
+  const dataDir = freshDir('held-disagreement');
+  const ledger = runLedger(dataDir, runId, engine, process.execPath);
+  ledger.engineStart();
+  const first = await census.startStopExitCensus(run, dataDir, dataDir, scope);
+  await engine.end();
+  ledger.engineExit();
+  const prior = await first.finish();
+  assert.ok(prior.exitAccountingGaps.some((g) => g.reason === 'ledger_os_disagree' && g.pid === engine.pid),
+    `the first census finds the disagreement: ${JSON.stringify(prior.exitAccountingGaps)}`);
+  const targetsFile = path.join(dataDir, 'exit-targets.json'), exitsFile = path.join(dataDir, 'process-exits.json');
+  const bytes = [fs.readFileSync(targetsFile), fs.readFileSync(exitsFile)];
+  const retry = async () => (await census.startStopExitCensus(run, dataDir, dataDir, scope)).finish();
+  const disagrees = (r) => r.exitAccountingComplete === false
+    && r.exitAccountingGaps.some((g) => g.reason === 'ledger_os_disagree' && g.pid === engine.pid);
+  const readers = [holdOpen(targetsFile), holdOpen(exitsFile)];
+  const retries = [];
+  try {
+    for (const reader of readers) await reader.held();
+    // Two retries while both files stay held past the archive retry.
+    retries.push(await retry(), await retry());
+  } finally { for (const reader of readers) await reader.release(); }
+  assert.ok(fs.readFileSync(targetsFile).equals(bytes[0]) && fs.readFileSync(exitsFile).equals(bytes[1]), 'the held census is untouched');
+  for (const [i, r] of retries.entries()) {
+    assert.ok(disagrees(r), `retry ${i + 1} keeps the earlier disagreement: ${JSON.stringify(r.exitAccountingGaps)}`);
+    assert.deepEqual(r.censusWrittenAs, [`exit-targets.${i + 1}.json`, `process-exits.${i + 1}.json`]);
+    for (const name of ['exit-targets.json', 'process-exits.json']) {
+      assert.ok(r.earlierCensus?.includes(name), `retry ${i + 1} lists the held ${name}: ${JSON.stringify(r.earlierCensus)}`);
+      assert.deepEqual(r.earlierCensusFiles?.find((f) => f.name === name), { name, readable: true, archived: false });
+    }
+  }
+  assert.deepEqual(retries[1].earlierCensusFiles.filter((f) => f.archived).map((f) => f.name),
+    ['exit-targets.1.json', 'process-exits.1.json'], 'and the first retry\'s own census');
+  // Released: the next retry archives it under the next number and still carries the disagreement.
+  const after = await retry();
+  assert.ok(disagrees(after), JSON.stringify(after.exitAccountingGaps));
+  assert.ok(fs.readFileSync(path.join(dataDir, 'exit-targets.3.json')).equals(bytes[0]), 'archived as it was');
+  assert.ok(after.earlierCensusFiles.every((f) => f.archived && f.readable), JSON.stringify(after.earlierCensusFiles));
+  // An earlier census held so that it cannot even be read is a named gap.
+  const heldDir = freshDir('held-unreadable');
+  const heldLedger = runLedger(heldDir, runId, noProcess(971601, '134364632933610725'), process.execPath);
+  heldLedger.engineStart();
+  heldLedger.engineExit();
+  const unreadable = path.join(heldDir, 'process-exits.json');
+  fs.writeFileSync(unreadable, JSON.stringify({ processExits: [] }));
+  const locked = holdOpen(unreadable, 'None');
+  let blind;
+  try {
+    await locked.held();
+    blind = await (await census.startStopExitCensus({ runId, pids: { backendRootPid: 971601 } }, heldDir, heldDir, scope)).finish();
+  } finally { await locked.release(); }
+  assert.equal(blind.exitAccountingComplete, false);
+  assert.ok(blind.exitAccountingGaps.some((g) => g.reason === 'earlier-census-unreadable' && g.file === 'process-exits.json'),
+    JSON.stringify(blind.exitAccountingGaps));
+  assert.deepEqual(blind.earlierCensusFiles, [{ name: 'process-exits.json', readable: false, archived: false }]);
 });
 
 /**
