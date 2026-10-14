@@ -69,7 +69,10 @@ test('parser inheritance refuses missing containment, wrong birth, early exit an
   const reused = parserHistory('QUIT'); reused.children.records[3].line.parentCreationFileTime=birth(2);
   assert.equal(census.ledgerView(reused,incarnation.session).witnesses[0].exit.exitClass,'UNEXPECTED');
   const early = parserHistory('QUIT'); early.children.records.at(-1).line.exitedAt=at(3);
-  assert.equal(census.ledgerView(early,incarnation.session).witnesses[0].exit.exitClass,'UNEXPECTED');
+  // An exit before the parser's does not inherit its QUIT. The parser's window, with no end record,
+  // covers until the parser's recorded exit, so the exit is the window's (task b6d536 b101).
+  const earlyExit = census.ledgerView(early,incarnation.session).witnesses[0].exit;
+  assert.deepEqual([earlyExit.exitClass, earlyExit.reason], ['REQUESTED', 'OCR']);
 });
 test('running record preserves the first-ready retry incarnation', async t => {
   // Execute the production record construction with IO seams; no second copy of its fields.

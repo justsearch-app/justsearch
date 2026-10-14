@@ -29,6 +29,15 @@ public final class GpuCapabilitiesService {
   }
 
   /**
+   * Whether the nvidia-smi tool itself is available, from its detector and without starting it.
+   * Where NVML answers, the snapshot's nvidia-smi section carries NVML's figures (its source says
+   * so), and this, not that section, says whether nvidia-smi is there.
+   */
+  public boolean nvidiaSmiToolAvailable() {
+    return vramDetector.isToolAvailable();
+  }
+
+  /**
    * Snapshot WITHOUT a CUDA-functional reading (the {@link GpuCapabilities.Cuda#unknown()}
    * sentinel). Used by consumers that only need the VRAM/device axes. The composition seam that
    * also probes CUDA calls {@link #snapshot(GpuCapabilities.Cuda)} so the merged view carries

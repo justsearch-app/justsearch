@@ -94,11 +94,11 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     this.ocrMetricCatalog = ocrMetricCatalog == null ? OcrMetricCatalog.noop() : ocrMetricCatalog;
     // The MIME this extractor detects drives OCR/VDU routing, so it must agree with the detector
     // the structured extractor parses under (tempdoc 803).
-    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
-      org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
-      this.tika = new Tika(detector, OwnedTikaParsers.create(detector),
-          new org.apache.tika.language.translate.DefaultTranslator());
-    }
+    // No owner window: constructing the parser graph launches nothing beyond the recorded
+    // runtime's one-time check, which carries its own window (task b6d536 b101).
+    org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
+    this.tika = new Tika(detector, OwnedTikaParsers.create(detector),
+        new org.apache.tika.language.translate.DefaultTranslator());
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
     this.structuredExtractor =
         new StructuredContentExtractor(this.policy.maxExtractedChars(), this.policy, inputFactory);

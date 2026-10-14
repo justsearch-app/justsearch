@@ -64,7 +64,12 @@ public final class DiskEncryptionProbe {
    * One volume's reading: the value the last successful probe gave, when it was taken, and whether
    * the latest probe failed so the value is only the last known one. {@code age} is as of this read.
    */
-  public record Reading(AtRestProtection value, long probedAtMs, Duration age, boolean stale) {}
+  public record Reading(AtRestProtection value, long probedAtMs, Duration age, boolean stale) {
+    /** What this reading tells consumers ({@link DiskEncryptionProbe#verdict}); same reading, same time. */
+    public AtRestProtection verdict() {
+      return DiskEncryptionProbe.verdict(this);
+    }
+  }
 
   /** The per-volume readings, keyed by volume root. */
   private static final class Volumes {

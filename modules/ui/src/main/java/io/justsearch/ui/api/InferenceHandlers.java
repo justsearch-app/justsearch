@@ -45,7 +45,8 @@ final class InferenceHandlers {
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private final Supplier<ComponentRecoveryAuthority> componentRecovery;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; nvidia-smi availability
-  // is read from gpuCapabilitiesService.snapshot().nvidiaSmi().available().
+  // is read from gpuCapabilitiesService.snapshot().nvidiaSmi().available(), or from
+  // nvidiaSmiToolAvailable() where NVML supplied that section (task b6d536 b101).
   private final GpuCapabilitiesService gpuCapabilitiesService;
   private final EnterprisePolicyService enterprisePolicyService;
   private final io.justsearch.app.services.settings.UiSettingsStore settingsStore;
@@ -211,15 +212,18 @@ final class InferenceHandlers {
     // Tempdoc 374 alpha.27: read nvidia-smi availability from the snapshot's
     // nvidiaSmi() accessor instead of a direct VramDetector reference. Task b6d536
     // b101: where NVML answers, that section carries NVML's figures (source
-    // "read in-process (NVML)") and no nvidia-smi process starts.
+    // "read in-process (NVML)") and no nvidia-smi process starts; nvidiaSmiAvailable
+    // then still reports the tool itself, from its detector, without starting it.
     GpuCapabilities snapshot = null;
     try {
       snapshot = gpuCapabilitiesService.snapshot();
     } catch (Exception ignored) {
       // best-effort
     }
-    boolean nvidiaSmiAvailable =
-        snapshot != null && snapshot.nvidiaSmi() != null && snapshot.nvidiaSmi().available();
+    boolean nvidiaSmiAvailable = snapshot != null && snapshot.nvidiaSmi() != null
+        && (GpuCapabilities.NvidiaSmi.SOURCE_NVML.equals(snapshot.nvidiaSmi().source())
+            ? gpuCapabilitiesService.nvidiaSmiToolAvailable()
+            : snapshot.nvidiaSmi().available());
     boolean cudaAvailable = snapshot != null
         && snapshot.effective() != null
         && snapshot.effective().cudaAvailable();

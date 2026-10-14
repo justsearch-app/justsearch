@@ -171,8 +171,18 @@ public final class VramDetector {
   }
 
   /**
-   * Makes the next reading a fresh probe whatever its age, and retries a sticky failure. Shared
-   * by all readers: concurrent forced reads still start one process.
+   * Whether the nvidia-smi tool is available, without starting it: the last shared reading's
+   * answer when one was taken, otherwise whether nvidia-smi is installed where a launch finds it.
+   * Independent of where the GPU memory figures come from (NVML reads them in process).
+   */
+  public boolean isToolAvailable() {
+    return readings.toolAvailable();
+  }
+
+  /**
+   * Marks the shared reading stale and asks for a fresh one: the next probe the five-second
+   * interval allows takes it, retrying a sticky failure. Never starts nvidia-smi sooner than
+   * that; a read inside the interval returns the last reading, marked stale.
    */
   public void invalidateCache() {
     readings.invalidate();

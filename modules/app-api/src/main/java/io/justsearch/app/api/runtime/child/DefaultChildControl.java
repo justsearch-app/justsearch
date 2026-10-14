@@ -829,7 +829,8 @@ public final class DefaultChildControl implements ChildControl {
         intent == null ? null : intent.intentId(), cooperativeAt, terminator.codeDistinctive()));
     ProcessIntents.outcome(held.pid, held.os.creationFileTime().orElse(null), exitClass.name(),
         outcome.reason().map(Enum::name).orElse(
-            exitClass == ExitClass.UNEXPECTED ? ProcessIntents.NO_INTENT : null));
+            exitClass == ExitClass.UNEXPECTED ? ProcessIntents.NO_INTENT : null),
+        exitedAt.orElse(observedAt));
     CompletableFuture<ExitOutcome> stopFuture;
     boolean allDurable;
     String registryId;

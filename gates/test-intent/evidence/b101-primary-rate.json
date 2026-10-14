@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T18:03:05.558Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "25a2664a1689241228d88fdf14a401e089567920",
+  "createdAt": "2026-10-14T21:09:55.145Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "fd70247a50b3eb15e6f2a709ceff17e4dc96af31",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement.primaryRateWithAndWithoutProbeChurn\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 113138
+      "durationMs": 125589
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ProbeChurnPrimaryRateMeasurement.java#primaryRateWithAndWithoutProbeChurn",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ProbeChurnPrimaryRateMeasurement.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2e14f47d4079f4cf344313b88a47143327f4e6d0f5a1dfae1849cf8f94907938",
+      "contentDigest": "sha256:1b7a36681dd5b58c5a9f19421c1ccfae0e5ee8859e3ac5e9ff99c7ca1f688e42",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -51,16 +51,16 @@
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement.primaryRateWithAndWithoutProbeChurn\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 181580
+        "durationMs": 188722
       }
     ],
     "checks": [
       {
         "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ProbeChurnPrimaryRateMeasurement.java#primaryRateWithAndWithoutProbeChurn",
         "classification": "assertion",
-        "detail": "primaryRateWithAndWithoutProbeChurn(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: helper ledger writes must take at most 2% of indexing time and at most 32 records per burst, whatever the document count:&#13;&#10;  round 0: 3606 helper records (4.01 per document) took 9.271 s of 21.68 s indexing (42.77%)&#10;  round 1: 3604 helper records (4.0"
+        "detail": "primaryRateWithAndWithoutProbeChurn(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: ledger writes must take at most 2% of indexing time and at most 32 records per burst, whatever the document count:&#13;&#10;  round 0: 3631 ledger records (4.03 per document) took 10.411 s of 25.47 s indexing (40.88%)&#10;  round 1: 3630 ledger records (4.03 per"
       }
     ]
   },
-  "digest": "sha256:e10698aabece9f8b1bbfbc4cd7c2e013e68d338d2ff28f2eebe323b6d9014ffd"
+  "digest": "sha256:49bb2b8d0d2fc1ff186158c9cb88297e9fedd2f06c5dcead9493a70ad799c1d5"
 }

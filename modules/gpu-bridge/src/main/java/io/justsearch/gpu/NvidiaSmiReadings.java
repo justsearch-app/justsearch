@@ -2,6 +2,7 @@
 package io.justsearch.gpu;
 
 import io.justsearch.app.api.runtime.child.OwnedHelper;
+import io.justsearch.configuration.SystemAccess;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -22,9 +23,10 @@ import org.slf4j.LoggerFactory;
  * {@link #MIN_INTERVAL} is served to everyone without a new process. Readers that arrive while a
  * probe runs wait for it and share its answer.
  *
- * <p>{@link #invalidate()} makes the next read a fresh one whatever its age: admission and
- * pressure decisions use it. Concurrent forced readers still share a single probe. A failure to
- * start nvidia-smi, or a non-zero exit, is sticky until the next invalidation, as before.
+ * <p>{@link #invalidate()} marks the reading stale; it never shortens the interval. A read inside
+ * the interval returns the last reading marked {@link Reading#stale() stale}, and the next probe
+ * the interval allows answers every reader waiting for it. A failure to start nvidia-smi, or a
+ * non-zero exit, is sticky until an invalidation, which retries it once the interval allows.
  */
 final class NvidiaSmiReadings {
   private static final Logger LOG = LoggerFactory.getLogger(NvidiaSmiReadings.class);
@@ -33,10 +35,23 @@ final class NvidiaSmiReadings {
   static final Duration MIN_INTERVAL = Duration.ofSeconds(5);
 
   private static final int TIMEOUT_SECONDS = 5;
-  private static final NvidiaSmiReadings SHARED = new NvidiaSmiReadings(Clock.systemUTC(), NvidiaSmiReadings::launch);
+  private static final NvidiaSmiReadings SHARED =
+      new NvidiaSmiReadings(Clock.systemUTC(), NvidiaSmiReadings::launch, NvidiaSmiReadings::onSearchPath);
 
-  /** One nvidia-smi answer; any figure it could not give is null. */
-  record Reading(boolean available, String error, Long totalBytes, Long freeBytes, String driverVersion, Instant at) {}
+  /**
+   * One nvidia-smi answer; any figure it could not give is null. {@code stale}: a fresh reading was
+   * asked for inside the minimum interval, so this is the last one, taken at {@code at}.
+   */
+  record Reading(boolean available, String error, Long totalBytes, Long freeBytes, String driverVersion, Instant at,
+      boolean stale) {
+    Reading(boolean available, String error, Long totalBytes, Long freeBytes, String driverVersion, Instant at) {
+      this(available, error, totalBytes, freeBytes, driverVersion, at, false);
+    }
+
+    Reading markedStale() {
+      return stale ? this : new Reading(available, error, totalBytes, freeBytes, driverVersion, at, true);
+    }
+  }
 
   /** What one probe process returned; {@code output} is null when it did not finish in time. */
   record Outcome(int exitCode, String output) {}
@@ -49,14 +64,23 @@ final class NvidiaSmiReadings {
 
   private final Clock clock;
   private final Runner runner;
+  private final java.util.function.BooleanSupplier installed;
   private final ReentrantLock lock = new ReentrantLock();
   private Reading last;
-  private boolean forceNext;
+  private Instant probedAt;
+  private boolean staleRequested;
   private boolean unavailable;
+  private Instant presenceAt;
+  private boolean present;
 
   NvidiaSmiReadings(Clock clock, Runner runner) {
+    this(clock, runner, () -> false);
+  }
+
+  NvidiaSmiReadings(Clock clock, Runner runner, java.util.function.BooleanSupplier installed) {
     this.clock = clock;
     this.runner = runner;
+    this.installed = installed;
   }
 
   /** The process-wide readings. */
@@ -64,18 +88,25 @@ final class NvidiaSmiReadings {
     return SHARED;
   }
 
-  /** The current reading: the shared one while it is young enough, otherwise one fresh probe. */
+  /**
+   * The current reading: the shared one while it is younger than {@link #MIN_INTERVAL}, marked
+   * stale when a fresh one was asked for; otherwise one fresh probe. Never two probes within the
+   * interval, whatever was invalidated.
+   */
   Reading read() {
     lock.lock();
     try {
       Instant now = clock.instant();
-      if (unavailable && !forceNext) {
-        return last;
+      boolean allowed = probedAt == null || Duration.between(probedAt, now).compareTo(MIN_INTERVAL) >= 0;
+      if (!allowed) {
+        return staleRequested && last != null ? last.markedStale() : last;
       }
-      if (!forceNext && last != null && Duration.between(last.at(), now).compareTo(MIN_INTERVAL) < 0) {
-        return last;
+      if (unavailable && !staleRequested) {
+        return last; // sticky until an invalidation asks again
       }
-      forceNext = false;
+      staleRequested = false;
+      unavailable = false;
+      probedAt = now;
       last = probe(now);
       return last;
     } finally {
@@ -83,15 +114,60 @@ final class NvidiaSmiReadings {
     }
   }
 
-  /** The next {@link #read()} probes afresh, and a sticky failure is retried. */
+  /**
+   * Asks for a fresh reading: the current one is stale, and the next probe the interval allows
+   * takes it, retrying a sticky failure. Never starts a probe sooner than the interval.
+   */
   void invalidate() {
     lock.lock();
     try {
-      forceNext = true;
-      unavailable = false;
+      staleRequested = true;
     } finally {
       lock.unlock();
     }
+  }
+
+  /**
+   * Whether nvidia-smi is available, without starting it: the last reading's answer when one was
+   * taken, otherwise whether the executable is where a launch would find it. Its presence is looked
+   * up at most once per {@link #MIN_INTERVAL}.
+   */
+  boolean toolAvailable() {
+    lock.lock();
+    try {
+      if (last != null) return last.available();
+      Instant now = clock.instant();
+      if (presenceAt == null || Duration.between(presenceAt, now).compareTo(MIN_INTERVAL) >= 0) {
+        present = installed.getAsBoolean();
+        presenceAt = now;
+      }
+      return present;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /** Whether an nvidia-smi executable is where {@code new ProcessBuilder("nvidia-smi")} finds it. */
+  private static boolean onSearchPath() {
+    boolean windows = java.io.File.separatorChar == '\\';
+    String name = windows ? "nvidia-smi.exe" : "nvidia-smi";
+    java.util.List<String> directories = new java.util.ArrayList<>();
+    String root = SystemAccess.envVar("SystemRoot");
+    if (windows && root != null) {
+      directories.add(root + "\\System32");
+      directories.add(root);
+    }
+    String path = SystemAccess.envVar("PATH");
+    if (path != null) directories.addAll(java.util.List.of(path.split(java.io.File.pathSeparator)));
+    for (String directory : directories) {
+      if (directory.isBlank()) continue;
+      try {
+        if (java.nio.file.Files.isRegularFile(java.nio.file.Path.of(directory.strip()).resolve(name))) return true;
+      } catch (RuntimeException invalidEntry) {
+        // a malformed PATH entry finds nothing
+      }
+    }
+    return false;
   }
 
   private Reading probe(Instant now) {

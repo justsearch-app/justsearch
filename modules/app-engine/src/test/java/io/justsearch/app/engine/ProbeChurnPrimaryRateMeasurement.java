@@ -47,8 +47,13 @@ import org.junit.jupiter.api.io.TempDir;
  * asserts the ledger's cost directly: in every {@code off} trial the helper owner's ledger writes
  * take at most {@link #MAX_WRITE_SHARE} of the trial's indexing time, and their number stays within
  * {@link #MAX_HELPER_RECORDS_PER_TRIAL} however many documents the trial indexes (a trial is one
- * burst; b599d4d7e wrote two forced records per document). The write time counts the whole trial,
- * Engine start and close included, against the indexing time alone, so it errs high. The rate
+ * burst; b599d4d7e wrote two forced records per document). The ledger writes counted are every
+ * record the trial adds to the ledger: the Engine's helper owner records, timed as they happen, and
+ * the rest (the Engine job witness's process records and the extraction child's own records, the
+ * child being another process), read back after the trial and replayed, every one forced, through a
+ * writer on the same volume and timed there (an upper bound). The write
+ * time counts the whole trial, Engine start and close included, against the indexing time alone, so
+ * it errs high. The rate
  * ratio of {@code off} to {@code nosink} is printed, not asserted: on a shared host single trials
  * vary by a factor of two. Each trial prints the host's mean CPU load while it ran; the summary
  * prints free memory before and after.
@@ -95,6 +100,7 @@ final class ProbeChurnPrimaryRateMeasurement {
       List<String> order = round % 2 == 0 ? arms : arms.reversed();
       for (String arm : order) {
         Map<String, Integer> before = ledgerTypes(ledgerData);
+        java.util.Set<String> linesBefore = ledgerLines(ledgerData);
         // "nosink": the same indexing with helper owner receipts discarded instead of forced to disk.
         if (arm.equals("nosink")) {
           io.justsearch.app.api.runtime.child.OwnedHelper.recordTo((type, fields) -> true,
@@ -110,6 +116,9 @@ final class ProbeChurnPrimaryRateMeasurement {
         } finally {
           recorderField.set(null, realRecorder);
         }
+        if (arm.equals("off")) {
+          timing.replayUntimedRecords(ledgerData, linesBefore, temp.resolve("replay-r" + round));
+        }
         rates.get(arm).add(result[0]);
         processes.get(arm).add((int) result[1]);
         System.out.printf("PROBE-CHURN round=%d arm=%s docs=%d seconds=%.2f rate=%.2f probeLaunches=%d"
@@ -121,7 +130,7 @@ final class ProbeChurnPrimaryRateMeasurement {
           double share = timing.seconds() / seconds;
           if (share > MAX_WRITE_SHARE || timing.writes() > MAX_HELPER_RECORDS_PER_TRIAL) {
             costFailures.add(String.format(java.util.Locale.ROOT,
-                "round %d: %d helper records (%.2f per document) took %.3f s of %.2f s indexing (%.2f%%)",
+                "round %d: %d ledger records (%.2f per document) took %.3f s of %.2f s indexing (%.2f%%)",
                 round, timing.writes(), timing.writes() / (double) files.size(), timing.seconds(), seconds,
                 100 * share));
           }
@@ -142,7 +151,7 @@ final class ProbeChurnPrimaryRateMeasurement {
       assertTrue(rates.containsKey("off"), "check (c) needs the 'off' arm (the real ledger)");
       assertTrue(realRecorder != null, "check (c) needs the Engine's helper ledger to be open");
       assertTrue(costFailures.isEmpty(), String.format(java.util.Locale.ROOT,
-          "helper ledger writes must take at most %.0f%% of indexing time and at most %d records per"
+          "ledger writes must take at most %.0f%% of indexing time and at most %d records per"
               + " burst, whatever the document count:%n  %s", 100 * MAX_WRITE_SHARE,
           MAX_HELPER_RECORDS_PER_TRIAL, String.join("\n  ", costFailures)));
     }
@@ -274,11 +283,62 @@ final class ProbeChurnPrimaryRateMeasurement {
         : (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2;
   }
 
-  /** Count and wall time of the helper owner's ledger writes during one trial. */
+  /** Every line of every ledger file, to tell the lines a trial added. */
+  private static java.util.Set<String> ledgerLines(Path data) throws Exception {
+    java.util.Set<String> lines = new java.util.HashSet<>();
+    Path dir = io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(data);
+    if (!Files.isDirectory(dir)) return lines;
+    try (var files = Files.walk(dir)) {
+      for (Path file : files.filter(Files::isRegularFile).toList()) {
+        lines.addAll(Files.readAllLines(file, StandardCharsets.UTF_8));
+      }
+    }
+    return lines;
+  }
+
+  /**
+   * Count and wall time of the ledger writes during one trial: the Engine's helper owner records,
+   * timed as written, and every other record the trial added, replayed afterwards.
+   */
   private static final class RecordTiming {
     private final java.util.concurrent.atomic.AtomicLong nanos = new java.util.concurrent.atomic.AtomicLong();
     private final java.util.concurrent.atomic.AtomicLong maxNanos = new java.util.concurrent.atomic.AtomicLong();
     private final AtomicInteger writes = new AtomicInteger();
+    private int replayedWrites;
+    private long replayedNanos;
+
+    /**
+     * The records this trial added to the ledger other than the helper owner records timed as
+     * written (the job witness's process records, the extraction child's records), written again
+     * through a writer of the same kind on the same volume, each forced, and timed.
+     */
+    void replayUntimedRecords(Path data, java.util.Set<String> before, Path replay) throws Exception {
+      long self = ProcessHandle.current().pid();
+      var json = tools.jackson.databind.json.JsonMapper.builder().build();
+      Files.createDirectories(replay);
+      var writer = io.justsearch.app.api.runtime.ledger.ExitLedgerWriter.appendOnly(replay,
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.CHILDREN,
+          io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
+              io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE, java.time.Instant.now()),
+          java.time.Clock.systemUTC());
+      for (String line : ledgerLines(data)) {
+        if (before.contains(line) || line.isBlank()) continue;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = json.readValue(line, Map.class);
+        boolean timedLive = record.get("writer") instanceof Map<?, ?> writerId
+            && writerId.get("pid") instanceof Number pid && pid.longValue() == self
+            && String.valueOf(record.get("type")).startsWith("helper-");
+        if (timedLive) continue; // the Engine's helper owner records are timed as they are written
+        var type = io.justsearch.app.api.runtime.ledger.LedgerRecordType.fromToken(String.valueOf(record.get("type")));
+        if (type.isEmpty()) continue;
+        Map<String, Object> fields = new LinkedHashMap<>(record);
+        List.of("schemaVersion", "type", "seq", "at", "writer").forEach(fields::remove);
+        long started = System.nanoTime();
+        if (!writer.append(type.get(), fields)) throw new IllegalStateException("replay write failed: " + line);
+        replayedNanos += System.nanoTime() - started;
+        replayedWrites++;
+      }
+    }
 
     /** A copy of OwnedHelper's private recorder whose sink is the real one, timed. */
     Object wrap(Object realRecorder) throws Exception {
@@ -304,7 +364,8 @@ final class ProbeChurnPrimaryRateMeasurement {
             } catch (java.lang.reflect.InvocationTargetException failure) {
               throw failure.getCause();
             } finally {
-              note(System.nanoTime() - started);
+              // A group force (flush) is timed with the writes; only appends count as records.
+              note(System.nanoTime() - started, method.getName().startsWith("append"));
             }
           });
       var constructor = type.getDeclaredConstructor(types);
@@ -312,23 +373,24 @@ final class ProbeChurnPrimaryRateMeasurement {
       return constructor.newInstance(values);
     }
 
-    private void note(long elapsed) {
-      writes.incrementAndGet();
+    private void note(long elapsed, boolean record) {
+      if (record) writes.incrementAndGet();
       nanos.addAndGet(elapsed);
       maxNanos.accumulateAndGet(elapsed, Math::max);
     }
 
+    /** Every ledger record of the trial: timed as written or replayed. */
     int writes() {
-      return writes.get();
+      return writes.get() + replayedWrites;
     }
 
     double seconds() {
-      return nanos.get() / 1e9;
+      return (nanos.get() + replayedNanos) / 1e9;
     }
 
     @Override public String toString() {
-      return String.format(java.util.Locale.ROOT, "%d/%.0fms/max%.0fms", writes.get(), nanos.get() / 1e6,
-          maxNanos.get() / 1e6);
+      return String.format(java.util.Locale.ROOT, "%d/%.0fms/max%.0fms+replayed%d/%.0fms", writes.get(),
+          nanos.get() / 1e6, maxNanos.get() / 1e6, replayedWrites, replayedNanos / 1e6);
     }
   }
 

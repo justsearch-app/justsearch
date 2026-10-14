@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T17:56:36.938Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "7049aea06981b2647c54ff1f9f220939cf7328c1",
+  "createdAt": "2026-10-14T20:52:08.202Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "28e563cef3a4a0ca11fc11fa2fe2802c37c58072",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.oneProbeAnswersEveryReaderForFiveSeconds\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.probesNeverRunConcurrentlyAndWaitingReadersShareTheAnswer\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.aForcedReadingHappensWithinTheIntervalAndIsShared\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.aStartFailureIsStickyUntilInvalidated\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.partialAndUnparseableOutputs\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.snapshotSectionFromASharedReadingNamesNvidiaSmi\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.oneProbeAnswersEveryReaderForFiveSeconds\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.probesNeverRunConcurrentlyAndWaitingReadersShareTheAnswer\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.aStartFailureIsStickyUntilInvalidated\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.partialAndUnparseableOutputs\" --tests \"io.justsearch.gpu.NvidiaSmiReadingsTest.snapshotSectionFromASharedReadingNamesNvidiaSmi\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3487
+      "durationMs": 3142
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#oneProbeAnswersEveryReaderForFiveSeconds",
       "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:baf88a9f442fd6dc04bd8a324466f1efc661c6580750e561d0bcefa25d6365a9",
+      "contentDigest": "sha256:8d2349b10234abe89c29cef8326baa12aefd40e73befc6f50a10288e1eaf3cf0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#probesNeverRunConcurrentlyAndWaitingReadersShareTheAnswer",
       "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:baf88a9f442fd6dc04bd8a324466f1efc661c6580750e561d0bcefa25d6365a9",
+      "contentDigest": "sha256:8d2349b10234abe89c29cef8326baa12aefd40e73befc6f50a10288e1eaf3cf0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -56,25 +56,10 @@
       ]
     },
     {
-      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#aForcedReadingHappensWithinTheIntervalAndIsShared",
-      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:baf88a9f442fd6dc04bd8a324466f1efc661c6580750e561d0bcefa25d6365a9",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "aForcedReadingHappensWithinTheIntervalAndIsShared()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#aStartFailureIsStickyUntilInvalidated",
       "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:baf88a9f442fd6dc04bd8a324466f1efc661c6580750e561d0bcefa25d6365a9",
+      "contentDigest": "sha256:8d2349b10234abe89c29cef8326baa12aefd40e73befc6f50a10288e1eaf3cf0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +74,7 @@
       "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#partialAndUnparseableOutputs",
       "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:baf88a9f442fd6dc04bd8a324466f1efc661c6580750e561d0bcefa25d6365a9",
+      "contentDigest": "sha256:8d2349b10234abe89c29cef8326baa12aefd40e73befc6f50a10288e1eaf3cf0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +89,7 @@
       "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#snapshotSectionFromASharedReadingNamesNvidiaSmi",
       "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:baf88a9f442fd6dc04bd8a324466f1efc661c6580750e561d0bcefa25d6365a9",
+      "contentDigest": "sha256:8d2349b10234abe89c29cef8326baa12aefd40e73befc6f50a10288e1eaf3cf0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -117,5 +102,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:3061a72b73d8114cdf67add74ca62a73738630f5a2fe58be51c63093d899962f"
+  "digest": "sha256:28f164690a44b69030844b5f05247647ac71dcf2122459edb370a2090be1c968"
 }

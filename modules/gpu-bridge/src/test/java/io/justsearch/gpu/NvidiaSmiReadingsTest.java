@@ -81,16 +81,48 @@ final class NvidiaSmiReadingsTest {
     assertEquals(1, runs.get(), "readers waiting on a probe share its answer");
   }
 
-  @Test void aForcedReadingHappensWithinTheIntervalAndIsShared() {
+  @Test void anInvalidationInsideTheIntervalServesTheLastReadingMarkedStale() throws Exception {
     var readings = readings("12282, 10953, 591.59");
     var detector = new VramDetector(readings);
     detector.getAvailableVramBytes();
     now = now.plusSeconds(1);
     detector.invalidateCache(); // an admission decision asks for a fresh figure
     detector.invalidateCache(); // a second decision at the same moment
+    assertEquals(10953L << 20, detector.getAvailableVramBytes());
+    assertEquals(1, runs.get(), "an invalidation never shortens the five-second interval");
+    assertEquals(Boolean.TRUE, stale(readings.read()), "inside the interval the last reading is marked stale");
+    now = now.plusSeconds(4); // five seconds after the probe: the next one is allowed
     detector.getAvailableVramBytes();
     detector.getAvailableVramBytes();
-    assertEquals(2, runs.get(), "one forced fresh reading, shared by the decisions that asked");
+    assertEquals(2, runs.get(), "the next allowed probe answers every reader that asked");
+    assertEquals(Boolean.FALSE, stale(readings.read()), "and its reading is fresh");
+  }
+
+  @Test void invalidatedSnapshotsWithoutNvmlStartOneProbePerInterval() {
+    var readings = readings("12282, 10953, 591.59");
+    NvmlService nvml = org.mockito.Mockito.mock(NvmlService.class);
+    org.mockito.Mockito.when(nvml.probe()).thenReturn(new GpuCapabilities.Nvml(false, null, null,
+        "unavailable", null, null, null, null, null, null, null, null, null));
+    var service = new GpuCapabilitiesService(nvml, new VramDetector(readings));
+    for (int i = 0; i < 6; i++) {
+      service.invalidateNvidiaSmiCache();
+      assertTrue(service.snapshot().nvidiaSmi().available());
+      now = now.plusMillis(80); // six admission decisions in under half a second
+    }
+    assertEquals(1, runs.get(), "six invalidated snapshots in 480 ms start one nvidia-smi");
+    now = now.plusSeconds(5);
+    service.invalidateNvidiaSmiCache();
+    service.snapshot();
+    assertEquals(2, runs.get(), "the next one when the interval allows");
+  }
+
+  /** {@code Reading.stale()}, read reflectively so this file also compiles on 47981cfa6. */
+  private static Boolean stale(Object reading) throws Exception {
+    try {
+      return (Boolean) reading.getClass().getDeclaredMethod("stale").invoke(reading);
+    } catch (NoSuchMethodException before) {
+      return null;
+    }
   }
 
   @Test void aStartFailureIsStickyUntilInvalidated() {

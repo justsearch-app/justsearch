@@ -45,6 +45,7 @@ public final class OwnedHelper extends Process {
   private final String purpose;
   private final String birth;
   private final String creatorBirth;
+  private final boolean grouped;
   private String stopReason;
   private boolean cooperative;
   private TerminateResult terminated;
@@ -57,7 +58,16 @@ public final class OwnedHelper extends Process {
     recordTo(sink, owner, null);
   }
 
+  /**
+   * The Engine's recorder. With the children ledger's {@code directory}, the Engine job's witness
+   * also reads the helper windows other processes (the extraction child) record there.
+   */
   public static synchronized void recordTo(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory) {
+    install(sink, owner, directory);
+    ProcessIntents.readWindowsFrom(directory);
+  }
+
+  private static synchronized void install(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory) {
     recorder = new Recorder(sink, owner, directory, false);
     while (!beforeRecorder.isEmpty()) {
       Pending pending = beforeRecorder.removeFirst();
@@ -95,7 +105,7 @@ public final class OwnedHelper extends Process {
           io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
               io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE,
               self.info().startInstant().orElse(Instant.now())), java.time.Clock.systemUTC());
-      recordTo(LedgerSink.of(writer), new EngineIdentity(self.pid(),
+      install(LedgerSink.of(writer), new EngineIdentity(self.pid(),
           ProcessTerminator.forCurrentOs().creationFileTime(self.pid()), "parser-" + UUID.randomUUID()), dir);
       recorder = new Recorder(recorder.sink(), recorder.owner(), dir, nestedContainment);
       return;
@@ -173,10 +183,13 @@ public final class OwnedHelper extends Process {
     this.purpose = purpose;
     records = recorder;
     terminator = ProcessTerminator.forCurrentOs();
+    // A launch inside an open window of this process for its image: the forced window start
+    // already attributes it, so its receipts are written unforced and forced as a group.
+    grouped = ProcessIntents.openWindowFor(process.info().command().orElse(null), Instant.now());
     held = terminator.open(process);
     try {
       birth = held.creationFileTime().orElse(null);
-      creatorBirth = terminator.creationFileTime(ProcessHandle.current().pid()).orElse(null);
+      creatorBirth = SelfIdentity.BIRTH;
       Map<String, Object> fields = identity();
       fields.put("purpose", purpose);
       append(LedgerRecordType.HELPER_START, fields);
@@ -286,9 +299,21 @@ public final class OwnedHelper extends Process {
     // A pre-interrupted caller can still launch a helper. FileChannel would discard its
     // start receipt on that interrupt; preserve cancellation while writing the owner record.
     boolean interrupted = Thread.interrupted();
-    try { record(records, type, fields); }
+    try { record(records, type, fields, !grouped); }
     finally { if (interrupted) Thread.currentThread().interrupt(); }
   }
+
+  /** This process's identity, the owner of the windows it opens and the creator of its helpers. */
+  private static final class SelfIdentity {
+    static final long PID = ProcessHandle.current().pid();
+    static final String BIRTH = ProcessTerminator.forCurrentOs().creationFileTime(PID).orElse(null);
+  }
+
+  /** The longest an unforced record waits before it is forced to disk with the others pending. */
+  static final long GROUP_FLUSH_MS = 1_000;
+  /** Recorders holding unforced records not yet forced to disk; guarded by the class lock. */
+  private static final java.util.Set<Recorder> unflushed = new java.util.LinkedHashSet<>();
+  private static boolean flushScheduled;
 
   // Finite config probes run before ChildControl opens under the data-directory lock.
   // Retain their owner receipts, including closed windows, until that writer attaches.
@@ -299,11 +324,33 @@ public final class OwnedHelper extends Process {
   private static synchronized void record(Recorder selected, LedgerRecordType type,
       Map<String, Object> fields, boolean force) {
     Recorder target = selected == null ? recorder : selected;
-    if (target != null) target.append(type, fields, force);
-    else if (beforeRecorder.size() < 4096) beforeRecorder.addLast(new Pending(type, fields));
+    if (target != null) {
+      target.append(type, fields, force);
+      if (!force) pendingFlush(target);
+    } else if (beforeRecorder.size() < 4096) beforeRecorder.addLast(new Pending(type, fields));
     else {
       if (pendingLost++ == 0) pendingLostSince = Instant.now();
     }
+  }
+
+  /** Unforced records are forced as a group: at window close, at shutdown, and within 1 s. */
+  private static synchronized void pendingFlush(Recorder target) {
+    unflushed.add(target);
+    if (flushScheduled) return;
+    flushScheduled = true;
+    java.util.concurrent.CompletableFuture.delayedExecutor(GROUP_FLUSH_MS, TimeUnit.MILLISECONDS)
+        .execute(OwnedHelper::flushPending);
+  }
+
+  /** Forces every unforced record written so far to disk, one force per ledger. */
+  public static void flushPending() {
+    java.util.List<Recorder> due;
+    synchronized (OwnedHelper.class) {
+      due = java.util.List.copyOf(unflushed);
+      unflushed.clear();
+      flushScheduled = false;
+    }
+    for (Recorder target : due) target.sink().flush();
   }
 
   /** Third-party helper admission is limited to the declared image and this closed time window. */
@@ -324,7 +371,7 @@ public final class OwnedHelper extends Process {
       this.image = image;
       this.purpose = purpose;
       deadline = started.plus(max);
-      ProcessIntents.windowOpened(id, image, purpose, started, deadline);
+      ProcessIntents.windowOpened(id, image, purpose, started, deadline, SelfIdentity.PID, SelfIdentity.BIRTH);
       append(LedgerRecordType.HELPER_WINDOW_START, started);
     }
     private void append(LedgerRecordType type, Instant at) {
@@ -344,6 +391,7 @@ public final class OwnedHelper extends Process {
         append(LedgerRecordType.HELPER_WINDOW_END, at);
         ProcessIntents.windowClosed(id, at);
         closed = true;
+        flushPending(); // the receipts written unforced inside this window
       }
     }
   }
@@ -416,16 +464,18 @@ public final class OwnedHelper extends Process {
       private Open(Instant started) {
         this.started = started;
         this.deadline = started.plus(span);
-        ProcessIntents.windowOpened(id, image, purpose, started, deadline);
+        ProcessIntents.windowOpened(id, image, purpose, started, deadline, SelfIdentity.PID, SelfIdentity.BIRTH);
         // Forced once: it gates attribution of every launch made under this window.
         record(records, LedgerRecordType.HELPER_WINDOW_START, fields(null), true);
       }
 
       private void end() {
         Instant at = nativePrecision(clock.instant());
-        // Not forced: a lost end is reconstructed from the forced start and its deadline.
+        // Not forced on its own: a lost end is reconstructed from the forced start, its deadline
+        // and its owner's exit. The flush forces it with the receipts written inside the window.
         record(records, LedgerRecordType.HELPER_WINDOW_END, fields(at), false);
         ProcessIntents.windowClosed(id, at);
+        flushPending();
       }
 
       private Map<String, Object> fields(Instant closedAt) {
@@ -486,6 +536,7 @@ public final class OwnedHelper extends Process {
         current = null;
         window.end();
       }
+      flushPending(); // shutdown: nothing written unforced stays unforced
     }
 
     /** One caller's hold on the shared window; release it when the caller can no longer launch. */

@@ -205,6 +205,25 @@ public final class ExitLedgerWriter {
     return true;
   }
 
+  /**
+   * Forces what {@link #appendUnforced} wrote to disk: one force of the current file, and of the
+   * newest archive in case a rotation moved unforced lines there. A group of unforced records
+   * costs one force instead of one each.
+   */
+  public synchronized boolean flush() {
+    boolean durable = true;
+    for (Path file : List.of(family.current(ledgerDir), family.rotated(ledgerDir))) {
+      try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+        channel.force(false);
+      } catch (NoSuchFileException absent) {
+        // nothing written there
+      } catch (IOException e) {
+        durable = false;
+      }
+    }
+    return durable;
+  }
+
   /** Whether the last write succeeded and no gap is waiting to be written. */
   public boolean healthy() {
     return healthy;

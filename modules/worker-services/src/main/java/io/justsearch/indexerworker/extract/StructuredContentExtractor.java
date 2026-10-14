@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.extract;
 
 import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.extraction.StructuredDocument;
-import io.justsearch.app.api.runtime.child.OwnedHelper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -68,11 +67,11 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     this.inputFactory = inputFactory;
     // Text-named, text-byte files must not be routed to a binary parser by a magic-number
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
-    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
-      org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
-      this.parser = OwnedTikaParsers.create(detector);
-      this.tika = new Tika(detector, this.parser, new org.apache.tika.language.translate.DefaultTranslator());
-    }
+    // No owner window: constructing the parser graph launches nothing beyond the recorded
+    // runtime's one-time check, which carries its own window (task b6d536 b101).
+    org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
+    this.parser = OwnedTikaParsers.create(detector);
+    this.tika = new Tika(detector, this.parser, new org.apache.tika.language.translate.DefaultTranslator());
     this.maxContentLength = maxContentLength;
     this.policy = policy;
   }

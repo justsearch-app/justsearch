@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T20:52:57.980Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "e7d3fd93a2a742eed8f1a7519ed9eb9b7223c835",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest.nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7251
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/NvidiaSmiAvailabilityHttpTest.java#nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/NvidiaSmiAvailabilityHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88a31ec17fed016e73ae04698d9235b41084686c5b59e445bd0970a948a336f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "47981cfa6",
+    "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest.nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21514
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/NvidiaSmiAvailabilityHttpTest.java#nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable",
+        "classification": "assertion",
+        "detail": "nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: NVML's figures do not make the missing nvidia-smi available: {\"cudaAvailable\":true,\"totalVramBytes\":12884901888,\"vramDescription\":\"12.0 GB\",\"vramDetectionSource\":\"nvml\",\"nvidiaSmiAvailable\":true,\"nvmlAvailable\":true,\"nvmlTotalVramBytes\":12884901888,\"nvmlDriverVer"
+      }
+    ]
+  },
+  "digest": "sha256:7d2b257560282ed7dd68a6e63431bc9c8298a8cc5bbc7b761d3a00c17924a2b4"
+}

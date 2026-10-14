@@ -313,7 +313,8 @@ final class WindowsJobWitness implements AutoCloseable {
           held.parentPid, held.parentBirth, ownerWaitOver);
     } else {
       found = io.justsearch.app.api.runtime.child.ProcessIntents.resolve(pid, held.birth,
-          held.executable, instantOf(held.birth == null ? 0 : Long.parseLong(held.birth)), exitedAt, ownerWaitOver);
+          held.executable, instantOf(held.birth == null ? 0 : Long.parseLong(held.birth)), exitedAt, ownerWaitOver,
+          held.parentPid, held.parentBirth);
     }
     if (found.isEmpty()) return null;
     var resolution = found.get();

@@ -1360,9 +1360,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         probe = new io.justsearch.app.services.atrest.DiskEncryptionProbe(indexBasePath);
         diskEncryptionProbe = probe;
       }
-      io.justsearch.app.services.atrest.AtRestProtection p = probe.current();
-      // When the value was read: the probe just answered from (or refreshed) this reading.
+      // One reading per status build: its value and the time it was read come from the same
+      // immutable object, so an expiry between two calls cannot pair one reading's value with
+      // another's time (task b6d536 b101). A probe without readings (a test double) answers current().
       var reading = probe.reading();
+      io.justsearch.app.services.atrest.AtRestProtection p =
+          reading != null ? reading.verdict() : probe.current();
       result = new AtRestProtectionView(p.state().name(), p.source(), p.confidence().name(), false,
           reading == null ? null : reading.probedAtMs());
     } catch (RuntimeException e) {

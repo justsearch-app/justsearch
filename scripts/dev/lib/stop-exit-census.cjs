@@ -243,6 +243,18 @@ function ledgerView(ledger, runId) {
         intent.closedAt = line.closedAt;
     }
   }
+  // A window's end: its recorded end; when that is absent (an open window, or an unforced end a
+  // host crash lost), its owner's recorded exit or crash/owner-died record, or its Engine's exit;
+  // with none of those the owner is alive and the window runs to its deadline (task b6d536 b101).
+  const msToFileTime = ms => (Number.isFinite(ms) ? (BigInt(Math.trunc(ms)) * 10000n + 116444736000000000n).toString() : null);
+  const windowEnd = (i, deadline) => {
+    const recorded = fileTimeFromInstant(i.closedAt);
+    if (recorded) return recorded;
+    const owner = sameBirth(i.engine.creationFileTimeUtc, i.owner?.creationFileTime) && i.engine.pid === Number(i.owner?.pid)
+      ? i.engine : children.find(c => c.pid === Number(i.owner?.pid) && sameBirth(c.creationFileTimeUtc, i.owner?.creationFileTime));
+    const ends = [owner?.exit, i.engine.exit].filter(Boolean).map(e => msToFileTime(closedByMs(e))).filter(Boolean);
+    return ends.length ? ends.reduce((a, b) => (BigInt(a) < BigInt(b) ? a : b)) : deadline;
+  };
   const valid = [...witnesses.values()].filter(w => !w.invalid);
   for (const r of ledger?.children?.records ?? []) {
     const line = r.line;
@@ -278,7 +290,7 @@ function ledgerView(ledger, runId) {
       const born = BigInt(w.creationFileTimeUtc);
       const intent = [...windows.values()].find(i => {
         const start = fileTimeFromInstant(i.requestedAt), deadline = fileTimeFromInstant(i.deadlineAt);
-        const close = fileTimeFromInstant(i.closedAt);
+        const close = windowEnd(i, deadline);
         return i.engine === w.engine && createdBy(w, i.owner) && typeof i.reason === 'string' && i.reason.length > 0
           && path.win32.basename(w.executable ?? '').toLowerCase() === i.image?.toLowerCase()
           && start && deadline && close && BigInt(close) >= BigInt(start)
