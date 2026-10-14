@@ -387,3 +387,14 @@ changeset.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-breaker-20261014",
+  "verdict": "accept",
+  "digest": "sha256:c7e4528d8741576f4cbac19249c7b147c4a78baf47b590f58c04fba580e8e363",
+  "note": "VC-breaker (independent Claude verifier) over three rounds, accepting 2185f86f0 vs bc5978095 (rejected d72a8a90c for one PMD addition, 184dc8963 for a next-try text that went stale): after 3 consecutive automatic passes that launched llama-server for picture reading and completed no document (all refused, or the vision entry failed), automatic passes stop entering picture-reading mode and stop relaunching llama-server; half-open probe after 5 min doubling to 60; progress, an explicit pass, a committed settings apply and chat off/on close it; explicit passes never blocked; refusals without a launch neither count nor reset; a refusal mixed with a real failure counts as progress; interrupted or cancelled passes neither count nor reset; an Engine restart starts closed; under the settings-recovery fence a llama-server started only for picture reading is stopped again; status on the wire shows the visual-understanding component DEGRADED with vdu.breaker_open.refused or .entry_failed, and the vdu.unavailable message names a rounded-up next-try time or 'when the computer is next idle', never a past time, absent when closed. Every new-behaviour check fails on its predecessor by assertion; preservation (normal passes, game mode, restoration budget, quit) passes on both. Suites, ArchUnit (SystemAccessFunnel baseline) and PMD clean. Unverified: live run; readinessNotice.ts web tests (no node_modules). Digest bound with --base bc5978095, the lane's base."
+}
+```
