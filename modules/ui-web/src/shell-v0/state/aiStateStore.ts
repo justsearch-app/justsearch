@@ -408,14 +408,14 @@ function friendlyModel(id: string | null | undefined): string | null {
  * this long after start is not a start-up delay any more. Measured on the server's own clock
  * (`uptimeMs`), so a page opened late into a session does not restart the window.
  */
-export const DOCUMENT_COUNT_STARTUP_WINDOW_MS = 120_000;
+const DOCUMENT_COUNT_STARTUP_WINDOW_MS = 120_000;
 
 /**
  * Task t-20261013-ef3c41 — whether the backend reported that it could not count the index
  * (`indexedDocumentsUnknown`). Its `indexedDocuments`/`searchableDocuments` then carry a 0 kept only
  * for older readers; it is not a count and must never read as an empty index. Absent ⇒ known.
  */
-export function documentCountUnknown(status: StatusSnapshot | null | undefined): boolean {
+function documentCountUnknown(status: StatusSnapshot | null | undefined): boolean {
   return status?.worker?.core?.indexedDocumentsUnknown === true;
 }
 
