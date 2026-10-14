@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T14:34:17.242Z",
-  "revision": "99809b8a27169d4b6a9965947a5e281e68edb9c7",
-  "tree": "940abaab0d2a5bb2c206f9bd1806b1b955379fd5",
+  "createdAt": "2026-10-14T16:06:23.136Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "4fc67997894ce6e1ec7ca784fe6f6f291220253c",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatFailureScopeTest.aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 17433
+      "durationMs": 6200
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.GenerativeSettingsComponentOwnerTest.aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer\" --tests \"io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest.everyFailedCodeTheBrainRowsNameCarriesItsReasonCode\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 22717
+      "durationMs": 6944
     }
   ],
   "checks": [
@@ -50,7 +50,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java#aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c39c8f28ed7ad6c77616a99822632b2fe8c329d23043cba07c873a11cff1698c",
+      "contentDigest": "sha256:91503a756378dd0aa84201e71f064c86651d1037653e7cfacc993cd13ca89d60",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -81,18 +81,19 @@
     "ref": "99809b8a2",
     "revision": "99809b8a27169d4b6a9965947a5e281e68edb9c7",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatFailureScopeTest.aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 81033
+        "durationMs": 31992
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.GenerativeSettingsComponentOwnerTest.aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer\" --tests \"io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest.everyFailedCodeTheBrainRowsNameCarriesItsReasonCode\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 38303
+        "durationMs": 63697
       }
     ],
     "checks": [
@@ -113,5 +114,5 @@
       }
     ]
   },
-  "digest": "sha256:76f995c4cd9b9db1eafc448236745e644a74b50d650062e98a04953387172015"
+  "digest": "sha256:3d99e97404569b5a35954cb5e22406ba0089fbe2c8609490a1ba2c774eed36a7"
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T01:25:16.293Z",
-  "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
-  "tree": "7094c54e162386f7542b945b616f5344b44c6c40",
+  "createdAt": "2026-10-14T16:21:15.833Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "b4118631cc454f8a4c5ef8f40cfa48831eb0239f",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aSuspensionLongerThanTheDwellStillRestartsItInFull\" --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4035
+      "durationMs": 3901
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatDeviceLostStopFailureTest.aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4573
+      "durationMs": 5541
     }
   ],
   "checks": [
@@ -65,7 +65,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatDeviceLostStopFailureTest.java#aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatDeviceLostStopFailureTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2f672a238476aecb310c29505eb03aba036c147767c6d2fcf29800bfdd563a45",
+      "contentDigest": "sha256:3e0da7da2f4a2d103952168da81c843444a88fad005fcebc3df60e655618ac74",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,13 +87,13 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aSuspensionLongerThanTheDwellStillRestartsItInFull\" --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 7555
+        "durationMs": 51403
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatDeviceLostStopFailureTest.aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4833
+        "durationMs": 6660
       }
     ],
     "checks": [
@@ -114,5 +114,5 @@
       }
     ]
   },
-  "digest": "sha256:c6db67b1066dbff37a9fbb9786e093e70c016d43a179c246c67fb331279d9666"
+  "digest": "sha256:15f691571ecc0e6c98306b9b1de69b03e3e32a1392a633f9e1e3181e58c8fe05"
 }
