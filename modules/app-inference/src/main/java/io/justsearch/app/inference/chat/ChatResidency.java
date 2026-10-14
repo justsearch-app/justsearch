@@ -42,6 +42,9 @@ public interface ChatResidency {
   /** Why chat is unloaded for another GPU user, or empty while it is not. */
   Optional<StopDetail> unloaded();
 
+  /** A failed normal-configuration restoration exhausted its automatic retry budget. */
+  default boolean vduRestorationRetriesStopped() { return false; }
+
   /**
    * The ordinary reload's permission and the instant before which it may not start, from the same
    * state as demand refusals. The instant is absolute and stays the same for a given wait.

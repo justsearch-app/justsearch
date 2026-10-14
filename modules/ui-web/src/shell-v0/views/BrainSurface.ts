@@ -1840,7 +1840,15 @@ export class BrainSurface extends JfElement {
       // while the footer said "Indexing" and /api/health reported `inference.offline` (0.2.0 F-6b).
       // Only the `sub` stays BrainSurface's own: the footer has no sub-text slot.
       // Each row is only ever selected when `aiState` equals its key, so `aiVerdict` is exact here.
-      online: { dot: 'online', label: aiEngineHeadline(aiVerdict), sub: 'Chat and summaries ready.' },
+      online: {
+        dot: 'online',
+        label: aiEngineHeadline(aiVerdict),
+        sub: this._unifiedAiState?.snapshotLive
+          && this._unifiedAiState.status?.inference?.procedure === 'VDU_BATCH'
+          && this._unifiedAiState.status?.inference?.engineReason === 'automatic-vdu'
+          ? 'Reading pictures. Chat resumes after the current document.'
+          : 'Chat and summaries ready.',
+      },
       // Tempdoc 663 — indexing is now a distinct, named state (the original ladder had no explicit
       // branch for `runtime.mode === 'indexing'` and fell through to 'offline').
       // Tempdoc 734 round 5 finding 3 — `awaitingChatEnable` distinguishes "the engine is parked

@@ -66,6 +66,7 @@ public final class HeadAssembly implements AutoCloseable {
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
 
   private static final Logger log = LoggerFactory.getLogger(HeadAssembly.class);
+  public static final java.time.Duration TERMINAL_GENERATIVE_ALLOWANCE = java.time.Duration.ofSeconds(12);
   private static final Set<String> GENERATIVE_DEPENDENCIES = Set.of(
       EnvRegistry.LLM_ENABLED.configKey(),
       EnvRegistry.AI_DISABLED.configKey(),
@@ -116,6 +117,7 @@ public final class HeadAssembly implements AutoCloseable {
   private final List<io.justsearch.app.services.encryption.UnlockDeferredScan> unlockScans =
       new java.util.ArrayList<>();
   private final io.justsearch.app.services.vdu.OfflineCoordinator offlineCoordinator;
+  private boolean enrichmentTerminalStopRequired;
   private final Telemetry telemetry;
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration foregroundDocumentOwner;
@@ -347,6 +349,97 @@ public final class HeadAssembly implements AutoCloseable {
   /** Stop the terminal-owned child even when Head's dependency drain refuses full closure. */
   public void stopGenerativeBackendForTerminalShutdown(java.time.Duration timeout) {
     if (inferenceManager != null) inferenceManager.stopServerForTerminalShutdown(timeout);
+  }
+
+  /** Fence new passes; an owned pass makes chat terminal before its cancellation can restore chat. */
+  public synchronized boolean prepareEnrichmentShutdown(io.justsearch.app.api.runtime.child.StopRequest request) {
+    if (offlineCoordinator != null) {
+      offlineCoordinator.prepareForShutdown(() -> {
+        enrichmentTerminalStopRequired = true;
+        recordTerminalStop(request);
+        if (inferenceManager != null) inferenceManager.beginTerminalShutdown();
+      });
+    }
+    return enrichmentTerminalStopRequired;
+  }
+
+  /**
+   * A quit's share of the picture-reading quiesce (Spec F §4.3): at QB1 it fences new documents and
+   * chat actuations and asks the owned pass to cancel, without waiting and without stopping
+   * llama-server, which the quit stops only through the chat controller. Null when no pass is owned.
+   * The returned stage ends when the pass has ended; {@link #awaitEnrichmentCancelForQuit} waits for
+   * it within the quit's budget.
+   */
+  public java.util.concurrent.CompletableFuture<Void> cancelEnrichmentForQuit(
+      io.justsearch.app.api.runtime.child.StopRequest request) {
+    if (!prepareEnrichmentShutdown(request)) return null;
+    return offlineCoordinator == null
+        ? java.util.concurrent.CompletableFuture.completedFuture(null)
+        : offlineCoordinator.cancelForShutdown().toCompletableFuture();
+  }
+
+  /**
+   * Waits up to {@code wait} (the quit's remaining live-work budget) for a pass cancelled by
+   * {@link #cancelEnrichmentForQuit}. A pass that has not ended by then is left to the supervisor's
+   * forced exit and the next start's recovery. Returns null or a named outcome, never throws.
+   */
+  public static String awaitEnrichmentCancelForQuit(
+      java.util.concurrent.CompletableFuture<Void> exited, java.time.Duration wait) {
+    if (exited == null) return null;
+    try {
+      exited.get(Math.max(0, wait.toMillis()), java.util.concurrent.TimeUnit.MILLISECONDS);
+      return null;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      log.warn("Enrichment quit drain interrupted; later shutdown steps will continue", interrupted);
+      return "VDU_DRAIN_INTERRUPTED";
+    } catch (java.util.concurrent.TimeoutException timeoutFailure) {
+      log.warn("Enrichment quit drain did not end within the quit budget ({} ms)", wait.toMillis());
+      return "VDU_DRAIN_TIMEOUT";
+    } catch (java.util.concurrent.ExecutionException failure) {
+      log.warn("Enrichment quit cleanup failed; later shutdown steps will continue", failure);
+      return "VDU_DRAIN_FAILED";
+    }
+  }
+
+  /** Quiesce an owned pass before the live-work drain; ordinary chat retains its late shutdown. */
+  public String quiesceEnrichmentForTerminalShutdown(
+      io.justsearch.app.api.runtime.child.StopRequest request, java.time.Duration timeout) {
+    if (!prepareEnrichmentShutdown(request)) return null;
+    long deadline = System.nanoTime() + timeout.toNanos();
+    var exited = offlineCoordinator == null
+        ? java.util.concurrent.CompletableFuture.<Void>completedFuture(null)
+        : offlineCoordinator.cancelForShutdown().toCompletableFuture();
+    // An explicit pass can still be draining normal chat. Its entry cancellation releases the
+    // pass; that chat exchange keeps the ordinary interactive cancellation and late stop order.
+    // VDU leases never count as chat generation, so a document still gets the early stop.
+    boolean chatGenerating = inferenceManager != null && inferenceManager.generationActivity().generating();
+    RuntimeException stopFailure = null;
+    if (!chatGenerating) {
+      try { stopGenerativeBackendForTerminalShutdown(timeout); }
+      catch (RuntimeException failure) { stopFailure = failure; }
+    }
+    String outcome = chatGenerating ? "VDU_STOP_DEFERRED_CHAT" : null;
+    try {
+      exited.get(Math.max(0, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      log.warn("Enrichment terminal drain interrupted; later shutdown steps will continue", interrupted);
+      outcome = "VDU_DRAIN_INTERRUPTED";
+    } catch (java.util.concurrent.TimeoutException timeoutFailure) {
+      log.warn("Enrichment terminal drain exceeded its allowance; later shutdown steps will continue");
+      outcome = "VDU_DRAIN_TIMEOUT";
+    } catch (java.util.concurrent.ExecutionException failure) {
+      log.warn("Enrichment terminal cleanup failed; later shutdown steps will continue", failure);
+      outcome = "VDU_DRAIN_FAILED";
+    }
+    if (stopFailure != null) {
+      // The ordinary late terminal step checks ownership again after the later drains. A slow
+      // stop is an outcome here; only a process surviving that final stop fails the exit.
+      log.warn("Early picture-reading process stop incomplete; final terminal cleanup will retry", stopFailure);
+      return "VDU_STOP_INCOMPLETE";
+    }
+    return outcome;
   }
 
   /**

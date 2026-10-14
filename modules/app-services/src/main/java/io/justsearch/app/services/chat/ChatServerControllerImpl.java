@@ -21,6 +21,7 @@ import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatBootOrder;
+import io.justsearch.app.inference.chat.ChatDrainPolicy;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.ChatResidency;
 import io.justsearch.app.inference.chat.SelfTestLauncher;
@@ -143,6 +144,18 @@ public final class ChatServerControllerImpl
   /** Open holds and sessions (guarded by {@link #monitor}). */
   private final List<OpenHold> holds = new ArrayList<>();
 
+  /** Only the automatic loaded-chat pass yields a waiting human demand at document boundaries. */
+  private AutomaticVdu automaticVdu;
+
+  private static final class AutomaticVdu {
+    private final OpenHold hold;
+    private final CompletableFuture<Void> restored = new CompletableFuture<>();
+    private boolean interrupted;
+    private boolean entryAttempted;
+
+    private AutomaticVdu(OpenHold hold) { this.hold = hold; }
+  }
+
   /**
    * Orders hold edges with their delivery to {@link #listeners}. Taken only by threads that open or
    * close a hold, never by the controller thread, and never while waiting for a step.
@@ -169,6 +182,12 @@ public final class ChatServerControllerImpl
 
   /** The monotonic clock of the residency dwell; tests drive it by hand. */
   private final LongSupplier nanoTime;
+  // Failed VDU exit retains the normal configuration offline. Only this controller retries it.
+  private boolean vduRestorePending;
+  private long vduRetryAtNanos;
+  private long vduRetryDelaySeconds = 5;
+  private int vduRestoreFailures;
+  private Pending vduRestoreAttempt;
 
   /** The pressure last reported (Spec E feeds it; the dev trigger too). */
   private volatile PressureSignal pressure = PressureSignal.NONE;
@@ -382,6 +401,10 @@ public final class ChatServerControllerImpl
   public CompletionStage<Void> setActivation(Activation activation) {
     Objects.requireNonNull(activation, "activation");
     if (activation.active()) {
+      synchronized (monitor) {
+        if (vduRestorePending) return CompletableFuture.failedFuture(new SupersededException(
+            "Normal chat restoration is waiting for its bounded retry or a person's request"));
+      }
       // Spec A §2.2: the residency latch ranks above boot order. A latched chat is not loaded by
       // a forwarded activation (reconciliation F6); a GPU start under pressure is refused into
       // UNLOADED (CH7). Only a demand or "load anyway" loads it again.
@@ -405,6 +428,8 @@ public final class ChatServerControllerImpl
       CompletableFuture<Void> waiters;
       synchronized (monitor) {
         bootWaiting = false;
+        vduRestorePending = false;
+        vduRestoreFailures = 0;
         // Chat switched off is OFF, not unloaded; nothing waits for a reload any more.
         waiters = clearLatchLocked();
         deferred = false;
@@ -518,6 +543,31 @@ public final class ChatServerControllerImpl
         synchronized (monitor) {
           while (queue.isEmpty() && desired.terminal() == null && replay == null
               && deviceLost == null && !resumeProbePending && !residencyRecheckPending) {
+            if (vduRestorePending && holds.isEmpty() && vduRestoreAttempt == null) {
+              if (actuator.serverRunning()) {
+                vduRestorePending = false;
+                vduRestoreFailures = 0;
+                continue;
+              }
+              PressureSignal restorePressure = restorationPressureLocked();
+              if (restorePressure != PressureSignal.NONE && forcedUnder != restorePressure) {
+                if (latchRestorationPressureLocked(restorePressure)) continue;
+                monitor.wait();
+                continue;
+              }
+              if (vduRestoreFailures >= 5) {
+                monitor.wait();
+                continue;
+              }
+              long remaining = Math.max(vduRetryAtNanos - nanoTime.getAsLong(),
+                  dwellLeftLocked().toNanos());
+              if (remaining <= 0) {
+                queueVduRestoreLocked();
+                continue;
+              }
+              TimeUnit.NANOSECONDS.timedWait(monitor, remaining);
+              continue;
+            }
             if (bootGate != BootGate.CLOSED) {
               monitor.wait();
               continue;
@@ -661,6 +711,15 @@ public final class ChatServerControllerImpl
   }
 
   private void execute(Pending pending, ChatActuator.DrainHold drained) {
+    if (pending.step.kind() == ChatActuation.Kind.APPLY
+        || pending.step.kind() == ChatActuation.Kind.PREPARED_RETIRE) {
+      synchronized (monitor) {
+        if (vduRestorePending) {
+          resetVduRetryBudgetLocked();
+          monitor.notifyAll();
+        }
+      }
+    }
     complete(pending, () -> actuator.execute(pending.step, drained));
   }
 
@@ -741,7 +800,12 @@ public final class ChatServerControllerImpl
   public VduHold holdVdu(String owner) throws ChatRefusal {
     OpenHold hold = open(Kind.VDU, owner);
     try {
-      routeHeld(actuator.activation(new Activation(true, TransitionReason.VDU_ENTER)), true);
+      Pending restoration;
+      synchronized (monitor) {
+        restoration = vduRestorePending ? queueVduRestoreLocked() : null;
+      }
+      if (restoration != null) awaitHeld(restoration, false, false);
+      else routeHeld(actuator.activation(new Activation(true, TransitionReason.VDU_ENTER)), true);
       routeHeld(actuator.vduEnter(), false);
     } catch (ChatRefusal refused) {
       // A failed entry may have restarted the server already; return it to its configuration.
@@ -803,9 +867,118 @@ public final class ChatServerControllerImpl
     if (bulkPressure() != PressureSignal.NONE) return false;
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded || !holds.isEmpty()) return false;
-      if (unloadedDetail != null || unloadInFlight) return false;
+      if (unloadedDetail != null || unloadInFlight || vduRestorePending) return false;
     }
     return actuator.failureLatch() == null && !actuator.serverRunning();
+  }
+
+  @Override
+  public boolean automaticVduMayStart(Duration idleWindow) {
+    if (!generationIdleFor(idleWindow) || !actuator.idleForAutomaticVdu()
+        || bulkPressure() != PressureSignal.NONE || actuator.failureLatch() != null) return false;
+    synchronized (monitor) {
+      return desired.terminal() == null && !loopEnded && holds.isEmpty()
+          && current == null && queue.isEmpty() && unloadedDetail == null && !unloadInFlight;
+    }
+  }
+
+  private boolean generationIdleFor(Duration idleWindow) {
+    GenerationActivity activity = actuator.generationActivity();
+    return activity != null && !activity.generating() && activity.queued() == 0
+        && activity.idleSinceNanos() != Long.MIN_VALUE
+        && nanoTime.getAsLong() - activity.idleSinceNanos() >= idleWindow.toNanos();
+  }
+
+  @Override
+  public VduHold holdAutomaticVdu(String owner, Duration idleWindow,
+      java.util.function.BooleanSupplier stillEligible) throws ChatRefusal {
+    Objects.requireNonNull(stillEligible, "stillEligible");
+    AutomaticVdu pass;
+    synchronized (holdEdges) {
+      if (!automaticVduMayStart(idleWindow) || !stillEligible.getAsBoolean()) {
+        throw new ChatRefusal(RefusalReason.BUSY, java.util.Optional.empty(), false);
+      }
+      open(Kind.VDU, owner, true);
+      synchronized (monitor) {
+        pass = automaticVdu;
+      }
+    }
+    try {
+      // Unlike an explicit request, automatic entry never drains an active exchange. The
+      // IF_IDLE check and admission close share the tracker's lock; a racing AUX lease wins.
+      routeHeld(ChatActuation.of(ChatActuation.Kind.VDU_ENTER, ignored -> {
+            if (!automaticEntryWanted(pass, idleWindow, stillEligible)) {
+              throw automaticVduBusy("Automatic VDU eligibility changed");
+            }
+            try (var drained = closeAutomaticVduAdmission()) {
+              if (!automaticEntryWanted(pass, idleWindow, stillEligible)) {
+                throw automaticVduBusy("Automatic VDU eligibility changed during admission");
+              }
+              pass.entryAttempted = true;
+              return actuator.vduEnter().run(drained);
+            }
+          }), false);
+    } catch (ChatRefusal refused) {
+      finishAutomaticVdu(pass, refused);
+      throw refused;
+    } catch (RuntimeException | Error failure) {
+      finishAutomaticVdu(pass, failure);
+      throw failure;
+    }
+    return new VduHold() {
+      private final java.util.concurrent.atomic.AtomicBoolean closed =
+          new java.util.concurrent.atomic.AtomicBoolean();
+      @Override public String owner() { return pass.hold.owner(); }
+      @Override public boolean interruptRequested() {
+        synchronized (monitor) {
+          return pass.interrupted || desired.terminal() != null || loopEnded
+              || bulkPressure() != PressureSignal.NONE;
+        }
+      }
+      @Override public void close() {
+        if (closed.compareAndSet(false, true)) finishAutomaticVdu(pass, null);
+      }
+    };
+  }
+
+  private ChatActuator.DrainHold closeAutomaticVduAdmission() throws InterruptedException, ChatRefusal {
+    try {
+      return actuator.drain(new ChatDrainPolicy(StopReason.VDU_ENTER, ChatDrainPolicy.Waiting.IF_IDLE,
+          Duration.ZERO, ChatDrainPolicy.Expiry.REFUSE_BUSY, false));
+    } catch (IllegalStateException busy) {
+      throw refusal(RefusalReason.BUSY, busy);
+    }
+  }
+
+  private static ChatRefusal automaticVduBusy(String message) {
+    return refusal(RefusalReason.BUSY, new IllegalStateException(message));
+  }
+
+  private boolean automaticEntryWanted(AutomaticVdu pass, Duration idleWindow,
+      java.util.function.BooleanSupplier stillEligible) {
+    synchronized (monitor) {
+      if (pass.interrupted || desired.terminal() != null || loopEnded) return false;
+    }
+    return bulkPressure() == PressureSignal.NONE && generationIdleFor(idleWindow)
+        && stillEligible.getAsBoolean();
+  }
+
+  private void finishAutomaticVdu(AutomaticVdu pass, Throwable entryFailure) {
+    Throwable failure = null;
+    try {
+      if (pass.entryAttempted) exitVduAndRelease(pass.hold);
+      else release(pass.hold);
+    } catch (RuntimeException | Error cleanup) {
+      failure = cleanup;
+      if (entryFailure != null) entryFailure.addSuppressed(cleanup);
+      else throw cleanup;
+    } finally {
+      synchronized (monitor) {
+        if (automaticVdu == pass) automaticVdu = null;
+      }
+      if (failure == null) pass.restored.complete(null);
+      else pass.restored.completeExceptionally(failure);
+    }
   }
 
   @Override
@@ -829,6 +1002,10 @@ public final class ChatServerControllerImpl
   }
 
   private OpenHold open(Kind kind, String owner) throws ChatRefusal {
+    return open(kind, owner, false);
+  }
+
+  private OpenHold open(Kind kind, String owner, boolean automatic) throws ChatRefusal {
     Objects.requireNonNull(owner, "owner");
     if (Thread.currentThread() == controllerThread) {
       throw new IllegalStateException("a chat hold was requested from the chat controller thread");
@@ -849,6 +1026,7 @@ public final class ChatServerControllerImpl
         }
         first = !open.contains(kind);
         holds.add(hold);
+        if (automatic) automaticVdu = new AutomaticVdu(hold);
         // A hold that starts the server ranks above the residency latch (Spec A §2.2).
         if (kind == Kind.VDU || kind == Kind.RUNNING) {
           if (unloadedDetail != null) {
@@ -884,6 +1062,7 @@ public final class ChatServerControllerImpl
         if (!holds.remove(hold)) return;
         last = holds.stream().noneMatch(h -> h.kind() == hold.kind());
         noneOpen = holds.isEmpty();
+        monitor.notifyAll();
       }
       LOG.info("Chat hold closed: {} by {}", hold.kind(), hold.owner());
       if (last) {
@@ -923,7 +1102,20 @@ public final class ChatServerControllerImpl
   private <T> T routeHeld(ChatActuation<T> step, boolean supersededIsDone, boolean uninterruptible)
       throws ChatRefusal {
     try {
-      return uninterruptible ? (T) awaitUninterruptibly(enqueue(step)) : route(step);
+      return (T) awaitHeld(enqueue(step), supersededIsDone, uninterruptible);
+    } catch (RefusedException refused) {
+      throw refusal(RefusalReason.ENGINE_STOPPING, refused);
+    } catch (RuntimeException failure) {
+      throw refusal(RefusalReason.FAILED, failure);
+    }
+  }
+
+  private Object awaitHeld(Pending pending, boolean supersededIsDone, boolean uninterruptible)
+      throws ChatRefusal {
+    try {
+      return uninterruptible ? awaitUninterruptibly(pending) : await(pending);
+    } catch (ChatRefusal refused) {
+      throw refused;
     } catch (SupersededException superseded) {
       if (supersededIsDone) return null;
       throw refusal(RefusalReason.BUSY, superseded);
@@ -1001,11 +1193,60 @@ public final class ChatServerControllerImpl
       routeHeld(actuator.vduExit(), false, true);
     } catch (ChatRefusal refused) {
       if (refused.reason() != RefusalReason.ENGINE_STOPPING) {
+        synchronized (monitor) {
+          vduRestorePending = true;
+          vduRestoreFailures = 1;
+          vduRetryDelaySeconds = 5;
+          vduRetryAtNanos = nanoTime.getAsLong() + TimeUnit.SECONDS.toNanos(vduRetryDelaySeconds);
+          monitor.notifyAll();
+        }
         throw new IllegalStateException(
-            "Failed to exit VDU mode; the server may keep its vision-safe configuration", refused);
+            "Normal chat is offline; the controller will retry restoration", refused);
       }
     } finally {
       release(hold);
+    }
+  }
+
+  /** Called under monitor; retries are serialized with all other server steps. */
+  private Pending queueVduRestoreLocked() {
+    if (vduRestoreAttempt != null) return vduRestoreAttempt;
+    Pending pending = queueLocked(actuator.vduExit(), new ArrayList<>());
+    vduRestoreAttempt = pending;
+    var unused = pending.result.whenComplete((result, failure) -> vduRestoreEnded(pending, failure));
+    return pending;
+  }
+
+  private void vduRestoreEnded(Pending pending, Throwable failure) {
+    synchronized (monitor) {
+      if (vduRestoreAttempt != pending) return;
+      vduRestoreAttempt = null;
+      if (failure == null) {
+        vduRestorePending = false;
+        vduRestoreFailures = 0;
+        vduRetryDelaySeconds = 5;
+        CompletableFuture<Void> waiters = clearLatchLocked();
+        if (waiters != null) waiters.complete(null);
+      } else if (vduRestorePending) {
+        vduRestoreFailures++;
+        vduRetryDelaySeconds = Math.min(30, vduRetryDelaySeconds * 2);
+        vduRetryAtNanos = nanoTime.getAsLong() + TimeUnit.SECONDS.toNanos(vduRetryDelaySeconds);
+      }
+      monitor.notifyAll();
+    }
+  }
+
+  /** A person's action permits a fresh bounded series; called under monitor. */
+  private void resetVduRetryBudgetLocked() {
+    vduRestoreFailures = 0;
+    vduRetryDelaySeconds = 5;
+    vduRetryAtNanos = nanoTime.getAsLong();
+  }
+
+  @Override
+  public boolean vduRestorationRetriesStopped() {
+    synchronized (monitor) {
+      return vduRestorePending && vduRestoreAttempt == null && vduRestoreFailures >= 5;
     }
   }
 
@@ -1158,6 +1399,7 @@ public final class ChatServerControllerImpl
     }
     if (previous != signal) LOG.info("Chat GPU pressure: {} -> {}", previous, signal);
     if (signal != PressureSignal.NONE) evaluateResidency();
+    synchronized (monitor) { monitor.notifyAll(); }
   }
 
   @Override
@@ -1350,7 +1592,9 @@ public final class ChatServerControllerImpl
     // The loop also evaluates a deferred no-lease notification here. It queues the unload as
     // usual, so every drain and stop still runs through the controller's actuation queue.
     boolean running = observeRunning();
-    boolean gpu = running && actuator.gpuChat();
+    boolean restoring;
+    synchronized (monitor) { restoring = vduRestorePending; }
+    boolean gpu = (running || restoring) && actuator.gpuChat();
     GenerationActivity activity = actuator.generationActivity();
     boolean generating = activity != null && activity.generating();
     StopDetail detail = unloadDetail(signal);
@@ -1358,6 +1602,11 @@ public final class ChatServerControllerImpl
     long epoch;
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded) return;
+      if (vduRestorePending && !running && gpu && holds.isEmpty() && forcedUnder != signal) {
+        latchRestorationPressureLocked(signal);
+        monitor.notifyAll();
+        return;
+      }
       if (unloadedDetail != null || unloadInFlight) return;
       if (overrideCoversLocked(signal)) return;
       if (!holds.isEmpty()) return;
@@ -1380,6 +1629,38 @@ public final class ChatServerControllerImpl
     LOG.info("Chat unloads for another GPU user ({})", detail.token());
     var unused = pending.result.whenComplete(
         (result, failure) -> unloadEnded(detail, epoch, result, failure));
+  }
+
+  /** Normal residency leaves CPU chat alone; a later CPU configuration ends a GPU latch. */
+  private PressureSignal restorationPressureLocked() {
+    PressureSignal signal = effectivePressure();
+    if ((signal != PressureSignal.NONE || unloadedDetail != null) && !actuator.gpuChat()) {
+      if (unloadedDetail != null) {
+        CompletableFuture<Void> waiters = clearLatchLocked();
+        if (waiters != null) waiters.complete(null);
+      }
+      return PressureSignal.NONE;
+    }
+    return signal;
+  }
+
+  /** The stopped restoration uses the same pressure latch and reload dwell as residency. */
+  private boolean latchRestorationPressureLocked(PressureSignal signal) {
+    StopDetail detail = unloadDetail(signal);
+    if (unloadedDetail == detail) return false;
+    latchLocked(detail, true);
+    // Publish the existing residency reason through the real lifecycle projection too. This
+    // records an unloaded stopped server, and never activates it under pressure.
+    queueLocked(actuator.residencyUnload(detail, () -> restorationPressureStillWanted(signal)),
+        new ArrayList<>());
+    return true;
+  }
+
+  private boolean restorationPressureStillWanted(PressureSignal signal) {
+    synchronized (monitor) {
+      return vduRestorePending && effectivePressure() == signal && forcedUnder != signal
+          && actuator.gpuChat();
+    }
   }
 
   /**
@@ -1495,6 +1776,25 @@ public final class ChatServerControllerImpl
       if (desired.terminal() != null || loopEnded) {
         throw new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false);
       }
+      if (human && automaticVdu != null) {
+        automaticVdu.interrupted = true;
+        return automaticVdu.restored.copy();
+      }
+      if (vduRestorePending && holds.isEmpty()) {
+        if (!human) throw new ChatRefusal(
+            RefusalReason.FAILED, java.util.Optional.empty(), false);
+        PressureSignal restorePressure = restorationPressureLocked();
+        RefusalReason pressureReason = pressureRefusal(restorePressure);
+        if (pressureReason != null && forcedUnder != restorePressure) {
+          latchRestorationPressureLocked(restorePressure);
+          throw new ChatRefusal(pressureReason, java.util.Optional.of(PRESSURE_RETRY_AFTER), true);
+        }
+        Duration dwellLeft = dwellLeftLocked();
+        if (dwellLeft.isPositive()) throw new ChatRefusal(RefusalReason.RELOAD_BACKOFF,
+            java.util.Optional.of(dwellLeft), true);
+        resetVduRetryBudgetLocked();
+        return queueVduRestoreLocked().result.thenApply(ignored -> null);
+      }
       if (kind == DemandKind.BACKGROUND) {
         ChatRefusal yielded = backgroundYieldLocked(replying);
         if (yielded != null) throw yielded;
@@ -1551,6 +1851,15 @@ public final class ChatServerControllerImpl
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded) {
         throw new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false);
+      }
+      if (vduRestorePending) {
+        if (!holds.isEmpty()) throw heldRefusalLocked();
+        // The person's override covers the effective pressure now; no earlier window carries over.
+        PressureSignal restoreSignal = effectivePressure();
+        clearOverrideLocked();
+        if (restoreSignal != PressureSignal.NONE) forcedUnder = restoreSignal;
+        resetVduRetryBudgetLocked();
+        return queueVduRestoreLocked().result.thenApply(ignored -> null);
       }
       if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);
       if (!holds.isEmpty()) throw heldRefusalLocked();
@@ -1908,12 +2217,11 @@ public final class ChatServerControllerImpl
   // ==================== Terminal ====================
 
   @Override
-  public void shutdown(StopReason reason, Duration budget) {
+  public void beginShutdown(StopReason reason) {
     Objects.requireNonNull(reason, "reason");
-    Objects.requireNonNull(budget, "budget");
-    long deadline = System.nanoTime() + budget.toNanos();
     List<Pending> refused;
     CompletableFuture<Void> waiters;
+    CompletableFuture<Void> vduWaiters;
     synchronized (monitor) {
       if (desired.terminal() == null) {
         desired = new DesiredInputs(desired.version() + 1, reason);
@@ -1923,6 +2231,7 @@ public final class ChatServerControllerImpl
       queue.clear();
       waiters = nextLoad;
       nextLoad = null;
+      vduWaiters = automaticVdu == null ? null : automaticVdu.restored;
       monitor.notifyAll();
     }
     for (Pending pending : refused) refuse(pending);
@@ -1930,7 +2239,18 @@ public final class ChatServerControllerImpl
       waiters.completeExceptionally(
           new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false));
     }
+    if (vduWaiters != null) {
+      vduWaiters.completeExceptionally(
+          new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false));
+    }
     closeEdgeSubscription();
+  }
+
+  @Override
+  public void shutdown(StopReason reason, Duration budget) {
+    Objects.requireNonNull(budget, "budget");
+    long deadline = System.nanoTime() + budget.toNanos();
+    beginShutdown(reason);
     StopReason terminalReason;
     synchronized (monitor) {
       terminalReason = desired.terminal();

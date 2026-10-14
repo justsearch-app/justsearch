@@ -123,7 +123,7 @@ class VduChatHoldTest {
     try {
       // Wired as CoreApiAssembly wires it: the claim is the controller's own answer.
       var sampler = new VduOfflineTriggerSampler(executors, () -> coordinator, () -> null,
-          () -> !holds.vduMayStart());
+          () -> !holds.vduMayStart(), () -> null, () -> Long.MAX_VALUE);
       try {
         // UNLOADED for a self-test, a latched failure or an open hold: the controller says no.
         sampler.checkOnce();

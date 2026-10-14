@@ -1752,17 +1752,58 @@ public class HeadlessApp {
       if (!orderedShutdownComplete) {
         boolean workCleanupComplete = processRoot == null;
         if (processRoot != null) {
+          boolean admissionClosed = false;
+          boolean attemptsClosed = false;
+          boolean interactiveCancelled = false;
+          boolean producersQuiesced = false;
+          boolean admitted = false;
+          boolean bodies = false;
+          try {
+            var stop = terminalStopOf(io.justsearch.app.engine.ShutdownRequest.Reason.QUIT);
+            if (bootstrap != null && bootstrap.prepareEnrichmentShutdown(stop)) {
+              String outcome = bootstrap.quiesceEnrichmentForTerminalShutdown(
+                  stop, HeadAssembly.TERMINAL_GENERATIVE_ALLOWANCE);
+              if (outcome != null) log.warn("Startup cleanup enrichment outcome: {}", outcome);
+            }
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup enrichment stop incomplete; continuing cleanup", failure);
+          }
           try {
             processRoot.admission().beginClosing();
-            processRoot.operationAttempts().beginClosing();
-            processRoot.admission().cancelInteractive("shutdown");
-            processRoot.quiesceProducers();
-            boolean admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
-            boolean bodies = processRoot.operationAttempts().awaitDrained(java.time.Duration.ofSeconds(5));
-            workCleanupComplete = admitted && bodies;
+            admissionClosed = true;
           } catch (RuntimeException failure) {
-            log.warn("Live work drain incomplete; retaining its dependencies", failure);
+            log.warn("Startup cleanup admission closure incomplete", failure);
           }
+          try {
+            processRoot.operationAttempts().beginClosing();
+            attemptsClosed = true;
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup operation admission closure incomplete", failure);
+          }
+          try {
+            processRoot.admission().cancelInteractive("shutdown");
+            interactiveCancelled = true;
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup interactive cancellation incomplete", failure);
+          }
+          try {
+            processRoot.quiesceProducers();
+            producersQuiesced = true;
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup producer quiescence incomplete", failure);
+          }
+          try {
+            admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup live work drain incomplete", failure);
+          }
+          try {
+            bodies = processRoot.operationAttempts().awaitDrained(java.time.Duration.ofSeconds(5));
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup operation body drain incomplete", failure);
+          }
+          workCleanupComplete = admissionClosed && attemptsClosed && interactiveCancelled
+              && producersQuiesced && admitted && bodies;
         }
         try {
           stopRecoveryAndApi(healthMonitor, apiServer);
@@ -2189,6 +2230,8 @@ public class HeadlessApp {
     var chatStopped =
         new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>>();
     var cooperativeWindowStartMs = new java.util.concurrent.atomic.AtomicLong(-1L);
+    var enrichmentExited =
+        new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>>();
     return List.of(
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "runtime-manifest",
@@ -2198,12 +2241,27 @@ public class HeadlessApp {
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "operation-admission",
-            reason -> {
-              if (engineAdmission != null) engineAdmission.beginClosing();
-              if (attempts != null) attempts.beginClosing();
-              operationLeases.freezeAdmission(reason.wire());
-              if (apiServer != null) apiServer.closeSseAttachments();
-              return null;
+            (reason, budget) -> {
+              String outcome = null;
+              try {
+                var stop = terminalStopOf(reason);
+                if (bootstrap != null && budget.bounded()) {
+                  // A quit's picture-reading quiesce runs inside the single quit budget (Spec F
+                  // §4.3): QB1 fences new documents and asks the owned pass to cancel, without a
+                  // wait; llama-server stops only through the controller (interactive-work), and
+                  // the pass's end is awaited from the live-work budget (live-work-drain).
+                  enrichmentExited.set(bootstrap.cancelEnrichmentForQuit(stop));
+                } else if (bootstrap != null && bootstrap.prepareEnrichmentShutdown(stop)) {
+                  outcome = bootstrap.quiesceEnrichmentForTerminalShutdown(
+                      stop, HeadAssembly.TERMINAL_GENERATIVE_ALLOWANCE);
+                }
+              } finally {
+                if (engineAdmission != null) engineAdmission.beginClosing();
+                if (attempts != null) attempts.beginClosing();
+                operationLeases.freezeAdmission(reason.wire());
+                if (apiServer != null) apiServer.closeSseAttachments();
+              }
+              return outcome;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "interactive-work",
@@ -2237,6 +2295,10 @@ public class HeadlessApp {
             (reason, budget) -> {
               if (!producersQuiesced.get()) throw new IllegalStateException(
                   "Live work drain requires recorded producer quiescence");
+              // A quit's cancelled picture-reading pass ends within the live-work budget; one that
+              // has not is left to the forced exit and the next start's recovery.
+              String outcome = HeadAssembly.awaitEnrichmentCancelForQuit(
+                  enrichmentExited.get(), liveWorkWait(budget, cooperativeWindowStartMs));
               if (attempts != null) {
                 boolean admitted = engineAdmission == null
                     || engineAdmission.awaitDrained(liveWorkWait(budget, cooperativeWindowStartMs));
@@ -2249,7 +2311,7 @@ public class HeadlessApp {
                 }
                 workDrained.set(true);
               }
-              return null;
+              return outcome;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "shutdown-request-watcher",

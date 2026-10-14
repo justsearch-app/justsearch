@@ -1,0 +1,280 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-14T00:14:32.225Z",
+  "revision": "83f07cc4cdef58a63b043979e4c480390314a7d8",
+  "tree": "1fc222200c547e92e2aa8026b92134684b48024d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.failedAutomaticRestoreLeavesNormalConfigurationOfflineAndHumanRequestRecovers\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.failedExplicitRestoreAlsoLeavesNormalConfigurationOfflineAndRecovers\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.racingLeaseAtEntryLeavesNoFalseOfflineReason\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownMidLoadedAutomaticDocumentDrainsCleanlyAndLeavesItPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownMidChatOffAutomaticDocumentDrainsCleanlyAndLeavesItPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownMidExplicitDocumentDrainsCleanlyAndLeavesItPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.loadedAutomaticPassWaitsForTheFullProcessStartupIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.statusIdentifiesOnlyAutomaticBorrowingOfLoadedChat\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 60800
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppVduShutdownTest.terminalEnrichmentQuiescesBeforeTheLiveWorkDrain\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23032
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedAutomaticRestoreLeavesNormalConfigurationOfflineAndHumanRequestRecovers",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedAutomaticRestoreLeavesNormalConfigurationOfflineAndHumanRequestRecovers()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedExplicitRestoreAlsoLeavesNormalConfigurationOfflineAndRecovers",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedExplicitRestoreAlsoLeavesNormalConfigurationOfflineAndRecovers()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#racingLeaseAtEntryLeavesNoFalseOfflineReason",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "racingLeaseAtEntryLeavesNoFalseOfflineReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidLoadedAutomaticDocumentDrainsCleanlyAndLeavesItPending",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownMidLoadedAutomaticDocumentDrainsCleanlyAndLeavesItPending()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidChatOffAutomaticDocumentDrainsCleanlyAndLeavesItPending",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownMidChatOffAutomaticDocumentDrainsCleanlyAndLeavesItPending()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidExplicitDocumentDrainsCleanlyAndLeavesItPending",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownMidExplicitDocumentDrainsCleanlyAndLeavesItPending()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#loadedAutomaticPassWaitsForTheFullProcessStartupIdleWindow",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loadedAutomaticPassWaitsForTheFullProcessStartupIdleWindow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#statusIdentifiesOnlyAutomaticBorrowingOfLoadedChat",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "statusIdentifiesOnlyAutomaticBorrowingOfLoadedChat()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#terminalEnrichmentQuiescesBeforeTheLiveWorkDrain",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:48c9654c6e00d8a0a7bf718e8f187add15db02e3706544cd3f5a4adbe9b839b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminalEnrichmentQuiescesBeforeTheLiveWorkDrain(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "13524ddf0",
+    "revision": "13524ddf01e92a273111ec752cacd74c0eeea233",
+    "overlays": [
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java",
+      "modules/app-services/build.gradle.kts"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.failedAutomaticRestoreLeavesNormalConfigurationOfflineAndHumanRequestRecovers\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.failedExplicitRestoreAlsoLeavesNormalConfigurationOfflineAndRecovers\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.racingLeaseAtEntryLeavesNoFalseOfflineReason\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownMidLoadedAutomaticDocumentDrainsCleanlyAndLeavesItPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownMidChatOffAutomaticDocumentDrainsCleanlyAndLeavesItPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownMidExplicitDocumentDrainsCleanlyAndLeavesItPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.loadedAutomaticPassWaitsForTheFullProcessStartupIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.statusIdentifiesOnlyAutomaticBorrowingOfLoadedChat\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 62738
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppVduShutdownTest.terminalEnrichmentQuiescesBeforeTheLiveWorkDrain\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 25900
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedAutomaticRestoreLeavesNormalConfigurationOfflineAndHumanRequestRecovers",
+        "classification": "assertion",
+        "detail": "failedAutomaticRestoreLeavesNormalConfigurationOfflineAndHumanRequestRecovers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed restore must leave VDU configuration ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedExplicitRestoreAlsoLeavesNormalConfigurationOfflineAndRecovers",
+        "classification": "assertion",
+        "detail": "failedExplicitRestoreAlsoLeavesNormalConfigurationOfflineAndRecovers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed restore must leave VDU configuration ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand",
+        "classification": "assertion",
+        "detail": "failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed restore must leave VDU configuration ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#racingLeaseAtEntryLeavesNoFalseOfflineReason",
+        "classification": "assertion",
+        "detail": "racingLeaseAtEntryLeavesNoFalseOfflineReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: BUSY is a deferral, not AI offline ==> expected: <null> but was: <vdu.ai_offline>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidLoadedAutomaticDocumentDrainsCleanlyAndLeavesItPending",
+        "classification": "assertion",
+        "detail": "shutdownMidLoadedAutomaticDocumentDrainsCleanlyAndLeavesItPending(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: abandoned document is pending; no success or FAILED update ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidChatOffAutomaticDocumentDrainsCleanlyAndLeavesItPending",
+        "classification": "assertion",
+        "detail": "shutdownMidChatOffAutomaticDocumentDrainsCleanlyAndLeavesItPending(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: abandoned document is pending; no success or FAILED update ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidExplicitDocumentDrainsCleanlyAndLeavesItPending",
+        "classification": "assertion",
+        "detail": "shutdownMidExplicitDocumentDrainsCleanlyAndLeavesItPending(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: abandoned document is pending; no success or FAILED update ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow",
+        "classification": "assertion",
+        "detail": "chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: startup is activity: no automatic pass before full idle window ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#loadedAutomaticPassWaitsForTheFullProcessStartupIdleWindow",
+        "classification": "assertion",
+        "detail": "loadedAutomaticPassWaitsForTheFullProcessStartupIdleWindow(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: startup is activity: no automatic pass before full idle window ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#statusIdentifiesOnlyAutomaticBorrowingOfLoadedChat",
+        "classification": "assertion",
+        "detail": "statusIdentifiesOnlyAutomaticBorrowingOfLoadedChat(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the wire engine reason must identify automatic borrowing of loaded chat ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#terminalEnrichmentQuiescesBeforeTheLiveWorkDrain",
+        "classification": "assertion",
+        "detail": "terminalEnrichmentQuiescesBeforeTheLiveWorkDrain(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: pending-status cleanup precedes admission closure ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:6ef3e52c7af17b55e0f3069edd6f874e3eef8b05db27227607167c8e20f342b3"
+}

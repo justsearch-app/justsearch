@@ -151,6 +151,29 @@ public final class IndexingCoordinator {
     }
   }
 
+  /**
+   * Compares stored fields and updates the same document within one serialized RMW.
+   * A missing document or changed field is a harmless lost comparison, returning false.
+   */
+  public boolean updateDocumentIf(
+      String docId, Map<String, Object> expectedFields, Map<String, Object> updates) {
+    if (docId == null || docId.isBlank() || expectedFields == null
+        || updates == null || updates.isEmpty()) {
+      return false;
+    }
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try {
+        return writeOps.get().updateDocumentIf(docId, expectedFields, updates);
+      } finally {
+        dispatchLock.unlock();
+      }
+    } finally {
+      releaseWriteBarrierAndReport();
+    }
+  }
+
   public BatchUpdateResult updateDocumentsBatch(
       List<Map.Entry<String, Map<String, Object>>> batchUpdates) {
     if (batchUpdates == null || batchUpdates.isEmpty()) {

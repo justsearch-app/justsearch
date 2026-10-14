@@ -545,6 +545,10 @@ public final class RuntimeReconciler implements AutoCloseable {
                 base,
                 RuntimeStatus.REASON_ENGINE_UP_FOR_BACKGROUND,
                 "Inference engine running for background document understanding; chat is unavailable");
+      } else if (proc.kind() == RuntimeStatus.ProcedureKind.VDU_BATCH
+          && "automatic-vdu".equals(proc.reason())) {
+        base = overlayEngine(base, "automatic-vdu",
+            "Picture reading is temporarily borrowing loaded chat");
       }
     }
     publishStatus(base);

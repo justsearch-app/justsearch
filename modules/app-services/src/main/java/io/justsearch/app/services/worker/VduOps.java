@@ -129,8 +129,16 @@ final class VduOps {
         return released;
     }
 
+    int recoverVduProcessingForOwner(EngineContext engineContext) {
+        return recoverVduProcessing(engineContext, RecoverVduProcessingRequest.newBuilder()
+                .setProcedureOwner(engineContext.workId().orElseThrow().toString()).build());
+    }
+
     int recoverVduProcessing(EngineContext engineContext) {
-        var request = RecoverVduProcessingRequest.getDefaultInstance();
+        return recoverVduProcessing(engineContext, RecoverVduProcessingRequest.getDefaultInstance());
+    }
+
+    private int recoverVduProcessing(EngineContext engineContext, RecoverVduProcessingRequest request) {
         var response = rpc.execute("recoverVduProcessing",
                 KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
                 calls -> calls.recoverVduProcessing(request), engineContext);

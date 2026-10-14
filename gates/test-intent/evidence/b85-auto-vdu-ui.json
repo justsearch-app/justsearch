@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-13T05:31:30.748Z",
+  "revision": "0a79303bb10f7a1194c7d04f6f7bc9b4fe3bee7b",
+  "tree": "14969cc18546eca90c0ccdbcdfd9b49dc6e87dee",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/BrainSurface.automatic-vdu.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b85-auto-vdu\\\\test-tmp\\\\test-intent-vitest-29900-1791869447446.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 43299
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#names picture reading while loaded chat lends its server to a VDU pass",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f13b80fb0d5840d3a2429bea99045603b27ad9f9913fa92ab39a29a831e1d29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "names picture reading while loaded chat lends its server to a VDU pass",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#keeps normal chat wording after the hold closes and never claims stale picture reading",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f13b80fb0d5840d3a2429bea99045603b27ad9f9913fa92ab39a29a831e1d29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps normal chat wording after the hold closes and never claims stale picture reading",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f1ffe806f4cd54bb2836f189477dc03be724dcc304bd9a273908b7020bf4047f"
+}

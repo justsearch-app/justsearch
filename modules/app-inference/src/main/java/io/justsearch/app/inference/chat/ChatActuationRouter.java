@@ -83,6 +83,11 @@ public interface ChatActuationRouter {
    */
   void shutdown(StopReason reason, Duration budget);
 
+  /** Refuse later steps before cancelling procedure bodies; physical stop follows in shutdown. */
+  default void beginShutdown(StopReason reason) {
+    // Isolated inline/test adapters have no queue to fence; shutdown owns their physical stop.
+  }
+
   /** Runs every step on the calling thread; shutdown stops the process directly. */
   static ChatActuationRouter inline(ChatActuator actuator) {
     Objects.requireNonNull(actuator, "actuator");

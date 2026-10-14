@@ -1793,6 +1793,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return vduOps.recoverVduProcessing(engineContext);
     }
 
+    /** Abandon only PROCESSING claims owned by this still-attached procedure. */
+    public int recoverVduProcessingForOwner(EngineContext engineContext) {
+        return vduOps.recoverVduProcessingForOwner(engineContext);
+    }
+
+
     /**
      * Stops the background root-walk and WAITS for it, rather than only asking it to stop.
      *

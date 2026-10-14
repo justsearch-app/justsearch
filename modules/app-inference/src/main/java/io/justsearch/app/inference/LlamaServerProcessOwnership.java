@@ -40,6 +40,15 @@ final class LlamaServerProcessOwnership {
     this.control = Objects.requireNonNull(control, "control");
   }
 
+  /** Launch-only terminal fence; stopping can follow after procedure cancellation. */
+  void beginTerminalShutdown(StopRequest request) {
+    Objects.requireNonNull(request, "request");
+    synchronized (gate) {
+      terminal = true;
+      if (terminalRequest == null) terminalRequest = request;
+    }
+  }
+
   void requireLaunchAllowed() throws IOException {
     synchronized (gate) {
       if (terminal) throw new IOException("llama-server ownership is closing");

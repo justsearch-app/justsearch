@@ -93,7 +93,7 @@ class VduProcedureExecutorLifetimeTest {
     try (var registry = new DefaultEngineExecutorRegistry();
         var coordinator = new OfflineCoordinator(registry, admission,
             batch, () -> client, new VduCapabilityState())) {
-      var sampler = new VduOfflineTriggerSampler(registry, () -> coordinator, () -> null, () -> false);
+      var sampler = expiredStartupSampler(registry, coordinator);
       Thread closer = null;
       try {
         var check = VduOfflineTriggerSampler.class.getDeclaredMethod("checkOnce");
@@ -130,6 +130,24 @@ class VduProcedureExecutorLifetimeTest {
         if (closer != null) closer.join(5_000);
         sampler.stop();
       }
+    }
+  }
+  private static VduOfflineTriggerSampler expiredStartupSampler(
+      io.justsearch.core.execution.EngineExecutorRegistry registry, OfflineCoordinator coordinator)
+      throws Exception {
+    try {
+      var constructor = VduOfflineTriggerSampler.class.getDeclaredConstructor(
+          io.justsearch.core.execution.EngineExecutorRegistry.class, java.util.function.Supplier.class,
+          java.util.function.Supplier.class, java.util.function.BooleanSupplier.class,
+          java.util.function.Supplier.class, java.util.function.LongSupplier.class);
+      constructor.setAccessible(true);
+      return constructor.newInstance(registry, (java.util.function.Supplier<OfflineCoordinator>) () -> coordinator,
+          (java.util.function.Supplier<io.justsearch.app.services.worker.KnowledgeServerBootstrap>) () -> null,
+          (java.util.function.BooleanSupplier) () -> false,
+          (java.util.function.Supplier<io.justsearch.app.inference.chat.ChatHolds>) () -> null,
+          (java.util.function.LongSupplier) () -> Long.MAX_VALUE);
+    } catch (NoSuchMethodException beforeStartupRepair) {
+      return new VduOfflineTriggerSampler(registry, () -> coordinator, () -> null, () -> false);
     }
   }
 }
