@@ -345,9 +345,12 @@ public final class InferenceCompositionRoot {
    * Estimates only the independently rebuilt query-role sessions for a committed selection.
    *
    * <p>The plans are resolved by the same helpers as {@link #composeQueryRoles}; retained index
-   * roles cannot enter this total. The returned value uses the same ten-percent headroom as the
-   * generation candidate estimator so {@link io.justsearch.core.component.DeviceMemoryLine}
-   * compares the required candidate peak with currently free memory.
+   * roles cannot enter this total. Planned self-contained sessions retain their weights between
+   * calls; their activation allowance is already reserved by the shared device plan and must not
+   * be demanded again when preparing a replacement. External or uninspectable weight layouts
+   * and unplanned sessions retain their existing conservative arena estimate.
+   * The returned value includes ten-percent composition headroom for admission through
+   * {@link io.justsearch.core.component.DeviceMemoryLine}.
    */
   static long estimateQueryFootprintBytes(EncoderConfigurationProjection projection,
       QueryRoleSelection selection, HardwareProfile hardware) {
@@ -359,10 +362,10 @@ public final class InferenceCompositionRoot {
         null, selection.reranker());
     QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, null, null,
         null, selection.citation());
-    long arenaCapBytes = queryPlanArenaCapBytes(EncoderRole.RERANKER, rerankerPlan, cfg, hardware);
-    arenaCapBytes = Math.addExact(arenaCapBytes,
-        queryPlanArenaCapBytes(EncoderRole.CITATION, citationPlan, cfg, hardware));
-    return withCompositionHeadroom(arenaCapBytes);
+    long retainedBytes = queryPlanCompositionBytes(EncoderRole.RERANKER, rerankerPlan, cfg, hardware);
+    retainedBytes = Math.addExact(retainedBytes,
+        queryPlanCompositionBytes(EncoderRole.CITATION, citationPlan, cfg, hardware));
+    return withCompositionHeadroom(retainedBytes);
   }
 
   /**
@@ -377,11 +380,21 @@ public final class InferenceCompositionRoot {
     return sourceRetainedLowerBound(source.surfaceForOwner());
   }
 
-  private static long queryPlanArenaCapBytes(EncoderRole role, QueryPlan plan,
+  private static long queryPlanCompositionBytes(EncoderRole role, QueryPlan plan,
       ResolvedConfig cfg, HardwareProfile hardware) {
-    return plan.variant() == null ? 0L
-        : ModelSessionPolicyResolver.resolve(role, cfg, hardware, plan.variant())
-            .gpu().arenaCapBytes();
+    if (plan.variant() == null) return 0L;
+    var gpu = ModelSessionPolicyResolver.resolve(role, cfg, hardware, plan.variant()).gpu();
+    if (gpu.arenaCapBytes() == 0L) return 0L;
+    if (!gpu.plannedProfile()) return gpu.arenaCapBytes();
+    try {
+      if (io.justsearch.ort.OnnxExternalData.hasExternalData(plan.variant().modelFile())) {
+        return gpu.arenaCapBytes();
+      }
+      return java.nio.file.Files.size(plan.variant().modelFile());
+    } catch (IOException unmeasuredLayout) {
+      // A graph alone cannot prove retained weights for external or uninspectable layouts.
+      return gpu.arenaCapBytes();
+    }
   }
 
   /** Both source owners retire during generation replacement; count only their realized sessions. */

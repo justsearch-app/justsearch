@@ -465,8 +465,14 @@ public record GpuArenaPlan(
    * </ul>
    */
   public static GpuArenaPlan resolve(Facts facts, Settings settings) {
+    return resolve(facts, settings, Optional.empty());
+  }
+
+  /** Budget an explicitly selected chat artifact with the same rule as measured chat. */
+  public static GpuArenaPlan resolve(Facts facts, Settings settings, Optional<Chat> selectedChat) {
     Objects.requireNonNull(facts, "facts");
     Objects.requireNonNull(settings, "settings");
+    Objects.requireNonNull(selectedChat, "selectedChat");
     if (settings.gpuOff() || facts.deviceTotalMiB().isEmpty()) {
       Set<String> unmet = new LinkedHashSet<>();
       // The CPU placement veto keeps the preference, but cannot apply positive offload layers.
@@ -481,7 +487,7 @@ public record GpuArenaPlan(
         .filter(placed -> onGpuInPlan(placed.getKey(), settings))
         .mapToDouble(Map.Entry::getValue)
         .sum();
-    boolean chatCanRun = !facts.installedChatModels().isEmpty()
+    boolean chatCanRun = selectedChat.isPresent() || !facts.installedChatModels().isEmpty()
         || facts.externalChat() == ExternalChat.LOCAL;
 
     ChatPlan selected = null;
@@ -497,7 +503,7 @@ public record GpuArenaPlan(
               >= minimumActivation(plan.profile())) {
         defaultSelected = plan;
       }
-      Chat candidate = chatFor(plan, settings, facts, chatCanRun);
+      Chat candidate = selectedChat.orElseGet(() -> chatFor(plan, settings, facts, chatCanRun));
       Budget budget = budget(device, candidate.footprintMiB(), weights, facts);
       if (budget.packingMiB() >= minimumActivation(plan.profile())) {
         selected = plan;
@@ -509,9 +515,9 @@ public record GpuArenaPlan(
       Budget atFloor = budget(device, chatCanRun ? floor.footprintMiB() : 0, weights, facts);
       Profile profile = atFloor.packingMiB() >= minimumActivation(Profile.P8)
           ? Profile.P8 : Profile.BELOW_P8;
-      if (settings.chatExplicit()) {
+      if (settings.chatExplicit() || selectedChat.isPresent()) {
         ChatPlan fallback = defaultSelected != null ? defaultSelected : PLANS.get(1);
-        Chat chat = chatFor(fallback, settings, facts, chatCanRun);
+        Chat chat = selectedChat.orElseGet(() -> chatFor(fallback, settings, facts, chatCanRun));
         Set<String> unmet = new LinkedHashSet<>();
         settings.contextTokens().ifPresent(ignored -> unmet.add(UNMET_CONTEXT));
         settings.gpuLayers().ifPresent(ignored -> unmet.add(UNMET_LAYERS));
@@ -524,7 +530,8 @@ public record GpuArenaPlan(
       return todaysConstants(profile, todaysChat(), Optional.empty(), facts, settings, Set.of());
     }
 
-    Chat chat = chatFor(selected, settings, facts, chatCanRun);
+    Chat chat = selectedChat.isPresent() ? selectedChat.get()
+        : chatFor(selected, settings, facts, chatCanRun);
     Budget budget = budget(device, chat.footprintMiB(), weights, facts);
     Set<String> unmet = new LinkedHashSet<>();
     if (settings.chatExplicit() && budget.packingMiB() < minimumActivation(selected.profile())) {

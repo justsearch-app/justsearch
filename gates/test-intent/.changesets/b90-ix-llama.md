@@ -7,17 +7,16 @@ author-session: b90-ix-llama
 
 # Test-intent entries
 
-Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; round-1 evidence remains archived. Delegation is the owner turn at 2026-10-11T16:05Z. These are delegated choices, not reviewer words presented as owner words. Independent acceptance is pending.
+Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-change reference and final gate base remain 61ff9b955. Historical script-produced evidence is retained for unchanged checks; affected round-2 file digests are refreshed against 7de3976a1, while new round-3 failures and preservation run against 1f8ce3e01. Delegation is the owner turn at 2026-10-11T16:05Z. Every design choice cites that delegation rather than presenting reviewer words as owner words. Evidence paths below are produced by the unchanged canonical runner. Independent acceptance is pending.
 
 ```json
 {
   "entries": [
     {
-      "behaviour": "Installed profile paths retain manifest-verified profile identity and measured co-residence, with automatic compact selection for an installer path and honest budgeting for operator locks; registry GPU-off keys apply through preparation; foreign encoder devices keep scoped unplanned policies; planner errors degrade visibly with changed-result INFO logs; VDU ownership refuses preparation before drain and across entry/prepared transaction windows; external self-tests name the external owner.",
+      "behaviour": "VDU ownership refuses preparation before drain and across entry/prepared transaction windows; external self-tests name the external owner; split-device placement does not apply another adapter's reduced caps.",
       "repaired": true,
       "class": "New",
       "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java"
       ],
@@ -27,7 +26,33 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
           "delegationLocation": "task t-20261005-b6d536 request",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
-          "choice": "Installed profile paths retain manifest-verified profile identity and measured co-residence, with automatic compact selection for an installer path and honest budgeting for operator locks; registry GPU-off keys apply through preparation; foreign encoder devices keep scoped unplanned policies; planner errors degrade visibly with changed-result INFO logs; VDU ownership refuses preparation before drain and across entry/prepared transaction windows; external self-tests name the external owner.",
+          "choice": "VDU ownership refuses preparation before drain and across entry/prepared transaction windows; external self-tests name the external owner; split-device placement does not apply another adapter's reduced caps.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#anExternalServerRefusalNamesTheExternalServer",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#heldVduRefusesPreparationBeforeAnyDrain",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#pendingVduEntryRefusesPreparationBetweenItsTwoSteps",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aPreparedConfigurationRetainsOwnershipUntilCommitOrAbort",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-app-services.json"
+    },
+    {
+      "behaviour": "Installed profile paths retain verified profile identity and measured co-residence, with automatic compact selection for installer paths and honest operator locks; registered GPU-off keys disable every automatic role when chat truly exhausts the device budget; foreign devices retain scoped unplanned policies; planner failures degrade visibly and unchanged results do not repeat INFO logs.",
+      "repaired": true,
+      "class": "New",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java"
+      ],
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner items 5 and 6; preserve round-2 B1/M1/M2/S-a repairs under the round-3 actual-allocation decision. The M1 fixture now uses context 1,048,576 to produce a real encoder shortfall while preserving its registered-key CPU-off expectations.",
+          "choice": "Installed profile paths retain verified profile identity and measured co-residence, with automatic compact selection for installer paths and honest operator locks; registered GPU-off keys disable every automatic role when chat truly exhausts the device budget; foreign devices retain scoped unplanned policies; planner failures degrade visibly and unchanged results do not repeat INFO logs.",
           "label": "agent choice"
         }
       ],
@@ -39,14 +64,9 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
         "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation",
         "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#unchangedPlanningDoesNotRepeatInfoLogs",
         "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anOperatorLockedProfileIsBudgetedAsTheActualLaunch",
-        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan",
-        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#anExternalServerRefusalNamesTheExternalServer",
-        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#heldVduRefusesPreparationBeforeAnyDrain",
-        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#pendingVduEntryRefusesPreparationBetweenItsTwoSteps",
-        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aPreparedConfigurationRetainsOwnershipUntilCommitOrAbort",
-        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps"
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan"
       ],
-      "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-app-services.json"
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-r2-app-services-refresh.json"
     },
     {
       "behaviour": "Replacement admission credits the realized GPU artifact weights (including an actual FP32 fallback), not zero or unused cap ceilings; unknown free memory beside resident GPU sources refuses with free_device_memory_unknown. Index and query owners contribute only their retained GPU weights.",
@@ -71,7 +91,7 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle"
       ],
-      "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-indexer-worker.json"
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-r2-indexer-refresh.json"
     },
     {
       "behaviour": "One item remains runnable through CPU when GPU weights or padding cannot fit. Planned non-FP16 CPU placement carries its reason and logs once per model.",
@@ -79,7 +99,6 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
       "class": "New",
       "items": [
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
-        "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
         "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java"
       ],
       "sources": [
@@ -95,7 +114,6 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aCpuSelectedHandleDoesNotApplyItsGpuPackingBudget",
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#nonFp16CpuPlacementHasAStatusReasonAndLogsOnce",
-        "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java#anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked",
         "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anInfeasibleSingleItemRemainsAvailableForCpuDispatch"
       ],
       "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-ort-common.json"
@@ -171,11 +189,10 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
       "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-ui.json"
     },
     {
-      "behaviour": "Preserve conservative custom artifact identity and explicit encoder pressure protection while exercising the registered keys through preparation.",
+      "behaviour": "Preserve explicit encoder pressure protection with the master GPU setting off, exercising the registered keys through preparation.",
       "repaired": false,
       "class": "New",
       "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java"
       ],
       "sources": [
@@ -184,12 +201,11 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
           "delegationLocation": "task t-20261005-b6d536 request",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationScope": "Owner items 5 and 6; assigned round-2 B1/B2/M1-M4/S-a-S-d decisions and preservation of the round-1 repairs.",
-          "choice": "Preserve conservative custom artifact identity and explicit encoder pressure protection while exercising the registered keys through preparation.",
+          "choice": "Preserve explicit encoder pressure protection with the master GPU setting off, exercising the registered keys through preparation.",
           "label": "agent choice"
         }
       ],
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChangedArtifactAtTheShippedPathIsStillCustom",
         "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#explicitGpuEncodersKeepPressureProtectionWithMasterOff"
       ],
       "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-app-services.json"
@@ -215,7 +231,7 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#plannedP12ReplacementFromCpuSourceFitsFiveGiBFree",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#retirementDoesNotCreditAnUnusedArenaCeiling"
       ],
-      "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-indexer-worker.json"
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-r2-indexer-refresh.json"
     },
     {
       "behaviour": "Preserve CPU placement when the live arbiter changes after an unbounded CPU packing shape is chosen.",
@@ -495,6 +511,315 @@ Round 2 repairs start at 7de3976a1. The whole-change reference is 61ff9b955; rou
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#cudaPublicationRemainsStrictForUnknownOrPositivePolicy"
       ],
       "evidence": "gates/test-intent/evidence/b90-ix-llama-r2-indexer-worker.json"
+    },
+    {
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The real prepared GPU plan admits a standard-to-compact chat switch on 12, 16 and 24 GiB and same-plan query re-preparation on 16 and 24 GiB while the old chat remains loaded; planned query estimates and source retirement credit count retained weights rather than demanding the shared activation allowance twice.",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java"
+      ],
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#chatModelSwitchIsAdmittedWithTheOldChatLoaded",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#samePlanRepreparationIsAdmittedWithChatLoaded",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceEstimateUsesRealizedGpuHandleAndPolicy"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-indexer-worker.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner items 5 and 6; round-3 P7 preservation repairs and consistent retained-memory admission.",
+          "choice": "Keep planned query candidate and retiring-source estimates on retained weights, preserve headroom and unplanned behavior, and admit the plan's own supported replacements while the old chat is resident.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": false,
+      "behaviour": "A genuinely insufficient free-memory line plus realized source weights still refuses a query replacement with candidate_exceeds_releasable_device_memory. An ONNX graph whose tensors are stored externally keeps the conservative arena estimate because its graph-file size cannot establish its retained GPU weights.",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java"
+      ],
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#aRealRetainedWeightShortfallStillRefusesReplacement",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java#externalTensorWeightsKeepTheConservativeArenaEstimate"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-indexer-worker.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner item 5; preserve refusal of a real device-memory shortfall and conservative admission for externally stored ONNX tensors during the P7 repair.",
+          "choice": "Do not authorize replacement when candidate retained weights and headroom exceed actual free memory plus demonstrably retained source weights. Retain the existing arena estimate when external tensor storage prevents the graph-file size from proving retained weights.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedQueryReplacementAdmissionTest.java"
+      ],
+      "whatMoved": "Restore the existing same-policy admission oracle with positive activation: the FP16 fixture holds 1 MiB weights under a 3 MiB cap instead of padding weights to the entire cap. Use the trusted prepared-plan marker and the real query estimator as the candidate observation; retained-weight source credit and expected IN_PLACE admission remain explicit. The larger-candidate refusal oracle is kept. Synthetic model fixtures additionally receive syntactically inspectable ONNX headers for the embedded-versus-external tensor distinction; their allocated byte sizes, retained-weight observations and admission outcomes are unchanged by this header instrumentation.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Round-3 instruction to restore same-policy admission with activation above zero and record it as an Adaptation.",
+          "choice": "Restore the nonzero-activation precondition and observe real estimator admission without weakening the original successful-replacement or real-shortfall outcomes.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Stored unmeasured GPU chat paths reserve file plus projector, configured-context KV and 770 MiB rather than the whole device; CPU chat and missing saved files, including relative managed paths, reserve no chat GPU memory. Small custom, CPU and missing chat configurations keep all four measured encoders planned, with named chat diagnostics and no false encoder_memory shortage.",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java"
+      ],
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aSmallCustomGpuModelKeepsTheEncoderPlan",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#cpuChatDoesNotSpendDeviceMemory",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aMissingSavedChatPathKeepsEncodersPlannedAndNamesTheFile",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aMissingRelativeManagedPathNamesTheUnavailableFile"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-app-services.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner item 5; round-3 P4 decisions for custom, CPU-run and missing saved chat paths through the real settings rebuild.",
+          "choice": "Budget the actual possible chat allocation, reserve zero for CPU or unavailable chat, keep encoders in the remaining budget and expose the actual chat availability or measurement reason.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java"
+      ],
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The relative managed missing-file fixture explicitly sets DATA_DIR to its own models directory's parent around the real settings rebuild, then restores the previous JVM property in finally. This isolates the fixture from a DATA_DIR property left by an unrelated earlier test. The relative saved path, absent file, real preparation boundary, encoder placement and exact missing-file diagnostic assertions remain unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner item 5; round-3 stored relative-path availability check through the real settings rebuild, with independent fixture state and unchanged placement expectations.",
+          "choice": "Give the relative saved-path fixture its intended base directory at the registered JVM source, restore the prior value after preparation and retain every existing outcome assertion.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Synchronous configuration preparation reads at most bounded model identity metadata and does not stream the chat model for a SHA-256.",
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigArtifactIdentityTest.java"
+      ],
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigArtifactIdentityTest.java#configurationPreparationDoesNotStreamTheChatModel"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-app-inference.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Round-3 boot-path decision: identify installed artifacts cheaply and move any necessary full hash off synchronous boot.",
+          "choice": "Count reads through the model input seam and reject a boot-time full-file hash with a deterministic byte-bound assertion rather than a timing threshold.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Operating status reached through the real stored-path rebuild reports a missing saved chat as unavailable with its filename and reports unmeasured chat placement without inventing an encoder memory shortage.",
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java"
+      ],
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingSavedChatIsUnavailableAndNamesItsMissingFile",
+        "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-ui.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner items 5 and 6; round-3 placement-reason and missing-file availability decisions.",
+          "choice": "Project the planner's named chat diagnostic through operating status and keep encoder_memory exclusive to actual encoder memory shortage.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": false,
+      "behaviour": "A missing saved candidate model does not replace the observed READY state, reason code or timestamp of the existing serving chat.",
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java"
+      ],
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingCandidateDoesNotReplaceTheReadyServersObservedState"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-ui.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner item 6; preserve observed runtime ownership while adding desired-model diagnostics.",
+          "choice": "Only report the missing model as unavailable when there is no READY serving chat; preserve an already observed serving child and its status evidence.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": false,
+      "behaviour": "A single padded item that exceeds its GPU packing budget acquires the CPU lease and CPU session, never the GPU lease; unmeasured-role packing remains unchanged.",
+      "items": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java"
+      ],
+      "newChecks": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java#anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-ort-common-preservation.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Round-3 request to make the existing CPU-dispatch check assert dispatch rather than only a one-item count.",
+          "choice": "Observe the selected CPU lease/session and verify GPU acquisition never occurs; classify the existing working behavior as preservation against the round-3 starting revision.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The actual installer verifies and promotes its local partial file, then the synchronous stored-path settings rebuild reads no whole model content and preserves the verified STANDARD 6549 MiB plan.",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java"
+      ],
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#bootSettingsRebuildDoesNotStreamTheInstalledModel"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-app-services.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Round-3 boot-read decision and stored-path boundary requirement; retain the budgeted unmeasured fallback until cheap or persisted file identity confirms a measured model.",
+          "choice": "Count model reads after real installer verification and promotion, and preserve the measured shipped-model identity through the boot settings rebuild without another full SHA-256.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "repaired": false,
+      "behaviour": "Preserve shipped profile identity, exact measured chat footprints and projector placement on 8, 12, 16 and 24 GiB; preserve operator-locked and installer compact selection, registered GPU-off keys under a true shortfall, and custom attribution for changed content at the shipped filename without demanding that its encoder plan be removed. A local external chat server retains at least its 6,549 MiB reservation despite unused local CPU or missing-model settings, without a false local missing-file diagnostic.",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java"
+      ],
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#installedProfilePathKeepsItsMeasuredPlan",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#customChatDisablesEveryAutomaticGpuRoleThroughPrepare",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anOperatorLockedProfileIsBudgetedAsTheActualLaunch",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChangedArtifactAtTheShippedPathIsStillCustom",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#externalChatReservationIgnoresUnusedLocalSettings"
+      ],
+      "evidence": "gates/test-intent/evidence/b90-ix-llama-r3-profile-preservation.json",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Owner items 5 and 6; round-3 requirements to preserve all default plans, retain M1 registered-key behavior, distinguish genuinely custom content from installed identity and preserve round-1 external-server ownership when local chat settings select CPU or a missing file.",
+          "choice": "Keep the existing shipped-profile, operator precedence and real-shortfall outcomes; changed content keeps an empty measured-model identity and an extrapolated footprint while the separate stored-path checks establish its revised allocation policy. Budget a selected local external server independently of unused local launch settings, keeping its existing GPU reservation and excluding false local missing-file diagnostics.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "Obsolete",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java"
+      ],
+      "behaviour": "Remove the expectation that any custom chat model, however small, disables all GPU encoders. Keep the M1 registered-key CPU-off assertions with a genuinely oversized context, and cover small custom models with the new stored-path budget checks.",
+      "conflictSearch": "decision records searched for a conflict: none; reviewed ADR-0004's co-residence amendment, ADR-0047 and ADR-0050. None requires blanket whole-device reservation or CPU placement for every custom chat file; the round-3 allocation decision specifically replaces that rule.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Round-3 P4 decision for custom chat allocations and preservation of M1's actual registered-key failure under a genuine shortfall.",
+          "choice": "A custom GPU model spends its file, projector, configured-context KV and 770 MiB, so only a real remaining-budget shortfall disables encoders. Supersede the old blanket-custom CPU policy instead of describing its changed input as mere re-encoding.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "Obsolete",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java"
+      ],
+      "behaviour": "Remove only the assertion that changed content at a shipped filename must have an unplanned encoder set. Retain and strengthen its custom-identity observation: no measured chat model is attributed and the footprint is extrapolated.",
+      "conflictSearch": "decision records searched for a conflict: none; reviewed ADR-0004's co-residence amendment, ADR-0047 and ADR-0050. None requires blanket whole-device reservation or CPU placement for every custom chat file; the round-3 allocation decision specifically replaces that rule.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Round-3 allocation decision replaces the whole-device reservation for unmeasured chat while preserving round-2 protection against lending a profile measurement to different content.",
+          "choice": "A changed artifact remains custom but may coexist with planned encoders when the specification's unmeasured allocation fits; file identity and co-residence admission are distinct facts.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java"
+      ],
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Fixture creation still writes the same profile artifacts and declares their same manifest sizes and digests. It additionally records the verified write's path/size/mtime identity receipt through the real helper, reflecting its optional presence so original before revisions retain their own verification path. This instruments the off-boot installer verification boundary; it does not overlay repaired production into before worktrees or alter measured-plan assertions. The added 24 GiB case is covered separately as preservation; obsolete custom-placement expectations are recorded separately.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationLocation": "task t-20261005-b6d536 request",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationScope": "Round-3 boot-path decision to persist verified path/size/modification-time identity and keep default shipped plans unchanged.",
+          "choice": "Seed the same identity an installer records after verifying its output so profile tests exercise cheap persisted identity rather than relying on a boot-time full hash.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

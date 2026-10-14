@@ -299,6 +299,18 @@ public record InferenceConfig(
     // custom file elsewhere; the path's configuration source does not change its identity.
     ChatModelProfile installedProfile = usingLlmModelOverride
         ? profileForInstalledFile(modelPath, configuredModelsDir) : null;
+    if (installedProfile == null && usingLlmModelOverride
+        && !Path.of(llmModelPathOverride).isAbsolute() && !Files.exists(modelPath)) {
+      // Legacy managed relative selections also describe an installation still being prepared.
+      // Keep that intent independent of activation order; absolute missing overrides stay unknown.
+      for (ChatModelProfile candidate : ChatModelProfile.values()) {
+        if (modelPath.toAbsolutePath().normalize().equals(
+            configuredModelsDir.resolve(candidate.modelFile()).toAbsolutePath().normalize())) {
+          installedProfile = candidate;
+          break;
+        }
+      }
+    }
     boolean customModelOverride = usingLlmModelOverride && installedProfile == null;
     if (installedProfile != null) {
       profile = installedProfile;
@@ -375,13 +387,7 @@ public record InferenceConfig(
     return null;
   }
 
-  private record ArtifactStamp(Object fileKey, long size, java.nio.file.attribute.FileTime modified,
-      String digest) {}
-
-  private static final java.util.Map<Path, ArtifactStamp> ARTIFACT_IDENTITIES =
-      new java.util.concurrent.ConcurrentHashMap<>();
-
-  /** Verify the registry's content identity once for each observed installed-file identity. */
+  /** Configuration reads only a bounded receipt; an owned background lane verifies uncertain bytes. */
   private static boolean matchesManifest(Path file, ChatModelProfile profile) throws IOException {
     var registry = io.justsearch.configuration.model.ModelRegistryLoader
         .loadFromClasspath("ai/model-registry.v2.json");
@@ -390,29 +396,7 @@ public record InferenceConfig(
         String relative = Path.of(pkg.targetDir() == null ? "" : pkg.targetDir())
             .resolve(variant.filename()).toString().replace('\\', '/');
         if (!relative.equals(profile.modelFile())) continue;
-        var attrs = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class);
-        if (attrs.size() != variant.sizeBytes() || variant.sha256() == null) return false;
-        ArtifactStamp previous = ARTIFACT_IDENTITIES.get(file);
-        String digest;
-        if (previous != null && Objects.equals(previous.fileKey(), attrs.fileKey())
-            && previous.size() == attrs.size() && previous.modified().equals(attrs.lastModifiedTime())) {
-          digest = previous.digest();
-        } else {
-          java.security.MessageDigest hash;
-          try { hash = java.security.MessageDigest.getInstance("SHA-256"); }
-          catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
-          try (var input = Files.newInputStream(file)) {
-            byte[] bytes = new byte[64 * 1024];
-            for (int count; (count = input.read(bytes)) >= 0;) hash.update(bytes, 0, count);
-          }
-          digest = java.util.HexFormat.of().formatHex(hash.digest());
-          var after = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class);
-          if (!Objects.equals(attrs.fileKey(), after.fileKey()) || attrs.size() != after.size()
-              || !attrs.lastModifiedTime().equals(after.lastModifiedTime())) return false;
-          ARTIFACT_IDENTITIES.put(file, new ArtifactStamp(attrs.fileKey(), attrs.size(),
-              attrs.lastModifiedTime(), digest));
-        }
-        return digest.equalsIgnoreCase(variant.sha256());
+        return ChatArtifactIdentity.matches(file, variant.sizeBytes(), variant.sha256());
       }
     }
     return false;

@@ -66,7 +66,6 @@ io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveBundledRun
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveEnvOrProp
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveModelsDir
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#getJustSearchHome
-io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#initialRuntimeContext
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#resolveOccurrenceBufferSize
 io.justsearch.app.services.bootstrap.phases.ExamplePlugin#enabled
 io.justsearch.app.services.bootstrap.phases.InferenceWiring#seedAutostartSpec
@@ -78,7 +77,6 @@ io.justsearch.app.services.policy.EnterprisePolicyServiceImpl#isWindows
 io.justsearch.app.services.policy.EnterprisePolicyServiceImpl#resolveAiHome
 io.justsearch.app.services.policy.EnterprisePolicyServiceImpl#resolveMachinePolicyPath
 io.justsearch.app.services.policy.EnterprisePolicyServiceImpl#snapshot
-io.justsearch.app.services.worker.KnowledgeServerBootstrap#tryIngestHelpFiles
 io.justsearch.app.services.worker.KnowledgeServerConfig#detectProductionMode
 io.justsearch.app.services.worker.KnowledgeServerConfig#envOrProperty
 io.justsearch.app.services.worker.KnowledgeServerConfig#resolveLibDir
@@ -97,7 +95,6 @@ io.justsearch.indexerworker.extract.ExtractionSandboxCommand#javaBinary
 io.justsearch.indexerworker.extract.TikaOcrRuntime#appDataHome
 io.justsearch.indexerworker.extract.TikaOcrRuntime#appOwnedRuntimeRoots
 io.justsearch.indexerworker.extract.TikaOcrRuntime#executableNames
-io.justsearch.indexerworker.extract.TikaOcrRuntime#findExecutableOnPath
 io.justsearch.indexerworker.extract.TikaOcrRuntime#findTessdataDirectory
 io.justsearch.indexerworker.extract.TikaOcrRuntime#localAppDataHome
 io.justsearch.indexerworker.extract.TikaOcrRuntime#resolve
@@ -118,6 +115,3 @@ io.justsearch.telemetry.TracingBootstrap#<init>
 io.justsearch.ui.HeadlessApp#buildApi
 io.justsearch.ui.HeadlessApp#harmonizeDataDirProperties
 io.justsearch.ui.HeadlessApp#hasCudaRuntime
-io.justsearch.ui.api.DebugConditionController#handleClear
-io.justsearch.ui.api.DebugConditionController#handleTrip
-io.justsearch.ui.api.LocalApiServer#handleResetIndex

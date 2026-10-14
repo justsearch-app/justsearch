@@ -212,26 +212,37 @@ public final class GpuProfileResolver {
           Optional.of(ChatModelProfile.resolve(launch.chatProfileId())), settings.contextTokens(),
           settings.gpuLayers(), settings.roleGpuMemMiB(), settings.gpuOff(), settings.projectorOnGpu());
     }
-    GpuArenaPlan plan = GpuArenaPlan.resolve(facts, settings);
     GpuArenaPlan automaticPlan = GpuArenaPlan.resolve(facts, GpuArenaPlan.Settings.none());
-    // Use the launch resolver itself so path/profile precedence cannot diverge here. Custom
-    // architecture and projector allocations have no measured co-residence bound: reserve the
-    // device and keep automatic encoders on CPU until such a bound exists.
-    if (total.isPresent() && plan.profile() != GpuArenaPlan.Profile.NO_GPU
-        && (launch.chatProfileId() == null || customProjector(cfg, launch))) {
-      double reservation = Math.max(total.getAsDouble(), fileMiB(launch.modelPath())
-          + fileMiB(launch.mmprojPath()) + GpuArenaPlan.UNMEASURED_CHAT_OVERHEAD_MIB);
-      var chat = new GpuArenaPlan.Chat(Optional.empty(), OptionalInt.of(launch.contextSize()),
-          false, reservation, true);
-      var budget = new GpuArenaPlan.Budget(total.getAsDouble(),
-          GpuArenaPlan.EXTERNAL_ALLOWANCE_MIB, reservation, GpuArenaPlan.FREE_MARGIN_MIB,
-          GpuArenaPlan.ENGINE_NON_ARENA_MIB, 0, DeviceGatePolicy.DEFAULTS.seats());
-      plan = withoutCoResidence(plan, chat, Optional.of(budget), plannedWeights,
-          "chat_model_unmeasured");
+    var diagnostics = new java.util.LinkedHashSet<String>();
+    if (!unplannedRoles.isEmpty()) diagnostics.add("encoder_device_conflict");
+    Optional<GpuArenaPlan.Chat> selectedChat = Optional.empty();
+    boolean customChat = launch.chatProfileId() == null || customProjector(cfg, launch);
+    boolean unavailableManagedSelection = cfg.ai().llmModelPath() != null
+        && launch.chatProfileId() != null
+        && !installedChatModels.contains(ChatModelProfile.resolve(launch.chatProfileId()));
+    boolean missingChat = (customChat || unavailableManagedSelection)
+        && !java.nio.file.Files.isRegularFile(launch.modelPath());
+    boolean cpuChat = settings.gpuLayers().isPresent() && settings.gpuLayers().getAsInt() == 0;
+    // The configured external server ignores local launch paths and layer settings.
+    if ((endpoint == null || endpoint.isBlank()) && (missingChat || cpuChat || customChat)) {
+      boolean projector = cfg.ai().mmprojOffload() && launch.mmprojPath() != null
+          && !cpuChat && !missingChat;
+      double reservation = 0;
+      if (!missingChat && !cpuChat) {
+        reservation = fileMiB(launch.modelPath()) + (projector ? fileMiB(launch.mmprojPath()) : 0)
+            + GpuArenaPlan.UNMEASURED_CHAT_OVERHEAD_MIB
+            + unmeasuredKvMiB(launch.contextSize(), cfg.ai().llmKvType());
+      }
+      selectedChat = Optional.of(new GpuArenaPlan.Chat(Optional.empty(),
+          OptionalInt.of(launch.contextSize()), projector, reservation, customChat && !missingChat));
+      if (missingChat) diagnostics.add("chat_model_missing:" + launch.modelPath());
+      else if (customChat) diagnostics.add("chat_model_unmeasured");
     }
+    GpuArenaPlan plan = GpuArenaPlan.resolve(facts, settings, selectedChat);
     // A measured but explicitly locked profile may leave no room for automatic encoders.
     // Keep that model and its honest footprint, while retaining custom-chat pressure protection.
-    if (io.justsearch.app.inference.InferenceConfig.operatorModelPathSelected(cfg)
+    if ((selectedChat.isPresent()
+            || io.justsearch.app.inference.InferenceConfig.operatorModelPathSelected(cfg))
         && plan.unmetSettings().contains(GpuArenaPlan.UNMET_ENCODER_MEMORY)) {
       plan = withoutCoResidence(plan, plan.chat(), plan.budget(), plannedWeights,
           "chat_profile_budget_unmet");
@@ -245,7 +256,7 @@ public final class GpuProfileResolver {
     return new Resolution(Optional.of(plan),
         overridden ? ProfileSource.USER_OVERRIDE : ProfileSource.MEASURED, ordinal,
         device.status() == DeviceFacts.ProbeStatus.RAN_NO_DEVICE, encoderProfile,
-        unplannedRoles.isEmpty() ? Set.of() : Set.of("encoder_device_conflict"), unplannedRoles);
+        diagnostics, unplannedRoles);
   }
 
   /**
@@ -397,6 +408,15 @@ public final class GpuProfileResolver {
     } catch (java.io.IOException unreadable) {
       throw new java.io.UncheckedIOException("Cannot measure selected chat artifact", unreadable);
     }
+  }
+
+  private static double unmeasuredKvMiB(int context, String kvType) {
+    double multiplier = switch (kvType.toLowerCase(Locale.ROOT)) {
+      case "q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl" -> 1.0;
+      case "f16", "bf16" -> 2.0;
+      default -> 4.0;
+    };
+    return multiplier * GpuArenaPlan.CHAT_KV_MIB_PER_1K_TOKENS * context / 1_024.0;
   }
 
   private static GpuArenaPlan withoutCoResidence(GpuArenaPlan plan, GpuArenaPlan.Chat chat,

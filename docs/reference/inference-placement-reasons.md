@@ -7,6 +7,10 @@ description: Additive placement and refusal reasons for GPU planning and chat ow
 
 # Inference placement reasons
 
+`chat_model_unmeasured` means the selected chat artifact has no confirmed measured profile identity. Its GPU reservation is the model file plus a GPU projector, KV at the configured context and cache precision, and 770 MiB of runtime overhead. CPU chat reserves no device memory. The remaining memory continues to plan the encoders; this reason alone does not mean insufficient encoder memory.
+
+`chat_model_missing:<path>` means the saved chat artifact is unavailable at the named path. It reserves no GPU memory, and the encoders are planned as if no chat artifact were selected. Status names the missing file and reports chat unavailable with `MODEL_LOAD_FAILED` when no server is running. A running server keeps its observed status.
+
 `encoder_device_conflict` means an encoder was explicitly placed on a different CUDA device from the device-memory plan. That role keeps its explicit device and unplanned policy; chat and the other roles keep the shared plan. It is an additive `user_setting_unmet` cause, distinct from insufficient encoder memory.
 
 `chat_profile_budget_unmet` keeps automatic encoders on CPU when an explicitly locked, measured chat profile leaves insufficient encoder memory. The selected chat artifact remains the one requested.

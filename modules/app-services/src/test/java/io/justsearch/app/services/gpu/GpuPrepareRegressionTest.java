@@ -38,7 +38,7 @@ final class GpuPrepareRegressionTest {
   }
 
   @ParameterizedTest(name = "installedProfilePathKeepsItsMeasuredPlan({0})")
-  @CsvSource({"16376, STANDARD, 7675, true", "12282, STANDARD, 6549, false",
+  @CsvSource({"24564, STANDARD, 7675, true", "16376, STANDARD, 7675, true", "12282, STANDARD, 6549, false",
       "8178, COMPACT, 3533, false"})
   void installedProfilePathKeepsItsMeasuredPlan(double mib, ChatModelProfile profile,
       double footprint, boolean projector) throws Exception {
@@ -61,9 +61,33 @@ final class GpuPrepareRegressionTest {
     assertFalse(prepared.ai().gpuMemoryPlan().isBlank());
   }
 
+  @ParameterizedTest(name = "externalChatReservationIgnoresUnusedLocalSettings({0}, {1})")
+  @CsvSource({"0, false", "99, true"})
+  void externalChatReservationIgnoresUnusedLocalSettings(int layers, boolean missing)
+      throws Exception {
+    Files.writeString(dir.resolve(ChatModelProfile.STANDARD.modelFile()), "standard");
+    registerFixtureArtifacts();
+    String endpoint = "http://127.0.0.1:65432";
+    preparePlanner(12_282, Map.of(EnvRegistry.MODELS_DIR.configKey(), dir.toString(),
+        EnvRegistry.INFERENCE_EXTERNAL_ENDPOINT.configKey(), endpoint));
+    var control = ConfigStoreRebuilder.planOf(ConfigStoreRebuilder.prepare(new UiSettings()))
+        .orElseThrow().plan().orElseThrow();
+    assertEquals(6549, control.chat().footprintMiB(), 0.001);
+    var settings = new UiSettings();
+    settings.setGpuLayers(layers);
+    settings.setLlmModelPath(dir.resolve(missing ? "unused-missing.gguf"
+        : ChatModelProfile.STANDARD.modelFile()).toAbsolutePath().toString());
+    var cfg = ConfigStoreRebuilder.prepare(settings);
+    var actual = ConfigStoreRebuilder.planOf(cfg).orElseThrow();
+    assertEquals(endpoint, cfg.ai().inferenceExternalEndpoint());
+    assertTrue(actual.plan().orElseThrow().chat().footprintMiB() >= control.chat().footprintMiB(),
+        "a local external server retains its GPU reservation despite unused local launch settings");
+  }
+
   @Test void customChatDisablesEveryAutomaticGpuRoleThroughPrepare() throws Exception {
     Path file = Files.writeString(dir.resolve("custom.gguf"), "unmeasured architecture");
-    preparePlanner(12_282, Map.of(EnvRegistry.MODELS_DIR.configKey(), dir.toString()));
+    preparePlanner(12_282, Map.of(EnvRegistry.MODELS_DIR.configKey(), dir.toString(),
+        EnvRegistry.CONTEXT_SIZE.configKey(), "1048576"));
     var weights = new java.util.EnumMap<>(WEIGHTS);
     weights.put(EncoderRole.BGE_M3, 1_000.0);
     ConfigStoreRebuilder.rememberDevicePlanner(GpuProfileResolver.planner(
@@ -217,7 +241,7 @@ final class GpuPrepareRegressionTest {
     settings.setLlmModelPath(file.toString());
     var cfg = ConfigStoreRebuilder.prepare(settings);
     var plan = ConfigStoreRebuilder.planOf(cfg).orElseThrow().plan().orElseThrow();
-    assertFalse(plan.planned(), "a filename cannot lend a measurement to different content");
+    assertTrue(plan.chat().model().isEmpty(), "a filename cannot lend a measurement to different content");
     assertTrue(plan.chat().extrapolated());
   }
 
@@ -228,6 +252,13 @@ final class GpuPrepareRegressionTest {
       if (!Files.isRegularFile(file)) continue;
       String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
           .digest(Files.readAllBytes(file)));
+      try {
+        Class.forName("io.justsearch.app.inference.ChatArtifactIdentity")
+            .getMethod("rememberWritten", Path.class, long.class, String.class)
+            .invoke(null, file, Files.size(file), digest);
+      } catch (ClassNotFoundException beforeReceiptSupport) {
+        // Earlier revisions verify this fixture through their original synchronous path.
+      }
       var variant = new io.justsearch.configuration.model.ModelVariant(file.getFileName().toString(),
           io.justsearch.configuration.model.ModelPrecision.GGUF,
           io.justsearch.configuration.model.ExecutionProvider.LLAMA_SERVER, digest, Files.size(file), null);

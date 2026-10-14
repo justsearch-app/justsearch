@@ -333,13 +333,22 @@ class InferenceCompositionRootFootprintTest {
     Path reranker = createModel(temp.resolve("reranker"), "model.onnx", "tokenizer.json")
         .resolve("model.onnx");
     try (var file = new java.io.RandomAccessFile(reranker.toFile(), "rw")) {
-      file.setLength(3L * MIB);
+      file.setLength(MIB);
+      file.writeByte(10);
+      for (long length = MIB - 4; length > 0; length >>>= 7) {
+        file.writeByte((int) (length & 127) | (length > 127 ? 128 : 0));
+      }
     }
     Map<String, String> entries = disabledRoles();
     entries.put(EnvRegistry.RERANK_GPU_MEM_MB.configKey(), "3");
-    var cfg = TestResolvedConfigHelper.fromEntries(entries);
+    var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
+    entries.forEach(builder::putDefault);
+    builder.contributeAutoDetected(Map.of(EnvRegistry.GPU_MEMORY_PLAN.configKey(), "p12"));
+    var cfg = builder.build();
     var policy = ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, CUDA_HOST,
         VariantSelection.optimal(reranker, ModelPrecision.FP16, ExecutionProvider.CUDA));
+    assertTrue(policy.gpu().arenaCapBytes() > Files.size(reranker),
+        "same-policy replacement must remain admissible with positive activation allowance");
     SessionHandle gpu = mock(SessionHandle.class);
     when(gpu.isGpuAvailable()).thenReturn(true);
     SessionHandle cpu = mock(SessionHandle.class);
@@ -354,7 +363,10 @@ class InferenceCompositionRootFootprintTest {
         "credit the retained weights, not zero or the unused arena ceiling");
     assertEquals(ComposeEvidence.Mode.IN_PLACE,
         new DeviceMemoryLine(12L * 1024L * MIB, MIB)
-            .decision(withHeadroom(3L * MIB), releasable).mode(),
+            .decision(InferenceCompositionRoot.estimateQueryFootprintBytes(
+                EncoderConfigurationProjection.from(cfg), new QueryRoleSelection(
+                    selected(reranker.getParent(), ModelPrecision.FP16, ExecutionProvider.CUDA),
+                    QueryRoleSelection.Role.disabled()), CUDA_HOST), releasable).mode(),
         "retained weights plus free device memory permit replacing the source");
     assertEquals(ComposeEvidence.Mode.REFUSED,
         new DeviceMemoryLine(12L * 1024L * MIB, MIB)

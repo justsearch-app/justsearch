@@ -2,7 +2,15 @@
 package io.justsearch.ort;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import ai.onnxruntime.OrtSession;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -132,6 +140,24 @@ final class GpuCallPackerTest {
     assertEquals(1, org.junit.jupiter.api.Assertions.assertDoesNotThrow(
         () -> splade(Optional.of(tiny), 9, 512)),
         "a single item remains available to the CPU session when GPU packing is infeasible");
+
+    SessionHandle sessions = mock(SessionHandle.class);
+    OrtSession cpuSession = mock(OrtSession.class);
+    OrtSession gpuSession = mock(OrtSession.class);
+    var request = SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.BACKGROUND, Duration.ofSeconds(30));
+    var cpuLease = new SessionHandle.Lease(cpuSession, null, () -> {}, true, OrtRunRecorder.NOOP);
+    var gpuLease = new SessionHandle.Lease(gpuSession, null, () -> {}, false, OrtRunRecorder.NOOP);
+    when(sessions.arenaPlan()).thenReturn(Optional.of(tiny));
+    when(sessions.acquire(request)).thenReturn(gpuLease);
+    when(sessions.acquireCpu(request)).thenReturn(cpuLease);
+    try (var selected = GpuCallPacker.acquireForCall(sessions, request, EncoderRole.SPLADE, 1, 512)) {
+      assertTrue(selected.isCpu(), "the infeasible padded item must be dispatched to CPU");
+      assertSame(cpuLease, selected, "the dispatcher must return the explicitly acquired CPU lease");
+      assertSame(cpuSession, selected.session());
+      verify(sessions).acquireCpu(request);
+      verify(sessions, never()).acquire(request);
+    }
 
     GpuArenaPlan withBgeM3 =
         GpuArenaPlan.resolve(

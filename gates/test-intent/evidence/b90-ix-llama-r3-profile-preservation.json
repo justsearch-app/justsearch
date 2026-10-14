@@ -1,0 +1,182 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T08:20:00.934Z",
+  "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+  "tree": "68a2d7606230450f3f0c5c79569240324391768f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.installedProfilePathKeepsItsMeasuredPlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.customChatDisablesEveryAutomaticGpuRoleThroughPrepare\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anOperatorLockedProfileIsBudgetedAsTheActualLaunch\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anInstallerStandardPathFollowsTheCompactDevicePlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChangedArtifactAtTheShippedPathIsStillCustom\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.externalChatReservationIgnoresUnusedLocalSettings\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 25814
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#installedProfilePathKeepsItsMeasuredPlan",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(24564)",
+          "status": "passed"
+        },
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(16376)",
+          "status": "passed"
+        },
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(12282)",
+          "status": "passed"
+        },
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(8178)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#customChatDisablesEveryAutomaticGpuRoleThroughPrepare",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "customChatDisablesEveryAutomaticGpuRoleThroughPrepare()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anOperatorLockedProfileIsBudgetedAsTheActualLaunch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOperatorLockedProfileIsBudgetedAsTheActualLaunch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInstallerStandardPathFollowsTheCompactDevicePlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChangedArtifactAtTheShippedPathIsStillCustom",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChangedArtifactAtTheShippedPathIsStillCustom()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#externalChatReservationIgnoresUnusedLocalSettings",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalChatReservationIgnoresUnusedLocalSettings(0, false)",
+          "status": "passed"
+        },
+        {
+          "name": "externalChatReservationIgnoresUnusedLocalSettings(99, true)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1f8ce3e01",
+    "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.installedProfilePathKeepsItsMeasuredPlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.customChatDisablesEveryAutomaticGpuRoleThroughPrepare\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anOperatorLockedProfileIsBudgetedAsTheActualLaunch\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anInstallerStandardPathFollowsTheCompactDevicePlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChangedArtifactAtTheShippedPathIsStillCustom\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.externalChatReservationIgnoresUnusedLocalSettings\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 68773
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#installedProfilePathKeepsItsMeasuredPlan",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#customChatDisablesEveryAutomaticGpuRoleThroughPrepare",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anOperatorLockedProfileIsBudgetedAsTheActualLaunch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChangedArtifactAtTheShippedPathIsStillCustom",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#externalChatReservationIgnoresUnusedLocalSettings",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:c7fc4733d56b8ef5cb8fa4cb890ec840f0e589fdd6ffacae1d4062eac9465192"
+}

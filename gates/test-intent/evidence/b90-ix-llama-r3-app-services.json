@@ -1,0 +1,290 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T09:05:22.679Z",
+  "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+  "tree": "4f9ffae98ffd1ab44ef87a19be54e3344512607f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.aSmallCustomGpuModelKeepsTheEncoderPlan\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.cpuChatDoesNotSpendDeviceMemory\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.aMissingSavedChatPathKeepsEncodersPlannedAndNamesTheFile\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.aMissingRelativeManagedPathNamesTheUnavailableFile\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.bootSettingsRebuildDoesNotStreamTheInstalledModel\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.thePlansOwnContributionIsNotReadBackAsASetting\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.higherPrecisionKvReducesEncoderBudget\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17967
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aSmallCustomGpuModelKeepsTheEncoderPlan",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb187b05b7e8f0b12723083221edb0fd5e4b6c68395485a4860aeaf8256786f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSmallCustomGpuModelKeepsTheEncoderPlan(12282)",
+          "status": "passed"
+        },
+        {
+          "name": "aSmallCustomGpuModelKeepsTheEncoderPlan(24564)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#cpuChatDoesNotSpendDeviceMemory",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb187b05b7e8f0b12723083221edb0fd5e4b6c68395485a4860aeaf8256786f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuChatDoesNotSpendDeviceMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aMissingSavedChatPathKeepsEncodersPlannedAndNamesTheFile",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb187b05b7e8f0b12723083221edb0fd5e4b6c68395485a4860aeaf8256786f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aMissingSavedChatPathKeepsEncodersPlannedAndNamesTheFile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aMissingRelativeManagedPathNamesTheUnavailableFile",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb187b05b7e8f0b12723083221edb0fd5e4b6c68395485a4860aeaf8256786f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aMissingRelativeManagedPathNamesTheUnavailableFile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#bootSettingsRebuildDoesNotStreamTheInstalledModel",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb187b05b7e8f0b12723083221edb0fd5e4b6c68395485a4860aeaf8256786f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootSettingsRebuildDoesNotStreamTheInstalledModel()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#thePlansOwnContributionIsNotReadBackAsASetting",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "thePlansOwnContributionIsNotReadBackAsASetting()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#higherPrecisionKvReducesEncoderBudget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39ba79039d7f1c8ff13162d32b1bc08aa491d50680900a9232968b87a5460bdb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "higherPrecisionKvReducesEncoderBudget()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1f8ce3e01",
+    "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.aSmallCustomGpuModelKeepsTheEncoderPlan\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.cpuChatDoesNotSpendDeviceMemory\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.aMissingSavedChatPathKeepsEncodersPlannedAndNamesTheFile\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.aMissingRelativeManagedPathNamesTheUnavailableFile\" --tests \"io.justsearch.app.services.gpu.StoredChatBudgetTest.bootSettingsRebuildDoesNotStreamTheInstalledModel\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.thePlansOwnContributionIsNotReadBackAsASetting\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.higherPrecisionKvReducesEncoderBudget\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 71994
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aSmallCustomGpuModelKeepsTheEncoderPlan",
+        "classification": "assertion",
+        "detail": "aSmallCustomGpuModelKeepsTheEncoderPlan(12282): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the remaining GPU budget must continue to plan encoders ==> expected: <true> but was: <false> | aSmallCustomGpuModelKeepsTheEncoderPlan(24564): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the remaining GPU budget must continue to plan encoders ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#cpuChatDoesNotSpendDeviceMemory",
+        "classification": "assertion",
+        "detail": "cpuChatDoesNotSpendDeviceMemory(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the remaining GPU budget must continue to plan encoders ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aMissingSavedChatPathKeepsEncodersPlannedAndNamesTheFile",
+        "classification": "assertion",
+        "detail": "aMissingSavedChatPathKeepsEncodersPlannedAndNamesTheFile(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the remaining GPU budget must continue to plan encoders ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#aMissingRelativeManagedPathNamesTheUnavailableFile",
+        "classification": "assertion",
+        "detail": "aMissingRelativeManagedPathNamesTheUnavailableFile(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the remaining GPU budget must continue to plan encoders ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java#bootSettingsRebuildDoesNotStreamTheInstalledModel",
+        "classification": "assertion",
+        "detail": "bootSettingsRebuildDoesNotStreamTheInstalledModel(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the synchronous settings rebuild must not hash model content: 65536 ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#thePlansOwnContributionIsNotReadBackAsASetting",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#higherPrecisionKvReducesEncoderBudget",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:fbffb14cfe5e6c1aa21a6398cf5a74b21e344759fe27089bfa065b21b70ce9c2"
+}

@@ -3,6 +3,7 @@ package io.justsearch.ui.api;
 
 import io.justsearch.app.api.chat.ChatReasonCodes;
 import io.justsearch.app.api.chat.ChatState;
+import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.chat.LoadingCause;
 import io.justsearch.app.api.chat.UnloadReason;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
@@ -54,8 +55,11 @@ import java.util.function.Supplier;
  *       reason code classifies, when exactly one does. A stopped chat whose reason code says the
  *       chat controller unloaded it for another GPU user is UNLOADED (RESIDENCY_PRESSURE) with
  *       detail {@code gpu_busy} or {@code game_mode} (Spec A step 9). {@code reasonCode} and
- *       {@code since} are the component's own, so they equal {@code components.generative}. The
- *       block is absent while the Engine is stopping. Generation activity, reload blocking and load
+ *       {@code since} come from the component. The
+ *       block is absent while the Engine is stopping. When chat is OFF and the prepared plan names
+ *       a missing chat file, it reports FAILED (MODEL_LOAD_FAILED), retaining the component's code;
+ *       an observed serving or loading
+ *       server keeps its state. Generation activity, reload blocking and load
  *       progress have no producer yet and are {@code null}.
  *   <li><b>indexing</b> (Spec E step E1) is IDLE when the queue is empty and no enabled and
  *       available enrichment stage, VDU included, has work pending. Otherwise it is the mode of the
@@ -142,6 +146,7 @@ final class OperatingStateAssembler {
     OperatingIndexingView indexing = indexing(power, worker, workerSampledAtMs, now);
     if (gpu == null) gpu = OperatingGpuView.unknown();
     GpuProfileResolver.Resolution plan = readDevicePlan();
+    chat = withModelAvailability(chat, plan);
     if (plan != null) gpu = withProfile(gpu, plan);
     List<OperatingDegradationView> degradations = degradations(plan, assembledAt);
     List<OperatingBlock> staleSources = new ArrayList<>();
@@ -189,6 +194,20 @@ final class OperatingStateAssembler {
     return new OperatingGpuView(plan.placementProfile(), plan.source(), g.adapter(),
         g.adapterTotalBytes(), g.adapterFreeBytes(), g.ourDedicatedBytes(), g.ourSharedBytes(),
         g.externalUsedBytes(), g.spillSuspected(), g.source(), g.sampledAt(), g.ageMs(), g.stale());
+  }
+
+  /** An OFF chat with a missing configured artifact names its model-load failure. */
+  private static OperatingChatView withModelAvailability(
+      OperatingChatView chat, GpuProfileResolver.Resolution plan) {
+    if (chat == null || chat.state() != ChatState.OFF || plan == null
+        || plan.diagnosticReasons().stream().noneMatch(reason ->
+            reason.startsWith("chat_model_missing:"))) {
+      return chat;
+    }
+    return new OperatingChatView(ChatState.FAILED, FailedCode.MODEL_LOAD_FAILED.name(), chat.detail(),
+        chat.reasonCode(), chat.since(), chat.managed(),
+        chat.generating(), chat.inFlight(), chat.queued(), chat.blockedBy(), chat.load(),
+        chat.reloadAllowed(), chat.nextReloadNotBefore(), chat.sampledAt());
   }
 
   /**
