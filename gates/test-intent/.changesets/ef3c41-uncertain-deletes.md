@@ -2191,3 +2191,14 @@ Round 8b (on top of ef205d0e9, decisions under the owner's delegation): only a d
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-ef3c41-20261014",
+  "verdict": "accept",
+  "digest": "sha256:5b2ee215be15c75e6a1f5543eccf54f8abee1cbd43a569d280b5c406a8346d75",
+  "note": "Independent verifier accepted 925610f44 (round 8): D6 fixed live on the real interface; volume recording and upgrade seeding as decided; suites, ArchUnit, PMD clean; every new check fails on ef205d0e9 by assertion; earlier rounds' live S1-S8 verification still holds. Restart-before-re-registration window and profiling reset verified by tests only."
+}
+```
