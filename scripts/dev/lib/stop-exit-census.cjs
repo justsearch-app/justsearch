@@ -59,8 +59,21 @@ async function engineIdentityAsync(pid, dataDir) {
 }
 
 /**
+ * The files of a family read with lines that could not be read: corrupt, of an unknown schema or
+ * type, or a torn last line (one a writer had not finished when it was read). Each names its file
+ * and how many lines it lost; the records on them are not in the ledger read.
+ */
+function damageOf(files) {
+  return (files ?? []).filter(f => f.corruptLines || f.unknownSchemaLines || f.unknownTypeLines || f.tornTail)
+    .map(f => ({ file: f.file, lines: f.corruptLines + f.unknownSchemaLines + f.unknownTypeLines + (f.tornTail ? 1 : 0),
+      corruptLines: f.corruptLines, unknownSchemaLines: f.unknownSchemaLines, unknownTypeLines: f.unknownTypeLines,
+      tornTail: f.tornTail }));
+}
+
+/**
  * Both ledger families of a data directory. `present` is false when the family has no file (its
  * writer has never written) or could not be read; an absent family is not evidence of no records.
+ * `damage` lists the family's files with lines that could not be read (damageOf).
  * `reader` (exit-ledger createIncrementalReader) parses each file once across the reads of a stop.
  */
 function readRunLedger(dataDir, reader = null) {
@@ -69,8 +82,9 @@ function readRunLedger(dataDir, reader = null) {
   for (const family of ['engine', 'children']) {
     const present = ledgerLib.ledgerFiles(dir, family).length > 0;
     try {
-      out[family] = { present, records: (reader ? reader.read(dir, family) : ledgerLib.readLedger(dir, family)).records,
-        sourceFiles: ledgerLib.ledgerFiles(dir, family) };
+      const read = reader ? reader.read(dir, family) : ledgerLib.readLedger(dir, family);
+      out[family] = { present, records: read.records, sourceFiles: ledgerLib.ledgerFiles(dir, family),
+        damage: damageOf(read.files) };
     } catch (error) {
       out[family] = { present: false, records: [], error: error.message };
     }
@@ -771,6 +785,13 @@ function ledgerExitFor(target, view) {
  */
 function exitResult(input, output, source, ledger = null, view = null) {
   const gaps = [...input.gaps, ...(output.gaps ?? [])], processExits = [];
+  // Accounting is never complete over records the census could not read.
+  for (const family of ['engine', 'children']) {
+    for (const d of ledger?.[family]?.damage ?? []) {
+      gaps.push({ reason: 'ledger-damaged', family, ...d, detail: `${d.lines} line(s) of ${path.basename(d.file)} could not be read`
+        + `${d.tornTail ? ' (its last line is torn)' : ''}; any process recorded there is not accounted` });
+    }
+  }
   view = view ?? (ledger ? ledgerView(ledger, input.runId) : { engines: [], children: [] });
   // The rows by PID, kept current as rows are added (rows are only ever appended).
   const rowsByPid = new Map();
@@ -1066,6 +1087,8 @@ function endedIdentitiesOf(view) {
   return ended;
 }
 
+/** How long the verdict waits before reading a torn ledger line again. */
+const TORN_TAIL_SETTLE_MS = 250;
 const EARLIER_TARGETS_RE = /^exit-targets\.(\d+)\.json$/;
 const EARLIER_EXITS_RE = /^process-exits\.(\d+)\.json$/;
 const sameIdentity = (a, b) => Number(a?.pid) === Number(b?.pid) && a?.creationFileTimeUtc === b?.creationFileTimeUtc;
@@ -1105,9 +1128,11 @@ function keepEarlierCensus(runDir, inputFile, outputFile, read) {
 
 async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}) {
   const read = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
-  // One reader for the whole stop: each ledger file is parsed once, later reads add what was appended.
-  const reader = ledgerLib.createIncrementalReader();
+  // One reader for the whole stop (the stop's own when it passes one): each ledger file is parsed
+  // once, and later reads add what was appended.
+  const reader = runtime.ledgerReader ?? ledgerLib.createIncrementalReader();
   const readLedger = runtime.readLedger ?? (dir => readRunLedger(dir, reader));
+  const settle = runtime.pause ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
   let manifest, observed = [], scopeError;
   try { manifest = read(path.join(dataDir, 'runtime/manifest.json')); } catch { /* named below */ }
   if (scopeFile) {
@@ -1122,11 +1147,6 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   const outputFile = path.join(runDir, 'process-exits.json');
   const inputFile = path.join(runDir, 'exit-targets.json');
   const earlier = keepEarlierCensus(runDir, inputFile, outputFile, read);
-  /** What the ledger proves has ended, read now (only what was appended since the last read). */
-  const endedIdentities = () => {
-    const ledger = dataDir ? readLedger(dataDir) : null;
-    return ledger ? endedIdentitiesOf(ledgerView(ledger, run?.runId)) : [];
-  };
   // The verdict reads the ledger last: `beforeVerdict(osExits)` gets the identity-bound OS exits and
   // writes the stop's own records from them (the dev-cli Engine exit), so the report reads them too.
   const verdict = async (observerOutput, beforeVerdict) => {
@@ -1136,7 +1156,13 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     const armed = { ...input, targets: [...input.targets, ...earlier.targets.filter(t => !input.targets.some(x => sameIdentity(x, t))
       && (output.processExits ?? []).some(e => sameIdentity(e, t)))] };
     if (beforeVerdict) await beforeVerdict(exitResult(armed, output, outputFile, null).processExits);
-    const finalLedger = dataDir ? readLedger(dataDir) : null;
+    let finalLedger = dataDir ? readLedger(dataDir) : null;
+    // A line its writer is still writing is read again once; torn then, it is a gap like any other.
+    const torn = l => ['engine', 'children'].some(f => (l?.[f]?.damage ?? []).some(d => d.tornTail));
+    if (torn(finalLedger)) {
+      await settle(TORN_TAIL_SETTLE_MS);
+      finalLedger = readLedger(dataDir);
+    }
     const finalView = finalLedger ? ledgerView(finalLedger, run?.runId) : null;
     const refreshed = exitTargets(run, manifest, observed, finalLedger, finalView);
     const membershipGap = g => ['unaccounted_process', 'orphan_console_host', 'evidence_lost'].includes(g.reason);
@@ -1153,7 +1179,7 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     try { fs.writeFileSync(outputFile, JSON.stringify({ ...output, earlierCensus: earlier.files })); } catch { /* the kept files remain */ }
     return { ...result, earlierCensus: earlier.files };
   };
-  if (process.platform !== 'win32' && !runtime.launch) return { endedIdentities, finish: async ({ beforeVerdict } = {}) => verdict(
+  if (process.platform !== 'win32' && !runtime.launch) return { finish: async ({ beforeVerdict } = {}) => verdict(
     { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, beforeVerdict) };
   const readyFile = path.join(runDir, 'exit-census-ready.json');
   const finishFile = path.join(runDir, 'exit-census-finish.json');
@@ -1173,7 +1199,7 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   }
   // The stop's own kills are not an input (Spec B §5.1, step 9): a dev kill of the Engine writes its
   // own engine-intent and engine-exit, and the verdict reads them from the ledger.
-  return { endedIdentities, finish: async ({ beforeVerdict } = {}) => {
+  return { finish: async ({ beforeVerdict } = {}) => {
     fs.writeFileSync(finishFile, '{}');
     const end = now() + 5000;
     while (!fs.existsSync(outputFile) && !launchError && proc.exitCode == null && now() < end) await pause(50);

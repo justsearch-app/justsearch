@@ -40,14 +40,32 @@ b599d4d7e (run 8f60c4e7, item 6 defects of the dev-runner stop and census):
   when every recorded identity has an exit.
 - A retried stop never overwrites the earlier stop-report.json either: it is kept as
   stop-report.1.json (then .2, and so on), and the new stop-report.json records `earlierCensus`
-  and `earlierReports`, naming the kept files.
+  and `earlierReports`, naming the kept files. A self-exit report keeps an earlier report the
+  same way.
+
+Follow-up decisions after the independent verifier rejected f3a8282f7:
+
+- Any unreadable, corrupt or torn ledger line in a file the census depends on makes accounting
+  incomplete, with a gap naming the file and the line count; the census never claims complete
+  over records it could not read. A torn last line in a file still being written during the stop
+  counts the same, unless a later re-read in the same stop finds it complete. (f3a8282f7 reported
+  complete with no gap and left out a child whose start line was corrupt or torn; b599d4d7e
+  reported incomplete.)
+- The ledger is resolved first: an identity with a ledger exit is never passed to an OS lookup or
+  probe, in any phase. (f3a8282f7 passed a ledger-ended Engine to the identity lookup three times
+  in one stop.)
 
 What changed:
 
-- `scripts/dev/lib/stop-exit-census.cjs`: the stop's census returns `endedIdentities()`, the
-  run's Engine incarnations, ledger children and job witnesses with an exit record (a
-  reconciliation's IDENTITY_UNKNOWN record proves nothing). One incremental reader serves the
-  stop (`exit-ledger.cjs` `createIncrementalReader`: a file, known by its file id and first
+- `scripts/dev/lib/stop-exit-census.cjs`: `endedIdentitiesOf(view)` lists the run's Engine
+  incarnations, ledger children and job witnesses with an exit record (a reconciliation's
+  IDENTITY_UNKNOWN record proves nothing). `readRunLedger` reports each family's `damage`: the
+  files with corrupt, unknown-schema, unknown-type or torn lines, with their counts
+  (`exit-ledger.cjs` `readLedger` and the incremental reader now return per-file counts as
+  `files`). The verdict adds a `ledger-damaged` gap per damaged file (`family`, `file`, `lines`
+  and the counts), so accounting is incomplete; a torn line at the verdict is read once more
+  after 250 ms first. One incremental reader serves the stop and its census (the stop passes its
+  own as `ledgerReader`) (`exit-ledger.cjs` `createIncrementalReader`: a file, known by its file id and first
   bytes, is parsed once; later reads parse only the complete lines appended since). The ledger
   view reads each helper window's instants once and finds windows, owner records, console
   parents and report rows through PID and image indexes instead of rescanning every record per
@@ -60,16 +78,20 @@ What changed:
 - `scripts/dev/lib/stop-job-run.ps1` and `job-run.cjs` (`stopJobRunSync` option
   `endedIdentities`, passed through a temporary `-EndedPath` file): identities the ledger shows
   ended are skipped by the job stop's probes and reported as `endedPerLedger`.
-- `scripts/dev/dev-runner.cjs` `stopRun`: the Engine job stop gets the ledger's ended identities;
-  a tracked or recorded identity whose state is unknown is resolved when the ledger records its
-  exit, and listed in the stop report as `resolvedByLedger`. Before writing its report, a stop
+- `scripts/dev/dev-runner.cjs` `stopRun`: the stop reads the ledger before its first lookup and
+  again before each lookup phase and the Engine job stop. An identity whose exit the ledger records
+  is left out of every identity lookup and of the port-owner match. Every lookup verdict for it is
+  `gone`, the post-kill wait for it is skipped, the Engine job stop skips it, and the stop report
+  lists it once in `resolvedByLedger`. `writeSelfExitStopReport` keeps an earlier report the same
+  way as a stop does. Before writing its report, a stop
   renames an existing stop-report.json to the next free stop-report.N.json; the report and the
   stop's output list the kept reports as `earlierReports` (oldest first), and the report carries
   the census's `earlierCensus`. stop-report.json is always the latest stop's, so its readers
   (including the forget check) are unchanged.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (7 cases). Cases 1 to 6 fail by
-assertion on b599d4d7e, case 7 on ccd687b2d, and all pass after:
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (12 cases). Cases 1 to 6 fail by
+assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
+b599d4d7e, as preservation), and all pass after:
 
 1. Real `stop-job-run.ps1`: a job member whose PID now names a running process whose birth
    cannot be read (found at run time, query rights only) is a survivor without the ledger and is
@@ -77,8 +99,8 @@ assertion on b599d4d7e, case 7 on ccd687b2d, and all pass after:
 2. Real `stopRun` with the real census, identity lookup and job stop, the Engine gone: on
    b599d4d7e it reports `STOP_INCOMPLETE` with "Engine job: incomplete (pid N still running)",
    the incident's error; after, `STOPPED`, `endedPerLedger` names the member, census complete.
-3. A tracked identity the lookup cannot read is resolved by its ledger exit; one without a ledger
-   exit still blocks.
+3. A tracked identity with a ledger exit is resolved without a lookup (as is the ledger-ended
+   Engine); one the lookup cannot read and without a ledger exit still blocks.
 4. A retried census keeps the earlier census verbatim (`process-exits.1.json`,
    `exit-targets.1.json`), accounts the Engine with the earlier OS exit and is complete.
 5. A stop that finds the Engine gone is complete from the ledger; an identity without its exit
@@ -91,5 +113,16 @@ assertion on b599d4d7e, case 7 on ccd687b2d, and all pass after:
    byte-for-byte as stop-report.1.json, the second as stop-report.2.json; each later report names
    them in `earlierReports`, and the retry's report names the kept census files in
    `earlierCensus`. On ccd687b2d: "the earlier stop report is kept" fails.
+8. and 9. Real `stopRun`, empty scope census: an Engine start and exit, then a job process's
+   start with no exit, whose line is corrupt (8) or torn before its newline (9). Accounting is
+   not complete. On f3a8282f7 it was complete with no gaps.
+10. The census verdict for those two ledgers has a `ledger-damaged` gap naming children.v1.jsonl
+   with 1 line (corrupt count 1, or torn). A line torn at arming and whole by the verdict leaves
+   no such gap.
+11. Real `stopRun` with a valid Engine identity and its ledger exit: the injected lookup is never
+   given the Engine's PID, the port-owner match never gets it, and the report resolves it by
+   the ledger. On f3a8282f7 the lookup got it 3 times.
+12. `writeSelfExitStopReport` over an existing stop-report.json keeps it as stop-report.1.json
+   and names it in `earlierReports`.
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/.

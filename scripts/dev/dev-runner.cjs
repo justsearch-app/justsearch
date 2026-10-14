@@ -21,7 +21,7 @@ const { spawn, spawnSync, execFile } = require('child_process');
 // can't break the build/Engine JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
-const { engineIdentityAsync, startStopExitCensus } = require('./lib/stop-exit-census.cjs');
+const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, endedIdentitiesOf } = require('./lib/stop-exit-census.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
 const devDataFolder = require('./lib/dev-data-folder.cjs');
@@ -1089,6 +1089,13 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
     engineLog,
     incarnation,
   });
+  // An earlier report of the run (a stop's, or an earlier incarnation's death) is kept, not overwritten.
+  try {
+    const earlierReports = keepEarlierReports(path.dirname(runPath));
+    if (earlierReports.length) stopReport.earlierReports = earlierReports;
+  } catch (err) {
+    stopReport.errors = [...stopReport.errors, `earlier stop report not kept: ${err?.message ?? err}`];
+  }
   const stopReportPath = path.join(path.dirname(runPath), 'stop-report.json');
   await writeJsonAtomic(stopReportPath, stopReport);
   // Lane F stage B item B8: the report becomes a per-incarnation record rather than the runner's
@@ -3806,6 +3813,32 @@ async function stopRun(opts, {
   // Each entry now also carries the identity verdict the kill decision was made on.
   const pidLiveness = [];
 
+  // The exit ledger first: a recorded identity whose exit it records (same PID and birth) is gone,
+  // and it is never passed to an OS lookup or probe in any phase. Its PID may name another process
+  // by now, possibly one whose birth cannot be read, which never makes it ours. One reader serves
+  // the stop and its census, so each ledger file is parsed once and later reads add what was appended.
+  const ledgerReader = dataDirAbs ? ledgerLib.createIncrementalReader() : null;
+  let ledgerEnded = [];
+  const readLedgerEnded = () => {
+    if (!ledgerReader) return ledgerEnded;
+    try {
+      ledgerEnded = endedIdentitiesOf(ledgerView(readRunLedger(dataDirAbs, ledgerReader), runId));
+    } catch (err) {
+      errors.push(`exit ledger: ${err?.message ?? err}`);
+    }
+    return ledgerEnded;
+  };
+  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && ledgerEnded.some((e) => e.pid === Number(p.pid)
+    && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc)));
+  // Each identity resolved by its ledger exit instead of a lookup, once.
+  const resolvedByLedger = [];
+  const noteResolved = (p) => {
+    if (!resolvedByLedger.some((r) => r.pid === Number(p.pid) && r.creationFileTimeUtc === String(p.creationFileTimeUtc))) {
+      resolvedByLedger.push(describeResolved(p));
+    }
+  };
+  readLedgerEnded();
+
   /**
    * Ends one recorded process, never its tree, with the non-distinctive code `taskkill /F` gives,
    * through a handle on which its recorded birth is checked again: an inspection before it never
@@ -3846,11 +3879,16 @@ async function stopRun(opts, {
   const gracefulShutdownMarkerPath = path.join(runDir, 'graceful-shutdown.json');
   let phaseRows = new Map();
   const lookupPhase = async (entries) => {
-    const ids = [...new Set(entries.filter(p => p?.pid).map(p => p.pid))];
+    readLedgerEnded();
+    const ids = [...new Set(entries.filter(p => p?.pid && !provenEnded(p)).map(p => p.pid))];
     phaseRows = ids.length ? await Promise.resolve().then(() => lookupIdentities(ids)).catch(() => null) : new Map();
   };
   const lookupOne = async (p) => {
     if (!p?.pid) return 'gone';
+    if (provenEnded(p)) {
+      noteResolved(p);
+      return 'gone';
+    }
     const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
     if (!p.creationFileTimeUtc && row?.present && !Number.isFinite(p.bornNotAfterMs)) {
       p.bornNotAfterMs = Date.now();
@@ -3897,7 +3935,7 @@ async function stopRun(opts, {
   // Arm OS exit handles while the initial identity lookup starts. Actions still wait for both.
   let censusError;
   const pendingCensus = !opts.forgetUnresolved
-    ? Promise.resolve(census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE))
+    ? Promise.resolve(census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE, { ledgerReader }))
       .catch(error => { censusError = error; return null; }) : null;
   if (!opts.forgetUnresolved) {
     await lookupPhase(allEntries());
@@ -4085,7 +4123,7 @@ async function stopRun(opts, {
       pidLiveness.push({ role: 'backend', pid: byRole.backend.pid, aliveBeforeKill: true });
     } else if (byRole.backend.pid) {
       const p = byRole.backend;
-      if (runnerKilled) {
+      if (runnerKilled && !provenEnded(p)) {
         // The runner's job closes with it; give the Engine a moment to go the same way.
         const until = Date.now() + 2000;
         while (isPidAlive(p.pid) && Date.now() < until) {
@@ -4171,22 +4209,7 @@ async function stopRun(opts, {
   //    its held jobs as its own last step and reports what they ended; otherwise the job's recorded host is ended here (on a handle showing its recorded birth),
   //    which ends every member, and each recorded member is verified gone. Either way each process
   //    the job's termination ended is listed by identity.
-  // What the exit ledger proves has ended, read once here (the census's reader adds only what was
-  // appended since it armed). A recorded identity with its exit there is gone and is not probed
-  // again: a live process under that PID whose birth cannot be read never matches it.
-  let ledgerEnded = null;
-  const endedPerLedger = () => {
-    if (ledgerEnded === null) {
-      try { ledgerEnded = exitCensus?.endedIdentities?.() ?? []; } catch (err) {
-        ledgerEnded = [];
-        errors.push(`exit ledger: ${err?.message ?? err}`);
-      }
-    }
-    return ledgerEnded;
-  };
-  const provenEnded = (p) => Boolean(p?.pid) && endedPerLedger().some((e) => e.pid === Number(p.pid)
-    && ledgerLib.sameBirth(String(e.creationFileTimeUtc), String(p.creationFileTimeUtc ?? '')));
-  const resolvedByLedger = [];
+  //    The job stop skips each identity the ledger shows ended (read again now).
   let engineJob = null;
   const answeredJob = runnerAnswer?.engineJob ?? null;
   const recordedJob = run?.engineJob?.recordPath && run.engineJob.host?.pid ? run.engineJob : null;
@@ -4199,7 +4222,7 @@ async function stopRun(opts, {
       engineJob = { source: 'record', incarnation: recordedJob.incarnation ?? null, outcome: 'gone',
         endedByJob: jobIdentities(answeredJob?.endedByJob), survivors: [] };
     } else {
-      const result = await Promise.resolve().then(() => stopEngineJob(recordedJob, { ended: endedPerLedger() }))
+      const result = await Promise.resolve().then(() => stopEngineJob(recordedJob, { ended: readLedgerEnded() }))
         .catch(() => ({ ok: false, outcome: 'failed' }));
       engineJob = { source: 'stop', incarnation: recordedJob.incarnation ?? null, outcome: result?.outcome ?? 'failed',
         host: result?.host ?? null, endedByJob: jobIdentities(result?.endedByJob), survivors: jobIdentities(result?.survivors),
@@ -4219,38 +4242,40 @@ async function stopRun(opts, {
   const unresolvedProcesses = [];
   for (const p of tracked.values()) {
     const state = await lookupOne(p);
-    if (state === 'unknown' && provenEnded(p)) resolvedByLedger.push(describeResolved(p));
-    else if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
+    if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
   }
 
   // Tempdoc 819 §D: the marker's job is done once we reach here, whatever the outcome.
   try { await fsp.rm(gracefulShutdownMarkerPath, { force: true }); } catch (_) { /* best-effort */ }
 
   // Is the stack gone? Every recorded process (but this one) must be gone or its pid reused.
-  const remaining = processes.filter((p) => p.pid && p.pid !== process.pid);
+  const remaining = processes.filter((p) => p.pid && p.pid !== process.pid).filter((p) => {
+    if (!provenEnded(p)) return true;
+    noteResolved(p);
+    return false;
+  });
   const after = phaseRows;
   const survivors = remaining
     .map((p) => ({ ...p, observedName: after?.get(p.pid)?.name ?? p.observedName,
       observedCreationFileTimeUtc: after?.get(p.pid)?.creationFileTime ?? p.observedCreationFileTimeUtc,
       state: checkRecordedProcess(p, after ? after.get(p.pid) ?? null : null) }))
-    .filter((p) => {
-      if (p.state === 'unknown' && provenEnded(p)) { resolvedByLedger.push(describeResolved(p)); return false; }
-      return p.state === 'match' || p.state === 'unknown';
-    });
+    .filter((p) => p.state === 'match' || p.state === 'unknown');
   for (const s of survivors) errors.push(`${s.role} pid ${s.pid} is ${s.state === 'match' ? 'still running' : 'of unknown state'} after the stop`);
 
   // Ports: wait (bounded) for the run's own listeners to close. A port owner is never killed.
   const deadline = Date.now() + portWaitMs;
-  let apiInfo = await portOwner(apiPort, processes);
-  let uiInfo = await portOwner(uiPort, processes);
+  // A port's owner is matched only with identities not proven ended.
+  const portCandidates = processes.filter((p) => !provenEnded(p));
+  let apiInfo = await portOwner(apiPort, portCandidates);
+  let uiInfo = await portOwner(uiPort, portCandidates);
   const waitingOnRun = (info) => !info.closed && info.portOwner?.ownedByRun !== false;
   while (Date.now() < deadline && (waitingOnRun(apiInfo) || waitingOnRun(uiInfo))) {
     // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 250));
     // eslint-disable-next-line no-await-in-loop
-    apiInfo = await portOwner(apiPort, processes);
+    apiInfo = await portOwner(apiPort, portCandidates);
     // eslint-disable-next-line no-await-in-loop
-    uiInfo = await portOwner(uiPort, processes);
+    uiInfo = await portOwner(uiPort, portCandidates);
   }
   if (!apiInfo.closed) errors.push(`API port ${apiPort} still listening after stop timeout`);
   if (!uiInfo.closed) errors.push(`UI port ${uiPort} still listening after stop timeout`);
@@ -4318,7 +4343,7 @@ async function stopRun(opts, {
     fallback,
     // Every process the Engine's job ended after the Engine itself, by identity.
     engineJob,
-    // Identities whose state could not be read now but whose exit the ledger records.
+    // Recorded identities resolved by their exit in the ledger, never looked up or probed.
     ...(resolvedByLedger.length ? { resolvedByLedger } : {}),
     ...(foreignPortOwner ? { foreignPortOwner } : {}),
   });

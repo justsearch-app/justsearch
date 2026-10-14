@@ -310,13 +310,15 @@ function readFileBytes(bytes, family, out, tally) {
  * Reads one family under `ledgerDir`, the older generation first. Missing files are an empty ledger.
  * An I/O error on a file that exists is thrown: the caller must treat the ledger as unreadable.
  *
+ * `files` has the same counts for each file read, in that order.
+ *
  * @returns {{records: object[], corruptLines: number, unknownSchemaLines: number,
- *   unknownTypeLines: number, tornTail: boolean, skippedLines: number}}
+ *   unknownTypeLines: number, tornTail: boolean, skippedLines: number, files: object[]}}
  */
 function readLedger(ledgerDir, family) {
   familyOf(family);
-  const tally = { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false };
   const records = [];
+  const files = [];
   for (const file of ledgerFiles(ledgerDir, family)) {
     let bytes;
     try {
@@ -325,13 +327,23 @@ function readLedger(ledgerDir, family) {
       if (err && err.code === 'ENOENT') continue;
       throw err;
     }
+    const tally = { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false };
     readFileBytes(bytes, family, records, tally);
+    files.push({ file, ...tally });
   }
-  return {
-    records,
-    ...tally,
-    skippedLines: tally.corruptLines + tally.unknownSchemaLines + tally.unknownTypeLines,
-  };
+  return { records, ...totalOf(files), files };
+}
+
+/** The counts of a family's files added up, as readLedger reports them. */
+function totalOf(files) {
+  const total = { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false };
+  for (const f of files) {
+    total.corruptLines += f.corruptLines;
+    total.unknownSchemaLines += f.unknownSchemaLines;
+    total.unknownTypeLines += f.unknownTypeLines;
+    total.tornTail = total.tornTail || f.tornTail;
+  }
+  return { ...total, skippedLines: total.corruptLines + total.unknownSchemaLines + total.unknownTypeLines };
 }
 
 /** How many leading bytes of a ledger file identify it across reads (with its file id). */
@@ -342,7 +354,8 @@ const INCREMENTAL_HEAD_BYTES = 256;
  * its census, before it judges the Engine's job and at its verdict): each file is parsed once, and
  * a later read parses only the complete lines appended since. A file is the same file when its file
  * id (which a rotation's rename keeps) and its first bytes are unchanged and it has not shrunk;
- * anything else is parsed again from its start. The result is readLedger's.
+ * anything else is parsed again from its start. A line still being written when one read finds it
+ * (a torn tail) is parsed whole by a later read. The result is readLedger's.
  */
 function createIncrementalReader() {
   const cache = new Map();
@@ -358,7 +371,7 @@ function createIncrementalReader() {
   };
   function read(ledgerDir, family) {
     familyOf(family);
-    const total = { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false };
+    const files = [];
     const records = [];
     for (const file of ledgerFiles(ledgerDir, family)) {
       let fd;
@@ -391,15 +404,12 @@ function createIncrementalReader() {
         if (head.length > entry.head.length) entry.head = head;
         entry.tally.tornTail = size > entry.offset;
         for (const r of entry.records) records.push(r);
-        total.corruptLines += entry.tally.corruptLines;
-        total.unknownSchemaLines += entry.tally.unknownSchemaLines;
-        total.unknownTypeLines += entry.tally.unknownTypeLines;
-        total.tornTail = total.tornTail || entry.tally.tornTail;
+        files.push({ file, ...entry.tally });
       } finally {
         fs.closeSync(fd);
       }
     }
-    return { records, ...total, skippedLines: total.corruptLines + total.unknownSchemaLines + total.unknownTypeLines };
+    return { records, ...totalOf(files), files };
   }
   return { read };
 }

@@ -86,12 +86,17 @@ function runLedger(dataDir, runId, engine, executable) {
         codeName: 'ok', exitedAt: null, observedAt: new Date(), terminateCalledAt: null, forced: false,
         phase: 'STOPPING', codeDistinctive: true });
     },
-    /** A process the Engine's job witness held and saw exit (a console host, as pid 24536 was). */
-    jobProcess(p, witnessId) {
+    /** A process the Engine's job witness held (its start only). */
+    jobProcessStart(p, witnessId) {
       const common = { witnessId, pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner, incarnation };
       engineWriter.append('job-process-start', { ...common, executable: 'C:\\Windows\\System32\\conhost.exe',
         parentPid: engine.pid, parentCreationFileTime: engine.creationFileTimeUtc, contained: true,
         observedAt: new Date(startedAt + 2000), awaited: false, expectedCode: null, reason: null });
+    },
+    /** A process the Engine's job witness held and saw exit (a console host, as pid 24536 was). */
+    jobProcess(p, witnessId) {
+      const common = { witnessId, pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner, incarnation };
+      this.jobProcessStart(p, witnessId);
       engineWriter.append('job-process-exit', { ...common, code: 0, exitClass: 'UNEXPECTED', reason: null,
         exitedAt: iso7(BigInt(p.creationFileTimeUtc) + 450000n), observedAt: new Date(startedAt + 2100), forced: false });
     },
@@ -189,14 +194,20 @@ test('a tracked identity the lookup cannot read stays unresolved unless the ledg
   const fixture = stopFixture({ runId, dataDir, engine });
   fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: [tracked, other] }));
   // Both PIDs are present but their births cannot be read; the Engine is gone.
-  const io = { ...fixture.io, lookupIdentities: async (ids) => new Map(ids.map((pid) => [pid,
-    [tracked.pid, other.pid].includes(pid) ? { present: true, creationFileTime: null } : { present: false }])) };
+  const looked = new Set();
+  const io = { ...fixture.io, lookupIdentities: async (ids) => {
+    for (const pid of ids) looked.add(pid);
+    return new Map(ids.map((pid) => [pid,
+      [tracked.pid, other.pid].includes(pid) ? { present: true, creationFileTime: null } : { present: false }]));
+  } };
   const out = await api.stopRun({}, io);
   assert.equal(out.outcome, 'STOP_INCOMPLETE', 'an identity nothing proves ended still blocks');
   assert.deepEqual(out.unresolvedProcesses.map((p) => p.pid), [other.pid]);
+  assert.deepEqual([looked.has(tracked.pid), looked.has(engine.pid), looked.has(other.pid)], [false, false, true]);
   const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
-  assert.deepEqual(report.resolvedByLedger?.map((p) => [p.pid, p.creationFileTimeUtc, p.basis]),
-    [[tracked.pid, tracked.creationFileTimeUtc, 'exit ledger']]);
+  // The Engine and the tracked identity are resolved by their ledger exits, without a lookup.
+  assert.deepEqual(report.resolvedByLedger?.map((p) => [p.pid, p.creationFileTimeUtc, p.basis]).sort(),
+    [[engine.pid, engine.creationFileTimeUtc, 'exit ledger'], [tracked.pid, tracked.creationFileTimeUtc, 'exit ledger']]);
 });
 
 test('a retried stop keeps every earlier stop report and names the reports and census it kept', async () => {
@@ -244,7 +255,7 @@ test('a retried stop keeps every earlier stop report and names the reports and c
 });
 
 /** The census entry point with a stand-in for the PowerShell observer (as test-dev-runner-exit-census). */
-async function arm(run, dataDir, exitsAtFinish) {
+async function arm(run, dataDir, exitsAtFinish, atFinish = null) {
   let args, clock = 0, finished = false;
   const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => {};
   const flag = (f) => args[args.indexOf(f) + 1];
@@ -254,6 +265,7 @@ async function arm(run, dataDir, exitsAtFinish) {
       clock += ms;
       if (!finished && fs.existsSync(flag('-FinishFile'))) {
         finished = true;
+        atFinish?.();
         fs.writeFileSync(flag('-OutputFile'), '\uFEFF' + JSON.stringify({ processExits: exitsAtFinish, gaps: [] }));
       }
     },
@@ -330,6 +342,111 @@ test('a stop that finds the Engine already gone completes from the ledger when e
   const incomplete = await (await arm(run, open, [])).observer.finish();
   assert.equal(incomplete.exitAccountingComplete, false);
   assert.ok(incomplete.exitAccountingGaps.some((g) => g.pid === 970203), JSON.stringify(incomplete.exitAccountingGaps));
+});
+
+/**
+ * The run's children ledger file with its last line damaged as the verifier found it: `corrupt`
+ * keeps the line's end but not its whole record; `torn` cuts it before its newline.
+ */
+function damageLastLine(dataDir, how) {
+  const files = ledgerLib.ledgerFiles(ledgerLib.ledgerDirectory(dataDir), 'children');
+  const file = files[files.length - 1];
+  const text = fs.readFileSync(file, 'utf8');
+  const start = text.lastIndexOf('\n', text.length - 2) + 1;
+  const line = text.slice(start, text.length - 1);
+  const cut = line.slice(0, Math.floor(line.length / 2));
+  fs.writeFileSync(file, text.slice(0, start) + (how === 'corrupt' ? `${cut}\n` : cut));
+  return { file, rest: line.slice(cut.length) + '\n' };
+}
+
+/** A stop of a run whose Engine and exit are recorded, and one job process with its start only. */
+function damagedRun(how) {
+  const runId = `stop-census-damaged-${how}`;
+  const engine = noProcess(970701 + (how === 'torn' ? 4 : 0), '134364632933610725');
+  const child = noProcess(970702 + (how === 'torn' ? 4 : 0) + 1, '134364634153991105');
+  const dataDir = freshDir(`damaged-${how}`);
+  const ledger = runLedger(dataDir, runId, engine, process.execPath);
+  ledger.engineStart();
+  ledger.engineExit();
+  ledger.jobProcessStart(child, `j-damaged-${how}`);
+  return { runId, engine, child, dataDir, ledger };
+}
+
+for (const how of ['corrupt', 'torn']) {
+  test(`a stop never reports complete accounting over a ${how} ledger line (preserved from b599d4d7e)`, async () => {
+    const { runId, engine, dataDir } = damagedRun(how);
+    damageLastLine(dataDir, how);
+    const fixture = stopFixture({ runId, dataDir, engine });
+    const out = await api.stopRun({}, fixture.io);
+    const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
+    assert.notEqual(report.exitAccountingComplete, true,
+      `a record the census could not read leaves accounting incomplete: ${JSON.stringify(report.exitAccountingGaps)}`);
+    assert.notEqual(out.exitAccountingComplete, true);
+  });
+}
+
+test('a damaged ledger line is a gap naming its file and line count; a torn line the stop later reads whole is not', async () => {
+  const run = (runId, engine) => ({ runId, pids: { backendRootPid: engine.pid } });
+  for (const how of ['corrupt', 'torn']) {
+    const { runId, engine, dataDir } = damagedRun(how);
+    const { file } = damageLastLine(dataDir, how);
+    const result = await (await arm(run(runId, engine), dataDir, [])).observer.finish();
+    assert.equal(result.exitAccountingComplete, false, how);
+    const gap = result.exitAccountingGaps.find((g) => g.reason === 'ledger-damaged');
+    assert.ok(gap, `${how}: ${JSON.stringify(result.exitAccountingGaps)}`);
+    assert.deepEqual([gap.family, path.basename(gap.file), gap.lines, gap.corruptLines, gap.tornTail],
+      ['children', path.basename(file), 1, how === 'corrupt' ? 1 : 0, how === 'torn'], how);
+  }
+  // A line torn when the census armed (its writer was still writing it) and whole by the verdict.
+  const { runId, engine, dataDir } = damagedRun('later');
+  const { file, rest } = damageLastLine(dataDir, 'torn');
+  let completed = false;
+  const census2 = await arm(run(runId, engine), dataDir, [], () => {
+    if (completed) return;
+    completed = true;
+    fs.appendFileSync(file, rest);
+  });
+  const whole = await census2.observer.finish();
+  assert.equal(completed, true);
+  assert.deepEqual(whole.exitAccountingGaps.filter((g) => g.reason === 'ledger-damaged'), []);
+});
+
+test('an identity whose exit the ledger records is never passed to an OS lookup or probe', async () => {
+  const runId = 'stop-census-no-probe';
+  const engine = noProcess(970801, '134364632933610725');
+  const dataDir = freshDir('no-probe');
+  const ledger = runLedger(dataDir, runId, engine, process.execPath);
+  ledger.engineStart();
+  ledger.engineExit();
+  const fixture = stopFixture({ runId, dataDir, engine });
+  const looked = [], ported = [];
+  const io = { ...fixture.io,
+    lookupIdentities: async (ids) => { looked.push([...ids]); return new Map(ids.map((pid) => [pid, { present: false }])); },
+    portOwner: async (port, processes) => { ported.push((processes ?? []).map((p) => p.pid)); return { closed: true }; } };
+  const out = await api.stopRun({}, io);
+  assert.equal(out.outcome, 'STOPPED', JSON.stringify(out.errors));
+  assert.equal(looked.filter((ids) => ids.includes(engine.pid)).length, 0,
+    `the ledger-ended Engine was looked up ${looked.filter((ids) => ids.includes(engine.pid)).length} times: ${JSON.stringify(looked)}`);
+  assert.equal(ported.filter((pids) => pids.includes(engine.pid)).length, 0, 'nor offered as a port owner');
+  const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
+  assert.ok(report.resolvedByLedger?.some((p) => p.pid === engine.pid && p.creationFileTimeUtc === engine.creationFileTimeUtc),
+    JSON.stringify(report.resolvedByLedger));
+});
+
+test('a self-exit report keeps the earlier stop report under the next number', async () => {
+  const dir = path.join(scratch, 'self-exit', 'runs', 'run-self');
+  fs.mkdirSync(dir, { recursive: true });
+  const runPath = path.join(dir, 'run.json');
+  const earlier = JSON.stringify({ outcome: 'STOP_INCOMPLETE', note: 'the earlier stop' });
+  fs.writeFileSync(path.join(dir, 'stop-report.json'), earlier);
+  const report = await api.writeSelfExitStopReport({ runId: 'run-self', runPath, run: { dataDir: null },
+    backendExitCode: 137, interactive: false });
+  assert.equal(fs.existsSync(path.join(dir, 'stop-report.1.json')), true, 'the earlier stop report is kept');
+  assert.equal(fs.readFileSync(path.join(dir, 'stop-report.1.json'), 'utf8'), earlier);
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'stop-report.json'), 'utf8'));
+  assert.equal(onDisk.backendExitCode, 137);
+  assert.deepEqual(onDisk.earlierReports, ['stop-report.1.json']);
+  assert.deepEqual(report.earlierReports, ['stop-report.1.json']);
 });
 
 /**
