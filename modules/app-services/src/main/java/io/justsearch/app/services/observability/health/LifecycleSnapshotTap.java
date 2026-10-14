@@ -321,7 +321,9 @@ public final class LifecycleSnapshotTap {
             "vdu.ai_offline",
             "vdu.insufficient_vram",
             "vdu.missing_mmproj",
-            "vdu.circuit_open")) {
+            "vdu.circuit_open",
+            "vdu.breaker_open.refused",
+            "vdu.breaker_open.entry_failed")) {
       MAPPING_TABLE.put(
           new MappingKey(ReadinessDimension.VISUAL_TEXT_EXTRACTION, "DEGRADED", reason),
           new ConditionMapping("vdu.unavailable", "vdu", Severity.WARNING));

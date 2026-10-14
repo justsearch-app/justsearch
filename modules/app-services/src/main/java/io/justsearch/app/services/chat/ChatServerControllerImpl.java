@@ -163,6 +163,9 @@ public final class ChatServerControllerImpl
   private final Object holdEdges = new Object();
 
   private final List<Listener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+  /** Told about a committed settings apply and a person's chat switch (automatic VDU breaker). */
+  private final List<java.util.function.Consumer<String>> automaticVduResetListeners =
+      new java.util.concurrent.CopyOnWriteArrayList<>();
 
   private final Duration bootGateTimeout;
 
@@ -400,6 +403,9 @@ public final class ChatServerControllerImpl
   @Override
   public CompletionStage<Void> setActivation(Activation activation) {
     Objects.requireNonNull(activation, "activation");
+    if (activation.reason() == TransitionReason.USER_SWITCH) {
+      automaticVduReset(activation.active() ? "chat switched on" : "chat switched off");
+    }
     if (activation.active()) {
       synchronized (monitor) {
         if (vduRestorePending) return CompletableFuture.failedFuture(new SupersededException(
@@ -719,6 +725,7 @@ public final class ChatServerControllerImpl
           monitor.notifyAll();
         }
       }
+      automaticVduReset("applied settings");
     }
     complete(pending, () -> actuator.execute(pending.step, drained));
   }
@@ -978,6 +985,24 @@ public final class ChatServerControllerImpl
       }
       if (failure == null) pass.restored.complete(null);
       else pass.restored.completeExceptionally(failure);
+    }
+  }
+
+  @Override
+  public AutoCloseable addAutomaticVduResetListener(java.util.function.Consumer<String> listener) {
+    Objects.requireNonNull(listener, "listener");
+    automaticVduResetListeners.add(listener);
+    return () -> automaticVduResetListeners.remove(listener);
+  }
+
+  /** Called without the monitor; a failing listener never disturbs the controller. */
+  private void automaticVduReset(String event) {
+    for (var listener : automaticVduResetListeners) {
+      try {
+        listener.accept(event);
+      } catch (RuntimeException failure) {
+        LOG.warn("An automatic picture-reading reset listener failed", failure);
+      }
     }
   }
 

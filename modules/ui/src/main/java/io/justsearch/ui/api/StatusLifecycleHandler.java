@@ -2175,6 +2175,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       case "vdu.insufficient_vram" -> LifecycleReasonCode.VDU_INSUFFICIENT_VRAM.code();
       case "vdu.missing_mmproj" -> LifecycleReasonCode.VDU_MISSING_MMPROJ.code();
       case "vdu.circuit_open" -> LifecycleReasonCode.VDU_CIRCUIT_OPEN.code();
+      case "vdu.breaker_open.refused" -> LifecycleReasonCode.VDU_BREAKER_OPEN_REFUSED.code();
+      case "vdu.breaker_open.entry_failed" -> LifecycleReasonCode.VDU_BREAKER_OPEN_ENTRY_FAILED.code();
       default -> LifecycleReasonCode.OCR_ENGINE_MISSING.code();
     };
   }

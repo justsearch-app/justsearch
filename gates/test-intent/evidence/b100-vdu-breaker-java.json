@@ -1,0 +1,490 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T10:24:41.347Z",
+  "revision": "bc5978095505edb2ac3b20426e0dceec0ecfd90f",
+  "tree": "00d94ba591cc4eb6489ec245441bc91cfeb70c86",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.refusedAutomaticPassesStopAfterThreeAndStatusShowsThePause\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.aPassThatCompletesADocumentResetsTheCount\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.aRefusalMixedWithARealFailureCountsAsProgress\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.aProbeThatNeitherCountsNorProgressesKeepsThePauseAndTheNextTickProbesAgain\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.anExplicitPassWhileOpenRunsNormallyAndClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.anExplicitPassClosesTheBreakerEvenWhenItIsRefusedToo\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.failedVisionEntriesCountAndAreReportedApart\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.activityInterruptedPassNeitherCountsNorResets\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.cancelledPassNeitherCountsNorResets\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.anEngineRestartStartsClosed\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.chatOffRefusedPassesStopRelaunchingLlamaServerAfterThree\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.chatOffFailedVisionEntriesStopRelaunchingLlamaServerAfterThree\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.refusedChatOffEntryUnderTheRecoveryFenceLeavesNoLlamaServerRunning\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.committedSettingsApplyClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.preparedSettingsPublishClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.switchingChatOffClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.anExplicitPassClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.anExplicitPassWhileOpenReadsTheDocuments\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 77259
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.recoveryFenceAdmitsOnlyTheDeactivationThatStopsTheServer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1857
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleHandlerTest.pausedAutomaticPictureReadingReportsItsOwnReason\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3900
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#refusedAutomaticPassesStopAfterThreeAndStatusShowsThePause",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusedAutomaticPassesStopAfterThreeAndStatusShowsThePause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#aPassThatCompletesADocumentResetsTheCount",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPassThatCompletesADocumentResetsTheCount()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#aRefusalMixedWithARealFailureCountsAsProgress",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusalMixedWithARealFailureCountsAsProgress()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#aProbeThatNeitherCountsNorProgressesKeepsThePauseAndTheNextTickProbesAgain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aProbeThatNeitherCountsNorProgressesKeepsThePauseAndTheNextTickProbesAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#anExplicitPassWhileOpenRunsNormallyAndClosesTheBreaker",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitPassWhileOpenRunsNormallyAndClosesTheBreaker()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#anExplicitPassClosesTheBreakerEvenWhenItIsRefusedToo",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitPassClosesTheBreakerEvenWhenItIsRefusedToo()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#failedVisionEntriesCountAndAreReportedApart",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedVisionEntriesCountAndAreReportedApart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#activityInterruptedPassNeitherCountsNorResets",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "activityInterruptedPassNeitherCountsNorResets()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#cancelledPassNeitherCountsNorResets",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledPassNeitherCountsNorResets()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#anEngineRestartStartsClosed",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b82a156baeb6f4c98435fe9b98ff0aa86a959f2973c519a108acef44f4cd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEngineRestartStartsClosed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#chatOffRefusedPassesStopRelaunchingLlamaServerAfterThree",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatOffRefusedPassesStopRelaunchingLlamaServerAfterThree()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#chatOffFailedVisionEntriesStopRelaunchingLlamaServerAfterThree",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatOffFailedVisionEntriesStopRelaunchingLlamaServerAfterThree()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#refusedChatOffEntryUnderTheRecoveryFenceLeavesNoLlamaServerRunning",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusedChatOffEntryUnderTheRecoveryFenceLeavesNoLlamaServerRunning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#committedSettingsApplyClosesTheBreaker",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "committedSettingsApplyClosesTheBreaker()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#preparedSettingsPublishClosesTheBreaker",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedSettingsPublishClosesTheBreaker()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#switchingChatOffClosesTheBreaker",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchingChatOffClosesTheBreaker()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anExplicitPassClosesTheBreaker",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitPassClosesTheBreaker()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anExplicitPassWhileOpenReadsTheDocuments",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b45b147e7917e50b1b85d56c322546444f0f742a81f8e3ab8642b34294e5abb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitPassWhileOpenReadsTheDocuments()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#recoveryFenceAdmitsOnlyTheDeactivationThatStopsTheServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1b58c949431d5e796b61a2de9979ebbc5067fd10c32f31c3080e769e3f736a7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryFenceAdmitsOnlyTheDeactivationThatStopsTheServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#pausedAutomaticPictureReadingReportsItsOwnReason",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:24b8a30a99174cd5ae47a4ce306204a98d697a16032d756ee95ec2b070882ff2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pausedAutomaticPictureReadingReportsItsOwnReason()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bc5978095",
+    "revision": "bc5978095505edb2ac3b20426e0dceec0ecfd90f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.refusedAutomaticPassesStopAfterThreeAndStatusShowsThePause\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.aPassThatCompletesADocumentResetsTheCount\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.aRefusalMixedWithARealFailureCountsAsProgress\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.aProbeThatNeitherCountsNorProgressesKeepsThePauseAndTheNextTickProbesAgain\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.anExplicitPassWhileOpenRunsNormallyAndClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.anExplicitPassClosesTheBreakerEvenWhenItIsRefusedToo\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.failedVisionEntriesCountAndAreReportedApart\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.activityInterruptedPassNeitherCountsNorResets\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.cancelledPassNeitherCountsNorResets\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerTest.anEngineRestartStartsClosed\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.chatOffRefusedPassesStopRelaunchingLlamaServerAfterThree\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.chatOffFailedVisionEntriesStopRelaunchingLlamaServerAfterThree\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.refusedChatOffEntryUnderTheRecoveryFenceLeavesNoLlamaServerRunning\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.committedSettingsApplyClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.preparedSettingsPublishClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.switchingChatOffClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.anExplicitPassClosesTheBreaker\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.anExplicitPassWhileOpenReadsTheDocuments\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 166840
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.recoveryFenceAdmitsOnlyTheDeactivationThatStopsTheServer\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7759
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleHandlerTest.pausedAutomaticPictureReadingReportsItsOwnReason\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 19439
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#refusedAutomaticPassesStopAfterThreeAndStatusShowsThePause",
+        "classification": "assertion",
+        "detail": "refusedAutomaticPassesStopAfterThreeAndStatusShowsThePause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no fourth automatic entry within the five-minute back-off ==> expected: <3> but was: <9>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#aPassThatCompletesADocumentResetsTheCount",
+        "classification": "assertion",
+        "detail": "aPassThatCompletesADocumentResetsTheCount(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the third refused pass in a row since progress opens the breaker ==> expected: <6> but was: <7>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#aRefusalMixedWithARealFailureCountsAsProgress",
+        "classification": "assertion",
+        "detail": "aRefusalMixedWithARealFailureCountsAsProgress(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the third refused pass in a row since progress opens the breaker ==> expected: <6> but was: <7>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress",
+        "classification": "assertion",
+        "detail": "halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no probe before the 5 min back-off ends ==> expected: <3> but was: <4>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#aProbeThatNeitherCountsNorProgressesKeepsThePauseAndTheNextTickProbesAgain",
+        "classification": "assertion",
+        "detail": "aProbeThatNeitherCountsNorProgressesKeepsThePauseAndTheNextTickProbesAgain(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an undecided probe keeps the pause ==> expected: <vdu.breaker_open.refused> but was: <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#anExplicitPassWhileOpenRunsNormallyAndClosesTheBreaker",
+        "classification": "assertion",
+        "detail": "anExplicitPassWhileOpenRunsNormallyAndClosesTheBreaker(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <vdu.breaker_open.refused> but was: <vdu.ai_offline>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#anExplicitPassClosesTheBreakerEvenWhenItIsRefusedToo",
+        "classification": "assertion",
+        "detail": "anExplicitPassClosesTheBreakerEvenWhenItIsRefusedToo(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <vdu.breaker_open.refused> but was: <vdu.ai_offline>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#failedVisionEntriesCountAndAreReportedApart",
+        "classification": "assertion",
+        "detail": "failedVisionEntriesCountAndAreReportedApart(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no fourth vision launch after three failed entries ==> expected: <3> but was: <8>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#activityInterruptedPassNeitherCountsNorResets",
+        "classification": "assertion",
+        "detail": "activityInterruptedPassNeitherCountsNorResets(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: and it did not reset: three refusals in a row open the breaker ==> expected: <4> but was: <5>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#cancelledPassNeitherCountsNorResets",
+        "classification": "assertion",
+        "detail": "cancelledPassNeitherCountsNorResets(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: and it did not reset ==> expected: <4> but was: <5>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerTest.java#anEngineRestartStartsClosed",
+        "classification": "assertion",
+        "detail": "anEngineRestartStartsClosed(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <3> but was: <4>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#chatOffRefusedPassesStopRelaunchingLlamaServerAfterThree",
+        "classification": "assertion",
+        "detail": "chatOffRefusedPassesStopRelaunchingLlamaServerAfterThree(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after three automatic passes without progress no automatic pass relaunches llama-server; launches: [model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.g"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#chatOffFailedVisionEntriesStopRelaunchingLlamaServerAfterThree",
+        "classification": "assertion",
+        "detail": "chatOffFailedVisionEntriesStopRelaunchingLlamaServerAfterThree(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after three automatic passes without progress no automatic pass relaunches llama-server; launches: [model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.g"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#refusedChatOffEntryUnderTheRecoveryFenceLeavesNoLlamaServerRunning",
+        "classification": "assertion",
+        "detail": "refusedChatOffEntryUnderTheRecoveryFenceLeavesNoLlamaServerRunning(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat is off: the server started for picture reading is stopped ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#committedSettingsApplyClosesTheBreaker",
+        "classification": "assertion",
+        "detail": "committedSettingsApplyClosesTheBreaker(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after three automatic passes without progress no automatic pass relaunches llama-server; launches: [model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.g"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#preparedSettingsPublishClosesTheBreaker",
+        "classification": "assertion",
+        "detail": "preparedSettingsPublishClosesTheBreaker(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after three automatic passes without progress no automatic pass relaunches llama-server; launches: [model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.g"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#switchingChatOffClosesTheBreaker",
+        "classification": "assertion",
+        "detail": "switchingChatOffClosesTheBreaker(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after three automatic passes without progress no automatic pass relaunches llama-server; launches: [model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.g"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anExplicitPassClosesTheBreaker",
+        "classification": "assertion",
+        "detail": "anExplicitPassClosesTheBreaker(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after three automatic passes without progress no automatic pass relaunches llama-server; launches: [model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.g"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anExplicitPassWhileOpenReadsTheDocuments",
+        "classification": "assertion",
+        "detail": "anExplicitPassWhileOpenReadsTheDocuments(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after three automatic passes without progress no automatic pass relaunches llama-server; launches: [model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.gguf, model.g"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#recoveryFenceAdmitsOnlyTheDeactivationThatStopsTheServer",
+        "classification": "assertion",
+        "detail": "recoveryFenceAdmitsOnlyTheDeactivationThatStopsTheServer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a server started under the fence can still be stopped ==> Unexpected exception thrown: java.lang.IllegalStateException: Generative replacement already owns admission"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#pausedAutomaticPictureReadingReportsItsOwnReason",
+        "classification": "assertion",
+        "detail": "pausedAutomaticPictureReadingReportsItsOwnReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the pause is not reported as a missing OCR engine ==> expected: <vdu.breaker_open.refused> but was: <ocr.engine_missing>"
+      }
+    ]
+  },
+  "digest": "sha256:fb146ca9bff6cd0e80a6b97da12bec105fec29538988c5c1ca13517a06bf4799"
+}

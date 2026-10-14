@@ -109,4 +109,14 @@ public interface ChatHolds {
 
   /** Registers a listener; closing the result removes it. */
   AutoCloseable addListener(Listener listener);
+
+  /**
+   * Registers {@code listener} for actions that give automatic picture reading a fresh start: a
+   * committed settings apply and a person switching chat off or on. It receives a short event name,
+   * on the acting thread, and must not call back into the controller. Closing the result removes it.
+   */
+  default AutoCloseable addAutomaticVduResetListener(java.util.function.Consumer<String> listener) {
+    Objects.requireNonNull(listener, "listener");
+    return () -> {};
+  }
 }

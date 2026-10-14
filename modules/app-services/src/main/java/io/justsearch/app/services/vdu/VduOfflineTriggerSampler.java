@@ -156,12 +156,31 @@ public final class VduOfflineTriggerSampler {
             "Idle ({}ms since activity) and energy conditions met; auto-triggering VDU offline"
                 + " processing",
             msSinceActivity);
-        if (loadedPass) loadedAttemptAt = now;
-        var pass = loadedPass
-            ? coordinator.startAutomaticProcessing(AUTOMATIC_CONTEXT,
-                () -> !stopped.get() && automaticEligible(knowledgeServerSupplier.get()))
-            : coordinator.startOfflineProcessing(AUTOMATIC_CONTEXT, outcome -> {});
+        // Repeated automatic passes without progress pause automatic picture reading: no pass
+        // starts, so llama-server is not relaunched for vision until the back-off's probe.
+        AutomaticVduBreaker breaker = coordinator.automaticBreaker();
+        if (breaker != null && !breaker.tryStartAutomatic()) {
+          log.debug("Automatic picture reading is paused: {}", breaker.snapshot());
+          return;
+        }
+        java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome> pass;
+        try {
+          if (loadedPass) loadedAttemptAt = now;
+          pass = loadedPass
+              ? coordinator.startAutomaticProcessing(AUTOMATIC_CONTEXT,
+                  () -> !stopped.get() && automaticEligible(knowledgeServerSupplier.get()))
+              : coordinator.startOfflineProcessing(AUTOMATIC_CONTEXT, outcome -> {});
+        } catch (RuntimeException | Error notStarted) {
+          if (breaker != null) breaker.passEnded(new AutomaticVduBreaker.Result.Neutral());
+          throw notStarted;
+        }
         pass.whenComplete((outcome, failure) -> {
+          if (breaker != null) {
+            String detail = coordinator.vduCapabilityState() == null ? null
+                : coordinator.vduCapabilityState().snapshot().detail();
+            breaker.passEnded(failure != null ? AutomaticVduBreaker.classify(failure, detail)
+                : AutomaticVduBreaker.classify(outcome, detail));
+          }
           if (failure != null) {
             if (loadedPass) retryAfter = System.currentTimeMillis()
                 + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;

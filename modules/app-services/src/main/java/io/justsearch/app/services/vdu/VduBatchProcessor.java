@@ -199,8 +199,8 @@ public class VduBatchProcessor {
                 vduCapabilityState.clearAll();
                 return report(progress, selected, 0, 0, BlockReason.NONE);
             }
-            vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
-            var modeFailure = new IllegalStateException("Failed to enter VDU mode", failure);
+            vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE, rootMessage(failure));
+            var modeFailure = new IllegalStateException(ENTRY_FAILURE_MESSAGE, failure);
             try {
                 report(progress, selected, 0, 0, BlockReason.AI_OFFLINE);
             } catch (RuntimeException checkpointFailure) {
@@ -271,7 +271,8 @@ public class VduBatchProcessor {
                             if (writeFailure != failure) writeFailure.addSuppressed(failure);
                             throw writeFailure;
                         }
-                        vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
+                        vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE,
+                            "generation refused: " + rootMessage(failure));
                         blocked = BlockReason.AI_OFFLINE;
                         break;
                     }
@@ -326,6 +327,33 @@ public class VduBatchProcessor {
         } finally {
             finishVduMode(primaryFailure);
         }
+    }
+
+    /** The chat controller's holds the processor enters VDU mode through, or {@code null}. */
+    io.justsearch.app.inference.chat.ChatHolds chatHolds() {
+        return vduProcessor.chatHolds();
+    }
+
+    /** The message of the failure a pass ends with when entering VDU mode failed. */
+    static final String ENTRY_FAILURE_MESSAGE = "Failed to enter VDU mode";
+
+    /**
+     * Whether {@code failure} is the one a pass ends with when entering VDU mode failed (the chat
+     * controller refused or the vision launch failed), as opposed to a failure after entry. The
+     * automatic-pass breaker counts failed entries.
+     */
+    static boolean isEntryFailure(Throwable failure) {
+        return failure != null && failure.getClass() == IllegalStateException.class
+            && ENTRY_FAILURE_MESSAGE.equals(failure.getMessage())
+            && failure.getCause() instanceof VduProcessor.VduException;
+    }
+
+    private static String rootMessage(Throwable failure) {
+        Throwable root = failure;
+        var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        while (root.getCause() != null && seen.add(root)) root = root.getCause();
+        String message = root.getMessage();
+        return message == null || message.isBlank() ? root.getClass().getSimpleName() : message;
     }
 
     private void finishVduMode(Throwable primaryFailure) {

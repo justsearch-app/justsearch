@@ -145,6 +145,10 @@ public enum LifecycleReasonCode {
   VDU_INSUFFICIENT_VRAM("vdu.insufficient_vram"),
   VDU_MISSING_MMPROJ("vdu.missing_mmproj"),
   VDU_CIRCUIT_OPEN("vdu.circuit_open"),
+  /** Automatic picture reading paused: repeated automatic passes had every attempt refused. */
+  VDU_BREAKER_OPEN_REFUSED("vdu.breaker_open.refused"),
+  /** Automatic picture reading paused: repeated automatic passes could not enter vision mode. */
+  VDU_BREAKER_OPEN_ENTRY_FAILED("vdu.breaker_open.entry_failed"),
 
   // --- Telemetry ---
   TELEMETRY_UNAVAILABLE("telemetry.unavailable"),
@@ -316,6 +320,8 @@ public enum LifecycleReasonCode {
           VDU_INSUFFICIENT_VRAM,
           VDU_MISSING_MMPROJ,
           VDU_CIRCUIT_OPEN,
+          VDU_BREAKER_OPEN_REFUSED,
+          VDU_BREAKER_OPEN_ENTRY_FAILED,
           TELEMETRY_UNAVAILABLE,
           TELEMETRY_METRICS_STALE,
           TELEMETRY_METRICS_HIGH_FAILURE_RATE,

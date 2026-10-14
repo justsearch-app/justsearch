@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference.chat;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -218,6 +219,24 @@ final class GenerationTrackerTest {
     assertThrows(IllegalStateException.class,
         () -> tracker.admit(GenerationTracker.Kind.GENERATE, null));
     assertThrows(IllegalStateException.class, tracker::requireOpen);
+  }
+
+  @Test
+  void recoveryFenceAdmitsOnlyTheDeactivationThatStopsTheServer() throws Exception {
+    var tracker = new GenerationTracker(ignored -> () -> {}, Runnable::run);
+    tracker.fenceForRecovery();
+    var stop = assertDoesNotThrow(
+        () -> tracker.drain(ChatDrainPolicy.forReason(StopReason.DEACTIVATE, BOUND)),
+        "a server started under the fence can still be stopped");
+    stop.close();
+    assertThrows(IllegalStateException.class,
+        () -> tracker.admit(GenerationTracker.Kind.GENERATE, null),
+        "the fence keeps admission closed after the deactivation");
+    assertThrows(IllegalStateException.class,
+        () -> tracker.drain(ChatDrainPolicy.forReason(StopReason.RECONFIGURE, BOUND)),
+        "a relaunch stays refused under the fence");
+    assertThrows(IllegalStateException.class, tracker::closeNow,
+        "an unattributed close stays refused under the fence");
   }
 
   @Test

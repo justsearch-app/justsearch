@@ -69,6 +69,8 @@ final class VduDeferredRetryTest {
   private final GenerationTracker generation = new GenerationTracker(work -> () -> {}, Runnable::run);
   private final AtomicInteger passes = new AtomicInteger();
   private final AtomicInteger attempts = new AtomicInteger();
+  /** The automatic-pass breaker's back-off clock (b100); advanced by the test, never slept on. */
+  private final java.util.concurrent.atomic.AtomicLong breakerClock = new java.util.concurrent.atomic.AtomicLong();
   private SqliteJobQueue queue;
   private RunningRuntime runtime;
   private DefaultEngineExecutorRegistry registry;
@@ -130,13 +132,13 @@ final class VduDeferredRetryTest {
         24_000_000_000L, 0L, GpuCapabilities.Cuda.unknown())));
     var capability = new VduCapabilityState();
     var batch = new VduBatchProcessor(processor, gpu, () -> client, VduMetricCatalog.noop(), capability);
-    coordinator = new OfflineCoordinator(registry, admission, batch, () -> client, capability);
+    coordinator = coordinator(admission, batch, capability);
 
     // Nobody has used the product for longer than the idle threshold, on mains power.
     var idle = mock(KnowledgeServerBootstrap.class);
     when(idle.msSinceLastUserActivity(anyLong())).thenReturn(VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS + 60_000);
     when(idle.energyState()).thenReturn(new EnergyState(EnergyState.Intent.FULL, EnergyState.Source.AC));
-    sampler = new VduOfflineTriggerSampler(registry, () -> coordinator, () -> idle, () -> false);
+    sampler = idleSampler(idle);
   }
 
   @AfterEach
@@ -168,6 +170,9 @@ final class VduDeferredRetryTest {
             "a refused vision call leaves the document waiting for a later pass, not stuck mid-processing");
       }
     }
+    // Adaptation (b100): three refused automatic passes in a row pause automatic picture reading;
+    // the half-open probe after the five-minute back-off is the pass that reads the document.
+    if (refusals >= 3) breakerClock.addAndGet(TimeUnit.MINUTES.toNanos(5));
     idleTick();
     assertEquals(refusals + 1, passes.get(), "the next idle tick after the drain retries the document");
     assertEquals(SchemaFields.VDU_STATUS_COMPLETED, status(),
@@ -189,6 +194,43 @@ final class VduDeferredRetryTest {
     assertEquals(1, admitted.processed(), "the first admitted attempt reads the document");
     assertEquals(SchemaFields.VDU_STATUS_COMPLETED, status(),
         "temporary refusals do not make a healthy document fail for want of retries");
+  }
+
+  /**
+   * The sampler's idle time is capped by process uptime (a fresh process is not idle); this JVM has
+   * been running for less than the idle threshold, so the test supplies an uptime past it.
+   */
+  private VduOfflineTriggerSampler idleSampler(KnowledgeServerBootstrap idle) throws Exception {
+    java.util.function.Supplier<OfflineCoordinator> coordinators = () -> coordinator;
+    java.util.function.Supplier<KnowledgeServerBootstrap> hosts = () -> idle;
+    java.util.function.BooleanSupplier unclaimed = () -> false;
+    try {
+      var clocked = VduOfflineTriggerSampler.class.getDeclaredConstructor(
+          io.justsearch.core.execution.EngineExecutorRegistry.class, java.util.function.Supplier.class,
+          java.util.function.Supplier.class, java.util.function.BooleanSupplier.class,
+          java.util.function.Supplier.class, java.util.function.LongSupplier.class);
+      clocked.setAccessible(true);
+      return clocked.newInstance(registry, coordinators, hosts, unclaimed,
+          (java.util.function.Supplier<?>) () -> null,
+          (java.util.function.LongSupplier) () -> VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS + 60_000);
+    } catch (NoSuchMethodException beforeUptimeFloor) {
+      return new VduOfflineTriggerSampler(registry, coordinators, hosts, unclaimed);
+    }
+  }
+
+  private OfflineCoordinator coordinator(EngineAdmissionController admission, VduBatchProcessor batch,
+      VduCapabilityState capability) throws Exception {
+    java.util.function.Supplier<io.justsearch.app.services.worker.KnowledgeClient> clients = () -> client;
+    try {
+      return OfflineCoordinator.class.getConstructor(io.justsearch.core.execution.EngineExecutorRegistry.class,
+              io.justsearch.app.api.EngineAdmissionService.class, VduBatchProcessor.class,
+              java.util.function.Supplier.class, VduCapabilityState.class,
+              java.util.function.LongSupplier.class)
+          .newInstance(registry, admission, batch, clients, capability,
+              (java.util.function.LongSupplier) breakerClock::get);
+    } catch (NoSuchMethodException beforeBreaker) {
+      return new OfflineCoordinator(registry, admission, batch, clients, capability);
+    }
   }
 
   private void idleTick() throws Exception {

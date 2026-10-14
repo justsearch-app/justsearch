@@ -163,7 +163,7 @@ Common reason codes:
 6. `index.throughput_stalled`, `index.throughput_degraded`
 7. `inference.starting`, `inference.offline`
 8. `ocr.disabled`, `ocr.engine_missing`, `ocr.language_missing`
-9. `vdu.ai_offline`, `vdu.insufficient_vram`, `vdu.missing_mmproj`, `vdu.circuit_open`
+9. `vdu.ai_offline`, `vdu.insufficient_vram`, `vdu.missing_mmproj`, `vdu.circuit_open`, `vdu.breaker_open.refused`, `vdu.breaker_open.entry_failed` (automatic picture reading paused after three automatic passes in a row made no progress; see `docs/reference/automatic-vdu.md`)
 10. `index.embedding_rebuilding` — semantic retrieval is paused during an in-place embedding rebuild; keyword retrieval remains available.
 
 For a serving migration, `LifecycleSnapshotTap` asserts distinct

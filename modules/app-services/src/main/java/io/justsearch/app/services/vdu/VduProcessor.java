@@ -230,6 +230,11 @@ public class VduProcessor {
         }
     }
 
+    /** The chat controller's holds, or {@code null} where the processor drives the lifecycle itself. */
+    ChatHolds chatHolds() {
+        return chatHolds;
+    }
+
     /** Whether the chat controller asked the batch's VDU hold to stop (Spec A §2.2). */
     public boolean vduInterruptRequested() {
         VduHold hold = vduHold.get();
