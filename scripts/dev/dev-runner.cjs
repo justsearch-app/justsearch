@@ -4137,6 +4137,8 @@ async function stopRun(opts, {
   if (!opts.forgetUnresolved) learnUnprovenFrom([...(ledgerResolved?.unproven ?? []), ...earlierReportIdentities(runDir)]);
   // </ledger-resolution>
   const allEntries = () => [...processes, ...tracked, ...knownUnproven].filter(p => p.pid && p.pid !== process.pid);
+  // The stop itself is never one of the identities it looks up.
+  const isThisProcess = (p) => p?.pid === process.pid;
   // Arm OS exit handles while the initial identity lookup starts. Actions still wait for both.
   let censusError;
   const pendingCensus = !opts.forgetUnresolved
@@ -4512,9 +4514,9 @@ async function stopRun(opts, {
   const portsFreeOfRun = [apiInfo, uiInfo].every((info) => info.closed || info.portOwner?.ownedByRun === false);
   // A registered helper left running, or whose exit could not be verified, is part of the stack.
   const helpersUnresolved = childCleanup.filter((c) => !['dead', 'terminated', 'identity-mismatch'].includes(c.outcome));
-  const stackGone = survivors.length === 0 && portsFreeOfRun && helpersUnresolved.length === 0
+  let stackGone = survivors.length === 0 && portsFreeOfRun && helpersUnresolved.length === 0
     && unresolvedProcesses.length === 0 && jobUnresolved.length === 0;
-  const outcome = stackGone && portsClosed ? STOP_OUTCOME.STOPPED : STOP_OUTCOME.STOP_INCOMPLETE;
+  let outcome = stackGone && portsClosed ? STOP_OUTCOME.STOPPED : STOP_OUTCOME.STOP_INCOMPLETE;
   if (unresolvedProcesses.length) {
     errors.push('at least one tracked process identity is still running or of unknown state; the stop is incomplete');
   }
@@ -4535,8 +4537,42 @@ async function stopRun(opts, {
   const engineLog = await preserveEngineLog(run, runPath);
   // The Engine exit this stop records is written from the census's OS observation and before the
   // census reads the ledger for its verdict, so the report reads every record of the stop.
+  // <ledger-resolution> The census's final read of the ledger may show a start no lookup of this stop
+  // was asked of (a successor repaired a crashed writer's torn record after the last one): each such
+  // start it leaves unproven, not one the stop already knows (knownAlready), is looked up once, in one
+  // bounded pass with no loop (round 13). What it finds ended is the census's evidence, as the first
+  // lookup's is: the stop never acted on these. One still running or unreadable is reported, never
+  // ended, and the stop is incomplete.
+  const lateUnresolved = [];
+  const lateLookupEnded = [];
+  let lateLookedUp = false;
+  const lookUpLate = async (unproven) => {
+    if (lateLookedUp || opts.forgetUnresolved) return [];
+    lateLookedUp = true;
+    const late = (unproven ?? []).filter((u) => u?.pid && !isThisProcess(u)
+      && (u.creationFileTimeUtc || Number.isFinite(u.bornNotAfterMs)) && !provenEnded(u) && !knownAlready(u))
+      .map((u) => ({ ...u, role: u.role ?? 'recorded identity', name: u.role ?? 'unknown' }));
+    if (!late.length) return [];
+    const askedAtMs = Date.now();
+    const rows = await Promise.resolve().then(() => lookupIdentities([...new Set(late.map((p) => p.pid))])).catch(() => null);
+    for (const p of late) {
+      const row = rows?.get(p.pid) ?? (rows ? { present: false } : null);
+      p.observedName = row?.name ?? (row?.executable ? path.win32.basename(row.executable) : null);
+      p.observedCreationFileTimeUtc = row?.creationFileTime ?? null;
+      const state = checkRecordedProcess(p, row);
+      if (state === 'match' || state === 'unknown') {
+        lateUnresolved.push({ ...p, state });
+        continue;
+      }
+      const observation = rows?.has(p.pid) ? lookupObservation(p, row, askedAtMs) : null;
+      if (observation) lateLookupEnded.push(observation);
+    }
+    return [...lateLookupEnded];
+  };
+  // </ledger-resolution>
   const censusAccounting = await exitCensus.finish({
     lookupEnded,
+    lookUpLate,
     beforeVerdict: pendingEngineExit ? (osExits) => {
       // <ledger-resolution> The census's OS exit of the run's Engine: its whole recorded identity, or
       // its PID where the run recorded no birth.
@@ -4552,6 +4588,24 @@ async function stopRun(opts, {
   // identity's exit was not yet seen is cleared, when this stop proves that exact identity ended: by a
   // bound ledger record (read again, with this stop's own records, only when such a gap is asked
   // about) or its identity-checked lookup.
+  for (const observation of lateLookupEnded) {
+    const bucket = lookupEndedByPid.get(observation.pid) ?? [];
+    if (bucket.some((o) => compareIdentity(o, observation, 'same'))) continue;
+    lookupEnded.push(observation);
+    lookupEndedByPid.set(observation.pid, [...bucket, observation]);
+  }
+  if (lateUnresolved.length) {
+    unresolvedProcesses.push(...lateUnresolved);
+    unresolved.push(...lateUnresolved.map((p) => describeUnresolved(p, p.state)));
+    stackGone = false;
+    outcome = STOP_OUTCOME.STOP_INCOMPLETE;
+    const message = 'at least one tracked process identity is still running or of unknown state; the stop is incomplete';
+    if (!errors.includes(message)) errors.push(message);
+    const current = await readJsonIfExists(runPath).catch(() => null);
+    await writeJsonAtomic(runPath, { ...(current ?? run), stopUnresolvedTrees: undefined,
+      stopTrackedProcesses: unresolvedProcesses });
+    await writeJsonAtomic(trackedPath, { processes: unresolvedProcesses, legacyBounds });
+  }
   const kept = await keepEarlierReports(runDir);
   let ledgerReadAgain = false;
   const endedInLedger = (gap) => {

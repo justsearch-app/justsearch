@@ -1959,7 +1959,10 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     detail: `${u.name} could not be read (${u.error}); what that census observed is not accounted` });
   // The verdict reads the ledger last: `beforeVerdict(osExits)` gets the identity-bound OS exits and
   // writes the stop's own records from them (the dev-cli Engine exit), so the report reads them too.
-  const verdict = async (observerOutput, beforeVerdict, lookupEnded = []) => {
+  // `lookUpLate(unproven)`: the stop's one identity-checked lookup of the starts the final read of the
+  // ledger leaves unproven (ledgerResolution); it returns the observations of those it found ended
+  // (lookupObservation), which count as the stop's other lookups do. Called once, never again.
+  const verdict = async (observerOutput, beforeVerdict, lookupEnded = [], lookUpLate = null) => {
     // An earlier census of this run adds its OS exits, and the targets it observed them for.
     const observerKeys = keysOf(observerOutput.processExits);
     const output = earlier.files.length ? { ...observerOutput, processExits: [...(observerOutput.processExits ?? []),
@@ -1976,6 +1979,12 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
       finalLedger = readLedger(dataDir);
     }
     const finalView = finalLedger ? viewOf(finalLedger) : null;
+    // A start recorded or repaired after the stop's last lookup (a successor completing a crashed
+    // writer's torn line) is seen first here: the stop looks it up once more before the verdict.
+    if (lookUpLate && finalView) {
+      const late = await Promise.resolve().then(() => lookUpLate(ledgerResolution(finalView).unproven)).catch(() => []);
+      if (Array.isArray(late) && late.length) lookupEnded = [...lookupEnded, ...late];
+    }
     const refreshed = exitTargets(run, manifest, observed, finalLedger, finalView);
     const membershipGap = g => ['unaccounted_process', 'orphan_console_host', 'evidence_lost'].includes(g.reason);
     // The ledger's gaps are the final read's: a gap of the arming read that a later read in this
@@ -2010,10 +2019,11 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     } catch { /* the kept files remain */ }
     return { ...result, ...written, earlierCensus: earlier.files, earlierCensusFiles: earlier.fileStates };
   };
-  // `finish({ beforeVerdict, lookupEnded })`: `lookupEnded`, the identities the stop's identity-checked
-  // lookup found ended before it acted on them (lookupEndedIdentities).
-  if (process.platform !== 'win32' && !runtime.launch) return { finish: async ({ beforeVerdict, lookupEnded } = {}) => verdict(
-    { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, beforeVerdict, lookupEnded) };
+  // `finish({ beforeVerdict, lookupEnded, lookUpLate })`: `lookupEnded`, the identities the stop's
+  // identity-checked lookup found ended before it acted on them (lookupEndedIdentities); `lookUpLate`,
+  // the stop's lookup of the starts only the final read of the ledger shows unproven (verdict).
+  if (process.platform !== 'win32' && !runtime.launch) return { finish: async ({ beforeVerdict, lookupEnded, lookUpLate } = {}) => verdict(
+    { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, beforeVerdict, lookupEnded, lookUpLate) };
   const readyFile = path.join(runDir, 'exit-census-ready.json');
   const finishFile = path.join(runDir, 'exit-census-finish.json');
   for (const file of [readyFile, finishFile, outputFile]) fs.rmSync(file, { force: true });
@@ -2032,13 +2042,13 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   }
   // The stop's own kills are not an input (Spec B §5.1, step 9): a dev kill of the Engine writes its
   // own engine-intent and engine-exit, and the verdict reads them from the ledger.
-  return { finish: async ({ beforeVerdict, lookupEnded } = {}) => {
+  return { finish: async ({ beforeVerdict, lookupEnded, lookUpLate } = {}) => {
     fs.writeFileSync(finishFile, '{}');
     const end = now() + 5000;
     while (!fs.existsSync(outputFile) && !launchError && proc.exitCode == null && now() < end) await pause(50);
     let output;
     try { output = read(outputFile); } catch { output = { gaps: [{ reason: 'exit observer did not finish through teardown' }] }; proc.kill(); }
-    return verdict(output, beforeVerdict, lookupEnded);
+    return verdict(output, beforeVerdict, lookupEnded, lookUpLate);
   } };
 }
 module.exports = { CONHOST_EXIT_GRACE_MS, NOT_SEEN_YET, NOT_SEEN_UNTIL_PROVEN, stopProves, fileTimeFromInstant, isFinding, carryFindings,
