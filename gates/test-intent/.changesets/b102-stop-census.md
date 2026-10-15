@@ -130,6 +130,7 @@ check):
   | Engine incarnation | `engine-owner-died` osCheck GONE naming another PID | false |
   | Engine incarnation | `engine-owner-died` ALIVE_MATCH (any class), IDENTITY_UNKNOWN, REUSED, or no osCheck | false |
   | Engine incarnation | `engine-intent`, `ledger-gap` | false |
+  | Engine incarnation | `engine-exit` or `engine-owner-died` naming only the incarnation, written by an Engine that is neither the start's process nor the writer that recorded the start, or by a writer with its PID started at another millisecond (round 9) | false |
   | Engine incarnation | an exit or GONE reconciliation of another incarnation, or one naming another birth than the start (at the start's measured tick) | false |
   | Engine incarnation with two start identities | an exit or GONE reconciliation not naming the start's PID and birth | false |
   | Engine incarnation | two exits with different codes | true, and a `ledger_codes_disagree` gap |
@@ -325,6 +326,46 @@ orchestrator):
   report or census file that parses to anything but a report (`null`, a list, a number) cannot be
   read, which is a gap, like one that does not parse.
 
+Follow-up decisions after the independent verifier rejected 3e9ebd546 (decided by the
+orchestrator; four regressions, each passing on b599d4d7e: a start appended after arming under
+another childId or incarnation borrowed an ended start's exit row through their shared PID and
+birth; two tracked records of one process under two childIds were merged into one, so the unproven
+one was never looked up; a coarse declared `birthTick` beside a native birth let an exit of a birth
+one tick away end a live tracked process; and an Engine's incarnation-only exit written by another
+Engine proved a live Engine start):
+
+- One plain decision, used in production: `isProven(start, allRecords, allStarts)`
+  (`stop-exit-census.cjs`) decides whether a start is proven ended, by brute force over every
+  record and every start it is given, with the agreed rules: a record agreeing with the start's
+  whole identity, native births compared to the tick; a key-only record only for a key no other
+  start shares and no record of the key contradicts; its writer the start's owner (a child's or a
+  witness's), and never a start with a conflict. The census decides every start with it (Engine
+  starts, each child start, each job witness start); a start that is not proven is looked up.
+  Indexes only narrow the candidates: the census passes isProven the records and starts of the
+  start's key (its incarnation, childId or witnessId), which never changes its answer, and never
+  decides itself. `ledgerView` returns every start with its answer (`allStarts`), and a generated
+  check compares each one with isProven over all records of the ledger.
+- A row is the start's own: the census's verdict counts a start as observed only by a row written
+  for it (the same PID and birth and the same childId or witnessId, and incarnation for an Engine),
+  never by a row of another start of the same process.
+- Tracked starts are a list of distinct records, never a map keyed by less than the whole
+  identity: the dev runner's `trackedIdentities()` merges two records only when they are the same
+  identity (compareIdentity `exact`) measured at the same tick, the second one's fields over the
+  first's, owned when either says so. Every other merge or overwrite of tracked identities is gone.
+- A birth read natively is exact whatever tick a record declares beside it (`identityOf`): two
+  native births are compared to the tick, never at a coarser declared `birthTick`.
+- An Engine's incarnation-only record proves its one start only when a supervisor wrote it (the
+  dev runner, the dev CLI or the shell, the only writers of `engine-exit` and `engine-owner-died`
+  that name only the incarnation: `engine-actuator.cjs`, `createCliEngineRecorder`), the Engine
+  itself (its PID, its `startedAt` its birth to the millisecond), or the writer that recorded the
+  start (the same role, PID and `startedAt`; the verifier's `audit-edges.cjs` and `audit-more.cjs`
+  fixtures record an Engine start and its exit through one Engine writer, and pass on 3e9ebd546).
+  Any other Engine, or a writer with the Engine's PID started at another millisecond, proves
+  nothing.
+- Any other record of a childId (`child-note`, `stop-intent`, `stop-escalate`, `child-survived`,
+  `gpu-release`) naming another owner or incarnation than a start of the childId is a conflict on
+  that start, whichever was written first.
+
 What changed:
 
 - `scripts/dev/lib/stop-exit-census.cjs`: `proofOfRecord` and `provenExitOf` decide exit proof
@@ -437,9 +478,35 @@ What changed:
   (`carryFindings`; `exitAccountingComplete: false` and the carried gaps when there are any, left
   unset otherwise, as before); `keepEarlierReports` and the census's `keepEarlierCensus` treat a
   file that parses to no object as unreadable.
+- Round 9, `stop-exit-census.cjs`: `proofOfRecord` and `provenExitOf` are replaced by `proofBy`
+  (how one record proves a start, by family) and `isProven` (exported), and `proofFields` (a
+  start's `exit`, `proof`, `unproven` and `conflictingCodes` from isProven's answer). `ledgerView`
+  decides each Engine start, child start and witness start with isProven, given the records and
+  starts of its key, and returns them as `allStarts`; witness starts are grouped per witnessId
+  (the same start recorded twice is one). `CHILD_META_TYPES` records naming another owner or
+  incarnation are conflicts on the starts of their childId. `exitResult` notes each row with the
+  start it was written for (`rowWrittenFor`): a target, a console host, an accounted process, a
+  ledger start. A ledger start (the inventory: every Engine start, child start and witness) and
+  each job witness start of the run are covered only by a row written for that start (`rowFor`:
+  the same PID and birth, childId and witnessId, and incarnation for an Engine); other gaps and
+  observed processes are covered by a row of their PID and birth, as before. `ledger-identity.cjs`: `identityOf` takes a native
+  source as exact before any declared tick; `compareIdentity` `proves` takes an Engine's
+  incarnation-only record only from a supervisor (`SUPERVISOR_ROLES`), the Engine itself, or a
+  writer that recorded the start (`startWriters`: `ledgerView` keeps each Engine start's writers,
+  one per record of the same start).
+  `dev-runner.cjs`: `trackedIdentities()` (in a `<ledger-resolution>` region, exported for the
+  check) holds the stop's tracked records as a list; `stopRun` uses it for every source of tracked
+  records (earlier trees, the run record, `stop-tracked-processes.json`, the manifest helpers and
+  every phase's additions).
+- Round 9 test fixtures: the writers in `test-dev-runner-owner-coverage.mjs`,
+  `test-dev-runner-delayed-crash-receipt.mjs` and `test-dev-runner-shim-console.mjs` now carry
+  their start instant (`startedAt`, the writer's birth to the millisecond), as the ledger reader
+  requires of every writer (`exit-ledger.cjs` `readWriter`). Without it their Engine's own
+  incarnation-only exit no longer proved its start (the writer could not be told to be that
+  Engine), and three cases failed; with it they pass here, on 3e9ebd546 and on b599d4d7e.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (61 cases; 40 and 41 rewritten and
-42 to 61 added in round 8, with their own before-results below). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (71 cases; 40 and 41 rewritten and
+42 to 61 added in round 8, 62 to 71 in round 9, with their own before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -699,6 +766,67 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    tail of two lines, and a kind added later are each carried from stop-report.1.json;
    `unrecorded_exit` and a torn last line of one line are not. Fails by assertion on a2c0400b3
    (`exit_unproven` not carried) and on b599d4d7e (nothing carried).
+62. Round 9, late childId (the verifier's reproduction): a child of the run, running, whose start
+   and own exit are in the ledger; once the census has armed, a `child-spawn` and `child-start` under
+   a second childId with the same PID and birth are appended. Through a whole real `stopRun` (the
+   real census and OS lookups), stop-report.json and the result are not complete, and a gap names
+   the process. Fails by assertion on 3e9ebd546 (complete: the late start borrowed the ended
+   start's row); passes on b599d4d7e.
+63. Round 9, late incarnation: an Engine start of incarnation 2 and its exit, then, after the real
+   census has armed, a start of incarnation 3 with the same PID and birth: the census is not
+   complete. Passes on 3e9ebd546 and b599d4d7e, as preservation.
+64. and 65. Round 9, tracked list (the verifier's reproduction, in both orders): a running child
+   under childId `c` with its own exit, and the same process started under `second-child`, which no
+   exit names; the run tracks both records, `second-child` then `c` (64) and `c` then
+   `second-child` (65). The stop looks the child up, finds it running, is `STOP_INCOMPLETE` and
+   accounting is not complete. 64 fails by assertion on 3e9ebd546 (the second record overwrote the
+   first; no lookup, `STOPPED`); 65 passes there. Both pass on b599d4d7e.
+66. Round 9, `trackedIdentities()`: seven records of one PID and birth that differ in childId,
+   owner, incarnation or declared tick stay seven, in order, each field kept; the same seven added
+   again whole (owned, with an observed name) merge into them, owned. Fails on 3e9ebd546 and
+   b599d4d7e (no such list).
+67. Round 9, native precision (the verifier's reproduction): a running tracked process read
+   natively (`creationTimeSource` native) declaring `birthTick` 10000, and a ledger child one tick
+   from its birth with its exit. The stop looks it up and is `STOP_INCOMPLETE`. Fails by assertion
+   on 3e9ebd546 (ended by the other birth's exit, never looked up); passes on b599d4d7e.
+68. Round 9, Engine writer (the verifier's reproduction): a running process records its own Engine
+   start (incarnation 2); the run's first Engine, another PID and birth, writes an `engine-exit`
+   naming only incarnation 2. The tracked start is looked up and the stop is `STOP_INCOMPLETE`,
+   accounting incomplete. Fails by assertion on 3e9ebd546 (`STOPPED`, complete); passes on
+   b599d4d7e.
+69. Round 9, Engine writer table: an `engine-exit` naming only the incarnation of an Engine's one
+   start proves it when the dev runner, the dev CLI, the shell, the Engine itself or the Engine
+   writer that recorded the start wrote it, and not when another Engine, a writer with the Engine's
+   PID started a millisecond later, or an Engine other than the start's recorder did. Fails by
+   assertion on 3e9ebd546 and b599d4d7e (those three rows prove there).
+70. Round 9, related shapes the verifier found, each through the real census of a running child
+   with its own exit: a later `child-note` naming another owner instance; a second childId whose
+   start names a relative executable; a job witness start of the same process. None is complete.
+   Fails by assertion on 3e9ebd546 (all three complete); passes on b599d4d7e.
+71. Round 9, generated: 3,000 ledgers from seed 0xB6D536 ^ 9. Engine starts of up to three
+   incarnations and child starts under two childIds share PIDs and births (and births one tick
+   apart), some appended after the census armed; exits name the whole identity, one tick off, or
+   only the key; Engine incarnation-only exits are written by the dev runner, the dev CLI, the
+   shell, the Engine itself, the Engine's PID a millisecond later, the run's first Engine or the
+   next one; `engine-owner-died` and `owner-died` with GONE or ALIVE_MATCH, named owners whole,
+   bare, another instance or PID; job witnesses of the same processes with their own, reconciled
+   or one-tick-off exits; later notes naming another owner. Tracked records name a start whole,
+   bare, under another key or owner, or a process no start names, with declared ticks of 1, 10 and
+   10000 beside native and CIM sources, repeated and in random order. Each case checks: every start
+   written is a start of the ledger, none merged; each start's decision (`allStarts`, and the
+   proof the verdict reads) is isProven's over every record and start of the ledger; the census,
+   armed before the late records with no OS exit observed, is never complete over an unproven start
+   and, without a witness, complete exactly when every start is proven and every start it armed for
+   was proven at arming; each tracked record stays in `trackedIdentities()` whole and is looked up
+   exactly when some start agreeing with it is unproven or none agrees; and a whole `stopRun`
+   (stand-in observer, every tracked PID running with an unreadable birth) looks up and reports
+   exactly those PIDs, is `STOP_INCOMPLETE` when any is, and is never complete over an unproven
+   start. `STOP_CENSUS_REFERENCE=<file>` takes isProven from another checkout's census. Run on
+   3e9ebd546 with this change's isProven as the reference, 690 of the 3,000 are misjudged
+   (decision 590, census 113, stop 272; a case can be misjudged several ways): 624 starts proven
+   there that isProven does not prove (552 Engine starts, mostly through another Engine's
+   incarnation-only exit, and 72 child starts). On b599d4d7e the decision checks do not apply (no
+   `allStarts`).
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -811,4 +939,38 @@ full run of the check, cases 6 and 14 took 3,454 and 2,579 ms, case 58 13,652 ms
 generated cases 40 and 41 took 101,018 and 33,990 ms, with other work loading the machine
 (47,299 and 20,270 ms in the run before the indexing).
 
-Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r8/).
+After the 3e9ebd546 fixes, every verifier harness of rounds 2 to 8 was run again from copies with
+fresh folders (verifier-r9/harness-logs), against this change and b599d4d7e. On this change: the
+r2, r3 and r4 `independent.cjs` (19 each), r3 and r4 `independent-extra.cjs` (22 each),
+`independent-edges.cjs` (21), `proof-probes.cjs` and `proof-extra.cjs` (5 each), `r5-retention.cjs`
+(3), `r6-retention.cjs` (6), `audit-edges.cjs` (19), `audit-more.cjs` (23), `sticky-edges.cjs` (3),
+`incremental-tail-probe.cjs` (plain and corrupt), round 8's `r8-corrected-identity.cjs` (12) and
+`independent-edges.cjs` (3), and `fresh-edges.cjs` (9) pass; `r7-identity-edges.cjs` passes 7 of 8
+(`missing-child-exit-native-fields`, as decided in round 8). `fresh-edges.cjs` was 0 of 9 on
+3e9ebd546. The first run on this change, before the start-writer reading above, failed
+`engine-death-before-later-ALIVE_MATCH` and `-IDENTITY_UNKNOWN` in both audit files (an Engine start
+and its exit written by one Engine writer); its logs are kept as `run-harnesses.out`. On b599d4d7e:
+independent 5/19, independent-extra 6/22, independent-edges 5/21, proof-probes and proof-extra 3/5,
+both retention files none, audit-edges 11/19, audit-more 15/23, sticky-edges 1/3, both tail probes
+fail, `r7-identity-edges.cjs` 8/8, `r8-corrected-identity.cjs` 11/12, round 8's
+`independent-edges.cjs` 3/3 and `fresh-edges.cjs` 9/9. The corrected `rotation-rename-gap-r8.cjs`
+and the four `enoent-states-r8.cjs` states pass on this change and fail by assertion on
+b599d4d7e. Of the originals, `rotation-edges.cjs`, `rotation-read-retry.cjs` (cold and warm),
+`rotation-race.cjs`, `writer-and-named-limit.cjs`, the two permanent `enoent-states.cjs` states,
+`torn-engine.cjs` and the legacy r2 and r3 torn and r3 rotation probes pass on this change;
+`rotation-rename-gap.cjs` and the two transient `enoent-states.cjs` states fail for their
+misaligned writer, as in round 8. With the corrected generator (`run-perf-r8.ps1`), interleaved
+three times, CPU load 12 to 48 %: b599d4d7e 11,409 / 12,114 / 12,155 ms, 118,510 parses, not
+complete; this change 2,053 / 2,083 / 2,029 ms, 59,255 parses, complete; `assert-perf.cjs`,
+`assert-file-reads.cjs` and `assert-comparison-r8.cjs` pass. Its `lifecycle-perf-r8.cjs` census
+took 12,056 ms on b599d4d7e (arming 4,149, verdict 7,905) and 1,705 ms with this change (1,329 and
+375), complete. Over the original, misaligned fixtures: b599d4d7e 13,004 / 12,109 / 12,774 ms, this
+change 13,298 / 13,196 / 13,392 ms, both not complete (every child looked for, as in round 8); the
+legacy r2 and r3 perf harnesses took 12,044 and 11,706 ms on b599d4d7e and 11,340 and 14,795 ms
+with this change, not complete for the same reason.
+The 41 `test-dev-runner-*.mjs` files and `e-pair-identity.test.mjs` pass (230 tests). In the full
+run of the check, with other work loading the machine, the 17 MB stops took 2,637 and 3,142 ms, case
+58 17,830 ms, and the generated cases 40, 41 and 71 took 122,037, 37,676 and 219,213 ms (in a run
+alone before: 1,748, 2,044, 11,639, 88,624, 30,952 and 182,234 ms).
+
+Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r9/).

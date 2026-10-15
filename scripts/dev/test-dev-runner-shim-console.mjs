@@ -11,7 +11,8 @@ const at = n => new Date(Date.UTC(2026, 9, 8, 10, 0, n)).toISOString();
 const birth = n => census.fileTimeFromInstant(at(n));
 const incarnation = { session: 'shim-console', n: 1 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'owner' };
-const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100 } });
+// Each writer as the ledger records it: its role, PID and start instant (its birth to the millisecond).
+const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100, startedAt: at(0) } });
 const start = (pid, born, parent, parentBorn, image = 'wrapper.exe') => rec('job-process-start', {
   witnessId: `j-${pid}`, owner, incarnation, pid, creationFileTime: birth(born),
   parentPid: parent, parentCreationFileTime: birth(parentBorn), executable: `C:\\test\\${image}`, contained: true });

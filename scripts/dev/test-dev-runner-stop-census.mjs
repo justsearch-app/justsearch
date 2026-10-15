@@ -1879,8 +1879,8 @@ async function trackedStop(r, tracked, { census: censusOf, lookup } = {}) {
   writeLedger(r.dataDir, r.records);
   const fixture = stopFixture({ runId: r.runId, dataDir: r.dataDir, engine: r.engine });
   const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
-  fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, stopTrackedProcesses: tracked
-    ? [{ role: 'job-helper', owned: false, ...tracked }] : [] }));
+  fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, stopTrackedProcesses: [tracked ?? []].flat()
+    .map((t) => ({ role: 'job-helper', owned: false, ...t })) }));
   const lookups = [];
   const out = await api.stopRun({}, { ...fixture.io, ...(censusOf ? { census: censusOf } : {}),
     lookupIdentities: async (ids) => { lookups.push(...ids); return (lookup ?? actuator.lookupProcessIdentities)(ids); } });
@@ -2228,6 +2228,206 @@ test('round 8 structural: no census or ledger-resolution code compares a PID or 
     .filter(([re]) => re.test(text)).map(([, what]) => `${where}: ${what}: ${text.trim()}`));
   assert.deepEqual(found, []);
   assert.ok(regions.length >= 3, `the dev runner's ledger resolution, runner matching and engine-exit match are marked: ${regions.length}`);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Round 9: one start never stands in for another. The verifier's four reproductions (and the
+// related shapes it found) on real running children: a start appended after arming under another
+// childId or incarnation with an ended start's PID and birth; two tracked records of one PID and
+// birth under two childIds; a native tracked birth with a coarse declared tick; an Engine's
+// incarnation-only exit written by another Engine. Each passes on b599d4d7e and failed on 3e9ebd546.
+// ---------------------------------------------------------------------------------------------
+
+/** `census` (the stop's census entry point) that appends `records` to the ledger once the census has armed. */
+const appendAfterArming = (records, scopeFile = null) => async (run, dataDir, runDir, s, runtime) => {
+  const armed = await census.startStopExitCensus(run, dataDir, runDir, scopeFile ?? s, runtime);
+  for (const r of records) appendLedger(dataDir, r);
+  return armed;
+};
+/** A gap of `gaps` that names process `p` by its PID (and its birth, where the gap records one). */
+const namesProcess = (gaps, p) => (gaps ?? []).some((g) => g.pid === p.pid
+  && (g.creationFileTimeUtc == null || g.creationFileTimeUtc === p.creationFileTimeUtc));
+
+test('round 9 late childId: a start appended after arming under another childId, with an ended start\'s PID and birth, has no exit of its own, so the whole stop is incomplete', async () => {
+  const p = await liveChild();
+  try {
+    const r = identityRun('r9-late-childid');
+    r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
+    r.startOf(p);
+    r.exitOf({ pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner: r.owner });
+    const late = [rec('children', r.writer, 'child-spawn', { childId: 'second-child', kind: 'EXTRACTION', owner: r.owner }),
+      rec('children', r.writer, 'child-start', { childId: 'second-child', pid: p.pid, creationFileTime: p.creationFileTimeUtc,
+        executable: process.execPath, contained: false })];
+    const { out, fixture } = await trackedStop(r, null, { census: appendAfterArming(late) });
+    const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
+    assert.equal(report.exitAccountingComplete, false, `the late start borrowed the ended start's exit: ${JSON.stringify(report.exitAccountingGaps)}`);
+    assert.equal(out.exitAccountingComplete, false);
+    assert.ok(namesProcess(report.exitAccountingGaps, p), `a gap names the late start's process: ${JSON.stringify(report.exitAccountingGaps)}`);
+  } finally {
+    await p.end();
+  }
+});
+
+test('round 9 late incarnation: an Engine start appended after arming under another incarnation, with an ended start\'s PID and birth, keeps the census incomplete', async () => {
+  const p = await liveChild();
+  try {
+    const r = identityRun('r9-late-incarnation');
+    const start = (n) => rec('engine', by.runner, 'engine-start', { incarnation: { ...r.incarnation, n }, pid: p.pid,
+      creationFileTime: p.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(p.creationFileTimeUtc),
+      cause: 'RESTART', supervisorKind: 'dev-runner' });
+    r.records.push(start(2), rec('engine', by.runner, 'engine-exit', { incarnation: { ...r.incarnation, n: 2 }, exitClass: 'REQUESTED',
+      reason: 'QUIT', detail: null, code: 0, codeName: 'ok', exitedAt: null, observedAt: new Date().toISOString(),
+      terminateCalledAt: null, forced: false, phase: 'STOPPING', codeDistinctive: true }));
+    writeLedger(r.dataDir, r.records);
+    const runDir = freshDir('r9-late-incarnation-run');
+    const armed = await census.startStopExitCensus({ runId: r.runId, pids: { backendRootPid: r.engine.pid } }, r.dataDir, runDir, scope);
+    appendLedger(r.dataDir, start(3));
+    const result = await armed.finish();
+    assert.equal(result.exitAccountingComplete, false, `incarnation 3 borrowed incarnation 2's exit: ${JSON.stringify(result.exitAccountingGaps)}`);
+  } finally {
+    await p.end();
+  }
+});
+
+for (const order of [['second-child', 'c'], ['c', 'second-child']]) {
+  test(`round 9 tracked list: two tracked records of one process under childIds ${order.join(' then ')}, one proven ended, are both kept: the unproven one is looked up and the stop is incomplete`, async () => {
+    const p = await liveChild();
+    try {
+      const r = identityRun(`r9-two-tracked-${order[0]}`);
+      r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
+      r.startOf(p);
+      r.exitOf({ pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner: r.owner });
+      r.child('child-spawn', { childId: 'second-child', kind: 'EXTRACTION', owner: r.owner });
+      r.startOf(p, { childId: 'second-child' });
+      const tracked = order.map((childId) => ({ ...p, childId, owner: r.owner }));
+      const result = await trackedStop(r, tracked);
+      assertLiveChildFound(result, p, `tracked ${order.join(', ')}`);
+    } finally {
+      await p.end();
+    }
+  });
+}
+
+test('round 9 tracked list: records repeated whole are one; records of one PID and birth that differ in childId, owner, incarnation or tick are each kept', () => {
+  assert.equal(typeof api.trackedIdentities, 'function', 'the stop keeps its tracked identities as a list');
+  const base = { pid: 974301, creationFileTimeUtc: genFar(7), role: 'job-helper', owned: false };
+  const list = api.trackedIdentities();
+  const forms = [{ ...base, childId: 'a' }, { ...base, childId: 'b' }, { ...base, childId: 'a', birthTick: '10000' },
+    { ...base, childId: 'a', owner: GEN_OWNER }, { ...base, incarnation: GEN_INCS.n1 }, { ...base, incarnation: GEN_INCS.n2 }, base];
+  for (const f of forms) list.add(f);
+  // The run record and stop-tracked-processes.json both hold what the last stop listed.
+  for (const f of forms) list.add({ ...f, owned: true, observedName: 'parser.exe' });
+  assert.equal(list.list.length, forms.length, JSON.stringify(list.list));
+  forms.forEach((f, i) => {
+    for (const k of Object.keys(f).filter((k) => k !== 'owned')) assert.deepEqual(list.list[i][k], f[k], `${i}.${k}`);
+    assert.equal(list.list[i].owned, true, 'owned when either record says so');
+  });
+});
+
+test('round 9 native precision: a tracked birth read natively is compared to the tick whatever tick it declares, so an exit of a birth one tick away never ends it', async () => {
+  const p = await liveChild();
+  try {
+    const r = identityRun('r9-native-declared-coarse');
+    const other = { pid: p.pid, creationFileTimeUtc: String(BigInt(p.creationFileTimeUtc) + 1n) };
+    r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
+    r.startOf(other);
+    r.exitOf({ pid: other.pid, creationFileTime: other.creationFileTimeUtc, owner: r.owner });
+    const { out, lookups } = await trackedStop(r, { ...p, creationTimeSource: 'native', birthTick: '10000' });
+    assert.ok(lookups.includes(p.pid), `looked up, not ended by another birth's exit: ${JSON.stringify(out.resolvedByLedger ?? [])}`);
+    assert.equal(out.outcome, 'STOP_INCOMPLETE', JSON.stringify(out.errors));
+    assert.ok(out.unresolvedProcesses?.some((u) => u.pid === p.pid), JSON.stringify(out.unresolvedProcesses));
+  } finally {
+    await p.end();
+  }
+});
+
+test('round 9 Engine writer: an incarnation-only exit another Engine wrote proves nothing of a live Engine start, which is looked up and keeps the stop incomplete', async () => {
+  const p = await liveChild();
+  try {
+    const r = identityRun('r9-engine-other-writer');
+    const n2 = { ...r.incarnation, n: 2 };
+    // The live stand-in records its own start, as an Engine does: its PID, its start to the millisecond.
+    r.records.push(rec('engine', { role: 'engine', pid: p.pid, startedAt: isoMs(p.creationFileTimeUtc) }, 'engine-start', {
+      incarnation: n2, pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: process.execPath,
+      processStartedAt: isoMs(p.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }));
+    // The run's first Engine (another PID and birth) writes an exit naming only that incarnation.
+    r.records.push(rec('engine', r.writer, 'engine-exit', { incarnation: n2, exitClass: 'REQUESTED', reason: 'QUIT', detail: null,
+      code: 0, codeName: 'ok', exitedAt: null, observedAt: new Date().toISOString(), terminateCalledAt: null, forced: false,
+      phase: 'STOPPING', codeDistinctive: true }));
+    assertLiveChildFound(await trackedStop(r, { ...p, incarnation: n2 }), p, 'another Engine\'s incarnation-only exit');
+  } finally {
+    await p.end();
+  }
+});
+
+test('round 9 Engine writer table: an incarnation-only Engine exit proves its one start when a supervisor, that Engine itself or the writer of its start wrote it, never another Engine', () => {
+  const runId = 'stop-census-r9-writers';
+  const e = { pid: 974401, birth: genFar(4) }, inc = { session: runId, n: 1 };
+  const startedAt = isoMs(e.birth);
+  const self = { role: 'engine', pid: e.pid, startedAt };
+  // Another Engine, which in the last two rows recorded the start.
+  const other = { role: 'engine', pid: 974405, startedAt };
+  const writers = {
+    'dev-runner': [self, { role: 'dev-runner', pid: 4001, startedAt }, true], 'dev-cli': [self, { role: 'dev-cli', pid: 4005, startedAt }, true],
+    shell: [self, { role: 'shell', pid: 4009, startedAt }, true], 'the Engine itself': [self, self, true],
+    'another Engine': [self, other, false],
+    'its PID, started a millisecond later': [self, { role: 'engine', pid: e.pid, startedAt: isoMs(BigInt(e.birth) + 10000n) }, false],
+    'the Engine that recorded the start': [other, other, true],
+    'an Engine other than the one that recorded the start': [other, { ...other, pid: 974409 }, false],
+  };
+  const wrong = [];
+  for (const [name, [startWriter, writer, proves]] of Object.entries(writers)) {
+    const dataDir = freshDir(`r9-writer-${name.replace(/\W+/g, '-')}`);
+    writeLedger(dataDir, [rec('engine', startWriter, 'engine-start', { incarnation: inc, pid: e.pid,
+      creationFileTime: e.birth, executable: process.execPath, processStartedAt: startedAt, cause: 'START', supervisorKind: 'dev-runner' }),
+    rec('engine', writer, 'engine-exit', { incarnation: inc, exitClass: 'REQUESTED', reason: 'QUIT', detail: null, code: 0, codeName: 'ok',
+      exitedAt: null, observedAt: startedAt, terminateCalledAt: null, forced: false, phase: 'STOPPING', codeDistinctive: true })]);
+    const got = Boolean(census.ledgerView(census.readRunLedger(dataDir), runId).engines[0]?.exit);
+    if (got !== proves) wrong.push(`${name}: ${got ? 'proves' : 'does not prove'}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('round 9 related shapes: a later note naming another owner, a second childId with a relative executable, and a job witness of an ended child\'s process each keep the census incomplete', async () => {
+  const shapes = {
+    'later-note-conflict': (r, p) => {
+      r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
+      r.startOf(p);
+      r.exitOf({ pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner: r.owner });
+      r.child('child-note', { childId: 'c', token: 'fixture', owner: { ...r.owner, instanceId: 'other-owner' } });
+    },
+    'second-childId-relative-executable': (r, p) => {
+      r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
+      r.startOf(p);
+      r.exitOf({ pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner: r.owner });
+      r.child('child-spawn', { childId: 'second-child', kind: 'EXTRACTION', owner: r.owner });
+      r.startOf(p, { childId: 'second-child', executable: 'node.exe' });
+    },
+    'witness-of-ended-child': (r, p) => {
+      r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
+      r.startOf(p);
+      r.exitOf({ pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner: r.owner });
+      r.child('job-process-start', { witnessId: 'w', owner: r.owner, incarnation: r.incarnation, pid: p.pid,
+        creationFileTime: p.creationFileTimeUtc, executable: process.execPath, contained: true, awaited: false, expectedCode: null,
+        reason: null, parentPid: r.engine.pid, parentCreationFileTime: r.engine.creationFileTimeUtc, observedAt: new Date().toISOString() });
+    },
+  };
+  const p = await liveChild();
+  try {
+    const wrong = [];
+    for (const [name, setup] of Object.entries(shapes)) {
+      const r = identityRun(`r9-${name}`);
+      setup(r, p);
+      writeLedger(r.dataDir, r.records);
+      const armed = await census.startStopExitCensus({ runId: r.runId, pids: { backendRootPid: r.engine.pid } }, r.dataDir,
+        freshDir(`r9-${name}-run`), scope);
+      const result = await armed.finish();
+      if (result.exitAccountingComplete !== false) wrong.push(`${name}: complete ${JSON.stringify(result.exitAccountingGaps)}`);
+    }
+    assert.deepEqual(wrong, []);
+  } finally {
+    await p.end();
+  }
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -2746,4 +2946,323 @@ test(`a stop carries forward exactly what earlier stops found, over ${GEN_EVIDEN
     for (const w of wrong.slice(0, 5)) console.log(JSON.stringify(w));
   }
   assert.deepEqual(wrong.map((w) => w.case), genOnly != null ? [genOnly] : []);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Round 9, generated: the census's indexed decision against isProven over all records. Random
+// ledgers in which starts share a PID and birth across childIds and incarnations (some appended after
+// the census armed), exits of every shape (whole identity, one tick off, key-only, an Engine's by a
+// supervisor, by itself, by another Engine or a millisecond off), job witnesses of the same processes,
+// and lists of tracked records in every order, with declared ticks beside native births. Each case:
+//  - every start the ledger records is the one the generator wrote (none merged into another);
+//  - each start's decision, made from the records and starts of its key, is isProven's over every
+//    record and every start of the ledger;
+//  - the census (armed before the late records) is complete exactly when every start of the run is
+//    proven now and every start it armed for was proven then (no OS exit is observed), and never
+//    complete when a start is unproven;
+//  - each tracked record survives in the stop's list whole and is looked up exactly when no start
+//    agrees with it (PID, birth at the coarser of the two measured ticks, every other field both
+//    carry) or one that agrees is unproven; a whole stop looks up and reports exactly those.
+// STOP_CENSUS_GEN_CASE=<n> runs one case; STOP_CENSUS_GEN_DUMP=<dir> writes the misjudged ones;
+// STOP_CENSUS_REFERENCE=<stop-exit-census.cjs> takes isProven from that file (judging an older checkout).
+// ---------------------------------------------------------------------------------------------
+const GEN_PROOF_CASES = 3000;
+const r9ReferenceModule = process.env.STOP_CENSUS_REFERENCE ? require(path.resolve(process.env.STOP_CENSUS_REFERENCE)) : census;
+const R9_RUN = 'stop-census-r9-gen';
+const R9_E0 = { pid: 974001, birth: genFar(0) };
+const R9_OWNERS = { same: { pid: R9_E0.pid, creationFileTime: R9_E0.birth, instanceId: 'inst-1' },
+  instance: { pid: R9_E0.pid, creationFileTime: R9_E0.birth, instanceId: 'inst-2' },
+  bare: { pid: R9_E0.pid, creationFileTime: R9_E0.birth }, otherPid: { pid: 974009, creationFileTime: R9_E0.birth, instanceId: 'inst-1' } };
+/** The processes starts are recorded for: two of one PID a tick apart, and another. */
+const R9_PROCS = [{ pid: 974101, birth: genFar(1) }, { pid: 974101, birth: sameMicrosecondNeighbour(genFar(1)) },
+  { pid: 974105, birth: genFar(2) }];
+const r9Inc = (n) => ({ session: R9_RUN, n });
+const R9_EXE = 'C:\\fixture\\proc.exe';
+const r9Writers = {
+  runner: { role: 'dev-runner', pid: 4001, startedAt: isoMs(R9_E0.birth) }, cli: { role: 'dev-cli', pid: 4005, startedAt: isoMs(R9_E0.birth) },
+  shell: { role: 'shell', pid: 4009, startedAt: isoMs(R9_E0.birth) },
+  // The run's Engine (the children's owner) and the next Engine.
+  owner: { role: 'engine', pid: R9_E0.pid, startedAt: isoMs(R9_E0.birth) },
+  later: { role: 'engine', pid: 974021, startedAt: isoMs(genFar(3)) },
+};
+const r9Self = (proc, offMs = 0n) => ({ role: 'engine', pid: proc.pid, startedAt: isoMs(BigInt(proc.birth) + offMs * 10000n) });
+const r9EngineExit = (fields) => ({ exitClass: 'REQUESTED', reason: 'QUIT', detail: null, code: 0, codeName: 'ok', exitedAt: null,
+  observedAt: isoMs(genFar(5)), terminateCalledAt: null, forced: false, phase: 'STOPPING', codeDistinctive: true, ...fields });
+
+/** One case: ledger items in order (`late`: appended after the census armed), the starts it wrote, and the tracked records. */
+function generateProofCase(r) {
+  const items = [];
+  const starts = [];
+  const add = (record, late = false) => items.push({ record, late });
+  const lateness = () => r.chance(0.3);
+  add(rec('engine', r9Writers.runner, 'engine-start', { incarnation: r9Inc(1), pid: R9_E0.pid, creationFileTime: R9_E0.birth,
+    executable: R9_EXE, processStartedAt: isoMs(R9_E0.birth), cause: 'START', supervisorKind: 'dev-runner' }));
+  starts.push({ family: 'engine', key: 1, pid: R9_E0.pid, birth: R9_E0.birth });
+  // The children family is present whatever else the case writes.
+  add(rec('children', r9Writers.owner, 'child-note', { childId: 'present', token: 'present' }));
+  const e0Exit = r.pick(['runner', 'runner', 'runner', 'cli', 'shell', 'owner', 'later', 'none']);
+  if (e0Exit !== 'none') add(rec('engine', r9Writers[e0Exit], 'engine-exit', r9EngineExit({ incarnation: r9Inc(1) })), r.chance(0.15));
+  // Engine starts of later incarnations, of processes children and witnesses also name.
+  for (let i = r.int(3); i > 0; i--) {
+    const proc = r.pick(R9_PROCS), n = r.pick([2, 2, 3]), late = lateness();
+    // The same start recorded again is recorded by the same writer.
+    const writer = starts.find((s) => s.family === 'engine' && s.key === n && s.pid === proc.pid && s.birth === proc.birth)?.writer
+      ?? r.pick(['runner', 'self']);
+    add(rec('engine', writer === 'self' ? r9Self(proc) : r9Writers.runner, 'engine-start', { incarnation: r9Inc(n), pid: proc.pid,
+      creationFileTime: proc.birth, executable: R9_EXE, processStartedAt: isoMs(proc.birth), cause: 'RESTART', supervisorKind: 'dev-runner' }), late);
+    if (!starts.some((s) => s.family === 'engine' && s.key === n && s.pid === proc.pid && s.birth === proc.birth)) {
+      starts.push({ family: 'engine', key: n, pid: proc.pid, birth: proc.birth, writer });
+    }
+    for (let j = r.int(3); j > 0; j--) {
+      const shape = r.pick(['keyOnly', 'keyOnly', 'whole', 'ownerDied']);
+      const exitLate = late || lateness();
+      if (shape === 'keyOnly') {
+        const w = r.pick(['runner', 'cli', 'self', 'self', 'selfLateMs', 'owner', 'later']);
+        add(rec('engine', w === 'self' ? r9Self(proc) : w === 'selfLateMs' ? r9Self(proc, 1n) : r9Writers[w], 'engine-exit',
+          r9EngineExit({ incarnation: r9Inc(n) })), exitLate);
+      } else if (shape === 'whole') {
+        add(rec('engine', r9Writers.runner, 'engine-exit', r9EngineExit({ incarnation: r9Inc(n), pid: proc.pid,
+          creationFileTime: r.chance(0.8) ? proc.birth : sameMicrosecondNeighbour(proc.birth) })), exitLate);
+      } else {
+        add(rec('engine', r9Writers.runner, 'engine-owner-died', { incarnation: r9Inc(n), pid: r.chance(0.8) ? proc.pid : 974113,
+          basis: 'OPEN_START', osCheck: r.pick(['GONE', 'GONE', 'ALIVE_MATCH']), exitClass: 'OWNER_DIED' }), exitLate);
+      }
+    }
+  }
+  // Child starts under two childIds, of the same processes.
+  const spawned = new Set();
+  for (let i = r.int(4); i > 0; i--) {
+    const proc = r.pick(R9_PROCS), childId = r.pick(['c1', 'c2']), late = lateness();
+    const owner = r.pick(['same', 'same', 'same', 'instance', 'otherPid']);
+    if (!spawned.has(childId) || r.chance(0.1)) {
+      add(rec('children', r9Writers.owner, 'child-spawn', { childId, kind: 'EXTRACTION', owner: R9_OWNERS[owner] }), late);
+      spawned.add(childId);
+    }
+    const own = r.chance(0.15) ? { owner: R9_OWNERS[r.pick(['same', 'instance'])] } : {};
+    add(rec('children', r9Writers.owner, 'child-start', { childId, pid: proc.pid, creationFileTime: proc.birth, executable: R9_EXE,
+      contained: false, ...(r.chance(0.15) ? { incarnation: r9Inc(1) } : {}), ...own }), late);
+    if (!starts.some((s) => s.family === 'child' && s.key === childId && s.pid === proc.pid && s.birth === proc.birth)) {
+      starts.push({ family: 'child', key: childId, pid: proc.pid, birth: proc.birth });
+    }
+    for (let j = r.int(3); j > 0; j--) {
+      const exitLate = late || lateness();
+      const named = r.pick(['same', 'same', 'instance', 'bare', null]);
+      const writer = r.pick(['owner', 'owner', 'later']);
+      if (r.chance(0.75)) {
+        const whole = r.chance(0.6);
+        add(rec('children', r9Writers[writer], 'child-exit', { childId, code: 0, exitClass: 'REQUESTED', reason: 'QUIT', forced: false,
+          exitedAt: iso7(BigInt(proc.birth) + 450000n), ...(named ? { owner: R9_OWNERS[named] } : {}),
+          ...(whole ? { pid: proc.pid, creationFileTime: r.chance(0.8) ? proc.birth : sameMicrosecondNeighbour(proc.birth) } : {}),
+          ...(whole && r.chance(0.3) ? { incarnation: r9Inc(1) } : {}) }), exitLate);
+      } else {
+        add(rec('children', r9Writers.later, 'owner-died', { childId, previousOwner: R9_OWNERS[named ?? 'same'], basis: 'OPEN_START',
+          osCheck: r.pick(['GONE', 'GONE', 'ALIVE_MATCH']), exitClass: 'OWNER_DIED',
+          ...(r.chance(0.5) ? { pid: proc.pid, creationFileTime: proc.birth } : {}) }), exitLate);
+      }
+    }
+    if (r.chance(0.08)) add(rec('children', r9Writers.owner, 'child-note', { childId, token: 'note', owner: R9_OWNERS.instance }), lateness());
+  }
+  // A job witness of one of the processes.
+  let witnessed = false;
+  if (r.chance(0.3)) {
+    witnessed = true;
+    const proc = r.pick(R9_PROCS), late = lateness();
+    const common = { witnessId: 'w1', owner: R9_OWNERS.same, incarnation: r9Inc(1) };
+    add(rec('children', r9Writers.owner, 'job-process-start', { ...common, pid: proc.pid, creationFileTime: proc.birth, executable: R9_EXE,
+      contained: true, awaited: false, expectedCode: null, reason: null, parentPid: R9_E0.pid, parentCreationFileTime: R9_E0.birth,
+      observedAt: isoMs(genFar(5)) }), late);
+    starts.push({ family: 'witness', key: 'w1', pid: proc.pid, birth: proc.birth });
+    for (let j = r.int(3); j > 0; j--) {
+      const shape = r.pick(['own', 'own', 'reconciled', 'ownReconciled']);
+      const birth = r.chance(0.8) ? proc.birth : sameMicrosecondNeighbour(proc.birth);
+      add(rec('children', shape === 'reconciled' ? r9Writers.runner : r9Writers.owner, 'job-process-exit', { ...common, pid: proc.pid,
+        creationFileTime: birth, code: 0, exitClass: shape === 'own' ? 'UNEXPECTED' : 'OWNER_DIED', reason: null, forced: false,
+        exitedAt: iso7(BigInt(proc.birth) + 450000n), observedAt: isoMs(genFar(5)),
+        ...(shape === 'own' ? {} : { reconciled: true, cause: 'ENGINE_CRASH', osCheck: 'GONE' }) }), late || lateness());
+    }
+  }
+  // Tracked records: a start's identity in some form, or a process no start names; ticks declared beside
+  // native births. Never the run's first Engine, whose PID the stop looks up as its Engine's.
+  const tracked = [];
+  for (let i = 1 + r.int(3); i > 0; i--) {
+    const s = starts.length > 1 && r.chance(0.9) ? r.pick(starts.slice(1))
+      : { family: 'child', key: 'c1', pid: 974109, birth: genFar(6) };
+    const birth = r.chance(0.85) ? s.birth : sameMicrosecondNeighbour(s.birth);
+    const tick = r.pick([{ birthTick: '1' }, { birthTick: '10' }, { birthTick: '10000' }, {}, { creationTimeSource: 'native', birthTick: '10000' },
+      { creationTimeSource: 'native' }, { creationTimeSource: 'CIM' }]);
+    const form = r.pick(['whole', 'whole', 'bare', 'otherKey', 'otherOwner']);
+    const keyed = s.family === 'engine' ? { incarnation: r9Inc(form === 'otherKey' ? 7 : s.key) }
+      : s.family === 'child' ? { childId: form === 'otherKey' ? 'c9' : s.key, ...(form === 'otherOwner' ? { owner: R9_OWNERS.instance } : {}) }
+        : { witnessId: form === 'otherKey' ? 'w9' : s.key };
+    const t = { pid: s.pid, creationFileTimeUtc: birth, role: 'job-helper', owned: false, ...tick, ...(form === 'bare' ? {} : keyed) };
+    tracked.push(t);
+    if (r.chance(0.15)) tracked.push({ ...t });
+  }
+  return { items, starts, tracked: r.shuffle(tracked), witnessed };
+}
+
+/** The case's records written before the census armed. */
+const r9Records = (c) => c.items.filter((x) => !x.late).map((x) => x.record);
+/** Every ledger record as the census reads it (both families). */
+const r9AllRecords = (ledger) => [...(ledger.engine?.records ?? []), ...(ledger.children?.records ?? [])];
+const r9Key = (family, id) => (family === 'engine' ? id.incarnation?.n : family === 'child' ? id.childId : id.witnessId);
+/** A start of the run: an Engine start, a witnessed process, or a child owned by the run's Engine (PID and birth). */
+const r9Run = (s) => s.family !== 'child' || (s.identity.owner?.pid === R9_E0.pid && s.identity.owner?.birth === R9_E0.birth);
+/** The tick a tracked record's birth was measured at: native exact, else what it declares, else its source's, else CIM's. */
+const r9TrackedTick = (t) => (t.creationTimeSource === 'native' ? 1n : t.birthTick ? BigInt(t.birthTick)
+  : t.creationTimeSource === 'B11.startInstant' ? 10000n : 10n);
+/** Tracked record `t` and start `s` agree: one PID, births at the coarser tick, every other field both carry. */
+function r9Agrees(t, s) {
+  const id = s.identity, tick = r9TrackedTick(t) > BigInt(id.tick) ? r9TrackedTick(t) : BigInt(id.tick);
+  if (t.pid !== id.pid || BigInt(t.creationFileTimeUtc) / tick !== BigInt(id.birth) / tick) return false;
+  if (t.childId != null && id.childId != null && t.childId !== id.childId) return false;
+  if (t.witnessId != null && id.witnessId != null && t.witnessId !== id.witnessId) return false;
+  if (t.owner && id.owner && (t.owner.pid !== id.owner.pid || t.owner.creationFileTime !== id.owner.birth
+    || (t.owner.instanceId != null && id.owner.instanceId != null && t.owner.instanceId !== id.owner.instanceId))) return false;
+  if (t.incarnation && id.incarnation && (t.incarnation.session !== id.incarnation.session || t.incarnation.n !== id.incarnation.n)) return false;
+  return true;
+}
+const R9_TRACKED_FIELDS = ['pid', 'creationFileTimeUtc', 'childId', 'witnessId', 'owner', 'incarnation'];
+/** `x` is tracked record `t`, whole: every identity field the same, its birth measured at the same tick. */
+const r9IsTracked = (x, t) => R9_TRACKED_FIELDS.every((k) => JSON.stringify(x[k] ?? null) === JSON.stringify(t[k] ?? null))
+  && r9TrackedTick(x) === r9TrackedTick(t);
+
+/**
+ * isProven's verdicts for a case, from the reference census module (`reference`: this checkout's,
+ * unless a comparison with another checkout swaps it): each start of the final and the arming
+ * ledgers, judged over every record and every start of that ledger.
+ */
+function r9Reference(reference, armingLedger, finalLedger) {
+  const judge = (ledger) => {
+    const view = reference.ledgerView(ledger, R9_RUN);
+    const records = r9AllRecords(ledger);
+    return view.allStarts.map((s) => ({ ...s, ref: reference.isProven(s, records, view.allStarts) }));
+  };
+  return { arming: judge(armingLedger), final: judge(finalLedger) };
+}
+
+const r9Owner = (o) => (o ? `${o.pid}/${o.rawBirth}/${o.instanceId ?? ''}` : null);
+/**
+ * What the census decided of a start: the proof of its view item (what the census's verdict reads),
+ * found by the start's whole identity; undefined when the view has no item for it.
+ */
+function r9Decision(view, s) {
+  const items = s.family === 'engine' ? view.engines : s.family === 'child' ? view.children : view.witnessStarts ?? [];
+  const same = (items ?? []).filter((x) => x.identity && x.identity.pid === s.identity.pid
+    && x.identity.rawBirth === s.identity.rawBirth && r9Key(s.family, x.identity) === r9Key(s.family, s.identity)
+    && r9Owner(x.identity.owner) === r9Owner(s.identity.owner));
+  return same.length === 1 ? Boolean(same[0].proof) : undefined;
+}
+
+async function r9Census(c, dataDir, runDir) {
+  writeLedger(dataDir, r9Records(c));
+  const armingLedger = census.readRunLedger(dataDir);
+  fs.rmSync(runDir, { recursive: true, force: true });
+  fs.mkdirSync(runDir, { recursive: true });
+  const run = { runId: R9_RUN, pids: { backendRootPid: R9_E0.pid } };
+  const armed = await standInCensus(run, dataDir, runDir, null, {});
+  for (const x of c.items.filter((x) => x.late)) appendLedger(dataDir, x.record);
+  const result = await armed.finish();
+  return { armingLedger, finalLedger: census.readRunLedger(dataDir), complete: result.exitAccountingComplete, gaps: result.exitAccountingGaps };
+}
+
+/** A whole stop of the run over the census's final ledger (the late records after the rest), tracking the case's records. */
+async function r9Stop(c, dataDir) {
+  writeLedger(dataDir, [...r9Records(c), ...c.items.filter((x) => x.late).map((x) => x.record)]);
+  const fixture = stopFixture({ runId: R9_RUN, dataDir, engine: { pid: R9_E0.pid, creationFileTimeUtc: R9_E0.birth } });
+  try {
+    const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
+    fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, stopTrackedProcesses: c.tracked }));
+    const lookups = new Set();
+    // Every tracked process is running and its birth cannot be read: looked up, it stays unresolved.
+    const out = await api.stopRun({}, { ...fixture.io, census: standInCensus,
+      lookupIdentities: async (ids) => {
+        for (const pid of ids) lookups.add(pid);
+        return new Map(ids.map((pid) => [pid, pid === R9_E0.pid ? { present: false } : { present: true, creationFileTime: null, name: 'proc.exe' }]));
+      } });
+    return { lookups: [...lookups].sort(), unresolved: out.unresolvedProcesses ?? [], outcome: out.outcome, complete: out.exitAccountingComplete };
+  } finally {
+    fs.rmSync(fixture.dir, { recursive: true, force: true });
+  }
+}
+
+async function judgeProofCase(c, dataDir, runDir, reference = census) {
+  const misjudged = [];
+  const got = await r9Census(c, dataDir, runDir);
+  const ref = r9Reference(reference, got.armingLedger, got.finalLedger);
+  // Every start written is a start of the ledger, none merged into another.
+  const written = c.starts.map((s) => `${s.family}/${s.key}/${s.pid}/${s.birth}`).sort();
+  const read = ref.final.map((s) => `${s.family}/${r9Key(s.family, s.identity)}/${s.identity.pid}/${s.identity.rawBirth}`).sort();
+  if (JSON.stringify(written) !== JSON.stringify(read)) misjudged.push({ kind: 'starts', written, read });
+  // Each start's decision is isProven's over every record and start.
+  const finalView = census.ledgerView(got.finalLedger, R9_RUN);
+  for (const s of ref.final) {
+    // The census's own record of its decision (this checkout's: its index chose what isProven was given).
+    if (reference === census && Boolean(s.proven) !== Boolean(s.ref)) {
+      misjudged.push({ kind: 'decision', start: `${s.family}/${r9Key(s.family, s.identity)}/${s.identity.pid}`, indexed: Boolean(s.proven) });
+    }
+    if (!r9Run(s)) continue;
+    const decided = r9Decision(finalView, s);
+    if (decided !== Boolean(s.ref)) misjudged.push({ kind: 'decision', start: `${s.family}/${r9Key(s.family, s.identity)}/${s.identity.pid}/${s.identity.rawBirth}`,
+      decided, isProven: Boolean(s.ref) });
+  }
+  // The census: never complete over an unproven start; exactly complete when nothing else (a witness's
+  // receipt) decides. A start it armed for unproven needs the exit the OS saw, and it saw none.
+  const allProven = ref.final.filter(r9Run).every((s) => s.ref);
+  const armedProven = ref.arming.filter(r9Run).every((s) => s.ref);
+  if (got.complete && !allProven) misjudged.push({ kind: 'census', complete: true, unproven: true });
+  if (!c.witnessed && got.complete !== (allProven && armedProven)) {
+    misjudged.push({ kind: 'census', complete: got.complete, expected: allProven && armedProven, gaps: got.gaps });
+  }
+  // Tracked records: each kept whole, looked up exactly when not every start agreeing with it is proven.
+  const runStarts = ref.final.filter(r9Run);
+  const ended = (t) => { const agreeing = runStarts.filter((s) => r9Agrees(t, s)); return agreeing.length > 0 && agreeing.every((s) => s.ref); };
+  if (typeof api.trackedIdentities === 'function') {
+    const list = api.trackedIdentities();
+    for (const t of c.tracked) list.add(t);
+    const resolution = census.ledgerResolution(finalView);
+    for (const t of c.tracked) {
+      const listed = list.list.filter((x) => r9IsTracked(x, t));
+      const lookedUp = listed.length ? listed.some((x) => !resolution.isEnded(x)) : 'lost';
+      if (lookedUp !== !ended(t)) misjudged.push({ kind: 'lookup', tracked: t, lookedUp, expected: !ended(t) });
+    }
+  }
+  // A whole stop. Each tracked PID is running, its birth unreadable: a PID some tracked record of
+  // which is not ended is looked up and reported unresolved, and the stop is incomplete; a PID every
+  // tracked record of which is ended, and no unproven start of the run names, is neither.
+  const stop = await r9Stop(c, dataDir);
+  const unprovenPids = new Set(runStarts.filter((s) => !s.ref).map((s) => s.identity.pid));
+  for (const pid of new Set(c.tracked.map((t) => t.pid))) {
+    const open = c.tracked.some((t) => t.pid === pid && !ended(t));
+    if (!open && unprovenPids.has(pid)) continue;
+    const lookedUp = stop.lookups.includes(pid), reported = stop.unresolved.some((u) => u.pid === pid);
+    if (lookedUp !== open || reported !== open) {
+      misjudged.push({ kind: 'stop', pid, lookedUp, reported, expected: open, unresolved: stop.unresolved.filter((u) => u.pid === pid) });
+    }
+  }
+  const anyOpen = c.tracked.some((t) => !ended(t));
+  if (anyOpen && stop.outcome !== 'STOP_INCOMPLETE') misjudged.push({ kind: 'stop', outcome: stop.outcome, expected: 'STOP_INCOMPLETE' });
+  if (stop.complete && !allProven) misjudged.push({ kind: 'stop', complete: true, unproven: true });
+  if (!c.witnessed && !anyOpen && stop.complete !== allProven) misjudged.push({ kind: 'stop', complete: stop.complete, expected: allProven });
+  return misjudged;
+}
+
+test(`round 9: the census's decisions agree with isProven over all records on ${GEN_PROOF_CASES} generated ledgers (seed ${GEN_SEED ^ 0x9})`, async () => {
+  const r = seeded(GEN_SEED ^ 0x9);
+  const dataDir = freshDir('generated-proof'), runDir = path.join(freshDir('generated-proof-run'), 'run');
+  const wrong = [];
+  const kinds = {};
+  for (let i = 0; i < GEN_PROOF_CASES; i++) {
+    const c = generateProofCase(r);
+    if (genOnly != null && genOnly !== i) continue;
+    const misjudged = await judgeProofCase(c, dataDir, runDir, r9ReferenceModule);
+    for (const k of new Set(misjudged.map((m) => m.kind))) kinds[k] = (kinds[k] ?? 0) + 1;
+    if (misjudged.length || genOnly === i) wrong.push({ seed: GEN_SEED ^ 0x9, case: i, misjudged, input: c });
+  }
+  if (wrong.length) {
+    console.log(`generated proof cases misjudged: ${wrong.length} of ${GEN_PROOF_CASES} (${JSON.stringify(kinds)}); reproduce one with STOP_CENSUS_GEN_CASE=<case>`);
+    genDump('generated-proof', wrong);
+    for (const w of wrong.slice(0, 3)) console.log(JSON.stringify(w));
+  }
+  assert.deepEqual(wrong.filter((w) => w.misjudged.length).map((w) => w.case), []);
 });

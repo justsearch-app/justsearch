@@ -23,7 +23,7 @@ const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
 const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, ledgerResolution,
   carryFindings } = require('./lib/stop-exit-census.cjs');
-const { TICK, compareIdentity, hasPid, birthOrder, bornAfter } = require('./lib/ledger-identity.cjs');
+const { TICK, compareIdentity, identityOf, identityKey, hasPid, birthOrder, bornAfter } = require('./lib/ledger-identity.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
 const devDataFolder = require('./lib/dev-data-folder.cjs');
@@ -3721,13 +3721,46 @@ function recordedProcesses(run, recordWrittenMs) {
   });
 }
 
+// <ledger-resolution> Every identity comparison in this region is compareIdentity's (ledger-identity.cjs);
+// the structural check in test-dev-runner-stop-census.mjs holds it to that.
+/**
+ * The identities a stop tracks, as a list of distinct records (round 9): never a map keyed by part of
+ * an identity. Two records of one PID and birth that name another childId, witness, owner, incarnation
+ * or birth tick are both kept, and each is judged (ledger resolution, lookup) on its own, so one never
+ * stands in for the other. Only a record repeated whole (compareIdentity 'exact', at the same tick:
+ * an earlier stop writes its list to both run.json and stop-tracked-processes.json) is one record, its
+ * other fields merged. `add(p)` adds one; `list` holds them in the order first added.
+ */
+function trackedIdentities() {
+  const list = [];
+  // By PID and birth: an index only; each candidate in a bucket is compared whole.
+  const byKey = new Map();
+  const sameRecord = (a, b) => compareIdentity(a, b, 'exact') && identityOf(a)?.tick === identityOf(b)?.tick;
+  return {
+    list,
+    add(p) {
+      if (!p?.pid) return;
+      const key = identityKey(p);
+      if (!byKey.has(key)) byKey.set(key, []);
+      const bucket = byKey.get(key);
+      const at = bucket.find((i) => sameRecord(list[i], p));
+      if (at === undefined) {
+        bucket.push(list.length);
+        list.push({ ...p });
+        return;
+      }
+      const prior = list[at];
+      list[at] = { ...prior, ...p, owned: prior.owned === true || p.owned === true ? true : p.owned ?? prior.owned,
+        bornNotAfterMs: prior.bornNotAfterMs ?? p.bornNotAfterMs };
+    },
+  };
+}
+
 /**
  * One recorded process against an OS lookup (`lookupProcessIdentities` row, or null when the lookup
  * failed): 'match' (alive, the recorded birth), 'gone', 'reused' (the pid now names another process)
  * or 'unknown'. Only 'match' may be killed; 'unknown' is never read as dead (S17).
  */
-// <ledger-resolution> Every identity comparison in this region is compareIdentity's (ledger-identity.cjs);
-// the structural check in test-dev-runner-stop-census.mjs holds it to that.
 function checkRecordedProcess(recorded, seen) {
   if (!recorded?.pid) return 'gone';
   if (!seen) return 'unknown';
@@ -3985,15 +4018,10 @@ async function stopRun(opts, {
   // Identities left unresolved by an earlier attempt are re-checked, rather than treating a failed
   // helper or a self-exited root as permanent debt. They are reported, never killed: only a
   // process this run started, or a helper the Engine registered, is ever ended.
-  const tracked = new Map();
-  const remember = (p) => {
-    if (p?.pid) {
-      const key = `${p.pid}/${p.creationFileTimeUtc ?? '?'}`;
-      const prior = tracked.get(key);
-      tracked.set(key, { ...prior, ...p, owned: prior?.owned === true || p.owned === true ? true : p.owned ?? prior?.owned,
-        bornNotAfterMs: prior?.bornNotAfterMs ?? p.bornNotAfterMs });
-    }
-  };
+  // A list of distinct records, never merged by part of an identity (trackedIdentities).
+  const trackedSet = trackedIdentities();
+  const tracked = trackedSet.list;
+  const remember = trackedSet.add;
   // A record from an earlier tree-era stop: its listed identities stay reported until resolved.
   for (const tree of run.stopUnresolvedTrees ?? []) {
     for (const p of tree.processes ?? []) remember({ ...p, role: `${tree.role} descendant` });
@@ -4014,7 +4042,7 @@ async function stopRun(opts, {
       birthTick: child.creationFileTimeUtc ? 10 : 10000, owned: false };
   });
   for (const p of helperProcesses) remember(p);
-  const allEntries = () => [...processes, ...tracked.values()].filter(p => p.pid && p.pid !== process.pid);
+  const allEntries = () => [...processes, ...tracked].filter(p => p.pid && p.pid !== process.pid);
   // Arm OS exit handles while the initial identity lookup starts. Actions still wait for both.
   let censusError;
   const pendingCensus = !opts.forgetUnresolved
@@ -4022,9 +4050,9 @@ async function stopRun(opts, {
       .catch(error => { censusError = error; return null; }) : null;
   if (!opts.forgetUnresolved) {
     await lookupPhase(allEntries());
-    for (const p of tracked.values()) await lookupOne(p);
-    await writeJsonAtomic(runPath, { ...run, stopTrackedProcesses: [...tracked.values()] });
-    await writeJsonAtomic(trackedPath, { processes: [...tracked.values()], legacyBounds });
+    for (const p of tracked) await lookupOne(p);
+    await writeJsonAtomic(runPath, { ...run, stopTrackedProcesses: [...tracked] });
+    await writeJsonAtomic(trackedPath, { processes: [...tracked], legacyBounds });
   } else {
     // Explicit escape hatch: inspection only. No shutdown request, runner request, or terminator.
     const leftBehind = [];
@@ -4039,7 +4067,7 @@ async function stopRun(opts, {
         startedAt: child.startedAt ?? 'unknown' });
     }
     await lookupPhase(allEntries());
-    for (const p of [...processes, ...tracked.values()].filter(p => p.pid)) {
+    for (const p of [...processes, ...tracked].filter(p => p.pid)) {
       const state = await lookupOne(p);
       if (state === 'match' || state === 'unknown') leftBehind.push(describeUnresolved(p, state));
     }
@@ -4323,7 +4351,7 @@ async function stopRun(opts, {
       .map((p) => ({ ...p, role: 'Engine job member', state: 'unknown' })) : [];
 
   const unresolvedProcesses = [];
-  for (const p of tracked.values()) {
+  for (const p of tracked) {
     const state = await lookupOne(p);
     if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
   }
@@ -4684,6 +4712,7 @@ if (require.main === module) {
 } else {
   module.exports = {
     __test: {
+      trackedIdentities,
       pruneHistoricRuns,
       resolveDataDir,
       cleanDataDir,

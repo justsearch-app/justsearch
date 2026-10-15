@@ -19,10 +19,12 @@
  *                 with no birth, whose PID, when the dev runner's engine-owner-died names one, must
  *                 agree) proves only the one start in the run with that key
  *                 (`ctx.keyStarts === 1`), never a start with conflicting metadata, never when another
- *                 record of the key contradicts the start (`ctx.contested`), and, for a child, only
+ *                 record of the key contradicts the start (`ctx.contested`); for a child, only
  *                 when the owner the record names (owner, previousOwner) or else its writer is the
- *                 start's owner instance. Any other record must carry and agree on every field the
- *                 start carries.
+ *                 start's owner instance; for an Engine, only when its writer is a supervisor (shell,
+ *                 dev runner, dev CLI), that Engine itself (its PID, started its millisecond) or a
+ *                 writer that recorded the start (`ctx.startWriters`: role, PID and start instant).
+ *                 Any other record must carry and agree on every field the start carries.
  *   'contradicts' some field both carry disagrees (a record about another process of the same key).
  *   'exact'       one start: the same fields, each equal, the births to the tick.
  *   'native'      one process by PID and birth alone, for pairing records whose other fields describe
@@ -83,8 +85,7 @@ function identityOf(x, { tick = null, source = null, kind = null, defaultTick = 
     const hit = derived.get(x)?.get(String(defaultTick));
     if (hit && unchanged(hit, x)) return hit.value;
   }
-  const value = build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, witnessId });
-  if (plain) {
+  const value = build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, witnessId });  if (plain) {
     if (!derived.has(x)) derived.set(x, new Map());
     derived.get(x).set(String(defaultTick), { value, source: sourceOf(x) });
   }
@@ -100,7 +101,10 @@ function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId
     pid: validPid(x.pid ?? x.ProcessId),
     birth: isFileTime(birth) ? birth : null,
     rawBirth: birth,
-    tick: String(tick ?? tickOf(x.birthTick) ?? SOURCE_TICK[x.creationTimeSource] ?? defaultTick),
+    // A birth read natively (GetProcessTimes) is exact whatever tick a record declares beside it: two
+    // native FILETIMEs are compared to the tick, never at a coarser declaration (round 9).
+    tick: String(tick ?? (x.creationTimeSource === 'native' ? TICK.EXACT : null) ?? tickOf(x.birthTick)
+      ?? SOURCE_TICK[x.creationTimeSource] ?? defaultTick),
     source: source ?? x.creationTimeSource ?? null,
     kind: kind ?? null,
     childId: (childId !== undefined ? childId : x.childId) ?? null,
@@ -185,8 +189,21 @@ function writerIsOwner(writer, owner, { unknownBirth = false } = {}) {
   return O.birth !== null && birthMs(O) === startedMs;
 }
 
-/** Ledger record line `line` (its writer `writer`) proves start `S` (rule 'proves'). */
-function proves(line, S, { keyStarts = 1, contested = false, writer = null, family = null } = {}) {
+/** The writer roles that supervise an Engine and write its records (exit-ledger.cjs WRITER_ROLES but 'engine'). */
+const SUPERVISOR_ROLES = new Set(['shell', 'dev-runner', 'dev-cli']);
+
+/** A writer's start instant in milliseconds (the ledger reader gives it as a number), or null. */
+const writerStartedMs = (w) => (Number.isFinite(w?.startedAt) ? w.startedAt : knownTimestamp(w?.startedAt) ?? null);
+/** The same writer: one role, one PID, one start instant, all recorded. */
+const sameWriter = (a, b) => Boolean(a && b) && typeof a.role === 'string' && a.role === b.role
+  && validPid(a.pid) !== null && validPid(a.pid) === validPid(b.pid)
+  && writerStartedMs(a) !== null && writerStartedMs(a) === writerStartedMs(b);
+
+/**
+ * Ledger record line `line` (its writer `writer`) proves start `S` (rule 'proves'). `startWriters`:
+ * the writers that recorded the start (an Engine start's).
+ */
+function proves(line, S, { keyStarts = 1, contested = false, writer = null, family = null, startWriters = [] } = {}) {
   if (!line || !S) return false;
   const R = identityOf(line, { defaultTick: TICK.EXACT, owner: line.owner ?? line.previousOwner ?? null });
   if (S.conflicts.length) return false;
@@ -198,7 +215,13 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
     : line.pid == null && line.creationFileTime == null && line.incarnation == null;
   if (keyOnly) {
     if (keyStarts !== 1 || contested || contradicts(R, S)) return false;
-    if (engine) return true;
+    // An Engine's incarnation-only record is the word of its supervisor (the shell, the dev runner, a
+    // dev CLI stop), of that Engine itself (an Engine writer with the start's own PID, started the
+    // start's millisecond), or of the writer that recorded the start. Any other Engine's word about it
+    // proves nothing (round 9).
+    if (engine) {
+      return SUPERVISOR_ROLES.has(writer?.role) || writerIsOwner(writer, S) || startWriters.some(w => sameWriter(writer, w));
+    }
     if (line.owner != null || line.previousOwner != null) return ownerCarries(R.owner, S.owner) && S.owner !== null;
     return writerIsOwner(writer, S.owner);
   }
