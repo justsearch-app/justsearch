@@ -83,3 +83,14 @@ BootPowerEvents dependency, so the declaration-only replay removes that unrelate
   "note": "The current preamble and entry explicitly claim fail-before by transplanting candidate EngineRoot and reducing bindPowerEvents to a no-op. All four checks directly require those removed effects, so the declared assertion failures are stub-created rather than evidence from the old implementation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:015b66edb536cac03413fbbe7227b119412e37e7bdfbecf1b2c617d02a9b5723",
+  "note": "All four candidate checks pass; the exact 48326a1ce replay with the declaration-only compatibility patch fails compilation on missing bindPowerEvents, also absent at b1cfcac8e. The candidate-only reason is true and the declaration matches the assertions; bound to main."
+}
+```

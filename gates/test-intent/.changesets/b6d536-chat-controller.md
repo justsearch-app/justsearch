@@ -305,3 +305,14 @@ overlaid on top of them.
   "note": "Before rerun mismatch for entries 1 and 2: the exact declared f75486245 test/helper overlay, with no patch, fails compileTestJava because ChildControl and ProcessTerminator are absent. The separate repaired-seam evidence records assertion failures; the older combined evidence's compatibility patch does not repair this unpatched record."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:7605fd552e776453d91613f68e7c47266ea22d796aa67f523c73c9099725ea61",
+  "note": "Re-reviewed the corrected entries since 9f1f6257b: both candidate checks pass and the exact f75486245 compatibility-patch replay reproduces the declared coalescing and lifecycle-lock assertion failures. The patch does not decide those outcomes; other entries, listed items and evidence remain truthful and unchanged; bound to main."
+}
+```

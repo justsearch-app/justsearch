@@ -242,3 +242,14 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
   "note": "The preamble and New entries present manual failures from candidate device-loss/resume methods replaced by no-op or fixed-result stubs as fail-before proof. Those reached stubs determine the asserted missing effects; candidate checks passing does not make these manufactured failures valid before-state evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:035dc988c2f1f8b7208f521a1e6a8d9885ca9b6b9be60cabd0ba0cdec3a224b2",
+  "note": "Reran all 46 changed-entry checks successfully; the actual a3e96417e replay and API audit confirm the stated missing APIs, so the candidate-only reasons are true and withdrawn outcome-stub failures are not proof. Declarations match assertions; other entries and evidence are unchanged since 9f1f6257b; bound to main."
+}
+```

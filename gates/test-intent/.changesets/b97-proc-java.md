@@ -401,3 +401,14 @@ F:/phaseb-fix3-b6d536-20261015.
   "note": "Entry 6 has candidate-only preservation evidence with no stated before-state reason for aFailureBeforeResumeLeavesNoProcessBehind and aFailureJoiningTheJobLeavesNoProcessBehind. The archived before XML proves only the original pipe/argument case; it does not cover these two later checks."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:be756e5344de0b5f085061734838985b2135a746b11c843bb2db0820c9820752",
+  "note": "All three corrected checks pass; both preservation checks also pass at a164833f5 with the declared add-only createChat stub, which their paths cannot reach. The job-assignment candidate-only reason is true, declarations match assertions, and remaining entries/items/evidence are unchanged since 9f1f6257b; bound to main."
+}
+```
