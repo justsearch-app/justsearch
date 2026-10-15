@@ -131,7 +131,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private final UiSettingsStore store;
   private final ConfigStore config;
   private final Runnable restart;
-  private final Function<UiSettings, ResolvedConfig> prepareConfig;
+  private final java.util.function.BiFunction<UiSettings,
+      io.justsearch.app.api.settings.SettingsCandidateContext, ResolvedConfig> prepareConfig;
   private final Function<UiSettings, OperationResult> prepareResponse;
   private final Replacement replacement;
   private final BooleanSupplier processClosing;
@@ -169,7 +170,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       Function<UiSettings, OperationResult> prepareResponse, BooleanSupplier processClosing,
       SettingsComponentComposer components,
       java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
-    this(store, config, restart, ConfigStoreRebuilder::prepare, prepareResponse,
+    this(store, config, restart,
+        (candidate, context) -> ConfigStoreRebuilder.prepare(candidate, context.chatProfile(), config.get()), prepareResponse,
         store::replacePrepared, processClosing, components, faultHook);
   }
 
@@ -198,6 +200,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
       Function<UiSettings, ResolvedConfig> prepareConfig,
+      Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
+      BooleanSupplier processClosing, SettingsComponentComposer components,
+      java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
+    this(store, config, restart, (candidate, context) -> prepareConfig.apply(candidate),
+        prepareResponse, replacement, processClosing, components, faultHook);
+  }
+
+  private SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      java.util.function.BiFunction<UiSettings,
+          io.justsearch.app.api.settings.SettingsCandidateContext, ResolvedConfig> prepareConfig,
       Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
       BooleanSupplier processClosing, SettingsComponentComposer components,
       java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
@@ -363,7 +375,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       // candidate, including ordinary settings that accompanied the model paths.
       var preparedSettings = store.prepareExact(candidate, successor,
           InstallerQueryRoleSelection.fromPlan(plan).orElse(null));
-      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(preparedSettings.settings()),
+      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(preparedSettings.settings(),
+          io.justsearch.app.api.settings.SettingsCandidateContext.NONE),
           "Prepared installer configuration");
       requireSelectedInstallerEncoderPaths(desired, plan);
       ResolvedConfig serving = config.get();
@@ -682,7 +695,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       // Its committed defaults are applied by the already-required successor boot.
       boolean chatComponentChanged = !active.recoveryReset() && !Objects.equals(
           active.priorSettings.getChatEnabled(), preparedCandidate.getChatEnabled());
-      ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(preparedCandidate), "Prepared config");
+      ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(preparedCandidate, candidateContext), "Prepared config");
       ResolvedConfig serving = config.get();
       var changedKeys = active.recoveryReset()
           ? new ConfigApplyScopes.ChangedKeys(Set.of(), Map.of(),
@@ -1100,6 +1113,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   @Override
   public boolean recoverCommittedComposition() {
     SettingsComponentComposer.Prepared prepared = null;
+    ConfigStore.PreparedSwap recoveredConfig = null;
     boolean installed = false;
     mutex.lock();
     try {
@@ -1121,7 +1135,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, active.id));
         throw new IllegalStateException("Committed settings witness changed during boot recovery");
       }
-      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(snapshot.settings()), "Recovered config");
+      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(snapshot.settings(), recoveredContext), "Recovered config");
       var generativeKeys = new java.util.TreeSet<String>();
       if (recoveredContext.hasChatProfile()) {
         generativeKeys.add("chatProfile");
@@ -1129,9 +1143,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (recoveredContext.forceGenerativeRefresh()) {
         generativeKeys.add("modelRefresh");
       }
-      var affected = Map.<String, Set<String>>of("generative", Set.copyOf(generativeKeys));
+      var affected = new java.util.TreeMap<String, Set<String>>();
+      affected.put("generative", Set.copyOf(generativeKeys));
+      var changed = ConfigApplyScopes.classify(config.get(), desired);
+      if (changed.component().containsKey("encoders")) {
+        affected.put("encoders", changed.component().get("encoders"));
+      }
       prepared = Objects.requireNonNull(components.prepare(snapshot.settings(), desired, affected,
           recoveredContext), "Recovered component transaction");
+      recoveredConfig = config.prepareSwap(desired);
+      ConfigStore.PreparedSwap chosenConfig = recoveredConfig;
       SettingsComponentComposer.Prepared chosen = prepared;
       var publication = config.publicationLock();
       chosen.withOwnerLocks(() -> {
@@ -1140,7 +1161,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           if (!active.prior.equals(store.inspect().witness())) {
             throw new IllegalStateException("Committed settings witness changed during recovery publication");
           }
+          config.validatePrepared(chosenConfig);
           chosen.validate();
+          config.installPrepared(chosenConfig);
           chosen.install();
         } finally { publication.writeLock().unlock(); }
       });
@@ -1166,6 +1189,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     }
     // A completed install is externally visible. Arbitrary observation and retirement run
     // outside the settings mutex and the shared publication writer.
+    config.notifyListeners(recoveredConfig.event());
     try { prepared.notifyObservers(); }
     catch (RuntimeException notificationFailure) {
       LOG.warn("Recovered generative component notification failed", notificationFailure);

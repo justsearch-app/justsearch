@@ -2,6 +2,7 @@
 package io.justsearch.app.services.ai.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -77,10 +78,15 @@ final class RuntimeActivationServiceChatProfileTest {
   private final Map<String, String> prevProps = new HashMap<>();
   private ConfigStore prevStore;
   private final List<io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture> intentFixtures = new ArrayList<>();
+  private boolean planningInstalled;
 
   @AfterEach
   void restore() throws Exception {
     for (var fixture : intentFixtures) fixture.close();
+    if (planningInstalled) {
+      ConfigStoreRebuilder.rememberDevicePlanner(null);
+      ConfigStoreRebuilder.rememberAutoDetected(Map.of());
+    }
     for (var e : prevProps.entrySet()) {
       if (e.getValue() == null) {
         System.clearProperty(e.getKey());
@@ -95,6 +101,193 @@ final class RuntimeActivationServiceChatProfileTest {
   }
 
   // ---------------------------------------------------------------- resolution + remedy
+
+  @Test
+  void compactToStandardActivationReplansEncoderCaps() throws Exception {
+    assertActivationCaps(ChatModelProfile.COMPACT, ChatModelProfile.STANDARD);
+  }
+
+  @Test
+  void standardToCompactActivationReplansEncoderCaps() throws Exception {
+    assertActivationCaps(ChatModelProfile.STANDARD, ChatModelProfile.COMPACT);
+  }
+
+  @Test
+  void unchangedProfileActivationDoesNotRecomposeEncoders() throws Exception {
+    setUpGpuPlanning(ChatModelProfile.COMPACT);
+    var store = settingsStore();
+    var components = new RecordingComponents(store);
+    var service = newService(OnlineAiService.unavailable(), store, components);
+    var before = encoderCaps(ConfigStore.global().get());
+    service.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
+
+    service.startActivate("cuda12", "compact");
+
+    assertEquals("completed", awaitDone(service).state);
+    assertEquals(before, encoderCaps(ConfigStore.global().get()));
+    assertTrue(components.encoderCandidates.isEmpty(),
+        "unchanged profile activation must not recompose encoders");
+  }
+
+  @Test
+  void committedProfileRecoveryReplansEncoderCaps() throws Exception {
+    setUpGpuPlanning(ChatModelProfile.COMPACT);
+    var clock = java.time.Clock.systemUTC();
+    var store = settingsStore();
+    var db = tmp.resolve("interrupted-profile.db");
+    var descriptor = io.justsearch.app.api.operations.OperationDescriptor.invocation(
+        io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+        "settings.apply-internal-candidate", "{}", false);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(clock);
+    try (var operations = new io.justsearch.app.observability.operations.SqliteOperationStore(db)) {
+      var preparation = new io.justsearch.app.api.operations.OperationStore.Preparation(
+          java.util.UUID.randomUUID(), new io.justsearch.app.api.operations.OperationPreparedPayload(false,
+              "{\"schema\":\"settings-candidate-v1\",\"chatProfileId\":\"standard\",\"forceGenerativeRefresh\":false}"));
+      operations.savePreparation(key, descriptor, preparation);
+      var row = operations.acceptPrepared(key, descriptor, TestEngineContexts.internal(),
+          null, preparation.nonce()).record();
+      assertTrue(operations.start(row.id()));
+      assertTrue(operations.armSettingsRevision(row.id(), 0));
+      var settings = new UiSettings();
+      settings.setServerExecutablePath(createVariantExe("cuda12").toString());
+      store.replacePrepared(store.prepare(settings, new SettingsWitness(1, key)));
+    }
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
+    var expected = standardCaps();
+    assertNotEquals(expected, encoderCaps(config.get()));
+    var components = new RecordingComponents(store);
+    try (var operations = new io.justsearch.app.observability.operations.SqliteOperationStore(db)) {
+      var owner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(store, config,
+          () -> fail("recovery must not restart the application"),
+          candidate -> io.justsearch.agent.api.registry.OperationResult.success("recovered"),
+          () -> false, components);
+      var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+          operations, clock, java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+              io.justsearch.agent.api.registry.OperationKind.RECONFIGURE), owner);
+      assertTrue(runner.reconcileSettingsAfterComposition());
+      assertEquals(expected, encoderCaps(config.get()),
+          "committed profile recovery must publish the selected profile's encoder caps");
+      assertEquals(List.of(expected), components.encoderCandidates,
+          "recovery must recompose changed encoder caps through the settings owner");
+    }
+  }
+
+  @Test
+  void settingsChatModelSelectionReplansEncoderCaps() throws Exception {
+    setUpGpuPlanning(ChatModelProfile.COMPACT);
+    clearProp(CHAT_PROFILE_PROP);
+    var store = settingsStore();
+    var settings = store.load();
+    settings.setLlmModelPath(modelsDir().resolve(ChatModelProfile.COMPACT.modelFile()).toString());
+    store.replacePrepared(store.prepare(settings, new SettingsWitness(0, null)));
+    var components = new RecordingComponents(store);
+    newService(OnlineAiService.unavailable(), store, components);
+    assertNotEquals(standardCaps(), encoderCaps(ConfigStore.global().get()));
+
+    var snapshot = store.inspect();
+    snapshot.settings().setLlmModelPath(
+        modelsDir().resolve(ChatModelProfile.STANDARD.modelFile()).toString());
+    commitSettings(store, snapshot.settings(), snapshot.witness());
+
+    assertEquals(standardCaps(), encoderCaps(ConfigStore.global().get()),
+        "a settings chat model selection must install the standard encoder caps");
+    assertEquals(1, components.encoderCandidates.size());
+  }
+
+  private void assertActivationCaps(ChatModelProfile from, ChatModelProfile to) throws Exception {
+    setUpGpuPlanning(from);
+    var store = settingsStore();
+    var components = new RecordingComponents(store);
+    var service = newService(OnlineAiService.unavailable(), store, components);
+    var before = encoderCaps(ConfigStore.global().get());
+    // A steady start with the target profile is the independent comparison, with the same device
+    // and installed encoders. The activation keeps the launcher's original profile in place.
+    setProp(CHAT_PROFILE_PROP, to.id());
+    var expected = encoderCaps(ConfigStoreRebuilder.prepare(store.load()));
+    setProp(CHAT_PROFILE_PROP, from.id());
+    assertNotEquals(before, expected, "the two profiles reserve different chat footprints");
+    service.setSelfTestOverrideForTest((exe, model) -> passingSelfTest());
+
+    service.startActivate("cuda12", to.id());
+
+    var status = awaitDone(service);
+    assertEquals("completed", status.state, status.message);
+    assertEquals(expected, encoderCaps(ConfigStore.global().get()),
+        from.id() + " to " + to.id() + " activation must install the " + to.id() + " encoder caps");
+    assertEquals(List.of(expected), components.encoderCandidates,
+        "changed caps must reach encoder preparation through the settings owner");
+    var snapshot = store.inspect();
+    snapshot.settings().setExcludePatterns(List.of("*.unrelated"));
+    commitSettings(store, snapshot.settings(), snapshot.witness());
+    assertEquals(expected, encoderCaps(ConfigStore.global().get()),
+        "an unrelated settings commit must retain the activated profile's plan");
+    assertEquals(1, components.encoderCandidates.size(),
+        "an equal plan must not recompose encoders");
+  }
+
+  private void setUpGpuPlanning(ChatModelProfile initial) throws Exception {
+    setUpEnvironment();
+    createVariantExe("cuda12");
+    var packages = new ArrayList<io.justsearch.configuration.model.ModelPackage>();
+    for (var profile : List.of(ChatModelProfile.STANDARD, ChatModelProfile.COMPACT)) {
+      var model = modelsDir().resolve(profile.modelFile());
+      Files.createDirectories(model.getParent());
+      Files.writeString(model, "fixture");
+      Files.writeString(modelsDir().resolve(profile.mmprojFile()), "projector");
+      String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest
+          .getInstance("SHA-256").digest(Files.readAllBytes(model)));
+      io.justsearch.app.inference.ChatArtifactIdentity.rememberWritten(model, Files.size(model), digest);
+      var variant = new io.justsearch.configuration.model.ModelVariant(model.getFileName().toString(),
+          io.justsearch.configuration.model.ModelPrecision.GGUF,
+          io.justsearch.configuration.model.ExecutionProvider.LLAMA_SERVER, digest, Files.size(model), null);
+      packages.add(new io.justsearch.configuration.model.ModelPackage(profile.id(), "fixture", "fixture",
+          modelsDir().relativize(model.getParent()).toString(), List.of(variant), List.of(), 0, null));
+    }
+    setProp(CHAT_PROFILE_PROP, initial.id());
+    setProp("justsearch.context.size", "32768");
+    ConfigStoreRebuilder.rememberAutoDetected(Map.of("justsearch.gpu.layers", "99",
+        "justsearch.gpu.enabled", "true"));
+    planningInstalled = true;
+    var device = new io.justsearch.app.services.gpu.CudaDevice(0, java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(), 12_282L * 1024 * 1024);
+    var facts = new io.justsearch.app.services.gpu.DeviceFacts(
+        io.justsearch.app.services.gpu.DeviceFacts.ProbeStatus.RAN_OK, 0, 12_080,
+        List.of(device), java.util.Optional.of(device));
+    var weights = Map.of(io.justsearch.ort.EncoderRole.EMBEDDING, 598.3,
+        io.justsearch.ort.EncoderRole.SPLADE, 474.2, io.justsearch.ort.EncoderRole.NER, 257.2,
+        io.justsearch.ort.EncoderRole.RERANKER, 600.3);
+    var manifest = new io.justsearch.configuration.model.ModelRegistry(2, "fixture identities", packages);
+    var planner = io.justsearch.app.services.gpu.GpuProfileResolver.planner(() -> facts, ignored -> weights);
+    ConfigStoreRebuilder.rememberDevicePlanner(config -> {
+      try (var registry = org.mockito.Mockito.mockStatic(
+          io.justsearch.configuration.model.ModelRegistryLoader.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        registry.when(() -> io.justsearch.configuration.model.ModelRegistryLoader
+            .loadFromClasspath("ai/model-registry.v2.json")).thenReturn(manifest);
+        return planner.plan(config);
+      }
+    });
+  }
+
+  private static List<Integer> encoderCaps(ResolvedConfig config) {
+    return List.of(config.ai().embedding().gpuMemMb(), config.ai().splade().gpuMemMb(),
+        config.ai().reranker().gpuMemMb());
+  }
+
+  private List<Integer> standardCaps() {
+    String previous = System.getProperty(CHAT_PROFILE_PROP);
+    setProp(CHAT_PROFILE_PROP, "standard");
+    try { return encoderCaps(ConfigStoreRebuilder.prepare(new UiSettings())); }
+    finally {
+      if (previous == null) clearProp(CHAT_PROFILE_PROP);
+      else setProp(CHAT_PROFILE_PROP, previous);
+    }
+  }
+
+  private void commitSettings(UiSettingsStore store, UiSettings settings, SettingsWitness witness) {
+    var result = new SettingsServiceImpl(store, intentFixtures.getLast().runner())
+        .applyInternal(settings, witness, TestEngineContexts.internal());
+    assertTrue(result.response().success(), "settings commit: " + result.response());
+  }
 
   @Test
   @DisplayName("compact profile with no model on disk fails MODEL_NOT_FOUND naming the fetch script")
@@ -650,12 +843,12 @@ final class RuntimeActivationServiceChatProfileTest {
   }
 
   private void setProp(String key, String value) {
-    prevProps.putIfAbsent(key, System.getProperty(key));
+    if (!prevProps.containsKey(key)) prevProps.put(key, System.getProperty(key));
     System.setProperty(key, value);
   }
 
   private void clearProp(String key) {
-    prevProps.putIfAbsent(key, System.getProperty(key));
+    if (!prevProps.containsKey(key)) prevProps.put(key, System.getProperty(key));
     System.clearProperty(key);
   }
 
@@ -684,6 +877,7 @@ final class RuntimeActivationServiceChatProfileTest {
     final List<Integer> desiredGpuLayers = new ArrayList<>();
     final List<Integer> desiredContexts = new ArrayList<>();
     final List<Boolean> chatEnabledAtInstall = new ArrayList<>();
+    final List<List<Integer>> encoderCandidates = new ArrayList<>();
     boolean failValidation;
     int abortedCount;
 
@@ -706,7 +900,13 @@ final class RuntimeActivationServiceChatProfileTest {
       preparedGpuLayers.add(candidate.getGpuLayers());
       desiredGpuLayers.add(desired.ai().gpuLayers());
       desiredContexts.add(desired.ai().contextSize());
+      if (affected.containsKey("encoders")) encoderCandidates.add(encoderCaps(desired));
       return new Prepared() {
+        @Override public java.util.Optional<io.justsearch.app.api.settings.QueryRoleSelection> queryRoleSelection() {
+          if (!affected.containsKey("encoders")) return java.util.Optional.empty();
+          var disabled = io.justsearch.app.api.settings.QueryRoleSelection.Role.disabled();
+          return java.util.Optional.of(new io.justsearch.app.api.settings.QueryRoleSelection(disabled, disabled));
+        }
         @Override public void includeObservation(
             io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
           throw new UnsupportedOperationException("Chat-profile fixture has no generation projection");
