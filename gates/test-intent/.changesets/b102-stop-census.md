@@ -286,7 +286,29 @@ orchestrator):
 - An Engine incarnation's key-only record has no birth; the dev runner's `engine-owner-died` names
   the PID, which must then agree with the start's. (This reading lets `engine-owner-died` GONE
   with `{ incarnation, pid }` prove the one start of its incarnation, as the proof table already
-  had it.)
+  had it.) Confirmed on the writer: the dev runner's reconcile (`engine-actuator.cjs`) is the only
+  writer of `engine-owner-died` (the Engine's `LedgerRecordType` names it but writes none), and
+  it writes `{ incarnation, basis, osCheck, exitClass, pid }` for the one open start of that
+  incarnation it read. Driven for real (verifier-r8/confirm/engine-owner-died-real-writer.cjs),
+  its GONE record, for an absent PID or one reused by another birth, proves that start; its
+  ALIVE_MATCH and IDENTITY_UNKNOWN records do not.
+- Writer agreement (the assumption that changed): the verifier's fixtures of rounds 2 to 7 gave the
+  Engine writer any `startedAt` (a year after the owner's birth in the 17 MB perf fixture, about
+  three hours before it in `rotation-rename-gap.cjs` and `enoent-states.cjs`). Round 8 holds a
+  key-only exit to its writer being the owner: its PID and its `startedAt` the owner's birth to the
+  millisecond. That is what a real Engine writer records: `startedAt` is
+  `ProcessHandle.current().info().startInstant()` (DefaultChildControl.java:198), written through
+  `LedgerTimestamps.format` (`truncatedTo(MILLIS)`). Measured on the repo's JDK (Temurin 25.0.2,
+  `resolve-jdk.cjs`), 40 JVMs each printing that value while the native reader
+  (`read-process-birth.ps1`, GetProcessTimes) took their FILETIME: the value was the native birth
+  truncated to the millisecond in 40 of 40, 22 of them 0.5 ms or more past their millisecond, so
+  Java truncates and never rounds, which is `birthMs`. Case 60 checks it on every run. A writer a
+  year or three hours away from its own birth cannot occur, so those fixtures were wrong and the
+  contract stands (coordinator decision). Corrected copies sit beside the originals, which are
+  unchanged: `rotation-rename-gap-r8.cjs`, `enoent-states-r8.cjs`, `make-perf-fixture-r8.cjs` and
+  `lifecycle-perf-r8.cjs`, each with only `startedAt` derived from the owner's birth. A misaligned
+  writer still proves nothing, so the stop falls back to looking the child up and stays safe
+  (case 59).
 - Carry by default: every gap a stop reports is a finding, carried into every later stop of the
   run (`carriedFrom`), keeping accounting incomplete until a person forgets the run, unless its kind
   is on the short not-seen-yet list (`NOT_SEEN_YET`): `unrecorded_exit`, and a `ledger-damaged`
@@ -416,8 +438,8 @@ What changed:
   unset otherwise, as before); `keepEarlierReports` and the census's `keepEarlierCensus` treat a
   file that parses to no object as unreadable.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (58 cases; 40 and 41 rewritten and
-42 to 58 added in round 8, with their own before-results below). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (61 cases; 40 and 41 rewritten and
+42 to 61 added in round 8, with their own before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -656,8 +678,27 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
 58. Real `stopRun` over a 17 MB ledger of 19,195 Engine children whose key-only exits prove
    nothing (their writer records a start a year after the owner's birth): every child is an
    `exit_unproven` gap, each ledger file is read once, and the stop takes under 30 s. Before the
-   round-8 indexing below it failed by assertion after 561,570 ms. b599d4d7e took about 13 s on the verifier's
-   fixture of the same shape.
+   round-8 indexing below it failed by assertion after 561,570 ms. b599d4d7e took about 13 s on
+   the verifier's fixture of the same shape.
+59. Identity edge `key-only-exit-misaligned-writer`: a key-only `child-exit` of the one start
+   under its childId, written by a writer with the owner's PID but a `startedAt` a year after, or
+   about three hours before, the owner's birth (the misaligned fixtures). Through the real census
+   and the real OS lookups, the stop looks the live child up, finds it running, and is
+   incomplete. Fails by assertion on a2c0400b3 (the child was taken as ended, never looked up);
+   passes on b599d4d7e, as preservation.
+60. Writer agreement: eight real JVMs from the repo's JDK each print their own PID and
+   `startInstant` as the Engine's writer records it; the native reader takes their FILETIME while
+   they live. `birthMs` of that birth is the printed millisecond, `writerIsOwner` holds, and a
+   key-only exit that writer wrote proves its one child. It needs ledger-identity.cjs, so it does
+   not load on a2c0400b3 or b599d4d7e; against a copy of it whose `birthMs` rounds it fails by
+   assertion on the first birth 0.5 ms or more past its millisecond.
+61. Real `stopRun` after an earlier report holding one gap of every kind: `exit_unproven`, an
+   identity-bound OS exit unavailable, `identity_metadata_conflict`, `unaccounted_process`,
+   `ledger_codes_disagree`, `ledger_os_disagree`, `evidence_lost`, `final_owner_receipt_unavailable`,
+   `ledger-unreadable`, `earlier-census-unreadable`, a damaged line that is not a torn tail, a torn
+   tail of two lines, and a kind added later are each carried from stop-report.1.json;
+   `unrecorded_exit` and a torn last line of one line are not. Fails by assertion on a2c0400b3
+   (`exit_unproven` not carried) and on b599d4d7e (nothing carried).
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -736,6 +777,16 @@ case 53). On b599d4d7e they fail by assertion as before (independent 5/19, indep
 6/22, independent-edges 5/21, proof-probes and proof-extra 3/5, both retention files none,
 audit-edges 11/19, audit-more 15/23, sticky-edges 1/3, both tail probes), and
 `r7-identity-edges.cjs` passes 8 of 8 there, as preservation.
+With the corrected fixtures (the writer agreement decision above), interleaved three times, CPU
+load 1 to 57 %: on the 17 MB harness with `make-perf-fixture-r8.cjs` (`run-perf-r8.ps1`),
+b599d4d7e took 15,043 / 14,663 / 14,874 ms, 118,510 parses, not complete; this change took 2,564 /
+2,592 / 2,448 ms, 59,255 parses, 1 read call per file, complete. `assert-perf.cjs`,
+`assert-file-reads.cjs` and `assert-comparison-r8.cjs` pass. Its `lifecycle-perf-r8.cjs` census
+took 14,509 ms on b599d4d7e (arming 5,073, verdict 9,435) and 2,135 ms with this change (1,645
+and 489), complete. `rotation-rename-gap-r8.cjs` and the four `enoent-states-r8.cjs` states pass
+on this change and fail by assertion on b599d4d7e (its rotation and ENOENT defects, as the
+originals there). The runs over the original, misaligned fixtures follow, kept as they were
+measured.
 On the 17 MB harness, interleaved three times (CPU load 0 to 85 %): b599d4d7e 16,622 / 14,754 /
 16,263 ms, 120,178 parses, not complete; this change 17,912 / 16,934 / 16,708 ms, 60,089 parses, 1
 read call per file, not complete. `assert-perf.cjs` and `assert-file-reads.cjs` pass on it;
@@ -755,9 +806,9 @@ fail by assertion for the same reason (their writer records 12:00:00Z for an own
 14:56:55.399Z, and the child is `exit_unproven`), and pass with only that `startedAt` set to the
 owner's birth. The legacy r2 and r3 perf harnesses took 15,748 and 11,794 ms on b599d4d7e and
 14,639 and 12,864 ms with this change (`assert-perf.cjs` passes), not complete for the same reason.
-The 41 `test-dev-runner-*.mjs` files and `e-pair-identity.test.mjs` pass (205 tests). In the full run of the
-check, cases 6 and 14 took 2,882 and 2,647 ms, case 58 15,317 ms, and the generated cases 40 and
-41 took 109,378 and 36,013 ms, with other work loading the machine (47,299 and 20,270 ms in the
-run before the indexing).
+The 41 `test-dev-runner-*.mjs` files and `e-pair-identity.test.mjs` pass (208 tests). In the
+full run of the check, cases 6 and 14 took 3,454 and 2,579 ms, case 58 13,652 ms, and the
+generated cases 40 and 41 took 101,018 and 33,990 ms, with other work loading the machine
+(47,299 and 20,270 ms in the run before the indexing).
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r8/).

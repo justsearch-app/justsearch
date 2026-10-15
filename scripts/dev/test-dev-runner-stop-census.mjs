@@ -1955,6 +1955,17 @@ const IDENTITY_EDGES = {
     r.startOf(p);
     r.exitOf({ owner: { ...r.owner, instanceId: 'inst-2' } });
   },
+  // ... nor when its writer has the owner's PID but records a start other than the owner's birth (the
+  // verifier's round-2 to round-7 fixtures: a year later, and about three hours earlier). A real
+  // Engine's writer records its own birth to the millisecond (the writer agreement case), so such a
+  // writer is another process under a reused PID: the stop falls back to looking the child up.
+  'key-only-exit-misaligned-writer': (r, p) => {
+    r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner, incarnation: r.incarnation });
+    r.startOf(p);
+    const birth = BigInt(r.engine.creationFileTimeUtc);
+    r.exitOf({}, { ...r.writer, startedAt: isoMs(birth + 365n * 86400n * 10000000n) });
+    r.exitOf({}, { ...r.writer, startedAt: isoMs(birth - 10615399n * 10000n) });
+  },
 };
 for (const [name, setup] of Object.entries(IDENTITY_EDGES)) {
   test(`round 8 identity edge ${name}: the stop looks the live child up, finds it running, and is incomplete`, async () => {
@@ -2066,6 +2077,39 @@ test('round 8 carry: an earlier report or census that parses to no report (null,
   }
 });
 
+test('round 8 carry: a retry carries every kind of finding an earlier stop reported, and only an exit not yet seen or one torn last line is looked at again', { skip: !windows && 'the Windows exit observer' }, async () => {
+  const at = (n) => ({ pid: 972100 + 4 * n, creationFileTimeUtc: String(134364634153991105n + BigInt(n) * 10000n) });
+  const carried = [
+    { reason: 'exit_unproven', role: 'extraction-child', detail: 'child-exit does not prove the exit', ...at(1) },
+    { reason: 'identity-bound OS exit code/time unavailable through teardown', role: 'extraction-child', ...at(2) },
+    { reason: 'identity_metadata_conflict', role: 'extraction-child', childId: 'c-conflict', ...at(3) },
+    { reason: 'unaccounted_process', detail: 'contradicts recorded containment', ...at(4) },
+    { reason: 'ledger_codes_disagree', codes: [0, 7], ...at(5) },
+    { reason: 'ledger_os_disagree', ledgerCode: 0, osCode: 7, ...at(6) },
+    { reason: 'evidence_lost', detail: 'children.v1.9.jsonl', ...at(7) },
+    { reason: 'final_owner_receipt_unavailable', role: 'job-helper', ...at(8) },
+    { reason: 'ledger-unreadable', family: 'children', detail: 'EBUSY' },
+    { reason: 'earlier-census-unreadable', file: 'process-exits.3.json' },
+    { reason: 'ledger-damaged', family: 'children', file: 'children.v1.jsonl', lines: 1, tornTail: false },
+    { reason: 'ledger-damaged', family: 'engine', file: 'engine.v1.jsonl', lines: 2, tornTail: true },
+    { reason: 'a_kind_added_later', ...at(9) },
+  ];
+  const lookedAgain = [
+    { reason: 'unrecorded_exit', role: 'extraction-child', ...at(10) },
+    { reason: 'ledger-damaged', family: 'children', file: 'children.v1.1.jsonl', lines: 1, tornTail: true },
+  ];
+  const report = await stopAfterEarlierReport('stop-census-r8-carry-kinds', JSON.stringify({ runId: 'earlier', exitAccountingComplete: false,
+    exitAccountingGaps: [...carried, ...lookedAgain] }));
+  const gaps = report.out.exitAccountingGaps;
+  const same = (a) => (g) => g.reason === a.reason && (g.pid ?? null) === (a.pid ?? null) && (g.file ?? null) === (a.file ?? null)
+    && (g.family ?? null) === (a.family ?? null);
+  for (const gap of carried) {
+    assert.ok(gaps.some((g) => same(gap)(g) && g.carriedFrom === 'stop-report.1.json'), `${gap.reason} is carried: ${JSON.stringify(gaps)}`);
+  }
+  for (const gap of lookedAgain) assert.ok(!gaps.some(same(gap)), `${gap.reason} (${gap.file ?? gap.pid}) is looked at again, not carried`);
+  assert.equal(report.out.exitAccountingComplete, false);
+});
+
 test('round 8 carry: a self-exit report carries what an earlier stop of the run found, and not an exit it had not yet seen', async () => {
   const selfExit = async (name, earlier) => {
     const dir = path.join(scratch, 'self-exit-carry', 'runs', name);
@@ -2085,6 +2129,70 @@ test('round 8 carry: a self-exit report carries what an earlier stop of the run 
   const notYet = await selfExit('run-self-not-yet', { exitAccountingComplete: false, exitAccountingGaps: [{ reason: 'unrecorded_exit',
     pid: 971045, role: 'engine' }] });
   assert.equal(notYet.onDisk.exitAccountingComplete, undefined, 'an exit not yet seen is not carried; a self-exit takes no census');
+});
+
+/**
+ * The Engine's writer records `startedAt` as ProcessHandle.current().info().startInstant()
+ * (DefaultChildControl), written to the millisecond (LedgerTimestamps.format: truncatedTo(MILLIS),
+ * ISO_INSTANT). This program prints exactly that for its own process, and its PID, then waits.
+ */
+const SELF_BIRTH_JAVA = `import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+
+public class SelfBirth {
+  public static void main(String[] args) throws Exception {
+    ProcessHandle self = ProcessHandle.current();
+    Instant start = self.info().startInstant().orElseThrow();
+    System.out.println(self.pid() + " " + DateTimeFormatter.ISO_INSTANT.format(start.truncatedTo(ChronoUnit.MILLIS)));
+    System.out.flush();
+    System.in.read();
+  }
+}
+`;
+
+test('round 8 writer agreement: a real JVM\'s own startInstant is its native birth truncated to the millisecond, so its writer is its owner', { skip: !windows && 'the native birth reader' }, async () => {
+  // The JDK the product runs on (resolve-jdk.cjs, as the dev runner launches the Engine).
+  const { resolveJavaExe } = require('./lib/resolve-jdk.cjs');
+  const identityLib = require('./lib/ledger-identity.cjs');
+  const java = resolveJavaExe();
+  const dir = path.join(scratch, 'self-birth');
+  fs.mkdirSync(dir, { recursive: true });
+  const source = path.join(dir, 'SelfBirth.java');
+  fs.writeFileSync(source, SELF_BIRTH_JAVA);
+  const seen = [];
+  // Eight launches: a birth 0.5 ms or more past its millisecond (about half of them) tells
+  // truncation from rounding.
+  for (let i = 0; i < 8; i++) {
+    const child = cp.spawn(java, [source], { stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true });
+    try {
+      const line = await new Promise((resolve, reject) => {
+        let out = '';
+        child.on('error', reject);
+        child.on('exit', (code) => reject(new Error(`the JVM exited (${code}) before printing: ${out}`)));
+        child.stdout.on('data', (d) => { out += d; if (out.includes('\n')) resolve(out.trim()); });
+      });
+      // The native observer's reading while the JVM is alive (GetProcessTimes on a held handle).
+      const native = actuator.captureSpawnedIdentity(child);
+      assert.ok(native, `the native birth of the JVM ${child.pid} is read`);
+      const [pid, startedAt] = line.split(' ');
+      assert.equal(Number(pid), child.pid, 'the JVM reports its own PID');
+      const owner = { pid: child.pid, creationFileTime: native.creationFileTimeUtc, instanceId: 'self-birth' };
+      seen.push({ birth: native.creationFileTimeUtc, startedAt });
+      assert.equal(identityLib.birthMs({ creationFileTimeUtc: native.creationFileTimeUtc }), Date.parse(startedAt),
+        `birthMs(${native.creationFileTimeUtc}) is the JVM's startInstant ${startedAt}`);
+      const writer = { role: 'engine', pid: child.pid, startedAt };
+      assert.equal(identityLib.writerIsOwner(writer, owner), true, JSON.stringify({ writer, owner }));
+      // And through the one rule: the JVM's key-only exit of its one child proves that child.
+      const start = identityLib.startIdentity({ pid: 4242, creationFileTime: String(BigInt(native.creationFileTimeUtc) + 10000000n),
+        childId: 'self-birth-child', kind: 'child', owner });
+      assert.equal(identityLib.compareIdentity({ childId: 'self-birth-child' }, start, 'proves', { writer }), true);
+    } finally {
+      child.stdin.end('x');
+      if (child.exitCode === null) await new Promise((resolve) => child.once('exit', resolve));
+    }
+  }
+  console.log(`JVM births and startInstants: ${JSON.stringify(seen)}`);
 });
 
 test('round 8 structural: no census or ledger-resolution code compares a PID or a birth outside compareIdentity', () => {
