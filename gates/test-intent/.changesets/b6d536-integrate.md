@@ -29,6 +29,10 @@ so the packaged-register check now expects 289. It passes on the candidate and f
 75e70d488 (289 expected, 282 actual). The count changes with the change, so entry 6 is now marked
 repaired and its text names 289.
 
+Phase B (integration base 181363e86, merge 98fd416d0): `b6d536-integrate-system-reads-repaired.json`
+was regenerated with its before-state f648453b5 and overlays unchanged. Both checks pass on the
+candidate and fail there by assertion, as entry 4 states.
+
 ## Evidence that goes stale on the integration branch only
 
 Each slice below ships as its own stacked PR, where its evidence was run against the test files
