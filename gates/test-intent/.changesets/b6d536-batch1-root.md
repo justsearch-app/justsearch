@@ -107,3 +107,14 @@ Phase B verifier repair (integration base 181363e86):
   "note": "Current-state and unchanged-splitter assertions pass and fail on their real parent, but the mapping-exception new check remains candidate-only without assertion fail-before; the record also names a superseded legacy method and obsolete forced-rewrite behavior. Own fresh Health-stream subscriber probe observes a failure while the component is READY. See verify-batch2/report.md and logs/own-subscriber.log."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:81cdc6e1288c820141751992d722f230839c1359caedd3f5af51b6d8195538ac",
+  "note": "Re-reviewed corrected admission and backfill declarations and the unreached compile-only compatibility stub; candidate and declared before checks reproduce the recorded repair and preservation outcomes."
+}
+```

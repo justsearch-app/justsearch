@@ -141,3 +141,14 @@ before and after; the gate's "does not show a repair" note is expected for prese
   "note": "Fresh real lifecycle reason-table check passes on 1e333857b and candidate. This record explicitly has no real-parent assertion failure on 64e04b891 for the new table check, which remains a mandatory proof gap under this verifier contract. No stub is treated as baseline evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:46092a120c4bdcd16a82f8bc6d1e46e5f973c0d22762fba41878faa16071a25e",
+  "note": "Re-reviewed the new reason-table API and explicit withdrawal of the synthetic null-returning proof; candidate table and child-API checks pass, with declared real-parent preservation reproduced."
+}
+```

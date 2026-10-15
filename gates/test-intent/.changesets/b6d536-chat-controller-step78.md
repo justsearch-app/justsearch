@@ -193,3 +193,14 @@ files.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:4750117dad682b14698a4f19d0f4e6d0c55e7d530d393b867018d9561a8828be",
+  "note": "Re-reviewed chat reason codes, failure scope and follow-up ownership intent; candidate and declared before checks reproduce the recorded repair outcomes."
+}
+```

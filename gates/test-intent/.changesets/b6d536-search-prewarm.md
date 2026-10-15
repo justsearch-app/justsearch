@@ -198,3 +198,14 @@ Evidence files (all written by run-evidence.mjs):
   "note": "verify-d57: fail-before re-run on 1392fdfbc (assertion, reason under test), mutation run on 370d82b33 (cause plumbing, readiness one-way/bound, cold->DEGRADED, daemon), behaviour claims match test code"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:bd883f617adbed76ec6d78017cbf98bb6609cc631567b731f29f77cf644c80df",
+  "note": "Re-reviewed query-leg acquisition, readiness and the concrete candidate-only reasons; candidate and declared before checks reproduce the recorded repair and preservation outcomes."
+}
+```

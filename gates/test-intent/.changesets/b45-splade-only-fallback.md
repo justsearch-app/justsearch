@@ -107,3 +107,14 @@ Independent verifier acceptance:
   "note": "Test-intent acceptance only. The exact candidate sources compiled on 9fde46683 through an external init script, with nine intended assertion failures and four preservation passes; all thirteen pass on 681ee1da2. OwnSpladeOnlyExpiryProbe independently fails before and passes after, and its sparse control passes both. An independent actual-postings probe preserves successful SPLADE retrieval and successful empty weights on both and repairs the nonmatching fallback's lost reason after. Product/test files were not edited. Three pre-existing full UI failures, shared governance failures, excluded unsafe cleanup and the initial full UI process-audit gap remain separate from this acceptance. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-splade/report.md, focused-summary.json and before/candidate-own-results.log."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:1701224f60169e176686e976ddbc49516d9327dbc497dfcfd1928d6de544697b",
+  "note": "Re-reviewed worker, HTTP and MCP fallback intent; candidate checks and the 9fde46683 replay reproduce the nine repair failures and four preservation passes."
+}
+```

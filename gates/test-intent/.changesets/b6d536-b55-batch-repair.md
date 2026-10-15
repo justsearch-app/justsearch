@@ -103,3 +103,14 @@ there by assertion.
   "note": "verify-batch5: entries pass on 7aafc6d72 (subscriber inside recovery sees no stale failure, also live R1; unchanged checks read no child rows; R4 legacy upgrade identical for 2,110 documents)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:30ba77de3a6c518ae7452c3d716b5bfa1ddea1d5825e9b724242c7c04ba30eb1",
+  "note": "Re-reviewed health-bridge recovery and the constructor that delegates unchanged before-state construction; candidate and declared before checks reproduce the recorded repairs."
+}
+```

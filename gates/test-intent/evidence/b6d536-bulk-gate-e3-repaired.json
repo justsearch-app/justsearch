@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T16:05:42.044Z",
-  "revision": "124def8a103222373661d9ef2fc1bb27b7f8e64b",
-  "tree": "68d9fec743f22acffaf8f1f569b20c25113f6338",
+  "createdAt": "2026-10-15T16:37:15.309Z",
+  "revision": "d1c278ba32023c378a667460046ab7aae8ee7134",
+  "tree": "4a86f8dd08456cec1fefea99d58c20a08ad8a7dc",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGpuBusyTest.externalUsePausesWithTheGpuBusyCode\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4257
+      "durationMs": 33168
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.InlineEmbeddingBulkHoldTest.heldBulkWorkDefersInlineEmbedding\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4080
+      "durationMs": 26294
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.combinedCycleStartsNoBatchAfterTheRaise\" --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.bgeM3BatchDoesNotEncodeAfterTheRaise\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4560
+      "durationMs": 35689
     }
   ],
   "checks": [
@@ -101,28 +101,31 @@
   "failBefore": {
     "ref": "124def8a1",
     "revision": "124def8a103222373661d9ef2fc1bb27b7f8e64b",
-    "overlays": [
-      "modules/app-services/src/main/java/io/justsearch/app/services/gpu/GpuResidencySampler.java",
-      "modules/app-services/src/main/java/io/justsearch/app/services/gpu/ExternalPressureMachine.java"
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-e3-historical-sampler-compat.patch",
+        "contentDigest": "sha256:6080508d12d2375692bd4ec2c85f64c03554e8dd759d69a5cdaf2e310614cda5"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGpuBusyTest.externalUsePausesWithTheGpuBusyCode\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 77763
+        "durationMs": 159874
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.InlineEmbeddingBulkHoldTest.heldBulkWorkDefersInlineEmbedding\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 13691
+        "durationMs": 37888
       },
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.combinedCycleStartsNoBatchAfterTheRaise\" --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.bgeM3BatchDoesNotEncodeAfterTheRaise\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 9149
+        "durationMs": 39876
       }
     ],
     "checks": [
@@ -148,5 +151,5 @@
       }
     ]
   },
-  "digest": "sha256:a1a217891a9dbbc78e285433f77f8ecfe716f89edd28ec18a3361e073dfe854d"
+  "digest": "sha256:80c352dbae2d2b2eab01f2510b775d38884b86befb9e096239e1b96cb2a482aa"
 }

@@ -29,8 +29,11 @@ oracle is that the encode does not start.
 Evidence files (all written by run-evidence.mjs):
 
 - `b6d536-bulk-gate-e3-repaired.json`: repaired behaviour, failing by assertion on 124def8a1. The
-  before-state carries the two new sampler classes (GpuResidencySampler, ExternalPressureMachine)
-  as overlays, so E-S7c's pressure source exists there; nothing on 124def8a1 reads the gate's hold
+  before-state carries the two original E3 sampler classes (GpuResidencySampler,
+  ExternalPressureMachine) from fbc036129 in the digest-bound add-only patch
+  `gates/test-intent/evidence/b6d536-e3-historical-sampler-compat.patch`, so E-S7c's pressure source
+  exists there. There are no current-source overlays and no game/context APIs or stubs. The patch
+  adds neither a loop-site hold check nor a status reason; nothing on 124def8a1 reads the gate's hold
   at the loop sites, so every combined batch starts (6 instead of 1) and the BGE-M3 encode runs.
   Separately, a mutation run on the candidate with only the bus fold `|| isBulkHeld()` removed
   from WorkerSignalBus.shouldYieldGpuBackfill failed both E-S7c checks by assertion (temporary
@@ -48,7 +51,7 @@ Evidence files (all written by run-evidence.mjs):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "E-S7c. The real BackfillScheduler.runIdleCycle over the production InProcessWorkerSignalBus built over a P12 BulkWorkGate, with the real GpuResidencySampler on a manual scheduler reading PDH samples of 300 MiB free and 6 GB used by other processes. Ticks 1 and 2 land before the cycle, tick 3 (the raise) inside the first batch. Case A (combined SPLADE+NER cycle): the in-flight batch finishes and no further batch starts (1 batch start). Case B (BGE-M3): the raise lands between the batch's content fetch and its encode, and the encode does not start. In both, the bus yields and the gate's verdict is HOLD for the single reason GPU_BUSY_EXTERNAL (what the status block shows as PAUSED [gpu_busy_external]). After 4 clear samples it still yields; after the 5th it does not, the verdict is RUN, and the next cycle starts batches (and the BGE-M3 encode runs). On 124def8a1 with the sampler classes overlaid, Case A started 6 batches and Case B encoded once, failing by assertion.",
+      "behaviour": "E-S7c. The real BackfillScheduler.runIdleCycle over the production InProcessWorkerSignalBus built over a P12 BulkWorkGate, with the real GpuResidencySampler on a manual scheduler reading PDH samples of 300 MiB free and 6 GB used by other processes. Ticks 1 and 2 land before the cycle, tick 3 (the raise) inside the first batch. Case A (combined SPLADE+NER cycle): the in-flight batch finishes and no further batch starts (1 batch start). Case B (BGE-M3): the raise lands between the batch's content fetch and its encode, and the encode does not start. In both, the bus yields and the gate's verdict is HOLD for the single reason GPU_BUSY_EXTERNAL (what the status block shows as PAUSED [gpu_busy_external]). After 4 clear samples it still yields; after the 5th it does not, the verdict is RUN, and the next cycle starts batches (and the BGE-M3 encode runs). On 124def8a1 with the original E3 sampler classes added by the digest-bound compatibility patch, Case A started 6 batches and Case B encoded once, failing by assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -62,7 +65,7 @@ Evidence files (all written by run-evidence.mjs):
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
-          "choice": "BGE-M3 processes one batch per call, so the raise for that path lands between the content fetch and the encode, and the oracle is that the encode does not start; the sampler classes are overlaid on the before-state so the pressure source exists there.",
+          "choice": "BGE-M3 processes one batch per call, so the raise for that path lands between the content fetch and the encode, and the oracle is that the encode does not start; the original E3 sampler classes are added to the before-state by the digest-bound compatibility patch so the pressure source exists there.",
           "label": "agent choice"
         }
       ],
@@ -347,5 +350,16 @@ Evidence files (all written by run-evidence.mjs):
   "session": "verify-batch1-20261008-independent",
   "verdict": "accept",
   "digest": "sha256:2bde07be7161037e0598e9a37fd8146ba3331630714eda458b8cdb44bc874c98"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "reject",
+  "digest": "sha256:82adf49b32200ee08e942aba87be73cc8dbc9a0dbb9f6bfd1ce0496406a1b187",
+  "note": "Reject the repaired before evidence: exact 124def8a1 plus the two declared current sampler overlays fails app-services compilation with ten errors for absent context/game APIs and GAME_AND_EXTERNAL_MEMORY, so all three checks execute zero cases instead of the recorded assertions. Candidate checks pass, but the declared before replay does not reproduce its evidence."
 }
 ```

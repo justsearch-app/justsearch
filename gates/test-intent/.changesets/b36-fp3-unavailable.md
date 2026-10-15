@@ -94,3 +94,14 @@ c8c7e1c58 reads any of them. The nine repaired checks fail there by assertion; t
 ## Acceptance records
 
 Pending independent verifier acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:437e26b5327ce4ea1409d623d8c57a67309a88eb8040a924fe278cf49e2d57d6",
+  "note": "Re-reviewed unavailable-provider routing, source attribution and the add-only compatibility declarations; candidate checks and the c8c7e1c58 replay match the recorded assertion failures and preservation outcomes."
+}
+```

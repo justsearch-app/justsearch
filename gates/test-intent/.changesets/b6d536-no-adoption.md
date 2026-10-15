@@ -637,3 +637,14 @@ Phase B verifier repair (integration base 181363e86):
   "note": "Launch evidence has a stale ManagedLlamaAdoptionTest digest (1020910e... vs current a5662234e...). Current inference tests pass; changeset evidence remains invalid. See verify-e7c/no-adoption-stale.json."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:be8f89e244eefeab66a1a0f5361f1b0a60dd40811dc083a567e353ebd5a98174",
+  "note": "Re-reviewed the corrected distinction between the evidence runner limitation and the genuine before-API reproducer, plus endpoint and ownership checks; candidate and declared before checks match the evidence without a behavior-defining production stub."
+}
+```

@@ -249,7 +249,7 @@ before-state).
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "S10 changes the exact ordered GPU launch line to include --device CUDA0 -sm none immediately after -ngl 99. All other launch expectations remain unchanged. The evidence names the whole class because JUnit reports the fullGpuLaunchCommand method under its display name; only that ordered-line assertion fails on the parent, and the other eleven checks pass.",
+      "behaviour": "S10 changes the exact ordered GPU launch line to include --device CUDA0 -sm none immediately after -ngl 99. This entry claims only that GPU pinning expectation. The current whole-class replay at 79b5e2e25, with no production patch or overlay, executes fourteen cases: four assertion failures and ten passes. The full-GPU ordered-list failure includes both the missing E6 pinning flags and the missing later --cache-ram 1024 pair. The CPU --device none failure belongs to b48; the projector case stops at its later prompt-cache prefix assertion; the planned-rung failure belongs to E7b. Those unrelated later expectations and failures are excluded from this entry’s E6 repair claim. The current candidate passes all fourteen cases; this whole-class evidence is not an isolated pinning-only failure.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -286,6 +286,24 @@ before-state).
 }
 ```
 
+### Signoff repair, entry 7 (2026-10-15)
+
+The refreshed `b6d536-e6-intent-repair.json` runs the current whole class on the candidate and on
+79b5e2e25 with `-PskipWebBuild=true`, without production patches or overlays. Candidate: 14 pass.
+Before: 4 assertion failures, 10 pass. The first failing assertion in each failed case is:
+
+| Case | Observed before failure | Attribution and claim |
+| --- | --- | --- |
+| CPU argv | expected `[-c, 8192, -ngl, 0, --device, none, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]`; actual omits `--device none` | b48 (3241289f5); excluded from E6. |
+| Full GPU argv | expected `--cache-ram 1024` after the model and `--device CUDA0 -sm none` after `-ngl 99`; actual has neither pair/block | Only the pinning block is E6 (c7b770a03). Prompt-cache expectation is later (7bf4ec112), excluded. The combined list assertion does not isolate these differences. |
+| projectorOnTheCpuAddsOneFlagAfterTheProjector | `the default places the projector where llama-server does: no flag ==> expected: <[bin\llama-server.exe, -m, models\chat.gguf, --mmproj, models\mmproj.gguf, --cache-ram, 1024, --jinja]> but was: <[bin\llama-server.exe, -m, models\chat.gguf, --mmproj, models\mmproj.gguf, --jinja, --reasoning-format, deepseek]>` | Stops at the later prompt-cache prefix (7bf4ec112), before the projector-placement assertions introduced by E7b (29d9cc527). Excluded from E6. |
+| aPlannedRungTopsTheDerivedLadder | `expected: <[8192, 4096]> but was: <[32768, 16384, 8192, 4096]>` | Later E7b (29d9cc527); excluded from E6. |
+
+No compatibility patch causes any of these four failures. Git history was checked at the named
+commits to distinguish E6's added flags from these later expectations. The ten other cases pass
+on the before-state; all fourteen pass on the candidate. The earlier statement of one failure
+and eleven passes is superseded by these actual current-class counts.
+
 ## Acceptance records
 
 ```json
@@ -306,5 +324,16 @@ before-state).
   "session": "verify-batch1-20261008-independent",
   "verdict": "reject",
   "digest": "sha256:554876a32103128d96e1183d7fc4c4967010f50fa85960124165a6c33f0fe339"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "reject",
+  "digest": "sha256:5493f05aa3d0222aa3fa3999eaf3ba0aec3d42adb2c712e8688573498ee3c876",
+  "note": "Reject entry 7: the exact 79b5e2e25 whole-class replay runs fourteen tests with four failures (CPU argv, full GPU argv, projector-on-CPU and planned rung), contradicting its claim that only the GPU ordered-line assertion fails and eleven other checks pass. The current candidate whole class passes."
 }
 ```

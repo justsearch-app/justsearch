@@ -294,3 +294,14 @@ calls the overload. All nine checks fail there by assertion.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:b47b75448ef8eee5f21e76eefcdc30313683c4b877218754c832c96a0032bc6a",
+  "note": "Re-reviewed crash policy, start failures and restored before-compatible fixture; candidate and declared before outcomes match with creation-time-only fixture safety instrumentation, without changing production repair logic or test oracles."
+}
+```

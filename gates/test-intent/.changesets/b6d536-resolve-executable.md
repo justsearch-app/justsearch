@@ -88,3 +88,14 @@ Real executable fixtures exercise native launch identity, resolution caching and
   "note": "Independent identical-source comparison: five new executable checks fail by intended assertions on 351d0f22e and all eight pass on 4d02d4879; native stand-ins prove launched images and forbidden launcher nonexecution. Three precedence/restoration controls plus all 27 adapted runtime/PDF tests pass both without skips. Source integrity verified. Evidence F:/agent-sandbox/design-b6d536/codex/verify-census7/. Acceptance covers test intent, not unfinished live OCR preservation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:8a4076f983f68304ebef6e2b3285867dde672e9c8c7145c46f16711125931872",
+  "note": "Re-reviewed delegated-choice attribution and executable selection; candidate checks pass and all five declared before checks reproduce assertion classifications, with real launcher, batch and identity failures. The own status probe fails on bare 'tesseract' and missing executable-source, but its historical detail truncates inside a Mockito warning, so exact underlying assertion-message comparison remains unverified."
+}
+```

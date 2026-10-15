@@ -446,3 +446,14 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
   "note": "Verified on 1392fdfbc: 18 repaired checks fail on 68547f75a by assertion for the reason under test (BACKGROUND urgency, timeouts/deadline exceptions, 60 s rerank waits, H1 5012 ms vs D 5000 ms - thin but structural, expansion base results, missing MCP note); preservation checks pass before and after; all new checks pass in the full touched-module suite (8442 pass, 0 fail). Prior reject points fixed: merge order text now stuck>loading>contended; concurrent cap test added (8 callers, at most 2 native runs). Adaptation diffs only change matchers to eq()/any(InferenceRequest); oracles kept. Structural rule kept: predicate unchanged, one drop row added. Product finding outside test intent (CPU-only rerank orphan holds admission slot) reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:15dfcc309873033038d1efb57e14758feb59a9011d0a72ee11ea08529c86653b",
+  "note": "Re-reviewed deadlines, lexical fallback, priority and cause propagation; the declared abstract-to-default compatibility change is explicit, and candidate and declared before checks reproduce the recorded outcomes."
+}
+```

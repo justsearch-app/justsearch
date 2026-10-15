@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T16:31:58.531Z",
+  "revision": "d1c278ba32023c378a667460046ab7aae8ee7134",
+  "tree": "31d8193f4d0bcdee4c695eb5068c4823406d8382",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaDevicePlanTest\" --tests \"io.justsearch.app.inference.SelfTestDeviceEnvironmentTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 26058
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuDevicePlanTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 28100
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:243225f46d1fe07f5f4061c59c701e29c08a62d53709b4b847947d96900de72e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitResolvedLayersWinOverAnActivationDefaultOrCallerValue()",
+          "status": "passed"
+        },
+        {
+          "name": "unpinnedGpuRetainsInheritedDeviceOrder()",
+          "status": "passed"
+        },
+        {
+          "name": "aSelectedCpuLaunchCannotBeRaisedToGpuByAResolvedLayerSetting()",
+          "status": "passed"
+        },
+        {
+          "name": "cpuPolicyOverridesPinningLayersAndProjectorDefaults()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitZeroLayersHidesDevicesEvenWithoutAPolicyVetoOrProjector()",
+          "status": "passed"
+        },
+        {
+          "name": "gpuPlacementRetainsPinningAndExplicitLayers()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8c689cba60d1e47504a11d2c7eda80f068e4f519d85ea48844f04fc09f97520f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "childControlReceivesTheSameDeviceEnvironmentAndGpuOwnershipAsTheCommand()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6edc43bf5108b857a7644b73b3450fe54301a162b96c56622d5872367e1c86f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automaticActivationUsesTheResolvedProfileAndKeepsExplicitOverrides()",
+          "status": "passed"
+        },
+        {
+          "name": "gpuOffSelfTestUsesCpuPlanAndCanPassWithoutNvmlOrAVramIncrease()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6d579a86",
+    "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaDevicePlanTest\" --tests \"io.justsearch.app.inference.SelfTestDeviceEnvironmentTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 90968
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuDevicePlanTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 79700
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanTest.java",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:2e5819e744adab0cb037f76a589769c3f6ddb47cb045cd13f2a4d2380d9544f8"
+}
