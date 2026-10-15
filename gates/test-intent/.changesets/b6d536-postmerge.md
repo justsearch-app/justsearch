@@ -65,3 +65,14 @@ author-session: codex-b6d536-postmerge
 ## Acceptance records
 
 Pending separate verification. The builder records no acceptances.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VX-postmerge-20261015",
+  "verdict": "accept",
+  "digest": "sha256:954c474da03ded64846e447ec8933bcbde90eb46320a54e46bcb31efea9b3660",
+  "note": "Codex VX-postmerge ACCEPT ecb5ca073; evidence F:/js-verify-b6d536-20261015/verification-report.md"
+}
+```
