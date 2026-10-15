@@ -96,7 +96,7 @@ cd406ca13 by assertion. Node script checks and verifier harness results are link
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Real Tika availability probes that normally return code 1 execute inside a closed image-specific owner-declared intent window. Fail-before: cd406ca13 with b6d536-witness-classify-compat.patch, by assertion.",
+      "behaviour": "Real Tika availability probes that normally return code 1 execute inside a closed image-specific owner-declared intent window. Fail-before: cd406ca13 with b6d536-witness-classify-compat.patch, by assertion. Build cleanup declares the intent close handle immediately before try(close) in TikaProbeOwnerIntentTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -108,7 +108,7 @@ cd406ca13 by assertion. Node script checks and verifier harness results are link
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (builder brief b31, user message 2026-10-08)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-witness-classify.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-cd406ca13-5d5eaeaef9.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#normalTesseractAvailabilityIsCoveredByClosedOwnerIntent"
       ]
@@ -168,7 +168,7 @@ cd406ca13 by assertion. Node script checks and verifier harness results are link
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Abrupt Engine fixture death still uses code 1 and preserves every containment/ledger oracle. Termination now uses a retained native handle with PID and creation time recorded at start; cleanup never follows descendants to terminate them.",
+      "whatMoved": "Abrupt Engine fixture death still uses code 1 and preserves every containment/ledger oracle. Termination now uses a retained native handle with PID and creation time recorded at start; cleanup never follows descendants to terminate them. Build cleanup asserts child-control acquisition prerequisites in EngineJobChildLedgerTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",

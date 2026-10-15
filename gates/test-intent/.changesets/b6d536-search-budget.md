@@ -67,7 +67,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Through the real WorkerSearchService over a real Lucene index, a hybrid or dense search whose query encoders cannot answer inside the semantic sub-budget returns keyword results instead of failing or running past its deadline. B1a: an explicit hybrid search while models are still loading answers with keyword results inside the test timeout. B1b: an auto search with dense while loading reports hybrid_fallback_reason SEMANTIC_BUDGET_EXCEEDED. B2: a held embedding device gives keyword results, not 'inference deadline exceeded'. B3: a held SPLADE device skips only the SPLADE leg, with the SPLADE skip reason SEMANTIC_BUDGET_EXCEEDED, and the dense leg still runs. B4: a seated dense run that does not return releases the search within the semantic deadline plus margin, with keyword results. C1 (WorkerSearchServiceReasonCodeContractTest): the reason-code allowlists equal the SearchReasonCode wire vocabulary in both directions. The allowlist gains the row SEMANTIC_BUDGET_EXCEEDED, which S2 requires on the wire.",
+      "behaviour": "Through the real WorkerSearchService over a real Lucene index, a hybrid or dense search whose query encoders cannot answer inside the semantic sub-budget returns keyword results instead of failing or running past its deadline. B1a: an explicit hybrid search while models are still loading answers with keyword results inside the test timeout. B1b: an auto search with dense while loading reports hybrid_fallback_reason SEMANTIC_BUDGET_EXCEEDED. B2: a held embedding device gives keyword results, not 'inference deadline exceeded'. B3: a held SPLADE device skips only the SPLADE leg, with the SPLADE skip reason SEMANTIC_BUDGET_EXCEEDED, and the dense leg still runs. B4: a seated dense run that does not return releases the search within the semantic deadline plus margin, with keyword results. C1 (WorkerSearchServiceReasonCodeContractTest): the reason-code allowlists equal the SearchReasonCode wire vocabulary in both directions. The allowlist gains the row SEMANTIC_BUDGET_EXCEEDED, which S2 requires on the wire. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceSemanticBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -92,7 +92,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-worker-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-68547f75a-88c73adc9c.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#explicitHybridWithModelsLoadingAnswersWithKeywordResults",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#autoDenseWithModelsLoadingReportsTheBudgetReason",
@@ -142,7 +142,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "Preservation, passing on 68547f75a and on the change. B5: a request deadline too short to leave a semantic sub-budget is still honoured as a deadline. P6a: a lexical-only search does not wait for models that are still loading. P6b: a lexical-only search never consults the semantic budget, and its response carries no SEMANTIC_BUDGET_EXCEEDED. Expansion: a re-search that keeps its semantic legs is applied as before.",
+      "behaviour": "Preservation, passing on 68547f75a and on the change. B5: a request deadline too short to leave a semantic sub-budget is still honoured as a deadline. P6a: a lexical-only search does not wait for models that are still loading. P6b: a lexical-only search never consults the semantic budget, and its response carries no SEMANTIC_BUDGET_EXCEEDED. Expansion: a re-search that keeps its semantic legs is applied as before. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceSemanticBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -166,7 +166,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#deadlineTooShortForASemanticBudgetIsStillADeadline",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchDoesNotWaitForModels",
@@ -222,7 +222,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
         "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts"
       ],
       "class": "New",
-      "behaviour": "The per-leg cause of a semantic budget miss. SearchLegCauseContractTest (real WorkerSearchService): the cause vocabulary matches the enum both ways, and a cause appears exactly when its leg reports SEMANTIC_BUDGET_EXCEEDED. The cause is 'loading' while models load, 'contended' on the leg whose device was held, and 'stuck' for a seated run that does not return. A held SPLADE device sets the cause on the SPLADE leg only. SearchPerSourceCauseMergeTest: across sources the strongest dense cause wins with its reason; a budget miss is not overwritten by a later reason without a cause; SPLADE merges independently of dense; without causes the last reason still wins. McpSemanticBudgetCauseTest: each leg's cause appears in the MCP text, a SPLADE-only miss does not claim keyword-only ranking, and no cause adds no cause text. searchTraceExplain.test.ts: the existing '602 R6' exact-vocabulary list gains SEMANTIC_BUDGET_EXCEEDED, because S2 requires the UI to word it. New 'Spec D U1' tests check that LEG_CAUSE_WORDING covers contended, loading and stuck exactly, that a budget miss is worded with its cause on each leg without raw codes, and that a fallback without a cause keeps its wording. The cross-encoder mirror list CROSS_ENCODER_WORDED_CODES gains SEARCH_DEADLINE_EXCEEDED, the new drop member of CrossEncoderSkipReason, and a new 'Spec D' test checks that a rerank cut short by the search deadline is worded on the user line without the raw code.",
+      "behaviour": "The per-leg cause of a semantic budget miss. SearchLegCauseContractTest (real WorkerSearchService): the cause vocabulary matches the enum both ways, and a cause appears exactly when its leg reports SEMANTIC_BUDGET_EXCEEDED. The cause is 'loading' while models load, 'contended' on the leg whose device was held, and 'stuck' for a seated run that does not return. A held SPLADE device sets the cause on the SPLADE leg only. SearchPerSourceCauseMergeTest: across sources the strongest dense cause wins with its reason; a budget miss is not overwritten by a later reason without a cause; SPLADE merges independently of dense; without causes the last reason still wins. McpSemanticBudgetCauseTest: each leg's cause appears in the MCP text, a SPLADE-only miss does not claim keyword-only ranking, and no cause adds no cause text. searchTraceExplain.test.ts: the existing '602 R6' exact-vocabulary list gains SEMANTIC_BUDGET_EXCEEDED, because S2 requires the UI to word it. New 'Spec D U1' tests check that LEG_CAUSE_WORDING covers contended, loading and stuck exactly, that a budget miss is worded with its cause on each leg without raw codes, and that a fallback without a cause keeps its wording. The cross-encoder mirror list CROSS_ENCODER_WORDED_CODES gains SEARCH_DEADLINE_EXCEEDED, the new drop member of CrossEncoderSkipReason, and a new 'Spec D' test checks that a rerank cut short by the search deadline is worded on the user line without the raw code. Build cleanup uses unnamed lifetime-only resources in SearchLegCauseContractTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -247,7 +247,7 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/SearchPerSourceCauseMergeTest.java",

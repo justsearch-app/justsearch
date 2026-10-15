@@ -36,7 +36,7 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
         "signature",
         "input re-encoding"
       ],
-      "whatMoved": "Provider fakes implement availability instead of the removed abstract boolean. Query mocks return the same ready state as their boolean fixtures. Loading placeholders explicitly say STARTING, including the compatible cold-publication fixture. All old test methods, assertions, deadlines, model latches and inference/wait observations are kept. Non-query isAvailable stubs are unchanged.",
+      "whatMoved": "Provider fakes implement availability instead of the removed abstract boolean. Query mocks return the same ready state as their boolean fixtures. Loading placeholders explicitly say STARTING, including the compatible cold-publication fixture. All old test methods, assertions, deadlines, model latches and inference/wait observations are kept. Non-query isAvailable stubs are unchanged. Build cleanup uses unnamed lifetime-only resources in RagRetrievalCauseTest, SearchLegCauseContractTest, WorkerSearchServiceRagBudgetTest, WorkerSearchServiceSemanticBudgetTest; removes redundant qualification in WorkerSearchServiceMatchCitationsTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",

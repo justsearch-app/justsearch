@@ -79,7 +79,7 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
         "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec B T23 on real Windows processes. WindowsEngineJobTest#containsAnswersWhetherAProcessIsInTheEngineJob: in a probe JVM, before the Engine job is installed contains has no answer; after it, a child the Engine started and the Engine itself are in the job, and the process that started the Engine is not. EngineJobChildLedgerTest#killedEngineChildrenDieWithItAndTheNextEngineRecordsOwnerDied: a holder JVM boots like the Engine (Engine job, then DefaultChildControl.openForEngine with it) and starts two console children through the control, one cmd.exe that starts a ping grandchild and one ping. The holder is killed with taskkill /F; within 3 s nothing it started is alive, console hosts and the grandchild included; each child-start recorded contained true; and the next Engine's openForEngine on the same data directory writes exactly one owner-died OWNER_DIED with OS check GONE per child, naming the killed holder's instance as the previous owner, and no other ending.",
+      "behaviour": "Spec B T23 on real Windows processes. WindowsEngineJobTest#containsAnswersWhetherAProcessIsInTheEngineJob: in a probe JVM, before the Engine job is installed contains has no answer; after it, a child the Engine started and the Engine itself are in the job, and the process that started the Engine is not. EngineJobChildLedgerTest#killedEngineChildrenDieWithItAndTheNextEngineRecordsOwnerDied: a holder JVM boots like the Engine (Engine job, then DefaultChildControl.openForEngine with it) and starts two console children through the control, one cmd.exe that starts a ping grandchild and one ping. The holder is killed with taskkill /F; within 3 s nothing it started is alive, console hosts and the grandchild included; each child-start recorded contained true; and the next Engine's openForEngine on the same data directory writes exactly one owner-died OWNER_DIED with OS check GONE per child, naming the killed holder's instance as the previous owner, and no other ending. Build cleanup asserts child-control acquisition prerequisites in EngineJobChildLedgerTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -96,7 +96,7 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-child-consumers-before.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-1c6f8da2c-8775774ad0.json",
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#containsAnswersWhetherAProcessIsInTheEngineJob",
         "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java"

@@ -70,7 +70,7 @@ Records phase B (batch 3) re-ran `b75-integration.json` on b599d4d7e because its
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java"
       ],
       "class": "New",
-      "behaviour": "overlappingStatusPreservesAdmissionCapacityRefusal (also inherited by StatusPublicationCompletenessTest and VerifierStatus2Test to VerifierStatus5Test): with this client's work bound full (4 of 4), a real GET /api/status is still admitted and is held in flight. With the held read and three more observation reservations at the per-client bound of 4, an overlapping read gets 429, Retry-After 1, errorCode ADMISSION_CONTEXT_LIMIT and errorClass TRANSIENT. With other clients filling the observation aggregate of 16 while this client has room, it gets 429, Retry-After 1, ADMISSION_ENGINE_LIMIT and TRANSIENT. The held read keeps its slot until its response is sent: once released it answers 200, the live admission count returns to the work items alone, and a later read answers 200. The previous expectation, 429 because three work items and the held read filled the shared pool, is replaced: status no longer shares the work pool. Every other assertion of both classes is unchanged.",
+      "behaviour": "overlappingStatusPreservesAdmissionCapacityRefusal (also inherited by StatusPublicationCompletenessTest and VerifierStatus2Test to VerifierStatus5Test): with this client's work bound full (4 of 4), a real GET /api/status is still admitted and is held in flight. With the held read and three more observation reservations at the per-client bound of 4, an overlapping read gets 429, Retry-After 1, errorCode ADMISSION_CONTEXT_LIMIT and errorClass TRANSIENT. With other clients filling the observation aggregate of 16 while this client has room, it gets 429, Retry-After 1, ADMISSION_ENGINE_LIMIT and TRANSIENT. The held read keeps its slot until its response is sent: once released it answers 200, the live admission count returns to the work items alone, and a later read answers 200. The previous expectation, 429 because three work items and the held read filled the shared pool, is replaced: status no longer shares the work pool. Every other assertion of both classes is unchanged. Build cleanup removes redundant qualification in StatusIsolationHttpTest; removes trailing blank lines in VerifierStatusIsolationTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-words",
@@ -86,7 +86,7 @@ Records phase B (batch 3) re-ran `b75-integration.json` on b599d4d7e because its
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b75-integration.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
@@ -119,7 +119,7 @@ Records phase B (batch 3) re-ran `b75-integration.json` on b599d4d7e because its
       ],
       "class": "Adaptation",
       "moved": ["instrumentation"],
-      "whatMoved": "On a model-initialisation failure, KnowledgeServer now publishes FAILED embedding availability through the serving search service (svc.searchService().embeddingAvailability(), base commit a37c6ef33). e7b's fixture gave the mocked DefaultWorkerAppServices no search service, so the failure path threw NullPointerException. The fixture now returns a mocked WorkerSearchService reporting STARTING, the state a fresh server has. Recovery inputs, injected failures, the captured desired plan and every expectation are unchanged."
+      "whatMoved": "On a model-initialisation failure, KnowledgeServer now publishes FAILED embedding availability through the serving search service (svc.searchService().embeddingAvailability(), base commit a37c6ef33). e7b's fixture gave the mocked DefaultWorkerAppServices no search service, so the failure path threw NullPointerException. The fixture now returns a mocked WorkerSearchService reporting STARTING, the state a fresh server has. Recovery inputs, injected failures, the captured desired plan and every expectation are unchanged. Build cleanup removes redundant qualification in KnowledgeServerRecoveryCloseTest, retaining original inputs, resource lifetimes and every existing assertion."
     }
   ]
 }

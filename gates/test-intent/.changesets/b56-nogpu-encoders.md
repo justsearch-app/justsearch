@@ -36,7 +36,7 @@ Entry 2-5 evidence (`b56-nogpu-encoders.json`) was refreshed in records phase B 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Actual NO_DEVICE outcomes 0, 35, 100 and 803 govern every encoder GPU flag, the NO_GPU profile and the captured CPU ONNX policies, even against explicit GPU preferences and stale GPU hardware. Initial startup receives that CPU decision. A failed native start publishes the captured desired digest before owner attachment, so real recovery admission accepts the same plan; an already CPU-configured failure isolates that recovery assertion. Successful native assembly sees the desired decision before constructing the model, and every desired publication retains the captured configuration; the earlier single-write implementation assumption is replaced by these observable boundary assertions.",
+      "behaviour": "Actual NO_DEVICE outcomes 0, 35, 100 and 803 govern every encoder GPU flag, the NO_GPU profile and the captured CPU ONNX policies, even against explicit GPU preferences and stale GPU hardware. Initial startup receives that CPU decision. A failed native start publishes the captured desired digest before owner attachment, so real recovery admission accepts the same plan; an already CPU-configured failure isolates that recovery assertion. Successful native assembly sees the desired decision before constructing the model, and every desired publication retains the captured configuration; the earlier single-write implementation assumption is replaced by these observable boundary assertions. Build cleanup removes redundant qualification in KnowledgeServerRecoveryCloseTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [{
         "kind": "delegated-choice",
         "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
@@ -46,7 +46,7 @@ Entry 2-5 evidence (`b56-nogpu-encoders.json`) was refreshed in records phase B 
         "label": "agent choice",
         "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b56 builder role contract, task 1)'; the text does not appear in the owner's turns of session 886833dd"
       }],
-      "evidence": "gates/test-intent/evidence/b56-nogpu-encoders.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-6b317848e-8979326330.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/NoDeviceEncoderPlanTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialNativeFailureRetainsTheCapturedDesiredPlan",

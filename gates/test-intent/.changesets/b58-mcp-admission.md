@@ -35,7 +35,7 @@ five checks fail before by assertion.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java"
       ],
       "class": "New",
-      "behaviour": "Expired or cancelled completions waiting for chat actually exit and release their owner before chat exits. Status remains available when search and chat exhaust client work admission; simultaneous status reads retain typed bounded back-pressure. Native MCP status uses independent observation admission. Deferred publication lets a watcher finish its serving read before taking publication locks, and transfers same-queue admission without draining an accepted root scan. Native generation cutovers still drain that scan.",
+      "behaviour": "Expired or cancelled completions waiting for chat actually exit and release their owner before chat exits. Status remains available when search and chat exhaust client work admission; simultaneous status reads retain typed bounded back-pressure. Native MCP status uses independent observation admission. Deferred publication lets a watcher finish its serving read before taking publication locks, and transfers same-queue admission without draining an accepted root scan. Native generation cutovers still drain that scan. Build cleanup asserts occupied admission prerequisites in McpProtocolHandlerTest; uses imported concurrency types and an unnamed lifetime-only mutation handle in KnowledgeServerDeferredRetirementTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -63,7 +63,7 @@ five checks fail before by assertion.
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java#nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan"
       ],
-      "evidence": "gates/test-intent/evidence/b58-mcp-admission.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-7655b8a20-3e4f23d8e8.json",
       "repaired": true,
       "conflictSearch": "Existing admission, cancellation and mutation-fence ownership rules were inspected. Actual task exit remains the release boundary. Context/aggregate capacity refusal, observer overlap refusal, freezing and closing remain bounded and typed. Existing preservation assertions are unchanged."
     }

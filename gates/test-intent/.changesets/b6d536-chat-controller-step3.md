@@ -17,6 +17,13 @@ runtime reconciler's controller-less constructors have no production caller left
 deprecated, so earlier fail-before evidence stays reproducible (Spec A step 12 removes them). This
 changeset covers only this slice's files.
 
+The build-green evidence refresh keeps before revision 981aeb298. Its current StreamingFake fixture
+now calls ProcessTerminator, which is absent there, so the old fixture overlay is replaced by
+`gates/test-intent/evidence/b6d536-build-green-streaming-fixture-compat.patch`. This test-only patch
+adds the current fixture with its two identity operations expressed through ProcessHandle's start
+instant, its existing fallback identity. PID plus creation-time matching and the ten-second exit
+wait remain; the selected check, assertions, streaming behavior and production files are unchanged.
+
 ```json
 {
   "entries": [
@@ -27,7 +34,7 @@ changeset covers only this slice's files.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "I3, aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches: the manager BootstrapInferenceFactory builds, the /v1 proxy wired as CoreApiAssembly wires it, and llama-server as a separate process (StreamingFakeLlamaServer: it records each launch and each completed reply in events.txt and holds every chat reply open after its first event until the test releases it). With chat online and a streamed reply open through the proxy, applyConfig to another model (RESTART_IF_ONLINE) starts; for 5 s nothing relaunches and the apply has not returned; after release the client reads the reply through its last event and [DONE], then the apply completes, the target launches once, the first server's reply completion is recorded before the relaunch, and the manager ends online on the target. On the before-state the proxy's exchange held no lease the drain waited for, so the relaunch cut the open reply.",
+      "behaviour": "I3, aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches: the manager BootstrapInferenceFactory builds, the /v1 proxy wired as CoreApiAssembly wires it, and llama-server as a separate process (StreamingFakeLlamaServer: it records each launch and each completed reply in events.txt and holds every chat reply open after its first event until the test releases it). With chat online and a streamed reply open through the proxy, applyConfig to another model (RESTART_IF_ONLINE) starts; for 5 s nothing relaunches and the apply has not returned; after release the client reads the reply through its last event and [DONE], then the apply completes, the target launches once, the first server's reply completion is recorded before the relaunch, and the manager ends online on the target. On the before-state the proxy's exchange held no lease the drain waited for, so the relaunch cut the open reply. Build cleanup removes redundant qualification in StreamingFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -38,7 +45,7 @@ changeset covers only this slice's files.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-step3-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-981aeb298-12dec4afd4.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ProxyStreamAcrossReconfigureTest.java#aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches"
       ]

@@ -81,7 +81,7 @@ F:/phaseb-fix3-b6d536-20261015.
         "instrumentation",
         "signature"
       ],
-      "whatMoved": "Fixture cleanup records creation instants at process startup and checks them before terminating; the seam accepts an injected child control so the session and candidate share the same real ownership boundary. Existing test inputs and oracles are retained."
+      "whatMoved": "Fixture cleanup records creation instants at process startup and checks them before terminating; the seam accepts an injected child control so the session and candidate share the same real ownership boundary. Existing test inputs and oracles are retained. Build cleanup removes redundant qualification in SlowStartFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion."
     },
     {
       "items": [

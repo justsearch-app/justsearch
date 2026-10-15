@@ -64,7 +64,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "A cancelled search promptly leaves the models-ready wait. Unified BGE-M3 semantic-budget failures retain their original dense and sparse reason/cause while lexical hits remain available.",
+      "behaviour": "A cancelled search promptly leaves the models-ready wait. Unified BGE-M3 semantic-budget failures retain their original dense and sparse reason/cause while lexical hits remain available. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceSemanticBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -76,7 +76,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-worker.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-61ff9b955-b3b625c872.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#cancelledSearchLeavesTheModelsReadyWaitPromptly",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#unifiedEncoderBudgetFailureSurvivesBothDerivedLegs",
@@ -88,7 +88,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "Internal RAG reranking returns available lexical context by the retrieval request deadline, with native ownership retained until execution returns. Its local budget is a pre-inference check. BM25 MMR uses its semantic budget and position diversification on expiry. Empty keyword fallback retains the semantic reason and cause. The held-run fixture waits through the request deadline, rather than requiring the earlier local-budget cutoff.",
+      "behaviour": "Internal RAG reranking returns available lexical context by the retrieval request deadline, with native ownership retained until execution returns. Its local budget is a pre-inference check. BM25 MMR uses its semantic budget and position diversification on expiry. Empty keyword fallback retains the semantic reason and cause. The held-run fixture waits through the request deadline, rather than requiring the earlier local-budget cutoff. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceRagBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -100,7 +100,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-worker.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-61ff9b955-b3b625c872.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#internalRerankReleasesRetrievalWhileNativeRunIsHeld",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#emptyKeywordFallbackRetainsSemanticLoadingReason",
@@ -375,7 +375,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "A failed BGE-M3 encoder does not replace an explicitly supplied vector at capture, including a vector whose length differs from the index dimension. Explicit vectors remain successes at this boundary; their downstream validation stays authoritative.",
+      "behaviour": "A failed BGE-M3 encoder does not replace an explicitly supplied vector at capture, including a vector whose length differs from the index dimension. Explicit vectors remain successes at this boundary; their downstream validation stays authoritative. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceSemanticBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -387,7 +387,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         }
       ],
       "repaired": false,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-r2-java.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-ac6820757-123a03a4ec.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#aFailedBgeEncoderDoesNotReplaceAnExplicitVector"
       ]

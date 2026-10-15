@@ -14,12 +14,12 @@ The verifier's mixed PDF, search, 45-second cooldown and explicit enrichment pas
       "items": ["modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/VduActivityCheckpointTest.java"],
       "class": "New",
       "repaired": true,
-      "behaviour": "The production-composed interruption signal lets an accepted VDU pass run despite the earlier 45-second-old search, still interrupts for current energy reduction or a bulk hold, clears with those holds, and interrupts for activity during that pass.",
+      "behaviour": "The production-composed interruption signal lets an accepted VDU pass run despite the earlier 45-second-old search, still interrupts for current energy reduction or a bulk hold, clears with those holds, and interrupts for activity during that pass. Build cleanup uses unnamed lifetime-only resources in VduActivityCheckpointTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "Find the cause from the Engine and llama-server logs of the failing run (why each unit does not complete: projector not loaded or on a different device than the plan says, a request rejected, a deadline, a gate that never opens, a status that is never written) and fix it at the cause.", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request'; the text does not appear in the owner's turns of session 886833dd"},
         {"kind":"owner-adopted-scenario","task":"t-20261005-b6d536","scenario":"S7","quote":"while a game runs or adapter memory is low, no new bulk GPU batch starts","label":"agent-drafted, owner-adopted"}
       ],
-      "evidence": "gates/test-intent/evidence/b49-vdu-activity.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-f6d579a86-0b7289066b.json",
       "newChecks": ["modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/VduActivityCheckpointTest.java"]
     },
     {

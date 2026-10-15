@@ -113,7 +113,7 @@ ManagedChatSeam overlay alone.
       ],
       "class": "Adaptation",
       "moved": ["instrumentation"],
-      "whatMoved": "endAll, after ending and awaiting every recorded server as before, waits (at most 10 s, failing with the path named) until every path under the test directory that holds the fake's home can be renamed. ProxyStreamAcrossReconfigureTest failed @TempDir cleanup on a held data/logs/llama-server.log in the full ui suite, the same short hold after the last exit as in the chat seam fixture. No assertion changes in ProxyStreamAcrossReconfigureTest or KnowledgeSearchDuringChatDrainTest."
+      "whatMoved": "endAll, after ending and awaiting every recorded server as before, waits (at most 10 s, failing with the path named) until every path under the test directory that holds the fake's home can be renamed. ProxyStreamAcrossReconfigureTest failed @TempDir cleanup on a held data/logs/llama-server.log in the full ui suite, the same short hold after the last exit as in the chat seam fixture. No assertion changes in ProxyStreamAcrossReconfigureTest or KnowledgeSearchDuringChatDrainTest. Build cleanup removes redundant qualification in StreamingFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion."
     },
     {
       "items": [

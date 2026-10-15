@@ -49,7 +49,7 @@ overlaid on top of them.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget, through the manager BootstrapInferenceFactory builds and a stand-in llama-server that binds its port 1.5 s after start: with chat online, apply X (a new model) starts a relaunch; while X's server is still starting, applies A, B and C arrive one after another. X completes, then only C launches, once (launches recorded by the stand-in: model, x, c); the manager ends online on C; A and B fail with ALREADY_TRANSITIONING (superseded). On the before-state every request relaunched in turn (model, x, a, b, c). SlowStartFakeLlamaServer is the stand-in: it records each launch's -m model and pid, waits the configured delay (exiting if its launcher ends), then serves /health and a llama-shaped /props on the --port it is given. ManagedChatSeam builds the manager through BootstrapInferenceFactory against that stand-in and restores the global config and lite-mode property afterwards.",
+      "behaviour": "relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget, through the manager BootstrapInferenceFactory builds and a stand-in llama-server that binds its port 1.5 s after start: with chat online, apply X (a new model) starts a relaunch; while X's server is still starting, applies A, B and C arrive one after another. X completes, then only C launches, once (launches recorded by the stand-in: model, x, c); the manager ends online on C; A and B fail with ALREADY_TRANSITIONING (superseded). On the before-state every request relaunched in turn (model, x, a, b, c). SlowStartFakeLlamaServer is the stand-in: it records each launch's -m model and pid, waits the configured delay (exiting if its launcher ends), then serves /health and a llama-shaped /props on the --port it is given. ManagedChatSeam builds the manager through BootstrapInferenceFactory against that stand-in and restores the global config and lite-mode property afterwards. Build cleanup removes redundant qualification in SlowStartFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -67,7 +67,7 @@ overlaid on top of them.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-repaired-seam.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-f75486245-236f1c807d.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget"
       ]
@@ -101,7 +101,7 @@ overlaid on top of them.
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
       ],
       "class": "New",
-      "behaviour": "quitWhileTheServerIsStartingLeavesNothingRunningAndRefusesLaterStarts, through the same seam: while switchToOnlineMode waits for a launched stand-in that is not yet healthy, manager.close() (the quit path) makes the start fail, every launched server process ends, and no further launch happens within the stand-in's start delay afterwards. This passes on the before-state as well (the terminal fence already held there); it pins that the controller keeps it.",
+      "behaviour": "quitWhileTheServerIsStartingLeavesNothingRunningAndRefusesLaterStarts, through the same seam: while switchToOnlineMode waits for a launched stand-in that is not yet healthy, manager.close() (the quit path) makes the start fail, every launched server process ends, and no further launch happens within the stand-in's start delay afterwards. This passes on the before-state as well (the terminal fence already held there); it pins that the controller keeps it. Build cleanup removes redundant qualification in SlowStartFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -118,7 +118,7 @@ overlaid on top of them.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-unit.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#quitWhileTheServerIsStartingLeavesNothingRunningAndRefusesLaterStarts"
       ]

@@ -165,7 +165,7 @@ after the first runs:
         "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostIsNotStuckTest.java"
       ],
       "class": "New",
-      "behaviour": "Lost versus stuck, the no-report half of E-S11b, and a P2 guard (real NativeSessionHandles on their devices' real gates and real clock; only OrtSessions are mocks; DeviceHealth is new API). Device 65: after a warm GPU run, a background GPU run blocks for stuckAfterMs plus 300 ms; the breaker is open, a foreground query leg (released at its deadline, may not create a GPU session) is turned away with breakerOpen, the device is not lost and the query device stays GPU. Once the run returns the breaker is closed. The next GPU run throws CUDA error 719: the device is lost with code 719, the breaker stays closed, the same query leg gets a CPU lease and the query device is CPU. Devices 66 to 68: a GPU run failing with out of memory, the BFC arena message or error 46 latches nothing and no loss listener is told. A CPU-only handle whose CPU run fails with the 719 message latches nothing, tells no listener, and keeps CPU as its query device.",
+      "behaviour": "Lost versus stuck, the no-report half of E-S11b, and a P2 guard (real NativeSessionHandles on their devices' real gates and real clock; only OrtSessions are mocks; DeviceHealth is new API). Device 65: after a warm GPU run, a background GPU run blocks for stuckAfterMs plus 300 ms; the breaker is open, a foreground query leg (released at its deadline, may not create a GPU session) is turned away with breakerOpen, the device is not lost and the query device stays GPU. Once the run returns the breaker is closed. The next GPU run throws CUDA error 719: the device is lost with code 719, the breaker stays closed, the same query leg gets a CPU lease and the query device is CPU. Devices 66 to 68: a GPU run failing with out of memory, the BFC arena message or error 46 latches nothing and no loss listener is told. A CPU-only handle whose CPU run fails with the 719 message latches nothing, tells no listener, and keeps CPU as its query device. Build cleanup uses unnamed lifetime-only resources in DeviceLostIsNotStuckTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -197,7 +197,7 @@ after the first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-device-lost-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostIsNotStuckTest.java"
       ]
@@ -207,7 +207,7 @@ after the first runs:
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EncoderDeviceLossReporterTest.java"
       ],
       "class": "New",
-      "behaviour": "E-S11c (EncoderDeviceLossReporter is new API). Two real session handles built by OrtSessionAssembler.buildManager on CUDA devices 71 and 72, whose GPU runs go through the production run path; the OrtSessions and the ChatServerController are mocks. After a warm run (query device GPU), a GPU run on device 71 throws CUDA error 719, then a GPU run on device 72 does too. The controller gets reportDeviceLost(new DeviceLostEvidence(ORT_CUDA, \"719\")) exactly once and no other report, the first handle's generation listener fired, and its query device is CPU.",
+      "behaviour": "E-S11c (EncoderDeviceLossReporter is new API). Two real session handles built by OrtSessionAssembler.buildManager on CUDA devices 71 and 72, whose GPU runs go through the production run path; the OrtSessions and the ChatServerController are mocks. After a warm run (query device GPU), a GPU run on device 71 throws CUDA error 719, then a GPU run on device 72 does too. The controller gets reportDeviceLost(new DeviceLostEvidence(ORT_CUDA, \"719\")) exactly once and no other report, the first handle's generation listener fired, and its query device is CPU. Build cleanup uses unnamed lifetime-only resources in EncoderDeviceLossReporterTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -225,7 +225,7 @@ after the first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-device-lost-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EncoderDeviceLossReporterTest.java"
       ]
@@ -237,7 +237,7 @@ after the first runs:
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Turned-away query legs run on the warm CPU session (verify-d810 Finding 1). WorkerSearchService with the production index and planner; the dense leg acquires a real NativeSessionHandle on its device's real gate and runs the lease's session; only the OrtSessions are mocks, and the CPU session has run once, as any CPU encode makes it. Device 52: with the device free a hybrid search's dense leg runs on the GPU (P1); while a bulk lease holds the seat, a hybrid search (3 s deadline) answers without a fallback, its dense leg ran on the CPU session, and it answers inside D. Device 53: after a warm search, a bulk GPU run blocks for stuckAfterMs plus 300 ms; a hybrid search answers within 1 s without a fallback from the CPU session, and a VECTOR-only search answers VECTOR with its hit within 1 s from the CPU session; once the run returns the next leg runs on the GPU. ort-common, devices 81 and 82: with the seat held, a hybrid-leg request and a VECTOR-only-shaped request (3 s) each get a CPU lease after about the 1 s seat wait and inside 2 s; with the seat free the hybrid leg gets the GPU. On 8ba4bff64 each check fails by assertion: the busy hybrid search fell back with SEMANTIC_BUDGET_EXCEEDED (cause contended), the stuck check's first hybrid search fell back with SEMANTIC_BUDGET_EXCEEDED (cause stuck), so its VECTOR-only step was not reached there, and both ort-common acquisitions threw a deadline miss (assertDoesNotThrow).",
+      "behaviour": "Turned-away query legs run on the warm CPU session (verify-d810 Finding 1). WorkerSearchService with the production index and planner; the dense leg acquires a real NativeSessionHandle on its device's real gate and runs the lease's session; only the OrtSessions are mocks, and the CPU session has run once, as any CPU encode makes it. Device 52: with the device free a hybrid search's dense leg runs on the GPU (P1); while a bulk lease holds the seat, a hybrid search (3 s deadline) answers without a fallback, its dense leg ran on the CPU session, and it answers inside D. Device 53: after a warm search, a bulk GPU run blocks for stuckAfterMs plus 300 ms; a hybrid search answers within 1 s without a fallback from the CPU session, and a VECTOR-only search answers VECTOR with its hit within 1 s from the CPU session; once the run returns the next leg runs on the GPU. ort-common, devices 81 and 82: with the seat held, a hybrid-leg request and a VECTOR-only-shaped request (3 s) each get a CPU lease after about the 1 s seat wait and inside 2 s; with the seat free the hybrid leg gets the GPU. On 8ba4bff64 each check fails by assertion: the busy hybrid search fell back with SEMANTIC_BUDGET_EXCEEDED (cause contended), the stuck check's first hybrid search fell back with SEMANTIC_BUDGET_EXCEEDED (cause stuck), so its VECTOR-only step was not reached there, and both ort-common acquisitions threw a deadline miss (assertDoesNotThrow). Build cleanup uses unnamed lifetime-only resources in NativeSessionHandleCpuRecourseTest, WorkerSearchServiceCpuRecourseTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -277,7 +277,7 @@ after the first runs:
           "implementedAs": "Departs from Spec D: Spec D §2.2 ('nothing is redirected to CPU'), §3.2 rule 4 ('It never redirects to CPU') and K1 ('skip semantic') turn a query leg away from a busy or stuck device with keyword results only. Verification verify-d810 (Finding 1) measured the cost: with single SPLADE bulk calls of 188 s and 737 s holding the device's one seat, 74.6% of hybrid searches were keyword-only for about 15 of 20 minutes (baseline 13.3%). S2 asks for keyword results only when semantic search misses its sub-budget, so a leg that can still be encoded within that sub-budget on the CPU now is. Rule: a foreground request released at its deadline (a hybrid or RAG query leg, or a VECTOR-only leg), on a handle whose current CPU session has completed a run, goes to that CPU session through the same CPU lease path a lost device uses (cpuSessionFor, acquireCpuLease) when the device's breaker is open (at once), or when no seat comes within min(1 000 ms, half its remaining budget), S4's 'about one second'. A free seat is still taken first, so an idle device serves the leg on the GPU (P1). The CPU run keeps the leg's deadline: if it also misses, the leg falls back with SEMANTIC_BUDGET_EXCEEDED as before (cause stuck). Bulk (background), prewarm and the reranker and citation scorer (not released at a deadline) never take this path. The trace records the device used: lease.mode=cpu on the lease span, encoder.gpu=false on the encoder's ort_run span, and a cpu_fallback.triggered event (fallback.cause device_stuck or device_contended, fallback.encoder) on the caller's span."
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-8ba4bff64-8984edca5a.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseTest.java#aSearchOnABusyDeviceGetsItsDenseLegFromTheWarmCpuSession",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseTest.java#whileAGpuRunIsStuckSearchesGetTheirVectorsFromTheWarmCpuSession",
@@ -290,7 +290,7 @@ after the first runs:
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseBoundsTest.java"
       ],
       "class": "New",
-      "behaviour": "Preservation, passing on 8ba4bff64 and on the change (same seam as NativeSessionHandleCpuRecourseTest). Device 83, CPU session warm, seat held by a bulk lease: a background request (300 ms) and a foreground request that is not released at its deadline (prewarm, reranker; 300 ms) both end with GATE and never get the CPU session. Device 84, CPU session present but never run: a hybrid query leg (500 ms) still ends with GATE.",
+      "behaviour": "Preservation, passing on 8ba4bff64 and on the change (same seam as NativeSessionHandleCpuRecourseTest). Device 83, CPU session warm, seat held by a bulk lease: a background request (300 ms) and a foreground request that is not released at its deadline (prewarm, reranker; 300 ms) both end with GATE and never get the CPU session. Device 84, CPU session present but never run: a hybrid query leg (500 ms) still ends with GATE. Build cleanup uses unnamed lifetime-only resources in NativeSessionHandleCpuRecourseBoundsTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -316,7 +316,7 @@ after the first runs:
           "implementedAs": "Only foreground requests released at their deadline, on a handle whose current CPU session has completed a run, may run on the CPU when the device turns them away. Bulk work, prewarm, the reranker and the citation scorer wait for the device as before, and a CPU session that never ran is not used as a warm one."
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-8ba4bff64-8984edca5a.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseBoundsTest.java"
       ]
@@ -328,7 +328,7 @@ after the first runs:
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryEncoderPrewarmCpuWarmTest.java"
       ],
       "class": "New",
-      "behaviour": "New API (SessionHandle.prewarmCpuForQueries, QueryEncoderPrewarm.Target.cpuWarm). Device 85: a CPU session that never ran gives no recourse (GATE); prewarmCpuForQueries runs it once on input_ids 16 zeros, attention_mask 16 ones and token_type_ids 16 zeros, returns true, a second call does not run it again, and a turned-away hybrid leg then gets a CPU lease. A CPU-only handle returns false and does not run; a model whose input is a float pixel tensor (device 87) is not run. Device 86: a turned-away leg's span carries cpu_fallback.triggered with fallback.cause device_contended and fallback.encoder the handle name. QueryEncoderPrewarm on a real scheduled executor: after onReady, the CPU warm-up runs for the GPU-served EMBEDDING and SPLADE targets in order with a FOREGROUND request, not for a CPU-served BGE_M3 target, and a throwing warm-up reports no failure.",
+      "behaviour": "New API (SessionHandle.prewarmCpuForQueries, QueryEncoderPrewarm.Target.cpuWarm). Device 85: a CPU session that never ran gives no recourse (GATE); prewarmCpuForQueries runs it once on input_ids 16 zeros, attention_mask 16 ones and token_type_ids 16 zeros, returns true, a second call does not run it again, and a turned-away hybrid leg then gets a CPU lease. A CPU-only handle returns false and does not run; a model whose input is a float pixel tensor (device 87) is not run. Device 86: a turned-away leg's span carries cpu_fallback.triggered with fallback.cause device_contended and fallback.encoder the handle name. QueryEncoderPrewarm on a real scheduled executor: after onReady, the CPU warm-up runs for the GPU-served EMBEDDING and SPLADE targets in order with a FOREGROUND request, not for a CPU-served BGE_M3 target, and a throwing warm-up reports no failure. Build cleanup uses unnamed lifetime-only resources in NativeSessionHandleCpuPrewarmTest, NativeSessionHandleCpuRecourseTraceTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -354,7 +354,7 @@ after the first runs:
           "implementedAs": "The query prewarm, after it reports the encoders ready (so readiness is not delayed), calls prewarmCpuForQueries on every query encoder whose query device is GPU (embedding, SPLADE when not inference-free, BGE-M3). On a GPU handle it creates the CPU session if it was deferred (the embedding's is) and runs it once on a one-row, 16-token input (ids 0, attention mask 1, every input a 2-D int64 tensor); a model with other inputs is not run. A failure is logged and leaves those legs to the keyword fallback. Measured once on this machine (RTX 4070, onnxruntime 1.24.3, gte-multilingual-base model_fp16.onnx, which is the CPU session's model on GPU machines): CPU session creation 685 to 740 ms without the optimized store, first run 61 to 91 ms, then about 40 ms per query; process private memory +1.69 GB. The CPU and GPU query vectors (CLS) of six texts agreed with cosine 0.999997 or more. The suite has no GPU test environment, so that agreement is not a suite check."
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuPrewarmTest.java",
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseTraceTest.java",

@@ -163,7 +163,7 @@ Evidence files (all written by run-evidence.mjs):
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java"
       ],
       "class": "New",
-      "behaviour": "Checks of the new gate and pace policy, whose API does not exist before the change. G2 (DeviceEncoderGate with a fake clock, 400 seats of 50 ms, one bulk producer and a foreground stream): every foreground wait is at most the seated remainder, one aged background run and the foreground calls queued ahead of it. G3 (aging by wall time only, two bulk producers): each foreground call is overtaken at most once, bulk is seated at least once per agingWallMs, and no background wait exceeds agingWallMs plus four runs. G6 (two real handles on one device): a foreground query queued behind a 1 s bulk run leaves at its 200 ms deadline with GATE, the device has no waiter left, the query's session never runs, and the seat the bulk run frees is taken by the next caller. BulkPacePolicyUseTest: with a policy of SPLADE 5, embedding 24 and NER 7 documents, at most that many documents of each phase run between two pace() calls, each limit is reached, and no interval mixes two phases.",
+      "behaviour": "Checks of the new gate and pace policy, whose API does not exist before the change. G2 (DeviceEncoderGate with a fake clock, 400 seats of 50 ms, one bulk producer and a foreground stream): every foreground wait is at most the seated remainder, one aged background run and the foreground calls queued ahead of it. G3 (aging by wall time only, two bulk producers): each foreground call is overtaken at most once, bulk is seated at least once per agingWallMs, and no background wait exceeds agingWallMs plus four runs. G6 (two real handles on one device): a foreground query queued behind a 1 s bulk run leaves at its 200 ms deadline with GATE, the device has no waiter left, the query's session never runs, and the seat the bulk run frees is taken by the next caller. BulkPacePolicyUseTest: with a policy of SPLADE 5, embedding 24 and NER 7 documents, at most that many documents of each phase run between two pace() calls, each limit is reached, and no interval mixes two phases. Build cleanup uses unnamed lifetime-only resources in DeviceEncoderGateTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -181,7 +181,7 @@ Evidence files (all written by run-evidence.mjs):
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-gate-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateTest.java",
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleGateWaiterRemovalTest.java",
@@ -193,7 +193,7 @@ Evidence files (all written by run-evidence.mjs):
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGateWaitTest.java"
       ],
       "class": "New",
-      "behaviour": "Real DeviceEncoderGate and real IndexingPacing on one fake clock, foreground busy, 20% duty, sleeper recording. The bulk thread paces, then its background run waits 3 s at the gate behind a foreground run and works 0.5 s once seated; its next pace() sleeps nothing, because the 3 s wait already exceeds the 2 s that 0.5 s of work owes. Control: a further 0.5 s of work with no gate wait is paced 2000 ms. The gate's API does not exist before the change; against the pacing of this change before the fix the check failed by assertion (the waiting slice was paced 2000 ms).",
+      "behaviour": "Real DeviceEncoderGate and real IndexingPacing on one fake clock, foreground busy, 20% duty, sleeper recording. The bulk thread paces, then its background run waits 3 s at the gate behind a foreground run and works 0.5 s once seated; its next pace() sleeps nothing, because the 3 s wait already exceeds the 2 s that 0.5 s of work owes. Control: a further 0.5 s of work with no gate wait is paced 2000 ms. The gate's API does not exist before the change; against the pacing of this change before the fix the check failed by assertion (the waiting slice was paced 2000 ms). Build cleanup uses unnamed lifetime-only resources in IndexingPacingGateWaitTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -211,7 +211,7 @@ Evidence files (all written by run-evidence.mjs):
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-gate-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGateWaitTest.java"
       ]
@@ -221,7 +221,7 @@ Evidence files (all written by run-evidence.mjs):
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/BulkDutyFloorUnderDeviceGateTest.java"
       ],
       "class": "New",
-      "behaviour": "P5a, S5 regression guard. A real DeviceEncoderGate with the default policy and real IndexingPacing (20% duty) on one fake clock; two foreground callers (50 ms runs) keep a query always waiting, and one bulk producer paces, then runs 16 runs of 58.4 ms (128 documents at M5's 7.3 ms) per slice. Each seated run waits, in real time, until every other caller has queued again (or the bulk producer is inside a pacing sleep) before it advances the clock and before it releases, so the seat order and the gate-wait times do not depend on thread scheduling. Over 60 s of device time bulk gets at least 1/(agingSeatings + 2) of the seats less a stated 3-point tolerance for the window edge and pace yields, computed from DeviceGatePolicy (13.7% with the defaults). Twenty runs alone measured 16.78% minimum, 16.88% median and 17.05% maximum. Note: the spec's 20% assumed 1 in 5; derived bound per Spec D §3.2 aging rule; S5's owner-agreed 10 docs/s remains the live check P5b. Fail-before is a mutation, not a before-state run: with aging disabled (agedBackgroundWaiter returns null) bulk got 16 of 1198 seats (1.3%) and the check failed by assertion; the source was then restored byte-identical.",
+      "behaviour": "P5a, S5 regression guard. A real DeviceEncoderGate with the default policy and real IndexingPacing (20% duty) on one fake clock; two foreground callers (50 ms runs) keep a query always waiting, and one bulk producer paces, then runs 16 runs of 58.4 ms (128 documents at M5's 7.3 ms) per slice. Each seated run waits, in real time, until every other caller has queued again (or the bulk producer is inside a pacing sleep) before it advances the clock and before it releases, so the seat order and the gate-wait times do not depend on thread scheduling. Over 60 s of device time bulk gets at least 1/(agingSeatings + 2) of the seats less a stated 3-point tolerance for the window edge and pace yields, computed from DeviceGatePolicy (13.7% with the defaults). Twenty runs alone measured 16.78% minimum, 16.88% median and 17.05% maximum. Note: the spec's 20% assumed 1 in 5; derived bound per Spec D §3.2 aging rule; S5's owner-agreed 10 docs/s remains the live check P5b. Fail-before is a mutation, not a before-state run: with aging disabled (agedBackgroundWaiter returns null) bulk got 16 of 1198 seats (1.3%) and the check failed by assertion; the source was then restored byte-identical. Build cleanup uses unnamed lifetime-only resources in BulkDutyFloorUnderDeviceGateTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -239,7 +239,7 @@ Evidence files (all written by run-evidence.mjs):
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-gate-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/BulkDutyFloorUnderDeviceGateTest.java"
       ]
@@ -322,7 +322,7 @@ Evidence files (all written by run-evidence.mjs):
       ],
       "class": "Adaptation",
       "moved": ["instrumentation"],
-      "whatMoved": "B3 (contendedSpladeHandleSkipsOnlyThatLeg) and C2 (aHeldSpladeDeviceCarriesTheCauseOnTheSpladeLegOnly) hold the SPLADE leg's device while the dense leg's device stays free. Both handles were built on CUDA device 0, which expressed that precondition while each handle had its own semaphore. With one gate per device, two handles on device 0 share the seat, so holding SPLADE's device also held the dense leg's. The fixture now builds the SPLADE handle on CUDA device 1 through a new gpuHandle(name, device) overload (the existing overloads delegate to device 0), which restores the stated precondition. The search request, the held background lease, the deadline and every assertion (SPLADE skipped with SEMANTIC_BUDGET_EXCEEDED and cause contended, the dense leg answered with no cause, results available) are unchanged."
+      "whatMoved": "B3 (contendedSpladeHandleSkipsOnlyThatLeg) and C2 (aHeldSpladeDeviceCarriesTheCauseOnTheSpladeLegOnly) hold the SPLADE leg's device while the dense leg's device stays free. Both handles were built on CUDA device 0, which expressed that precondition while each handle had its own semaphore. With one gate per device, two handles on device 0 share the seat, so holding SPLADE's device also held the dense leg's. The fixture now builds the SPLADE handle on CUDA device 1 through a new gpuHandle(name, device) overload (the existing overloads delegate to device 0), which restores the stated precondition. The search request, the held background lease, the deadline and every assertion (SPLADE skipped with SEMANTIC_BUDGET_EXCEEDED and cause contended, the dense leg answered with no cause, results available) are unchanged. Build cleanup uses unnamed lifetime-only resources in SearchLegCauseContractTest, WorkerSearchServiceSemanticBudgetTest, retaining original inputs, resource lifetimes and every existing assertion."
     },
     {
       "items": [
@@ -429,7 +429,7 @@ Evidence files (all written by run-evidence.mjs):
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperSemanticStuckTest.java"
       ],
       "class": "New",
-      "behaviour": "Checks of the breaker and its standing state, whose API does not exist before the change. DeviceEncoderGateBreakerTest (DeviceEncoderGate on a fake clock): K4, a session's first run held past stuckAfterMs and a caller that leaves at its gate deadline do not open the breaker, while a later run of the same session held that long does (positive control); K2, while it is open a foreground query leg (released at its deadline, may not create a GPU session) is refused at once (RUN phase, breakerOpen), and releasing the stuck run closes the breaker in the same step so the next such leg is seated with nobody waiting; scope, while it is open a foreground caller that may create a session (VECTOR-only, reranker), a foreground caller not released at its deadline (prewarm) and a background caller are not turned away: each queues behind the stuck run and leaves only at its 50 ms gate deadline (GATE, not breakerOpen). StatusLifecycleSemanticStuckTest (production buildReadinessEnvelope, fixed clock): a breaker open since breakerStandingMs ago degrades the embedding component with encoders.health.semantic_stuck and the aiFeatures composite carries it; one millisecond less, or no open breaker, leaves the embedding READY. WorkerStatusMapperSemanticStuckTest: the worker health's semanticStuckSinceMs reaches the Head's worker view, and 0 or no health maps to null.",
+      "behaviour": "Checks of the breaker and its standing state, whose API does not exist before the change. DeviceEncoderGateBreakerTest (DeviceEncoderGate on a fake clock): K4, a session's first run held past stuckAfterMs and a caller that leaves at its gate deadline do not open the breaker, while a later run of the same session held that long does (positive control); K2, while it is open a foreground query leg (released at its deadline, may not create a GPU session) is refused at once (RUN phase, breakerOpen), and releasing the stuck run closes the breaker in the same step so the next such leg is seated with nobody waiting; scope, while it is open a foreground caller that may create a session (VECTOR-only, reranker), a foreground caller not released at its deadline (prewarm) and a background caller are not turned away: each queues behind the stuck run and leaves only at its 50 ms gate deadline (GATE, not breakerOpen). StatusLifecycleSemanticStuckTest (production buildReadinessEnvelope, fixed clock): a breaker open since breakerStandingMs ago degrades the embedding component with encoders.health.semantic_stuck and the aiFeatures composite carries it; one millisecond less, or no open breaker, leaves the embedding READY. WorkerStatusMapperSemanticStuckTest: the worker health's semanticStuckSinceMs reaches the Head's worker view, and 0 or no health maps to null. Build cleanup uses unnamed lifetime-only resources in DeviceEncoderGateBreakerTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -454,7 +454,7 @@ Evidence files (all written by run-evidence.mjs):
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-gate-breaker-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleSemanticStuckTest.java",

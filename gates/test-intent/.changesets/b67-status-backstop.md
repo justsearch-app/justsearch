@@ -31,7 +31,7 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The full canonical status structure publishes missed owner changes and stale/recovered transitions, excluding clocks and ages. Failed reads carry publication metadata; cached polls with unreflected changes refresh once; restart and missing metadata cannot restore older current state. Refused fresh reads do not create a loop. Copied verifier assertions are retained.",
+      "behaviour": "The full canonical status structure publishes missed owner changes and stale/recovered transitions, excluding clocks and ages. Failed reads carry publication metadata; cached polls with unreflected changes refresh once; restart and missing metadata cannot restore older current state. Refused fresh reads do not create a loop. Copied verifier assertions are retained. Build cleanup documents the baseline missing-header catches and removes trailing blank lines in VerifierStatus5Test, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -43,7 +43,7 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b67 builder brief, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b67-status-backstop-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-93479e944-43d5c70cef.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#realEncryptionOwnerPublishesItsCanonicalStateChange",
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#samplerFailureAndRecoveryPublishCanonicalFreshnessChanges",
@@ -61,7 +61,7 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java"
       ],
       "class": "New",
-      "behaviour": "Retain the independent verifier real-HTTP isolation, admission, owner, projection and provenance checks as preservation evidence. Their assertions remain unchanged; the fixture temporary directory uses the test runtime directory. Candidate-only. Before-state not reproducible as evidence for this change: at 93479e944 (parent of 6377d0030, the lane commit that added these four classes) every class fails by assertion, but the one assertion that fails in every class and run is overlappingStatusPreservesAdmissionCapacityRefusal, \"a saturated work pool must not refuse a status read\": the bounded status observation pool of b58 (9bf134aac), adapted into this check after this change by cbe6650b5. It is not the publication completeness this change repairs. The other failing cases (worker and lane staleness, at-rest, queued conversation producer) vary with timing at 93479e944. See Records phase B (batch 3), verifier repair.",
+      "behaviour": "Retain the independent verifier real-HTTP isolation, admission, owner, projection and provenance checks as preservation evidence. Their assertions remain unchanged; the fixture temporary directory uses the test runtime directory. Candidate-only. Before-state not reproducible as evidence for this change: at 93479e944 (parent of 6377d0030, the lane commit that added these four classes) every class fails by assertion, but the one assertion that fails in every class and run is overlappingStatusPreservesAdmissionCapacityRefusal, \"a saturated work pool must not refuse a status read\": the bounded status observation pool of b58 (9bf134aac), adapted into this check after this change by cbe6650b5. It is not the publication completeness this change repairs. The other failing cases (worker and lane staleness, at-rest, queued conversation producer) vary with timing at 93479e944. See Records phase B (batch 3), verifier repair. Build cleanup removes trailing blank lines in VerifierStatus2Test, VerifierStatus3Test, VerifierStatus4Test, VerifierStatusIsolationTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -73,7 +73,7 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b67 builder brief, Checks)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b67-status-backstop-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
@@ -93,7 +93,7 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Before each stale or unknown assertion on a held lane, the cases now age that lane by its own clock with StatusLaneAging.ageHeldLanes: they advance the handler clock beyond the capped idle limit and run one bounded sampler pass. Two b82 decisions caused this. Decision (a): a hung lane is reported stale only after 3 of its own update intervals, so detection is later when idle, about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown under load. Under the old rule a refresh in flight for more than 1 s made its lane stale, so these cases used to sleep 1.2 s: VerifierStatusIsolationTest's blocked-disk and hung-worker cases, VerifierStatus2Test's per-owner case, VerifierStatus4Test's additional-owner case and VerifierStatus5Test's samplerFailureAndRecoveryPublishCanonicalFreshnessChanges. Decision (b): when a fresh read misses its deadline, it shows the last published value labelled current, rather than unknown. So right after an action it can briefly show the pre-action value. These cases used to observe the held lane as stale or unknown right after a fresh read had missed its deadline, and they now age it first: VerifierStatus3Test's persistent hung worker, VerifierStatus4Test's older pending failure (conversation protection unknown) and VerifierStatus5Test's unknown unrelated owner. Each case still holds the same producer. It asserts the same stale or unknown marker on exactly that part, the same current values on every other part, the same counter and reflected-revision relations and the same recovery."
+      "whatMoved": "Before each stale or unknown assertion on a held lane, the cases now age that lane by its own clock with StatusLaneAging.ageHeldLanes: they advance the handler clock beyond the capped idle limit and run one bounded sampler pass. Two b82 decisions caused this. Decision (a): a hung lane is reported stale only after 3 of its own update intervals, so detection is later when idle, about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown under load. Under the old rule a refresh in flight for more than 1 s made its lane stale, so these cases used to sleep 1.2 s: VerifierStatusIsolationTest's blocked-disk and hung-worker cases, VerifierStatus2Test's per-owner case, VerifierStatus4Test's additional-owner case and VerifierStatus5Test's samplerFailureAndRecoveryPublishCanonicalFreshnessChanges. Decision (b): when a fresh read misses its deadline, it shows the last published value labelled current, rather than unknown. So right after an action it can briefly show the pre-action value. These cases used to observe the held lane as stale or unknown right after a fresh read had missed its deadline, and they now age it first: VerifierStatus3Test's persistent hung worker, VerifierStatus4Test's older pending failure (conversation protection unknown) and VerifierStatus5Test's unknown unrelated owner. Each case still holds the same producer. It asserts the same stale or unknown marker on exactly that part, the same current values on every other part, the same counter and reflected-revision relations and the same recovery. Build cleanup removes trailing blank lines in VerifierStatus2Test, VerifierStatus3Test, VerifierStatus4Test, VerifierStatusIsolationTest; documents the baseline missing-header catches and removes trailing blank lines in VerifierStatus5Test, retaining original inputs, resource lifetimes and every existing assertion."
     }
   ]
 }

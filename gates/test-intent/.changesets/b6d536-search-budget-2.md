@@ -25,8 +25,11 @@ Evidence files (all written by run-evidence.mjs):
 - `b6d536-search-budget-2-vector-repaired.json`: repaired VECTOR-only behaviour, with an assertion
   fail-before on 68547f75a. The VECTOR-only production change landed in 3d181a70c (steps 1-4), so
   on 3d181a70c this check already passes; its fail-before is shown on the commit before that change,
-  with the steps 1-4 fixture file `WorkerSearchServiceSemanticBudgetTest.java` overlaid (that file
-  uses only API present on 68547f75a).
+  with the steps 1-4 fixture file `WorkerSearchServiceSemanticBudgetTest.java` overlaid. The build-green
+  refresh keeps that before revision and overlay and also uses the existing
+  `b6d536-search-budget-worker-compat.patch`: the fixture now names later availability, phase and
+  cause declarations. The patch supplies those declarations without adding semantic-budget behavior;
+  V1a's real handle contention, request budget and assertions are unchanged.
 - `b6d536-search-budget-2-new.json`: checks of new API, no before-state.
 - `b6d536-signoff2-search-budget-2-6.json`: entry 6 preserves detached run-thread lifetime; both checks pass on 3d181a70c and on the candidate.
 - `b6d536-search-budget-2-preservation.json`: preservation checks that pass before (3d181a70c) and
@@ -75,7 +78,7 @@ first runs:
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A chat turn's RAG retrieval whose query embedding cannot answer inside its semantic sub-budget still returns BM25 context, inside the request deadline, with retrieval_mode BM25 and retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED, instead of failing. R1 (real WorkerSearchService.retrieveContext over a real Lucene index, rag.retrieve.mode auto): a held embedding device gives BM25 context with the reason, not 'inference deadline exceeded'; models still loading give BM25 context within the deadline, not a 120 s wait; MMR diversification whose document embeddings are held answers within the deadline by position diversification instead of failing. R2 (the production RAGContext injector over the production RemoteDocumentService over the in-process engine and worker, 5000 ms base deadline, models latch held closed): the turn has no terminal error and its rag.meta event carries retrieval_mode BM25, retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED and the BM25 chunks used. Before the change R2's injector emitted no rag.meta at all.",
+      "behaviour": "A chat turn's RAG retrieval whose query embedding cannot answer inside its semantic sub-budget still returns BM25 context, inside the request deadline, with retrieval_mode BM25 and retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED, instead of failing. R1 (real WorkerSearchService.retrieveContext over a real Lucene index, rag.retrieve.mode auto): a held embedding device gives BM25 context with the reason, not 'inference deadline exceeded'; models still loading give BM25 context within the deadline, not a 120 s wait; MMR diversification whose document embeddings are held answers within the deadline by position diversification instead of failing. R2 (the production RAGContext injector over the production RemoteDocumentService over the in-process engine and worker, 5000 ms base deadline, models latch held closed): the turn has no terminal error and its rag.meta event carries retrieval_mode BM25, retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED and the BM25 chunks used. Before the change R2's injector emitted no rag.meta at all. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceRagBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -100,7 +103,7 @@ first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-rag-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-900bdf4a0-ffdd9549b0.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#contendedQueryEmbeddingGivesBm25ContextWithTheReason",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#modelsLoadingGivesBm25ContextWithinTheDeadline",
@@ -114,7 +117,7 @@ first runs:
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "V1a (real WorkerSearchService over a real Lucene index; the query embedder acquires a real NativeSessionHandle held by a BACKGROUND lease): a VECTOR-only search whose embedding device stays held past D - margin ends, inside D, in a typed WorkerServiceException DEADLINE_EXCEEDED whose detail names SEMANTIC_BUDGET_EXCEEDED and the cause 'contended'. It never answers with keyword results or a silent empty result. Before the change the detail was only 'inference deadline exceeded'.",
+      "behaviour": "V1a (real WorkerSearchService over a real Lucene index; the query embedder acquires a real NativeSessionHandle held by a BACKGROUND lease): a VECTOR-only search whose embedding device stays held past D - margin ends, inside D, in a typed WorkerServiceException DEADLINE_EXCEEDED whose detail names SEMANTIC_BUDGET_EXCEEDED and the cause 'contended'. It never answers with keyword results or a silent empty result. Before the change the detail was only 'inference deadline exceeded'. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceVectorOnlyBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -132,7 +135,7 @@ first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-vector-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-68547f75a-61da8fda96.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java#vectorOnlyBlockedPastItsBudgetIsADeadlineWithTheReason"
       ]
@@ -143,7 +146,7 @@ first runs:
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "Preservation, passing on 3d181a70c and on the change. R3 (the production ConversationEngine running a one-shot shape with the production RAGContext injector; only the document service and the generation client are recorded): the turn's retrieval, which carries its query encodes, starts once and completes before the turn's first generation call, even when it answers late on another thread. V1b (real WorkerSearchService; the embedding device is held by a BACKGROUND lease for 3 s, inside D - margin with D = 8 s): a VECTOR-only search waits, runs its dense leg once, and returns the vector results with effective mode VECTOR and no keyword fallback.",
+      "behaviour": "Preservation, passing on 3d181a70c and on the change. R3 (the production ConversationEngine running a one-shot shape with the production RAGContext injector; only the document service and the generation client are recorded): the turn's retrieval, which carries its query encodes, starts once and completes before the turn's first generation call, even when it answers late on another thread. V1b (real WorkerSearchService; the embedding device is held by a BACKGROUND lease for 3 s, inside D - margin with D = 8 s): a VECTOR-only search waits, runs its dense leg once, and returns the vector results with effective mode VECTOR and no keyword fallback. Build cleanup uses unnamed lifetime-only resources in WorkerSearchServiceVectorOnlyBudgetTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -168,7 +171,7 @@ first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-3d181a70c-1ffebe56fc.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/RagRetrievalBeforeGenerationTest.java#everyRetrievalCompletesBeforeTheFirstGenerationCall",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java#vectorOnlyBlockedInsideItsBudgetWaitsAndReturnsVectors"
@@ -181,7 +184,7 @@ first runs:
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpRagCauseTest.java"
       ],
       "class": "New",
-      "behaviour": "The cause of a RAG budget miss, carried next to the reason. RagRetrievalCauseTest (real WorkerSearchService.retrieveContext): the wire field retrieval_mode_cause is 'contended' when the embedding device is held, 'loading' while models load, and empty for any other reason (NO_EMBEDDING_SERVICE). RagMetaCauseTest (production RAGContext injector): rag.meta carries retrieval_mode_cause next to SEMANTIC_BUDGET_EXCEEDED with no terminal error, carries no cause key for another reason, and drops a cause that arrives with another reason. McpRagCauseTest (production McpEvidenceProjection): the MCP answer evidence quality block carries retrievalModeCause next to retrievalModeReason, and no key when there is no cause.",
+      "behaviour": "The cause of a RAG budget miss, carried next to the reason. RagRetrievalCauseTest (real WorkerSearchService.retrieveContext): the wire field retrieval_mode_cause is 'contended' when the embedding device is held, 'loading' while models load, and empty for any other reason (NO_EMBEDDING_SERVICE). RagMetaCauseTest (production RAGContext injector): rag.meta carries retrieval_mode_cause next to SEMANTIC_BUDGET_EXCEEDED with no terminal error, carries no cause key for another reason, and drops a cause that arrives with another reason. McpRagCauseTest (production McpEvidenceProjection): the MCP answer evidence quality block carries retrievalModeCause next to retrievalModeReason, and no key when there is no cause. Build cleanup uses unnamed lifetime-only resources in RagRetrievalCauseTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -199,7 +202,7 @@ first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagRetrievalCauseTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RagMetaCauseTest.java",

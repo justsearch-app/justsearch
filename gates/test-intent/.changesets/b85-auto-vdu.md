@@ -105,7 +105,7 @@ before-states calls the added code. Every repaired check fails by assertion.
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "The process fixture records PID plus creation time and verifies both before cleanup. It additionally exposes controlled vision-launch refusal and a bounded paused model response so new module checks exercise actual lifecycle launches and HTTP inference, without a real model or GPU.",
+      "whatMoved": "The process fixture records PID plus creation time and verifies both before cleanup. It additionally exposes controlled vision-launch refusal and a bounded paused model response so new module checks exercise actual lifecycle launches and HTTP inference, without a real model or GPU. Build cleanup removes redundant qualification in SlowStartFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -176,7 +176,7 @@ before-states calls the added code. Every repaired check fails by assertion.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "When enrichment is active, production shutdown fences and cancels it before closing admission and waiting for durable live work. The round-3 fixture adaptation explicitly selects an active pass and preserves this order oracle. Fail-before: 13524ddf0 with b85-auto-vdu-r4-r2-refresh-compat.patch, by assertion.",
+      "behaviour": "When enrichment is active, production shutdown fences and cancels it before closing admission and waiting for durable live work. The round-3 fixture adaptation explicitly selects an active pass and preserves this order oracle. Fail-before: 13524ddf0 with b85-auto-vdu-r4-r2-refresh-compat.patch, by assertion. Build cleanup removes redundant qualification in HeadlessAppVduShutdownTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -187,7 +187,7 @@ before-states calls the added code. Every repaired check fails by assertion.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r4-r2-refresh.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-13524ddf0-14b7ac2ee6.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#terminalEnrichmentQuiescesBeforeTheLiveWorkDrain"
       ]
@@ -252,7 +252,7 @@ before-states calls the added code. Every repaired check fails by assertion.
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Add controlled normal-configuration launch refusal and capture the full launch arguments. Retain PID plus creation-time cleanup and all existing health/model fixtures. The fake exits directly with its captured launcher identity, avoiding HttpServer graceful-stop waiting on a deliberately paused response; no external process is stopped by the watcher.",
+      "whatMoved": "Add controlled normal-configuration launch refusal and capture the full launch arguments. Retain PID plus creation-time cleanup and all existing health/model fixtures. The fake exits directly with its captured launcher identity, avoiding HttpServer graceful-stop waiting on a deliberately paused response; no external process is stopped by the watcher. Build cleanup removes redundant qualification in SlowStartFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -371,7 +371,7 @@ before-states calls the added code. Every repaired check fails by assertion.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "No-pass shutdown preserves the original cancellation/drain/terminal-stop order. An active pass receives the normal twelve-second terminal allowance; a three-second stop remains clean and later steps all execute. Fail-before: 14a7eb8a2 with b85-auto-vdu-r3-java-compat.patch, by assertion.",
+      "behaviour": "No-pass shutdown preserves the original cancellation/drain/terminal-stop order. An active pass receives the normal twelve-second terminal allowance; a three-second stop remains clean and later steps all execute. Fail-before: 14a7eb8a2 with b85-auto-vdu-r3-java-compat.patch, by assertion. Build cleanup removes redundant qualification in HeadlessAppVduShutdownTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -382,7 +382,7 @@ before-states calls the added code. Every repaired check fails by assertion.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r3-java.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-14a7eb8a2-fdc94f763f.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#noPassPreservesOriginalCancellationAndStopOrder",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#activePassAllowsThreeSecondStopAndRunsLaterSteps"
@@ -463,7 +463,7 @@ before-states calls the added code. Every repaired check fails by assertion.
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Retain the previous active-enrichment-before-admission oracle; its Head fixture now explicitly identifies an active pass instead of implying every shutdown has one.",
+      "whatMoved": "Retain the previous active-enrichment-before-admission oracle; its Head fixture now explicitly identifies an active pass instead of implying every shutdown has one. Build cleanup removes redundant qualification in HeadlessAppVduShutdownTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",

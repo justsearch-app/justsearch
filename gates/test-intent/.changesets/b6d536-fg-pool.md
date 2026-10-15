@@ -377,7 +377,7 @@ fail once with an untyped deadline in a broader run, and that failure was not re
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java"
       ],
       "class": "New",
-      "behaviour": "The three checks that walk every EngineAdmissionException reason now cover INFERENCE_BUSY: its front-door code is ADMISSION_INFERENCE_BUSY (HTTP and MCP), it is in the capacity group with 429 and Retry-After, and retrySafe stays false. Every other reason keeps its expected code, status and header. Before-state not reproducible: the checks do not compile on f648453b5 because Reason.INFERENCE_BUSY and ApiErrorCode.ADMISSION_INFERENCE_BUSY arrive with f8c4967ed, and a compat mapping for the reason would be the behaviour under test.",
+      "behaviour": "The three checks that walk every EngineAdmissionException reason now cover INFERENCE_BUSY: its front-door code is ADMISSION_INFERENCE_BUSY (HTTP and MCP), it is in the capacity group with 429 and Retry-After, and retrySafe stays false. Every other reason keeps its expected code, status and header. Before-state not reproducible: the checks do not compile on f648453b5 because Reason.INFERENCE_BUSY and ApiErrorCode.ADMISSION_INFERENCE_BUSY arrive with f8c4967ed, and a compat mapping for the reason would be the behaviour under test. Build cleanup asserts occupied admission prerequisites in McpProtocolHandlerTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -394,7 +394,7 @@ fail once with an untyped deadline in a broader run, and that failure was not re
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-fg-pool-candidate.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-f648453b5-c64358a442.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java#wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay",
         "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry",

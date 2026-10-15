@@ -101,7 +101,7 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "Preserved b59/b61 fixtures now supply the server metadata carried by real transports; the Brain transport double invokes the same generic metadata reader as authorizedFetch. The old action/render assertions remain. CORS exact expectations include the three documented additive exposed headers. StatusIsolation child cleanup captures creation time at start and verifies it before stopping. The cross-client case is an additional assertion, with assertion failure on 23b8679ee and pass recorded in before-cross-client.log / cross-client.log.",
+      "whatMoved": "Preserved b59/b61 fixtures now supply the server metadata carried by real transports; the Brain transport double invokes the same generic metadata reader as authorizedFetch. The old action/render assertions remain. CORS exact expectations include the three documented additive exposed headers. StatusIsolation child cleanup captures creation time at start and verifies it before stopping. The cross-client case is an additional assertion, with assertion failure on 23b8679ee and pass recorded in before-cross-client.log / cross-client.log. Build cleanup removes redundant qualification in StatusIsolationHttpTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",

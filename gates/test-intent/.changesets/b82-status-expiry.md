@@ -213,7 +213,7 @@ Decision records were searched for a conflict with these behaviours (status poll
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java"
       ],
       "class": "New",
-      "behaviour": "The earlier rounds' isolation, hung-worker, blocked-disk, sampler-failure and additional-producer cases keep every assertion: a hung or failing producer is marked stale with exactly that part affected and the rest current, responses stay bounded, and the mark clears on recovery. Under S2 a held lane becomes stale by its own age, not by a refresh being in flight for 1 s, so instead of sleeping 1.2 s the cases now advance the handler clock beyond 3 sampler periods (StatusLaneAging) and run one bounded sampler pass before asserting staleness; StatusNonBlockingHttpTest's blocked-dependency case advances its clock the same way.",
+      "behaviour": "The earlier rounds' isolation, hung-worker, blocked-disk, sampler-failure and additional-producer cases keep every assertion: a hung or failing producer is marked stale with exactly that part affected and the rest current, responses stay bounded, and the mark clears on recovery. Under S2 a held lane becomes stale by its own age, not by a refresh being in flight for 1 s, so instead of sleeping 1.2 s the cases now advance the handler clock beyond 3 sampler periods (StatusLaneAging) and run one bounded sampler pass before asserting staleness; StatusNonBlockingHttpTest's blocked-dependency case advances its clock the same way. Build cleanup removes redundant qualification in StatusIsolationHttpTest; removes trailing blank lines in VerifierStatus2Test, VerifierStatus3Test, VerifierStatus4Test, VerifierStatusIsolationTest; documents the baseline missing-header catches and removes trailing blank lines in VerifierStatus5Test, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -232,7 +232,7 @@ Decision records were searched for a conflict with these behaviours (status poll
           "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b82-status-expiry-kept-java.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-candidate-b3b4c08bac.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",

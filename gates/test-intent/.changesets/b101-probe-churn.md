@@ -131,7 +131,7 @@ author-session: b101-probe-churn
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java"
       ],
       "class": "New",
-      "behaviour": "Through the real extractors: 1,000 markdown and text parses write no helper-window record (b599d4d7e: 2,000 window starts); 100 consecutive OCR-capable image parses write one start and one end (b599d4d7e: 200). In a child JVM inside a real Engine job, building the first-pass OCR configuration 20 times declares no window and starts no process. This replaces TikaProbeOwnerIntentTest#firstPassConfigurationProbeHasItsOwnWindow, which required a window around that configuration; the new check shows it launches nothing, so the window it required is the per-parse record this change removes. The file's other checks are unchanged.",
+      "behaviour": "Through the real extractors: 1,000 markdown and text parses write no helper-window record (b599d4d7e: 2,000 window starts); 100 consecutive OCR-capable image parses write one start and one end (b599d4d7e: 200). In a child JVM inside a real Engine job, building the first-pass OCR configuration 20 times declares no window and starts no process. This replaces TikaProbeOwnerIntentTest#firstPassConfigurationProbeHasItsOwnWindow, which required a window around that configuration; the new check shows it launches nothing, so the window it required is the per-parse record this change removes. The file's other checks are unchanged. Build cleanup declares the intent close handle immediately before try(close) in TikaProbeOwnerIntentTest, retaining original inputs, resource lifetimes and every existing assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -142,7 +142,7 @@ author-session: b101-probe-churn
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b101-extraction-windows.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-b599d4d7e-17378fce91.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionHelperWindowRecordsTest.java#markdownAndTextParsesWriteNoHelperWindowRecords",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionHelperWindowRecordsTest.java#consecutiveOcrCapableParsesShareOneWindow",
@@ -826,7 +826,7 @@ author-session: b101-probe-churn
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java"
       ],
       "class": "New",
-      "behaviour": "The shared nvidia-smi reading, on an injected clock and runner: five callers wait on one probe that times out after the clock passes the 5 s interval. No caller starts a second probe; with no good reading yet every caller gets the timeout; after a good reading, waiters on the next timeout get that reading marked stale. Launches keep the 5 s interval afterwards, invalidated or not.",
+      "behaviour": "The shared nvidia-smi reading, on an injected clock and runner: five callers wait on one probe that times out after the clock passes the 5 s interval. No caller starts a second probe; with no good reading yet every caller gets the timeout; after a good reading, waiters on the next timeout get that reading marked stale. Launches keep the 5 s interval afterwards, invalidated or not. The shared file adds completion-Condition instrumentation only to the separate cohort trial; this selected method, its slowProbe helper and all its oracles are unchanged.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -837,7 +837,7 @@ author-session: b101-probe-churn
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b101-gpu-slow-sharing.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-cdfc44cb7-0ba3e2550f.json",
       "newChecks": [
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java#callersWaitingOnATimedOutProbeShareItsOutcome"
       ],
@@ -848,7 +848,7 @@ author-session: b101-probe-churn
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java"
       ],
       "class": "New",
-      "behaviour": "The shared nvidia-smi reading, on an injected clock and runner: eight readers wait on a slow probe; the caller that ran it reads again at once and runs the next probe, which the interval allows. Every waiter receives the first probe's outcome (its timeout, or its success), never the second's. 100 trials each way.",
+      "behaviour": "The shared nvidia-smi reading, on an injected clock and runner: eight readers wait on a slow probe; the caller that ran it reads again at once and runs the next probe, which the interval allows. Before releasing the first probe, the fixture checks under its lock that all eight readers joined its completion Condition, and retains the original parked-thread assertion; a reader only waiting for the lock does not satisfy this precondition. Every waiter receives the first probe's outcome (its timeout, or its success), never the second's. The five-second setup bound, 100 trials each way, launch and answer counts, failure checks, release and joins are unchanged. The other slow-probe method and production code are unchanged.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -859,7 +859,7 @@ author-session: b101-probe-churn
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b101-gpu-probe-cohort.json",
+      "evidence": "gates/test-intent/evidence/b6d536-build-green-09950a33c-0b0e31775f.json",
       "newChecks": [
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java#everyWaiterReceivesTheOutcomeOfTheProbeItJoined"
       ],
