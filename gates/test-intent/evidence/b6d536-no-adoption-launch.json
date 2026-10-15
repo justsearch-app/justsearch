@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T02:17:22.628Z",
-  "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
-  "tree": "b755dadc83b5bb4cb1d086cdaa207baf149c7f32",
+  "createdAt": "2026-10-15T09:27:13.343Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "43d12acf2483666659dc6d91d0c1498c98f04ff3",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.explicitExternalEndpointIsUsedAndNeverStopped\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindRetriesOnceOnAFreshPortAtTheSameContextRung\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5483
+      "durationMs": 6171
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1020910e7e70891f03aa4ce8f885a337b4af7bed370f54562238d9feb45672c6",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#explicitExternalEndpointIsUsedAndNeverStopped",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1020910e7e70891f03aa4ce8f885a337b4af7bed370f54562238d9feb45672c6",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1020910e7e70891f03aa4ce8f885a337b4af7bed370f54562238d9feb45672c6",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindRetriesOnceOnAFreshPortAtTheSameContextRung",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1020910e7e70891f03aa4ce8f885a337b4af7bed370f54562238d9feb45672c6",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1020910e7e70891f03aa4ce8f885a337b4af7bed370f54562238d9feb45672c6",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,13 +104,22 @@
   "failBefore": {
     "ref": "6f7895a79",
     "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
-    "overlays": [],
+    "overlays": [
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/RecordingChildControl.java",
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/SurvivingTerminator.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-no-adoption-launch-compat.patch",
+        "contentDigest": "sha256:9f8c3ce36be9e250251075249a2df387e4fa45eb3ed72aa3c0a6a11257ac3cd6"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.explicitExternalEndpointIsUsedAndNeverStopped\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindRetriesOnceOnAFreshPortAtTheSameContextRung\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 22240
+        "durationMs": 7032
       }
     ],
     "checks": [
@@ -127,7 +136,7 @@
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash",
         "classification": "assertion",
-        "detail": "twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a launch never binds the configured port ==> expected: not equal but was: <54658>"
+        "detail": "twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a launch never binds the configured port ==> expected: not equal but was: <61209>"
       },
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindRetriesOnceOnAFreshPortAtTheSameContextRung",
@@ -137,9 +146,9 @@
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung",
         "classification": "assertion",
-        "detail": "lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a recovery launch plus exactly one bind retry: [[-m, C:\\Users\\Elias\\AppData\\Local\\Temp\\junit-2638835558903109857\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 54678, -c, 8192, -ngl, 0, -np, 2, -k"
+        "detail": "lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a recovery launch plus exactly one bind retry: [[-m, F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-2\\junit-7055764766868632546\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 61229, -c, 8192, -ngl, 0,"
       }
     ]
   },
-  "digest": "sha256:688fb2e4bfdc128b3d227643854a07ec131846c40a30bf124301653c222fa933"
+  "digest": "sha256:58ad86e64cdfd5e430bf78c37593bacd92b0833d45f925c73264cc7db22a55c2"
 }

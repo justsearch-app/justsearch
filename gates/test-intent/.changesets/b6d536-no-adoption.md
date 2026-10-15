@@ -29,6 +29,42 @@ candidate. The former entry 18 (an Adaptation for `scripts/jseval/lane-f/e456-in
 is removed. The gate leaves the jseval suite out of scope by design (tempdoc 966 D1), so that item is
 never flagged and the entry covered nothing.
 
+Phase B (integration base 181363e86, merge 98fd416d0):
+
+- `b6d536-no-adoption-launch.json` keeps its before-state 6f7895a79 and its helper overlays
+  `RecordingChildControl` and `SurvivingTerminator`. The rest of ManagedLlamaAdoptionTest uses the
+  child-control API that 6f7895a79 lacks, so the file did not compile there. The compat before-patch
+  `gates/test-intent/evidence/b6d536-no-adoption-launch-compat.patch` adds:
+  - in `app-api`: `StopRequest`, `LedgerSink`, `ProcessTerminator` (with `OsProcess`, and a
+    `forCurrentOs` that throws), and a `DefaultChildControl` that cannot be built;
+  - in `ChildControl`: a `ManifestEntry` record and default `start`, `stop` and `stopAll`
+    overloads that take it or a `StopRequest` and throw. The three existing abstract methods
+    (`start(ChildSpec)`, `stop(child, reason, mode)` and `stopAll(children, reason, mode)`) get
+    default bodies that throw, so the overlaid `RecordingChildControl` compiles. 6f7895a79 has no
+    production implementation of `ChildControl`, so nothing there reaches these bodies.
+  - in `LlamaServerOps`: a constructor taking a `ChildControl` that throws, and
+    `stopLlamaServer(StopRequest)` and `stopServerForTerminalShutdown(StopRequest, Duration)`
+    overloads that ignore the request and call the before-state's own stops;
+  - in the test helper `LlamaServerTestAccess`: `TEST_STOP`, and an `installChild` that throws.
+
+  No production code at 6f7895a79 calls the additions. The five repaired checks build
+  `LlamaServerOps` through the before-state's own `ManagedChildRegistry` constructor. They reach the
+  stop overloads only after their assertions. All five fail by assertion, for the behaviour under
+  test:
+  - the healthy server on the configured port is adopted (ADOPTED_EXTERNAL);
+  - the explicit endpoint is not used (LAUNCHED_MANAGED);
+  - a launch binds the configured port;
+  - a lost bind steps the context window down (4096 instead of 8192);
+  - the recovery launch gets no single bind retry.
+- `b6d536-no-adoption-rewrites-external.json` was regenerated candidate-only. It is preservation
+  only. Before-state not reproducible: both checks read `ExternalServerDiagnostics.note()`, which the
+  no-adoption repair f90c16237 itself adds. Both pass on the candidate.
+- `b6d536-no-adoption-rewrites-shutdown.json` keeps 6f7895a79. All four checks pass on the
+  candidate. There they fail by assertion: the Head still has its keep-running directive, and RESTART
+  and HANG do not stop the generative backend.
+- `b6d536-no-adoption-rewrites-inference-b15-refresh.json` has no before-state. It was re-run
+  candidate-only, and all seven checks pass.
+
 ```json
 {
   "entries": [
