@@ -21,14 +21,16 @@ import org.junit.jupiter.api.condition.OS;
 /** Real Windows job/handle evidence, in a disposable JVM. All children exit themselves. */
 @Tag("windows")
 @EnabledOnOs(OS.WINDOWS)
-@Timeout(60)
+@Timeout(120)
 final class WindowsJobWitnessTest {
   @Test void recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild() throws Exception {
     Process probe = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),
         "--enable-native-access=ALL-UNNAMED", "-cp", System.getProperty("java.class.path"),
         Probe.class.getName()).redirectErrorStream(true).start();
     String out = new String(probe.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    assertTrue(probe.waitFor(45, TimeUnit.SECONDS), out);
+    out.lines().filter(line -> line.startsWith("witness.probe.identity=")
+        || line.startsWith("witness.child.identity=")).forEach(System.out::println);
+    assertTrue(probe.waitFor(90, TimeUnit.SECONDS), out);
     assertEquals(0, probe.exitValue(), out);
     assertTrue(out.contains("witness.normal=true"), "NEW and EXIT carry exact held-handle PID/birth/code: " + out);
     assertTrue(out.contains("witness.crash=true"), "nonzero exit during the owner's await remains unexpected: " + out);
@@ -40,8 +42,11 @@ final class WindowsJobWitnessTest {
   public static final class Probe {
     public static void main(String[] args) throws Exception {
       ProcessTerminator os = ProcessTerminator.forCurrentOs();
+      System.out.println("witness.probe.identity=" + ProcessHandle.current().pid() + " FILETIME:"
+          + os.creationFileTime(ProcessHandle.current().pid()).orElseThrow());
       Process outside = child(0, 1200);
       String outsideBirth = os.creationFileTime(outside.pid()).orElseThrow();
+      System.out.println("witness.child.identity=" + outside.pid() + " FILETIME:" + outsideBirth);
       EngineContainment job = EngineContainment.installAtBoot();
       if (job.status() != EngineContainment.Status.CONTAINED) throw new AssertionError(job);
       List<Map<String, Object>> records = new CopyOnWriteArrayList<>();
@@ -60,22 +65,27 @@ final class WindowsJobWitnessTest {
       } catch (NoSuchMethodException before) { /* No witnesses on the before-state. */ }
       Process normal = child(0, 500);
       String normalBirth = os.creationFileTime(normal.pid()).orElseThrow();
+      System.out.println("witness.child.identity=" + normal.pid() + " FILETIME:" + normalBirth);
       Process crash = child(17, 500);
       String crashBirth = os.creationFileTime(crash.pid()).orElseThrow();
+      System.out.println("witness.child.identity=" + crash.pid() + " FILETIME:" + crashBirth);
       for (Process p : List.of(outside, normal, crash)) {
         if (!p.waitFor(15, TimeUnit.SECONDS)) throw new AssertionError("child did not exit: " + p.pid());
       }
-      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-      while (System.nanoTime() < deadline && !matches(records, crash.pid(), crashBirth, 17, "UNEXPECTED")) {
+      // Each process and the writer advance independently: a crash receipt is no barrier
+      // for the normal child's receipt or the console host's start record.
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      while (System.nanoTime() < deadline
+          && (!matches(records, normal.pid(), normalBirth, 0, "UNEXPECTED")
+              || !matches(records, crash.pid(), crashBirth, 17, "UNEXPECTED")
+              || !hasConsoleWitness(records))) {
         Thread.sleep(25);
       }
       System.out.println("witness.normal=" + matches(records, normal.pid(), normalBirth, 0, "UNEXPECTED"));
       System.out.println("witness.crash=" + matches(records, crash.pid(), crashBirth, 17, "UNEXPECTED"));
       System.out.println("witness.outside=" + records.stream().noneMatch(r ->
           Long.valueOf(outside.pid()).equals(r.get("pid")) && outsideBirth.equals(r.get("creationFileTime"))));
-      System.out.println("witness.host=" + records.stream().anyMatch(r ->
-          "job-process-start".equals(r.get("type")) && String.valueOf(r.get("executable")).endsWith("conhost.exe")
-          && r.get("creationFileTime") != null));
+      System.out.println("witness.host=" + hasConsoleWitness(records));
       boolean drain = false;
       try {
         EngineContainment.class.getMethod("finishProcessRecording", java.time.Duration.class)
@@ -83,6 +93,7 @@ final class WindowsJobWitnessTest {
         int count = records.size();
         Process afterFence = child(0, 100);
         String afterBirth = os.creationFileTime(afterFence.pid()).orElseThrow();
+        System.out.println("witness.child.identity=" + afterFence.pid() + " FILETIME:" + afterBirth);
         if (!afterFence.waitFor(15, TimeUnit.SECONDS)) throw new AssertionError("after-fence child " + afterBirth);
         Thread.sleep(75);
         drain = count > 0 && count == records.size();
@@ -95,6 +106,12 @@ final class WindowsJobWitnessTest {
       return new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
           "Start-Sleep -Milliseconds " + milliseconds + "; exit " + code)
           .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectErrorStream(true).start();
+    }
+
+    private static boolean hasConsoleWitness(List<Map<String, Object>> records) {
+      return records.stream().anyMatch(r -> "job-process-start".equals(r.get("type"))
+          && String.valueOf(r.get("executable")).endsWith("conhost.exe")
+          && r.get("creationFileTime") != null);
     }
 
     private static boolean matches(List<Map<String, Object>> records, long pid, String birth,

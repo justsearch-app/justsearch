@@ -19,6 +19,19 @@ Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before 
   "entries": [
     {
       "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["instrumentation"],
+      "whatMoved": "Loaded-machine observation only: wait for the same durable COMPLETE condition for up to 300 seconds instead of 60, allow the owned probe 360 seconds instead of 100, and give the three-probe test 20 minutes instead of 180 seconds. The deliberate interruption checkpoint gets the same 300-second allowance instead of 90 seconds. Print completion-wait elapsed time for diagnosis. The first unchanged verifier combined run on 0d90a3388 failed with a RUNNING replay and exit 99 while chunk writes were still advancing. The input, mutation-1000 halt, real JVM restart, operation authorization, COMPLETE states, exact attempt counts, zero failures, entire declared chunk set, unique IDs and ordinals, control/replay equality and one DONE job assertions are all retained. This test establishes durable completeness, not a 60-second throughput contract; no product behavior changes.",
+      "sources": [{
+        "kind": "owner-words",
+        "quote": "Make the test robust without weakening its assertion. Waiting on the condition with a generous bound is fine; loosening what is asserted is not.",
+        "location": "task t-20261005-b6d536 builder brief 2026-10-15 part 1"
+      }]
+    },
+    {
+      "items": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java"
       ],
