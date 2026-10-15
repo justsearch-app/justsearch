@@ -333,3 +333,14 @@ constructor that 5e4f4e698 left. So that file was re-run without a before-state.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:bac5c001b2d42b36aac85edf1038509a8bdb02e1239aba0c27c67f8fb26daa7c",
+  "note": "Reviewed changed hold/config fixtures, candidate-only API-absence reasons and the retained controller guardrail rule. Candidate unit/reconciler and adapted guardrail checks passed; superseded manual before-pass prose is not counted as current script evidence."
+}
+```

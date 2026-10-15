@@ -422,3 +422,14 @@ caller gets TimeoutException instead of "UnsupportedOperationException: drain br
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:19cd264dbb241fdabf2d612213bfa10e3b57c2d2029e1748162da63cea29f036",
+  "note": "Entries 7 and 9 claim assertion fail-before from the manual all-stub/layer-stub runs described in the preamble. Those runs replace the controller/gate/routes or demand/loadAnyway behavior with no-op or immediate-success stubs that determine the asserted failures, so they are not old-behavior witnesses."
+}
+```

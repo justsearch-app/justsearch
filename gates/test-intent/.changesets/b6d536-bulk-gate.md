@@ -227,3 +227,14 @@ Evidence files (all written by run-evidence.mjs):
   "digest": "sha256:e4a9f3f3033c2d3490140a07ae1a426d5e8a9e194ad395ffc49778ffb92e7829"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:785ee1bc2d66382358d14685edea33e0c979a820a2182ca92cacb2dc1d6b8923",
+  "note": "Reviewed the corrected durable-ledger failure declaration and current policy/projection oracles. Own candidate checks passed; exact-content independent b62ca201b reruns give 23 candidate passes and 20 passes/3 assertions before 5f91835f3 with only the allowed enum addition."
+}
+```

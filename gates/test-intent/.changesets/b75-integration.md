@@ -126,3 +126,14 @@ Records phase B (batch 3) re-ran `b75-integration.json` on b599d4d7e because its
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:9e0b0f0f34c9948188aced94881adda8e86a49c2df5ccfefcde699f3e379e2f9",
+  "note": "Reviewed independent observation capacity/refusal and slot retention against the delegated integration choice. Own candidate checks passed all seven listed overlap methods; the explicit manual-before explanation is retained as a nonblocking proof limit."
+}
+```

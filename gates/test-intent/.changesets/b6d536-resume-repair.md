@@ -95,3 +95,14 @@ Independent acceptance remains for the orchestrator/verifier; this builder does 
   "digest": "sha256:65c52340e542bf822b3a79adedac91230d9f7c41062ab00aab8753d890816adb"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:e1c235bfcd51cf3b6eaa2f5588ab4c6744db14dc07bf8340bf91a6729a4c8a71",
+  "note": "Entry 2's b6d536-resume-repair-preserved.json has failBefore null with no applicable candidate-only reason in the entry or shared preamble. The sibling repaired entry already compiles the same ChatResumeRepairTest class on its declared before-state."
+}
+```

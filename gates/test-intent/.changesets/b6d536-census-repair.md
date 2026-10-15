@@ -106,3 +106,14 @@ Independent verifier acceptance is pending; the builder has not judged its own t
   "note": "Independently reran the four real boot fallback checks: all fail by assertion on 46c74f725 for absent intent/final records, and all pass without skips on 6f78776b6. The revised census negatives reject ancestry-only N4/O3 claims. This accepts test intent only, not behavior."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:9eaf2a899382a1f2f7b297761494b3baafd78a4d62579e827c97512aabfb4b3e",
+  "note": "Reviewed the source-only correction against item 6 and the exit-ledger classification/timestamp oracles. Candidate checks passed; test items and execution evidence are unchanged since cd406ca13."
+}
+```

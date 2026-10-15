@@ -50,3 +50,14 @@ Historical one-quit legacy expectations are superseded by the Q2 ruling of the 2
   "digest": "sha256:7693bf2e212105557a4763ce57240c10b50ba1b5a661f6acb4954606e503aa4c"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:3db032103aa1d3d95ebf880d8d48cee9d7a2e7de1faa2140c508d150421e118a",
+  "note": "Reviewed the fixture cleanup import as an adaptation retaining the addressed quit/ownership oracles. Own node --test scripts/dev/test-dev-runner-quit.mjs run passed all 12 cases; no Engine or dev stack was started."
+}
+```

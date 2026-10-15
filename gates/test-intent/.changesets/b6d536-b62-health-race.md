@@ -154,3 +154,14 @@ Records phase B (batch 3), gate tidy. Against main, ChunkAdmissionCostTest.java 
   "note": "verify-batch5: entries pass on 7aafc6d72 (V5/V6, B5-H2 observer consistency, B5-C1 deleted child, R3 bounded unchanged cost 0.45-0.6 ms with one content check). The separate producer-interrupt regression B5-H1 is attributed to b65."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:2771fc99b7076a5f1c550c2a1af9b4703af7de3d7bba4a02b40f675b86137d43",
+  "note": "Reviewed current item normalization, adapted resource ownership and publication/cost oracles. Own candidate checks passed; byte-matched independent 150a989ca evidence reruns reproduce four assertion failures and the zero-child-read preservation pass at 13950b090."
+}
+```

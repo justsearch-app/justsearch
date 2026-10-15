@@ -378,3 +378,14 @@ first runs:
   "note": "verify-d57: fail-before re-run on 1392fdfbc (assertion, reason under test), mutation run on 370d82b33 (cause plumbing, readiness one-way/bound, cold->DEGRADED, daemon), behaviour claims match test code"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:01d629fc14661c8fda4e2c66bc30054b13989fc948da62e8db98250c08ce5efe",
+  "note": "Entry 6's DetachedRunThreadLifetimeTest has candidate-only evidence without an applicable reason: the shared new-API label does not describe it. The acquisition/handle/lease APIs and daemon ort-query-run thread construction already exist at 3d181a70c, so their absence cannot explain omitting this before run."
+}
+```

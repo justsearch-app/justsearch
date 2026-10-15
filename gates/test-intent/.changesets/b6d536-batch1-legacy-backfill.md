@@ -53,3 +53,14 @@ Complete legacy parents now keep unchanged admission and acquire declarations fr
   "note": "The two shared-interface legacy regression checks fail on 65daf680a and pass on freshly built candidate artifacts; incomplete preservation passes. The newly added race checks call new backfill interfaces and have no real-parent assertion fail-before. Required real old-build upgrade counts and comparable quiet scan times are still unverified. See verify-batch2/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:89edea8272447f7cf7935e2453cf72f181c93c80bc6ec2e397d76c22f7b704c2",
+  "note": "Entry 2 attaches candidate-only b6d536-batch1-legacy-preservation.json without explaining the missing before run. Entry 3's absent package-private race APIs concern different checks; the existing legacy isUnmodified oracle does not use them."
+}
+```

@@ -255,3 +255,14 @@ the coordinator's review.
   "note": "Q2 rejects requests without incarnation or nonce. The candidate intentionally honours a nonce-less legacy request at later boot checkpoints; independently reproduced by verify-oq/ProbeBootOwnership.java, laterCheckpointHonoured=true and exitCode=0. Delegation does not override the explicit Q2 contract. Live stack checks and durable chunk replay remain pending."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:3c3a3435f7dd7f51914e49ef93fe1464e331c62c46c7ce8272bab4ca14e39c6a",
+  "note": "Entry 5's b6d536-power-events.json is candidate-only and supplies no reason for omitting before execution; saying no fail-before is claimed is not a reason. The test intentionally uses reflection so an absent production class still compiles and can fail an assertion."
+}
+```

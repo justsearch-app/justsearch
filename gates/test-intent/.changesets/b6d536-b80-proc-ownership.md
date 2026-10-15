@@ -94,3 +94,14 @@ The same change repairs F1-F3 in scripts/dev (dev-runner stop: termination valid
   "note": "VC-proc3 (independent Claude verifier) judged the b80 records at 002073b2b: DefaultChildControlGpuBarrierTest and RuntimeActivationSelfTestStopFailureTest are byte-identical to a164833f5, fail at 44a9e8aa2 by the recorded assertions and pass at 002073b2b; preservation checks RuntimeActivationServiceChatProfileTest, RuntimeActivationServiceTest and SelfTestGpuBarrierTest pass on both. The Java behaviour itself was accepted by VC-procjava3 on proc-java 1eb01f51e. DefaultChildControlTest was not run because it ends processes by PID alone; its preservation rests on the file being unchanged. Digest bound with --base 44a9e8aa2, the lane's base."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:0a7ebc2b5e2fa16d5d5cff4c2a4e362f01a33ce2c6a5486260eaf82c135cbfac",
+  "note": "Reviewed source relabel and current child release/accounting ownership assertions against item 6. Candidate checks passed; unchanged unpatched before evidence at 44a9e8aa2 describes the guarded failures truthfully."
+}
+```

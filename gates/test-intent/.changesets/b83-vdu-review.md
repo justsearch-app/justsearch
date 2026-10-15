@@ -77,3 +77,16 @@ automatic title no longer makes the window write its own rename again.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:d09eaba9454d0f1b218bff19aec314275a8402745070ad493c7df872ee45ad1d",
+  "note": "Reviewed deferred retry, neutral MCP observations and automatic-title preservation against their intent sources. Own candidate checks passed; own 0a79303bb Java/frontend reruns reproduced the declared PENDING/retry, observer-interruption and title assertions."
+}
+```

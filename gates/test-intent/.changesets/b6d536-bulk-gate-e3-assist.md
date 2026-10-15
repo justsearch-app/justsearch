@@ -151,3 +151,14 @@ Evidence files (all written by run-evidence.mjs):
   "digest": "sha256:7f661bc7002d6379e8159b8de1309fd6894526cf32d74afcb281827efae9ae80"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:d1e7d4f00dfde6b6a6744d7a7e16f2b0d59020a78a844ac8340a5243a8bb8ef8",
+  "note": "Reviewed genuine-chat versus query/VDU completion ownership and the explicit new-kind candidate-only reason. Own candidate checks passed; own f5c7df712 VDU rerun reproduced DUTY_FLOOR instead of RUN, matching the declared failure."
+}
+```
