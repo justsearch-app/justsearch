@@ -438,3 +438,14 @@ fail once with an untyped deadline in a broader run, and that failure was not re
   "note": "Reviewed admission/deadline/typed refusal obligations and allowed compatibility additions. Own candidate checks passed; exact-source independent reruns match the declared before assertions/preservation and corrected entries 11-12, while compile/exception outcomes remain unverified behavior proof."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "reject",
+  "digest": "sha256:a874b13bd6cf5894d4eb44f52d450aaac1bf19d9ccb249f4741905f9400c829c",
+  "note": "Reject entry 1: its VECTOR integration timing claim still says the request queued past D minus 500 ms, but the current check instead injects semantic expiry through a mocked policy while retaining a 60-second request budget. All 62 candidate case references pass and the 29 declared before check outcomes match exactly; the changed check is not truthfully described by that timing claim."
+}
+```

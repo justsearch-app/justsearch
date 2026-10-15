@@ -168,3 +168,14 @@ are stand-ins; it does not establish live GPU allocation, search continuity or E
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:3725a8185247a94fe8de86d1b955294eca2622f6a2aaa050b4ab0a1d5e359e1b",
+  "note": "All ten selected candidate checks pass, and fresh unpatched replays on 0d90a3388 and 2c499df0d match the declared assertion failures and preservation passes. The physical-session fixture exercises the stated serving owners and construction caps; its native stand-ins and live-allocation limits are explicitly disclosed."
+}
+```

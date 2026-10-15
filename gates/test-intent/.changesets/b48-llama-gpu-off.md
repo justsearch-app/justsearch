@@ -299,3 +299,14 @@ candidate case passes both iterations, including argv and GPU-ownership assertio
   "note": "Reject entries 5-7: their candidate-only b48-llama-gpu-off-new.json evidence has failBefore null, and neither the entries nor shared preamble explains why before execution is not reproducible. Candidate checks and the separately declared repaired before checks pass their required outcomes; they do not supply the missing reason."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:0ce6e8f418a1875777aed28ac75865b58538306ae3ede79c305fb2c4128eb246",
+  "note": "Re-reviewed the VS1 entries 5-7 correction: absent-API candidate-only reasons are concrete, and all nine candidate cases pass. Fresh f6d579a86 runs reproduce the declared unpatched compile failures and, with the declared input/spec compatibility patch, the launcher assertion expected -1 but null; the patch does not propagate the environment."
+}
+```

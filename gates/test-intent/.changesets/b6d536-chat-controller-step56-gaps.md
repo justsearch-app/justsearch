@@ -139,3 +139,14 @@ ManagedChatSeam overlay alone.
   "note": "Reviewed current fixtures, evidence and corrected sources; selected current candidate checks pass. Today's independent reruns exactly match both declared repaired-seam before assertions and the shared API-absence explanation covers the separate candidate-only cases."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:5f74bc3911ffdbca803fc60026a77e3dd21d254400f4c20529a2810a7bbb5318",
+  "note": "Entries and evidence are unchanged since 9f1f6257b; the shared controller file only gained the independently covered planner check, and its current whole class passes. Read review and source/patch comparisons confirm the retained seam assertions still match the independent d3fe74ef2 replay."
+}
+```

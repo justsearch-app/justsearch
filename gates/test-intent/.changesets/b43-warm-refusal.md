@@ -72,3 +72,14 @@ Pending independent verifier acceptance.
   "note": "Reviewed the corrected source declaration against the unchanged warm-refusal check and before evidence. The current candidate rerun passes and the entry preserves the existing refusal obligation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:303d82ac4c64fcd605ed41970d7aa06a819959c0a26b38ad61b3aaa29411c095",
+  "note": "The current file-level candidate runs all 38 queue cases successfully. Fresh a37c6ef33 replay matches exactly: two warm-seat assertion failures and 36 preservation passes, including the added whole-deadline race case."
+}
+```

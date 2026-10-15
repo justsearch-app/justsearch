@@ -216,3 +216,14 @@ Pending independent verification. The builder does not accept its own work.
   "note": "The 38 selected checks pass on the candidate and 10 assertion failures reproduce on 5970a2de5. However the settings integration seam uses empty native roles and fails to verify its claimed retained indexing ownership. On the real candidate, a single 16384-to-32768 context write returns 200 but the next approved text ingest fails with Mutation producer belongs to a retired generation; the old indexed alpha remains searchable and beta does not appear. The same before-state and context update on f648453b5 indexes beta successfully. Evidence: verify-e7c/ownership-single-update-engine.log and pre-ownership-engine.log plus API receipts. Other repair checks have appropriate oracles, but this required preservation claim is unsatisfied."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:dc34ffd5c84bd8f1cccf6a1769dda0bdb3f7db91ad5bae813a13e50b8fc7f56c",
+  "note": "Reviewed the corrected empty-physical-session scope, delegated choices and preservation guards; all 17 candidate case references pass. Fresh 5970a2de5 replay of the seven repaired check IDs matches their assertion failures; unchanged guard proof was checked against its retained source and evidence."
+}
+```
