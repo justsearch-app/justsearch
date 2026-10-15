@@ -1562,9 +1562,12 @@ The delayed-crash-receipt, shim-console and owner-coverage evidence was produced
 compatibility patch that adds only the two lookup interfaces the adapted checks call, as stubs that
 look up and observe nothing (`gates/test-intent/evidence/b102-census-lookup-compat-r5.patch`,
 `-r4.patch`): the delayed check fails before by assertion as recorded ("delayed owner crash receipt
-lost by final stop census"), the four console checks too; for owner-coverage the two checks whose
-interfaces f5877635f lacks do not compile there, as its changeset records, and
-`TikaProbeOwnerIntentTest#firstPassConfigurationProbeHasItsOwnWindow` is not found on the candidate
-(b101 replaced it).
+lost by final stop census"), the four console checks too. The owner-coverage evidence
+(`b6d536-owner-coverage.json`, regenerated on the merged tree at 3bc5c6f57) runs four checks, and
+all four pass on the candidate. Its before-state is f5877635f with
+`b6d536-owner-coverage-compat.patch` and `b102-census-lookup-compat-r4.patch`. There
+`VramDetectorOwnedBootTest`, `TikaProductionOwnerCoverageTest` and
+`CrashedEngineHelperReceiptTest#successorRecordsCrashConsequenceAndUnknownExitTime` fail by
+assertion, and `EngineSpawnOwnershipArchTest` (not declared repaired) passes.
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r11/).
