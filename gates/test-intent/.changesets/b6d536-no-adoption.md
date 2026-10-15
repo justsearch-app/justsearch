@@ -72,11 +72,29 @@ Phase B verifier repair (integration base 181363e86):
   (the shared-foundation changeset and its evidence). Production code, configuration and tests are
   identical, so the runs at 6f7895a79 above show the same before-state. The new runs below use
   68547f75a.
-- **Entry 3, candidate-only.** Before-state not reproducible: both checks build
-  `ManagedChildReconciler(registry)` without a declared configuration hash. The reconciler at
-  68547f75a needs the process executors and the declared llama configuration hash, and that hash
-  decides whether a healthy predecessor is adopted or terminated. A compat constructor would have to
-  pick the hash, so it would itself decide the check.
+- **Entry 3, candidate-only.** Before-state not reproducible: run-evidence cannot record a
+  before-API variant under these ids. The before run copies the candidate's
+  `ManagedChildReconcilerTest.java` over any patched-in version. A variant class is refused because
+  its file does not exist on the candidate (exit 2). The step4/b85 compat-constructor route does not
+  apply: the candidate's `ManagedChildReconciler(registry)` would need a declared llama
+  configuration hash, and that hash alone decides adopt versus terminate (see the control below).
+  Both checks pass on the candidate (`b6d536-no-adoption-reconciler.json`).
+
+  Observation, not recorded by the runner. The before-API variant
+  `gates/test-intent/evidence/b6d536-no-adoption-reconciler-before-api.patch` (the verifier's
+  `ManagedChildReconcilerBeforeApiTest`) holds both checks unchanged. Each calls the 68547f75a
+  public constructor with `TestEngineExecutors` and the fixture record's existing `applied-A`
+  hash; there is no production stub. It was applied at 68547f75a, then run with
+  `gradlew.bat :modules:ui:test --tests io.justsearch.ui.runtime.ManagedChildReconcilerBeforeApiTest --rerun -PskipWebBuild=true`:
+  - `verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot` fails by assertion ("the
+    predecessor's llama-server must have ended", after the 15 s wait). The old reconciler takes its
+    adoption branch (LLAMA_SERVER, matching hash, healthy probe) and leaves the process running.
+  - `llamaRecordWithReusedPidLeavesTheLiveProcessUntouched` passes (preservation).
+  - Control: with the termination check's declared hash changed to `applied-B`, both pass. The
+    failure therefore comes from compatible-predecessor adoption, not from the fixture.
+
+  Logs, outside the repository: `F:/agent-sandbox/design-b6d536/phaseb-2-scripts/no-adoption-before-api-gradle.log`
+  (sha256 d326e4d6...) and `no-adoption-before-api-control.log` (sha256 3f7f6be7...).
 - **Entry 6 now names four checks.** `b6d536-no-adoption-endpoint.json` was re-run on the
   candidate, and all four pass. Before-state not reproducible: they assert the result of
   `ExternalInferenceEndpoint.parse` or of `LlamaServerOps.externalServerNote()`. Both arrive with
