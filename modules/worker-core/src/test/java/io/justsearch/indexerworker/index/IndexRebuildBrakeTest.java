@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -184,9 +186,13 @@ final class IndexRebuildBrakeTest {
 
   /**
    * Both the state file and its backup unreadable — nothing left to recover from. The manager must
-   * re-establish a layout rather than throw, and the brake must read as zero: bookkeeping we lost is
-   * not evidence that rebuilds were already attempted, and treating it as such would refuse the one
-   * rebuild the user now actually needs.
+   * re-establish a layout rather than throw, so the app still boots and serves.
+   *
+   * <p>Task t-20261013-ef3c41, round 3 (owner's rule, delegated decision): the brake no longer reads
+   * as zero. Whether rebuilds were already attempted cannot be told from lost bookkeeping, and
+   * never acting on uncertainty means no automatic rebuild starts on its account; the re-established
+   * record says the brake was lost, and a person's rebuild (which the brake never gates) remains the
+   * way forward. This reverses the "lost bookkeeping counts as no attempts" half of tempdoc 915.
    */
   @Test
   void aTotallyLostStateFileDoesNotBlockRecovery(@TempDir Path tempDir) throws Exception {
@@ -205,13 +211,71 @@ final class IndexRebuildBrakeTest {
 
     IndexGenerationManager reopened = new IndexGenerationManager(base);
     assertNull(reopened.readStateBestEffort(), "nothing parseable reads as absent, not as healthy");
-    assertEquals(
-        0,
-        reopened.autoRebuildAttemptsFor(TARGET_A),
-        "a lost brake counts as no attempts, so recovery is not blocked by lost bookkeeping");
 
     var relayout = reopened.initializeOrLoad();
     assertNotNull(relayout, "the manager re-establishes a layout from an unreadable state file");
     assertNotNull(relayout.state().active_generation(), "an active generation is restored");
+
+    assertThrows(IOException.class, () -> reopened.recordAutoRebuildAttempt(TARGET_A),
+        "a lost brake is recorded as lost, not as no attempts: no automatic rebuild is counted,"
+            + " and none starts, on lost bookkeeping");
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 2 — a brake that cannot be read counts as braked. Here the state
+   * file and its backup are both present and neither parses at the moment a rebuild would be
+   * counted. Before, the failed read meant "no brake": the attempt rebuilt a fresh state and was
+   * counted as the first, so an automatic rebuild started with no brake at all.
+   */
+  @Test
+  void anUnreadableBrakeRefusesToCountAnAttempt(@TempDir Path tempDir) throws Exception {
+    Path base = tempDir.resolve("index");
+    IndexGenerationManager mgr = new IndexGenerationManager(base);
+    mgr.initializeOrLoad();
+    mgr.recordAutoRebuildAttempt(TARGET_A);
+    mgr.recordAutoRebuildAttempt(TARGET_A);
+    for (String name : new String[] {"state.json", "state.json.prev"}) {
+      Files.writeString(base.resolve(name), "{", StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+    }
+
+    IndexGenerationManager reopened = new IndexGenerationManager(base);
+    assertThrows(IOException.class, () -> reopened.recordAutoRebuildAttempt(TARGET_A),
+        "an unreadable brake was read as no brake and the attempt was counted as the first");
+  }
+
+  /**
+   * The same rule for a brake record that parses but cannot be read as a count: the target is
+   * recorded with no attempt count. Before, the missing count read as zero and the next attempt was
+   * counted as the first, so a spent brake whose count was lost released itself.
+   */
+  @Test
+  void aBrakeRecordWithoutACountRefusesToCountAnAttempt(@TempDir Path tempDir) throws Exception {
+    Path base = tempDir.resolve("index");
+    IndexGenerationManager mgr = new IndexGenerationManager(base);
+    mgr.initializeOrLoad();
+    for (int i = 0; i <= IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS; i++) {
+      mgr.recordAutoRebuildAttempt(TARGET_A);
+    }
+    Path statePath = base.resolve("state.json");
+    String json = Files.readString(statePath);
+    String withoutCount =
+        json.replaceAll("\"auto_rebuild_count\"\\s*:\\s*\\d+", "\"auto_rebuild_count\" : null");
+    assertNotEquals(json, withoutCount, "precondition: the brake count is recorded in state.json");
+    Files.writeString(statePath, withoutCount, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+
+    IndexGenerationManager reopened = new IndexGenerationManager(base);
+    assertThrows(IOException.class, () -> reopened.recordAutoRebuildAttempt(TARGET_A),
+        "a brake record without a count released the brake");
+  }
+
+  /** Preservation: a readable brake for a different target is still a fresh budget, not unreadable. */
+  @Test
+  void aReadableBrakeForAnotherTargetStillCountsFromOne(@TempDir Path tempDir) throws Exception {
+    Path base = tempDir.resolve("index");
+    IndexGenerationManager mgr = new IndexGenerationManager(base);
+    mgr.initializeOrLoad();
+    mgr.recordAutoRebuildAttempt(TARGET_A);
+
+    assertEquals(1, new IndexGenerationManager(base).recordAutoRebuildAttempt(TARGET_B));
   }
 }

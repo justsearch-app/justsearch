@@ -1064,7 +1064,8 @@ public final class EngineRoot implements WorkerHost {
                 () -> requestRestart(started))));
     this.client = built;
     try {
-      recordedIngestion.bindProducer(built::enumerateRecordedRoot, built::enumerateWatchedRecordedRoot);
+      recordedIngestion.bindProducer(built::enumerateRecordedRoot,
+          built::enumerateRecoveredRecordedRoot, built::enumerateWatchedRecordedRoot);
       recordedIngestion.bindBulkProducer(built::enumerateWatchedCapturedRoots, built,
           () -> requestRestart(started),
           operationKey -> {

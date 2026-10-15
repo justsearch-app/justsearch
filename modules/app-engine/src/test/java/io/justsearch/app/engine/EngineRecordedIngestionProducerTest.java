@@ -514,6 +514,10 @@ final class EngineRecordedIngestionProducerTest {
     var runtime = mock(RunningRuntime.class);
     var service = spy(new WorkerIngestService(queue, mock(IndexingLoop.class), null,
         IndexingPacing.unthrottled(), indexBase, layout.activeGenerationPath(), runtime, runtime, null, 0L));
+    // The person added the root, which records its volume (task t-20261013-ef3c41, round 8: only
+    // the add records it). The fixture's own calls are not the test's.
+    EngineTestHarness.recordAddedRoot(service, root);
+    org.mockito.Mockito.clearInvocations(service);
     var scanEntered = new CountDownLatch(1);
     var callContext = new AtomicReference<CallContext>();
     var scanThread = new AtomicReference<Thread>();

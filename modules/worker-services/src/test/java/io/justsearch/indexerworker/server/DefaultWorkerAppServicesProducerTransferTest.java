@@ -215,11 +215,13 @@ final class DefaultWorkerAppServicesProducerTransferTest {
           mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
       deferred.wireEmbeddingProvider(deferredProvider);
       deferred.wireSpladeEncoder(deferredSplade);
+      var watchRequest = io.justsearch.ipc.WatchRootRequest.newBuilder()
+          .setRootPath(root.toString()).setCollection("docs");
+      // The person's add records its volume. Older declared before-states have no marker.
+      var rootAdded = watchRequest.getDescriptorForType().findFieldByName("root_added");
+      if (rootAdded != null) watchRequest.setField(rootAdded, true);
       var watched = deferred.ingestService().watchRoot(
-          io.justsearch.ipc.WatchRootRequest.newBuilder()
-              .setRootPath(root.toString())
-              .setCollection("docs")
-              .build(),
+          watchRequest.build(),
           io.justsearch.indexerworker.services.CallContext.none());
       assertTrue(watched.getWatching(), watched.getErrorMessage());
 

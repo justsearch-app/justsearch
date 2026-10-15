@@ -187,6 +187,9 @@ final class DocumentIdentityBootImportTest {
     server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.releaseModelReadyLatchForTests();
+    // The person added the root, which records its volume (task t-20261013-ef3c41, round 8:
+    // only the add records it, and the migration's walk refuses a root with none recorded).
+    addedWithoutWatching(server.appServices().ingestService(), root);
 
     try (SqliteDocumentIdentityStore probe =
         new SqliteDocumentIdentityStore(layout.dataDir().resolve("jobs.db"))) {
@@ -459,6 +462,10 @@ final class DocumentIdentityBootImportTest {
       assertEquals(1, queue.enqueueEntries(List.of(
           JobQueue.EnqueueEntry.stat(source).withinRoot(source))));
     }
+    // The explicit ingest that left this item also recorded its folder's volume (round 8b of task
+    // t-20261013-ef3c41: only that request records it; without it the item is never admitted).
+    io.justsearch.indexerworker.services.ExplicitIngestRecords.recordFileFolder(
+        layout.indexBase(), source.getParent());
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
     server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
@@ -510,5 +517,26 @@ final class DocumentIdentityBootImportTest {
             + server.jobQueueForTests().jobStateCounts()
             + ", failures="
             + server.jobQueueForTests().failureSummary());
+  }
+
+  /**
+   * The person's add of {@code root} (its watch with the add marker, which records the root's
+   * volume), after which only the watch subscription is dropped from the Worker's registry, so the
+   * test's own rename is not raced by watcher events, as before the add was needed. Dropping it
+   * through the person's removal would drop the record too.
+   */
+  private static void addedWithoutWatching(
+      io.justsearch.indexerworker.services.WorkerIngestService ingest, Path root) throws Exception {
+    assertTrue(ingest.watchRoot(
+        io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString())
+            .setRootAdded(true).build(), CallContext.none())
+        .getWatching(), "precondition: the person adds the root");
+    var registryField = io.justsearch.indexerworker.services.WorkerIngestService.class
+        .getDeclaredField("rootWatcherRegistry");
+    registryField.setAccessible(true);
+    Object registry = registryField.get(ingest);
+    var unwatch = registry.getClass().getDeclaredMethod("unwatch", String.class);
+    unwatch.setAccessible(true);
+    unwatch.invoke(registry, root.toString());
   }
 }

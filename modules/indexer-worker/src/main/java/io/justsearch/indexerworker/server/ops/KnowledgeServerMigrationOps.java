@@ -1344,16 +1344,30 @@ public final class KnowledgeServerMigrationOps {
         case "PRUNE_PREFIX" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
-              int result = context.ingestLifecycle().pruneOps().pruneByPathPrefix(payload, () -> false, 100);
-              boolean aborted = result < 0;
-              int pruned = Math.max(0, result);
-              if (aborted) {
+              // Task t-20261013-ef3c41: replay prunes only confirmed absences — the prefix must be
+              // a present, listable folder, re-checked every batch. A prune that could not finish
+              // stays unapplied and is retried, exactly like a SYNC_ROOT replay whose root is gone.
+              var result =
+                  context.ingestLifecycle().pruneOps().pruneByPathPrefix(
+                      payload,
+                      () -> false,
+                      100,
+                      io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard.forRoot(
+                          Path.of(payload)),
+                      ignoredConfirmedDeletion -> {});
+              int pruned = result.pruned();
+              mutatedLucene = mutatedLucene || pruned > 0;
+              if (!result.complete()) {
                 allApplied = false;
                 context
                     .log()
-                    .warn("Buffered PRUNE_PREFIX replay aborted unexpectedly: prefix={}", payload);
+                    .warn(
+                        "Buffered PRUNE_PREFIX replay did not complete ({}), will retry later:"
+                            + " prefix={} pruned={}",
+                        result.completion(),
+                        payload,
+                        pruned);
               } else {
-                mutatedLucene = mutatedLucene || pruned > 0;
                 context
                     .log()
                     .info("Replayed buffered PRUNE_PREFIX: prefix={} pruned={}", payload, pruned);

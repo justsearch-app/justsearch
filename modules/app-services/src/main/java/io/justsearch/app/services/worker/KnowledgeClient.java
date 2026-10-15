@@ -277,9 +277,27 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         // Tempdoc 821 §3-C3 — same defect on the mode: this lambda hard-coded
         // SCAN_MODE_INITIAL, so a force-reindex arrived at the Worker indistinguishable from an
         // ordinary rewalk. The caller decides the mode now; this lambda only carries it.
+        // Task t-20261013-ef3c41, round 8: the person's add carries the add marker, which alone
+        // records the root's volume on the Worker; every other scan and watch goes without it.
         RootLifecycleOps.ScanRootFn scanRootFn =
-            (rootPath, collection, mode, excludeGlobs, progressConsumer, engineContext) ->
-                scanRoot(rootPath, collection, mode, excludeGlobs, progressConsumer, engineContext);
+            new RootLifecycleOps.ScanRootFn() {
+                @Override
+                public io.justsearch.ipc.ScanRootProgress scan(String rootPath, String collection,
+                        io.justsearch.ipc.ScanMode mode, List<String> excludeGlobs,
+                        java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer,
+                        EngineContext engineContext) {
+                    return scanRoot(rootPath, collection, mode, excludeGlobs, progressConsumer, engineContext);
+                }
+
+                @Override
+                public io.justsearch.ipc.ScanRootProgress scanAdded(String rootPath, String collection,
+                        io.justsearch.ipc.ScanMode mode, List<String> excludeGlobs,
+                        java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer,
+                        EngineContext engineContext) {
+                    return scanRoot(rootPath, collection, mode, excludeGlobs, null, true,
+                            progressConsumer, engineContext);
+                }
+            };
         RootLifecycleOps.WorkerWatchFn workerWatchFn =
             new RootLifecycleOps.WorkerWatchFn() {
                 @Override
@@ -290,7 +308,13 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 @Override
                 public void watch(String rootPath, String collection, EngineContext engineContext,
                         WatchedRootsState.RootProducerFence fence) {
-                    watchRoot(rootPath, collection, engineContext, fence);
+                    watchRoot(rootPath, collection, engineContext, fence, false);
+                }
+
+                @Override
+                public void watchAdded(String rootPath, String collection, EngineContext engineContext,
+                        WatchedRootsState.RootProducerFence fence) {
+                    watchRoot(rootPath, collection, engineContext, fence, true);
                 }
 
                 @Override
@@ -624,6 +648,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         if (collection != null && !collection.isBlank()) {
             builder.setTargetCollection(collection);
         }
+        // Task t-20261013-ef3c41, round 8b (decision 1): an explicit ingest request, a person's or
+        // an agent's, is a deliberate add and records the volume of each file's folder.
+        builder.setRootAdded(true);
         BatchRequest request = builder.build();
         return executeIngestRpc(
             "submitBatch",
@@ -1656,12 +1683,30 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             List<String> excludeGlobs,
             CancelToken cancelToken,
             java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer, EngineContext engineContext) {
+        return scanRoot(rootPath, collection, mode, excludeGlobs, cancelToken, false,
+                progressConsumer, engineContext);
+    }
+
+    /**
+     * As the {@link CancelToken} overload; {@code rootAdded} marks the scan as the person's add of
+     * the root, which alone records the root's volume on the Worker (task t-20261013-ef3c41,
+     * round 8). Every other scan passes {@code false}.
+     */
+    public io.justsearch.ipc.ScanRootProgress scanRoot(
+            String rootPath,
+            String collection,
+            io.justsearch.ipc.ScanMode mode,
+            List<String> excludeGlobs,
+            CancelToken cancelToken,
+            boolean rootAdded,
+            java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> progressConsumer, EngineContext engineContext) {
         Objects.requireNonNull(rootPath, "rootPath");
         Objects.requireNonNull(progressConsumer, "progressConsumer");
         io.justsearch.ipc.ScanRootRequest.Builder builder =
                 io.justsearch.ipc.ScanRootRequest.newBuilder()
                         .setRootPath(rootPath)
-                        .setMode(mode == null ? io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL : mode);
+                        .setMode(mode == null ? io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL : mode)
+                        .setRootAdded(rootAdded);
         if (collection != null && !collection.isBlank()) {
             builder.setCollection(collection);
         }
@@ -1706,14 +1751,15 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      */
     public io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection, EngineContext engineContext) {
         return watchRoot(rootPath, collection, engineContext,
-                watchedRootsState.captureRootProducer(Path.of(rootPath), false));
+                watchedRootsState.captureRootProducer(Path.of(rootPath), false), false);
     }
 
     private io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection,
-            EngineContext engineContext, WatchedRootsState.RootProducerFence fence) {
+            EngineContext engineContext, WatchedRootsState.RootProducerFence fence, boolean rootAdded) {
         Objects.requireNonNull(rootPath, "rootPath");
         io.justsearch.ipc.WatchRootRequest.Builder builder =
-                io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(rootPath);
+                io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(rootPath)
+                        .setRootAdded(rootAdded);
         if (collection != null && !collection.isBlank()) {
             builder.setCollection(collection);
         }

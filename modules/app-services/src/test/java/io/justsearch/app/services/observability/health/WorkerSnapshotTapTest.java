@@ -53,7 +53,7 @@ final class WorkerSnapshotTapTest {
   void setUp() {
     conditions = new ConditionStore();
     occurrences = new OccurrenceLog();
-    changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
+    changes = newChanges();
     listener = new RecordingListener();
     changes.subscribeTyped(listener);
     clock = new MutableClock(T0);
@@ -61,6 +61,22 @@ final class WorkerSnapshotTapTest {
   }
 
   // ----- helpers -----
+
+  /** The before-state owns delivery internally; the candidate requires its owner to supply it. */
+  private static HealthEventChangeRegistry newChanges() {
+    ExecutorService delivery = Executors.newVirtualThreadPerTaskExecutor();
+    try {
+      try {
+        return HealthEventChangeRegistry.class.getConstructor(ExecutorService.class).newInstance(delivery);
+      } catch (NoSuchMethodException beforeOwnerSuppliedDelivery) {
+        delivery.close();
+        return HealthEventChangeRegistry.class.getConstructor().newInstance();
+      }
+    } catch (ReflectiveOperationException failure) {
+      delivery.close();
+      throw new AssertionError("health delivery fixture failed", failure);
+    }
+  }
 
   private static WorkerOperationalView view(
       CompatibilityStatusView compat, QueueDbStatusView queueDb, FailureTrackingView failure) {
@@ -912,7 +928,7 @@ final class WorkerSnapshotTapTest {
           new WorkerSnapshotTap(
               localConditions,
               new OccurrenceLog(),
-              new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()),
+              newChanges(),
               HEAD_SRC,
               clock);
       localTap.accept(
@@ -932,6 +948,27 @@ final class WorkerSnapshotTapTest {
       assertEquals(expectedTargets.get(reason), condition.recovery().get().target().value());
       assertEquals(expectedDefaults.get(reason), condition.recovery().get().defaultArgsJson());
     }
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 2 — an unreadable rebuild brake holds like a spent one, so its
+   * recovery is the same: the explicit index rebuild, not a plain reindex (which the held Worker
+   * would not act on).
+   */
+  @Test
+  void anUnreadableRebuildBrakeRoutesToTheIndexRebuild() {
+    tap.accept(
+        view(
+            compat("COMPATIBLE", "COMPATIBLE", true, "rebuild_brake_unreadable"),
+            queueDb(true, true),
+            failure("", "", 0, 0)),
+        false);
+
+    HealthEvent event = conditions.find("schema.reindex-required", "worker.schema").orElseThrow();
+    AssertedCondition condition = (AssertedCondition) event.body();
+    assertTrue(condition.recovery().isPresent(), "required reindex must expose a recovery");
+    assertEquals("core.rebuild-index", condition.recovery().get().target().value());
+    assertEquals("{}", condition.recovery().get().defaultArgsJson());
   }
 
   @Test

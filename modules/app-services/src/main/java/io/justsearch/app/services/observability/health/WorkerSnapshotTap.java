@@ -450,7 +450,8 @@ public final class WorkerSnapshotTap {
 
   private static ConditionMapping resolveReindexMapping(String reason) {
     return switch (reason) {
-      case "embedding_mismatch", "embedding_legacy", "rebuild_brake_exhausted" ->
+      case "embedding_mismatch", "embedding_legacy", "rebuild_brake_exhausted",
+          "rebuild_brake_unreadable", "rebuild_brake_state_lost" ->
           REBUILD_INDEX_MAPPING;
       default -> REINDEX_MAPPING;
     };

@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-14T13:17:36.842Z",
+  "revision": "ef205d0e921c698bd3d30aaad5ad4efce674689a",
+  "tree": "04cb8b0de514c082b52ee368164cec8bae8d3cfb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineRootVolumeSwapTest.theOriginalVolumeReturningIsIndexedAndPrunedAsBefore\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15680
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#theOriginalVolumeReturningIsIndexedAndPrunedAsBefore",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1a584b0f71b0c683f848337d48b6fef4c978d633644b606303791f43944b7f30",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theOriginalVolumeReturningIsIndexedAndPrunedAsBefore()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "09a19e033",
+    "revision": "09a19e03317de53e7c5761d3bb0b1baa704f01e2",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineRootVolumeSwapTest.theOriginalVolumeReturningIsIndexedAndPrunedAsBefore\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 20472
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#theOriginalVolumeReturningIsIndexedAndPrunedAsBefore",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:6b00176853183ba98d1d825519bc58d15e932dd2a211fdc5dedb90fee6b41f42"
+}

@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Stable directory identity, independent of mutable timestamps and path spelling. */
 record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
@@ -93,6 +94,27 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
       throw new IOException("Reconciliation root has no stable file identity: " + root);
     }
     return new RootIdentity(realPath(root), new ProviderFileIdentity(fileKey));
+  }
+
+  /**
+   * Test seam (task t-20261013-ef3c41, round 9): while set, {@link #volume()} answers as on a
+   * platform that exposes no volume identity (Linux, macOS), so a run on Windows covers that path.
+   * Nothing in production sets it.
+   */
+  static final AtomicBoolean VOLUME_IDENTITY_UNAVAILABLE = new AtomicBoolean();
+
+  /**
+   * The volume this root lives on, comparable across restarts, or {@code null} where the platform
+   * exposes no volume identity (task t-20261013-ef3c41: a different volume at the same path must
+   * not vouch for the original's deletions).
+   */
+  String volume() {
+    if (VOLUME_IDENTITY_UNAVAILABLE.get()) {
+      return null;
+    }
+    return stableFileIdentity instanceof WindowsFileIdentity windows
+        ? "windows-volume:" + Long.toHexString(windows.volumeSerialNumber())
+        : null;
   }
 
   sealed interface StableFileIdentity permits ProviderFileIdentity, WindowsFileIdentity {}

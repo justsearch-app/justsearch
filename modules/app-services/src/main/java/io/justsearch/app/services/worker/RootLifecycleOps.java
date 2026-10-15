@@ -55,7 +55,32 @@ final class RootLifecycleOps {
     // window) means a re-mounted folder clears the state on its own — guardrail (i): never cache
     // "missing" permanently.
     private static final long AVAIL_STALENESS_MS = 2_000L;
-    private static final String ROOT_MISSING_REASON = "ROOT_NOT_DIRECTORY";
+    static final String ROOT_MISSING_REASON = "ROOT_NOT_DIRECTORY";
+
+    /**
+     * Task t-20261013-ef3c41, round 8 (refined decision 2): the unavailable reason of a root whose
+     * drive the Worker could not confirm after an upgrade; the same text the Worker answers with
+     * ({@code WorkerIngestService.ROOT_UNCONFIRMED_AFTER_UPGRADE}). Shown verbatim. No module both
+     * sides use holds the root reason codes, so the text is kept in both; a change to one must be
+     * made to the other (round 8b, decision 7).
+     */
+    static final String ROOT_UNCONFIRMED_REASON = ROOT_MISSING_REASON + ": drive not confirmed after upgrade";
+
+    /** Whether {@code reason} is a root-level unavailable reason, plain or with its detail. */
+    static boolean isRootUnavailableReason(String reason) {
+        return reason != null
+                && (reason.equals(ROOT_MISSING_REASON) || reason.startsWith(ROOT_MISSING_REASON + ":"));
+    }
+
+    /**
+     * The walk error a root-level refusal is recorded as: the upgrade reason verbatim, every other
+     * one as the plain root-level reason.
+     */
+    static String unavailableReasonFor(String workerReason) {
+        return workerReason != null && workerReason.startsWith(ROOT_UNCONFIRMED_REASON)
+                ? ROOT_UNCONFIRMED_REASON
+                : ROOT_MISSING_REASON;
+    }
     private final Map<Path, Boolean> rootAvailable = new ConcurrentHashMap<>();
     private final Map<Path, Long> rootAvailCheckedAtMs = new ConcurrentHashMap<>();
     private final Set<Path> availRefreshInFlight = ConcurrentHashMap.newKeySet();
@@ -102,6 +127,15 @@ final class RootLifecycleOps {
             }, () -> null);
         }
 
+        /**
+         * Task t-20261013-ef3c41, round 8: the watch registration of the person's add, carrying the
+         * add marker that alone records the root's volume on the Worker.
+         */
+        default void watchAdded(String rootPath, String collection, EngineContext engineContext,
+                WatchedRootsState.RootProducerFence fence) {
+            watch(rootPath, collection, engineContext, fence);
+        }
+
         void unwatch(String rootPath, EngineContext engineContext);
     }
 
@@ -129,6 +163,19 @@ final class RootLifecycleOps {
                 io.justsearch.ipc.ScanMode mode,
                 List<String> excludeGlobs,
                 java.util.function.Consumer<ScanRootProgress> progressConsumer, EngineContext engineContext);
+
+        /**
+         * Task t-20261013-ef3c41, round 8: the walk of the person's add, carrying the add marker
+         * that alone records the root's volume on the Worker.
+         */
+        default ScanRootProgress scanAdded(
+                String rootPath,
+                String collection,
+                io.justsearch.ipc.ScanMode mode,
+                List<String> excludeGlobs,
+                java.util.function.Consumer<ScanRootProgress> progressConsumer, EngineContext engineContext) {
+            return scan(rootPath, collection, mode, excludeGlobs, progressConsumer, engineContext);
+        }
     }
 
     // ========== Watched Root Accessors ==========
@@ -184,8 +231,12 @@ final class RootLifecycleOps {
                 walkExecutor.execute(
                     () -> {
                         try {
-                            rootAvailable.put(root, Files.isDirectory(root));
-                            rootAvailCheckedAtMs.put(root, System.currentTimeMillis());
+                            boolean available = isListableDirectory(root);
+                            // Round 8 (S8): a root removed while it was being checked keeps no answer.
+                            if (watchedRoots.containsKey(root)) {
+                                rootAvailable.put(root, available);
+                                rootAvailCheckedAtMs.put(root, System.currentTimeMillis());
+                            }
                         } finally {
                             availRefreshInFlight.remove(root);
                         }
@@ -197,6 +248,25 @@ final class RootLifecycleOps {
         }
         Boolean known = rootAvailable.get(root);
         return known == null || known; // default available until the first background check lands
+    }
+
+    /**
+     * Task t-20261013-ef3c41 (S8): a folder that exists but cannot be listed (access denied, a share
+     * that answers metadata but not enumeration) is just as unavailable to indexing as a missing
+     * one, and its documents are kept; it shows the same single root-level "unavailable" state
+     * instead of reading as indexed while its files fail one by one.
+     */
+    private static boolean isListableDirectory(Path root) {
+        if (!Files.isDirectory(root)) {
+            return false;
+        }
+        try (var entries = Files.newDirectoryStream(root)) {
+            // Reading the first entry is what proves the folder can be enumerated; empty is fine.
+            boolean firstEntryRead = entries.iterator().hasNext();
+            return firstEntryRead || Files.isDirectory(root);
+        } catch (java.io.IOException | SecurityException | java.nio.file.DirectoryIteratorException e) {
+            return false;
+        }
     }
 
     // ========== Root Add/Remove ==========
@@ -217,10 +287,10 @@ final class RootLifecycleOps {
         // (IndexingService#addWatchedPath), which is DEFAULT_COLLECTION. One root must carry ONE
         // label across every arm and every restart, so this records the same literal the add path
         // normalizes to and the reindex paths now read back.
-        watchedRootsState.register(normalized, null, false);
+        boolean added = watchedRootsState.register(normalized, null, false);
         submitFencedWalk(normalized, IngestCollectionPolicy.DEFAULT_COLLECTION,
                 io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL,
-                watchedRootsState.captureRootProducer(normalized, true), false, engineContext);
+                watchedRootsState.captureRootProducer(normalized, true), false, added, engineContext);
     }
 
     /**
@@ -238,16 +308,17 @@ final class RootLifecycleOps {
      * passes {@code SCAN_MODE_FORCE_REINDEX}; every other walk is an ordinary initial scan.
      */
     private void submitFencedWalk(Path normalized, String collection, io.justsearch.ipc.ScanMode mode,
-            WatchedRootsState.RootProducerFence fence, boolean pruneFirst, EngineContext engineContext) {
+            WatchedRootsState.RootProducerFence fence, boolean pruneFirst, boolean rootAdded,
+            EngineContext engineContext) {
         submitWalk.accept(ownedContext -> fence.run(() -> {
             if (pruneFirst) syncOps.pruneMissing(normalized.toString(), ownedContext);
-            walkAndSubmitOwned(normalized, collection, mode, ownedContext);
+            walkAndSubmitOwned(normalized, collection, mode, rootAdded, ownedContext);
             return null;
         }, () -> null), engineContext);
     }
 
-    private void walkAndSubmitOwned(
-            Path normalized, String collection, io.justsearch.ipc.ScanMode mode, EngineContext engineContext) {
+    private void walkAndSubmitOwned(Path normalized, String collection, io.justsearch.ipc.ScanMode mode,
+            boolean rootAdded, EngineContext engineContext) {
         if (!watchedRoots.containsKey(normalized)) {
             log.debug("Walk cancelled before start: root {} removed", normalized);
             return;
@@ -256,13 +327,14 @@ final class RootLifecycleOps {
         List<String> excludeGlobs = excludes.patterns();
         long[] admittedTotal = new long[] {0L};
         try {
-            ScanRootProgress terminal =
-                    scanRootFn.scan(
-                            normalized.toString(),
-                            collection,
-                            mode,
-                            excludeGlobs,
-                            progress -> admittedTotal[0] = progress.getFilesAdmitted(), engineContext);
+            java.util.function.Consumer<ScanRootProgress> progressConsumer =
+                    progress -> admittedTotal[0] = progress.getFilesAdmitted();
+            // Task t-20261013-ef3c41, round 8: only the person's add carries the add marker.
+            ScanRootProgress terminal = rootAdded
+                    ? scanRootFn.scanAdded(normalized.toString(), collection, mode, excludeGlobs,
+                            progressConsumer, engineContext)
+                    : scanRootFn.scan(normalized.toString(), collection, mode, excludeGlobs,
+                            progressConsumer, engineContext);
 
             synchronized (watchedRootsState) {
                 if (!watchedRoots.containsKey(normalized)) {
@@ -277,6 +349,9 @@ final class RootLifecycleOps {
                         // Empty/all-excluded is completed, distinct from a walk still in progress.
                         watchedRootsState.markWalkedEmpty(normalized);
                     }
+                } else if (isRootUnavailableReason(reason)) {
+                    // Round 6 (S8): the root reads unavailable; its last-indexed time is kept.
+                    watchedRootsState.markWalkRefused(normalized, unavailableReasonFor(reason));
                 } else {
                     watchedRootsState.markWalkFailed(normalized, reason);
                 }
@@ -312,10 +387,12 @@ final class RootLifecycleOps {
         if (initialization == null) return;
         // The caller must release this monitor before the Engine worker acquires its fence.
         try {
-            startWatcherOwned(initialization.collection(), initialization.path(), engineContext, initialization.fence());
+            startWatcherOwned(initialization.collection(), initialization.path(), engineContext,
+                    initialization.fence(), true);
             initialization.fence().run(() -> {
                 submitFencedWalk(initialization.path(), initialization.collection(),
-                        io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, initialization.fence(), false, engineContext);
+                        io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, initialization.fence(), false, true,
+                        engineContext);
                 watchedRootsState.finishInitialization(initialization.path());
                 watchedRootsState.persist();
                 return null;
@@ -484,8 +561,16 @@ final class RootLifecycleOps {
 
         // Retain persisted roots until all cleanup succeeds so incomplete removal can be retried.
         watchedRootsState.removeRootAndNestedAndPersist(normalized);
+        // Round 8 (task t-20261013-ef3c41, S8): nothing of a removed root is kept, so the same
+        // folder added again starts from its own first availability check.
+        forgetAvailabilityUnder(normalized);
 
         return deletedJobs;
+    }
+
+    private void forgetAvailabilityUnder(Path removed) {
+        rootAvailable.keySet().removeIf(root -> root.startsWith(removed));
+        rootAvailCheckedAtMs.keySet().removeIf(root -> root.startsWith(removed));
     }
 
     void flush(EngineContext engineContext) {
@@ -494,13 +579,27 @@ final class RootLifecycleOps {
 
     /**
      * Clears all watched roots — stops watchers, clears state, persists empty. Used by profiling
-     * reset. Does NOT issue per-root in-process port deletion (the Worker deleteAll handles that).
+     * reset, after the Worker's deleteAll emptied the index.
+     *
+     * <p>Task t-20261013-ef3c41, round 8: a reset that removes roots removes each one exactly as
+     * the person's removal does, so the Worker drops its volume record, its pending upgrade
+     * seeding, its held watch and watcher state, and any deferred boot state of the root. Each
+     * outermost root is removed (which covers its nested roots); whatever is left is cleared.
      */
     void clearAllRoots(EngineContext engineContext) {
         log.info("clearAllRoots: clearing root state");
-        // Tempdoc 626 §Axis-A — no Head-side watcher to stop; the Worker watcher is unregistered
-        // per-root via removeWatchedPath, and a profiling reset clears Worker state via deleteAll.
-        watchedRootsState.clearAll();
+        synchronized (watchedRootsState.lifecycleLock()) {
+            List<Path> roots = List.copyOf(watchedRoots.keySet());
+            for (Path root : roots) {
+                boolean nested = roots.stream().anyMatch(other -> !other.equals(root) && root.startsWith(other));
+                if (!nested && removeWatchedPathOwned(root, engineContext) < 0) {
+                    log.warn("clearAllRoots: removal of {} did not complete on the Worker", root);
+                }
+            }
+            watchedRootsState.clearAll();
+            rootAvailable.clear();
+            rootAvailCheckedAtMs.clear();
+        }
         log.info("clearAllRoots: all roots cleared and persisted");
     }
 
@@ -550,7 +649,7 @@ final class RootLifecycleOps {
             // backpressure. The fenced walk handles batching, state marking, and persistence.
             var fence = watchedRootsState.captureRootProducer(root, true);
             String collection = collectionOf(root);
-            submitFencedWalk(root, collection, scanMode, fence, true, engineContext);
+            submitFencedWalk(root, collection, scanMode, fence, true, false, engineContext);
         }
         watchedRootsState.persist();
     }
@@ -578,9 +677,9 @@ final class RootLifecycleOps {
             // persisted before the field existed has none and falls back to the default, which is
             // what every arm sent before.
             String collection = collectionOf(normalized);
-            startWatcherOwned(collection, normalized, engineContext, fence);
+            startWatcherOwned(collection, normalized, engineContext, fence, false);
             submitFencedWalk(normalized, collection, io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL,
-                    fence, false, engineContext);
+                    fence, false, false, engineContext);
         }
         // Runs after all walks complete (single-thread executor serializes tasks).
         int count = rootsToReindex.size();
@@ -602,12 +701,16 @@ final class RootLifecycleOps {
     }
 
     private void startWatcherOwned(String collection, Path normalized, EngineContext engineContext,
-            WatchedRootsState.RootProducerFence fence) {
+            WatchedRootsState.RootProducerFence fence, boolean rootAdded) {
         // Tempdoc 626 §Axis-A (the 418 Phase-C cutover) — the Worker-side watcher is now the SOLE
         // file-event source; the redundant Head-side watcher stack was deleted. The reconciler
         // (periodic syncDirectory + reindexPersistedRoots) remains the source-of-truth backstop.
         try {
-            workerWatchFn.watch(normalized.toString(), collection, engineContext, fence);
+            if (rootAdded) {
+                workerWatchFn.watchAdded(normalized.toString(), collection, engineContext, fence);
+            } else {
+                workerWatchFn.watch(normalized.toString(), collection, engineContext, fence);
+            }
         } catch (RuntimeException e) {
             EngineRefusals.rethrow(e);
             log.debug(

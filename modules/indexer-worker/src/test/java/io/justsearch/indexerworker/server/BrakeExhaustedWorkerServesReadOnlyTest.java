@@ -196,6 +196,60 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
 
 
   /**
+   * Task t-20261013-ef3c41, round 2 — a brake that cannot be read counts as braked. The brake
+   * record names the shape this runtime would build but its attempt count is gone (the record
+   * parses; the count does not). Before, the missing count read as no attempts: the boot counted a
+   * first attempt and started an automatic rebuild. Now the boot holds exactly as a spent brake
+   * does — no rebuild, read-only search — status names the unreadable brake, and a person's rebuild
+   * still goes ahead.
+   */
+  @Test
+  void anUnreadableBrakeHoldsLikeASpentOneAndAPersonsRebuildStillRuns(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    WorkerBootFixture.seed(layout.activePath(), null, 1);
+    WorkerBootFixture.seedInFlightGreen(layout, FOREIGN_SHAPE, 1);
+    String target = WorkerBootFixture.currentFingerprint();
+    layout.genManager().recordAutoRebuildAttempt(target);
+    Path statePath = layout.indexBase().resolve("state.json");
+    String json = Files.readString(statePath, StandardCharsets.UTF_8);
+    String withoutCount =
+        json.replaceAll("\"auto_rebuild_count\"\\s*:\\s*\\d+", "\"auto_rebuild_count\" : null");
+    assertTrue(!json.equals(withoutCount), "precondition: the brake count is recorded in state.json");
+    Files.writeString(statePath, withoutCount, StandardCharsets.UTF_8);
+
+    WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.start();
+
+    assertTrue(server.rebuildBrakeExhaustedForTest(),
+        "an unreadable brake was read as no brake: the boot started an automatic rebuild");
+    assertNotNull(server.appServices(), "the held Worker still finished starting");
+    assertNull(new IndexGenerationManager(layout.indexBase()).readStateBestEffort().building_generation(),
+        "no automatic rebuild generation was started");
+
+    StatusResponse status =
+        server.appServices().ingestService().indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+    assertEquals("BLOCKED_REBUILD_BRAKE", status.getCompatibility().getSchemaCompatState());
+    assertEquals("rebuild_brake_unreadable", status.getCompatibility().getReindexRequiredReason(),
+        "status must name the unreadable brake, not a spent one");
+    assertTrue(status.getCompatibility().getReindexRequired());
+
+    SearchResponse search = server.appServices().searchService()
+        .search(SearchRequest.newBuilder().setQuery("*").setLimit(10).build(), CallContext.none());
+    assertNotNull(search, "search still answers from the existing index");
+
+    MigrationStartResponse rebuild = server.appServices().ingestService().startMigration(
+        MigrationStartRequest.newBuilder()
+            .setReason(MigrationSource.USER_REQUESTED_REBUILD.wire())
+            .setRestartWorker(false)
+            .build(),
+        CallContext.none());
+    assertTrue(rebuild.getAccepted(), "a person's rebuild still runs: " + rebuild.getError());
+    assertTrue(!rebuild.getBuildingGenerationId().isBlank(), "and it allocates a Green beside Blue");
+  }
+
+  /**
    * Tempdoc 915 (live validation D3). The braked verdict is right today only because
    * {@code safeSchemaCompatState()} tests the brake before it looks at the stored fingerprint. With
    * that fingerprint reported as the empty string, the moment an operator does what the brake's own

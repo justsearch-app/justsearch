@@ -66,13 +66,21 @@ function freePort() {
 }
 
 /** Poll `supervisor.v1.json` until `predicate` holds, recording every distinct state seen. */
-export async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen }) {
+export async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen, faultGatePath }) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const state = io.readJsonIfPresent(statePath);
     if (state) {
       const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}${state.phase ? `:${state.phase}` : ''}`;
       if (!seen.has(key)) seen.set(key, state);
+      // Lifecycle cases may wait for a later incarnation. They still witness the first RUNNING
+      // identity on the way there, so release its fixture fault just as the actuator cases do.
+      if (faultGatePath && state.state === 'running' && state.incarnation === 1
+          && !fs.existsSync(faultGatePath)) {
+        fs.writeFileSync(faultGatePath, JSON.stringify({
+          pid: state.pid, instanceId: state.instanceId, incarnation: state.incarnation,
+        }));
+      }
       if (predicate(state)) return state;
     }
     if (Date.now() >= deadline) return null;
@@ -107,6 +115,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const startTimeoutMs = String(testCase.startTimeoutMs ?? 10000);
   const uiPort = await freePort();
   const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
+  const faultGatePath = path.join(workDir, 'first-incarnation-running.json');
   const seen = new Map();
 
   const child = spawn(
@@ -133,6 +142,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, ...preload, io.fakeEngine]),
         JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([IDLE_FRONTEND[0], ...preload, ...IDLE_FRONTEND.slice(1)]),
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
+        JUSTSEARCH_FAKE_ENGINE_FAULT_GATE: faultGatePath,
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
         // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
         // and a case that hangs for either is a case nobody will run.
@@ -212,7 +222,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
     removeFixtureDirectory(workDir);
   };
 
-  return { workDir, dataDir, stateRoot, statePath, child, output, exited, seen, cleanup, uiPort, identities };
+  return { workDir, dataDir, stateRoot, statePath, faultGatePath, child, output, exited, seen, cleanup, uiPort, identities };
 }
 
 const RESTART_CASES = new Set([
@@ -259,6 +269,13 @@ export async function runCase({ testCase, policy, io }) {
     if (running.policyProfile !== 'harness') {
       problems.push(`the supervisor ran on the PRODUCT policy (${running.policyProfile}); the overrides did not reach it`);
     }
+    // Arm the fixture only after witnessing the precondition. Socket/manifest publication precedes
+    // Windows process census and lease setup; a timer from listen() can expire before RUNNING.
+    // Keep the configured fault delays and all post-fault assertions unchanged. Later incarnations
+    // retain their original timing, including deaths during discovery and partial boots.
+    fs.writeFileSync(run.faultGatePath, JSON.stringify({
+      pid: running.pid, instanceId: running.instanceId, incarnation: running.incarnation,
+    }), 'utf8');
 
     if (testCase.id === 'live-503-and-continuous-essential-stability') {
       problems.push(...await proveEssentialStability({ dataDir: run.dataDir, statePath: run.statePath, policy, io }));
@@ -588,7 +605,7 @@ async function runLifecycleCase({ testCase, policy, io }) {
       const first = await driveCase({ testCase, policy, io, workDir, keepWorkDir: true });
       runs.push(first);
       const up = await watchSupervisor({ statePath: first.statePath, predicate: (s) => s.state === 'running',
-        timeoutMs: 20_000, io, seen: first.seen });
+        timeoutMs: 20_000, io, seen: first.seen, faultGatePath: first.faultGatePath });
       if (!up) {
         problems.push(`the first supervisor never reached running. stderr: ${first.output.stderr.slice(-1200)}`);
         return { problems };
@@ -617,6 +634,7 @@ async function runLifecycleCase({ testCase, policy, io }) {
       timeoutMs: 40_000,
       io,
       seen: run.seen,
+      faultGatePath: run.faultGatePath,
     });
     if (!reached) {
       problems.push(

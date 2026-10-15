@@ -54,6 +54,7 @@
       "searchableDocuments" : 0,
       "indexMaxDoc" : 0,
       "indexNumDocs" : 0,
+      "indexedDocumentsUnknown" : false,
       "vduAvailable" : true
     },
     "failure" : {

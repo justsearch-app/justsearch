@@ -833,6 +833,39 @@
       "fixtures": []
     },
     {
+      "id": "worker-root-volume-record",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "RootVolumeLedger.java resolves the literals \"root-volumes.properties\" and \"root-volumes-pending.properties\" (each rewritten through a \".tmp\" sibling) against the Worker's index base path, which WorkerIngestService is given by its owner; the index/<...> prefix is configuration-resolved, not a literal in this component.",
+      "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
+      "encryptionNote": "Holds in the clear the absolute path of every root the person added, every configured collection root and the folder of every explicitly ingested file, each with the serial number of the volume it was on (windows-volume:<hex>), and the roots awaiting their seeding. Folder paths of the user's, no document content. Rebuilt on evidence at boot when lost or corrupt, so it is unsealed and covered by OS disk encryption only.",
+      "owner": "WORKER",
+      "note": "Task t-20261013-ef3c41 (S8): the volume each root was on when the person added it, so another volume at the same drive letter or mount point never vouches for the original's deletions. Written only by a deliberate add (the person's add of a root, an explicit ingest request) and by the one-time seeding on evidence; a root's entry is dropped when the person removes it. Written and read by the Worker's ingest service (worker-services, RootWitness through RootVolumeLedger). On a platform that exposes no volume identity (anything but Windows) no volume is written.",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "index/*/root-volumes.properties",
+        "index/*/root-volumes-pending.properties"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "Java properties, unversioned: <absolute folder> or explicit-file-folder|<absolute folder> = <scheme>:<hex volume serial>; pending file: <absolute folder> = awaiting",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "DISCARD_UNREADABLE_DERIVED_STATUS_AND_RESCAN",
+      "corruptionNote": "A lost or unreadable record never causes a deletion. While the Worker runs, a record that cannot be read, or whose content is not a well-formed record, is 'cannot tell': every root it would vouch for is refused (nothing is walked, synced, watched or pruned there) and reads unavailable. At the next boot a corrupt record or pending file is discarded, and a lost or discarded record is rebuilt as after an upgrade from a version without it: every declared root awaits its one-time seeding and reads 'drive not confirmed after upgrade' until at least half of up to 50 of its indexed files are on the drive at its path with their indexed size and modification time (or it has nothing indexed), when that drive is recorded again; configured collection roots are seeded the same way. Not rebuilt: the records of explicitly ingested files' folders outside every root, whose files are not admitted and under which nothing is pruned until they are explicitly ingested again. A file that exists but cannot be opened (locked, access denied) is not discarded: nothing is recorded and its roots stay refused, reading ROOT_NOT_DIRECTORY rather than the upgrade reason, until it can be read.",
+      "reconciliation": "RESEED_DECLARED_ROOTS_ON_INDEX_EVIDENCE_AT_BOOT",
+      "status": "READY",
+      "implementationSources": [
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/RootVolumeLedger.java"
+      ],
+      "tests": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java"
+      ],
+      "fixtures": []
+    },
+    {
       "id": "entity-clusters",
       "pathVerification": "COMPOSED",
       "pathVerificationNote": "Only the base name is a literal (DisambiguationService.java:50, dataDir.resolve(\"entity-clusters.db\")). SQLite creates the -wal and -shm sidecars itself, so neither name exists as a literal.",

@@ -491,6 +491,16 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
+  // Task t-20261013-ef3c41 — the repeat-rebuild brake itself could not be read. A brake that cannot be
+  // read holds like a spent one: no automatic rebuild starts, ingestion does not resume, and a person's
+  // rebuild is the way forward. Same consequence as the row above, so the same severity and remedy.
+  {
+    code: 'index.rebuild_brake_unreadable',
+    wording:
+      'The index needs rebuilding, but its rebuild record could not be read, so it is not being rebuilt automatically — search still works on what is already indexed, but new files are not being added. Rebuild the index to continue.',
+    remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
+    severity: 'warn',
+  },
   // Tempdoc 837 S6 removed the `index.rebuilding` row that used to sit here. Its code was emitted
   // only inside the window the verdict forces to `transitioning`, where this projection returns null,
   // so the row was unreachable UI. Its wording was not lost — it moved, word for word, into
@@ -546,6 +556,7 @@ const REINDEX_CAUSE_CODES: ReadonlySet<string> = new Set([
   'index.embedding_legacy',
   'index.embedding_mismatch',
   'index.rebuild_brake_exhausted',
+  'index.rebuild_brake_unreadable',
 ]);
 
 /**

@@ -1294,13 +1294,36 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
   }
 
-  /** One accepted child on the existing bounded walker; completion means both owned tasks exited. */
+  /**
+   * One accepted child on the existing bounded walker; completion means both owned tasks exited.
+   * The request was just made by a person or an agent: an explicit ingest is a deliberate add, so
+   * it carries the add marker and records its folder's volume (task t-20261013-ef3c41, round 8b,
+   * decision 1).
+   */
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation) {
+    return enumerateExplicitRoot(plan, childKey, epoch, context, cancellation, true);
+  }
+
+  /**
+   * {@link #enumerateRecordedRoot} for an explicit ingest resumed after a restart or a stopped
+   * attachment: it is no fresh add, so it carries no add marker and records nothing (round 8b,
+   * decision 2); a folder with no recorded volume is then refused and nothing is deleted.
+   */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecoveredRecordedRoot(
+      RecordedRootPlan plan, String childKey, long epoch, EngineContext context,
+      CancelToken cancellation) {
+    return enumerateExplicitRoot(plan, childKey, epoch, context, cancellation, false);
+  }
+
+  private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateExplicitRoot(
+      RecordedRootPlan plan, String childKey, long epoch, EngineContext context,
+      CancelToken cancellation, boolean rootAdded) {
     CallView view = captureCallView();
     try {
       return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, false));
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, false),
+          rootAdded);
     } catch (RuntimeException | Error failure) {
       view.release();
       throw failure;
@@ -1313,7 +1336,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     CallView view = captureCallView();
     try {
       return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, true));
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, true),
+          false);
     } catch (RuntimeException | Error failure) {
       view.release();
       throw failure;
@@ -1358,7 +1382,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           if (outcome != JobQueue.WalkEnumerationOutcome.COMPLETE) return CompletableFuture.completedFuture(outcome);
           if (cancellation.isCancelled()) return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
           return enumerateRecordedRoot(singleRoot, operationKey, epoch, owner.context(), cancellation,
-              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork(), fence);
+              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork(), fence, false);
         });
       }
       return result.whenComplete((ignored, failure) -> {
@@ -1379,7 +1403,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation,
       WorkerIngestService.RecordedScanMode mode, CallView view,
-      io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence fence) {
+      io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence fence,
+      boolean rootAdded) {
     try {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
@@ -1390,7 +1415,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     var root = plan.roots().getFirst();
     var builder = ScanRootRequest.newBuilder().setRootPath(root.path().toString())
         .setMode(root.force() ? ScanMode.SCAN_MODE_FORCE_REINDEX : ScanMode.SCAN_MODE_INITIAL)
-        .addAllExcludeGlobs(root.excludePatterns());
+        .addAllExcludeGlobs(root.excludePatterns())
+        .setRootAdded(rootAdded);
     if (root.collection() != null) builder.setCollection(root.collection());
     var request = builder.build();
     var recorded = new WorkerIngestService.RecordedRootScan(request, childKey, epoch,
@@ -1406,6 +1432,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               ? JobQueue.WalkEnumerationOutcome.CANCELLED
               : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
                   ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+          if (!root.singleFile()) {
+            // Task t-20261013-ef3c41, round 6 (S8): the reindex walk records a root-level refusal
+            // as the root's state at once, as the boot walk does, instead of leaving it to read
+            // indexed until the periodic sync asks.
+            roots.recordRecordedWalk(root.path(),
+                outcome.get() == JobQueue.WalkEnumerationOutcome.COMPLETE,
+                terminal.getTerminalReasonCode());
+          }
         }
         return null;
       }, () -> {

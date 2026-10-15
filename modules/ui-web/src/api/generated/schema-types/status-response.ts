@@ -339,6 +339,7 @@ export interface StatusResponse {
       indexSizeBytes?: number;
       indexState?: string | null;
       indexedDocuments?: number;
+      indexedDocumentsUnknown?: boolean;
       pendingBytes?: number;
       pendingJobs?: number;
       pendingUnknownSizeJobs?: number;
@@ -773,6 +774,7 @@ export const statusResponseSchema = z.strictObject({
       "indexSizeBytes": z.number().int().optional(),
       "indexState": z.string().nullable().optional(),
       "indexedDocuments": z.number().int().optional(),
+      "indexedDocumentsUnknown": z.boolean().optional(),
       "pendingBytes": z.number().int().optional(),
       "pendingJobs": z.number().int().optional(),
       "pendingUnknownSizeJobs": z.number().int().optional(),
