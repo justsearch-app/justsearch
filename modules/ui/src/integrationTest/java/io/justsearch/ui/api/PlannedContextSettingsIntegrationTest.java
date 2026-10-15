@@ -141,6 +141,10 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
     assertEquals(12, requested.json().path("llm").path("gpuLayers").asInt());
     assertEquals(4096, requested.json().path("llm").path("contextWindow").asInt());
     assertEquals(12, new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE).load().getGpuLayers());
+    var coreField = LocalApiServer.class.getDeclaredField("core");
+    coreField.setAccessible(true);
+    var core = (CoreApiAssembly.Result) coreField.get(server);
+    core.statusLifecycleHandler().sampleAndBuildStatusSnapshot();
     var status = getJson("/api/status");
     var notices = status.json().path("operating").path("degradations");
     assertTrue(notices.toString().contains("user_setting_unmet"), status.body());
@@ -150,6 +154,7 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
         "witness", requested.json().path("witness"), "operationKey", operationKey()));
     assertEquals(200, zero.statusCode(), zero.body());
     assertEquals(0, zero.json().path("llm").path("gpuLayers").asInt());
+    core.statusLifecycleHandler().sampleAndBuildStatusSnapshot();
     assertEquals(0, getJson("/api/status").json().path("operating").path("degradations").size());
   }
 }

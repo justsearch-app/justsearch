@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T02:01:02.029Z",
-  "revision": "4191f899b5c23424586408c3d7b598967540e6ab",
-  "tree": "636eae5b6b1d2149c118c33bfcc6e0149f971648",
+  "createdAt": "2026-10-15T07:20:06.724Z",
+  "revision": "4cd8c540d4dc15a91ef25b480482bec7ed106348",
+  "tree": "7c123f5ff792af2fac81af1e4136f969709467db",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationAutomaticCpuTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuCommitTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 376959
+      "durationMs": 13742
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.GpuOffUnmetStatusTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 153101
+      "durationMs": 7872
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.CpuCrashClassificationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 16207
+      "durationMs": 6429
     },
     {
       "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest.cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 314780
+      "durationMs": 10351
     }
   ],
   "checks": [
@@ -127,7 +127,7 @@
       "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java#cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice",
       "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1fc186b4bb842661197452b91d8b1b20ec4d9f6493b5b2376ff7286c98acac32",
+      "contentDigest": "sha256:a8c46613ba11dbf04a8d05faa000dffce75a3ae634fa11b33f8b99c24c4243ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -237,30 +237,31 @@
     "ref": "3241289f5",
     "revision": "3241289f51f748cbfe1145d64d9428aab263caaf",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationAutomaticCpuTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuCommitTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 54099
+        "durationMs": 48429
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.GpuOffUnmetStatusTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 26261
+        "durationMs": 20354
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.CpuCrashClassificationTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 14766
+        "durationMs": 9152
       },
       {
         "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest.cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 26929
+        "durationMs": 20392
       }
     ],
     "checks": [
@@ -287,7 +288,7 @@
       {
         "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java#cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice",
         "classification": "assertion",
-        "detail": "cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {\"schema_version\":2,\"observed_at\":\"2026-10-10T02:00:57.831494500Z\",\"lifecycle\":{\"state\":\"LIFECYCLE_STATE_READY\",\"reason_code\":null,\"message\":null},\"components\":{\"api\":{\"state\":\"READY\",\"reason_code\":null,\"state_since\":\"2026-10-10T02:00:56.887982800Z\"},\"index\":{\"st"
+        "detail": "cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {\"schema_version\":2,\"observed_at\":\"2026-10-15T07:19:56.683777200Z\",\"lifecycle\":{\"state\":\"LIFECYCLE_STATE_READY\",\"reason_code\":null,\"message\":null},\"components\":{\"api\":{\"state\":\"READY\",\"reason_code\":null,\"state_since\":\"2026-10-15T07:19:55.072676200Z\"},\"index\":{\"st"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java#chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes",
@@ -301,5 +302,5 @@
       }
     ]
   },
-  "digest": "sha256:3989177ca8eb7012301617262c5ff185a20a65c35055b72e53a1087dd63103e6"
+  "digest": "sha256:13b29841e7b02d95afd8c4f6ff264827d61a0b4b04afc5280c6bb6542ce6fa83"
 }

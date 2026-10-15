@@ -1223,6 +1223,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     io.justsearch.app.services.vdu.VduCapabilityState.Snapshot snapshot = value("vdu", null);
     boolean processing = Boolean.TRUE.equals(value("vdu-processing", false));
     String blockedReason = snapshot != null ? snapshot.blockedReason() : null;
+    io.justsearch.app.services.gpu.GpuProfileResolver.Resolution plan = value("device-plan", null);
+    if (!Boolean.TRUE.equals(value("vision", false)) && plan != null
+        && plan.diagnosticReasons().contains("chat_identity_pending")) {
+      blockedReason = "chat_identity_pending";
+    }
     boolean blockedReasonPresent = blockedReason != null && !blockedReason.isBlank();
     // Spec E step E1 (§1.7): only the Head knows whether a VDU backlog can drain, so it sets the
     // availability the operating block's IDLE rule reads.
@@ -2197,6 +2202,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       case "vdu.ai_offline" -> LifecycleReasonCode.VDU_AI_OFFLINE.code();
       case "vdu.insufficient_vram" -> LifecycleReasonCode.VDU_INSUFFICIENT_VRAM.code();
       case "vdu.missing_mmproj" -> LifecycleReasonCode.VDU_MISSING_MMPROJ.code();
+      case "chat_identity_pending" -> "chat_identity_pending";
       case "vdu.circuit_open" -> LifecycleReasonCode.VDU_CIRCUIT_OPEN.code();
       case "vdu.breaker_open.refused" -> LifecycleReasonCode.VDU_BREAKER_OPEN_REFUSED.code();
       case "vdu.breaker_open.entry_failed" -> LifecycleReasonCode.VDU_BREAKER_OPEN_ENTRY_FAILED.code();

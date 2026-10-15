@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T13:12:18.487Z",
-  "revision": "5970a2de5cd5a309f7aa701a2fbec06f60d7f730",
-  "tree": "29e9f5b52fa5599051d03c99782f993ea5a2f85f",
+  "createdAt": "2026-10-15T07:37:59.125Z",
+  "revision": "4cd8c540d4dc15a91ef25b480482bec7ed106348",
+  "tree": "84077ee6b8f0fe41be69fcf58fa9fe3cd786e87f",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,31 +21,31 @@
       "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10159
+      "durationMs": 14286
     },
     {
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5604
+      "durationMs": 11929
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2702
+      "durationMs": 6584
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2429
+      "durationMs": 4820
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3555
+      "durationMs": 4632
     }
   ],
   "checks": [
@@ -53,7 +53,7 @@
       "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java",
       "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1954a1fd889081a4b22a16ea269478ae6e1138211a83c1d2ee4f7e9a92e30f4a",
+      "contentDigest": "sha256:a8c46613ba11dbf04a8d05faa000dffce75a3ae634fa11b33f8b99c24c4243ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -64,6 +64,10 @@
         },
         {
           "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice()",
           "status": "passed"
         }
       ]
@@ -117,7 +121,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f0473235f42571c19054aa7fdf484581f39eb060aa5ce44c0b67c3911bf9e019",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -147,11 +151,15 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f98efe03dc25ff621a6f833522760d19006ebbb6ffec998348f9aa7f94ebcbb7",
+      "contentDigest": "sha256:37e0fe404e97ff24be210a22e1590c304e7e450d81b0bc8be2fa08b60d274956",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "anInfeasibleSingleItemRemainsAvailableForCpuDispatch()",
+          "status": "passed"
+        },
         {
           "name": "anExplicitCompactChatRepeatsTheProfileRuleWithItsOwnFootprint()",
           "status": "passed"
@@ -167,6 +175,10 @@
         {
           "name": "anExplicitNineBOnACompactSizedDeviceIsKeptAndReportedUnmet()",
           "status": "passed"
+        },
+        {
+          "name": "anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet()",
+          "status": "passed"
         }
       ]
     }
@@ -179,36 +191,37 @@
       "modules/ui/src/integrationTest/java/io/justsearch/ui/api/LocalApiIntegrationTestBase.java",
       "modules/ui/src/integrationTest/java/io/justsearch/indexerworker/server/PlannedSettingsQueryOwner.java"
     ],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 13715
+        "durationMs": 138273
       },
       {
         "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 7618
+        "durationMs": 12118
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4636
+        "durationMs": 5787
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4449
+        "durationMs": 25286
       },
       {
         "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3230
+        "durationMs": 6860
       }
     ],
     "checks": [
@@ -249,5 +262,5 @@
       }
     ]
   },
-  "digest": "sha256:ba22623e2175cb48430cc492977119b92b77402da87b5818e2b233ff556f4497"
+  "digest": "sha256:b0ad5255070fd1acaaffc51f0375ee33a45294843b39432174e8b28539b0b63e"
 }

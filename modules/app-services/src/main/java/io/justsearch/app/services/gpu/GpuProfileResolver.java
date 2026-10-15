@@ -135,6 +135,8 @@ public final class GpuProfileResolver {
     /** The {@code user_setting_unmet} tokens; empty when every explicit setting is met. */
     public Set<String> unmetSettings() {
       var reasons = new java.util.LinkedHashSet<>(diagnosticReasons);
+      reasons.remove("chat_model_unmeasured");
+      reasons.remove("chat_identity_pending");
       plan.ifPresent(value -> reasons.addAll(value.unmetSettings()));
       return Set.copyOf(reasons);
     }
@@ -217,6 +219,10 @@ public final class GpuProfileResolver {
     if (!unplannedRoles.isEmpty()) diagnostics.add("encoder_device_conflict");
     Optional<GpuArenaPlan.Chat> selectedChat = Optional.empty();
     boolean customChat = launch.chatProfileId() == null || customProjector(cfg, launch);
+    boolean identityPending = (endpoint == null || endpoint.isBlank())
+        && launch.chatProfileId() == null
+        && io.justsearch.app.inference.ChatArtifactIdentity.pending(launch.modelPath());
+    if (identityPending) diagnostics.add("chat_identity_pending");
     boolean unavailableManagedSelection = cfg.ai().llmModelPath() != null
         && launch.chatProfileId() != null
         && !installedChatModels.contains(ChatModelProfile.resolve(launch.chatProfileId()));
@@ -236,9 +242,11 @@ public final class GpuProfileResolver {
       selectedChat = Optional.of(new GpuArenaPlan.Chat(Optional.empty(),
           OptionalInt.of(launch.contextSize()), projector, reservation, customChat && !missingChat));
       if (missingChat) diagnostics.add("chat_model_missing:" + launch.modelPath());
-      else if (customChat) diagnostics.add("chat_model_unmeasured");
     }
     GpuArenaPlan plan = GpuArenaPlan.resolve(facts, settings, selectedChat);
+    if (selectedChat.isPresent() && customChat && !identityPending && plan.chat().footprintMiB() > 0) {
+      diagnostics.add("chat_model_unmeasured");
+    }
     // A measured but explicitly locked profile may leave no room for automatic encoders.
     // Keep that model and its honest footprint, while retaining custom-chat pressure protection.
     if ((selectedChat.isPresent()

@@ -1,0 +1,130 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T07:15:35.093Z",
+  "revision": "4cd8c540d4dc15a91ef25b480482bec7ed106348",
+  "tree": "f2463071ec270026feab6e4bbcefc0ba7be6674c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.ChatPlacementDiagnosticsTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11285
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9334
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ChatPlacementDiagnosticsTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ChatPlacementDiagnosticsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a1b3cdc0c14a05bed205849b3b126dfacc14a3ad96f2c6f36f63dd6aadfa00bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpu=false, layers=12, unmeasured=false",
+          "status": "passed"
+        },
+        {
+          "name": "gpu=true, layers=0, unmeasured=false",
+          "status": "passed"
+        },
+        {
+          "name": "gpu=true, layers=12, unmeasured=true",
+          "status": "passed"
+        },
+        {
+          "name": "aManagedArtifactAwaitingVerificationNamesItsPendingIdentity()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:30768369e41b518685be71ce6e2b953b3b29aca27d2966d1aedd0d740d541eea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingCandidateDoesNotReplaceTheReadyServersObservedState()",
+          "status": "passed"
+        },
+        {
+          "name": "unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "pendingIdentityHasItsOwnStatusDiagnostic()",
+          "status": "passed"
+        },
+        {
+          "name": "missingSavedChatIsUnavailableAndNamesItsMissingFile()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4cd8c540d",
+    "revision": "4cd8c540d4dc15a91ef25b480482bec7ed106348",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.ChatPlacementDiagnosticsTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 53389
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 23786
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ChatPlacementDiagnosticsTest.java",
+        "classification": "assertion",
+        "detail": "gpu=false, layers=12, unmeasured=false: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (2 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: chat_model_unmeasured requires an actual GPU reservation ==> expected: <false> but was: <true>&#13;&#10;&#9;org.opentest4j.AssertionFailedError: chat_model_unmeasured is diagnostic, | gpu=true, layers=0, unmeasured=false: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multipl"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
+        "classification": "assertion",
+        "detail": "unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an extrapolated chat allocation must have a visible placement diagnostic ==> expected: <true> but was: <false> | [1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: vision off during identity verification must name chat_identity_pending ==> expected: <chat_identity_pending> but was: <null> | pendingIdentityHasItsOwnStatusDiagn"
+      }
+    ]
+  },
+  "digest": "sha256:c8ba859c835277b2376ee43fefb06ec87f4b5cf4c1ea0476ead2961ffca65892"
+}
