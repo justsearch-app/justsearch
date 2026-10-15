@@ -881,3 +881,14 @@ author-session: b101-probe-churn
   "note": "Codex VX-probechurn rounds 1-6; ACCEPT on 513b137c0; evidence C:/Users/Elias/Documents/VX-probechurn-513b137c0.zip and r5 zip; census fixture items deferred to merged integration"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:29241f2f636502d1c3afeb0937890e166e06acd243e73d67cba8e7c16adb81d7",
+  "note": "re-bound to main; no change since 4cd8c540d4dc15a91ef25b480482bec7ed106348. Read all 37 entries, their current checks and evidence, including the explicit API and preservation limits; source digests match."
+}
+```

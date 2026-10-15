@@ -64,3 +64,14 @@ Independent acceptance is pending; the builder does not approve its own test int
   "note": "Candidate rerun mismatch: recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild reports witness.normal=false and fails its exact PID/birth/code assertion, while the other four flags pass. Matching normal records arrive later in the printed ledger, suggesting an observation race; the executed assertion failure still conflicts with the recorded pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:51bf8b5cb13b54a7b96850fef9370c9363f358e671642be13e88752a62f54049",
+  "note": "Reviewed the changed wait condition against the prior oracle: every exact identity, exit-code, classification, exclusion and writer-fence assertion is retained. The current native probe passed and its absent-witness assertion failure reproduced on e546e9e54."
+}
+```

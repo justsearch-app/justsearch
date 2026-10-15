@@ -194,3 +194,14 @@ results are compile failures.
   "note": "Verifier f12: all six new checks fail on f75486245 for the reason under test and pass on ef6df5aec; T23 matched live (taskkill /F of the dev Engine ended llama-server, extraction JVM and their conhosts within 1.24 s). Notes: entry 3 cites Spec F section 2.4 where the failure policy is section 1.3; entry 4's 'input re-encoding' label is loose (the expected list changed, exact-members oracle kept); entry 1 could also cite S18 for takeover/interrupted."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:74b4f86710ec501272fc2277c1e97ca6d3e6c2c6dafbae545d5848511a8515f1",
+  "note": "Reviewed the corrected surface declaration: the five absent-API checks are explicitly candidate-only and the architecture check is preservation, with no outcome-defining stub. Current checks passed and the declared vocabulary/containment failures, architecture pass and compile-before limitations were rerun."
+}
+```

@@ -180,3 +180,14 @@ Records phase B (batch 3), gate tidy. Entry 3 listed governance/fixtures/exit-le
   "note": "Verifier ran the full app-api (358), app-engine, ui and gpu-bridge suites on 9b88b9e03: DefaultChildControlTest 19, LedgerReconcilerTest 2, EngineWrittenChildrenFixtureTest 1, NvmlVramProbeTest 2, RuntimeManifestIncarnationTest 2 and RuntimeManifestIncarnationPublishTest 2 all pass. All entries are New for an API absent at b76f89ba2, so the fail-before is compile-only, as claimed; no assertion fail-before exists. The reconciler and incarnation behaviour was confirmed live: OWNER_DIED for a killed Engine's child, owner_died_alive for a live match left running, GONE on PID reuse, UNKNOWN for spawn-only, and the manifest incarnation n=2 after restart."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:d162e2bc0f620c21608c1ee22f38c4c27e8e7735f16ec6015aa3c9661e39274b",
+  "note": "Reviewed all five entries and the candidate-only explanation against the new ChildControl, reconciler and manifest APIs. All six named current test classes executed and passed; candidate-only execution is not counted as a before pass."
+}
+```

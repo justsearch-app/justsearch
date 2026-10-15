@@ -199,3 +199,14 @@ Independent verifier acceptance is pending. The builder does not accept its own 
   "note": "Accept test intent only. Independent fail-before assertions and candidate reruns are recorded in F:/agent-sandbox/design-b6d536/codex/verify-census4/report.md. The two containment preservation checks were rerun with native birth rechecks; the initial legacy PID-only baseline result is excluded. Delivered behavior fails S15 in native sibling-owner and live clean-OCR cases."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:fc9d787e479a5869080377aef345af8980f71e3976bf4e7c975976ae7d0ed0c7",
+  "note": "Reviewed the owner, crash, retention and native witness expectations and the compile-only helper stub; selected runtime checks never reach that stub. All ten current checks passed and the declared assertion failures reproduced on cd406ca13."
+}
+```

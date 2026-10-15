@@ -1605,3 +1605,16 @@ there before the self-PID test moved out of the identity region, then run again)
 `e-pair-identity.test.mjs` (12) and `fixture-cleanup.test.mjs` (10) pass.
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r11/).
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:8f3c644a4f8a2d70cc232f0b0408f5701d28883ad83c11456e11b7352258e710",
+  "note": "Reviewed both supervisor-record and lookup-context adaptations against their before tests and production writer shape; every assertion and fault injection is preserved. Both current integration classes passed, with their declared repaired receipt checks independently rerun under the owning changesets."
+}
+```
