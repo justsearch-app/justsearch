@@ -43,8 +43,10 @@ function ledger({ ended = false, launchAt = 4, exitAt = 5, code = 0, creator = p
       observedAt: at(parserExitAt), forced: false }));
   }
   if (ownerDiedAt != null) {
+    // As the next Engine writes it: its OS check found the owner gone (an owner-died proves the end
+    // only with osCheck GONE, b102).
     children.push(rec('owner-died', { childId: 'parser', previousOwner: engine, pid: 202, creationFileTime: birth(2),
-      code: null, exitClass: 'OWNER_DIED', reason: 'owner gone', observedAt: instant(ownerDiedAt), forced: false }));
+      code: null, exitClass: 'OWNER_DIED', reason: 'owner gone', osCheck: 'GONE', observedAt: instant(ownerDiedAt), forced: false }));
   }
   const engineRecords = [rec('engine-start', { incarnation, pid: 100, creationFileTime: birth(0),
     executable: 'C:\\test\\java.exe' })];

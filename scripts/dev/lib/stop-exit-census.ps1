@@ -16,8 +16,9 @@ try {
       $exe = $null
       try { $exe = $observed.MainModule.FileName } catch { }
       # Spec F §6.1, the shared birth rule (exit-ledger.cjs sameBirth): the recorded birth and the
-      # handle's agree when both, truncated to the target's tick (the coarser clock: the microsecond
-      # for a CIM or ledger birth, the millisecond for a B11 startInstant), are equal. A pid reused by
+      # handle's agree when both, truncated to the target's tick (what the recorded birth measured: 1,
+      # exact, for a native ledger birth, as the handle's is; the microsecond for a CIM read; the
+      # millisecond for a B11 startInstant), are equal. A pid reused by
       # another process names a birth a whole process lifetime after the recorded one, never inside
       # one tick; and the handle held from here keeps the pid from being reused again.
       # A target without a tick takes the rule's default, the microsecond (BIRTH_TICKS.MICROSECOND).

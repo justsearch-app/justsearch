@@ -38,6 +38,7 @@ class LauncherConsoleReceiptTest {
 
   @Test void crashedEnginesOwnConsoleGetsSuccessorCrashReceipt() throws Throwable {
     try (NativeLaunch engine = new NativeLaunch(command(Holder.class, data.toString(), "console"))) {
+      var writer = supervise(engine);
       awaitFile(data.resolve("ready"));
       engine.captureConsole(); // Independent oracle, including on the unrepaired before-state.
       for (var start : ExitLedgerReader.read(LedgerFamily.directory(data), LedgerFamily.CHILDREN).records()) {
@@ -45,7 +46,6 @@ class LauncherConsoleReceiptTest {
             + start.field("pid").asLong(0) + "/" + start.text("creationFileTime").orElse("unknown"));
       }
       engine.terminate();
-      var writer = engineWriter(data);
       writer.append(LedgerRecordType.ENGINE_EXIT, Map.of("incarnation", incarnation(),
           "exitClass", "UNEXPECTED", "code", 1, "observedAt", Instant.now()));
       Thread.sleep(2500);
@@ -68,11 +68,14 @@ class LauncherConsoleReceiptTest {
 
   @Test void unsampledEnginesOwnConsoleIsAccountedOnCleanQuit() throws Throwable {
     try (NativeLaunch engine = new NativeLaunch(command(Holder.class, data.toString(), "clean-console"))) {
+      var writer = supervise(engine);
       awaitFile(data.resolve("ready"));
       engine.captureConsole();
       assertCensus("clean-arm");
       Files.writeString(data.resolve("quit"), "QUIT", StandardCharsets.UTF_8);
       engine.awaitNaturalExit(data.resolve("native-exits.json"));
+      writer.append(LedgerRecordType.ENGINE_EXIT, Map.of("incarnation", incarnation(), "exitClass", "REQUESTED",
+          "reason", "QUIT", "code", 0, "observedAt", Instant.now()));
       assertCensus("clean-final");
       try (var next = DefaultChildControl.openForEngine(data, "successor", ManagedChildRegistry.noop(),
           VramProbe.none(), EngineContainment.current())) { }
@@ -107,6 +110,16 @@ class LauncherConsoleReceiptTest {
     String script = """
         const assert = require('node:assert/strict'), fs = require('node:fs');
         const [module, data, mode] = process.argv.slice(1), c = require(module);
+        // The stop's identity-checked lookup (dev-runner stopRun): every start the ledger leaves
+        // unproven is looked up, and the observations go to the verdict (lookupObservation).
+        const { lookupProcessIdentities } = require(require('node:path').join(require('node:path').dirname(module), 'engine-actuator.cjs'));
+        const stopLookup = async (view) => {
+          const unproven = c.ledgerResolution(view).unproven, askedAtMs = Date.now();
+          const rows = await lookupProcessIdentities(unproven.map(p => p.pid));
+          assert.ok(rows, 'identity-checked lookup answered');
+          return unproven.map(p => c.lookupObservation(p, rows.get(p.pid), askedAtMs)).filter(Boolean);
+        };
+        (async () => {
         const ledger = c.readRunLedger(data), view = c.ledgerView(ledger, 'launcher-console');
         const records = ledger.children.records;
         if (mode === 'wrapper') {
@@ -127,13 +140,15 @@ class LauncherConsoleReceiptTest {
           const input = c.exitTargets({runId:'launcher-console',pids:{backendRootPid:w.engine.pid}}, null, [], ledger);
           assert.ok(input.targets.some(t => t.pid === w.pid && t.witnessId === w.witnessId), 'unsampled console armed');
           fs.writeFileSync(data+'/armed.json', JSON.stringify(input));
+          // The stop looks its identities up once before it acts, while the Engine still runs.
+          fs.writeFileSync(data+'/lookup-ended.json', JSON.stringify(await stopLookup(view)));
         } else if (mode === 'clean-history') {
           const w = view.witnesses.find(w => w.consoleClient);
           assert.equal(w.exit.exitClass,'REQUESTED', 'surviving owner records ended intended console');
           assert.equal(w.exit.code,null);
           assert.equal(w.exit.exitedAtMs,null);
           const input = c.exitTargets({runId:'launcher-console',pids:{backendRootPid:w.engine.pid}}, null, [], ledger);
-          const result = c.exitResult(input,{processExits:[]},'historical clean console',ledger);
+          const result = c.exitResult(input,{processExits:[]},'historical clean console',ledger,null,{ lookupEnded: await stopLookup(view) });
           assert.equal(result.processExits.find(r => r.pid === w.pid).ledgerClass,'REQUESTED');
           assert.deepEqual(result.exitAccountingGaps,[]);
         } else if (mode === 'clean-final') {
@@ -143,7 +158,8 @@ class LauncherConsoleReceiptTest {
             assert.ok(target, 'native exit belongs to armed target');
             return {...exit, osCreationFileTimeUtc:exit.creationFileTimeUtc, creationFileTimeUtc:target.creationFileTimeUtc};
           })};
-          const result = c.exitResult(input,output,'native clean quit',ledger);
+          const lookupEnded = JSON.parse(fs.readFileSync(data+'/lookup-ended.json','utf8'));
+          const result = c.exitResult(input,output,'native clean quit',ledger,null,{ lookupEnded });
           assert.equal(result.processExits.find(r => r.role === 'console-host').ledgerClass,'REQUESTED');
           assert.equal(result.processExits.filter(r => r.ledgerClass === 'UNEXPECTED').length,0);
           assert.deepEqual(result.exitAccountingGaps,[]);
@@ -156,9 +172,10 @@ class LauncherConsoleReceiptTest {
           const start = records.find(r => r.type === 'job-process-start' && r.line.witnessId === w.witnessId);
           const seen = {pid:w.pid,parentPid:w.engine.pid,creationFileTimeUtc:w.creationFileTimeUtc,
             name:'conhost.exe',lastSeenAtMs:Date.parse(start.line.observedAt)};
+          const lookupEnded = await stopLookup(view);
           for (const observed of [[], [seen]]) {
             const input = c.exitTargets({runId:'launcher-console',pids:{backendRootPid:w.engine.pid}}, null, observed, ledger);
-            const result = c.exitResult(input, {processExits:[]}, 'native console', ledger);
+            const result = c.exitResult(input, {processExits:[]}, 'native console', ledger, null, { lookupEnded });
             const row = result.processExits.find(r => r.pid === w.pid);
             assert.equal(row.ledgerClass, 'OWNER_DIED');
             assert.equal(row.expectedTermination, false);
@@ -166,6 +183,7 @@ class LauncherConsoleReceiptTest {
             assert.ok(!result.exitAccountingGaps.some(g => g.pid === w.pid));
           }
         }
+        })().catch(error => { console.error(error); process.exit(1); });
         """;
     Path log = data.resolve("census.log");
     Process node = new ProcessBuilder("node", "-e", script,
@@ -186,6 +204,18 @@ class LauncherConsoleReceiptTest {
 
   private static RuntimeManifest.IncarnationInfo incarnation() {
     return new RuntimeManifest.IncarnationInfo("launcher-console", 1);
+  }
+  /**
+   * The test as the Engine's supervisor (the dev runner's actuator, the shell's): it records the start
+   * of the Engine it launched, with the birth its CIM lookup reads (to the microsecond), and its exit
+   * with the same writer.
+   */
+  private ExitLedgerWriter supervise(NativeLaunch engine) {
+    var writer = engineWriter(data);
+    writer.append(LedgerRecordType.ENGINE_START, Map.of("pid", engine.pid,
+        "creationFileTime", Long.toString(Long.parseLong(engine.birth) / 10 * 10),
+        "executable", ProcessHandle.current().info().command().orElseThrow(), "incarnation", incarnation()));
+    return writer;
   }
   private static ExitLedgerWriter engineWriter(Path dir) {
     return ExitLedgerWriter.appendOnly(LedgerFamily.directory(dir), LedgerFamily.ENGINE,
@@ -208,10 +238,11 @@ class LauncherConsoleReceiptTest {
       var job = EngineContainment.installAtBoot();
       assertEquals(EngineContainment.Status.CONTAINED, job.status());
       var engine = engineWriter(dir);
-      String nativeBirth = ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()).orElseThrow();
-      String engineBirth = mode.endsWith("console") ? Long.toString(Long.parseLong(nativeBirth) / 10 * 10) : nativeBirth;
-      engine.append(LedgerRecordType.ENGINE_START, Map.of("pid", ProcessHandle.current().pid(),
-          "creationFileTime", engineBirth,
+      // In the console modes the test is the Engine's supervisor and records its start and exit
+      // (supervise); the other modes keep the records the fixture writes for itself.
+      boolean supervised = mode.endsWith("console");
+      if (!supervised) engine.append(LedgerRecordType.ENGINE_START, Map.of("pid", ProcessHandle.current().pid(),
+          "creationFileTime", ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()).orElseThrow(),
           "executable", ProcessHandle.current().info().command().orElseThrow(), "incarnation", incarnation()));
       try (var control = DefaultChildControl.openForEngine(dir, "fixture", ManagedChildRegistry.noop(), VramProbe.none(), job)) {
         if (mode.endsWith("console")) {
@@ -243,7 +274,7 @@ class LauncherConsoleReceiptTest {
         }
         Thread.sleep(200); job.finishProcessRecording(Duration.ofSeconds(3));
       }
-      engine.append(LedgerRecordType.ENGINE_EXIT, Map.of("incarnation", incarnation(), "exitClass", "REQUESTED",
+      if (!supervised) engine.append(LedgerRecordType.ENGINE_EXIT, Map.of("incarnation", incarnation(), "exitClass", "REQUESTED",
           "reason", "QUIT", "code", 0, "observedAt", Instant.now()));
     }
   }

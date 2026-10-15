@@ -40,6 +40,15 @@ class CrashedEngineHelperReceiptTest {
     Process fixture = builder.start();
     var held = ProcessTerminator.forCurrentOs().open(fixture);
     String birth = held.creationFileTime().orElseThrow();
+    // As a real supervisor does (the shell's actuator, shell_actuator.rs): the one writer that records
+    // the Engine's exit records its start, with the native birth it reads (GetProcessTimes).
+    var writer = ExitLedgerWriter.appendOnly(LedgerFamily.directory(data), LedgerFamily.ENGINE,
+        LedgerWriterId.currentProcess(LedgerWriterId.Role.SHELL,
+            ProcessHandle.current().info().startInstant().orElseThrow()), Clock.systemUTC());
+    writer.append(LedgerRecordType.ENGINE_START, Map.of("pid", fixture.pid(),
+        "creationFileTime", birth,
+        "executable", ProcessHandle.current().info().command().orElseThrow(),
+        "incarnation", new RuntimeManifest.IncarnationInfo("crash-helper", 1)));
     long helperPid = 0;
     try {
       var output = new BufferedReader(new InputStreamReader(fixture.getInputStream(), StandardCharsets.UTF_8));
@@ -49,9 +58,6 @@ class CrashedEngineHelperReceiptTest {
       assertTrue(helperPid > 0, "fixture identity " + fixture.pid() + "/" + birth);
       assertEquals(TerminateResult.OK, held.terminate(1));
       assertTrue(fixture.waitFor(10, TimeUnit.SECONDS));
-      var writer = ExitLedgerWriter.appendOnly(LedgerFamily.directory(data), LedgerFamily.ENGINE,
-          LedgerWriterId.currentProcess(LedgerWriterId.Role.DEV_RUNNER,
-              ProcessHandle.current().info().startInstant().orElseThrow()), Clock.systemUTC());
       writer.append(LedgerRecordType.ENGINE_EXIT, Map.of("incarnation", new RuntimeManifest.IncarnationInfo("crash-helper", 1),
           "exitClass", "UNEXPECTED", "code", 1, "observedAt", java.time.Instant.now()));
       if (delayed) Thread.sleep(2500); // Beyond the census's 2 s containment grace.
@@ -83,9 +89,20 @@ class CrashedEngineHelperReceiptTest {
     String script = """
         const fs = require('node:fs'), assert = require('node:assert/strict');
         const [module, data, engine, helper] = process.argv.slice(1), c = require(module);
+        // The stop's identity-checked lookup (dev-runner stopRun): every start the ledger leaves
+        // unproven is looked up, and the observations go to the verdict (lookupObservation).
+        const { lookupProcessIdentities } = require(require('node:path').join(require('node:path').dirname(module), 'engine-actuator.cjs'));
+        const stopLookup = async (view) => {
+          const unproven = c.ledgerResolution(view).unproven, askedAtMs = Date.now();
+          const rows = await lookupProcessIdentities(unproven.map(p => p.pid));
+          assert.ok(rows, 'identity-checked lookup answered');
+          return unproven.map(p => c.lookupObservation(p, rows.get(p.pid), askedAtMs)).filter(Boolean);
+        };
+        (async () => {
         const ledger = c.readRunLedger(data), view = c.ledgerView(ledger, 'crash-helper');
+        const lookupEnded = await stopLookup(view);
         const input = c.exitTargets({runId:'crash-helper',pids:{backendRootPid:Number(engine)}}, null, [], ledger);
-        const result = c.exitResult(input, {processExits:[]}, 'native delayed receipt', ledger);
+        const result = c.exitResult(input, {processExits:[]}, 'native delayed receipt', ledger, null, { lookupEnded });
         fs.writeFileSync(require('node:path').join(data, 'final-census.json'), JSON.stringify(result, null, 2));
         assert.ok(view.witnesses.some(w => w.pid === Number(helper)));
         for (const w of view.witnesses.filter(w => w.pid !== Number(engine))) {
@@ -96,6 +113,7 @@ class CrashedEngineHelperReceiptTest {
           assert.equal(row.expectedTermination, false);
           assert.ok(!result.exitAccountingGaps.some(g => g.pid === w.pid), JSON.stringify(result.exitAccountingGaps));
         }
+        })().catch(error => { console.error(error); process.exit(1); });
         """;
     Path output = data.resolve("final-census-check.log");
     Process node = new ProcessBuilder("node", "-e", script,
@@ -117,13 +135,7 @@ class CrashedEngineHelperReceiptTest {
       var job = EngineContainment.installAtBoot();
       assertEquals(EngineContainment.Status.CONTAINED, job.status());
       Path data = Path.of(args[0]);
-      var engine = ExitLedgerWriter.appendOnly(LedgerFamily.directory(data), LedgerFamily.ENGINE,
-          LedgerWriterId.currentProcess(LedgerWriterId.Role.ENGINE,
-              ProcessHandle.current().info().startInstant().orElseThrow()), Clock.systemUTC());
-      engine.append(LedgerRecordType.ENGINE_START, Map.of("pid", ProcessHandle.current().pid(),
-          "creationFileTime", ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()).orElseThrow(),
-          "executable", ProcessHandle.current().info().command().orElseThrow(),
-          "incarnation", new RuntimeManifest.IncarnationInfo("crash-helper", 1)));
+      // Its start is its supervisor's record (the test's), as the Engine never writes its own.
       try (var control = DefaultChildControl.openForEngine(data, "crash-owner", ManagedChildRegistry.noop(),
           VramProbe.none(), job)) {
         Process helper = OwnedHelper.start(new ProcessBuilder("ping.exe", "-t", "127.0.0.1")

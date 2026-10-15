@@ -4,7 +4,13 @@ import census from './lib/stop-exit-census.cjs';
 
 const b = t => census.fileTimeFromInstant(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`);
 const at = t => Date.parse(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`);
-const rec = (type, line) => ({ type, line, writer: { role: type.startsWith('engine') ? 'dev-runner' : 'engine' } });
+// The dev runner writes the run's Engine records as itself, one writer for the start and its exit: a
+// role, a PID and its start instant, as the ledger reader requires of every writer. A role alone is
+// never evidence of an Engine exit (round 10).
+const DEV_RUNNER = { role: 'dev-runner', pid: 4000, startedAt: '2026-10-07T09:59:00.000Z' };
+// The Engine (pid 100) writes the children records as itself: its PID and its start, to the millisecond.
+const rec = (type, line) => ({ type, line, writer: type.startsWith('engine') ? DEV_RUNNER
+  : { role: 'engine', pid: 100, startedAt: new Date(at(0)).toISOString() } });
 const run = { runId: 'own-census', pids: { backendRootPid: 100 } };
 const manifest = { pid: 100, containment: { status: 'CONTAINED' }, incarnation: { session: run.runId } };
 const owner = { pid: 100, creationFileTime: b(0) };

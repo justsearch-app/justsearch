@@ -21,7 +21,9 @@ const { spawn, spawnSync, execFile } = require('child_process');
 // can't break the build/Engine JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
-const { engineIdentityAsync, startStopExitCensus } = require('./lib/stop-exit-census.cjs');
+const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, ledgerResolution,
+  carryFindings, stopProves, lookupObservation } = require('./lib/stop-exit-census.cjs');
+const { TICK, compareIdentity, identityOf, identityKey, hasPid, birthOrder, bornAfter } = require('./lib/ledger-identity.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
 const devDataFolder = require('./lib/dev-data-folder.cjs');
@@ -1089,7 +1091,23 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
     engineLog,
     incarnation,
   });
-  const stopReportPath = path.join(path.dirname(runPath), 'stop-report.json');
+  // An earlier report of the run (a stop's, or an earlier incarnation's death) is kept, not overwritten.
+  const kept = await keepEarlierReports(path.dirname(runPath));
+  if (kept.earlierReports.length) Object.assign(stopReport, { earlierReports: kept.earlierReports,
+    earlierReportFiles: kept.earlierReportFiles });
+  // This report takes no census, but what an earlier stop of the run found is carried into it, as into
+  // a stop's (carry by default): the latest report never reads as if it had not been found.
+  const carried = carryFindings({ exitAccountingGaps: [] }, kept.earlierFindings);
+  if (carried.exitAccountingComplete === false) {
+    Object.assign(stopReport, { exitAccountingComplete: false, exitAccountingGaps: carried.exitAccountingGaps });
+  }
+  if (kept.earlierReportNotArchived) {
+    stopReport.earlierReportNotArchived = kept.earlierReportNotArchived;
+    stopReport.reportWrittenAs = kept.reportName;
+    stopReport.errors = [...stopReport.errors, `earlier stop report not kept under a number: ${kept.earlierReportNotArchived.error}; `
+      + `this report is ${kept.reportName}`];
+  }
+  const stopReportPath = path.join(path.dirname(runPath), kept.reportName);
   await writeJsonAtomic(stopReportPath, stopReport);
   // Lane F stage B item B8: the report becomes a per-incarnation record rather than the runner's
   // last act. `stop-report.json` still names the LAST one, so every existing reader keeps working;
@@ -2039,6 +2057,115 @@ function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, split
   child.stdout?.on('data', (buf) => splitter('stdout', buf));
   child.stderr?.on('data', (buf) => splitter('stderr', buf));
   return child;
+}
+
+const EARLIER_REPORT_RE = /^stop-report\.(\d+)\.json$/;
+
+/** How long keeping an earlier report retries a rename another process's open handle refuses. */
+const REPORT_ARCHIVE_RETRY_MS = 2000;
+const REPORT_ARCHIVE_PAUSE_MS = 50;
+
+/**
+ * A retried stop never overwrites an earlier report of its run: the current stop-report.json is
+ * kept, as it was, as stop-report.N.json under the next free number. A rename another process's
+ * handle refuses for a moment (Windows EBUSY, EPERM, EACCES: a reader holding the file without
+ * delete sharing) is tried again for up to REPORT_ARCHIVE_RETRY_MS. If the earlier report still
+ * cannot be renamed it stays as stop-report.json, untouched, and this report is written under the
+ * next free number instead (`reportName`, with `earlierReportNotArchived` saying why). Never throws.
+ * `earlierReports` is every earlier report kept, archived or not (run-directory file names: the
+ * numbered ones, oldest number first, then a stop-report.json that stayed where it was);
+ * `earlierReportFiles` gives each with whether it was archived and can be read. `earlierFindings` is
+ * what those reports found that no later stop clears, for exitCensus.carryFindings: each readable
+ * report's accounting gaps, and an `earlier-report-unreadable` gap for each report that cannot be read.
+ * @returns {Promise<{ earlierReports: string[], earlierReportFiles: Array<{ name: string, archived: boolean,
+ *   readable: boolean }>, earlierFindings: Array<{ gap: object, from: string }>, reportName: string,
+ *   earlierReportNotArchived?: { file: string, error: string } }>}
+ */
+async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  retryMs = REPORT_ARCHIVE_RETRY_MS, now = Date.now } = {}) {
+  const list = () => { try { return fs.readdirSync(runDir); } catch { return []; } };
+  const numbered = (names) => names.filter((n) => EARLIER_REPORT_RE.test(n))
+    .sort((a, b) => Number(EARLIER_REPORT_RE.exec(a)[1]) - Number(EARLIER_REPORT_RE.exec(b)[1]));
+  const nextName = (names) => `stop-report.${Math.max(0, ...numbered(names).map((n) => Number(EARLIER_REPORT_RE.exec(n)[1]))) + 1}.json`;
+  let names = list();
+  let notArchived = null;
+  if (names.includes('stop-report.json')) {
+    const by = now() + retryMs;
+    for (;;) {
+      try {
+        fs.renameSync(path.join(runDir, 'stop-report.json'), path.join(runDir, nextName(names)));
+        break;
+      } catch (err) {
+        if (err?.code === 'ENOENT') break; // nothing left to keep
+        if (!['EBUSY', 'EPERM', 'EACCES'].includes(err?.code) || now() >= by) {
+          notArchived = { file: 'stop-report.json', error: `${err?.code ?? 'error'}: ${err?.message ?? err}` };
+          break;
+        }
+        await pause(REPORT_ARCHIVE_PAUSE_MS);
+        names = list();
+      }
+    }
+    names = list();
+  }
+  const kept = [...numbered(names).map((name) => ({ name, archived: true })),
+    ...(notArchived && names.includes('stop-report.json') ? [{ name: 'stop-report.json', archived: false }] : [])];
+  const earlierFindings = [];
+  const earlierReportFiles = kept.map(({ name, archived }) => {
+    let readable = true;
+    try {
+      const report = JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, ''));
+      // A file that parses to anything but a report (null, a list, a number) says nothing of what that
+      // stop found: it is read no better than one that does not parse.
+      if (!report || typeof report !== 'object' || Array.isArray(report)) {
+        throw Object.assign(new Error('not a stop report'), { code: 'NOT_A_REPORT' });
+      }
+      for (const gap of Array.isArray(report.exitAccountingGaps) ? report.exitAccountingGaps : []) {
+        earlierFindings.push({ gap, from: name });
+      }
+    } catch (err) {
+      readable = false;
+      // What that stop found cannot be read, so it cannot be carried: the report itself is the gap.
+      earlierFindings.push({ from: name, gap: { reason: 'earlier-report-unreadable', file: name, archived,
+        detail: `${name} could not be read (${err?.code ?? err?.name ?? 'error'}); what that stop found is not accounted` } });
+    }
+    return { name, archived, readable };
+  });
+  const earlierReports = kept.map((k) => k.name);
+  if (!notArchived) return { earlierReports, earlierReportFiles, earlierFindings, reportName: 'stop-report.json' };
+  return { earlierReports, earlierReportFiles, earlierFindings, reportName: nextName(names), earlierReportNotArchived: notArchived };
+}
+
+/**
+ * The identities (PID and birth) the earlier stops of a run name in what they found: each stop
+ * report's accounting gaps and each census file's findings, as they were written, so a later stop
+ * looks each up. Read only, before this stop's census keeps its earlier files; a file that cannot be
+ * read names none (keepEarlierReports and the census make it a gap).
+ */
+const EARLIER_CENSUS_FILE_RE = /^process-exits(?:\.\d+)?\.json$/;
+function earlierReportIdentities(runDir) {
+  let names = [];
+  try {
+    names = fs.readdirSync(runDir).filter((n) => n === 'stop-report.json' || EARLIER_REPORT_RE.test(n) || EARLIER_CENSUS_FILE_RE.test(n));
+  } catch { return []; }
+  const identities = [];
+  for (const name of names) {
+    try {
+      const report = JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, ''));
+      const found = EARLIER_CENSUS_FILE_RE.test(name) ? report?.findings : report?.exitAccountingGaps;
+      for (const g of Array.isArray(found) ? found : []) {
+        if (!Number.isInteger(g?.pid) || g.pid <= 0 || typeof g.creationFileTimeUtc !== 'string') continue;
+        identities.push({ pid: g.pid, creationFileTimeUtc: g.creationFileTimeUtc, role: g.role ?? null,
+          ...(g.birthTick != null ? { birthTick: String(g.birthTick) } : {}), ...(g.childId ? { childId: g.childId } : {}) });
+      }
+    } catch { /* named as unreadable by keepEarlierReports */ }
+  }
+  return identities;
+}
+
+/** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
+function describeResolved(p) {
+  return { pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc), role: p.role ?? null,
+    observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null, basis: 'exit ledger' };
 }
 
 /** The job record's identities in the shape stop reports use. */
@@ -3621,6 +3748,41 @@ function recordedProcesses(run, recordWrittenMs) {
   });
 }
 
+// <ledger-resolution> Every identity comparison in this region is compareIdentity's (ledger-identity.cjs);
+// the structural check in test-dev-runner-stop-census.mjs holds it to that.
+/**
+ * The identities a stop tracks, as a list of distinct records (round 9): never a map keyed by part of
+ * an identity. Two records of one PID and birth that name another childId, witness, owner, incarnation
+ * or birth tick are both kept, and each is judged (ledger resolution, lookup) on its own, so one never
+ * stands in for the other. Only a record repeated whole (compareIdentity 'exact', at the same tick:
+ * an earlier stop writes its list to both run.json and stop-tracked-processes.json) is one record, its
+ * other fields merged. `add(p)` adds one; `list` holds them in the order first added.
+ */
+function trackedIdentities() {
+  const list = [];
+  // By PID and birth: an index only; each candidate in a bucket is compared whole.
+  const byKey = new Map();
+  const sameRecord = (a, b) => compareIdentity(a, b, 'exact') && identityOf(a)?.tick === identityOf(b)?.tick;
+  return {
+    list,
+    add(p) {
+      if (!p?.pid) return;
+      const key = identityKey(p);
+      if (!byKey.has(key)) byKey.set(key, []);
+      const bucket = byKey.get(key);
+      const at = bucket.find((i) => sameRecord(list[i], p));
+      if (at === undefined) {
+        bucket.push(list.length);
+        list.push({ ...p });
+        return;
+      }
+      const prior = list[at];
+      list[at] = { ...prior, ...p, owned: prior.owned === true || p.owned === true ? true : p.owned ?? prior.owned,
+        bornNotAfterMs: prior.bornNotAfterMs ?? p.bornNotAfterMs };
+    },
+  };
+}
+
 /**
  * One recorded process against an OS lookup (`lookupProcessIdentities` row, or null when the lookup
  * failed): 'match' (alive, the recorded birth), 'gone', 'reused' (the pid now names another process)
@@ -3632,7 +3794,11 @@ function checkRecordedProcess(recorded, seen) {
   if (!seen.present) return 'gone';
   if (!seen.creationFileTime) return 'unknown';
   if (recorded.creationFileTimeUtc) {
-    if (!engineActuator.sameBirth(recorded.creationFileTimeUtc, String(seen.creationFileTime), BigInt(recorded.birthTick ?? 10))) return 'reused';
+    // The OS row read for the recorded PID: a CIM read (lookupProcessIdentities, the process table),
+    // to the microsecond unless the lookup names its tick; compared at the coarser of the two.
+    const row = { pid: recorded.pid, creationFileTime: String(seen.creationFileTime),
+      birthTick: String(seen.birthTick ?? TICK.MICROSECOND) };
+    if (!compareIdentity(recorded, row, 'same')) return 'reused';
     const want = normalizeExecutable(recorded.executable);
     const got = normalizeExecutable(seen.executable);
     return want && got && want !== got ? 'reused' : 'match';
@@ -3666,23 +3832,23 @@ function forgetGuidance(runId) {
  * descendant of one: every link up to the root is a parent born no later than its child.
  */
 function isRunProcess(pid, processes, rows) {
-  const ft = (row) => (/^\d+$/.test(String(row?.CreationFileTimeUtc ?? '')) ? BigInt(row.CreationFileTimeUtc) : null);
   const byPid = new Map(rows.map((row) => [Number(row.ProcessId), row]));
   let row = byPid.get(Number(pid));
   const visited = new Set();
   while (row && !visited.has(Number(row.ProcessId))) {
     visited.add(Number(row.ProcessId));
-    const isRoot = processes.some((p) => p.pid === Number(row.ProcessId) && checkRecordedProcess(p,
-      { present: true, creationFileTime: row.CreationFileTimeUtc ?? null, executable: null }) === 'match');
+    const current = row;
+    const isRoot = processes.some((p) => hasPid(p, current.ProcessId) && checkRecordedProcess(p,
+      { present: true, creationFileTime: current.CreationFileTimeUtc ?? null, executable: null }) === 'match');
     if (isRoot) return true;
     const parent = byPid.get(Number(row.ParentProcessId));
-    const childBorn = ft(row);
-    const parentBorn = ft(parent);
-    if (!parent || childBorn === null || parentBorn === null || parentBorn > childBorn) return false;
+    // Each link up is a parent born no later than its child (both read from one process table: exact).
+    if (!parent || birthOrder(parent, row, TICK.EXACT) === null || bornAfter(parent, row, TICK.EXACT)) return false;
     row = parent;
   }
   return false;
 }
+// </ledger-resolution>
 
 /**
  * Spec F §5.3 (X09-F3): who holds a port. Never kills. `ownedByRun` is true only for a recorded
@@ -3731,8 +3897,8 @@ async function stopRun(opts, {
   terminateProcess = engineActuator.terminateWithCode,
   portOwner = portOwnerOf,
   cliEngineRecorder = engineActuator.createCliEngineRecorder,
-  stopEngineJob = (job) => jobRun.stopJobRunSync({ recordPath: job.recordPath, host: job.host },
-    { code: engineActuator.NON_DISTINCTIVE_KILL_CODE }),
+  stopEngineJob = (job, { ended = [] } = {}) => jobRun.stopJobRunSync({ recordPath: job.recordPath, host: job.host },
+    { code: engineActuator.NON_DISTINCTIVE_KILL_CODE, endedIdentities: ended }),
   portWaitMs = 10_000,
 } = {}) {
   const { run, runPath } = await resolveTarget(opts);
@@ -3779,6 +3945,47 @@ async function stopRun(opts, {
   // Each entry now also carries the identity verdict the kill decision was made on.
   const pidLiveness = [];
 
+  // The exit ledger first: a recorded identity whose exit it records (same PID and birth) is gone,
+  // and it is never passed to an OS lookup or probe in any phase. Its PID may name another process
+  // by now, possibly one whose birth cannot be read, which never makes it ours. One reader serves
+  // the stop and its census, so each ledger file is parsed once and later reads add what was appended.
+  const ledgerReader = dataDirAbs ? ledgerLib.createIncrementalReader() : null;
+  // This stop's own Engine writer, bound in memory to the Engine identity this stop checked before it
+  // wrote that Engine's intent and exit (stopWriterBinding). Never read back from the ledger; a later
+  // stop has none, so it looks the Engine up.
+  const stopBindings = [];
+  // <ledger-resolution> What the ledger says of the tracked identities (exitCensus.ledgerResolution):
+  // `ledgerEnded` the identities it proves ended (for the job stop), `provenEnded(p)` whether the
+  // tracked record `p` is one of them. The whole tracked record is compared (compareIdentity 'same'):
+  // its PID and birth at the coarser of its own and the ledger's measured tick, and its childId, owner
+  // and incarnation where it records them; and every start of the run it agrees with must be proven.
+  let ledgerEnded = [];
+  let ledgerResolved = null;
+  let ledgerVersion = null;
+  const readLedgerEnded = () => {
+    if (!ledgerReader) return ledgerEnded;
+    try {
+      const ledger = readRunLedger(dataDirAbs, ledgerReader);
+      // Judged again only when a ledger file changed since the last judgement.
+      if (ledgerReader.version() !== ledgerVersion) {
+        ledgerVersion = ledgerReader.version();
+        ledgerResolved = ledgerResolution(ledgerView(ledger, runId, { stopBindings }));
+        ledgerEnded = ledgerResolved.ended;
+      }
+    } catch (err) {
+      errors.push(`exit ledger: ${err?.message ?? err}`);
+    }
+    return ledgerEnded;
+  };
+  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && Boolean(ledgerResolved?.isEnded(p));
+  // Each identity resolved by its ledger exit instead of a lookup, once.
+  const resolvedByLedger = [];
+  const noteResolved = (p) => {
+    if (!resolvedByLedger.some((r) => compareIdentity(r, p, 'same'))) resolvedByLedger.push(describeResolved(p));
+  };
+  // </ledger-resolution>
+  readLedgerEnded();
+
   /**
    * Ends one recorded process, never its tree, with the non-distinctive code `taskkill /F` gives,
    * through a handle on which its recorded birth is checked again: an inspection before it never
@@ -3818,12 +4025,48 @@ async function stopRun(opts, {
   const inProcess = runnerPid === process.pid;
   const gracefulShutdownMarkerPath = path.join(runDir, 'graceful-shutdown.json');
   let phaseRows = new Map();
+  // When the latest lookup was asked: a process its rows say nothing of may have been born after it.
+  let phaseAskedMs = null;
+  // The PIDs the latest lookup was asked of: its rows say nothing of any other.
+  let phaseAskedPids = new Set();
+  // Adds each unproven start of the ledger the stop did not know yet, once (set with knownUnproven).
+  let learnUnproven = () => [];
   const lookupPhase = async (entries) => {
-    const ids = [...new Set(entries.filter(p => p?.pid).map(p => p.pid))];
+    readLedgerEnded();
+    // A start this read of the ledger shows for the first time is asked of too (learnUnproven).
+    const learned = learnUnproven();
+    const ids = [...new Set([...entries, ...learned].filter(p => p?.pid && !provenEnded(p)).map(p => p.pid))];
+    phaseAskedMs = Date.now();
+    phaseAskedPids = new Set(ids);
     phaseRows = ids.length ? await Promise.resolve().then(() => lookupIdentities(ids)).catch(() => null) : new Map();
+  };
+  // What the first identity-checked lookup of this stop observed of the recorded identities it found
+  // ended, before the stop acted on anything (round 11): the recorded PID absent from a lookup that
+  // answered, or naming a process whose readable birth is not the recorded one (for a record without
+  // a birth, one born after the instant its process was seen alive, round 12). A lookup that failed, a
+  // row whose birth cannot be read, or a record with neither a birth nor such an instant adds nothing
+  // (S4 stays incomplete). The stop's own actions are never handed to the census (Spec B step 9).
+  // The census judges each identity it accounts against these observations (lookupEndedIdentities).
+  const lookupEnded = [];
+  // The observations so far by PID (an index only: each candidate is then matched by compareIdentity).
+  const lookupEndedByPid = new Map();
+  const noteLookupEnded = (entries, observedAtMs) => {
+    for (const p of entries) {
+      if (!p?.pid || (!p.creationFileTimeUtc && !Number.isFinite(p.bornNotAfterMs)) || provenEnded(p)
+        || !phaseRows?.has(p.pid)) continue;
+      const observation = lookupObservation(p, phaseRows.get(p.pid), observedAtMs);
+      const bucket = lookupEndedByPid.get(p.pid) ?? [];
+      if (!observation || bucket.some((o) => compareIdentity(o, p, 'same'))) continue;
+      lookupEnded.push(observation);
+      lookupEndedByPid.set(p.pid, [...bucket, observation]);
+    }
   };
   const lookupOne = async (p) => {
     if (!p?.pid) return 'gone';
+    if (provenEnded(p)) {
+      noteResolved(p);
+      return 'gone';
+    }
     const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
     if (!p.creationFileTimeUtc && row?.present && !Number.isFinite(p.bornNotAfterMs)) {
       p.bornNotAfterMs = Date.now();
@@ -3837,15 +4080,10 @@ async function stopRun(opts, {
   // Identities left unresolved by an earlier attempt are re-checked, rather than treating a failed
   // helper or a self-exited root as permanent debt. They are reported, never killed: only a
   // process this run started, or a helper the Engine registered, is ever ended.
-  const tracked = new Map();
-  const remember = (p) => {
-    if (p?.pid) {
-      const key = `${p.pid}/${p.creationFileTimeUtc ?? '?'}`;
-      const prior = tracked.get(key);
-      tracked.set(key, { ...prior, ...p, owned: prior?.owned === true || p.owned === true ? true : p.owned ?? prior?.owned,
-        bornNotAfterMs: prior?.bornNotAfterMs ?? p.bornNotAfterMs });
-    }
-  };
+  // A list of distinct records, never merged by part of an identity (trackedIdentities).
+  const trackedSet = trackedIdentities();
+  const tracked = trackedSet.list;
+  const remember = trackedSet.add;
   // A record from an earlier tree-era stop: its listed identities stay reported until resolved.
   for (const tree of run.stopUnresolvedTrees ?? []) {
     for (const p of tree.processes ?? []) remember({ ...p, role: `${tree.role} descendant` });
@@ -3866,17 +4104,50 @@ async function stopRun(opts, {
       birthTick: child.creationFileTimeUtc ? 10 : 10000, owned: false };
   });
   for (const p of helperProcesses) remember(p);
-  const allEntries = () => [...processes, ...tracked.values()].filter(p => p.pid && p.pid !== process.pid);
+  // <ledger-resolution> Every identity the stop knows of and cannot prove ended is looked up, the
+  // fallback the design rests on: the ledger's unproven starts (a predecessor's child another Engine
+  // stopped, whose receipt proves nothing, its manifest entry removed) and the identities an earlier
+  // stop report of the run names, never left out because no manifest entry or tracked record names
+  // them any more. Each is reported, never ended, while it runs or cannot be read (STOP_INCOMPLETE);
+  // one the lookup finds absent or reborn is accounted ended (noteLookupEnded). Its PID and birth are
+  // compared only through compareIdentity, against the records already listed with the same PID.
+  const knownByPid = new Map();
+  const knownAlready = (p) => {
+    const bucket = knownByPid.get(p.pid) ?? [];
+    if (bucket.some((q) => compareIdentity(q, p, 'same'))) return true;
+    knownByPid.set(p.pid, [...bucket, p]);
+    return false;
+  };
+  for (const p of [...processes, ...tracked]) if (p?.pid && p.creationFileTimeUtc) knownAlready(p);
+  const knownUnproven = [];
+  const learnUnprovenFrom = (identities) => {
+    const learned = [];
+    for (const u of identities) {
+      if (provenEnded(u) || knownAlready(u)) continue;
+      const entry = { ...u, role: u.role ?? 'recorded identity', name: u.role ?? 'unknown' };
+      knownUnproven.push(entry);
+      learned.push(entry);
+    }
+    return learned;
+  };
+  // A start a later read of the ledger shows (one recorded while this stop runs) joins them, each
+  // time the ledger is read again for a lookup and before the final check: it is looked up and checked
+  // like the rest, and reported, never ended, while it runs or cannot be read.
+  learnUnproven = () => (opts.forgetUnresolved ? [] : learnUnprovenFrom(ledgerResolved?.unproven ?? []));
+  if (!opts.forgetUnresolved) learnUnprovenFrom([...(ledgerResolved?.unproven ?? []), ...earlierReportIdentities(runDir)]);
+  // </ledger-resolution>
+  const allEntries = () => [...processes, ...tracked, ...knownUnproven].filter(p => p.pid && p.pid !== process.pid);
   // Arm OS exit handles while the initial identity lookup starts. Actions still wait for both.
   let censusError;
   const pendingCensus = !opts.forgetUnresolved
-    ? Promise.resolve(census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE))
+    ? Promise.resolve(census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE, { ledgerReader, stopBindings }))
       .catch(error => { censusError = error; return null; }) : null;
   if (!opts.forgetUnresolved) {
     await lookupPhase(allEntries());
-    for (const p of tracked.values()) await lookupOne(p);
-    await writeJsonAtomic(runPath, { ...run, stopTrackedProcesses: [...tracked.values()] });
-    await writeJsonAtomic(trackedPath, { processes: [...tracked.values()], legacyBounds });
+    noteLookupEnded(allEntries(), phaseAskedMs);
+    for (const p of tracked) await lookupOne(p);
+    await writeJsonAtomic(runPath, { ...run, stopTrackedProcesses: [...tracked] });
+    await writeJsonAtomic(trackedPath, { processes: [...tracked], legacyBounds });
   } else {
     // Explicit escape hatch: inspection only. No shutdown request, runner request, or terminator.
     const leftBehind = [];
@@ -3891,7 +4162,7 @@ async function stopRun(opts, {
         startedAt: child.startedAt ?? 'unknown' });
     }
     await lookupPhase(allEntries());
-    for (const p of [...processes, ...tracked.values()].filter(p => p.pid)) {
+    for (const p of [...processes, ...tracked].filter(p => p.pid)) {
       const state = await lookupOne(p);
       if (state === 'match' || state === 'unknown') leftBehind.push(describeUnresolved(p, state));
     }
@@ -3990,8 +4261,14 @@ async function stopRun(opts, {
     // on the Engine is announced as `dev-cli` before it is taken, and its exit is recorded however
     // it ended: on the quit, with the runner whose job held it, or killed here.
     const stopDetail = reason === 'takeover' ? 'takeover' : (opts.detail ?? null);
+    const engineIncarnation = { session: runId, n: Number.isInteger(run?.incarnation) && run.incarnation > 0 ? run.incarnation : null };
     const engineRecords = dataDirAbs && run?.control?.stopRequest && backendBefore === 'match'
-      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: { session: runId, n: Number.isInteger(run?.incarnation) && run.incarnation > 0 ? run.incarnation : null } })
+      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: engineIncarnation, ledgerReader })
+      : null;
+    // The identity this process checked ('match': the recorded PID and birth against the OS row) before
+    // writing; with the writer it then wrote as, it binds this stop's records to that start (round 10).
+    const engineChecked = backendBefore === 'match' && byRole.backend.creationFileTimeUtc
+      ? { pid: byRole.backend.pid, creationFileTimeUtc: byRole.backend.creationFileTimeUtc, birthTick: byRole.backend.birthTick ?? null }
       : null;
     if (engineRecords) fallback.ledger = [];
     const recordEngine = (kind, fields) => {
@@ -3999,6 +4276,10 @@ async function stopRun(opts, {
       try {
         const written = engineRecords[kind]({ reason: 'QUIT', detail: stopDetail, ...fields });
         fallback.ledger.push(written);
+        const writer = written?.written ? engineRecords.writerIdentity?.() : null;
+        if (writer && engineChecked && !stopBindings.length) {
+          stopBindings.push({ writer, incarnation: engineIncarnation, checked: engineChecked });
+        }
         return written;
       } catch (err) {
         errors.push(`exit ledger: ${err?.message ?? err}`);
@@ -4058,7 +4339,7 @@ async function stopRun(opts, {
       pidLiveness.push({ role: 'backend', pid: byRole.backend.pid, aliveBeforeKill: true });
     } else if (byRole.backend.pid) {
       const p = byRole.backend;
-      if (runnerKilled) {
+      if (runnerKilled && !provenEnded(p)) {
         // The runner's job closes with it; give the Engine a moment to go the same way.
         const until = Date.now() + 2000;
         while (isPidAlive(p.pid) && Date.now() < until) {
@@ -4144,6 +4425,7 @@ async function stopRun(opts, {
   //    its held jobs as its own last step and reports what they ended; otherwise the job's recorded host is ended here (on a handle showing its recorded birth),
   //    which ends every member, and each recorded member is verified gone. Either way each process
   //    the job's termination ended is listed by identity.
+  //    The job stop skips each identity the ledger shows ended (read again now).
   let engineJob = null;
   const answeredJob = runnerAnswer?.engineJob ?? null;
   const recordedJob = run?.engineJob?.recordPath && run.engineJob.host?.pid ? run.engineJob : null;
@@ -4156,10 +4438,11 @@ async function stopRun(opts, {
       engineJob = { source: 'record', incarnation: recordedJob.incarnation ?? null, outcome: 'gone',
         endedByJob: jobIdentities(answeredJob?.endedByJob), survivors: [] };
     } else {
-      const result = await Promise.resolve().then(() => stopEngineJob(recordedJob))
+      const result = await Promise.resolve().then(() => stopEngineJob(recordedJob, { ended: readLedgerEnded() }))
         .catch(() => ({ ok: false, outcome: 'failed' }));
       engineJob = { source: 'stop', incarnation: recordedJob.incarnation ?? null, outcome: result?.outcome ?? 'failed',
-        host: result?.host ?? null, endedByJob: jobIdentities(result?.endedByJob), survivors: jobIdentities(result?.survivors) };
+        host: result?.host ?? null, endedByJob: jobIdentities(result?.endedByJob), survivors: jobIdentities(result?.survivors),
+        ...(Array.isArray(result?.endedPerLedger) ? { endedPerLedger: jobIdentities(result.endedPerLedger) } : {}) };
       if (result?.host === 'terminated') {
         for (const p of engineJob.endedByJob) if (!killedPids.includes(p.pid)) killedPids.push(p.pid);
       }
@@ -4172,8 +4455,19 @@ async function stopRun(opts, {
       creationFileTimeUtc: recordedJob?.host?.creationFileTimeUtc ?? null }])
       .map((p) => ({ ...p, role: 'Engine job member', state: 'unknown' })) : [];
 
+  // <ledger-resolution> The outcome is decided by a lookup taken after the stop acted (round 12): every
+  // other step that acts looks up again after it, the Engine job step does not, so when it ran the
+  // identities are looked up once more, and one it just ended is seen gone, never judged on the lookup
+  // from before it acted. The ledger as it is now: a start it shows that the latest lookup was not
+  // asked of is looked up before the final check too, which otherwise would take it for absent.
+  readLedgerEnded();
+  learnUnproven();
+  if (engineJob?.source === 'stop' || knownUnproven.some((p) => p.pid && !provenEnded(p) && !phaseAskedPids.has(p.pid))) {
+    await lookupPhase(allEntries());
+  }
+  // </ledger-resolution>
   const unresolvedProcesses = [];
-  for (const p of tracked.values()) {
+  for (const p of [...tracked, ...knownUnproven]) {
     const state = await lookupOne(p);
     if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
   }
@@ -4182,7 +4476,11 @@ async function stopRun(opts, {
   try { await fsp.rm(gracefulShutdownMarkerPath, { force: true }); } catch (_) { /* best-effort */ }
 
   // Is the stack gone? Every recorded process (but this one) must be gone or its pid reused.
-  const remaining = processes.filter((p) => p.pid && p.pid !== process.pid);
+  const remaining = processes.filter((p) => p.pid && p.pid !== process.pid).filter((p) => {
+    if (!provenEnded(p)) return true;
+    noteResolved(p);
+    return false;
+  });
   const after = phaseRows;
   const survivors = remaining
     .map((p) => ({ ...p, observedName: after?.get(p.pid)?.name ?? p.observedName,
@@ -4193,16 +4491,18 @@ async function stopRun(opts, {
 
   // Ports: wait (bounded) for the run's own listeners to close. A port owner is never killed.
   const deadline = Date.now() + portWaitMs;
-  let apiInfo = await portOwner(apiPort, processes);
-  let uiInfo = await portOwner(uiPort, processes);
+  // A port's owner is matched only with identities not proven ended.
+  const portCandidates = processes.filter((p) => !provenEnded(p));
+  let apiInfo = await portOwner(apiPort, portCandidates);
+  let uiInfo = await portOwner(uiPort, portCandidates);
   const waitingOnRun = (info) => !info.closed && info.portOwner?.ownedByRun !== false;
   while (Date.now() < deadline && (waitingOnRun(apiInfo) || waitingOnRun(uiInfo))) {
     // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 250));
     // eslint-disable-next-line no-await-in-loop
-    apiInfo = await portOwner(apiPort, processes);
+    apiInfo = await portOwner(apiPort, portCandidates);
     // eslint-disable-next-line no-await-in-loop
-    uiInfo = await portOwner(uiPort, processes);
+    uiInfo = await portOwner(uiPort, portCandidates);
   }
   if (!apiInfo.closed) errors.push(`API port ${apiPort} still listening after stop timeout`);
   if (!uiInfo.closed) errors.push(`UI port ${uiPort} still listening after stop timeout`);
@@ -4235,11 +4535,31 @@ async function stopRun(opts, {
   const engineLog = await preserveEngineLog(run, runPath);
   // The Engine exit this stop records is written from the census's OS observation and before the
   // census reads the ledger for its verdict, so the report reads every record of the stop.
-  const exitAccounting = await exitCensus.finish({
+  const censusAccounting = await exitCensus.finish({
+    lookupEnded,
     beforeVerdict: pendingEngineExit ? (osExits) => {
-      pendingEngineExit((osExits ?? []).find((e) => e.role === 'engine' && e.pid === byRole.backend.pid) ?? null);
+      // <ledger-resolution> The census's OS exit of the run's Engine: its whole recorded identity, or
+      // its PID where the run recorded no birth.
+      pendingEngineExit((osExits ?? []).find((e) => e.role === 'engine' && (byRole.backend.creationFileTimeUtc
+        ? compareIdentity(e, byRole.backend, 'same') : hasPid(e, byRole.backend.pid))) ?? null);
+      // </ledger-resolution>
     } : null,
   });
+  // A retried stop keeps the earlier stop's report and names it (run-directory file names, oldest
+  // first); stop-report.json is always this stop's. What an earlier stop found (a disagreement, lost
+  // or unreadable evidence, or a report that cannot be read at all) is carried into this stop's
+  // accounting: no later record or stop clears it (exitCensus.carryFindings). Only a gap that said an
+  // identity's exit was not yet seen is cleared, when this stop proves that exact identity ended: by a
+  // bound ledger record (read again, with this stop's own records, only when such a gap is asked
+  // about) or its identity-checked lookup.
+  const kept = await keepEarlierReports(runDir);
+  let ledgerReadAgain = false;
+  const endedInLedger = (gap) => {
+    if (!ledgerReadAgain) { ledgerReadAgain = true; readLedgerEnded(); }
+    return provenEnded(gap);
+  };
+  const exitAccounting = carryFindings(censusAccounting, kept.earlierFindings,
+    { proves: stopProves({ isEnded: endedInLedger, lookupEnded }) });
 
   const stopReport = buildStopReport({
     ...exitAccounting,
@@ -4270,10 +4590,26 @@ async function stopRun(opts, {
     fallback,
     // Every process the Engine's job ended after the Engine itself, by identity.
     engineJob,
+    // Recorded identities resolved by their exit in the ledger, never looked up or probed.
+    ...(resolvedByLedger.length ? { resolvedByLedger } : {}),
+    // Recorded identities the first identity-checked lookup found ended before the stop acted (round 11).
+    ...(lookupEnded.length ? { endedByLookup: lookupEnded } : {}),
     ...(foreignPortOwner ? { foreignPortOwner } : {}),
   });
 
-  const stopReportPath = path.join(runDir, 'stop-report.json');
+  // The earlier census and reports this stop kept, by name.
+  const earlierReports = kept.earlierReports;
+  if (exitAccounting?.earlierCensus?.length) Object.assign(stopReport, { earlierCensus: exitAccounting.earlierCensus,
+    earlierCensusFiles: exitAccounting.earlierCensusFiles });
+  if (earlierReports.length) Object.assign(stopReport, { earlierReports, earlierReportFiles: kept.earlierReportFiles });
+  if (kept.earlierReportNotArchived) {
+    // The earlier report stays as stop-report.json, as it was; this one is written beside it.
+    stopReport.earlierReportNotArchived = kept.earlierReportNotArchived;
+    stopReport.reportWrittenAs = kept.reportName;
+    stopReport.errors.push(`earlier stop report not kept under a number: ${kept.earlierReportNotArchived.error}; `
+      + `this report is ${kept.reportName}`);
+  }
+  const stopReportPath = path.join(runDir, kept.reportName);
   await writeJsonAtomic(stopReportPath, stopReport);
 
   // Append interference events to a shared NDJSON log for aggregate analysis.
@@ -4330,6 +4666,11 @@ async function stopRun(opts, {
     unresolvedProcesses: unresolved,
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     ...exitAccounting,
+    // Recorded identities the first identity-checked lookup found ended before the stop acted (round 11).
+    ...(lookupEnded.length ? { endedByLookup: lookupEnded } : {}),
+    ...(earlierReports.length ? { earlierReports, earlierReportFiles: kept.earlierReportFiles } : {}),
+    ...(kept.earlierReportNotArchived ? { earlierReportNotArchived: kept.earlierReportNotArchived,
+      reportWrittenAs: kept.reportName } : {}),
   };
 }
 
@@ -4501,6 +4842,7 @@ if (require.main === module) {
 } else {
   module.exports = {
     __test: {
+      trackedIdentities,
       pruneHistoricRuns,
       resolveDataDir,
       cleanDataDir,

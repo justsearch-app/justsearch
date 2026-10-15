@@ -91,17 +91,29 @@ function readRunRecord(run) {
 
 /**
  * Stops a run started by startInJob and verifies its recorded processes have ended.
+ * `endedIdentities` (PID plus creation time) are identities an exit ledger records as ended: they
+ * are gone and not probed again, so a PID that now names a process whose birth cannot be read
+ * does not keep the stop incomplete. They are reported as `endedPerLedger`.
  * @returns {{ ok: boolean, outcome: string, survivors?: object[] }}
  */
-function stopJobRunSync(run, { code = NON_DISTINCTIVE_KILL_CODE, waitMs = 10000, exec = spawnSync } = {}) {
+function stopJobRunSync(run, { code = NON_DISTINCTIVE_KILL_CODE, waitMs = 10000, exec = spawnSync, endedIdentities = [] } = {}) {
   if (!run?.recordPath || !run.host?.pid || !/^[1-9]\d{0,19}$/.test(String(run.host.creationFileTimeUtc ?? ''))) {
     return { ok: false, outcome: 'unknown-identity' };
   }
+  const ended = (Array.isArray(endedIdentities) ? endedIdentities : [])
+    .filter((p) => Number.isSafeInteger(Number(p?.pid)) && Number(p.pid) > 0 && /^[1-9]\d{0,19}$/.test(String(p.creationFileTimeUtc ?? '')))
+    // Each is compared at the precision its birth was recorded at (`birthTick`, 100 ns ticks; the
+    // microsecond when it names none), so an exact ledger birth never matches a neighbouring one.
+    .map((p) => ({ pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc),
+      birthTick: /^[1-9]\d{0,9}$/.test(String(p.birthTick ?? '')) ? String(p.birthTick) : '10' }));
+  const endedPath = ended.length ? `${run.recordPath}.ended-${process.pid}-${crypto.randomUUID()}.json` : null;
   try {
+    if (endedPath) fs.writeFileSync(endedPath, JSON.stringify(ended));
     const result = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
       '-File', STOP_SCRIPT, '-RecordPath', run.recordPath, '-Pid', String(run.host.pid),
       '-CreationFileTimeUtc', String(run.host.creationFileTimeUtc), '-Code', String(code >>> 0),
-      '-WaitMs', String(waitMs)], { encoding: 'utf8', windowsHide: true, timeout: waitMs * 2 + 15000 });
+      '-WaitMs', String(waitMs), ...(endedPath ? ['-EndedPath', endedPath] : [])],
+    { encoding: 'utf8', windowsHide: true, timeout: waitMs * 2 + 15000 });
     const detail = JSON.parse(String(result.stdout).trim().split(/\r?\n/).pop()) ?? {};
     const outcome = detail.outcome ?? 'failed';
     const ok = result.status === 0 && (outcome === 'terminated' || outcome === 'gone');
@@ -109,6 +121,8 @@ function stopJobRunSync(run, { code = NON_DISTINCTIVE_KILL_CODE, waitMs = 10000,
     return { ...detail, ok, outcome, status: result.status ?? null };
   } catch {
     return { ok: false, outcome: 'failed', status: null };
+  } finally {
+    if (endedPath) fs.rmSync(endedPath, { force: true });
   }
 }
 

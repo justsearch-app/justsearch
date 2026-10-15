@@ -42,7 +42,9 @@ const birth = n => census.fileTimeFromInstant(at(n));
 const incarnation = { session: 'parser-stop', n: 2 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'engine' };
 const parser = { pid: 101, creationFileTime: birth(1), instanceId: 'parser' };
-const rec = (type, line, pid=100) => ({ type, line, writer: { role: 'engine', pid } });
+// Each record's writer as the Engine writes it: its PID and its start, to the millisecond (the owner's
+// birth for the Engine, pid 100; the parser's for pid 101).
+const rec = (type, line, pid=100) => ({ type, line, writer: { role: 'engine', pid, startedAt: at(pid === 100 ? 0 : 1) } });
 function parserHistory(reason, code=0, contained=true) {
   return { engine: { present: true, records: [rec('engine-start', { incarnation, pid:100,
     creationFileTime: birth(0), executable:'C:\\fixture\\java.exe' })] }, children: { present: true, records:[

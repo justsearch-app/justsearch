@@ -8,7 +8,9 @@ const instant = n => new Date(Date.UTC(2026, 9, 14, 10, 0, n)).toISOString();
 const birth = n => census.fileTimeFromInstant(instant(n));
 const incarnation = { session: 'roles', n: 1 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'engine' };
-const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100 } });
+// The Engine writes as itself, naming its start instant: a child's key-only exit proves its start
+// only when its writer is the child's owner (b102).
+const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100, startedAt: instant(0) } });
 const run = { runId: 'roles', pids: { backendRootPid: 100 } };
 
 // The witness line is written the way b599d4d7e wrote it (UNEXPECTED, no reason), so these rows

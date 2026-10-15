@@ -12,7 +12,8 @@ const at = n => new Date(Date.UTC(2026, 9, 8, 10, 0, n)).toISOString();
 const birth = n => census.fileTimeFromInstant(at(n));
 const incarnation = { session: 'coverage', n: 1 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'engine' };
-const rec = (type, line, pid = 100) => ({ type, line, writer: { role: 'engine', pid } });
+// Each writer as the ledger records it: its role, PID and start instant (its birth to the millisecond).
+const rec = (type, line, pid = 100) => ({ type, line, writer: { role: 'engine', pid, startedAt: at(pid === 100 ? 0 : 1) } });
 function fixture() {
   return { engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100,
     creationFileTime: birth(0), executable: 'C:\\test\\java.exe' }), rec('engine-exit', {

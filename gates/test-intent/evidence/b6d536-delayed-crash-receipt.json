@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T21:17:27.483Z",
-  "revision": "738c61aa40e2fa9237bfeb3ed23d328766ac2728",
-  "tree": "af77ff60619405eb4f606e33e5f944b5d2df1f55",
+  "createdAt": "2026-10-15T16:09:15.141Z",
+  "revision": "181363e8614cfed779b35d050af16b03fb7c23d5",
+  "tree": "be4b2e1046c6ff00a327c53451e6ff09969d1823",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.CrashedEngineHelperReceiptTest.delayedSuccessorReceiptSurvivesFinalStopCensus\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7004
+      "durationMs": 6203
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#delayedSuccessorReceiptSurvivesFinalStopCensus",
       "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:cdb067567c90279d01acad2d620556a1315351a199a8f36a100abc3ee966c34f",
+      "contentDigest": "sha256:001f3801daa3a3e7ffd64b7367a50d9255ab8c2ab203bc50625a454d8c354999",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -45,21 +45,27 @@
     "ref": "738c61aa4",
     "revision": "738c61aa40e2fa9237bfeb3ed23d328766ac2728",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b102-census-lookup-compat-r5.patch",
+        "contentDigest": "sha256:36ed24cf066c790f66648d54aa68465f4ee9fd8f665ec4b7f897d7045eb62cec"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.CrashedEngineHelperReceiptTest.delayedSuccessorReceiptSurvivesFinalStopCensus\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 9460
+        "durationMs": 31790
       }
     ],
     "checks": [
       {
         "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#delayedSuccessorReceiptSurvivesFinalStopCensus",
         "classification": "assertion",
-        "detail": "delayedSuccessorReceiptSurvivesFinalStopCensus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: node:assert:152&#13;&#10;  throw new AssertionError(obj);&#13;&#10;  ^&#13;&#10;&#13;&#10;AssertionError [ERR_ASSERTION]: delayed owner crash receipt lost by final stop census&#13;&#10;+ actual - expected&#13;&#10;&#13;&#10;+ 'UNKNOWN'&#13;&#10;- 'OWNER_DIED'&#13"
+        "detail": "delayedSuccessorReceiptSurvivesFinalStopCensus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: AssertionError [ERR_ASSERTION]: delayed owner crash receipt lost by final stop census&#10;+ actual - expected&#10;&#10;+ 'UNKNOWN'&#10;- 'OWNER_DIED'&#10;&#10;    at [eval]:21:10 {&#10;  generatedMessage: false,&#10;  code: 'ERR_ASSERTION',&#10;  actual: 'UNKNOWN"
       }
     ]
   },
-  "digest": "sha256:8ef86db42d9cd1e85f23c478d3c6a19f59c4b52f15c6a4af8099fd9f89e7a464"
+  "digest": "sha256:ab11b4e467f4b6d2ecadef45d28043910ef4123fa6718e637a663421aa230e60"
 }

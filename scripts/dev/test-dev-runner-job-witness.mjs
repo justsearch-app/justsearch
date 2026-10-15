@@ -13,7 +13,11 @@ const birth = n => census.fileTimeFromInstant(at(n));
 const incarnation = { session: 'job-witness-test', n: 1 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'test-instance' };
 const run = { runId: incarnation.session, pids: { backendRootPid: 100 } };
-const rec = (type, line) => ({ type, line, writer: { role: type.startsWith('engine-') ? 'dev-runner' : 'engine', pid: 100 } });
+// The dev runner writes the run's Engine records as itself, one writer for the start and its exit: a
+// role, a PID and its start instant, as the ledger reader requires of every writer. A role alone is
+// never evidence of an Engine exit (round 10).
+const DEV_RUNNER = { role: 'dev-runner', pid: 4000, startedAt: '2026-10-08T09:59:00.000Z' };
+const rec = (type, line) => ({ type, line, writer: type.startsWith('engine-') ? DEV_RUNNER : { role: 'engine', pid: 100 } });
 const row = (pid, parent, n, name, seen = n) => ({ pid, parentPid: parent, creationFileTimeUtc: birth(n),
   name, executable: `C:\\test\\${name}`, lastSeenAtMs: Date.parse(at(seen)) });
 const helper = row(102, 100, 2, 'powershell.exe', 10);

@@ -11,7 +11,8 @@ const birth = n => census.fileTimeFromInstant(at(n));
 const incarnation = { session: 'delayed-crash', n: 1 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'crashed-engine' };
 const run = { runId: incarnation.session, pids: { backendRootPid: 100 } };
-const rec = (type, line, role = 'engine', pid = 100) => ({ type, line, writer: { role, pid } });
+// Each writer as the ledger records it: its role, PID and start instant (its birth to the millisecond).
+const rec = (type, line, role = 'engine', pid = 100) => ({ type, line, writer: { role, pid, startedAt: at(0) } });
 function fixture(delay = 10) {
   const data = { engine: { present: true, records: [rec('engine-start', {
     incarnation, pid: 100, creationFileTime: birth(0), executable: 'C:\\test\\java.exe' }),

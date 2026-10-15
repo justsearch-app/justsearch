@@ -123,6 +123,13 @@ function fileTimeToMs(fileTime) {
 const { sameBirth } = ledgerLib;
 
 /**
+ * Above this many PIDs the CIM filter naming each would pass the command-line limit (a stop looks up
+ * every identity it cannot prove ended, thousands in a long run): the query then reads the whole
+ * process table, and the PIDs asked for are picked from it.
+ */
+const LOOKUP_FILTER_MAX_PIDS = 200;
+
+/**
  * Look up the OS identity of some pids in one bounded CIM query.
  *
  * @returns {Promise<Map<number, {present: true, creationFileTime: string|null, executable: string|null}
@@ -133,10 +140,10 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
   const wanted = [...new Set(pids.map(Number).filter((p) => Number.isInteger(p) && p > 0))];
   if (wanted.length === 0) return Promise.resolve(new Map());
   if (platform !== 'win32') return Promise.resolve(null);
-  const filter = wanted.map((p) => `ProcessId=${p}`).join(' OR ');
+  const filter = wanted.length <= LOOKUP_FILTER_MAX_PIDS ? ` -Filter '${wanted.map((p) => `ProcessId=${p}`).join(' OR ')}'` : '';
   const command = [
     '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
-    `$rows = @(Get-CimInstance Win32_Process -Filter '${filter}' -ErrorAction Stop | ForEach-Object {`,
+    `$rows = @(Get-CimInstance Win32_Process${filter} -ErrorAction Stop | ForEach-Object {`,
     '  [pscustomobject]@{ pid = [int]$_.ProcessId;',
     '    creation = $(if ($_.CreationDate) { $_.CreationDate.ToFileTimeUtc().ToString() } else { $null });',
     '    executable = $_.ExecutablePath; name = $_.Name } })',
@@ -144,7 +151,7 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
   ].join('\n');
   return new Promise((resolve) => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command],
-      { encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 1024 * 1024 },
+      { encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 },
       (error, stdout) => {
         if (error) { resolve(null); return; }
         let rows;
@@ -311,8 +318,11 @@ function createEngineActuator({
   clock = () => Date.now(),
   writerStartedAt = Date.now(),
   log = (line) => process.stderr.write(`[dev-runner] ${line}\n`),
+  ledgerReader = ledgerLib.createIncrementalReader(),
 }) {
   const ledgerDir = ledgerLib.ledgerDirectory(dataDir);
+  // One incremental, handle-identified reader for the supervisor's reads of its Engine ledger (the
+  // census's reader): an unchanged file is not read again, a grown one only for its tail (round 11).
   const writer = ledger ?? ledgerLib.createLedgerWriter({
     ledgerDir, family: 'engine', rotates: true,
     writer: { role: 'dev-runner', pid: process.pid, startedAt: writerStartedAt },
@@ -360,7 +370,7 @@ function createEngineActuator({
     async reconcile() {
       let read;
       try {
-        read = ledgerLib.readLedger(ledgerDir, 'engine');
+        read = ledgerReader.read(ledgerDir, 'engine');
       } catch (err) {
         log(`exit ledger unreadable at supervision start: ${err?.message ?? err}`);
         read = { records: [] };
@@ -577,7 +587,7 @@ function createEngineActuator({
       let selfIntent = null;
       try {
         const identity = state.identity ?? {};
-        selfIntent = ledgerLib.readLedger(ledgerDir, 'engine').records
+        selfIntent = ledgerReader.read(ledgerDir, 'engine').records
           .filter((r) => r.type === 'engine-self-intent' && Number(r.line?.engine?.pid) === state.pid
             && (!identity.creationFileTime || !r.line?.engine?.creationFileTime
               || sameBirth(String(r.line.engine.creationFileTime), identity.creationFileTime)))
@@ -661,17 +671,22 @@ const CLI_ENGINE_ENDINGS = Object.freeze({
  */
 function createCliEngineRecorder({
   dataDir, incarnation, policy = null, clock = () => Date.now(), describeExit = (code) => `unknown(${code})`,
+  ledgerReader = ledgerLib.createIncrementalReader(),
 }) {
+  // `ledgerReader`: the stop's own incremental reader (the census's) when it passes one, so the
+  // records it already read are not read again: an unchanged file is not reopened, a grown file is
+  // read only for its tail (round 11).
   const ledgerDir = dataDir ? ledgerLib.ledgerDirectory(dataDir) : null;
   const validIncarnation = Boolean(incarnation && typeof incarnation.session === 'string'
     && Number.isInteger(incarnation.n));
   let writer = null;
+  let writerIdentity = null;
   let exitWritten = false;
 
   const exitRecorded = () => {
     if (exitWritten) return true;
     let records = [];
-    try { records = ledgerLib.readLedger(ledgerDir, 'engine').records; } catch { /* write anyway */ }
+    try { records = ledgerReader.read(ledgerDir, 'engine').records; } catch { /* write anyway */ }
     return records.some((r) => r.type === 'engine-exit'
       && r.line?.incarnation?.session === incarnation.session && r.line?.incarnation?.n === incarnation.n);
   };
@@ -683,14 +698,17 @@ function createCliEngineRecorder({
   };
   const append = (type, fields) => {
     if (!writer) {
-      writer = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', clock,
-        writer: { role: 'dev-cli', pid: process.pid, startedAt: clock() } });
+      writerIdentity = { role: 'dev-cli', pid: process.pid, startedAt: clock() };
+      writer = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', clock, writer: writerIdentity });
       writer.startSession();
     }
     return writer.append(type, fields);
   };
 
   return {
+    /** The writer identity this recorder writes as (role, PID, start instant), once it has written; else null. */
+    writerIdentity: () => (writerIdentity ? { ...writerIdentity } : null),
+
     /** Before acting: `COOPERATIVE` over `HTTP_SHUTDOWN`, or `NOW` over `TERMINATE`. */
     intent({ reason = 'QUIT', detail = null, mode, channel, deadlineAt = null }) {
       const why = refusal();
