@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +22,9 @@ import org.slf4j.LoggerFactory;
  * one snapshot per status, telemetry or saturation tick. Now one process answers total memory,
  * free memory and driver version together; at most one runs at a time; and a reading younger than
  * {@link #MIN_INTERVAL} is served to everyone without a new process. Readers that arrive while a
- * probe runs wait for it and share its answer.
+ * probe runs wait for it and share its outcome, a timeout or failure included: they receive its
+ * reading when it gave one, otherwise the last good reading marked stale, or the failure when there
+ * is none. They never start a probe of their own.
  *
  * <p>{@link #invalidate()} marks the reading stale; it never shortens the interval. A read inside
  * the interval returns the last reading marked {@link Reading#stale() stale}, and the next probe
@@ -66,7 +69,12 @@ final class NvidiaSmiReadings {
   private final Runner runner;
   private final java.util.function.BooleanSupplier installed;
   private final ReentrantLock lock = new ReentrantLock();
+  private final Condition settled = lock.newCondition();
   private Reading last;
+  private Reading lastGood;
+  private boolean probing;
+  private long settledProbes;
+  private Reading forWaiters;
   private Instant probedAt;
   private boolean staleRequested;
   private boolean unavailable;
@@ -94,9 +102,16 @@ final class NvidiaSmiReadings {
    * interval, whatever was invalidated.
    */
   Reading read() {
+    Instant now;
     lock.lock();
     try {
-      Instant now = clock.instant();
+      if (probing) {
+        // One probe is in flight: wait for it and share its outcome, whatever the clock says now.
+        long awaited = settledProbes;
+        while (settledProbes == awaited) settled.awaitUninterruptibly();
+        return forWaiters;
+      }
+      now = clock.instant();
       boolean allowed = probedAt == null || Duration.between(probedAt, now).compareTo(MIN_INTERVAL) >= 0;
       if (!allowed) {
         return staleRequested && last != null ? last.markedStale() : last;
@@ -107,8 +122,32 @@ final class NvidiaSmiReadings {
       staleRequested = false;
       unavailable = false;
       probedAt = now;
-      last = probe(now);
-      return last;
+      probing = true;
+    } finally {
+      lock.unlock();
+    }
+    Probed probed = null;
+    try {
+      probed = probe(now);
+      return probed.reading();
+    } finally {
+      settle(probed, now);
+    }
+  }
+
+  /** Publishes the probe's outcome and wakes every reader waiting on it. */
+  private void settle(Probed probed, Instant now) {
+    Reading reading = probed != null ? probed.reading()
+        : new Reading(false, "nvidia-smi probe failed", null, null, null, now);
+    lock.lock();
+    try {
+      last = reading;
+      unavailable = probed != null && probed.sticky();
+      if (reading.available()) lastGood = reading;
+      forWaiters = reading.available() || lastGood == null ? reading : lastGood.markedStale();
+      probing = false;
+      settledProbes++;
+      settled.signalAll();
     } finally {
       lock.unlock();
     }
@@ -170,25 +209,28 @@ final class NvidiaSmiReadings {
     return false;
   }
 
-  private Reading probe(Instant now) {
+  /** One probe's reading; {@code sticky}: no further probe until an invalidation. */
+  private record Probed(Reading reading, boolean sticky) {}
+
+  /** Runs one probe without holding the lock, so waiting readers park on {@link #settled}. */
+  private Probed probe(Instant now) {
     Outcome outcome;
     try {
       outcome = runner.run();
     } catch (Exception e) {
       LOG.debug("nvidia-smi not available — disabling future polls: {}", e.getMessage());
-      unavailable = true;
-      return new Reading(false, "nvidia-smi not available: " + e.getMessage(), null, null, null, now);
+      return new Probed(new Reading(false, "nvidia-smi not available: " + e.getMessage(), null, null, null, now),
+          true);
     }
     if (outcome.output() == null) {
       LOG.warn("nvidia-smi timed out");
-      return new Reading(false, "nvidia-smi timed out", null, null, null, now);
+      return new Probed(new Reading(false, "nvidia-smi timed out", null, null, null, now), false);
     }
     if (outcome.exitCode() != 0 || outcome.output().isBlank()) {
       LOG.debug("nvidia-smi failed or returned empty output — disabling future polls");
-      unavailable = true;
-      return new Reading(false, "nvidia-smi exited " + outcome.exitCode(), null, null, null, now);
+      return new Probed(new Reading(false, "nvidia-smi exited " + outcome.exitCode(), null, null, null, now), true);
     }
-    return parse(outcome.output(), now);
+    return new Probed(parse(outcome.output(), now), false);
   }
 
   /**

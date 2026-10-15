@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T05:24:39.098Z",
+  "revision": "cdfc44cb7da17f9eb3f18f957bfeec4cf9855cf4",
+  "tree": "58a577bf87d6b5d85de933ab6b9f6146b8291e24",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvidiaSmiSlowProbeSharingTest.callersWaitingOnATimedOutProbeShareItsOutcome\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2545
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java#callersWaitingOnATimedOutProbeShareItsOutcome",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee4998411e7eee8c068c4552fe8d4ed3c525a46e1b69e3f8c81d43421acd876a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "callersWaitingOnATimedOutProbeShareItsOutcome()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "cdfc44cb7",
+    "revision": "cdfc44cb7da17f9eb3f18f957bfeec4cf9855cf4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvidiaSmiSlowProbeSharingTest.callersWaitingOnATimedOutProbeShareItsOutcome\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 19860
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java#callersWaitingOnATimedOutProbeShareItsOutcome",
+        "classification": "assertion",
+        "detail": "callersWaitingOnATimedOutProbeShareItsOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: six callers entered while one probe was in flight and share its outcome ==> expected: <1> but was: <2>"
+      }
+    ]
+  },
+  "digest": "sha256:9b871bb403aa087be9738215fe6e42058133743ac969f5d543dfa595b63f4bc7"
+}

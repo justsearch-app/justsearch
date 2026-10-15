@@ -314,17 +314,13 @@ final class WindowsJobWitness implements AutoCloseable {
     } else {
       found = io.justsearch.app.api.runtime.child.ProcessIntents.resolve(pid, held.birth,
           held.executable, instantOf(held.birth == null ? 0 : Long.parseLong(held.birth)), exitedAt, ownerWaitOver,
-          held.parentPid, held.parentBirth);
+          held.parentPid, held.parentBirth, code); // the crash class is applied before it is kept
     }
     if (found.isEmpty()) return null;
     var resolution = found.get();
     if ("none".equals(resolution.basis()) && waitedNanos < REGISTRATION_WAIT_NANOS) return null;
-    if (code != null && io.justsearch.app.api.runtime.child.OwnedHelper.crashCode(code)
-        && "REQUESTED".equals(resolution.exitClass())) {
-      return new io.justsearch.app.api.runtime.child.ProcessIntents.Resolution("UNEXPECTED",
-          "crash exit code after: " + resolution.reason(), resolution.basis());
-    }
-    return resolution;
+    // A console host follows its client's final class; its own crash code still counts.
+    return io.justsearch.app.api.runtime.child.ProcessIntents.afterExitCode(resolution, code);
   }
 
   private long[] times(MemorySegment process) throws Throwable {

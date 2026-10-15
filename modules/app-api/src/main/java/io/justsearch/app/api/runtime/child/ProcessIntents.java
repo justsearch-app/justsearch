@@ -191,10 +191,13 @@ public final class ProcessIntents {
    * class never waits on the owner's exit receipt. A window applies only when {@code
    * creatorPid}/{@code creatorBirth}, the exiting process's parent as read natively, is the window's
    * owner. Without a window, empty while the owner of an owned identity has not recorded its exit
-   * and {@code ownerWaitOver} is false: the witness asks again later.
+   * and {@code ownerWaitOver} is false: the witness asks again later. A crash {@code exitCode} makes
+   * any REQUESTED class UNEXPECTED, even inside a window, before the class is kept for the exit's
+   * console host: what is kept and returned is always the final class.
    */
   public static synchronized Optional<Resolution> resolve(long pid, String birth, String executable,
-      Instant born, Instant exited, boolean ownerWaitOver, Long creatorPid, String creatorBirth) {
+      Instant born, Instant exited, boolean ownerWaitOver, Long creatorPid, String creatorBirth,
+      Integer exitCode) {
     Owned owned = birth == null ? null : OWNED.get(new Key(pid, birth));
     LedgerWindows.Receipt receipt = owned == null ? ledgerReceipt(pid, birth, creatorPid, creatorBirth) : null;
     Resolution resolution;
@@ -220,8 +223,23 @@ public final class ProcessIntents {
             : new Resolution("UNEXPECTED", NO_INTENT, "none");
       }
     }
+    resolution = afterExitCode(resolution, exitCode);
     if (birth != null) WITNESSED.put(new Key(pid, birth), resolution);
     return Optional.of(resolution);
+  }
+
+  /** A crash exit code is UNEXPECTED whatever intent or window would have made it REQUESTED. */
+  public static Resolution afterExitCode(Resolution resolution, Integer exitCode) {
+    if (exitCode == null || !OwnedHelper.crashCode(exitCode) || !"REQUESTED".equals(resolution.exitClass())) {
+      return resolution;
+    }
+    return new Resolution("UNEXPECTED", "crash exit code after: " + resolution.reason(), resolution.basis());
+  }
+
+  /** Classifies a witnessed exit whose exit code is unknown: no crash override applies. */
+  public static Optional<Resolution> resolve(long pid, String birth, String executable, Instant born, Instant exited,
+      boolean ownerWaitOver, Long creatorPid, String creatorBirth) {
+    return resolve(pid, birth, executable, born, exited, ownerWaitOver, creatorPid, creatorBirth, null);
   }
 
   private static Optional<Window> window(String executable, Instant born, Instant exited, Long creatorPid,
