@@ -185,22 +185,41 @@ public final class ProcessIntents {
   }
 
   /**
-   * Classifies a witnessed exit. Empty while the owner of an owned identity has not recorded its
-   * exit and {@code ownerWaitOver} is false: the witness asks again later. A window applies only
-   * when {@code creatorPid}/{@code creatorBirth}, the exiting process's parent as read natively, is
-   * the window's owner.
+   * Classifies a witnessed exit. An exit its owner already recorded has that record's class and
+   * reason. Otherwise a launch a window covers is REQUESTED with the window's reason at once (with
+   * the owner's stop reason, if it recorded one): the window was forced before the launch, so the
+   * class never waits on the owner's exit receipt. A window applies only when {@code
+   * creatorPid}/{@code creatorBirth}, the exiting process's parent as read natively, is the window's
+   * owner. Without a window, empty while the owner of an owned identity has not recorded its exit
+   * and {@code ownerWaitOver} is false: the witness asks again later.
    */
   public static synchronized Optional<Resolution> resolve(long pid, String birth, String executable,
       Instant born, Instant exited, boolean ownerWaitOver, Long creatorPid, String creatorBirth) {
-    Optional<Resolution> owner = ownerOf(pid, birth, ownerWaitOver);
-    if (owner == null) return Optional.empty();
-    if (owner.isEmpty()) {
-      owner = ledgerOwnerOf(pid, birth, ownerWaitOver, creatorPid, creatorBirth);
-      if (owner == null) return Optional.empty();
+    Owned owned = birth == null ? null : OWNED.get(new Key(pid, birth));
+    LedgerWindows.Receipt receipt = owned == null ? ledgerReceipt(pid, birth, creatorPid, creatorBirth) : null;
+    Resolution resolution;
+    if (owned != null && owned.outcome != null) {
+      resolution = owned.outcome;
+    } else if (receipt != null && receipt.outcome() != null) {
+      resolution = receipt.outcome();
+    } else {
+      Optional<Window> window = window(executable, born, exited, creatorPid, creatorBirth);
+      String stop = owned != null ? owned.intent : receipt != null ? receipt.intent() : null;
+      if (window.isPresent()) {
+        resolution = stop != null ? new Resolution("REQUESTED", stop, "owner intent")
+            : new Resolution("REQUESTED", window.get().reason, "owner window");
+      } else if (owned == null && receipt == null) {
+        resolution = new Resolution("UNEXPECTED", NO_INTENT, "none");
+      } else if (!ownerWaitOver) {
+        return Optional.empty();
+      } else if (stop != null) {
+        resolution = new Resolution("REQUESTED", stop, "owner intent");
+      } else {
+        resolution = owned != null
+            ? new Resolution("UNEXPECTED", "owner recorded no exit and no stop intent", "none")
+            : new Resolution("UNEXPECTED", NO_INTENT, "none");
+      }
     }
-    Resolution resolution = owner.orElseGet(() -> window(executable, born, exited, creatorPid, creatorBirth)
-        .map(w -> new Resolution("REQUESTED", w.reason, "owner window"))
-        .orElse(new Resolution("UNEXPECTED", NO_INTENT, "none")));
     if (birth != null) WITNESSED.put(new Key(pid, birth), resolution);
     return Optional.of(resolution);
   }
@@ -219,23 +238,18 @@ public final class ProcessIntents {
   }
 
   /**
-   * The receipts the member's creator recorded in the shared ledger, when that creator is another
-   * process: its recorded exit, else (once the owner wait is over) its stop intent. Null: still
-   * waiting for that owner. Empty: no receipt of that creator names this PID and birth.
+   * The receipt the member's creator recorded in the shared ledger, when that creator is another
+   * process and the receipt names this PID and birth as created by it; null otherwise.
    */
-  private static Optional<Resolution> ledgerOwnerOf(long pid, String birth, boolean ownerWaitOver,
-      Long creatorPid, String creatorBirth) {
+  private static LedgerWindows.Receipt ledgerReceipt(long pid, String birth, Long creatorPid,
+      String creatorBirth) {
     if (ledgerWindows == null || birth == null || creatorPid == null || creatorBirth == null
         || creatorPid == ProcessHandle.current().pid()) {
-      return Optional.empty();
+      return null;
     }
     ledgerWindows.read();
     LedgerWindows.Receipt receipt = ledgerWindows.receipt(pid, birth);
-    if (receipt == null || !receipt.createdBy(creatorPid, creatorBirth)) return Optional.empty();
-    if (receipt.outcome() != null) return Optional.of(receipt.outcome());
-    if (!ownerWaitOver) return null;
-    return receipt.intent() == null ? Optional.empty()
-        : Optional.of(new Resolution("REQUESTED", receipt.intent(), "owner intent"));
+    return receipt == null || !receipt.createdBy(creatorPid, creatorBirth) ? null : receipt;
   }
 
   /**
@@ -244,10 +258,13 @@ public final class ProcessIntents {
    */
   public static synchronized Optional<Resolution> resolveConsole(long clientPid, String clientBirth,
       boolean ownerWaitOver) {
-    Optional<Resolution> owner = ownerOf(clientPid, clientBirth, ownerWaitOver);
+    Owned owned = clientBirth == null ? null : OWNED.get(new Key(clientPid, clientBirth));
+    Resolution witnessed = clientBirth == null ? null : WITNESSED.get(new Key(clientPid, clientBirth));
+    // The client's own record first, then its witnessed class (a window covers it at once).
+    Optional<Resolution> owner = owned != null && owned.outcome != null ? Optional.of(owned.outcome)
+        : witnessed != null ? Optional.of(witnessed) : ownerOf(clientPid, clientBirth, ownerWaitOver);
     if (owner == null) return Optional.empty();
-    Resolution client = owner.orElseGet(() -> clientBirth == null ? null
-        : WITNESSED.get(new Key(clientPid, clientBirth)));
+    Resolution client = owner.orElse(null);
     if (client == null) {
       return ownerWaitOver ? Optional.of(new Resolution("UNEXPECTED",
           NO_INTENT + " for the console client", "none")) : Optional.empty();

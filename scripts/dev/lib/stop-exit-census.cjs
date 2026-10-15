@@ -150,10 +150,20 @@ const createdBy = (w, owner) => Number(owner?.pid) === w.parentPid
   && BigInt(owner.creationFileTime) <= BigInt(w.creationFileTimeUtc);
 const sameOwner = (a, b) => a?.pid === b?.pid && a?.instanceId === b?.instanceId
   && sameBirth(a?.creationFileTime, b?.creationFileTime, BIRTH_TICKS.EXACT);
-const receiptCreator = (w, c) => createdBy(w, c.owner) || (c.helperId
-  && c.creatorPid === c.owner?.pid && isFileTime(c.creatorCreationFileTime)
-  && sameBirth(c.creatorCreationFileTime, c.owner.creationFileTime, BIRTH_TICKS.EXACT)
-  && BigInt(c.creatorCreationFileTime) <= BigInt(w.creationFileTimeUtc));
+// A receipt's self-declared creator never overrides the native one: when the witness read the
+// member's parent natively, the receipt's owner must be that parent and any creator the receipt
+// declares must equal it exactly; a conflict is no match. Only without a native parent does the
+// receipt's declared creator (its own owner) stand.
+const nativeCreatorKnown = (w) => Number.isInteger(w.parentPid) && isFileTime(w.parentCreationFileTime);
+const receiptCreator = (w, c) => (nativeCreatorKnown(w)
+  ? createdBy(w, c.owner) && (c.creatorPid == null || (c.creatorPid === w.parentPid
+    && isFileTime(c.creatorCreationFileTime)
+    && sameBirth(c.creatorCreationFileTime, w.parentCreationFileTime, BIRTH_TICKS.EXACT)))
+  : Boolean(c.helperId && c.creatorPid === c.owner?.pid && isFileTime(c.creatorCreationFileTime)
+    && sameBirth(c.creatorCreationFileTime, c.owner.creationFileTime, BIRTH_TICKS.EXACT)
+    && BigInt(c.creatorCreationFileTime) <= BigInt(w.creationFileTimeUtc)));
+/** A helper receipt's birth and a witness's are both native FILETIMEs: they match exactly. */
+const receiptBirth = (c, w) => sameBirth(c.creationFileTime, w.creationFileTimeUtc, BIRTH_TICKS.EXACT);
 
 /**
  * The run's Engine incarnations (`engine-start` with `incarnation.session = runId`) and the children
@@ -298,13 +308,14 @@ function ledgerView(ledger, runId) {
       || (w.consoleClient && w.exit.exitClass === 'REQUESTED'))) continue;
     const ownerExit = [...children, ...receipts.values()].find(c =>
       (c.engine === w.engine || ownedBy(c, w.engine)) && receiptCreator(w, c) && c.pid === w.pid
-      && sameBirth(c.creationFileTimeUtc ?? c.creationFileTime, w.creationFileTimeUtc) && c.exit)?.exit;
+      && (c.helperId ? receiptBirth(c, w) : sameBirth(c.creationFileTimeUtc ?? c.creationFileTime, w.creationFileTimeUtc))
+      && c.exit)?.exit;
     if (ownerExit) {
       // An owner record wins only when the independent code receipt confirms it.
       w.exit = sameCode(ownerExit.code, w.exit.code) ? { ...w.exit, ...ownerExit }
         : { ...w.exit, exitClass: 'UNKNOWN', reason: 'owner_witness_disagree' };
       if ([...receipts.values()].some(c => c.engine === w.engine && receiptCreator(w, c)
-        && c.pid === w.pid && sameBirth(c.creationFileTime, w.creationFileTimeUtc)
+        && c.pid === w.pid && receiptBirth(c, w)
         && c.exit === ownerExit)) ownedHelpers.add(w);
     } else {
       const born = BigInt(w.creationFileTimeUtc);
@@ -591,11 +602,11 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
       && sameBirth(w.creationFileTimeUtc, birthOf(p)));
     if (!w || isTargetAlready(p)) continue;
     if (contradictsJob(p, w.pid, w.creationFileTimeUtc)) { rejectedWitnesses.add(p); continue; }
-    const jobEnd = jobClosedByMs(w.engine);
-    const bornMs = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
-    const witnessedEnd = recordedEndMs(w.exit);
-    if (jobEnd != null && (bornMs > jobEnd
-      || (witnessedEnd != null && witnessedEnd > jobEnd + CONHOST_EXIT_GRACE_MS))) {
+    // The Engine's end as a cutoff, at native 100 ns precision.
+    const jobEnd = closedByTicks(w.engine?.exit);
+    const witnessedEnd = exitedTicksOf(w.exit);
+    if (jobEnd != null && (BigInt(w.creationFileTimeUtc) > jobEnd
+      || (witnessedEnd != null && witnessedEnd > jobEnd + BigInt(CONHOST_EXIT_GRACE_MS) * 10000n))) {
       rejectedWitnesses.add(p); continue;
     }
     const role = isConsoleHost(p) ? 'console-host' : witnessRole(w.pid, w.creationFileTimeUtc, w.executable, view.children);
