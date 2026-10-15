@@ -865,3 +865,14 @@ the records pass.
   "note": "Reject entry 17: b90-ix-llama-preservation.json has failBefore null, and neither its entry nor the preamble explains why explicitFalseEvaluationPropertyWins cannot be executed before the change; calling it preservation supplies no candidate-only reason. All 83 candidate case references pass and the changed round-2 before replay matches, but this declaration omission remains."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4d-20261015",
+  "verdict": "accept",
+  "digest": "sha256:a1a7892f23b151e3d74427db5cccfc24ac4af7b4c585ae8e6ac68fbb60d7d8d5",
+  "note": "Reviewed all entries against 628bb419f; only entry 17 and its preservation evidence changed. Reran explicitFalseEvaluationPropertyWins on the candidate and 61ff9b955 with no production overlays or compat patches: both pass, preserving CACHE_RAM=256 when system-property evaluation false overrides environment true."
+}
+```
