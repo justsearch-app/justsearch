@@ -24,6 +24,7 @@ import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.indexerworker.server.WorkerAppServices;
 import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.SearchBudgetPolicy;
 import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.ipc.PipelineConfig;
@@ -39,8 +40,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -385,30 +389,97 @@ final class EngineKnowledgeClientInferenceQueueTest {
         io.justsearch.configuration.resolved.ResolvedConfig.builder().build());
     when(runtime.indexCountOps().getOrComputeCorpusProfile()).thenReturn(
         io.justsearch.adapters.lucene.runtime.CorpusProfile.EMPTY);
-    held.delegate = new WorkerSearchService(runtime, embeddings,
+    var worker = new WorkerSearchService(runtime, embeddings,
         new io.justsearch.indexerworker.server.EncoderBindings());
+    held.delegate = worker;
+    // Control semantic expiry independently of the request's deadline. The old D - 300 ms
+    // release assumed the worker would run within 300 ms, which is false under suite load.
+    // The policy supplies an absolute deadline, just as in production; advance it only after
+    // the search is queued, then release the sole worker. All capture and deadline handling
+    // below the policy remain real, and the caller's own deadline remains armed.
+    long requestDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+    assertEquals(
+        requestDeadline - TimeUnit.MILLISECONDS.toNanos(SearchBudgetPolicy.DEFAULT.marginMs()),
+        SearchBudgetPolicy.DEFAULT.vectorOnlyDeadline(requestDeadline));
+    var semanticExpiry = new AtomicLong();
+    var policy = mock(SearchBudgetPolicy.class);
+    when(policy.vectorOnlyDeadline(org.mockito.ArgumentMatchers.anyLong()))
+        .thenAnswer(invocation -> semanticExpiry.get());
+    setField(worker, "budgetPolicy", policy);
     var admission = new EngineAdmissionController(8, 8, 1);
-    long budgetMs = 2_000;
+    long budgetMs = 60_000;
     try (var registry = registry(2, 1);
         var client = client(registry, held, admission, budgetMs)) {
       try {
         var holder = start(() -> client.search(inference("hold-0"), client(0)));
         await(() -> held.entered.get() == 1);
-        long submitted = System.nanoTime();
         var queued = start(() -> client.search(inference("queued"), client(1)));
         await(() -> queued(registry, INFERENCE) == 1 || queued.isDone());
-        // VECTOR-only waits within D - 500 ms; hold the only thread past it, inside D.
-        long until = submitted + TimeUnit.MILLISECONDS.toNanos(budgetMs - 300);
-        while (System.nanoTime() - until < 0) TimeUnit.MILLISECONDS.sleep(10);
+        assertEquals(1, queued(registry, INFERENCE), "the search must wait for the worker");
+        semanticExpiry.set(System.nanoTime());
         held.release.complete(null);
 
         String outcome = queued.get(5, TimeUnit.SECONDS);
         assertTrue(outcome.startsWith("deadline:") && outcome.contains("SEMANTIC_BUDGET_EXCEEDED"),
             outcome);
+        assertTrue(outcome.contains("contended"), outcome);
         assertEquals(0, embeddings.queryCalls.get(), "the dense leg started its encoder");
         holder.get(5, TimeUnit.SECONDS);
       } finally {
         held.release.complete(null);
+      }
+    }
+  }
+
+  @Test
+  void requestDeadlineWinningBeforeVectorCaptureStaysUntyped() throws Exception {
+    var held = new HeldSearch();
+    var embeddings = new GpuEmbeddings();
+    var runtime = mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    when(runtime.resolvedConfig()).thenReturn(
+        io.justsearch.configuration.resolved.ResolvedConfig.builder().build());
+    var captureEntered = new CompletableFuture<Void>();
+    var releaseCapture = new CompletableFuture<Void>();
+    var commitOps = runtime.commitOps();
+    org.mockito.Mockito.doAnswer(invocation -> {
+      captureEntered.complete(null);
+      releaseCapture.join();
+      return null;
+    }).when(commitOps).maybeRefresh();
+    held.delegate = new WorkerSearchService(runtime, embeddings,
+        new io.justsearch.indexerworker.server.EncoderBindings());
+    // A positive semantic budget already elapsed when this worker started, before D wins.
+    var policy = mock(SearchBudgetPolicy.class);
+    when(policy.vectorOnlyDeadline(org.mockito.ArgumentMatchers.anyLong()))
+        .thenAnswer(invocation -> (long) invocation.getArgument(0)
+            - TimeUnit.SECONDS.toNanos(60) + 1);
+    setField(held.delegate, "budgetPolicy", policy);
+    var admission = new EngineAdmissionController(8, 8, 1);
+    try (var registry = registry(2, 1);
+        var client = client(registry, held, admission, 60_000)) {
+      // Fire the actual head-deadline action at a latch, without waiting for wall time.
+      // This is the observed failing interleaving: the head completes and cancels the call
+      // before capture reaches its first request/semantic-budget check.
+      var alarm = new CompletableFuture<Runnable>();
+      var timer = mock(ScheduledExecutorService.class);
+      when(timer.schedule(any(Runnable.class), org.mockito.ArgumentMatchers.anyLong(), any()))
+          .thenAnswer(invocation -> {
+            alarm.complete(invocation.getArgument(0));
+            return mock(ScheduledFuture.class);
+          });
+      setField(client, "deadlines", timer);
+      try {
+        var search = start(() -> client.search(inference("deadline-first"), client(0)));
+        captureEntered.get(5, TimeUnit.SECONDS);
+        alarm.get(5, TimeUnit.SECONDS).run();
+        assertEquals("deadline", search.get(5, TimeUnit.SECONDS));
+        assertTrue(held.contexts.get("deadline-first").cancelled());
+        releaseCapture.complete(null);
+        held.delegateExited.get(5, TimeUnit.SECONDS);
+        assertEquals(0, embeddings.queryCalls.get(), "the dense leg started its encoder");
+      } finally {
+        releaseCapture.complete(null);
       }
     }
   }
@@ -666,6 +737,7 @@ final class EngineKnowledgeClientInferenceQueueTest {
     final WorkerAppServices services = mock(WorkerAppServices.class);
     final AtomicInteger entered = new AtomicInteger();
     final CompletableFuture<Void> release = new CompletableFuture<>();
+    final CompletableFuture<Void> delegateExited = new CompletableFuture<>();
     final List<String> ran = new CopyOnWriteArrayList<>();
     final Map<String, CallContext> contexts = new ConcurrentHashMap<>();
     final Map<String, SearchResponse> responses = new ConcurrentHashMap<>();
@@ -683,8 +755,12 @@ final class EngineKnowledgeClientInferenceQueueTest {
           return SearchResponse.getDefaultInstance();
         }
         WorkerSearchService real = delegate;
-        SearchResponse response = real == null ? SearchResponse.getDefaultInstance()
-            : real.search(request, call);
+        SearchResponse response;
+        try {
+          response = real == null ? SearchResponse.getDefaultInstance() : real.search(request, call);
+        } finally {
+          delegateExited.complete(null);
+        }
         responses.put(request.getQuery(), response);
         return response;
       });
@@ -733,6 +809,14 @@ final class EngineKnowledgeClientInferenceQueueTest {
     } catch (ReflectiveOperationException e) {
       throw new AssertionError(e);
     }
+  }
+
+  /** Instrument timing inputs without adding test-only hooks to the product. */
+  private static void setField(Object target, String name, Object value)
+      throws ReflectiveOperationException {
+    var field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(target, value);
   }
 
   /** Every kind of search that may run inference, as EngineKnowledgeClientExecutorTest lists. */
