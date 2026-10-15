@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-14T18:42:56.212Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "d4575919da0881fe3a3181fef77d79f2e43010da",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aPresentRootVouchesUntilItIsRenamedAway\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aRootMissingAtCaptureNeverVouches\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aDifferentFolderMappedAtTheSameLetterDoesNotVouch\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.anUnreadableVolumeRecordVouchesForNothing\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aRecordedVolumeIsForgottenWhenTheRootIsRemoved\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2214
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.RootVolumeCheckTest.theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5764
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aPresentRootVouchesUntilItIsRenamedAway",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPresentRootVouchesUntilItIsRenamedAway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRootMissingAtCaptureNeverVouches",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootMissingAtCaptureNeverVouches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aDifferentFolderMappedAtTheSameLetterDoesNotVouch",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDifferentFolderMappedAtTheSameLetterDoesNotVouch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#anUnreadableVolumeRecordVouchesForNothing",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnreadableVolumeRecordVouchesForNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRecordedVolumeIsForgottenWhenTheRootIsRemoved",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRecordedVolumeIsForgottenWhenTheRootIsRemoved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java#theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootVolumeCheckTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cd9038edd0d69e90724bff06189013439fcc537f87b47d465f7baf013547f6df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c3eee167dbbc1c55f0ad64379d1a8c8ef80a9ccb677a48d311275bf88b87c346"
+}

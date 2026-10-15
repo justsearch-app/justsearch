@@ -40,7 +40,11 @@ import {
 // Tempdoc 885 item 21b — the ONE spelling of the exhausted terminal state (see its javadoc). The
 // by-prefix listing defaults a blank state to `FAILED`, so an older backend keeps the old
 // rendering rather than falling into the exhausted arm.
-import { JOB_STATE_RETRY_EXHAUSTED } from '../state/indexingJobStates.js';
+import {
+  JOB_STATE_INDEXED_SOURCE_UNREADABLE,
+  JOB_STATE_RETRY_EXHAUSTED,
+  JOB_STATE_SOURCE_UNREADABLE,
+} from '../state/indexingJobStates.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 
 const RESOURCE_ID = 'core.failed-indexing-jobs';
@@ -284,7 +288,8 @@ export class FailedJobsDrawer extends JfElement {
     }
     /* 885 item 21b — "we never managed to read it" is a WAITING outcome, not a verdict on the file,
        so it carries the secondary tone rather than the danger tone the parse-failure line uses. */
-    .row-gaveup {
+    .row-gaveup,
+    .row-unreadable {
       margin-top: 0.15rem;
       font-size: var(--font-size-xs);
       color: var(--text-secondary);
@@ -347,6 +352,10 @@ export class FailedJobsDrawer extends JfElement {
     // actually happened and what makes the queue try again, so the error stays as detail rather
     // than as the explanation.
     const exhausted = r.state.toUpperCase() === JOB_STATE_RETRY_EXHAUSTED;
+    // Task t-20261013-ef3c41 — a file that exists but cannot be read is retried without end and its
+    // indexed content is kept; it must not read like a broken or a missing file.
+    const indexedUnreadable = r.state.toUpperCase() === JOB_STATE_INDEXED_SOURCE_UNREADABLE;
+    const unreadable = indexedUnreadable || r.state.toUpperCase() === JOB_STATE_SOURCE_UNREADABLE;
     // Tempdoc 941 F2 — the by-prefix wire has carried `scanId` since 911 but the drawer never
     // rendered it, so a failed row could not be tied back to the scan that produced it. `""` is the
     // contract's "no owning scan" (single-file ingest / watcher / pre-scan row), NOT an unknown —
@@ -365,6 +374,15 @@ export class FailedJobsDrawer extends JfElement {
           ${exhausted
             ? html`<div class="row-gaveup" data-testid="failed-job-exhausted">
                 Gave up after 7 days of retries — rescan the folder, or edit the file, to try again.
+              </div>`
+            : nothing}
+          ${unreadable
+            ? html`<div class="row-unreadable" data-testid="failed-job-source-unreadable">
+                ${indexedUnreadable
+                  ? 'Indexed, source unreadable — the file is locked or access is denied. Its'
+                    + ' indexed content stays searchable; retrying automatically.'
+                  : 'Source unreadable — the file is locked or access is denied. Retrying'
+                    + ' automatically.'}
               </div>`
             : nothing}
           ${r.errorMessage ? html`<div class="row-error">${r.errorMessage}</div>` : nothing}

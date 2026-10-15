@@ -1524,6 +1524,20 @@ public final class McpToolSurface {
   // Status: formatted text
   // =========================================================================
 
+  /**
+   * Task t-20261013-ef3c41: whether the status's document count is not a count — the Worker could
+   * not count the index and had no earlier count, or no Worker answered.
+   */
+  static boolean documentCountUnknown(KnowledgeStatus status) {
+    return Boolean.TRUE.equals(status.extras().get(
+        io.justsearch.app.api.knowledge.KnowledgeStatusView.DOC_COUNT_UNKNOWN_EXTRA));
+  }
+
+  /** The document count as an agent reads it: {@code unknown} when it is not a count, never 0. */
+  static String documentsValue(KnowledgeStatus status) {
+    return documentCountUnknown(status) ? "unknown" : String.valueOf(status.docCount());
+  }
+
   private Map<String, Object> callStatus(EngineContext engineContext) {
     KnowledgeSearchController ctrl = knowledgeLookup.get();
     if (ctrl == null) return errorContent(KNOWLEDGE_SERVER_UNAVAILABLE_MESSAGE, ApiErrorCode.SERVICE_UNAVAILABLE);
@@ -1533,7 +1547,7 @@ public final class McpToolSurface {
       var sb = new StringBuilder();
       sb.append("state: ").append(status.state()).append("\n");
       sb.append("ready: ").append(status.ready()).append("\n");
-      sb.append("documents: ").append(status.docCount()).append("\n");
+      sb.append("documents: ").append(documentsValue(status)).append("\n");
       sb.append("queueDepth: ").append(status.queueDepth()).append("\n");
       sb.append("healthy: ").append(status.healthy()).append("\n");
       sb.append("indexState: ").append(status.indexState()).append("\n");
@@ -1777,8 +1791,12 @@ public final class McpToolSurface {
       KnowledgeSearchController ctrl = knowledgeLookup.get();
       if (ctrl == null) return "JustSearch index status unknown. " + TOOL_SELECTION_GUIDANCE;
       var status = ctrl.getAdapter().status(engineContext);
-      var sb = new StringBuilder("JustSearch has ");
-      sb.append(status.docCount()).append(" documents indexed.");
+      var sb = new StringBuilder();
+      if (documentCountUnknown(status)) {
+        sb.append("JustSearch could not count its indexed documents yet.");
+      } else {
+        sb.append("JustSearch has ").append(status.docCount()).append(" documents indexed.");
+      }
       Map<String, Object> extras = status.extras();
       if (extras.get("embeddingCoveragePercent") instanceof Number n) {
         sb.append(" Embeddings: ").append(String.format("%.0f%%", n.doubleValue())).append(".");
@@ -1875,7 +1893,7 @@ public final class McpToolSurface {
       if (ctrl == null) return resourceError(uri, "Knowledge server not available");
       var status = ctrl.getAdapter().status(engineContext);
       var sb = new StringBuilder();
-      sb.append("documents: ").append(status.docCount()).append("\n");
+      sb.append("documents: ").append(documentsValue(status)).append("\n");
       sb.append("ready: ").append(status.ready()).append("\n");
       sb.append("healthy: ").append(status.healthy()).append("\n");
       sb.append("state: ").append(status.state()).append("\n");

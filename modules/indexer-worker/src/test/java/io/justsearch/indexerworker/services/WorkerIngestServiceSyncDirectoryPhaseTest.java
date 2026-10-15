@@ -63,7 +63,7 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest extends io.justsearch.adap
     Path orphanPath = root.resolve("orphan-missing.txt");
     indexDocument(orphanPath, "orphan-doc");
 
-    WorkerIngestService service = newService(new StubWorkerSignalBus());
+    WorkerIngestService service = newService(new StubWorkerSignalBus(), root);
     SyncDirectoryResponse response =
         service.syncDirectory(
             SyncDirectoryRequest.newBuilder()
@@ -86,7 +86,7 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest extends io.justsearch.adap
       Files.writeString(root.resolve("force-" + i + ".txt"), "x");
     }
 
-    WorkerIngestService service = newService(new StubWorkerSignalBus());
+    WorkerIngestService service = newService(new StubWorkerSignalBus(), root);
     SyncDirectoryResponse response =
         service.syncDirectory(
             SyncDirectoryRequest.newBuilder()
@@ -105,7 +105,7 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest extends io.justsearch.adap
   void syncDirectoryReturnsErrorForNonExistentRoot() throws Exception {
     Path missingRoot = tempDir.resolve("sync-root-missing");
 
-    WorkerIngestService service = newService(new StubWorkerSignalBus());
+    WorkerIngestService service = newService(new StubWorkerSignalBus(), null);
     SyncDirectoryResponse response =
         service.syncDirectory(
             SyncDirectoryRequest.newBuilder()
@@ -133,11 +133,15 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest extends io.justsearch.adap
     lifecycle.commitOps().maybeRefreshBlocking();
   }
 
-  private WorkerIngestService newService(WorkerSignalBus bus) throws Exception {
+  /** A service over a fresh index base; {@code addedRoot}, when given, was added by the person. */
+  private WorkerIngestService newService(WorkerSignalBus bus, Path addedRoot) throws Exception {
     Path indexBasePath = tempDir.resolve("indexBase-" + System.nanoTime());
     Path indexPath = tempDir.resolve("index-" + System.nanoTime());
     Files.createDirectories(indexBasePath);
     Files.createDirectories(indexPath);
+    if (addedRoot != null) {
+      addedByThePerson(indexBasePath, addedRoot);
+    }
     return new WorkerIngestService(
         jobQueue, stubIndexingLoop(), bus, IndexingPacing.unthrottled(), indexBasePath, indexPath,
         lifecycle, lifecycle, null, 0L);
@@ -173,5 +177,22 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest extends io.justsearch.adap
 
     @Override
     public void close() {}
+  }
+
+  /**
+   * The person's add of {@code root}: its watch request with the add marker, which records the
+   * root's volume under {@code indexBasePath}. Task t-20261013-ef3c41, round 8 (refined decision
+   * 2): only the add records a root's volume, and every other path refuses a root with none
+   * recorded.
+   */
+  private static void addedByThePerson(Path indexBasePath, Path root) {
+    var adding = new WorkerIngestService(null, null, null,
+        IndexingPacing.unthrottled(), indexBasePath, null,
+        null, null, null, 0L);
+    var added = adding.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(),
+        CallContext.none());
+    assertTrue(added.getWatching(),
+        "precondition: the person adds " + root + ": " + added.getErrorMessage());
   }
 }

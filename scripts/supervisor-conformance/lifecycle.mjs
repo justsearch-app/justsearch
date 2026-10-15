@@ -34,7 +34,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
       fs.writeFileSync(path.join(dir,'stop-request.json'),JSON.stringify({requestId:crypto.randomUUID(),reason,actor:'supervisor-conformance'}));
     }
   }
-  const waitState=(run,predicate)=>watchSupervisor({statePath:run.statePath,predicate,io,seen:run.seen,timeoutMs:25000});
+  const waitState=(run,predicate)=>watchSupervisor({statePath:run.statePath,predicate,io,seen:run.seen,timeoutMs:25000,faultGatePath:run.faultGatePath});
   try {
     if(testCase.expect?.killSupervisor) {
       const first=await start();const state=await waitState(first,s=>s.state==='running');assert(state,'first Engine reaches running');

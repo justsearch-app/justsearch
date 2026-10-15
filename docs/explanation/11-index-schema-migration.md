@@ -144,7 +144,7 @@ it against an index that was physically still perfectly compatible (tempdoc 804)
   - `indexSchemaFpStored`, `indexSchemaFpCurrent`
   - `indexSchemaCompatState`
   - `reindexRequired` + `reindexRequiredReason` (stable reason codes: `schema_mismatch`,
-    `rebuild_brake_exhausted`)
+    `rebuild_brake_exhausted`, `rebuild_brake_unreadable`, `rebuild_brake_state_lost`)
 - **Consumers:** none on the query path. `IndexStatusOps.safeSchemaCompatState()` computes the state
   for status reporting only; no planner, executor, or retrieval-leg decision reads it. The dense leg
   is gated by the *embedding* fingerprint below (`EmbeddingCompatibilityController.allowQueryEmbeddings()`,
@@ -280,6 +280,22 @@ Search therefore keeps serving everything already indexed, ingestion stops, and 
 says so explicitly: `schemaCompatState = BLOCKED_REBUILD_BRAKE` →
 `reindexRequiredReason = rebuild_brake_exhausted` → the `index.rebuild_brake_exhausted` readiness
 reason code, worded and given a rebuild remedy on the frontend.
+
+The brake holds the same way when its answer cannot be read (task t-20261013-ef3c41): a brake record
+without a readable count, a state record that cannot be read, a target fingerprint that cannot be
+computed, or a state record that had to be re-established because neither `state.json` nor its
+backup could be read (recorded as `auto_rebuild_key = "<state-lost>"` until a completed cutover).
+Those report `reindexRequiredReason = rebuild_brake_unreadable` (or `rebuild_brake_state_lost` for
+the re-established record), shown as `index.rebuild_brake_unreadable`. Every automatic rebuild asks
+the brake before it starts: the schema-mismatch migration, the embedding-model-change re-embed, the
+rebuild from source of an index recovered to empty, and the backup-first rebuild. A boot that held a
+rebuild back reports it for the rest of that boot, because ingestion stays stopped in that boot. A
+person's rebuild in such a boot still finishes on its own: the held boot has no write runtime to open
+the new generation in, so the Worker asks the Engine for a restart, and the next boot builds the
+person's generation with ingestion running, so new and changed files are indexed again without any
+further action (`HeldBootPersonsRebuildTest`).
+A `state.json` that is present but does not parse still stops the boot earlier, in ownership
+reconciliation, so the Worker does not start at all in that case.
 
 **Recovery is a user-initiated rebuild.** `core.rebuild-index` (`RebuildIndexHandler` →
 `startMigration(user_requested_rebuild)`) allocates a Green generation beside the read-only Blue, and
@@ -627,6 +643,161 @@ For `N >= 0`, the Engine blocks native cutover and marks the migration `FAILED` 
 ### Deadlines
 
 To avoid hanging forever in `SWITCHING`, the Worker enforces a maximum switching duration and transitions to `FAILED` if it cannot drain in time (no pointer swap).
+
+## Removing documents whose source is gone
+
+Task t-20261013-ef3c41. A document is removed because its file is gone only when the file is
+**confirmed absent**: reported not found while the root that holds it is present, can be listed,
+and is the same folder on the same volume it was. Admission, the pre-publish freshness check, the
+post-extraction re-hash, the writer's pre-write check and the watcher's delete confirmation all ask
+one shared root check for that (`SourcePresence.RootCheck`, implemented by `RootWitness`, cached
+for about a second per root rather than asked per file), the same question the prune asks through
+`RootPresenceGuard`. A volume is recorded in `root-volumes.properties` under the index base only
+by a deliberate add, which is a request carrying the add marker (`root_added`): the person's add
+of a root (the Head's watch and walk requests), or an explicit ingest request of a folder or of
+files, a person's or an agent's (the Engine's `core.ingest` walk accepted in this process, and
+`SubmitBatch`). An explicit folder ingest records the folder's volume like an add; an explicit file
+ingest records the volume of the file's folder under that folder's own keys, which never answer for
+a root, unless a declared root covers the folder. No walk ever records a volume. An explicit ingest
+resumed after a restart is no fresh add: it carries no marker and records nothing. Every other path
+(admission, recovery, the periodic sync and its volume check, a re-walk or reindex, the watcher,
+the boot reconcile, the deferred-root check, the prune) treats a folder with no volume recorded at
+or above it as unproven: it records nothing, adds and removes nothing, and a root reads
+unavailable. That includes a walk the restarted Worker receives before the Head has registered its
+roots again, when it cannot tell which root the folder belongs to: the walk is deferred, deletes
+nothing, and proceeds once the roots are registered and the folder's root is on its recorded
+volume. A root whose volume differs from the recorded one, or cannot be read, answers "cannot tell"
+in the same way and nothing beneath it is removed. Any other "cannot tell" (locked, access denied,
+a folder that cannot be listed) keeps the document and retries with growing back-off and no time
+limit. A folder outside every declared root with no record (a removed root whose queued work
+outlived it, say) admits and prunes nothing beneath it.
+
+An upgrade from a version that kept no volume record confirms each declared root once, on
+evidence, at the first boot that finds neither `root-volumes.properties` nor its pending file
+`root-volumes-pending.properties`. The boot writes the declared roots to the pending file first,
+then an empty record, so an interrupted upgrade resumes rather than starting again. For a root
+with indexed documents, up to 50 of its indexed files are compared with the drive at its path: its
+volume is recorded only if at least half of them are there with their indexed size and
+modification time. A root with nothing indexed is recorded like an add. A root whose evidence
+fails, or whose volume cannot be read, records nothing: it reads unavailable with the reason
+`drive not confirmed after upgrade`, nothing under it is deleted and its text stays searchable.
+The periodic cycle retries the same rule for each root still pending, so a returning drive is
+adopted without any action. A drive that never matches stays unavailable; removing the root and
+adding it again records the drive at its path then. Once a root is confirmed or removed, it no
+longer awaits the upgrade, and the rule above applies.
+
+A configured collection (`index.collections` in the configuration) and the bundled help folder are
+the person's configuration, not roots the person added, so no add records their volume. Their files
+are indexed only when a migration builds a new generation; nothing else walks or prunes them. Each
+boot, and each migration before it enumerates them, seeds a configured root that has no volume
+recorded at or above it once, by the same evidence rule as an upgraded root (a root with nothing
+indexed is recorded on the drive at its path). A configured root whose drive is not confirmed
+records nothing and reads unavailable with the reason `drive not confirmed after upgrade`. A
+migration builds the new generation only from roots on their recorded volume: a root refused for
+any reason fails the migration's enumeration, so the cutover keeps the active generation and
+nothing indexed under that root is lost; a later migration retries.
+
+The same root check guards every path that adds or updates documents, so another volume at a
+root's drive letter never puts its files in the place of the original's. Admission of a present
+file asks it (`RootCheck.admits`): while the root is another volume or cannot be read, the file is
+not read, and its queue item is retried with the root-level back-off (`ROOT_UNAVAILABLE`), never
+marked done; the original's documents stay searchable with their original text. The scan walk, a
+re-walk or reindex, and the sync (the periodic one included) refuse such a root before they look
+at any file: they add, update and remove nothing. No watcher is registered on such a root either,
+by the watch request or by the boot-root reconcile a migration cutover runs, so creates, changes
+and renames on the other volume are never seen; the watch is held and registered as soon as a walk
+or sync finds the recorded volume back, without a restart. A watcher
+already registered on the original drops events while the folder at the root's path is not the one
+it registered, as before.
+
+A refused walk or sync makes the root read unavailable at once: the Head records
+`ROOT_NOT_DIRECTORY` as the root's walk error (the root-level unavailable state of
+`/api/indexing-roots/substrate`, which also skips the root's file count), from the boot walk, the
+reindex button's recorded walk (`core.reindex`), a re-walk, or any sync, the periodic one included.
+The root's last-indexed time is kept, across a restart too. The periodic sync still walks one
+round-robin root per cycle (60 s), but each cycle it also asks every other root's volume (one
+volume identity read per root, no walk) and marks each refused root unavailable in that cycle, and
+it syncs the roots that read unavailable again. The first sync or reindex walk the Worker accepts,
+because the recorded volume is back, clears that state: the root reads indexed again, its held
+watch is registered, and the sync reconciles it as usual, pruning what was genuinely deleted.
+
+Removing the root keeps nothing of it: its record and held watch are dropped, a reconcile the
+Worker's watcher asked for before the removal and has not run yet (an event overflow or burst) is
+dropped, the periodic cycle that listed the root before the removal does not ask its volume, and
+the Head forgets the root's last availability answer. The Worker drops the record when the root
+is unwatched, which is the removal; deleting documents by path under a root that stays declared
+keeps its record. A folder added again at the same path starts afresh. A profiling reset that
+clears the roots removes each one the same way; the index reset on its own keeps the roots and
+their records.
+
+A boot that still has the previous index generation (a stop or crash between a migration's cutover
+and the old generation's removal) reconciles every declared root against the new generation before
+it serves. A root on another volume at that boot is deferred, never a start-up failure: its watch
+is held, it is left out of the boot's convergence check, so start-up completes and every other root
+is reconciled and served, and it reads unavailable as above. Nothing under it is pruned, and the
+previous generation is kept, its removal unfinished, until the root has been reconciled on its
+recorded volume. The server checks a deferred root's volume every 10 s (one volume identity read);
+once the volume is back, without a restart, it reconciles the root, registering its watch, and
+once the index matches the root's disk it commits that and lets the previous generation's removal
+complete. That check never records a volume: a deferred root is reconciled only once it is on the
+volume recorded for it. A deferred root the person removes is dropped from the check before
+anything else and is never reconciled, watched or indexed; its removal counts as resolved, so the
+previous generation's removal completes once every other deferred root is reconciled or removed
+too, and the check stops when none is left. A restart before then defers the root again. Any other
+boot-root failure, a missing root for example, still fails the boot.
+
+A prune keeps each document whose presence it cannot tell and goes on judging the rest, so one
+unreadable subfolder does not stop the genuine deletions beside it; a "not found" beneath a folder
+it could not list counts as "cannot tell". It re-checks the root at the first undecidable document
+of a batch and immediately before applying each batch's deletions (a batch with nothing to delete
+and nothing undecidable does not ask, and a run whose last batch did not ask asks once at the end);
+if the root has become unreadable, unavailable or another volume, it stops and removes nothing more.
+A run that kept
+documents or stopped reports itself incomplete, with the count of kept documents
+(`prune_incomplete`). A watcher DELETE is held for a 3 s settle window before it is classified, so a
+save-by-rename does not drop the file from search.
+
+Accepted limits:
+
+- A buffered `PRUNE_PREFIX` replayed after a legacy single-runtime switch checks that the prefix
+  folder is present and listable, but not that it is the same folder or volume.
+- The volume check compares the Windows volume serial number only, so two volumes that share a
+  serial (a cloned disk, for example) count as the same volume.
+- The person's add records whatever volume is at the root's path at that moment. A root added
+  while its drive letter held another volume has that volume recorded, and the original is then
+  the one refused, until the root is removed and added again.
+- The upgrade evidence compares size and modification time only. A different drive holding at
+  least half of the sampled files with the same size and time would be adopted; a drive whose
+  files were mostly changed or touched since they were indexed is not, and stays unavailable
+  until it is removed and added again.
+- On a platform that exposes no volume identity (anything but Windows), no volume is ever
+  recorded or compared: an add, an explicit ingest and the upgrade record nothing, and no root is
+  refused for its volume. Deletion there still requires the file to be reported not found under a
+  root that is present and can be listed, so nothing is pruned on uncertainty, but another volume
+  mounted at the same path is not told apart from the original. This path cannot be exercised on
+  Windows, where the checks run.
+- A migration cutover that is replaying a buffered `SYNC_ROOT` waits, holding the runtime lock, for
+  every queued file to settle, files awaiting a retry included, up to the 30-minute `SWITCHING`
+  budget. While a file waits for a retry then (a locked file, say), closing the index cannot take
+  the lock within its 5 s and fails, so the Engine keeps the index owner for a later attempt. The
+  cutover itself stays resumable and deletes nothing. This predates the task: main has the same
+  wait and the same close, and keeps such a file retrying for up to seven days; the task only adds
+  more files that wait for a retry (unreadable sources and refused roots, which never run out).
+- Each root answer is cached for about a second (`RootWitness.VOUCH_TTL_MS`), so a swap within
+  that second can still be answered from the previous look: a file admitted, or a deletion
+  confirmed, in that window was judged against the volume that was there a moment before.
+- Watching and the unavailable state resume through the next accepted walk or sync, so a returned
+  volume is noticed within one periodic-sync interval (60 s), or at once by a reindex. A swap is
+  noticed within one interval as well, unless a walk or sync of the root refuses it sooner.
+- While a root deferred at boot stays on another volume, the previous generation keeps its disk
+  space, however long that takes, and the root's documents are served as the new generation was
+  built.
+- Re-queuing a file (a new scan or watch event) resets its retry back-off to the first step.
+- OneDrive (and other cloud) placeholder files are not treated specially; a placeholder that cannot
+  be read is handled like any other unreadable file.
+- The Lucene adapter's own recovery of a corrupt index (backing it up and opening a fresh empty
+  one while the index opens) does not reach the repeat-rebuild brake; only the rebuild from source
+  that the Worker starts afterwards asks it.
 
 ## Operator surface (Head REST → index-half port call)
 

@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-14T18:39:10.546Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "39cd52178f8df79e78523ea60701a2ea74045d9c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aPresentRootVouchesUntilItIsRenamedAway\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aRootMissingAtCaptureNeverVouches\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aDifferentFolderMappedAtTheSameLetterDoesNotVouch\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.anUnreadableVolumeRecordVouchesForNothing\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aRecordedVolumeIsForgottenWhenTheRootIsRemoved\" --tests \"io.justsearch.indexerworker.loop.IndexedSourceUnreadableTest.aLockedSourceWithIndexedContentIsReportedAsIndexedSourceUnreadable\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4596
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-37904-1792003147598.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2946
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aPresentRootVouchesUntilItIsRenamedAway",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPresentRootVouchesUntilItIsRenamedAway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRootMissingAtCaptureNeverVouches",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootMissingAtCaptureNeverVouches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aDifferentFolderMappedAtTheSameLetterDoesNotVouch",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDifferentFolderMappedAtTheSameLetterDoesNotVouch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#anUnreadableVolumeRecordVouchesForNothing",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnreadableVolumeRecordVouchesForNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRecordedVolumeIsForgottenWhenTheRootIsRemoved",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d11d91007236f281ab31854a938cdc9fa3b150a073295c58c2311ffd46d57c5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRecordedVolumeIsForgottenWhenTheRootIsRemoved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexedSourceUnreadableTest.java#aLockedSourceWithIndexedContentIsReportedAsIndexedSourceUnreadable",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexedSourceUnreadableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:afe79add57927023f7520b4a6772c44c22934827b49e1bd83fdd6290518ef37f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLockedSourceWithIndexedContentIsReportedAsIndexedSourceUnreadable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#an indexed file whose source cannot be read reads as \"indexed, source unreadable\", not missing (t-20261013-ef3c41 S7)",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:40a6c9c4012e5fab7f5a8e1ebee774558d1db6aa1a3ed94d752edb12f7e4de56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedJobsDrawer an indexed file whose source cannot be read reads as \"indexed, source unreadable\", not missing (t-20261013-ef3c41 S7)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:93d694a1ad1c6f641fa618c8b274e6b2ba3104f7c15bed02f7c473163bb59aa7"
+}

@@ -1,0 +1,169 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-14T18:43:50.894Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "c75abee5630b55065ecf54f3ef3846f19b6e7d71",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aGenuinelyDeletedFileIsStillPrunedInOneRun\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2808
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckStillRetiresAGenuinelyDeletedSource\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3488
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.theSameVolumeAfterARestartStillPrunesAGenuineDelete\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5872
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aGenuinelyDeletedFileIsStillPrunedInOneRun",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15e2870a6e1a2e79c45d3c2e1de58d71c8f0833fba4d718fdefc494c6ba657b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGenuinelyDeletedFileIsStillPrunedInOneRun()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionStillRetiresAGenuinelyDeletedSource",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13f3a4c25451b1eb915b7b80a66d122a6879e5eb296b031246d131bb89364393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admissionStillRetiresAGenuinelyDeletedSource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckStillRetiresAGenuinelyDeletedSource",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13f3a4c25451b1eb915b7b80a66d122a6879e5eb296b031246d131bb89364393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theFreshnessCheckStillRetiresAGenuinelyDeletedSource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#theSameVolumeAfterARestartStillPrunesAGenuineDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a3a9d5097143506e608f4b66255ae5b388d95806c68c3085bc35cae4c9612075",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theSameVolumeAfterARestartStillPrunesAGenuineDelete()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a3a9d5097143506e608f4b66255ae5b388d95806c68c3085bc35cae4c9612075",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "cf3f14655",
+    "revision": "cf3f146558a0ea91669d77c21a7a99a8a3926c79",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aGenuinelyDeletedFileIsStillPrunedInOneRun\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5160
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckStillRetiresAGenuinelyDeletedSource\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 8345
+      },
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.theSameVolumeAfterARestartStillPrunesAGenuineDelete\" --tests \"io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest.aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 15698
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aGenuinelyDeletedFileIsStillPrunedInOneRun",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionStillRetiresAGenuinelyDeletedSource",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckStillRetiresAGenuinelyDeletedSource",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#theSameVolumeAfterARestartStillPrunesAGenuineDelete",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneMissingDifferentVolumeTest.java#aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:089c2bacf60b9f88f9f01c0d0a0b5a0626204b5cb1824c4e3f635dbbb16235af"
+}

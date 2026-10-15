@@ -80,7 +80,7 @@ import {
 import { setAiActivity, subscribeAiState, getAiState, type AiState } from '../state/aiStateStore.js';
 import { reportLayoutWidth, subscribeWide } from '../state/responsiveState.js';
 import { copyToClipboard } from '../utils/clipboardCopy.js';
-import { orElse, whenKnown } from '../state/known.js';
+import { whenKnown } from '../state/known.js';
 import {
   readinessNotice,
   reasonFor,
@@ -1330,13 +1330,15 @@ export class UnifiedChatView extends JfElement {
    * enumerate. An older backend omits `searchableDocumentCount` (UNKNOWN) → fall back to the
    * whole-index count; a KNOWN `0` is a real value and stays 0.
    */
-  private get docCount(): number {
+  private get docCount(): number | null {
     const index = this.aiState?.index;
     if (!index) return 0;
+    // Task t-20261013-ef3c41: when neither count is known (the backend could not count the index),
+    // there is no number to show — `null`, rendered without one, never "Searching 0 documents".
     return whenKnown(
       index.searchableDocumentCount,
       (n) => n,
-      () => orElse(index.documentCount, 0),
+      () => whenKnown(index.documentCount, (n): number | null => n, () => null),
     );
   }
 
@@ -2411,7 +2413,10 @@ export class UnifiedChatView extends JfElement {
 
   private renderAffordancePreview(): TemplateResult | typeof nothing {
     if (this.affordance === 'documents') {
-      return html`<div class="affordance-preview">Searching ${this.docCount} documents</div>`;
+      const docCount = this.docCount;
+      return docCount === null
+        ? html`<div class="affordance-preview">Searching your documents</div>`
+        : html`<div class="affordance-preview">Searching ${docCount} documents</div>`;
     }
     if (this.affordance === 'extract') {
       try {

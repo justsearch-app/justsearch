@@ -1,0 +1,125 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-13T18:50:21.221Z",
+  "revision": "6b15a81532e2a1e88070724d8db79e22936d860d",
+  "tree": "5aad9c935a69e37395135823747b2ea9ee18c276",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aLockedSourceIsStillRetriedPastTheSevenDayWindow\" --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aFileReplacedByADirectoryLeavesTheIndex\" --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aFileReplacedByADanglingJunctionLeavesTheIndex\" --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aLockedSourceIsNotRequeuedWithinSeconds\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5146
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aLockedSourceIsStillRetriedPastTheSevenDayWindow",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84d5b97d009d12a825f3bdb39e6af4e19dfa1f237211349f9d1ab416c8490cda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLockedSourceIsStillRetriedPastTheSevenDayWindow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aFileReplacedByADirectoryLeavesTheIndex",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84d5b97d009d12a825f3bdb39e6af4e19dfa1f237211349f9d1ab416c8490cda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFileReplacedByADirectoryLeavesTheIndex()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aFileReplacedByADanglingJunctionLeavesTheIndex",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84d5b97d009d12a825f3bdb39e6af4e19dfa1f237211349f9d1ab416c8490cda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFileReplacedByADanglingJunctionLeavesTheIndex()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aLockedSourceIsNotRequeuedWithinSeconds",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84d5b97d009d12a825f3bdb39e6af4e19dfa1f237211349f9d1ab416c8490cda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLockedSourceIsNotRequeuedWithinSeconds()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6b15a8153",
+    "revision": "6b15a81532e2a1e88070724d8db79e22936d860d",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aLockedSourceIsStillRetriedPastTheSevenDayWindow\" --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aFileReplacedByADirectoryLeavesTheIndex\" --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aFileReplacedByADanglingJunctionLeavesTheIndex\" --tests \"io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest.aLockedSourceIsNotRequeuedWithinSeconds\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 14239
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aLockedSourceIsStillRetriedPastTheSevenDayWindow",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aFileReplacedByADirectoryLeavesTheIndex",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aFileReplacedByADanglingJunctionLeavesTheIndex",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aLockedSourceIsNotRequeuedWithinSeconds",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:b0cc333ea7ab7f0e6373c7e34452245e7270f3d85e055c20bce3bed4f4871f77"
+}

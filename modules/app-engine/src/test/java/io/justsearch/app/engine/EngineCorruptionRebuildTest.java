@@ -87,6 +87,7 @@ final class EngineCorruptionRebuildTest {
     // 1) Baseline: index the file and confirm it is searchable.
     engine = EngineTestHarness.start(dataDir, dataDir.resolve("index"), RECOVERY_POSTURE);
     Path indexBase = engine.indexBase();
+    engine.addRootAsThePerson(docsDir);
     assertTrue(
         engine.client().submitBatch(List.of(file), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
         "the file must be accepted for indexing");

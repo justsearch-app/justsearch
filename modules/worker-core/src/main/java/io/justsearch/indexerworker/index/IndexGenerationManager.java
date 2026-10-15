@@ -317,19 +317,58 @@ public final class IndexGenerationManager {
       if (state != null) {
         return resolveFromState(state);
       }
+      // Task t-20261013-ef3c41, round 3: neither state.json nor its backup can be read, yet one of
+      // them exists. Whatever brake it held is gone, so whether a rebuild budget was spent cannot be
+      // told. The layout below is re-established as before (a compatible index boots and serves),
+      // but the new record says the brake was lost, so no automatic rebuild starts on its account.
+      boolean stateLost = stateRecordPossiblyPresent();
 
       // No state.json: decide between legacy import, adoption, or new generation.
+      IndexLayout layout;
       if (looksLikeLegacyIndexInBasePath(basePath)) {
-        return importLegacyIndex();
+        layout = importLegacyIndex();
+      } else {
+        IndexLayout adopted = tryAdoptSingleExistingGeneration();
+        layout = adopted != null ? adopted : createFreshGeneration("new");
       }
-
-      IndexLayout adopted = tryAdoptSingleExistingGeneration();
-      if (adopted != null) {
-        return adopted;
-      }
-
-      return createFreshGeneration("new");
+      return stateLost ? recordBrakeStateLost(layout) : layout;
     }
+  }
+
+  /**
+   * Re-writes a just-re-established layout's state with the {@link #AUTO_REBUILD_STATE_LOST_KEY}
+   * brake record. Kept until a completed cutover releases the brake, as any other brake record is.
+   */
+  private IndexLayout recordBrakeStateLost(IndexLayout layout) throws IOException {
+    State base = layout.state();
+    long now = System.currentTimeMillis();
+    State lost =
+        new State(
+            STATE_FORMAT_VERSION,
+            base.active_generation(),
+            base.building_generation(),
+            base.previous_generation(),
+            base.migration_state(),
+            base.migration_paused(),
+            base.pause_reason(),
+            base.paused_at_ms(),
+            now,
+            AUTO_REBUILD_STATE_LOST_KEY,
+            null,
+            now);
+    writeState(lost);
+    log.warn(
+        "Neither {} nor its backup could be read; the generation layout was re-established, and"
+            + " the automatic-rebuild brake is recorded as lost: no automatic rebuild will start"
+            + " until a person's rebuild completes (index.rebuild_brake_unreadable).",
+        statePath);
+    return new IndexLayout(
+        layout.basePath(),
+        layout.indicesDir(),
+        layout.statePath(),
+        lost,
+        layout.activeGenerationId(),
+        layout.activeGenerationPath());
   }
 
   /** One application-owned boot observation, projected before any generation repair or allocation. */
@@ -1285,6 +1324,14 @@ public final class IndexGenerationManager {
   public static final int MAX_AUTO_REBUILD_ATTEMPTS = 3;
 
   /**
+   * The brake key recorded when the state was re-established because neither {@code state.json}
+   * nor its backup could be read (task t-20261013-ef3c41, round 3). It names no target shape: it
+   * says the brake that was there is unknown, so it holds for every target until a completed
+   * cutover releases it. Never a valid {@code index_fingerprint}, so it cannot collide with one.
+   */
+  public static final String AUTO_REBUILD_STATE_LOST_KEY = "<state-lost>";
+
+  /**
    * Records an attempt to auto-start a rebuild targeting {@code targetKey} and returns the attempt
    * number, 1-based. The count resets whenever {@code targetKey} differs from the last recorded
    * one, so a new upgrade is never refused because an older one exhausted the budget.
@@ -1299,14 +1346,28 @@ public final class IndexGenerationManager {
     try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
+        // Task t-20261013-ef3c41: a state record that exists but cannot be read holds a brake this
+        // call cannot see. Re-initializing used to adopt the generation into a FRESH record — no
+        // attempts — so an unreadable brake read as "no brake" and a rebuild started.
+        if (stateRecordPossiblyPresent()) {
+          throw new AutoRebuildBrakeUnreadableException(
+              statePath, AutoRebuildBrake.STATE_UNREADABLE);
+        }
         initializeOrLoad();
         current = readStateBestEffort();
         if (current == null) {
-          return 1;
+          throw new AutoRebuildBrakeUnreadableException(
+              statePath, AutoRebuildBrake.STATE_UNREADABLE);
         }
       }
       State normalized = normalizeAndUpgradeStateIfNeeded(current);
       String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
+      if (AUTO_REBUILD_STATE_LOST_KEY.equals(normalized.auto_rebuild_key())) {
+        throw new AutoRebuildBrakeUnreadableException(statePath, AutoRebuildBrake.STATE_LOST);
+      }
+      if (brakeRecordMalformed(normalized, key)) {
+        throw new AutoRebuildBrakeUnreadableException(statePath, AutoRebuildBrake.UNREADABLE);
+      }
       boolean sameTarget = key.equals(normalized.auto_rebuild_key());
       int nextCount =
           sameTarget && normalized.auto_rebuild_count() != null
@@ -1347,6 +1408,132 @@ public final class IndexGenerationManager {
     }
     String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
     return key.equals(current.auto_rebuild_key()) ? current.auto_rebuild_count() : 0;
+  }
+
+  /** What the repeat-rebuild brake says about automatic rebuilds toward one target shape. */
+  public enum AutoRebuildBrake {
+    /** Automatic rebuilds toward this target may start: the budget is not spent. */
+    RELEASED,
+    /** The budget for this target is spent: only a person's rebuild proceeds. */
+    EXHAUSTED,
+    /**
+     * The brake record names this target but its attempt count cannot be read (task
+     * t-20261013-ef3c41). Treated exactly like {@link #EXHAUSTED} — no automatic rebuild or index
+     * replacement starts — because a brake that cannot be read may be a spent one.
+     */
+    UNREADABLE,
+    /**
+     * The state record holding the brake exists but cannot be read at all, so neither the target
+     * nor the count is known (task t-20261013-ef3c41). Holds like {@link #UNREADABLE}; unlike it,
+     * it says nothing about whether a rebuild toward this target was ever called for.
+     */
+    STATE_UNREADABLE,
+    /**
+     * The state record was re-established after neither it nor its backup could be read, so the
+     * brake it held is lost (task t-20261013-ef3c41, round 3). Holds for every target until a
+     * completed cutover; like {@link #STATE_UNREADABLE}, it says nothing about whether a rebuild
+     * is called for.
+     */
+    STATE_LOST,
+    /**
+     * The rebuild's target shape cannot be computed, so there is no brake to consult for it (task
+     * t-20261013-ef3c41, round 3). Holds: an attempt toward an unknown target cannot be bounded.
+     */
+    TARGET_UNKNOWN;
+
+    /** Whether the brake answer could not be read — any such answer holds. */
+    public boolean unreadable() {
+      return this == UNREADABLE
+          || this == STATE_UNREADABLE
+          || this == STATE_LOST
+          || this == TARGET_UNKNOWN;
+    }
+
+    /** Whether this answer stops an automatic rebuild. */
+    public boolean holds() {
+      return this != RELEASED;
+    }
+  }
+
+  /**
+   * The brake's answer for {@code targetKey}, read-only. Unlike {@link #autoRebuildAttemptsFor},
+   * a state record that exists but cannot be read is {@link AutoRebuildBrake#STATE_UNREADABLE},
+   * not "no attempts recorded"; only a store that has never written a state record is released by
+   * absence.
+   */
+  public AutoRebuildBrake autoRebuildBrakeFor(String targetKey) {
+    State current = readStateBestEffort();
+    if (current == null) {
+      return stateRecordPossiblyPresent()
+          ? AutoRebuildBrake.STATE_UNREADABLE
+          : AutoRebuildBrake.RELEASED;
+    }
+    if (AUTO_REBUILD_STATE_LOST_KEY.equals(current.auto_rebuild_key())) {
+      return AutoRebuildBrake.STATE_LOST;
+    }
+    String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
+    if (brakeRecordMalformed(current, key)) {
+      return AutoRebuildBrake.UNREADABLE;
+    }
+    return key.equals(current.auto_rebuild_key())
+            && current.auto_rebuild_count() > MAX_AUTO_REBUILD_ATTEMPTS
+        ? AutoRebuildBrake.EXHAUSTED
+        : AutoRebuildBrake.RELEASED;
+  }
+
+  /**
+   * A brake record names this target but carries no usable attempt count: the attempts made
+   * toward it cannot be read, which is not the same as none having been made.
+   */
+  private static boolean brakeRecordMalformed(State state, String key) {
+    return key.equals(state.auto_rebuild_key())
+        && (state.auto_rebuild_count() == null || state.auto_rebuild_count() < 1);
+  }
+
+  /**
+   * Whether a state record (current or previous) may exist. {@code Files.notExists} is true only
+   * when absence is confirmed, so a record whose existence cannot be checked counts as present.
+   */
+  private boolean stateRecordPossiblyPresent() {
+    return !Files.notExists(statePath) || !Files.notExists(statePrevPath);
+  }
+
+  /**
+   * The brake record exists but could not be read, so no automatic rebuild may start (task
+   * t-20261013-ef3c41). An {@link IOException} so callers that do not distinguish it keep failing
+   * closed, as they did when the read itself threw.
+   */
+  public static final class AutoRebuildBrakeUnreadableException extends IOException {
+    private static final long serialVersionUID = 1L;
+
+    /** Which unreadable answer this is; never {@code RELEASED} or {@code EXHAUSTED}. */
+    private final AutoRebuildBrake kind;
+
+    public AutoRebuildBrakeUnreadableException(Path statePath) {
+      this(statePath, AutoRebuildBrake.STATE_UNREADABLE);
+    }
+
+    public AutoRebuildBrakeUnreadableException(Path statePath, AutoRebuildBrake kind) {
+      this(
+          kind == AutoRebuildBrake.STATE_LOST
+              ? "The automatic-rebuild brake was lost: neither " + statePath
+                  + " nor its backup could be read when the layout was re-established"
+              : "The automatic-rebuild brake in " + statePath + " cannot be read",
+          kind);
+    }
+
+    public AutoRebuildBrakeUnreadableException(String message, AutoRebuildBrake kind) {
+      super(message);
+      this.kind = Objects.requireNonNull(kind, "kind");
+      if (!kind.unreadable()) {
+        throw new IllegalArgumentException("Not an unreadable brake answer: " + kind);
+      }
+    }
+
+    /** The unreadable answer that stopped the rebuild. */
+    public AutoRebuildBrake kind() {
+      return kind;
+    }
   }
 
   /**

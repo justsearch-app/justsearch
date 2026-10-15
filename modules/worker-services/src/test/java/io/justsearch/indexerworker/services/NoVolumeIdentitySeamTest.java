@@ -1,0 +1,33 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.indexerworker.services;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * Task t-20261013-ef3c41, round 9: the no-volume-identity seam ({@link NoVolumeIdentityExtension})
+ * takes the volume identity away, so a folder answers as on a platform without one (Linux,
+ * macOS). In a run with the seam's property set, the extension has switched it on for the whole
+ * run.
+ */
+final class NoVolumeIdentitySeamTest {
+
+  @Test
+  void theSeamTakesTheVolumeIdentityAway(@TempDir Path folder) {
+    boolean wasOn = RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.get();
+    if (Boolean.getBoolean(NoVolumeIdentityExtension.PROPERTY)) {
+      assertTrue(wasOn, "a run with the seam's property has the seam on for the whole run");
+    }
+    try {
+      RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(true);
+      assertFalse(NoVolumeIdentityExtension.volumeIdentityAvailable(folder),
+          "with the seam on a folder has no volume identity");
+    } finally {
+      RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(wasOn);
+    }
+  }
+}

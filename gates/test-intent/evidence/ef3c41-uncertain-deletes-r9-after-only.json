@@ -1,0 +1,82 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-14T18:57:11.004Z",
+  "revision": "63c23619cb12a3fb5f65aa1b3f7daff33ab97f35",
+  "tree": "c4a12a6aec9e21792df52320287b4d07b2e42444",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.NoVolumeIdentityRootTest.withNoVolumeIdentityARootIsWalkedWatchedAndPrunedAsOnMainAndNeverReadsUnavailable\" --tests \"io.justsearch.indexerworker.services.NoVolumeIdentitySeamTest.theSeamTakesTheVolumeIdentityAway\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6227
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NoVolumeIdentitySeamTest.theSeamTakesTheVolumeIdentityAway\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2619
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityRootTest.java#withNoVolumeIdentityARootIsWalkedWatchedAndPrunedAsOnMainAndNeverReadsUnavailable",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityRootTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ad4a9b4250cc493ebc89abae14e2c0bf197651bda0d338e12db44ddeb1b8715b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withNoVolumeIdentityARootIsWalkedWatchedAndPrunedAsOnMainAndNeverReadsUnavailable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java#theSeamTakesTheVolumeIdentityAway",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:82e061f47168b75bbd31c1681071c65f5cd44f67e0273d4f0257477e69f2775c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theSeamTakesTheVolumeIdentityAway(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java#theSeamTakesTheVolumeIdentityAway",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:82e061f47168b75bbd31c1681071c65f5cd44f67e0273d4f0257477e69f2775c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theSeamTakesTheVolumeIdentityAway(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:efd4a00039bf889aac565746017bed4fcdef7f01df3064ebc7f985f1eeee7fbb"
+}

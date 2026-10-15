@@ -52,12 +52,20 @@ record FileFreshnessSnapshot(
         envelope.observedAtMs());
   }
 
+  /**
+   * Re-observes the source. Only a "not found" answer is {@link SourceValidationResult#DELETED};
+   * any other failure is {@link SourceValidationResult#UNREADABLE} (task t-20261013-ef3c41). Even
+   * {@code DELETED} is only a candidate: a deletion additionally needs {@link SourcePresence} to
+   * confirm the folder holding the source is present.
+   */
   SourceValidationResult validateNow() {
     try {
       FileFreshnessSnapshot current = capture(originalPath);
       return compare(current);
-    } catch (IOException e) {
+    } catch (java.nio.file.NoSuchFileException notFound) {
       return SourceValidationResult.DELETED;
+    } catch (IOException | SecurityException cannotTell) {
+      return SourceValidationResult.UNREADABLE;
     }
   }
 
@@ -73,7 +81,9 @@ record FileFreshnessSnapshot(
     CONTENT_CHANGED,
     MODIFIED_TIME_CHANGED,
     FILE_KEY_CHANGED,
-    SOURCE_KIND_CHANGED
+    SOURCE_KIND_CHANGED,
+    /** The source could not be observed (locked, access denied, I/O error): never a deletion. */
+    UNREADABLE
   }
 
   static String pathHash(String value) {

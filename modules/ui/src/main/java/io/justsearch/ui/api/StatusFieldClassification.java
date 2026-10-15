@@ -136,7 +136,7 @@ final class StatusFieldClassification {
         state("core", "failure", "migration", "compatibility", "queueDb", "enrichment", "gpu",
             "vectorFormat", "telemetry", "searchConfig", "visualExtraction", "buildStamp"));
     put(table, CoreIndexView.class,
-        state("indexHealthy", "indexState", "vduAvailable"),
+        state("indexHealthy", "indexState", "indexedDocumentsUnknown", "vduAvailable"),
         measurement("indexedDocuments", "pendingJobs", "indexSizeBytes", "pendingVduCount",
             "writerQueueDepth", "writerPendingDocs", "commitCount", "refreshLagMs",
             "recentJobQueueDepth", "recentDocsPerSec", "pendingBytes", "pendingUnknownSizeJobs",

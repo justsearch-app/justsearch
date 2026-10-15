@@ -76,6 +76,11 @@ final class EngineSwitchingFenceBufferingTest {
     writeWatchedRoots(dataDir, watchedRoot);
 
     engine = EngineTestHarness.start(dataDir);
+    engine.addRootAsThePerson(watchedRoot);
+    // The SYNC_ROOT below syncs a folder the person added before the migration started.
+    Path syncRoot = dataDir.resolve("switching-sync-root");
+    Files.createDirectories(syncRoot);
+    engine.addRootAsThePerson(syncRoot);
 
     assertTrue(
         engine.client().submitBatch(List.of(blueFile), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
@@ -130,8 +135,6 @@ final class EngineSwitchingFenceBufferingTest {
         "a delete during SWITCHING must be accepted (buffered), not refused");
 
     // SYNC_ROOT — a separate root so it does not re-enqueue or undo the delete above.
-    Path syncRoot = dataDir.resolve("switching-sync-root");
-    Files.createDirectories(syncRoot);
     String syncMarker = "SM" + UUID.randomUUID().toString().replace("-", "");
     Files.writeString(syncRoot.resolve("sync.txt"), "hello " + syncMarker);
     SyncDirectoryResponse syncResp = engine.client().syncDirectory(syncRoot.toString(), true, TestEngineContexts.FOREGROUND);

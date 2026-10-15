@@ -92,6 +92,10 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     IndexCountOps failing = mock(IndexCountOps.class);
     when(failing.docCount()).thenReturn(12L);
     when(failing.countByField(anyString(), anyString())).thenReturn(2);
+    // The real IndexCountOps answers the throwing and non-throwing count forms alike when its
+    // reader is healthy; the parent count is read through the throwing form (t-20261013-ef3c41).
+    when(failing.docCountOrThrow()).thenReturn(12L);
+    when(failing.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
     when(failing.countQueryOrThrow(any())).thenThrow(new IOException("reader unavailable"));
 
     CoreStatus core = buildStatus(failing, null).getCore();
@@ -109,6 +113,10 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     IndexCountOps healthy = mock(IndexCountOps.class);
     when(healthy.docCount()).thenReturn(12L);
     when(healthy.countByField(anyString(), anyString())).thenReturn(2);
+    // The real IndexCountOps answers the throwing and non-throwing count forms alike when its
+    // reader is healthy; the parent count is read through the throwing form (t-20261013-ef3c41).
+    when(healthy.docCountOrThrow()).thenReturn(12L);
+    when(healthy.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
     when(healthy.countQueryOrThrow(any())).thenReturn(7);
 
     CoreStatus core = buildStatus(healthy, null).getCore();

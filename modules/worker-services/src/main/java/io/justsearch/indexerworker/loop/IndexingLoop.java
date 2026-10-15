@@ -397,6 +397,17 @@ public class IndexingLoop implements Closeable {
     if (commitOps != null) {
       commitOps.setCommitCompletedListener(embeddingLifecycle::refreshStoredFingerprintAfterCommit);
     }
+    // Task t-20261013-ef3c41: lets an unreadable source be reported as "indexed, source
+    // unreadable". Read-only; never part of a deletion decision.
+    if (documentFieldOps != null) {
+      ingestionAuthority.useIndexedSourceProbe(
+          source ->
+              documentFieldOps.getDocumentField(
+                      io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
+                          source.toAbsolutePath().toString()),
+                      SchemaFields.PATH)
+                  != null);
+    }
     // Tempdoc 516 Slice 4a.2 (W5.1): construct the stale resolver + writer. The indexedDelta
     // callback feeds the cross-seam indexedSinceCommit counter on the loop residue.
     this.staleResolver =
@@ -1037,6 +1048,14 @@ public class IndexingLoop implements Closeable {
    * package-private (test-only) to public after the 4 lifecycle-delegate setters were
    * removed from IndexingLoop's surface.
    */
+  /**
+   * Task t-20261013-ef3c41, round 4: every deletion decision this loop makes (admission, freshness,
+   * re-hash, pre-write) asks {@code check} whether the source's root still vouches for absence.
+   */
+  public void useRootCheck(SourcePresence.RootCheck check) {
+    ingestionAuthority.useRootCheck(check);
+  }
+
   public EmbeddingProviderLifecycle getEmbeddingLifecycle() {
     return embeddingLifecycle;
   }

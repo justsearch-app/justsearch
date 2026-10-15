@@ -67,8 +67,12 @@ final class ContextReplanIngestTest {
       var progress = new ArrayList<io.justsearch.ipc.ScanRootProgress>();
       try (var view = server.captureServingView()) {
         var ingest = view.services().ingestService();
+        var request = io.justsearch.ipc.ScanRootRequest.newBuilder().setRootPath(root.toString());
+        // This approved explicit ingest is a deliberate add. Older before-states have no marker.
+        var rootAdded = request.getDescriptorForType().findFieldByName("root_added");
+        if (rootAdded != null) request.setField(rootAdded, true);
         var scan = new WorkerIngestService.RecordedRootScan(
-            io.justsearch.ipc.ScanRootRequest.newBuilder().setRootPath(root.toString()).build(),
+            request.build(),
             operation, walk.enumerationEpoch(), ingest.captureServingGeneration(CallContext.none()),
             false, java.util.List.of());
         assertDoesNotThrow(() -> ingest.scanRecordedRoot(scan, progress::add, CallContext.none()),

@@ -795,6 +795,8 @@ public class KnowledgeSearchController {
         .indexState("UNKNOWN")
         .statusStale(true)
         .statusStaleMs(snapshot != null ? System.currentTimeMillis() - snapshot.atMs() : 0L)
+        // Task t-20261013-ef3c41: nothing was counted, so the 0 in indexedDocuments is not a count.
+        .indexedDocumentsUnknown(true)
         .build();
   }
 
