@@ -20,6 +20,25 @@ retry-incarnation fallback receipts. Script checks are outside the canonical JVM
 Full native parser teardown and full dev-runner retry/fallback replay remain separate verification
 limits; no live stack or GPU workload is used here.
 
+Script tests under scripts/dev are outside the gate. The gate flags only product test scope
+(modules/ and watched baselines), and run-evidence has no runner for Node scripts. This changeset
+therefore has no entries for them. Two earlier Adaptation entries are dropped because they named
+`scripts/dev/test-dev-runner-stop-ownership.mjs` and `scripts/dev/test-dev-runner-ix-lifecycle.mjs`,
+which no diff can flag (stale-entry-item). Their adaptations are kept here:
+
+- `test-dev-runner-stop-ownership.mjs`: the repaired unknown-observation contract records UNKNOWN
+  and no code for an unobserved terminate/taskkill, and records attemptedEnding separately. Every
+  census-observed case, the forced flag, the observed exit time and the one-exit-per-incarnation
+  check are unchanged.
+- `test-dev-runner-ix-lifecycle.mjs`: the vm context of 'running record preserves the first-ready
+  retry incarnation' supplies the integration's initial exit-census names (actuator.current(),
+  initialCensusState, initialCensusIdentity). Inputs, observation and expected outcome are
+  unchanged.
+
+Both were run directly with node on the merged tree b6d536/final (da09d9f15, which carries b102's
+stop census). ix-lifecycle passed 10 of 10 and stop-ownership passed 16 of 16. This was
+candidate-only; no fail-before applies to an adaptation, and the runner cannot record Node tests.
+
 Owner delegation was checked against the owner's transcript, not agent-written review prose.
 Execution details and safety exclusions are in F:/agent-sandbox/design-b6d536/codex/b91-ix-lifecycle/report.md.
 Independent test-intent acceptance is pending; the builder does not accept its own work.
@@ -413,26 +432,6 @@ This is unchanged behavior, not a new health guarantee.
     },
     {
       "items": [
-        "scripts/dev/test-dev-runner-stop-ownership.mjs"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "The repaired unknown-observation contract records UNKNOWN and no code for unobserved terminate/taskkill, and records attemptedEnding separately. The orchestrator expressly directed this adaptation in round 2. Every census-observed case, forced flag, observed exit time and one-exit-per-incarnation check stays unchanged.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
-          "delegationScope": "Owner item 6 process ownership and exit accounting; round-2 orchestrator decisions under this delegation.",
-          "choice": "Adapt the existing stop-ownership oracle to UNKNOWN/null when no exit was observed, with the attempted ending recorded separately; retain all census-observed and uniqueness cases.",
-          "label": "agent choice"
-        }
-      ]
-    },
-    {
-      "items": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureProbe.java"
       ],
@@ -630,26 +629,6 @@ This is unchanged behavior, not a new health guarantee.
           "choice": "Recovery test doubles explicitly accept the commit handshake while keeping restart, shutdown, history and fail-closed expectations unchanged. Restore damaged UTF-8 comment characters in the existing device-loss test; its expectations stay unchanged."
         }
       ]
-    },
-    {
-      "class": "Adaptation",
-      "items": [
-        "scripts/dev/test-dev-runner-ix-lifecycle.mjs"
-      ],
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "The test still executes the production running-record construction with IO seams. After the merge that block also reads the integration's initial exit-census capture (actuator.current(), initialCensusState, initialCensusIdentity), so the vm context supplies those three names. Inputs, observation and expected outcome are unchanged: the record keeps retry incarnation 2, and the fallback recorder writes engine-intent then engine-exit for incarnation 2.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (archived at F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
-          "delegationScope": "Process ownership and exit accounting, task t-20261005-b6d536",
-          "label": "agent choice",
-          "choice": "Merge of b6d536/ix-lifecycle (624a05539) into b6d536/integration (851507135), decided by the orchestrator under the owner's delegation: keep both lanes' accepted behaviour. The running record keeps this lane's incarnation field and the integration's exit-census Engine identity, which is captured before the record and kept only while that incarnation is still current."
-        }
-      ]
     }
   ]
 }
@@ -658,7 +637,8 @@ This is unchanged behavior, not a new health guarantee.
 ## Merge adaptations (b6d536/ix-lifecycle 624a05539 into b6d536/integration 851507135)
 
 The adaptations are where this lane and the integration's vdu-auto and dev-tool work meet; each
-keeps both lanes' accepted behaviour. One test changed (instrumentation only, entry above):
+keeps both lanes' accepted behaviour. One test changed (instrumentation only, a script test outside
+the gate, described near the top):
 
 - ChatServerControllerImpl, the controller loop: this lane's device-loss restart handshake holds
   every step while a restart is pending (deviceLostRestartPending), and vdu-auto's VDU restore and
@@ -676,7 +656,8 @@ keeps both lanes' accepted behaviour. One test changed (instrumentation only, en
   schemaVersion, because the integration's process-races test reads that field from the production
   source up to schemaVersion; incarnation now follows schemaVersion.
 - scripts/dev/test-dev-runner-ix-lifecycle.mjs: the vm context of 'running record preserves the
-  first-ready retry incarnation' supplies the integration's census names (Adaptation entry above).
+  first-ready retry incarnation' supplies the integration's census names (see the script-test note
+  near the top).
 
 ## Acceptance records
 
