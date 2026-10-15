@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:48:06.709Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
+  "createdAt": "2026-10-15T11:26:47.709Z",
+  "revision": "3166f25067d1f13908cb7a34ca58435b6c934423",
+  "tree": "4a6320b3549c3ad0d38a3213e28ce01556a728b5",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ApiErrorHandlerResolveTest.wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay\" --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5920
+      "durationMs": 14458
     },
     {
-      "command": "npx vitest run \"src/api/admissionFetch.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-29560-1791996485487.json\"",
+      "command": "npx vitest run \"src/api/admissionFetch.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-17272-1792063584220.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1221
+      "durationMs": 2022
     }
   ],
   "checks": [
@@ -107,6 +107,52 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:0e6ca5e065156ada57dba07a09ad587ca2154e19cd90bbdb76368de53df00cce"
+  "failBefore": {
+    "ref": "f648453b5",
+    "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ApiErrorHandlerResolveTest.wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay\" --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13324
+      },
+      {
+        "command": "npx vitest run \"src/api/admissionFetch.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-17272-1792063602839.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1907
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java#wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java#downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/ui-web/src/api/admissionFetch.test.ts#ADMISSION_INFERENCE_BUSY refused before execution waits the named delay and retries",
+        "classification": "assertion",
+        "detail": "pre-execution admission waits ADMISSION_INFERENCE_BUSY refused before execution waits the named delay and retries:  AssertionError: expected \"vi.fn()\" to be called 2 times, but got 1 times\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-1/test-intent-before-Wa2Rgf/modules/ui-web/src/api/admissionFetch.test.ts:69:18\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb-1-ui/modules/ui-web/node_modul"
+      },
+      {
+        "id": "modules/ui-web/src/api/admissionFetch.test.ts#never replays ADMISSION_INFERENCE_BUSY raised mid-request",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:fd66ed7107e4ddf72b2888a781ecf8371655d3f5a3f751d9dc1ce705da738169"
 }

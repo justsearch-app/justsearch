@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:18:00.190Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "0eeec00fe8c8051e46fcfa43252c6e7c2eac3721",
+  "createdAt": "2026-10-15T11:25:23.050Z",
+  "revision": "3166f25067d1f13908cb7a34ca58435b6c934423",
+  "tree": "2d759aec5662cb0b1322a08e2554f2c6897e4ed1",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5511
+      "durationMs": 5308
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired\" --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.containedOrInapplicableNeverRefuses\" --tests \"io.justsearch.ui.runtime.RuntimeManifestContainmentTest.manifestCarriesTheBootContainmentFromTheFirstWrite\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4591
+      "durationMs": 3871
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall\" --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.containedOrInapplicableEnginePublishesNothing\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4515
+      "durationMs": 2781
     }
   ],
   "checks": [
@@ -128,6 +128,68 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:caea6472f525ea9a2136d2b5145050af0e616967db5d2316ed460f88fae42c0e"
+  "failBefore": {
+    "ref": "f75486245",
+    "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-containment-surface-compat.patch",
+        "contentDigest": "sha256:bc1e33480be53c8c00bb8e5458797dbbbca8e245c75c7509ee4c3a0d2456c89d"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 13956
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired\" --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.containedOrInapplicableNeverRefuses\" --tests \"io.justsearch.ui.runtime.RuntimeManifestContainmentTest.manifestCarriesTheBootContainmentFromTheFirstWrite\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6580
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall\" --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.containedOrInapplicableEnginePublishesNothing\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3872
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java#onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppContainmentPolicyTest.java#unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired",
+        "classification": "assertion",
+        "detail": "unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the supervisor harness must be contained ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppContainmentPolicyTest.java#containedOrInapplicableNeverRefuses",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestContainmentTest.java#manifestCarriesTheBootContainmentFromTheFirstWrite",
+        "classification": "assertion",
+        "detail": "manifestCarriesTheBootContainmentFromTheFirstWrite(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the first write on disk carries the containment block ==> expected: <ContainmentInfo[status=UNAVAILABLE, reason=not_installed]> but was: <null>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java#unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall",
+        "classification": "exception",
+        "detail": "the check failed with an exception or panic other than an assertion"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java#containedOrInapplicableEnginePublishesNothing",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:15fc4698b84b561f705fe14f2174e0cdd4246659ed9f05207a6606cf1b7ec202"
 }

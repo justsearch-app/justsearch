@@ -26,6 +26,26 @@ production code at f75486245 reads it. All three checks fail there by assertion.
 run leaves behind the 600-second ping helper of the containment check, which nothing contains there;
 the helper ends on its own.
 
+b6d536-containment-surface.json now has a before run on f75486245, the parent of 624dcfc92, which
+added these checks together with the API they call. It applies
+`gates/test-intent/evidence/b6d536-containment-surface-compat.patch`, whose add-only declarations
+and immediate returns are read by no production code at f75486245:
+
+- An EngineContainment interface whose current() is UNAVAILABLE with reason not_installed, because
+  that before-state installs no job.
+- LifecycleReasonCode.ENGINE_CONTAINMENT_UNAVAILABLE, with its declared STICKY class.
+- RuntimeManifest.ContainmentInfo, with a containment() accessor that returns null.
+- A HealthEventChangeRegistry(ExecutorService) constructor that delegates to the default one.
+- A no-op EngineContainmentNotice.publish.
+- HeadlessApp.containmentRefusesBoot, which returns false.
+
+Results on f75486245: unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired and
+manifestCarriesTheBootContainmentFromTheFirstWrite fail by assertion.
+unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall fails by exception: its own
+`find(...).orElseThrow()` finds no published condition. The negative properties pass there:
+onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne, containedOrInapplicableNeverRefuses
+and containedOrInapplicableEnginePublishesNothing.
+
 ```json
 {
   "entries": [
@@ -100,7 +120,7 @@ the helper ends on its own.
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec F step 1, the surfaces of the Engine job. onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: see the entry above (no fail-before claimed). unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired and containedOrInapplicableNeverRefuses: an Engine whose job could not be created refuses to boot (before the instance lock, exit FATAL_OR_UNCAUGHT) only under the conformance harness or JUSTSEARCH_REQUIRE_CONTAINMENT; contained, absent or inapplicable containment never refuses. manifestCarriesTheBootContainmentFromTheFirstWrite: the runtime manifest on disk and every head publish carry the boot containment status and reason, and the public projection keeps it. unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall and containedOrInapplicableEnginePublishesNothing: an unavailable Engine job is a sticky WARNING health condition EngineContainmentUnavailable whose detail names the failed call; a contained or inapplicable Engine publishes none.",
+      "behaviour": "Spec F step 1, the surfaces of the Engine job. onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: see the entry above. unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired and containedOrInapplicableNeverRefuses: an Engine whose job could not be created refuses to boot (before the instance lock, exit FATAL_OR_UNCAUGHT) only under the conformance harness or JUSTSEARCH_REQUIRE_CONTAINMENT; contained, absent or inapplicable containment never refuses. manifestCarriesTheBootContainmentFromTheFirstWrite: the runtime manifest on disk and every head publish carry the boot containment status and reason, and the public projection keeps it. unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall and containedOrInapplicableEnginePublishesNothing: an unavailable Engine job is a sticky WARNING health condition EngineContainmentUnavailable whose detail names the failed call; a contained or inapplicable Engine publishes none. Before run: f75486245 with b6d536-containment-surface-compat.patch; the boot refusal and manifest checks fail by assertion, the notice check fails by exception (no condition published), and the three negative properties pass.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
