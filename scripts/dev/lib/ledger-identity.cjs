@@ -212,17 +212,20 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
   // is about its childId.
   const keyOnly = engine ? line.creationFileTime == null
     : line.pid == null && line.creationFileTime == null && line.incarnation == null;
+  // An Engine record proves only from a writer bound to that start, whatever identity it names (round
+  // 11): the Engine itself (an Engine writer with the start's own PID, started the start's
+  // millisecond), the writer that recorded the start (its role, PID and start instant), or a stop's own
+  // writer bound in memory to the identity that stop checked (stopWriterBinding, through startWriters).
+  // An unbound writer's record, its incarnation alone or the Engine's whole PID and birth, is evidence
+  // to look the Engine up, never proof. Child records keep their own rules below.
+  if (engine && !(writerIsOwner(writer, S) || startWriters.some(w => sameWriter(writer, w)))) return false;
   if (keyOnly) {
     if (keyStarts !== 1 || contested || contradicts(R, S)) return false;
-    // An Engine's incarnation-only record proves only from a writer the ledger binds to that start: the
-    // Engine itself (an Engine writer with the start's own PID, started the start's millisecond), or
-    // the writer that recorded the start (its role, PID and start instant). A writer's role is never
+    // An Engine's incarnation-only record from a bound writer (checked above). A writer's role is never
     // evidence: another supervisor instance, or the same PID with another start instant, proves
     // nothing (round 10). No record binds any other writer to a start today (a dev CLI stop's own
     // intent is its own word), so its exit leaves the start to the identity lookup.
-    if (engine) {
-      return writerIsOwner(writer, S) || startWriters.some(w => sameWriter(writer, w));
-    }
+    if (engine) return true;
     if (line.owner != null || line.previousOwner != null) return ownerCarries(R.owner, S.owner) && S.owner !== null;
     return writerIsOwner(writer, S.owner);
   }

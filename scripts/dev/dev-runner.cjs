@@ -3998,10 +3998,34 @@ async function stopRun(opts, {
   const inProcess = runnerPid === process.pid;
   const gracefulShutdownMarkerPath = path.join(runDir, 'graceful-shutdown.json');
   let phaseRows = new Map();
+  // When the latest lookup was asked: a process its rows say nothing of may have been born after it.
+  let phaseAskedMs = null;
   const lookupPhase = async (entries) => {
     readLedgerEnded();
     const ids = [...new Set(entries.filter(p => p?.pid && !provenEnded(p)).map(p => p.pid))];
+    phaseAskedMs = Date.now();
     phaseRows = ids.length ? await Promise.resolve().then(() => lookupIdentities(ids)).catch(() => null) : new Map();
+  };
+  // What the first identity-checked lookup of this stop observed of the recorded identities it found
+  // ended, before the stop acted on anything (round 11): the recorded PID absent from a lookup that
+  // answered, or naming a process whose readable birth is not the recorded one. A lookup that failed,
+  // a row whose birth cannot be read, or a record without a birth adds nothing (S4 stays incomplete).
+  // The census judges each identity it accounts against these observations (lookupEndedIdentities).
+  const lookupEnded = [];
+  const noteLookupEnded = (entries, observedAtMs) => {
+    for (const p of entries) {
+      if (!p?.pid || !p.creationFileTimeUtc || provenEnded(p) || !phaseRows?.has(p.pid)) continue;
+      const row = phaseRows.get(p.pid);
+      let observed = null;
+      if (row?.present === false) observed = 'absent';
+      else if (row?.present && row.creationFileTime && !compareIdentity(p, { pid: p.pid, creationFileTime: String(row.creationFileTime),
+        birthTick: String(row.birthTick ?? TICK.MICROSECOND) }, 'same')) observed = 'reused';
+      if (!observed || lookupEnded.some((o) => compareIdentity(o, p, 'same'))) continue;
+      lookupEnded.push({ pid: p.pid, creationFileTimeUtc: String(p.creationFileTimeUtc), ...(p.birthTick != null
+        ? { birthTick: String(p.birthTick) } : {}), role: p.role, observed, observedAtMs,
+      ...(observed === 'reused' ? { observedCreationFileTimeUtc: String(row.creationFileTime),
+        ...(row.birthTick != null ? { observedBirthTick: String(row.birthTick) } : {}) } : {}) });
+    }
   };
   const lookupOne = async (p) => {
     if (!p?.pid) return 'gone';
@@ -4054,6 +4078,7 @@ async function stopRun(opts, {
       .catch(error => { censusError = error; return null; }) : null;
   if (!opts.forgetUnresolved) {
     await lookupPhase(allEntries());
+    noteLookupEnded(allEntries(), phaseAskedMs);
     for (const p of tracked) await lookupOne(p);
     await writeJsonAtomic(runPath, { ...run, stopTrackedProcesses: [...tracked] });
     await writeJsonAtomic(trackedPath, { processes: [...tracked], legacyBounds });
@@ -4172,7 +4197,7 @@ async function stopRun(opts, {
     const stopDetail = reason === 'takeover' ? 'takeover' : (opts.detail ?? null);
     const engineIncarnation = { session: runId, n: Number.isInteger(run?.incarnation) && run.incarnation > 0 ? run.incarnation : null };
     const engineRecords = dataDirAbs && run?.control?.stopRequest && backendBefore === 'match'
-      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: engineIncarnation })
+      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: engineIncarnation, ledgerReader })
       : null;
     // The identity this process checked ('match': the recorded PID and birth against the OS row) before
     // writing; with the writer it then wrote as, it binds this stop's records to that start (round 10).
@@ -4434,6 +4459,7 @@ async function stopRun(opts, {
   // The Engine exit this stop records is written from the census's OS observation and before the
   // census reads the ledger for its verdict, so the report reads every record of the stop.
   const censusAccounting = await exitCensus.finish({
+    lookupEnded,
     beforeVerdict: pendingEngineExit ? (osExits) => {
       // <ledger-resolution> The census's OS exit of the run's Engine: its whole recorded identity, or
       // its PID where the run recorded no birth.
@@ -4480,6 +4506,8 @@ async function stopRun(opts, {
     engineJob,
     // Recorded identities resolved by their exit in the ledger, never looked up or probed.
     ...(resolvedByLedger.length ? { resolvedByLedger } : {}),
+    // Recorded identities the first identity-checked lookup found ended before the stop acted (round 11).
+    ...(lookupEnded.length ? { endedByLookup: lookupEnded } : {}),
     ...(foreignPortOwner ? { foreignPortOwner } : {}),
   });
 
@@ -4552,6 +4580,8 @@ async function stopRun(opts, {
     unresolvedProcesses: unresolved,
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     ...exitAccounting,
+    // Recorded identities the first identity-checked lookup found ended before the stop acted (round 11).
+    ...(lookupEnded.length ? { endedByLookup: lookupEnded } : {}),
     ...(earlierReports.length ? { earlierReports, earlierReportFiles: kept.earlierReportFiles } : {}),
     ...(kept.earlierReportNotArchived ? { earlierReportNotArchived: kept.earlierReportNotArchived,
       reportWrittenAs: kept.reportName } : {}),

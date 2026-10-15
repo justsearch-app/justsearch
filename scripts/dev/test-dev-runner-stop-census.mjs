@@ -1616,8 +1616,10 @@ test('a disagreement an earlier census found is never cleared by a later ledger 
   } finally { await engine.end(); }
   assert.ok(prior.exitAccountingGaps.some((g) => g.reason === 'ledger_os_disagree' && g.pid === engine.pid),
     `the first census finds the disagreement: ${JSON.stringify(prior.exitAccountingGaps)}`);
-  // A later receipt for the same identity names the code the OS saw.
-  appendLedger(dataDir, rec('engine', { role: 'dev-runner', pid: 4000, startedAt: new Date().toISOString() }, 'engine-exit', {
+  // A later receipt for the same identity names the code the OS saw, from the dev runner that recorded
+  // the start (round 11: an Engine record proves only from a writer bound to the start).
+  const startWriterMs = Number((BigInt(engine.creationFileTimeUtc) - EPOCH) / 10000n) - 1000;
+  appendLedger(dataDir, rec('engine', { role: 'dev-runner', pid: 4000, startedAt: new Date(startWriterMs).toISOString() }, 'engine-exit', {
     incarnation: { session: runId, n: 1 }, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, exitClass: 'UNEXPECTED',
     reason: null, detail: null, code: 7, codeName: null, exitedAt: new Date().toISOString(), observedAt: new Date().toISOString(),
     terminateCalledAt: null, forced: false, phase: 'RUNNING', codeDistinctive: true }));
@@ -2632,6 +2634,271 @@ test('round 10 real dev CLI stop: a second CLI process that checked the Engine\'
 });
 
 // ---------------------------------------------------------------------------------------------
+// Round 11 (b102 changeset, "Follow-up decisions after the independent verifier rejected
+// 5b4cea41b"): writer binding for every supervisor-written Engine record that would prove an exit,
+// key-only or naming the whole identity; an identity-checked OS lookup that finds the exact identity
+// gone proves it ended (complete, its exit code unknown); a later real CLI stop completes through its
+// own lookup; the CLI reads the ledger through the census's incremental reader.
+// ---------------------------------------------------------------------------------------------
+const R11_LOOKUP_ENDED = 'ended, observed by identity-checked lookup';
+
+test('round 11 Engine writer table: an Engine exit or GONE reconciliation proves its start only from a writer bound to it, whether it names the incarnation alone or the whole PID and birth', () => {
+  const runId = 'stop-census-r11-writers';
+  const e = { pid: 974701, birth: genFar(13) }, inc = { session: runId, n: 1 };
+  const startedAt = isoMs(e.birth);
+  const runner = { role: 'dev-runner', pid: 4001, startedAt };
+  const self = { role: 'engine', pid: e.pid, startedAt };
+  const unbound = {
+    'another dev runner': { role: 'dev-runner', pid: 4002, startedAt }, 'a dev CLI': { role: 'dev-cli', pid: 4005, startedAt },
+    'a shell': { role: 'shell', pid: 4009, startedAt }, 'another Engine': { role: 'engine', pid: 974705, startedAt },
+    'the start writer\'s PID, started a second later': { ...runner, startedAt: isoMs(BigInt(e.birth) + 10000000n) },
+    'the start writer\'s PID under another role': { ...runner, role: 'dev-cli' },
+  };
+  const shapes = {
+    'an exit naming the whole PID and birth': ['engine-exit', { pid: e.pid, creationFileTime: e.birth, exitClass: 'REQUESTED', reason: 'QUIT',
+      detail: null, code: 0, codeName: 'ok', exitedAt: null, observedAt: startedAt, terminateCalledAt: null, forced: false, phase: 'STOPPING',
+      codeDistinctive: true }],
+    'a GONE reconciliation naming the whole PID and birth': ['engine-owner-died', { pid: e.pid, creationFileTime: e.birth, basis: 'OPEN_START',
+      osCheck: 'GONE', exitClass: 'OWNER_DIED' }],
+    'a GONE reconciliation naming the PID': ['engine-owner-died', { pid: e.pid, basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' }],
+    'an incarnation-only exit': ['engine-exit', { exitClass: 'REQUESTED', reason: 'QUIT', detail: null, code: 0, codeName: 'ok', exitedAt: null,
+      observedAt: startedAt, terminateCalledAt: null, forced: false, phase: 'STOPPING', codeDistinctive: true }],
+  };
+  const wrong = [];
+  for (const [shape, [type, fields]] of Object.entries(shapes)) {
+    const rows = [...Object.entries(unbound).map(([name, w]) => [name, w, false]), ['the dev runner that recorded the start', runner, true],
+      ['the Engine itself', self, true]];
+    for (const [name, writer, proves] of rows) {
+      const dataDir = freshDir(`r11-writer-${shape.replace(/\W+/g, '-')}-${name.replace(/\W+/g, '-')}`);
+      writeLedger(dataDir, [rec('engine', runner, 'engine-start', { incarnation: inc, pid: e.pid, creationFileTime: e.birth,
+        executable: process.execPath, processStartedAt: startedAt, cause: 'START', supervisorKind: 'dev-runner' }),
+      rec('engine', writer, type, { incarnation: inc, ...fields })]);
+      const got = Boolean(census.ledgerView(census.readRunLedger(dataDir), runId).engines[0]?.proof);
+      if (got !== proves) wrong.push(`${shape}, by ${name}: ${got ? 'proves' : 'does not prove'}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+for (const [shape, recordOf] of [
+  ['an exit', (p, inc) => ['engine-exit', { ...r10Exit(inc), pid: p.pid, creationFileTime: p.creationFileTimeUtc }]],
+  ['a GONE reconciliation', (p, inc) => ['engine-owner-died', { incarnation: inc, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
+    basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' }]]]) {
+  test(`round 11 unbound full identity (${shape}): a supervisor no record binds to a live Engine's start, naming its whole PID and birth, proves nothing: the real census stays incomplete and the stop looks the Engine up and finds it running`, { skip: !windows && 'Windows processes' }, async () => {
+    const p = await liveChild();
+    try {
+      const r = identityRun(`r11-unbound-${shape.replace(/\W+/g, '-')}`);
+      const n2 = { ...r.incarnation, n: 2 };
+      const runner = { role: 'dev-runner', pid: 4051, startedAt: isoMs(p.creationFileTimeUtc) };
+      const stranger = { role: 'dev-cli', pid: 4055, startedAt: new Date().toISOString() };
+      const [type, fields] = recordOf(p, n2);
+      r.records.push(rec('engine', runner, 'engine-start', { incarnation: n2, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
+        executable: process.execPath, processStartedAt: isoMs(p.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }),
+      rec('engine', stranger, type, fields));
+      // The children family is present, so only the live Engine can keep the census incomplete.
+      r.child('child-note', { note: 'the family is present' });
+      writeLedger(r.dataDir, r.records);
+      const result = await (await census.startStopExitCensus({ runId: r.runId, pids: { backendRootPid: r.engine.pid } }, r.dataDir,
+        freshDir(`r11-unbound-${shape.replace(/\W+/g, '-')}-run`), scope)).finish();
+      assert.equal(result.exitAccountingComplete, false, `the live Engine is not proven ended: ${JSON.stringify(result.exitAccountingGaps)}`);
+      assertLiveChildFound(await trackedStop(r, { ...p, incarnation: n2 }), p, shape);
+    } finally {
+      await p.end();
+    }
+  });
+}
+
+test('round 11 crash recovery: an Engine that has gone, whose open start the next supervisor\'s real reconciliation recorded GONE from an unbound writer, is looked up by the stop, found gone and accounted: STOPPED and complete, its exit code unknown', { skip: !windows && 'Windows processes' }, async () => {
+  const p = await liveChild();
+  const runId = 'stop-census-r11-crash-recovery';
+  const dataDir = freshDir('r11-crash-recovery');
+  const inc = { session: runId, n: 1 };
+  writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4061, startedAt: isoMs(p.creationFileTimeUtc) }, 'engine-start', {
+    incarnation: inc, pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: process.execPath,
+    processStartedAt: isoMs(p.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
+  rec('children', { role: 'engine', pid: p.pid, startedAt: isoMs(p.creationFileTimeUtc) }, 'child-note', { note: 'the family is present' })]);
+  await p.end();
+  // The next supervisor (this process, its writer started now) closes what the crashed one left open.
+  const written = await actuator.createEngineActuator({ dataDir, runId, policy: {}, log: () => {},
+    spawnChild: () => { throw new Error('nothing is spawned'); } }).reconcile();
+  assert.deepEqual(written.map((x) => [x.pid, x.osCheck]), [[p.pid, 'GONE']]);
+  const fixture = stopFixture({ runId, dataDir, engine: p });
+  try {
+    const lookups = [];
+    const out = await api.stopRun({}, { ...fixture.io,
+      lookupIdentities: async (ids) => { lookups.push(...ids); return actuator.lookupProcessIdentities(ids); } });
+    assert.ok(lookups.includes(p.pid), `the unbound GONE proves nothing; the Engine is looked up: ${JSON.stringify(out.resolvedByLedger ?? [])}`);
+    assert.equal(out.outcome, 'STOPPED', JSON.stringify(out.errors));
+    assert.equal(out.exitAccountingComplete, true, `the identity-checked lookup that found it gone completes it: ${JSON.stringify(out.exitAccountingGaps)}`);
+    const row = (out.processExits ?? []).find((x) => x.pid === p.pid && x.role === 'engine');
+    assert.equal(row?.ledgerReason, R11_LOOKUP_ENDED, JSON.stringify(out.processExits));
+    assert.equal(row.exitCode, null, 'its exit code is unknown, a fact the row reports');
+    assert.ok((out.endedByLookup ?? []).some((o) => o.pid === p.pid && o.observed === 'absent'), JSON.stringify(out.endedByLookup));
+  } finally {
+    fs.rmSync(fixture.dir, { recursive: true, force: true });
+  }
+});
+
+test('round 11 lookup rows: a crashed Engine whose PID the stop\'s lookup finds absent or reused by another readable birth is accounted; one whose birth cannot be read stays incomplete (S4)', async () => {
+  const wrong = [];
+  for (const [kind, rowOf, complete] of [
+    ['absent', () => ({ present: false }), true],
+    ['reused by another birth', (e) => ({ present: true, creationFileTime: String(BigInt(e.creationFileTimeUtc) / 10n * 10n + 600000000n), name: 'other.exe' }), true],
+    ['unreadable', () => ({ present: true, creationFileTime: null, name: 'node.exe' }), false]]) {
+    const runId = `stop-census-r11-row-${kind.replace(/\W+/g, '-')}`;
+    const engine = noProcess(974721, genFar(15));
+    const dataDir = freshDir(`r11-row-${kind.replace(/\W+/g, '-')}`);
+    const inc = { session: runId, n: 1 };
+    writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4071, startedAt: isoMs(engine.creationFileTimeUtc) }, 'engine-start', {
+      incarnation: inc, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, executable: process.execPath,
+      processStartedAt: isoMs(engine.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
+    rec('engine', { role: 'dev-runner', pid: 4075, startedAt: new Date().toISOString() }, 'engine-owner-died', { incarnation: inc,
+      pid: engine.pid, basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' }),
+    rec('children', { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) }, 'child-note', { note: 'present' })]);
+    const fixture = stopFixture({ runId, dataDir, engine });
+    try {
+      const out = await api.stopRun({}, { ...fixture.io, census: standInCensus,
+        lookupIdentities: async (ids) => new Map(ids.map((pid) => [pid, pid === engine.pid ? rowOf(engine) : { present: false }])) });
+      const row = (out.processExits ?? []).find((x) => x.pid === engine.pid && x.role === 'engine');
+      const got = { complete: out.exitAccountingComplete, reason: row?.ledgerReason ?? null, ended: (out.endedByLookup ?? []).length };
+      const expected = complete ? { complete: true, reason: R11_LOOKUP_ENDED, ended: 1 } : { complete: false, reason: got.reason, ended: 0 };
+      if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push({ kind, got, expected, gaps: out.exitAccountingGaps });
+      if (!complete && out.outcome !== 'STOP_INCOMPLETE') wrong.push({ kind, outcome: out.outcome });
+    } finally {
+      fs.rmSync(fixture.dir, { recursive: true, force: true });
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('round 11 census: an observation that the exact PID and birth no longer exist accounts it, its code unknown; one of the same microsecond, one older than the birth, an unreadable one or another PID\'s does not; a disagreement stays', () => {
+  const runId = 'stop-census-r11-census';
+  const e = { pid: 974731, creationFileTimeUtc: genFar(16) }, inc = { session: runId, n: 1 };
+  const runner = { role: 'dev-runner', pid: 4081, startedAt: isoMs(e.creationFileTimeUtc) };
+  const start = rec('engine', runner, 'engine-start', { incarnation: inc, pid: e.pid, creationFileTime: e.creationFileTimeUtc,
+    executable: process.execPath, processStartedAt: isoMs(e.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' });
+  const note = rec('children', { role: 'engine', pid: e.pid, startedAt: isoMs(e.creationFileTimeUtc) }, 'child-note', { note: 'present' });
+  const run = { runId, pids: { backendRootPid: e.pid } };
+  // `armedOn`: the ledger as it was when the census armed (by default the final one).
+  const judge = (records, lookupEnded, processExits = [], armedOn = records) => {
+    const dataDir = freshDir('r11-census');
+    writeLedger(dataDir, armedOn);
+    const input = census.exitTargets(run, null, [], census.readRunLedger(dataDir));
+    writeLedger(dataDir, records);
+    const ledger = census.readRunLedger(dataDir);
+    return census.exitResult(input, { processExits }, 'r11', ledger, census.ledgerView(ledger, runId), { lookupEnded });
+  };
+  const now = Date.now();
+  const bornMs = Number((BigInt(e.creationFileTimeUtc) - EPOCH) / 10000n);
+  const rows = {
+    'absent': [{ pid: e.pid, observed: 'absent', observedAtMs: now }, true],
+    'reused by another birth': [{ pid: e.pid, observed: 'reused', observedCreationFileTimeUtc: genFar(17), observedAtMs: now }, true],
+    'reused at the same microsecond': [{ pid: e.pid, observed: 'reused',
+      observedCreationFileTimeUtc: String(BigInt(e.creationFileTimeUtc) / 10n * 10n), observedBirthTick: '10', observedAtMs: now }, false],
+    'absent before the process was born': [{ pid: e.pid, observed: 'absent', observedAtMs: bornMs - 1000 }, false],
+    'unreadable': [{ pid: e.pid, observed: 'unreadable', observedAtMs: now }, false],
+    'without the time of the lookup': [{ pid: e.pid, observed: 'absent' }, false],
+    'another PID absent': [{ pid: e.pid + 4, observed: 'absent', observedAtMs: now }, false],
+  };
+  const wrong = [];
+  for (const [name, [observation, ends]] of Object.entries(rows)) {
+    const result = judge([start, note], [observation]);
+    const row = (result.processExits ?? []).find((x) => x.pid === e.pid && x.role === 'engine');
+    const got = { complete: result.exitAccountingComplete, reason: row?.ledgerReason === R11_LOOKUP_ENDED, code: row?.exitCode ?? null };
+    const expected = { complete: ends, reason: ends, code: null };
+    if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push({ name, got, gaps: result.exitAccountingGaps });
+  }
+  assert.deepEqual(wrong, []);
+  // Without an observation the start is unaccounted: the observation is what completes it.
+  assert.equal(judge([start, note], []).exitAccountingComplete, false);
+  // The ledger's exit (bound: the start's writer, recorded after the census armed) names code 0, the
+  // OS saw 7: a disagreement no lookup clears.
+  const exit = rec('engine', runner, 'engine-exit', { ...r10Exit(inc), pid: e.pid, creationFileTime: e.creationFileTimeUtc });
+  const disagree = judge([start, exit, note], [{ pid: e.pid, observed: 'absent', observedAtMs: now }],
+    [{ pid: e.pid, creationFileTimeUtc: e.creationFileTimeUtc, osCreationFileTimeUtc: e.creationFileTimeUtc, exitCode: 7, atMs: now }],
+    [start, note]);
+  assert.equal(disagree.exitAccountingComplete, false);
+  assert.ok(disagree.exitAccountingGaps.some((g) => g.reason === 'ledger_os_disagree' && g.pid === e.pid), JSON.stringify(disagree.exitAccountingGaps));
+});
+
+test('round 11 real dev CLI stops: a second CLI process accounts the exit it wrote; a later real CLI stop, the Engine gone, keeps the earlier report and completes through its own identity-checked lookup', { skip: !windows && 'identity-checked stop' }, async () => {
+  const runner = await liveChild(), engine = await liveChild();
+  try {
+    const runId = 'stop-census-r11-real-cli';
+    const dataDir = freshDir('r11-real-cli');
+    const runnerWriter = { role: 'dev-runner', pid: runner.pid, startedAt: isoMs(runner.creationFileTimeUtc) };
+    writeLedger(dataDir, [rec('engine', runnerWriter, 'engine-start', { incarnation: { session: runId, n: 1 }, pid: engine.pid,
+      creationFileTime: engine.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(engine.creationFileTimeUtc),
+      cause: 'START', supervisorKind: 'dev-runner' }), rec('children', runnerWriter, 'child-note', { note: 'the family is present' })]);
+    const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
+    fs.mkdirSync(runDir, { recursive: true });
+    const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, executable: process.execPath });
+    fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({ schemaVersion: 1, runId, apiPortActual: 0, uiPortActual: 0, dataDir,
+      incarnation: 1, control: { stopRequest: 1 }, pids: { runnerPid: runner.pid, backendRootPid: engine.pid, frontendRootPid: null },
+      identities: { runner: identity(runner), backend: identity(engine), frontend: null } }));
+    const env = { ...process.env, NODE_OPTIONS: '', JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', CI: '' };
+    const cliStop = (session) => {
+      const out = cp.spawnSync(process.execPath, [path.join(root, 'scripts/dev/dev-runner.cjs'), 'stop', '--json', '--run', runId,
+        '--session-id', session], { cwd: root, env, encoding: 'utf8', windowsHide: true, timeout: 180000 });
+      return JSON.parse(String(out.stdout).trim().split(/\r?\n/).filter(Boolean).at(-1) ?? '{}');
+    };
+    const first = cliStop('r11-second-cli');
+    await Promise.race([engine.exited, new Promise((resolve) => setTimeout(resolve, 10000))]);
+    assert.equal(first.outcome, 'STOPPED', JSON.stringify(first));
+    assert.equal(first.exitAccountingComplete, true, `the second CLI accounts its own checked stop: ${JSON.stringify(first.exitAccountingGaps)}`);
+    const later = cliStop('r11-later-cli');
+    assert.equal(later.outcome, 'STOPPED', JSON.stringify(later));
+    assert.equal(later.exitAccountingComplete, true, `the later CLI stop completes through its own lookup: ${JSON.stringify(later.exitAccountingGaps)}`);
+    const row = (later.processExits ?? []).find((x) => x.role === 'engine' && x.pid === engine.pid);
+    // Its code is what the OS reported of that identity, if anything: this test still holds the Engine's handle.
+    assert.equal(row?.ledgerReason, R11_LOOKUP_ENDED, JSON.stringify(later.processExits));
+    assert.ok((later.earlierReportFiles ?? []).some((f) => f.name === 'stop-report.1.json' && f.readable), JSON.stringify(later.earlierReportFiles));
+    const kept = JSON.parse(fs.readFileSync(path.join(runDir, 'stop-report.1.json'), 'utf8'));
+    assert.equal(kept.exitAccountingComplete, true, 'the earlier report keeps its completeness');
+  } finally {
+    await engine.end();
+    await runner.end();
+  }
+});
+
+test('round 11 CLI read-once: the dev CLI recorder reads the Engine ledger through the stop\'s incremental reader, so no ledger file is read whole and each record is parsed once', () => {
+  const runId = 'stop-census-r11-read-once';
+  const dataDir = freshDir('r11-read-once');
+  const inc = { session: runId, n: 1 };
+  const e = { pid: 974741, birth: genFar(18) };
+  writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4091, startedAt: isoMs(e.birth) }, 'engine-start', { incarnation: inc,
+    pid: e.pid, creationFileTime: e.birth, executable: process.execPath, processStartedAt: isoMs(e.birth), cause: 'START',
+    supervisorKind: 'dev-runner' }), rec('children', { role: 'engine', pid: e.pid, startedAt: isoMs(e.birth) }, 'child-note', { note: 'present' })]);
+  const ledgerDir = ledgerLib.ledgerDirectory(dataDir);
+  // The stop's reader, as the census armed it: the start already read.
+  const reader = ledgerLib.createIncrementalReader();
+  assert.equal(reader.read(ledgerDir, 'engine').records.length, 1);
+  const isLedger = (p) => typeof p === 'string' && path.resolve(p).startsWith(path.resolve(ledgerDir));
+  const orig = { readFileSync: fs.readFileSync, parse: JSON.parse };
+  const wholeReads = [], parses = [];
+  fs.readFileSync = function (p, ...args) { if (isLedger(p)) wholeReads.push(p); return orig.readFileSync.call(this, p, ...args); };
+  JSON.parse = function (t, ...args) {
+    const r = orig.parse.call(this, t, ...args);
+    if (typeof t === 'string' && r?.schemaVersion === 1 && typeof r?.type === 'string' && r.type.startsWith('engine-')) parses.push(`${r.type}#${r.seq}`);
+    return r;
+  };
+  try {
+    const recorder = actuator.createCliEngineRecorder({ dataDir, incarnation: inc, ledgerReader: reader });
+    assert.equal(recorder.intent({ mode: 'NOW', channel: 'TERMINATE' }).written, true);
+    assert.equal(recorder.exit({ endedBy: 'terminate', observed: { exitCode: 1, atMs: Date.now() } }).written, true);
+    // The census's final read, through the same reader.
+    reader.read(ledgerDir, 'engine');
+  } finally {
+    fs.readFileSync = orig.readFileSync;
+    JSON.parse = orig.parse;
+  }
+  assert.deepEqual(wholeReads, [], 'no ledger file is read whole');
+  const counts = parses.reduce((m, k) => ({ ...m, [k]: (m[k] ?? 0) + 1 }), {});
+  assert.ok(!Object.keys(counts).some((k) => k.startsWith('engine-start#')), `the start the census read is not parsed again: ${JSON.stringify(counts)}`);
+  assert.deepEqual(Object.values(counts).filter((n) => n !== 1), [], `each record parsed once: ${JSON.stringify(counts)}`);
+});
+
+// ---------------------------------------------------------------------------------------------
 // The generated checks. Random ledgers over the schema, each judged by the real census and stop and
 // by the oracle below, which is the round-8 identity rule (b102 changeset, "One identity") written
 // out on its own and nothing else:
@@ -2709,7 +2976,10 @@ function generateIdentityCase(r) {
       const about = r.pick(starts);
       const type = r.pick(['engine-exit', 'engine-exit', 'engine-owner-died']);
       const exit = { type, session: r.chance(0.92) ? PROOF_RUN : 'another-run', n: r.pick([about.n, about.n, 3]),
-        pid: r.pick([null, null, about.pid, 972009]), birth: r.pick([null, null, about.birth, nb(about.birth), genFar(5)]) };
+        pid: r.pick([null, null, about.pid, 972009]), birth: r.pick([null, null, about.birth, nb(about.birth), genFar(5)]),
+        // Round 11: who wrote it. The dev runner of the run (by.runner), the Engine writer that may have
+        // recorded a start (by.engine), the Engine it is about itself, or another dev runner.
+        writer: r.pick(['runner', 'runner', 'runner', 'engine', 'self', 'otherRunner']), self: { pid: about.pid, birth: about.birth } };
       if (type === 'engine-exit') Object.assign(exit, { reconciled: r.chance(0.15), code: r.pick([0, 0, 3]) });
       else Object.assign(exit, { osCheck: r.pick(['GONE', 'GONE', 'ALIVE_MATCH', 'IDENTITY_UNKNOWN', 'REUSED', null]) },
         { exitClass: r.chance(0.8) ? 'OWNER_DIED' : 'UNKNOWN' });
@@ -2759,18 +3029,20 @@ function identityCaseRecords(c, withExits) {
   const startRecord = (s) => rec('engine', writerOf(s.writer), 'engine-start', { incarnation: inc(s.n), pid: s.pid,
     creationFileTime: s.birth, executable: process.execPath, processStartedAt: isoMs(s.birth), cause: 'START', supervisorKind: 'dev-runner' });
   const named = (e) => ({ ...(e.pid != null ? { pid: e.pid } : {}), ...(e.birth != null ? { creationFileTime: e.birth } : {}) });
+  const exitWriter = (e) => ({ runner: by.runner, engine: by.engine, otherRunner: { role: 'dev-runner', pid: 4002, startedAt: proofStartedAt },
+    self: { role: 'engine', pid: e.self?.pid, startedAt: e.self ? isoMs(e.self.birth) : null } })[e.writer ?? 'runner'];
   const records = [];
   if (c.kind === 'engine') {
     records.push(startRecord(c.starts[0]), rec('children', by.engine, 'child-note', { note: 'the family is present' }));
     for (const item of c.records) {
       if (item.start) records.push(startRecord(item.start));
       else if (withExits && item.exit.type === 'engine-exit') {
-        records.push(rec('engine', by.runner, 'engine-exit', { incarnation: inc(item.exit.n, item.exit.session), ...named(item.exit),
+        records.push(rec('engine', exitWriter(item.exit), 'engine-exit', { incarnation: inc(item.exit.n, item.exit.session), ...named(item.exit),
           exitClass: item.exit.code === 0 ? 'REQUESTED' : 'UNEXPECTED', reason: item.exit.code === 0 ? 'QUIT' : null, detail: null,
           code: item.exit.code, codeName: null, exitedAt: null, observedAt: proofStartedAt, terminateCalledAt: null, forced: false,
           phase: 'STOPPING', codeDistinctive: true, ...(item.exit.reconciled ? { reconciled: true } : {}) }));
       } else if (withExits) {
-        records.push(rec('engine', by.runner, 'engine-owner-died', { incarnation: inc(item.exit.n, item.exit.session), ...named(item.exit),
+        records.push(rec('engine', exitWriter(item.exit), 'engine-owner-died', { incarnation: inc(item.exit.n, item.exit.session), ...named(item.exit),
           basis: 'OPEN_START', ...(item.exit.osCheck ? { osCheck: item.exit.osCheck } : {}),
           exitClass: item.exit.osCheck === 'GONE' ? item.exit.exitClass : 'UNKNOWN' }));
       }
@@ -2848,10 +3120,13 @@ function oracleStarts(c) {
       const contradicts = (e) => (e.pid != null && e.pid !== s.pid) || (e.birth != null && !genBirthsAgree(e.birth, s.birth, s.tick));
       const contested = ofKey.some(contradicts);
       const keyStarts = starts.filter((o) => o.n === s.n).length;
-      // Every exit here is the dev runner's (by.runner): an incarnation-only one proves only a start that
-      // writer recorded, never through its role (round 10).
-      Object.assign(s, proofOf(ofKey, (e) => (e.birth == null
-        ? keyStarts === 1 && !contested && s.writers.has('dev-runner')
+      // An Engine record proves only from a writer bound to the start, whatever identity it names: the
+      // writer that recorded it, or the Engine itself (its PID, started its millisecond); never through
+      // a writer's role (round 10), nor by naming the whole PID and birth (round 11).
+      const bound = (e) => (e.writer === 'runner' && s.writers.has('dev-runner')) || (e.writer === 'engine' && s.writers.has('engine'))
+        || (e.writer === 'self' && e.self.pid === s.pid && isoMs(e.self.birth) === isoMs(s.birth));
+      Object.assign(s, proofOf(ofKey, (e) => bound(e) && (e.birth == null
+        ? keyStarts === 1 && !contested
         : e.pid === s.pid && genBirthsAgree(e.birth, s.birth, s.tick))));
     }
     return starts;
@@ -2952,12 +3227,25 @@ function identityOracle(c) {
   // A child case's run Engine ends by the dev runner's incarnation-only exit, which proves it only when
   // that dev runner recorded its start (round 10: a writer's role alone binds nothing).
   const engineProven = c.kind !== 'child' || c.engine.writer === 'dev-runner';
+  // What the stop's first lookup observed (round 11): every PID it asks of but the tracked one is
+  // absent; the tracked one is the case's row. It asks of the backend and the tracked identity when the
+  // ledger does not prove them ended. A start of an observed PID, born before the lookup, is ended
+  // when the PID was absent or named another birth (at the microsecond the lookup reads); an
+  // unreadable or alive row observes nothing.
+  const asked = [...new Set([...(!ended(backend) ? [backend.pid] : []), ...(lookedUp ? [tracked.pid] : [])])];
+  const cimUs = (ft) => BigInt(ft) / 10n;
+  const observedEnded = (s) => asked.includes(s.pid) && BigInt(s.birth) <= BigInt(Date.now()) * 10000n + EPOCH
+    && (s.pid !== tracked.pid || row === 'gone'
+      || (row === 'reused' && cimUs(s.birth) !== cimUs(BigInt(tracked.creationFileTimeUtc) + 10n)));
+  // The run's Engine of a child case is the backend: unproven, it is asked of and found absent.
+  const engineEnded = engineProven || c.kind === 'child';
   return { proven: proven.sort(), complete: engineProven && starts.every(accounted),
     stop: { lookedUp, outcome: unresolved ? 'STOP_INCOMPLETE' : 'STOPPED',
       // Every start proven, without a conflict or two codes, by its exit or by a reconciliation that
-      // classed it OWNER_DIED (one that could not class it leaves its final receipt unavailable).
-      accounting: engineProven && starts.every((s) => s.proof && !s.conflict && s.codes.size <= 1
-        && (s.proof.code != null || s.proof.exitClass === 'OWNER_DIED')) } };
+      // classed it OWNER_DIED (one that could not class it leaves its final receipt unavailable), or
+      // found ended by the stop's lookup (round 11: its exit code unknown).
+      accounting: engineEnded && starts.every((s) => !s.conflict && s.codes.size <= 1
+        && ((s.proof && (s.proof.code != null || s.proof.exitClass === 'OWNER_DIED')) || observedEnded(s))) } };
 }
 
 /** What the census makes of an identity case. */
@@ -3172,7 +3460,11 @@ test(`a stop carries forward exactly what earlier stops found, over ${GEN_EVIDEN
 //    complete when a start is unproven;
 //  - each tracked record survives in the stop's list whole and is looked up exactly when no start
 //    agrees with it (PID, birth at the coarser of the two measured ticks, every other field both
-//    carry) or one that agrees is unproven; a whole stop looks up and reports exactly those.
+//    carry) or one that agrees is unproven; a whole stop looks up and reports exactly those;
+//  - round 11: every Engine record, incarnation-only or naming the whole PID and birth, proves only
+//    from a writer bound to the start; and the stop's lookup finds each PID absent, reused by another
+//    birth, alive or unreadable: a start of the run is accounted when proven, or when the lookup found
+//    it ended (born before the lookup, its PID absent or another birth's), never when unreadable.
 // STOP_CENSUS_GEN_CASE=<n> runs one case; STOP_CENSUS_GEN_DUMP=<dir> writes the misjudged ones;
 // STOP_CENSUS_REFERENCE=<stop-exit-census.cjs> takes isProven from that file (judging an older checkout).
 // ---------------------------------------------------------------------------------------------
@@ -3214,7 +3506,9 @@ function generateProofCase(r) {
   // The children family is present whatever else the case writes.
   add(rec('children', r9Writers.owner, 'child-note', { childId: 'present', token: 'present' }));
   const e0Exit = r.pick(['runner', 'runner', 'runner', 'cli', 'shell', 'otherRunner', 'runnerReborn', 'owner', 'later', 'none']);
-  if (e0Exit !== 'none') add(rec('engine', r9Writers[e0Exit], 'engine-exit', r9EngineExit({ incarnation: r9Inc(1) })), r.chance(0.15));
+  // Round 11: the run Engine's exit sometimes names its whole PID and birth, which binds no writer either.
+  if (e0Exit !== 'none') add(rec('engine', r9Writers[e0Exit], 'engine-exit', r9EngineExit({ incarnation: r9Inc(1),
+    ...(r.chance(0.35) ? { pid: R9_E0.pid, creationFileTime: R9_E0.birth } : {}) })), r.chance(0.15));
   // Engine starts of later incarnations, of processes children and witnesses also name.
   for (let i = r.int(3); i > 0; i--) {
     const proc = r.pick(R9_PROCS), n = r.pick([2, 2, 3]), late = lateness();
@@ -3238,12 +3532,18 @@ function generateProofCase(r) {
         }
         add(rec('engine', w === 'self' ? r9Self(proc) : w === 'selfLateMs' ? r9Self(proc, 1n) : r9Writers[w], 'engine-exit',
           r9EngineExit({ incarnation: r9Inc(n) })), exitLate);
-      } else if (shape === 'whole') {
-        add(rec('engine', r9Writers.runner, 'engine-exit', r9EngineExit({ incarnation: r9Inc(n), pid: proc.pid,
-          creationFileTime: r.chance(0.8) ? proc.birth : sameMicrosecondNeighbour(proc.birth) })), exitLate);
       } else {
-        add(rec('engine', r9Writers.runner, 'engine-owner-died', { incarnation: r9Inc(n), pid: r.chance(0.8) ? proc.pid : 974113,
-          basis: 'OPEN_START', osCheck: r.pick(['GONE', 'GONE', 'ALIVE_MATCH']), exitClass: 'OWNER_DIED' }), exitLate);
+        // Round 11: a record naming the whole identity, or a reconciliation, by any writer: only a bound one proves.
+        const w = r.pick(['runner', 'runner', 'runner', 'cli', 'shell', 'otherRunner', 'runnerReborn', 'self', 'owner', 'later']);
+        const writer = w === 'self' ? r9Self(proc) : r9Writers[w];
+        if (shape === 'whole') {
+          add(rec('engine', writer, 'engine-exit', r9EngineExit({ incarnation: r9Inc(n), pid: proc.pid,
+            creationFileTime: r.chance(0.8) ? proc.birth : sameMicrosecondNeighbour(proc.birth) })), exitLate);
+        } else {
+          add(rec('engine', writer, 'engine-owner-died', { incarnation: r9Inc(n), pid: r.chance(0.8) ? proc.pid : 974113,
+            ...(r.chance(0.4) ? { creationFileTime: proc.birth } : {}),
+            basis: 'OPEN_START', osCheck: r.pick(['GONE', 'GONE', 'ALIVE_MATCH']), exitClass: 'OWNER_DIED' }), exitLate);
+        }
       }
     }
   }
@@ -3322,7 +3622,22 @@ function generateProofCase(r) {
     tracked.push(t);
     if (r.chance(0.15)) tracked.push({ ...t });
   }
-  return { items, starts, tracked: r.shuffle(tracked), witnessed };
+  // Round 11: what the stop's lookup finds at each PID. The run's Engine is never running (the stop
+  // would act on it); its PID absent or reused, or its birth unreadable.
+  const rows = { [R9_E0.pid]: r.pick(['absent', 'absent', 'reused', 'unreadable']) };
+  for (const pid of [974101, 974105, 974109]) rows[pid] = r.pick(['unreadable', 'unreadable', 'alive', 'absent', 'reused']);
+  return { items, starts, tracked: r.shuffle(tracked), witnessed, rows };
+}
+/** A process the lookup finds at a reused PID: born at another microsecond than any start of the case. */
+const R9_REUSED_BIRTH = String(BigInt(genFar(8)) / 10n * 10n);
+/** The birth an alive row reads (CIM's microsecond) at each PID: the first process of that PID. */
+const R9_ALIVE_BIRTH = { 974101: R9_PROCS[0].birth, 974105: R9_PROCS[2].birth, 974109: genFar(6) };
+/** The OS row the stop's lookup returns for `pid` in case `c` (an older case without rows: E0 absent, the rest unreadable). */
+function r9Row(c, pid) {
+  const kind = c.rows?.[pid] ?? (pid === R9_E0.pid ? 'absent' : 'unreadable');
+  return { kind, row: { absent: { present: false }, reused: { present: true, creationFileTime: R9_REUSED_BIRTH, name: 'other.exe' },
+    unreadable: { present: true, creationFileTime: null, name: 'proc.exe' },
+    alive: { present: true, creationFileTime: String(BigInt(R9_ALIVE_BIRTH[pid] ?? genFar(6)) / 10n * 10n), name: 'proc.exe' } }[kind] };
 }
 
 /** The case's records written before the census armed. */
@@ -3425,13 +3740,14 @@ async function r9Stop(c, dataDir) {
     const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
     fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, stopTrackedProcesses: c.tracked }));
     const lookups = new Set();
-    // Every tracked process is running and its birth cannot be read: looked up, it stays unresolved.
+    // Each PID as the case's rows say: absent, reused by another birth, alive, or its birth unreadable.
     const out = await api.stopRun({}, { ...fixture.io, census: standInCensus,
       lookupIdentities: async (ids) => {
         for (const pid of ids) lookups.add(pid);
-        return new Map(ids.map((pid) => [pid, pid === R9_E0.pid ? { present: false } : { present: true, creationFileTime: null, name: 'proc.exe' }]));
+        return new Map(ids.map((pid) => [pid, r9Row(c, pid).row]));
       } });
-    return { lookups: [...lookups].sort(), unresolved: out.unresolvedProcesses ?? [], outcome: out.outcome, complete: out.exitAccountingComplete };
+    return { lookups: [...lookups].sort(), unresolved: out.unresolvedProcesses ?? [], outcome: out.outcome, complete: out.exitAccountingComplete,
+      gaps: out.exitAccountingGaps };
   } finally {
     fs.rmSync(fixture.dir, { recursive: true, force: true });
   }
@@ -3447,10 +3763,10 @@ async function judgeProofCase(c, dataDir, runDir, reference = census) {
   const read = ref.final.map((s) => [s.family, r9Key(s.family, s.identity), s.identity.pid, s.identity.rawBirth,
     r9Owner(s.identity.owner), s.identity.incarnation?.n ?? null].join('|')).sort();
   if (JSON.stringify(written) !== JSON.stringify(read)) misjudged.push({ kind: 'starts', written, read });
-  // An Engine start proven ended has a record that can prove it on its own terms (round 10, independent
-  // of isProven): one naming its PID and birth, or an incarnation-only one written by a writer the ledger
-  // binds to it (the writer of one of its start records, or that Engine itself: its PID, started the
-  // start's millisecond). A supervisor's role alone never binds.
+  // An Engine start proven ended has a record that can prove it on its own terms (independent of
+  // isProven): one written by a writer the ledger binds to it (the writer of one of its start records,
+  // or that Engine itself: its PID, started the start's millisecond), whether it names the incarnation
+  // alone or the whole PID and birth (round 11). A supervisor's role alone never binds (round 10).
   for (const s of ref.final.filter((x) => x.family === 'engine' && x.ref)) {
     const n = s.identity.incarnation.n;
     const ofKey = (got.finalLedger.engine?.records ?? []).filter((x) => x.line?.incarnation?.session === R9_RUN && x.line.incarnation.n === n);
@@ -3458,7 +3774,7 @@ async function judgeProofCase(c, dataDir, runDir, reference = census) {
       && x.line.creationFileTime === s.identity.rawBirth).map((x) => x.writer),
     { role: 'engine', pid: s.identity.pid, startedAt: Number((BigInt(s.identity.rawBirth) - 116444736000000000n) / 10000n) }];
     const can = ofKey.some((x) => ['engine-exit', 'engine-owner-died'].includes(x.type)
-      && (x.line.creationFileTime != null || bound.some((w) => r9SameWriter(x.writer, w))));
+      && bound.some((w) => r9SameWriter(x.writer, w)));
     if (!can) misjudged.push({ kind: 'writer', start: `engine/${n}/${s.identity.pid}/${s.identity.rawBirth}`,
       writers: ofKey.filter((x) => x.type !== 'engine-start').map((x) => x.writer) });
   }
@@ -3495,23 +3811,38 @@ async function judgeProofCase(c, dataDir, runDir, reference = census) {
       if (lookedUp !== !ended(t)) misjudged.push({ kind: 'lookup', tracked: t, lookedUp, expected: !ended(t) });
     }
   }
-  // A whole stop. Each tracked PID is running, its birth unreadable: a PID some tracked record of
-  // which is not ended is looked up and reported unresolved, and the stop is incomplete; a PID every
-  // tracked record of which is ended, and no unproven start of the run names, is neither.
+  // A whole stop. A PID some tracked record of which is not ended is looked up; when the lookup finds
+  // it running (alive, or its birth unreadable) it is reported unresolved and the stop is incomplete.
+  // A PID every tracked record of which is ended, and no unproven start of the run names, is neither.
   const stop = await r9Stop(c, dataDir);
   const unprovenPids = new Set(runStarts.filter((s) => !s.ref).map((s) => s.identity.pid));
+  const running = (pid) => ['alive', 'unreadable'].includes(r9Row(c, pid).kind);
   for (const pid of new Set(c.tracked.map((t) => t.pid))) {
     const open = c.tracked.some((t) => t.pid === pid && !ended(t));
     if (!open && unprovenPids.has(pid)) continue;
     const lookedUp = stop.lookups.includes(pid), reported = stop.unresolved.some((u) => u.pid === pid);
-    if (lookedUp !== open || reported !== open) {
-      misjudged.push({ kind: 'stop', pid, lookedUp, reported, expected: open, unresolved: stop.unresolved.filter((u) => u.pid === pid) });
+    if (lookedUp !== open || reported !== (open && running(pid))) {
+      misjudged.push({ kind: 'stop', pid, lookedUp, reported, expected: open, row: r9Row(c, pid).kind,
+        unresolved: stop.unresolved.filter((u) => u.pid === pid) });
     }
   }
-  const anyOpen = c.tracked.some((t) => !ended(t));
+  const anyOpen = c.tracked.some((t) => !ended(t) && running(t.pid));
   if (anyOpen && stop.outcome !== 'STOP_INCOMPLETE') misjudged.push({ kind: 'stop', outcome: stop.outcome, expected: 'STOP_INCOMPLETE' });
-  if (stop.complete && !allProven) misjudged.push({ kind: 'stop', complete: true, unproven: true });
-  if (!c.witnessed && !anyOpen && stop.complete !== allProven) misjudged.push({ kind: 'stop', complete: stop.complete, expected: allProven });
+  // Round 11, the oracle's own reading of the lookup: the PIDs it asks of (the run's Engine unless the
+  // ledger proves it, and each tracked PID with a record not ended), each found ended for a start of
+  // the run born before the lookup when absent, or reused by a process of another microsecond. A start
+  // with conflicting metadata stays a finding whatever the lookup finds.
+  const asked = new Set([...(runStarts.some((s) => s.family === 'engine' && s.identity.pid === R9_E0.pid && !s.ref) ? [R9_E0.pid] : []),
+    ...c.tracked.filter((t) => !ended(t)).map((t) => t.pid)]);
+  const lookupEnded = (s) => asked.has(s.identity.pid) && !(s.identity.conflicts ?? []).length
+    && BigInt(s.identity.rawBirth) <= BigInt(Date.now()) * 10000n + EPOCH
+    && (r9Row(c, s.identity.pid).kind === 'absent' || (r9Row(c, s.identity.pid).kind === 'reused'
+      && BigInt(s.identity.rawBirth) / 10n !== BigInt(R9_REUSED_BIRTH) / 10n));
+  const allAccounted = runStarts.every((s) => s.ref || lookupEnded(s));
+  if (stop.complete && !allAccounted) misjudged.push({ kind: 'stop', complete: true, unaccounted: true });
+  if (!c.witnessed && !anyOpen && stop.complete !== allAccounted) {
+    misjudged.push({ kind: 'stop', complete: stop.complete, expected: allAccounted, gaps: stop.gaps });
+  }
   return misjudged;
 }
 

@@ -311,8 +311,11 @@ function createEngineActuator({
   clock = () => Date.now(),
   writerStartedAt = Date.now(),
   log = (line) => process.stderr.write(`[dev-runner] ${line}\n`),
+  ledgerReader = ledgerLib.createIncrementalReader(),
 }) {
   const ledgerDir = ledgerLib.ledgerDirectory(dataDir);
+  // One incremental, handle-identified reader for the supervisor's reads of its Engine ledger (the
+  // census's reader): an unchanged file is not read again, a grown one only for its tail (round 11).
   const writer = ledger ?? ledgerLib.createLedgerWriter({
     ledgerDir, family: 'engine', rotates: true,
     writer: { role: 'dev-runner', pid: process.pid, startedAt: writerStartedAt },
@@ -360,7 +363,7 @@ function createEngineActuator({
     async reconcile() {
       let read;
       try {
-        read = ledgerLib.readLedger(ledgerDir, 'engine');
+        read = ledgerReader.read(ledgerDir, 'engine');
       } catch (err) {
         log(`exit ledger unreadable at supervision start: ${err?.message ?? err}`);
         read = { records: [] };
@@ -577,7 +580,7 @@ function createEngineActuator({
       let selfIntent = null;
       try {
         const identity = state.identity ?? {};
-        selfIntent = ledgerLib.readLedger(ledgerDir, 'engine').records
+        selfIntent = ledgerReader.read(ledgerDir, 'engine').records
           .filter((r) => r.type === 'engine-self-intent' && Number(r.line?.engine?.pid) === state.pid
             && (!identity.creationFileTime || !r.line?.engine?.creationFileTime
               || sameBirth(String(r.line.engine.creationFileTime), identity.creationFileTime)))
@@ -661,7 +664,11 @@ const CLI_ENGINE_ENDINGS = Object.freeze({
  */
 function createCliEngineRecorder({
   dataDir, incarnation, policy = null, clock = () => Date.now(), describeExit = (code) => `unknown(${code})`,
+  ledgerReader = ledgerLib.createIncrementalReader(),
 }) {
+  // `ledgerReader`: the stop's own incremental reader (the census's) when it passes one, so the
+  // records it already read are not read again: an unchanged file is not reopened, a grown file is
+  // read only for its tail (round 11).
   const ledgerDir = dataDir ? ledgerLib.ledgerDirectory(dataDir) : null;
   const validIncarnation = Boolean(incarnation && typeof incarnation.session === 'string'
     && Number.isInteger(incarnation.n));
@@ -672,7 +679,7 @@ function createCliEngineRecorder({
   const exitRecorded = () => {
     if (exitWritten) return true;
     let records = [];
-    try { records = ledgerLib.readLedger(ledgerDir, 'engine').records; } catch { /* write anyway */ }
+    try { records = ledgerReader.read(ledgerDir, 'engine').records; } catch { /* write anyway */ }
     return records.some((r) => r.type === 'engine-exit'
       && r.line?.incarnation?.session === incarnation.session && r.line?.incarnation?.n === incarnation.n);
   };

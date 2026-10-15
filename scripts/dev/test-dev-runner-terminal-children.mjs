@@ -85,7 +85,11 @@ test('stopRun after failed Engine quit persists verified llama cleanup and retur
   let censusFinished = false;
   const result = await api.stopRun({}, {
     resolveTarget: async () => ({ run, runPath }),
-    lookupIdentities: async pids => new Map(pids.map(pid => [pid, { present: backendAlive, creationFileTime: birth }])),
+    // The backend as it is, and the registered llama child as itself (its manifest start, to the
+    // millisecond) while it runs: a row naming another birth at its PID would say it had ended.
+    lookupIdentities: async pids => new Map(pids.map(pid => [pid, pid === child.pid
+      ? { present: alive, creationFileTime: String(BigInt(Date.parse(child.startedAt)) * 10000n + 116444736000000000n) }
+      : { present: backendAlive, creationFileTime: birth }])),
     gracefulShutdown: async () => { backendAlive = false; return { outcome: 'exited', exitCode: 1 }; },
     // Spec B step 9: the census reads the ledger; the stop's own kills are not handed to it.
     census: async () => ({ finish: async options => {

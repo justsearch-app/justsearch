@@ -1097,11 +1097,48 @@ function ledgerExitFor(target, view) {
 }
 
 /**
+ * The gaps an identity-checked lookup that found the identity ended resolves (round 11): each says
+ * only that the end of the process was not proven or recorded, never that two accounts disagree.
+ * A missing exit code is a fact the row reports, not a gap.
+ */
+const LOOKUP_ENDED_RESOLVES = new Set(['exit_unproven', 'ledger_record_missing', 'unrecorded_exit',
+  'final_owner_receipt_unavailable', 'identity-bound OS exit code/time unavailable through teardown']);
+const PRE_STOP_HANDLE_GAP = 'process handle unavailable before stop';
+const LOOKUP_ENDED_REASON = 'ended, observed by identity-checked lookup';
+/**
+ * The observations of a stop's identity-checked OS lookup that ended a recorded identity before the
+ * stop acted on it (round 11): its PID absent from a lookup that answered (`observed: 'absent'`), or
+ * naming a process whose birth was read (`'reused'`, `observedCreationFileTimeUtc`, measured at
+ * `observedBirthTick`, the lookup's microsecond unless it names one), at `observedAtMs`. Anything else
+ * is dropped: a lookup that failed or whose birth could not be read observes no end.
+ */
+function lookupEndedIdentities(list) {
+  return (Array.isArray(list) ? list : []).filter(o => Number.isInteger(o?.pid) && o.pid > 0 && Number.isFinite(o.observedAtMs)
+    && (o.observed === 'absent' || (o.observed === 'reused' && isFileTime(o.observedCreationFileTimeUtc))));
+}
+/**
+ * Whether identity `x` (its PID and birth) is ended by one of the observations: born no later than
+ * the lookup, and its PID was absent then, or named a process whose birth is not `x`'s at the coarser
+ * of the two ticks. Judged for `x` itself, never through the record the stop looked up.
+ */
+const endedByObservation = (observations, x) => {
+  const id = identityOf(x);
+  if (!id || id.pid === null || !id.birth) return false;
+  const born = birthMs(x);
+  return observations.some(o => hasPid(x, o.pid) && born !== null && born <= o.observedAtMs && (o.observed === 'absent'
+    || !compareIdentity(x, { pid: o.pid, creationFileTimeUtc: o.observedCreationFileTimeUtc,
+      birthTick: String(o.observedBirthTick ?? TICK.MICROSECOND) }, 'same')));
+};
+
+/**
  * The verdict per target (Spec B §5.1): the ledger class compared with the OS observation.
  * `ledger` is re-read at finish; without it every exit is unrecorded. `view` is ledgerView of that
- * ledger when the caller already has it.
+ * ledger when the caller already has it. `lookupEnded`: the identities the stop's identity-checked
+ * lookup found ended before it acted (lookupEndedIdentities); each is accounted as ended, its exit
+ * code unknown unless the OS gave one, and only the gaps that say its end was unproven are resolved.
  */
-function exitResult(input, output, source, ledger = null, view = null) {
+function exitResult(input, output, source, ledger = null, view = null, { lookupEnded = [] } = {}) {
+  const endedByLookup = lookupEndedIdentities(lookupEnded);
   const gaps = [...input.gaps, ...(output.gaps ?? [])], processExits = [];
   // Accounting is never complete over records the census could not read.
   for (const family of ['engine', 'children']) {
@@ -1342,6 +1379,24 @@ function exitResult(input, output, source, ledger = null, view = null) {
     else if (!record || record.exitClass === 'UNKNOWN') gaps.push({ pid: item.pid,
       creationFileTimeUtc: item.creationFileTimeUtc, role, reason: record?.reason ?? 'final_owner_receipt_unavailable' });
   }
+  // An identity the stop's identity-checked lookup found ended (its PID absent, or another readable
+  // birth): its end is proven, so a gap that says only that its end was unproven or unrecorded is
+  // resolved. A gap naming a PID alone is resolved only when every unproven identity of that PID the
+  // census knows was found ended. Disagreements, conflicts and lost evidence stay.
+  const endedId = (x) => endedByObservation(endedByLookup, x);
+  const resolvedByLookup = [];
+  if (endedByLookup.length) {
+    const unprovenOfPid = (pid) => [...input.targets, ...[...view.engines, ...view.children, ...(view.witnesses ?? [])]
+      .filter(x => !x.proof)].filter(x => hasPid(x, pid));
+    const resolves = (g) => {
+      if (!(LOOKUP_ENDED_RESOLVES.has(g?.reason) || String(g?.reason ?? '').startsWith(PRE_STOP_HANDLE_GAP))) return false;
+      if (!Number.isInteger(g.pid)) return false;
+      if (g.creationFileTimeUtc) return endedId(g);
+      const known = unprovenOfPid(g.pid);
+      return known.length > 0 && known.every(endedId);
+    };
+    for (let i = gaps.length - 1; i >= 0; i--) if (resolves(gaps[i])) resolvedByLookup.unshift(gaps.splice(i, 1)[0]);
+  }
   for (const gap of gaps) {
     if (!gap.pid || !gap.creationFileTimeUtc || hasRow(gap)) continue;
     processExits.push({ pid: gap.pid, creationFileTimeUtc: gap.creationFileTimeUtc, role: gap.role ?? 'unknown',
@@ -1354,6 +1409,13 @@ function exitResult(input, output, source, ledger = null, view = null) {
     ...(view.reportIdentities ?? [])]) {
     if (witnessStarts.has(p) ? rowFor(p) : hasRow(p)) continue;
     let gap = gaps.find(g => gapNames(g, p));
+    if (!gap && !p.ledgerClass && input.targets.includes(p) && endedId(p)) {
+      // An armed target the lookup found ended, with nothing else known of it: accounted as ended.
+      processExits.push({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, role: p.role ?? 'unknown',
+        ledgerClass: 'UNKNOWN', ledgerReason: LOOKUP_ENDED_REASON, exitCode: null, atMs: null, exitTimeSource: 'unknown',
+        endedObservedBy: 'identity-checked lookup', expectedTermination: false, accounted: true, source });
+      continue;
+    }
     if (!gap && !p.ledgerClass) {
       gap = { pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, role: p.role,
         reason: 'witness_identity_or_membership_unproven' }; gaps.push(gap);
@@ -1361,6 +1423,16 @@ function exitResult(input, output, source, ledger = null, view = null) {
     processExits.push({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, role: p.role ?? 'unknown',
       ledgerClass: p.ledgerClass ?? 'UNKNOWN', ledgerReason: p.ledgerReason ?? gap?.reason ?? 'final owner receipt unavailable',
       atMs: null, exitTimeSource: 'unknown', expectedTermination: p.ledgerClass === 'REQUESTED', accounted: !gap, source });
+  }
+  // The rows of the identities whose unproven end the lookup resolved say how their end is known.
+  if (resolvedByLookup.length) {
+    for (const row of processExits) {
+      if (row.endedObservedBy || !endedId(row) || !resolvedByLookup.some(g => g.creationFileTimeUtc
+        ? compareIdentity(g, row, 'same') : hasPid(row, g.pid))) continue;
+      Object.assign(row, { ledgerClass: row.ledgerClass ?? 'UNKNOWN', ledgerReason: LOOKUP_ENDED_REASON,
+        endedObservedBy: 'identity-checked lookup', exitCode: Number.isInteger(row.exitCode) ? row.exitCode : null,
+        accounted: true });
+    }
   }
   for (const row of processExits) {
     row.ledgerClass ??= 'UNKNOWN';
@@ -1384,7 +1456,7 @@ function exitResult(input, output, source, ledger = null, view = null) {
     // had already gone, which arms none) the run's Engine incarnations in the ledger, every one of
     // whose recorded identities then has its exit (an identity without one is a gap above).
     exitAccountingComplete: (input.targets.length > 0 || view.engines.length > 0) && !gaps.length,
-    exitAccountingGaps: gaps, exitCensusFile: source, ledgerSummary: ledgerSummaryOf({ ...view, witnesses: (view.witnesses ?? []).map(w => {
+    exitAccountingGaps: gaps, ...(resolvedByLookup.length ? { resolvedByLookup } : {}), exitCensusFile: source, ledgerSummary: ledgerSummaryOf({ ...view, witnesses: (view.witnesses ?? []).map(w => {
       const host = consoleRowsOf(w.pid).find(p => compareIdentity(p, w, 'same'));
       return host ? { ...w, consoleClass: host.expectedTermination === true || host.ledgerClass === 'REQUESTED'
         ? 'REQUESTED' : host.ledgerClass ?? 'UNKNOWN' } : w;
@@ -1683,7 +1755,7 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     detail: `${u.name} could not be read (${u.error}); what that census observed is not accounted` });
   // The verdict reads the ledger last: `beforeVerdict(osExits)` gets the identity-bound OS exits and
   // writes the stop's own records from them (the dev-cli Engine exit), so the report reads them too.
-  const verdict = async (observerOutput, beforeVerdict) => {
+  const verdict = async (observerOutput, beforeVerdict, lookupEnded = []) => {
     // An earlier census of this run adds its OS exits, and the targets it observed them for.
     const observerKeys = keysOf(observerOutput.processExits);
     const output = earlier.files.length ? { ...observerOutput, processExits: [...(observerOutput.processExits ?? []),
@@ -1711,7 +1783,8 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
         || !armed.targets.some(t => compareIdentity(t, g, 'same')))],
       accountedProcesses: refreshed.accountedProcesses.filter(p => !armed.targets.some(t => compareIdentity(t, p, 'same'))) };
     // What an earlier census of the run found is carried forward: no later record clears it.
-    const result = carryFindings(exitResult(finalInput, output, outputFile, finalLedger, finalView), earlier.findings);
+    const result = carryFindings(exitResult(finalInput, output, outputFile, finalLedger, finalView, { lookupEnded }),
+      earlier.findings);
     // An earlier census file that could not be renamed stays as it was; this census names where it went.
     const written = earlier.notArchived.length ? { earlierCensusNotArchived: earlier.notArchived,
       censusWrittenAs: [path.basename(inputFile), path.basename(outputFile)] } : {};
@@ -1731,8 +1804,10 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     } catch { /* the kept files remain */ }
     return { ...result, ...written, earlierCensus: earlier.files, earlierCensusFiles: earlier.fileStates };
   };
-  if (process.platform !== 'win32' && !runtime.launch) return { finish: async ({ beforeVerdict } = {}) => verdict(
-    { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, beforeVerdict) };
+  // `finish({ beforeVerdict, lookupEnded })`: `lookupEnded`, the identities the stop's identity-checked
+  // lookup found ended before it acted on them (lookupEndedIdentities).
+  if (process.platform !== 'win32' && !runtime.launch) return { finish: async ({ beforeVerdict, lookupEnded } = {}) => verdict(
+    { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, beforeVerdict, lookupEnded) };
   const readyFile = path.join(runDir, 'exit-census-ready.json');
   const finishFile = path.join(runDir, 'exit-census-finish.json');
   for (const file of [readyFile, finishFile, outputFile]) fs.rmSync(file, { force: true });
@@ -1751,15 +1826,16 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   }
   // The stop's own kills are not an input (Spec B §5.1, step 9): a dev kill of the Engine writes its
   // own engine-intent and engine-exit, and the verdict reads them from the ledger.
-  return { finish: async ({ beforeVerdict } = {}) => {
+  return { finish: async ({ beforeVerdict, lookupEnded } = {}) => {
     fs.writeFileSync(finishFile, '{}');
     const end = now() + 5000;
     while (!fs.existsSync(outputFile) && !launchError && proc.exitCode == null && now() < end) await pause(50);
     let output;
     try { output = read(outputFile); } catch { output = { gaps: [{ reason: 'exit observer did not finish through teardown' }] }; proc.kill(); }
-    return verdict(output, beforeVerdict);
+    return verdict(output, beforeVerdict, lookupEnded);
   } };
 }
 module.exports = { CONHOST_EXIT_GRACE_MS, NOT_SEEN_YET, fileTimeFromInstant, isFinding, carryFindings,
   engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult,
-  endedIdentitiesOf, ledgerResolution, reconcileCrashedHelpers, startStopExitCensus, isProven, stopWriterBinding };
+  endedIdentitiesOf, ledgerResolution, reconcileCrashedHelpers, startStopExitCensus, isProven, stopWriterBinding,
+  lookupEndedIdentities, LOOKUP_ENDED_REASON };

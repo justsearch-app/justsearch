@@ -124,7 +124,7 @@ check):
 
   | Subject | Record and fields | Proves |
   | --- | --- | --- |
-  | Engine incarnation | `engine-exit` REQUESTED, UNEXPECTED with a code, or UNKNOWN without a code | true |
+  | Engine incarnation | `engine-exit` REQUESTED, UNEXPECTED with a code, or UNKNOWN without a code, written by a writer bound to the start (round 11) | true |
   | Engine incarnation | `engine-exit` marked reconciled | false |
   | Engine incarnation | `engine-owner-died` osCheck GONE, with its PID or without one, written by a writer bound to the start (round 10) | true |
   | Engine incarnation | `engine-owner-died` osCheck GONE naming another PID | false |
@@ -132,6 +132,7 @@ check):
   | Engine incarnation | `engine-intent`, `ledger-gap` | false |
   | Engine incarnation | `engine-exit` or `engine-owner-died` naming only the incarnation, written by an Engine that is neither the start's process nor the writer that recorded the start, or by a writer with its PID started at another millisecond (round 9) | false |
   | Engine incarnation | `engine-exit` or `engine-owner-died` naming only the incarnation, written by a supervisor (shell, dev runner, dev CLI) that did not record the start, or by the start writer's PID with another start instant or role, unless it is the stopping process's own writer bound to the identity that stop checked (round 10) | false |
+  | Engine incarnation | `engine-exit` or `engine-owner-died` GONE naming the start's whole PID and birth, written by a writer not bound to the start (another dev runner, a dev CLI, a shell, another Engine, the start writer's PID with another start instant or role) (round 11) | false |
   | Engine incarnation | an exit or GONE reconciliation of another incarnation, or one naming another birth than the start (at the start's measured tick) | false |
   | Engine incarnation with two start identities | an exit or GONE reconciliation not naming the start's PID and birth | false |
   | Engine incarnation | two exits with different codes | true, and a `ledger_codes_disagree` gap |
@@ -157,6 +158,16 @@ check):
   | Job witness | reconciled IDENTITY_UNKNOWN, ALIVE_MATCH, or no osCheck | false |
   | Job witness | `helper-start` and `helper-exit` alone | false |
   | any | `job-process-start`, `helper-intent`, `helper-window-start`/`-end`, `engine-start`, `engine-self-intent`, spawn records | false |
+
+  Round 11, beside the ledger: a stop's first identity-checked lookup, before it acts, that finds a
+  recorded identity's PID absent, or naming a process whose birth it read and which is another
+  birth (at the coarser of the two ticks), ends every identity of that PID born no later than the
+  lookup. The census accounts each such identity ended, exit code unknown unless the OS gave one,
+  reason "ended, observed by identity-checked lookup". It resolves only gaps that say the end was
+  unproven or unrecorded (`exit_unproven`, `ledger_record_missing`, `unrecorded_exit`,
+  `final_owner_receipt_unavailable`, the teardown and pre-stop handle gaps); a gap naming a PID
+  alone only when every unproven identity of that PID was found ended. Disagreements, conflicts,
+  damage and lost evidence stay. A lookup that failed or could not read the birth ends nothing.
 
 - Precision: when both sides are exact (a native read, `birthTick` 1, against a ledger birth an
   Engine wrote), they match only when equal. They are compared at a coarser tick only when one
@@ -394,6 +405,25 @@ collapsed into one):
   neither is proven. Only a start recorded again with every field equal (compareIdentity `exact`)
   is one start.
 
+Follow-up decisions after the independent verifier rejected 5b4cea41b (decided by the
+orchestrator; an unbound supervisor writer proved a live Engine's exit by naming its whole PID and
+birth, an identity-checked OS lookup that found a crashed Engine gone left accounting incomplete, a
+later real CLI stop lost completeness, and the live CLI read the whole Engine ledger again):
+
+- Writer binding applies to every supervisor-written Engine record that would prove an exit:
+  `engine-exit`, GONE and `engine-owner-died`, naming the incarnation alone or the whole identity.
+  An unbound writer's record is evidence to look the Engine up, never proof. Child records written
+  by the Java Engine keep the agreed rules.
+- An identity-checked OS observation that the exact PID-plus-birth identity no longer exists
+  proves the process ended: the PID absent, the PID reused by another birth, or the process
+  exited. It counts as complete for that identity, with exit code unknown and reason "ended,
+  observed by identity-checked lookup". A missing exit code is a fact to report, not a gap. An
+  unreadable lookup is still incomplete (S4 unchanged).
+- A later real CLI stop is fixed by the decision above: the earlier report's completeness is
+  carried, and the later stop is complete through its own lookup.
+- The actuator uses the same incremental, handle-identified reader as the census: unchanged files
+  are not reopened, and grown files are read only for their tail.
+
 What changed:
 
 - `scripts/dev/lib/stop-exit-census.cjs`: `proofOfRecord` and `provenExitOf` decide exit proof
@@ -545,6 +575,34 @@ What changed:
   requires of every writer (`exit-ledger.cjs` `readWriter`). Without it their Engine's own
   incarnation-only exit no longer proved its start (the writer could not be told to be that
   Engine), and three cases failed; with it they pass here, on 3e9ebd546 and on b599d4d7e.
+- Round 11, `ledger-identity.cjs`: `compareIdentity` `proves` checks the writer binding of every
+  Engine record before its shape: the Engine itself, a writer of the start, or a stop's bound
+  writer (`startWriters`), whether it names the incarnation alone or the whole PID and birth.
+  `stop-exit-census.cjs`: `lookupEndedIdentities` validates a stop's lookup observations (`pid`,
+  `observed` `absent` or `reused` with `observedCreationFileTimeUtc` and its tick, `observedAtMs`);
+  `exitResult(..., { lookupEnded })` judges each identity against them with compareIdentity
+  (`endedByObservation`), resolves the gaps above into `resolvedByLookup`, and gives each such
+  identity's row `ledgerReason` "ended, observed by identity-checked lookup", `endedObservedBy`,
+  and an exit code only when the OS gave one; an armed target the lookup found ended, with nothing
+  else known of it, gets such a row. `startStopExitCensus` `finish({ beforeVerdict, lookupEnded })`
+  passes them through. `dev-runner.cjs` `stopRun`: after its first lookup and before acting,
+  `noteLookupEnded` records each unproven recorded identity with a birth whose PID the lookup
+  found absent, or reused by another readable birth, with the time the lookup was asked; the stop
+  hands them to the census and reports them as `endedByLookup` (report and output). It passes its
+  incremental reader to the dev CLI recorder. `engine-actuator.cjs`: `createEngineActuator` and
+  `createCliEngineRecorder` take a `ledgerReader` (default: a new incremental reader) and read the
+  Engine ledger only through it (`reconcile`, the self-intent check, `exitRecorded`).
+- Round 11 test fixtures: in `test-dev-runner-stop-census.mjs`, the later receipt of the
+  disagreement case (39) was written by a dev runner writer with the right PID but started at that
+  moment, which is not the writer that recorded the start; it now carries that writer's start
+  instant, so the receipt proves the start and the case keeps checking that a disagreement is never
+  cleared by it. Without it, `ledger_codes_disagree` was missing (the receipt no longer proved).
+  In `test-dev-runner-terminal-children.mjs` (failed Engine quit, llama cleanup), the lookup stub
+  answered every PID with the backend's birth, so the stop's first lookup saw the running llama
+  child's PID name another birth and handed that observation to the census, whose stand-in asserts
+  no option names the child's PID (the stop's own kills are not handed to it). The stub now answers
+  the child's PID with its own manifest start while it runs, as the real lookup does; the
+  assertion is unchanged. It passes here and on 5b4cea41b; unchanged, it failed here by assertion.
 - Round 10 test fixtures: the dev runner's Engine records in `test-dev-runner-exit-census.mjs`,
   `test-dev-runner-exit-census-evidence.mjs` and `test-dev-runner-job-witness.mjs` were written by
   a role alone (`{ role: 'dev-runner' }`, once with a PID but no start instant), which the ledger
@@ -556,9 +614,9 @@ What changed:
   Engine's PID and birth) through `ledgerView`, as `stopRun` passes it. Without these, seven cases
   failed by assertion (the Engine's exit unproven).
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (82 cases; 40 and 41 rewritten and
-42 to 61 added in round 8, 62 to 71 in round 9, 69 rewritten and 72 to 82 added in round 10, with
-their own before-results below). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (90 cases; 40 and 41 rewritten and
+42 to 61 added in round 8, 62 to 71 in round 9, 69 rewritten and 72 to 82 added in round 10, 40 and
+71 extended and 83 to 90 added in round 11, with their own before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -896,6 +954,29 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    recorded, and a child-start of the same process under another owner or incarnation to be a
    start of its own: on ba109f4ab it misjudges 33 of its 2,000 cases (census 32, lookup 19,
    accounting 23), none here.
+   Extended in round 11: the whole-identity `engine-exit` and the `engine-owner-died` records (some
+   naming the birth) are written by any of the dev runner, the dev CLI, the shell, another dev
+   runner, the dev runner's PID a second later, the Engine itself, the run's first Engine or the
+   next one, and the run's first Engine's own exit sometimes names its whole PID and birth; the
+   `writer` check requires a bound writer for every proving Engine record, whole identity or not.
+   The stop's lookup finds each PID absent, reused by a process of another microsecond, alive or
+   unreadable (the run's first Engine absent, reused or unreadable, never running), and the stop is
+   judged by the oracle's own reading of the lookup: a looked-up PID with a tracked record not
+   ended is reported unresolved only when running or unreadable, the stop is `STOP_INCOMPLETE`
+   when any is, and it is complete (without a witness or such a PID) exactly when every start of
+   the run is proven or was found ended by the lookup (asked of its PID, born before it, absent or
+   another microsecond, without a metadata conflict); never complete otherwise. Round 8's
+   generated check (case 40) likewise writes each Engine exit and reconciliation by the dev runner,
+   the Engine writer, the Engine itself or another dev runner, proves an Engine start only through
+   a bound writer, and expects a whole stop to account each start of the run that its lookup found
+   absent or reused (and the run's Engine of a child case, which it always finds absent) without a
+   conflict or two codes. On 5b4cea41b (this file copied into its checkout) case 71 misjudges
+   1,057 of its 3,000 cases (writer 882, stop 249, census 1) and case 40 1,067 of its 2,000 (census
+   26, lookup 14, accounting 1,047); none here. With the stop's observations withheld from the census
+   (`lookupEnded: []`) case 40 misjudges 1,064 of its 2,000 cases (accounting) and case 71 250 of its
+   3,000 (stop); with the writer binding applied only to incarnation-only records (5b4cea41b's
+   rule), case 40 misjudges 26 (census 26, lookup 14, accounting 2) and case 71 882 (writer 882,
+   census 1).
 72. to 75. Round 10, unbound supervisor (the verifier's `own-edges.cjs` reproductions), through a
    whole real `stopRun` of a running Engine stand-in whose incarnation-2 start one writer recorded
    and whose incarnation-only exit another wrote: another shell (72), another dev runner (73), a
@@ -936,6 +1017,50 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    stop takes the exit through the dev CLI role), and fails by assertion on this change with
    `stopWriterBinding` returning null (`ledger_record_missing` for the Engine in the CLI's own
    stop), as do 80's bound row.
+83. Round 11, Engine writer table, through `ledgerView`: an `engine-exit` naming the whole PID and
+   birth, an `engine-owner-died` GONE naming them, one naming the PID, and an incarnation-only exit
+   prove the start only when written by the dev runner that recorded it or the Engine itself; never
+   by another dev runner, a dev CLI, a shell, another Engine, the start writer's PID started a second
+   later or under another role. Fails by assertion on 5b4cea41b (the whole-identity rows prove from
+   every writer) and on b599d4d7e (its view has no `proof`, so the bound rows prove nothing there).
+84. and 85. Round 11, unbound full identity (the verifier's `unbound-full-native-engine-exit`): a
+   running Engine stand-in whose incarnation-2 start a dev runner recorded, and an `engine-exit`
+   (84) or `engine-owner-died` GONE (85) naming its whole PID and birth written by a dev CLI that
+   did not. The real census (children family present) is not complete; a whole real `stopRun`
+   looks the Engine up, finds it running, reports it and is `STOP_INCOMPLETE`, accounting
+   incomplete. Both fail by assertion on 5b4cea41b (the census complete) and pass on b599d4d7e.
+86. Round 11, crash recovery (the verifier's `unbound-owner-died-gone-real-lookup`): a real child
+   process as the Engine, its start recorded by a dev runner; it ends; the real
+   `createEngineActuator(...).reconcile()` of this process (the next supervisor, an unbound writer)
+   records `engine-owner-died` GONE. A whole real `stopRun` with the real census and real lookups
+   looks the Engine up, finds it gone, and is `STOPPED`, accounting complete; its row reads "ended,
+   observed by identity-checked lookup" with exit code null, and `endedByLookup` names it
+   `absent`. Fails by assertion on 5b4cea41b and on b599d4d7e (not complete).
+87. Round 11, lookup rows: a crashed Engine (start by a dev runner, GONE by another) whose PID the
+   stop's first lookup finds absent, or reused by a readable birth a minute later, is accounted
+   (complete, the lookup-ended row, one `endedByLookup`); one whose birth cannot be read stays
+   incomplete and `STOP_INCOMPLETE`, with nothing in `endedByLookup` (S4). Fails by assertion on
+   5b4cea41b and on b599d4d7e (the absent and reused rows not complete).
+88. Round 11, census, through `exitResult` with `lookupEnded`: an armed Engine start with no exit is
+   accounted, its code null and the lookup-ended reason, by an observation that its PID was absent
+   or named another birth; not by one naming a birth of the same microsecond (at the CIM tick), one
+   made before the start's birth, an unreadable one, one without the time of the lookup, or one of
+   another PID; without an observation it stays incomplete. A bound exit naming code 0 recorded
+   after arming, with the OS reporting 7, keeps its `ledger_os_disagree` whatever the lookup found.
+   Fails by assertion on 5b4cea41b and on b599d4d7e (no observation accounts anything).
+89. Round 11, real dev CLI stops (the verifier's `real-second-cli-and-later-stop`): a runner and an
+   Engine (live fixture processes); one real `dev-runner stop --json --run` from a second CLI
+   process is `STOPPED` and complete; a later real CLI stop, the Engine gone, is `STOPPED` and
+   complete through its own lookup (the Engine's row reads "ended, observed by identity-checked
+   lookup"), lists stop-report.1.json as readable in `earlierReportFiles`, and that kept report is
+   still complete. Fails by assertion on 5b4cea41b (the later stop not complete:
+   `process handle unavailable before stop`) and on b599d4d7e (not complete).
+90. Round 11, CLI read-once: a ledger whose Engine start the stop's incremental reader has read; a
+   dev CLI recorder given that reader writes its intent and exit, and the reader reads again (the
+   census's verdict). No ledger file is read whole (`readFileSync`), the start is not parsed again,
+   and every Engine record is parsed once. Fails by assertion on 5b4cea41b ("no ledger file is read
+   whole": the recorder's `exitRecorded` read the whole file) and on b599d4d7e (no incremental
+   reader).
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -1110,4 +1235,36 @@ The 41 `test-dev-runner-*.mjs` files and `e-pair-identity.test.mjs` pass (241 te
 2,970 ms, case 58 17,419 ms, case 82 16,645 ms, and the generated cases 40, 41 and 71 took
 116,089, 47,106 and 262,583 ms.
 
-Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r10/).
+After the 5b4cea41b fixes, the round-10 verifier's reproductions (copied and repointed to this
+round's folder, verifier-r11/vx) pass on this change: `r10-edges.cjs` (3 of 3:
+`unbound-full-native-engine-exit`, `unbound-owner-died-gone-real-lookup`,
+`real-second-cli-and-later-stop`), `r10-corrected.cjs` `unbound-owner-died-gone-real-lookup`, and
+`live-recovery.cjs` (the Engine alive). Its CLI read check (verifier-r11/cli-read: two real CLI
+stops under a preload that records every open, read, whole-file read and Engine record parse) finds
+no whole-ledger read and each Engine record parsed once in both CLI processes here; on 5b4cea41b it
+fails by assertion ("reads no whole ledger file"). Every verifier harness of rounds 2 to 9 was run
+again from copies with fresh folders (verifier-r11/harness-logs) with the same results as in round
+10: r2, r3 and r4 `independent.cjs` (19 each), r3 and r4 `independent-extra.cjs` (22 each),
+`independent-edges.cjs` (21), `proof-probes.cjs` and `proof-extra.cjs` (5 each), `r5-retention.cjs`
+(3), `r6-retention.cjs` (6), `sticky-edges.cjs` (3), both `incremental-tail-probe.cjs` runs,
+`r8-corrected-identity.cjs` (12), round 8's `independent-edges.cjs` (3), `fresh-edges-r9.cjs` (9) and
+`own-edges.cjs` (6) pass; `r7-identity-edges.cjs` passes 7 of 8 (`missing-child-exit-native-fields`,
+as decided in round 8); `audit-edges.cjs` 18 of 19 and `audit-more.cjs` 22 of 23, both failing
+`engine-owner-died-GONE` as before (the unbound reconciliation proves nothing, and the stop looks the
+tracked identity up and cannot read its birth: S4). The boundary harnesses give the same exit codes
+as in round 10, the corrected ones passing here and failing by assertion on b599d4d7e. With the
+corrected generator (`run-perf-r8.ps1`), interleaved three times, run alone, CPU load 32 to 54 %:
+b599d4d7e 13,046 / 12,932 / 13,287 ms, 118,510 parses, not complete; this change 2,260 / 2,264 /
+2,513 ms, 59,255 parses, complete; `assert-perf.cjs`, `assert-file-reads.cjs` and
+`assert-comparison-r8.cjs` pass. Its census alone took 14,563 ms on b599d4d7e (arming 4,961, verdict
+9,601) and 1,751 ms with this change (1,335 and 416), complete. Over the original, misaligned
+fixtures: b599d4d7e 14,172 / 13,725 / 14,951 ms, this change 15,781 / 14,490 / 15,988 ms, both not
+complete (every child looked for); the legacy r2 and r3 perf harnesses took 14,497 and 13,902 ms on
+b599d4d7e and 17,434 and 15,975 ms with this change, not complete. The 41 `test-dev-runner-*.mjs`
+files and `e-pair-identity.test.mjs` pass (249 tests; `test-dev-runner-terminal-children.mjs` after
+its fixture change above, run again on its own), as does `fixture-cleanup.test.mjs` (10). In the
+full run of the check (90 of 90), the 17 MB stops took 2,462 and 2,712 ms, case 58 13,632 ms, cases
+82 and 89 16,035 and 16,142 ms, and the generated cases 40, 41 and 71 took 98,208, 30,467 and
+212,488 ms.
+
+Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r11/).
