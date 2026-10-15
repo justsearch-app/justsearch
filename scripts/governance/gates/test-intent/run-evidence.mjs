@@ -5,7 +5,8 @@
  *   node scripts/governance/gates/test-intent/run-evidence.mjs \
  *     --out gates/test-intent/evidence/<name>.json \
  *     --check <check id> [--check <check id> ...] \
- *     [--before <ref> [--overlay <path> ...] [--before-patch <compatibility.patch> ...]]
+ *     [--before <ref> [--overlay <path> ...] [--before-patch <compatibility.patch> ...]] \
+ *     [--copy-node-modules]
  *
  * It runs the named checks itself (Gradle → JUnit XML, vitest → JSON report, cargo → libtest
  * output), validates its own output (a fresh result file per run; a check that matched nothing is
@@ -18,6 +19,8 @@
  * transplanted) plus any `--overlay` paths, the same commands run there, and each check's failure is
  * classified: `assertion` (the only one that shows the old behaviour is wrong), `exception`,
  * `compile`, `environment`, `passed`, `skipped`.
+ * `--copy-node-modules`: copy candidate vitest dependencies into the before-worktree as ordinary
+ * files, dereferencing dependency links; by default the dependency directory is linked.
  *
  * Exit: 0 when every check executed and passed on the candidate (and, with --before, failed with an
  * assertion before); 1 otherwise; 2 usage/infrastructure error. Completed results are written
@@ -204,10 +207,12 @@ function rustTestFiles() {
   return rustTestFileCache;
 }
 
-function linkNodeModules(worktree) {
+function prepareNodeModules(worktree, copyNodeModules = false) {
   const src = path.join(REPO_ROOT, 'modules', 'ui-web', 'node_modules');
   const dst = path.join(worktree, 'modules', 'ui-web', 'node_modules');
-  if (fs.existsSync(src) && !fs.existsSync(dst)) fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
+  if (!fs.existsSync(src) || fs.existsSync(dst)) return;
+  if (copyNodeModules) fs.cpSync(src, dst, { recursive: true, dereference: true });
+  else fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
 }
 
 /** Detach links without visiting their targets, including dangling links and linked ancestors. */
@@ -251,9 +256,10 @@ function parseArgs(argv) {
     else if (k === '--before-patch') a.beforePatches.push(v().replaceAll('\\', '/'));
     else if (k === '--before-root') a.beforeRoot = path.resolve(v());
     else if (k === '--overlay') a.overlays.push(v().replaceAll('\\', '/'));
+    else if (k === '--copy-node-modules') a.copyNodeModules = true;
     else throw new Error(`unknown argument ${k}`);
   }
-  if (!a.out || a.checks.length === 0) throw new Error('usage: --out <file> --check <id> [--check <id>...] [--before <ref> [--overlay <path>...]]');
+  if (!a.out || a.checks.length === 0) throw new Error('usage: --out <file> --check <id> [--check <id>...] [--before <ref> [--overlay <path>...]] [--copy-node-modules]');
   if (a.beforePatches.length && !a.before) throw new Error('--before-patch requires --before');
   return a;
 }
@@ -310,7 +316,7 @@ function main() {
         return { path: rel, contentDigest: digest };
       });
       overlayInto(wt, args.checks, args.overlays);
-      if (args.checks.some(id => runnerFor(id) === 'vitest')) linkNodeModules(wt);
+      if (args.checks.some(id => runnerFor(id) === 'vitest')) prepareNodeModules(wt, args.copyNodeModules);
       const fb = runChecks(args.checks, wt);
       failBefore = {
         ref: args.before,
