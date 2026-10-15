@@ -392,7 +392,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "evidence": "gates/test-intent/evidence/b90-ix-llama-ui.json"
     },
     {
-      "behaviour": "An explicit false evaluation system property wins over a true environment value and preserves an explicit positive cache bound.",
+      "behaviour": "An explicit false evaluation system property wins over a true environment value and preserves an explicit positive cache bound. Preservation rerun: explicitFalseEvaluationPropertyWins passes on 61ff9b955 (the declared whole-change before-state) and on candidate 628bb419f, with no production overlays or compatibility patches. Both child JVMs report CACHE_RAM=256 with environment evaluation true and system-property evaluation false.",
       "class": "New",
       "items": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java"
@@ -852,5 +852,16 @@ the records pass.
   "verdict": "accept",
   "digest": "sha256:4068c75e6f2286d096d717ffa2697e7c54a0c1fd8286be9a682ef1eea6090acb",
   "note": "VC-llama (independent Claude verifier) over three rounds, accepting b9abcaf97 vs 61ff9b955 (rejected 7de3976a1-era review findings and 1f8ce3e01 for regressions): a chat model switch 9B to compact and a same-plan encoder re-preparation are admitted with chat loaded on 12/16/24 GB, real shortfalls still refused; a custom 1 GiB model reserves file+KV+770 MiB and keeps encoders on GPU, CPU chat and a missing saved file reserve nothing, the missing file is named; default-model plans identical to base on 8/12/16/24 GB; boot preparation with a stored installer path 161 ms (1f8ce3e01 7735 ms), identity receipt written off the boot path and used on the next boot; start-order and system-access allowlist tests pass; CPU dispatch asserted. All round-3 tests fail on 1f8ce3e01 by assertion. Suites, ArchUnit and PMD show only baseline or load-only failures. Live: default plan P12 measured; boot with a stored path, receipt, next boot measured. Unverified live: encoder re-plan during a chat switch (the runner drains chat first). Named limits: chat_model_unmeasured is listed as an unmet user setting even when nothing is reserved; custom-model KV uses the 4B rate and can be 1.4-2.7 GB low for dense 8B models at 32k; identity-pending state applies at the next rebuild or boot and is only partly visible. Digest bound with --base 61ff9b955, the lane's base."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "reject",
+  "digest": "sha256:38a7f2fe85bc61895c9882e1cbedb2bfdffba95fc37a08b0decb6b681944c75e",
+  "note": "Reject entry 17: b90-ix-llama-preservation.json has failBefore null, and neither its entry nor the preamble explains why explicitFalseEvaluationPropertyWins cannot be executed before the change; calling it preservation supplies no candidate-only reason. All 83 candidate case references pass and the changed round-2 before replay matches, but this declaration omission remains."
 }
 ```

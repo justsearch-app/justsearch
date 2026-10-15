@@ -344,3 +344,14 @@ constructor that 5e4f4e698 left. So that file was re-run without a before-state.
   "note": "Reviewed changed hold/config fixtures, candidate-only API-absence reasons and the retained controller guardrail rule. Candidate unit/reconciler and adapted guardrail checks passed; superseded manual before-pass prose is not counted as current script evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:f5f1c3db249f3db08cae49ba69897809978eecc37be611ecd97b1d8924913f7c",
+  "note": "All 24 current selected hold, session, install, VDU and reconciler candidate cases pass. The expanded shared profile fixture preserves these expectations, and the entries accurately give concrete new-API reasons for candidate-only cases; retained repaired evidence is unchanged."
+}
+```

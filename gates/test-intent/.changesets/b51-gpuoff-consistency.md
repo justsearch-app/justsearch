@@ -196,3 +196,14 @@ Independent acceptance pending.
   "note": "Bind the same independent acceptance of these demonstrated test intents to the normal local governance base. The preceding f6-specific record and report contain the replay/live evidence. This is not acceptance of the overall functional behavior: NO_GPU encoder startup still fails on baseline and candidate, and the documented operator reranker exception conflicts with the all-CPU profile. Report: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff3/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:24a453bf39fe74fec00f5f4db100dd12f4cfee7d038b9200be18c7b61228bfe9",
+  "note": "Current candidate checks pass all 33 case references, including the expanded profile fixture. Fresh 3241289f5 replay with the declared add-only compatibility class matches all seven assertion-classified check IDs; the no-op class has no original production consumer and supplies no activation decision."
+}
+```

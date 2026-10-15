@@ -316,3 +316,14 @@ overlaid on top of them.
   "note": "Re-reviewed the corrected entries since 9f1f6257b: both candidate checks pass and the exact f75486245 compatibility-patch replay reproduces the declared coalescing and lifecycle-lock assertion failures. The patch does not decide those outcomes; other entries, listed items and evidence remain truthful and unchanged; bound to main."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:86948d51f415be085aeaa91a749299c0b613d705fa8792aa4e6c647c57e2ef92",
+  "note": "All 19 current selected candidate cases pass; the shared controller addition is separately covered by fix-replan. Regenerated evidence retains the exact repaired seam source, compatibility patch and before outcomes independently reproduced in VS3b on f75486245; those bytes and the archived assertion results were checked."
+}
+```
