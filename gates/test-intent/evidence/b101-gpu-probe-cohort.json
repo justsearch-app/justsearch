@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T06:38:51.843Z",
+  "revision": "09950a33cb7fc2839029e416aa9c3eaf9fe53a76",
+  "tree": "410d10e8a72ad537cc6fa10f1f0460a0e0a1f051",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvidiaSmiSlowProbeSharingTest.everyWaiterReceivesTheOutcomeOfTheProbeItJoined\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5181
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java#everyWaiterReceivesTheOutcomeOfTheProbeItJoined",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:422d8e11553954fdbf2dc219a4c6c0d2f67eb5c7ed8834fb4e8c7e8ef5fc8579",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyWaiterReceivesTheOutcomeOfTheProbeItJoined()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "09950a33c",
+    "revision": "09950a33cb7fc2839029e416aa9c3eaf9fe53a76",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvidiaSmiSlowProbeSharingTest.everyWaiterReceivesTheOutcomeOfTheProbeItJoined\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 28139
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java#everyWaiterReceivesTheOutcomeOfTheProbeItJoined",
+        "classification": "assertion",
+        "detail": "everyWaiterReceivesTheOutcomeOfTheProbeItJoined(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: timeout trial 1: waiters received another probe's outcome instead of the one they joined: [Reading[available=false, error=nvidia-smi timed out, totalBytes=null, freeBytes=null, driverVersion=null, at=1970-01-01T00:00:00Z, stale=false], Reading[available=false, er"
+      }
+    ]
+  },
+  "digest": "sha256:6b1e815ec176ff6b29dfac9aaaedb31617ed5c505345124a8ae2e0a6f86a9f26"
+}

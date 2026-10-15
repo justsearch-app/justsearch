@@ -104,6 +104,8 @@ final class OperatingStateAssembler {
   private final Episode belowP8 = new Episode();
   private final Episode overcommit = new Episode();
   private final Episode bgeUnmeasured = new Episode();
+  private final Episode chatUnmeasured = new Episode();
+  private final Episode chatIdentityPending = new Episode();
   private volatile Supplier<ChatResidency> chatResidency;
 
   void setChatResidency(Supplier<ChatResidency> source) {
@@ -239,6 +241,16 @@ final class OperatingStateAssembler {
     unmet.see(unmetCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(
         DegradationCode.USER_SETTING_UNMET, unmetCause, DegradationScope.RUNTIME,
         LifecycleReasonCode.INFERENCE_SETTING_UNMET.code(), e.since, assembledAt, e.count)));
+    String chatUnmeasuredCause = plan != null
+        && plan.diagnosticReasons().contains("chat_model_unmeasured") ? "chat_model_unmeasured" : null;
+    chatUnmeasured.see(chatUnmeasuredCause, assembledAt).ifPresent(e -> out.add(
+        new OperatingDegradationView(DegradationCode.CHAT_MODEL_UNMEASURED, chatUnmeasuredCause,
+            DegradationScope.RUNTIME, "chat_model_unmeasured", e.since, assembledAt, e.count)));
+    String chatIdentityCause = plan != null
+        && plan.diagnosticReasons().contains("chat_identity_pending") ? "chat_identity_pending" : null;
+    chatIdentityPending.see(chatIdentityCause, assembledAt).ifPresent(e -> out.add(
+        new OperatingDegradationView(DegradationCode.CHAT_IDENTITY_PENDING, chatIdentityCause,
+            DegradationScope.RUNTIME, "chat_identity_pending", e.since, assembledAt, e.count)));
     String belowCause = plan != null && plan.belowP8() ? "device_memory" : null;
     belowP8.see(belowCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(
         DegradationCode.DEVICE_BELOW_P8, belowCause, DegradationScope.RUNTIME,

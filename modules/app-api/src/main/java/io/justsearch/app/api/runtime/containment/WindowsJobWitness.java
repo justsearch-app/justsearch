@@ -48,8 +48,37 @@ final class WindowsJobWitness implements AutoCloseable {
   private volatile long observedThrough;
   private volatile boolean closed;
 
-  private record Held(String id, MemorySegment handle, String birth, String executable,
-      boolean awaited, boolean engineConsole) {}
+  private static final class Held {
+    private final String id;
+    private final MemorySegment handle;
+    private final String birth;
+    private final String executable;
+    private final boolean engineConsole;
+    private final Long parentPid;
+    private final String parentBirth;
+    private long exitSeenAt;
+
+    private Held(String id, MemorySegment handle, String birth, String executable,
+        boolean engineConsole, Long parentPid, String parentBirth) {
+      this.id = id;
+      this.handle = handle;
+      this.birth = birth;
+      this.executable = executable;
+      this.engineConsole = engineConsole;
+      this.parentPid = parentPid;
+      this.parentBirth = parentBirth;
+    }
+
+    String id() { return id; }
+    MemorySegment handle() { return handle; }
+    String birth() { return birth; }
+    boolean engineConsole() { return engineConsole; }
+  }
+
+  /** How long an exit waits for its owner's own record before the witness classifies it. */
+  static final long OWNER_WAIT_NANOS = 2_000_000_000L;
+  /** Every exit waits this long, so an owner registering a just-started identity is not missed. */
+  static final long REGISTRATION_WAIT_NANOS = 250_000_000L;
   private record Event(LedgerRecordType type, Map<String, Object> fields) {}
 
   private WindowsJobWitness(MemorySegment job) throws Throwable {
@@ -207,7 +236,8 @@ final class WindowsJobWitness implements AutoCloseable {
     fields.put("reason", awaited ? "HELPER_COMPLETION" : null);
     enqueue(LedgerRecordType.JOB_PROCESS_START, fields);
     if (member || engineConsole) {
-      processes.put(pid, new Held(id, handle, birth, executable, awaited, engineConsole));
+      processes.put(pid, new Held(id, handle, birth, executable, engineConsole,
+          (Long) fields.get("parentPid"), (String) fields.get("parentCreationFileTime")));
       // The Engine's own console cannot end before the Engine. Witness it without making
       // a clean shutdown consume the helper drain deadline waiting for its own console.
       if (pid != ProcessHandle.current().pid() && !engineConsole) liveHelpers++;
@@ -237,29 +267,60 @@ final class WindowsJobWitness implements AutoCloseable {
   private void exited(long pid) throws Throwable {
     Held held = processes.get(pid);
     if (held == null || (int) calls.wait.invokeExact(held.handle(), 0) != 0) return;
+    boolean waiting = false;
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment result = arena.allocate(ValueLayout.JAVA_INT);
       Integer code = (int) calls.code.invokeExact(held.handle(), result) == 0
           ? null : result.get(ValueLayout.JAVA_INT, 0);
       long exit = times(held.handle())[1];
-      boolean requested = false; // Membership is evidence, never owner intent.
+      Instant exitedAt = instantOf(exit);
+      long now = System.nanoTime();
+      if (held.exitSeenAt == 0) held.exitSeenAt = now;
+      // Membership is evidence, never owner intent: the class and reason come from the intent an
+      // owner recorded before this exit, and only an exit with no recorded intent is UNEXPECTED.
+      var resolution = resolve(pid, held, code, exitedAt, now - held.exitSeenAt);
+      if (resolution == null) { waiting = true; return; } // the owner may still record it; keep the handle
       Map<String, Object> fields = new LinkedHashMap<>();
       fields.put("witnessId", held.id());
       fields.put("pid", pid);
       fields.put("creationFileTime", held.birth());
       fields.put("code", code);
-      fields.put("exitClass", code == null ? "UNKNOWN" : requested ? "REQUESTED" : "UNEXPECTED");
-      fields.put("reason", requested ? "HELPER_COMPLETION" : null);
-      Instant exitedAt = instantOf(exit);
+      fields.put("exitClass", code == null ? "UNKNOWN" : resolution.exitClass());
+      fields.put("reason", code == null ? "native exit code unavailable" : resolution.reason());
+      fields.put("intentBasis", resolution.basis());
       fields.put("exitedAt", exitedAt == null ? null : exitedAt.toString());
       fields.put("observedAt", Instant.now());
       fields.put("forced", false);
       enqueue(LedgerRecordType.JOB_PROCESS_EXIT, fields);
     } finally {
-      processes.remove(pid);
-      if (pid != ProcessHandle.current().pid() && !held.engineConsole()) liveHelpers--;
-      closeHandle(held.handle());
+      if (!waiting) {
+        processes.remove(pid);
+        if (pid != ProcessHandle.current().pid() && !held.engineConsole()) liveHelpers--;
+        closeHandle(held.handle());
+      }
     }
+  }
+
+  /** Null while the owner may still record this exit. */
+  private static io.justsearch.app.api.runtime.child.ProcessIntents.Resolution resolve(
+      long pid, Held held, Integer code, Instant exitedAt, long waitedNanos) {
+    boolean ownerWaitOver = waitedNanos >= OWNER_WAIT_NANOS;
+    java.util.Optional<io.justsearch.app.api.runtime.child.ProcessIntents.Resolution> found;
+    boolean console = held.executable != null
+        && held.executable.toLowerCase(java.util.Locale.ROOT).endsWith("\\conhost.exe") && held.parentPid != null;
+    if (console && !held.engineConsole) {
+      found = io.justsearch.app.api.runtime.child.ProcessIntents.resolveConsole(
+          held.parentPid, held.parentBirth, ownerWaitOver);
+    } else {
+      found = io.justsearch.app.api.runtime.child.ProcessIntents.resolve(pid, held.birth,
+          held.executable, instantOf(held.birth == null ? 0 : Long.parseLong(held.birth)), exitedAt, ownerWaitOver,
+          held.parentPid, held.parentBirth, code); // the crash class is applied before it is kept
+    }
+    if (found.isEmpty()) return null;
+    var resolution = found.get();
+    if ("none".equals(resolution.basis()) && waitedNanos < REGISTRATION_WAIT_NANOS) return null;
+    // A console host follows its client's final class; its own crash code still counts.
+    return io.justsearch.app.api.runtime.child.ProcessIntents.afterExitCode(resolution, code);
   }
 
   private long[] times(MemorySegment process) throws Throwable {

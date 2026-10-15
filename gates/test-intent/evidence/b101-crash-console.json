@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T05:23:57.012Z",
+  "revision": "cdfc44cb7da17f9eb3f18f957bfeec4cf9855cf4",
+  "tree": "f123d08144f2e0f3c8c29a4b32441bb210bf3968",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.CrashConsoleFollowsClientTest.crashClientDoesNotLeaveRequestedConsoleIntent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9124
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/CrashConsoleFollowsClientTest.java#crashClientDoesNotLeaveRequestedConsoleIntent",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/CrashConsoleFollowsClientTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:973a551df7dde9496f216faaf949bbd2d4581b50eb7825f53a6268d545d82082",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "crashClientDoesNotLeaveRequestedConsoleIntent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "cdfc44cb7",
+    "revision": "cdfc44cb7da17f9eb3f18f957bfeec4cf9855cf4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.CrashConsoleFollowsClientTest.crashClientDoesNotLeaveRequestedConsoleIntent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27241
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/CrashConsoleFollowsClientTest.java#crashClientDoesNotLeaveRequestedConsoleIntent",
+        "classification": "assertion",
+        "detail": "crashClientDoesNotLeaveRequestedConsoleIntent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the real console host follows its crashing client, UNEXPECTED: helper identity=28232/134365154278947559&#13;&#10;native.start={witnessId=j-64544144-dbf6-438b-9d89-5bf24d575710, pid=28232, creationFileTime=134365154278947559, executable=F:\\scoop\\apps\\temurin25-jdk"
+      }
+    ]
+  },
+  "digest": "sha256:ba5e9bdad1a6f8838de83835f2d3eb062e88a7b3932e5f1f2ee3c7412ecbc09a"
+}

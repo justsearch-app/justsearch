@@ -269,7 +269,7 @@ final class CoreApiAssembly {
                 }
               }));
       // Tempdoc 629 (FLOOR): wire the at-rest-protection condition tap + the shared disk-encryption
-      // probe (one PowerShell shell-property read of the data-dir volume, cached 5s, fed to both the
+      // probe (one PowerShell shell-property read per volume per ten minutes, shared, fed to both the
       // /api/status View and the at-rest.unprotected condition).
       var atRestProbe =
           new io.justsearch.app.services.atrest.DiskEncryptionProbe(b.indexBasePath);

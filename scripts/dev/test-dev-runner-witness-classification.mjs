@@ -31,11 +31,12 @@ rec('helper-window-end', { intentId: 'i-1', owner, incarnation, image: 'tesserac
   reason: 'Tika Tesseract availability', closedAt: instant(end) })];
 const cls = ledger => census.ledgerView(ledger, run.runId).witnesses[0].exit;
 
-test('W3: handled Tika code-1 availability probe is intended only inside a closed window', () => {
+test('W3: handled Tika code-1 availability probe is intended only inside its window', () => {
   assert.equal(cls(history(1, window(4))).exitClass, 'REQUESTED');
   assert.match(cls(history(1, window(4))).reason, /availability/);
   assert.equal(cls(history(1, window(2))).exitClass, 'UNEXPECTED');
-  assert.equal(cls(history(1, window(4).slice(0, 1))).exitClass, 'UNEXPECTED');
+  // A window whose end record is missing covers until its owner's recorded exit (task b6d536 b101).
+  assert.equal(cls(history(1, window(4).slice(0, 1))).exitClass, 'REQUESTED');
   assert.equal(cls(history(1, window(4), 'powershell.exe')).exitClass, 'UNEXPECTED');
 });
 test('W4: owner interruption receipt wins over the witness', () => {

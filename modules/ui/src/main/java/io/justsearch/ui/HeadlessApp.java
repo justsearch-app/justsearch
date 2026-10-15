@@ -191,7 +191,7 @@ public class HeadlessApp {
           String layers = "99";
           // Tempdoc 883 decision 4 slice 2: the map ONLY — no sysprop mirror. A sysprop write puts
           // this DERIVED hardware-probe number at ordinal 500, where it outranks the user's own GPU
-          // setting at 300. It was masked only because the settingsâ†’sysprop promotion ran first and
+          // setting at 300. It was masked only because the settings→sysprop promotion ran first and
           // setSysPropIfBlank then no-opped; with that promotion deleted, mirroring here would let
           // an auto-detected 99 silently override the user's choice on exactly the hardware where
           // the choice matters. The map is contributed at ordinal 150 and kept across rebuilds by
@@ -270,8 +270,8 @@ public class HeadlessApp {
   /**
    * GPU layers as they stand after auto-detection — the resolver's ordinal chain in miniature.
    *
-   * <p>Walks {@code -D} / env (500 / 400) â†’ {@code settings.json} (300) â†’ the auto-detected probe
-   * map (150) â†’ 0, which is the order {@link ResolvedConfigBuilder} will apply to the same key a few
+   * <p>Walks {@code -D} / env (500 / 400) → {@code settings.json} (300) → the auto-detected probe
+   * map (150) → 0, which is the order {@link ResolvedConfigBuilder} will apply to the same key a few
    * lines later in {@code resolveConfig}. Tempdoc 883 decision 4 slice 2 is what makes the middle
    * rung explicit: the settings value used to arrive here inside {@code EnvRegistry.GPU_LAYERS}
    * because a promotion mirrored it into the sysprop, so this method could not tell a GUI setting
@@ -754,7 +754,7 @@ public class HeadlessApp {
         io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridge.emitRecoveryOccurrence(
             occurrence, health.occurrenceLog(), health.changes(), health.headSource()));
     // Tempdoc 876 §C.8: reconcile the readiness snapshot on the poll the head already runs, so a
-    // dimension that settles WITHOUT a capability transition (INDEX_SERVING â†’ DEGRADED /
+    // dimension that settles WITHOUT a capability transition (INDEX_SERVING → DEGRADED /
     // index.dense_unavailable) still reaches the ConditionStore for a client that never calls
     // GET /api/status. Without this the trigger's capability-transition arm can leave a boot-time
     // index.unavailable standing, and core.search-index — gated on Not(index.unavailable) — stays
@@ -789,7 +789,7 @@ public class HeadlessApp {
     var settingsStore = new io.justsearch.app.services.settings.UiSettingsStore(mode);
     UiSettings settings = settingsStore.load();
 
-    // Tempdoc 883 decision 4 + its §C.5c residue: there is no settingsâ†’sysprop promotion left here
+    // Tempdoc 883 decision 4 + its §C.5c residue: there is no settings→sysprop promotion left here
     // for a resolver-backed key — not context-size (slice 1), not server.exe / exclude-patterns /
     // gpu.layers (slice 2), and no longer index.base_path or llm.model_path. Every one of those
     // rides settings.json at ordinal 300 via ConfigStoreRebuilder.contributeUiSettings; the derived

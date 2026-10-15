@@ -74,6 +74,7 @@ export interface StatusResponse {
   atRestProtection?: {
     confidence?: string;
     diskEncryption?: string;
+    probedAtMs?: number;
     qualityKnown?: boolean;
     source?: string;
   };
@@ -218,7 +219,7 @@ export interface StatusResponse {
     };
     degradations: ({
       cause: string | null;
-      code: "user_setting_unmet" | "device_below_p8" | "device_memory_overcommit" | "bge_m3_unmeasured" | "exit_ledger_unwritable" | "child_survived";
+      code: "user_setting_unmet" | "device_below_p8" | "device_memory_overcommit" | "bge_m3_unmeasured" | "chat_model_unmeasured" | "chat_identity_pending" | "exit_ledger_unwritable" | "child_survived";
       count: number;
       lastSeenAt: string;
       reasonCode: string;
@@ -507,6 +508,7 @@ export const statusResponseSchema = z.strictObject({
   "atRestProtection": z.strictObject({
     "confidence": z.string().optional(),
     "diskEncryption": z.string().optional(),
+    "probedAtMs": z.number().int().optional(),
     "qualityKnown": z.boolean().optional(),
     "source": z.string().optional(),
   }).optional(),
@@ -651,7 +653,7 @@ export const statusResponseSchema = z.strictObject({
     }).optional(),
     "degradations": z.array(z.strictObject({
       "cause": z.string().nullable(),
-      "code": z.enum(["user_setting_unmet", "device_below_p8", "device_memory_overcommit", "bge_m3_unmeasured", "exit_ledger_unwritable", "child_survived"]),
+      "code": z.enum(["user_setting_unmet", "device_below_p8", "device_memory_overcommit", "bge_m3_unmeasured", "chat_model_unmeasured", "chat_identity_pending", "exit_ledger_unwritable", "child_survived"]),
       "count": z.number().int(),
       "lastSeenAt": z.string(),
       "reasonCode": z.string(),

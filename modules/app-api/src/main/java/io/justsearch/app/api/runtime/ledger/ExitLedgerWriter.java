@@ -30,7 +30,8 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <ul>
  *   <li>Each record is one append of the whole line, then {@code FileChannel.force(false)}, before
- *       the caller acts. The file is opened per append, so a rename between appends is safe.
+ *       the caller acts. {@link #appendUnforced} skips the force for a record whose loss readers
+ *       reconstruct from earlier forced records. The file is opened per append, so a rename between appends is safe.
  *   <li>A write failure never stops the caller: {@link #append} returns {@code false}, the writer
  *       turns {@link #healthy() unhealthy}, and a {@code ledger-gap} record is appended before the
  *       next record that can be written.
@@ -72,6 +73,9 @@ public final class ExitLedgerWriter {
   private final long hardCapBytes;
 
   private final Map<LedgerGapReason, PendingGap> pendingGaps = new EnumMap<>(LedgerGapReason.class);
+  /** A failed force not yet followed by a successful one: unforced records may not be durable. */
+  private volatile PendingGap durabilityGap;
+  private boolean durabilityGapRecorded;
   private long seq;
   private volatile boolean healthy = true;
 
@@ -142,7 +146,20 @@ public final class ExitLedgerWriter {
    * @throws IllegalArgumentException if the record is of another family, names an envelope field,
    *     or exceeds {@link ExitLedger#MAX_RECORD_BYTES} (caller bugs, not I/O conditions)
    */
-  public synchronized boolean append(LedgerRecordType type, Map<String, ?> fields) {
+  public boolean append(LedgerRecordType type, Map<String, ?> fields) {
+    return append(type, fields, true);
+  }
+
+  /**
+   * Appends one record without forcing it: the line reaches the operating system before this
+   * returns, so it survives this process ending, but not necessarily a host crash. For records
+   * whose loss a reader reconstructs from earlier forced records (a helper window's end).
+   */
+  public boolean appendUnforced(LedgerRecordType type, Map<String, ?> fields) {
+    return append(type, fields, false);
+  }
+
+  private synchronized boolean append(LedgerRecordType type, Map<String, ?> fields, boolean force) {
     Objects.requireNonNull(type, "type");
     Objects.requireNonNull(fields, "fields");
     if (!type.belongsTo(family)) {
@@ -171,29 +188,96 @@ public final class ExitLedgerWriter {
       gapFields.put("since", gap.getValue().since());
       lines.add(new Line(gap.getKey(), encode(LedgerRecordType.LEDGER_GAP, gapFields, now, ++seq)));
     }
+    if (durabilityGap != null && !durabilityGapRecorded) {
+      lines.add(new Line(LedgerGapReason.FORCE_FAILED,
+          encode(LedgerRecordType.LEDGER_GAP, durabilityGapFields(null), now, ++seq)));
+    }
     lines.add(new Line(null, encode(type, fields, now, ++seq)));
 
     // Another writer may have left a torn line since the last append; close it in the same write.
     if (endsTorn(current)) lines.set(0, lines.get(0).afterNewline());
     for (Line line : lines) {
       try {
-        writeLine(current, line.bytes());
+        writeLine(current, line.bytes(), force);
       } catch (IOException e) {
         noteGap(LedgerGapReason.WRITE_FAILED, now);
         healthy = false;
         ExitLedgerHealth.failed(this, ledgerDir, now, e);
         return false;
       }
-      if (line.gap() != null) pendingGaps.remove(line.gap());
+      if (line.gap() == LedgerGapReason.FORCE_FAILED) durabilityGapRecorded = true;
+      else if (line.gap() != null) pendingGaps.remove(line.gap());
     }
     healthy = true;
     ExitLedgerHealth.recovered(this);
     return true;
   }
 
-  /** Whether the last write succeeded and no gap is waiting to be written. */
+  /**
+   * Forces what {@link #appendUnforced} wrote to disk: one force of the current file, and of the
+   * newest archive in case a rotation moved unforced lines there. A group of unforced records
+   * costs one force instead of one each.
+   *
+   * <p>A failed force opens a named durability gap: a {@code ledger-gap} record with reason {@code
+   * FORCE_FAILED}, written as soon as a write succeeds, and the writer is not {@link #healthy()}.
+   * The gap stays open, and the caller keeps its records pending, until a later force succeeds;
+   * then a forced {@code FORCE_FAILED} record with {@code clearedAt} closes it.
+   */
+  public synchronized boolean flush() {
+    boolean durable = true;
+    for (Path file : List.of(family.current(ledgerDir), family.rotated(ledgerDir))) {
+      try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+        channel.force(false);
+      } catch (NoSuchFileException absent) {
+        // nothing written there
+      } catch (IOException e) {
+        durable = false;
+      }
+    }
+    Instant now = clock.instant();
+    if (!durable) {
+      durabilityGap = durabilityGap == null ? new PendingGap(1, LedgerTimestamps.format(now))
+          : new PendingGap(durabilityGap.count() + 1, durabilityGap.since());
+      if (!durabilityGapRecorded) durabilityGapRecorded = writeDurabilityGap(now, null);
+    } else if (durabilityGap != null && writeDurabilityGap(now, now)) {
+      durabilityGap = null;
+      durabilityGapRecorded = false;
+    }
+    return durable;
+  }
+
+  /**
+   * Writes the durability gap's record: unforced while it is open (the force just failed), forced
+   * when {@code clearedAt} closes it, so the close is written only when it is itself durable. An
+   * open record that cannot be written now is written before the next record.
+   */
+  private boolean writeDurabilityGap(Instant now, Instant clearedAt) {
+    Path current = family.current(ledgerDir);
+    Line line = new Line(null, encode(LedgerRecordType.LEDGER_GAP, durabilityGapFields(clearedAt), now, ++seq));
+    if (endsTorn(current)) line = line.afterNewline();
+    try {
+      writeLine(current, line.bytes(), clearedAt != null);
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private Map<String, Object> durabilityGapFields(Instant clearedAt) {
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("reason", LedgerGapReason.FORCE_FAILED.name());
+    fields.put("count", durabilityGap.count());
+    fields.put("since", durabilityGap.since());
+    if (clearedAt != null) fields.put("clearedAt", LedgerTimestamps.format(clearedAt));
+    return fields;
+  }
+
+  /**
+   * Whether the last write succeeded, no gap is waiting to be written and no durability gap is
+   * open.
+   */
   public boolean healthy() {
-    return healthy;
+    return healthy && durabilityGap == null;
   }
 
   /**
@@ -203,7 +287,7 @@ public final class ExitLedgerWriter {
    */
   public synchronized boolean probeWritable() {
     try {
-      writeLine(family.current(ledgerDir), new byte[] {'\n'});
+      writeLine(family.current(ledgerDir), new byte[] {'\n'}, true);
       return true;
     } catch (IOException failure) {
       Instant now = clock.instant();
@@ -239,7 +323,7 @@ public final class ExitLedgerWriter {
   private void repairTornTail(Path current) {
     if (!endsTorn(current)) return;
     try {
-      writeLine(current, new byte[] {'\n'});
+      writeLine(current, new byte[] {'\n'}, true);
     } catch (IOException e) {
       healthy = false; // the next append closes it in the same write as its record
     }
@@ -263,14 +347,14 @@ public final class ExitLedgerWriter {
     }
   }
 
-  private void writeLine(Path file, byte[] bytes) throws IOException {
+  private void writeLine(Path file, byte[] bytes, boolean force) throws IOException {
     Files.createDirectories(ledgerDir);
     try (FileChannel channel =
         FileChannel.open(
             file, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
       ByteBuffer buffer = ByteBuffer.wrap(bytes);
       while (buffer.hasRemaining()) channel.write(buffer);
-      channel.force(false);
+      if (force) channel.force(false);
     }
   }
 
