@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T09:45:24.072Z",
-  "revision": "ef2c3805ae4d06f8d4f98cacff001e6e08941a1f",
-  "tree": "3228d0a2b631d56161df070fbefe347835751bb7",
+  "createdAt": "2026-10-14T15:51:55.500Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "10d50fbb3ff16a757d77359a2b7ff9c5ad218695",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.NoDeviceChatPlanTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 115367
+      "durationMs": 21245
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.NoDeviceCpuActivationTest\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --tests \"io.justsearch.app.services.runtimestate.RuntimeIntentProducerTest.acceptedRefusalStillReturnsItsServerIssuedKey\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15973
+      "durationMs": 9207
     }
   ],
   "checks": [
@@ -89,7 +89,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c9af355b8fb60b718068eee8b661e0cfc4ff5f8480fe25599cffe6ddbf033c1d",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -120,18 +120,19 @@
     "ref": "7f908530c",
     "revision": "7f908530ce37c52899930656062cb47019b169db",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.NoDeviceChatPlanTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 61668
+        "durationMs": 59453
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.NoDeviceCpuActivationTest\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --tests \"io.justsearch.app.services.runtimestate.RuntimeIntentProducerTest.acceptedRefusalStillReturnsItsServerIssuedKey\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 44310
+        "durationMs": 10246
       }
     ],
     "checks": [
@@ -148,7 +149,7 @@
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
         "classification": "assertion",
-        "detail": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <{justsearch.gpu.enabled=false, justsearch.gpu.memory_plan=no_gpu, justsearch.gpu.layers=0, justsearch.context.size=8192, justsearch.mmproj.offload=false}> but was: <{}>"
+        "detail": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <{justsearch.gpu.memory_plan=no_gpu, justsearch.context.size=8192, justsearch.gpu.device_available=false, justsearch.gpu.layers=0, justsearch.gpu.enabled=false, justsearch.mmproj.offload=false}> but was: <{}>"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentProducerTest.java#acceptedRefusalStillReturnsItsServerIssuedKey",
@@ -157,5 +158,5 @@
       }
     ]
   },
-  "digest": "sha256:d89722223ca247917ce5f2a28254f96aefa741cc58ddb68b338991273d55ddd6"
+  "digest": "sha256:776d6964e91822be8ed80347aadab5d25686824a0a8d022086dcf2e7f5d8b50c"
 }

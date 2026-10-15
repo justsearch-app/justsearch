@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-09T22:57:48.349Z",
-  "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
-  "tree": "65f67d1d359c0fe9ac77946c82c818df77908477",
+  "createdAt": "2026-10-14T15:48:15.774Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "454c3dfd79905386c2f7c5bc2c6e4bd49a33e0b8",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaDevicePlanTest\" --tests \"io.justsearch.app.inference.SelfTestDeviceEnvironmentTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 22299
+      "durationMs": 4651
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuDevicePlanTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15033
+      "durationMs": 10131
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.LlamaProfileDevicePlanTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13489
+      "durationMs": 6512
     }
   ],
   "checks": [
@@ -91,13 +91,13 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7e2fd4ca830a6ef788344c31510e60c1b9202e98ebd1dc798ab3c4a3852f2a09",
+      "contentDigest": "sha256:6edc43bf5108b857a7644b73b3450fe54301a162b96c56622d5872367e1c86f6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "automaticActivationTestsItsGpuCandidateAndKeepsExplicitOverrides()",
+          "name": "automaticActivationUsesTheResolvedProfileAndKeepsExplicitOverrides()",
           "status": "passed"
         },
         {
@@ -131,5 +131,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9dea3ff0832b078014a646ec81028d417777454fe1845127bb65e123ee1bf104"
+  "digest": "sha256:c53e01280b03a1dbb3cbd3ff11eb36b18aa0ebcb6f439015243e031071ea0883"
 }

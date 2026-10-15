@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T17:51:09.412Z",
-  "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
-  "tree": "688a56e5d5e30f5a04a768301eae125ab5abdfcc",
+  "createdAt": "2026-10-14T16:57:24.192Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "27c3da2a116822ee1476bac11ea27ed72be8a061",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerStepFailureTest.aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4178
+      "durationMs": 2985
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerStepFailureTest.java#aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerStepFailureTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4705c67b070569a122ef2a6b71bd22cbf52d05f6fdfed7bf54316114446229a6",
+      "contentDigest": "sha256:c4b48a806ccf1d98e588813b750542c885d27cd5885432944bfbe8c8ee2b2343",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -45,12 +45,18 @@
     "ref": "43564e20f",
     "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-step9-loop-repaired-compat.patch",
+        "contentDigest": "sha256:b55afda531b0b830c3c481c78d1abb3c1784e2681f06968da0c2eccd2c9f170e"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerStepFailureTest.aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 39005
+        "durationMs": 13088
       }
     ],
     "checks": [
@@ -61,5 +67,5 @@
       }
     ]
   },
-  "digest": "sha256:218c68a3f64d4a742761a4388356302cd93d92a82eb74d24f22a36d74a9f0e54"
+  "digest": "sha256:05abec73cde833d9c714567912291d83ae4ba6bc6f3c9b7727e98c4afc969f22"
 }

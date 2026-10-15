@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T13:07:02.943Z",
-  "revision": "5f91835f366032a75d856d796967c35ec1c769ea",
-  "tree": "8b0e68587e093ab8bddf0df4817354a381f59a80",
+  "createdAt": "2026-10-14T17:09:25.476Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "0091997415706e6dc7b4ac4c2eb0efe7fd810f13",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.enabledEmbeddingBacklogIsNotIdle\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5118
+      "durationMs": 8548
     }
   ],
   "checks": [
@@ -44,7 +44,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9a0b10357642eb2c846a11c363d9c6e5d91f91c4212fa1c8674f40dd64f2b526",
+      "contentDigest": "sha256:ecf8c1c6dc2cf7618ccc810d377916539d09e4e63192732d1624f4832552fadf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -114,6 +114,10 @@
           "status": "passed"
         },
         {
+          "name": "ledgerWriteFailureIsVisibleUntilDurableRecovery(Path)",
+          "status": "passed"
+        },
+        {
           "name": "indexing is absent without a Worker view, and listed stale when the sample is",
           "status": "passed"
         },
@@ -140,12 +144,18 @@
     "ref": "5f91835f3",
     "revision": "5f91835f366032a75d856d796967c35ec1c769ea",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-bulk-gate-repaired-compat.patch",
+        "contentDigest": "sha256:0f14b93260e2821771c3d4550017c45d1f09a066ae1c6bc7215ae51781febf30"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.enabledEmbeddingBacklogIsNotIdle\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 84121
+        "durationMs": 13515
       }
     ],
     "checks": [
@@ -157,9 +167,9 @@
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
         "classification": "assertion",
-        "detail": "indexing: IDLE with nothing pending, RUNNING with work, PAUSED for energy saver: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Spec E step E1 lands the energy-saver code with its producer ==> expected: <indexing.paused_energy_saver> but was: <null>"
+        "detail": "indexing: IDLE with nothing pending, RUNNING with work, PAUSED for energy saver: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Spec E step E1 lands the energy-saver code with its producer ==> expected: <indexing.paused_energy_saver> but was: <null> | ledgerWriteFailureIsVisibleUntilDurableRecovery(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: failed owner receipts must be visible through the production status projection ==> expected: <"
       }
     ]
   },
-  "digest": "sha256:1ad2be973a68565b4a4ca116e9915019fea81f1baa06cb3d7ffe3d9fa83922c3"
+  "digest": "sha256:392a81c20d951e8ce8a13da5d8eb7307fddcd731cf2af4eff7ce1160d5231436"
 }

@@ -18,9 +18,18 @@ The entries cite the owner-adopted scenarios and the owner's delegation for the 
 
 Evidence files (all written by run-evidence.mjs):
 
-- `b6d536-bulk-gate-repaired.json`: repaired behaviour, failing by assertion on 5f91835f3.
+- `b6d536-bulk-gate-repaired.json`: repaired behaviour, failing by assertion on 5f91835f3, the
+  parent of 2015420e2. The regenerated run applies
+  `gates/test-intent/evidence/b6d536-bulk-gate-repaired-compat.patch`, because
+  OperatingStateAssemblerTest now has a later method that names `LedgerRecordType.HELPER_START`.
+  The patch appends that constant after LEDGER_GAP; nothing at 5f91835f3 writes it. Both checks
+  fail there by assertion.
 - `b6d536-bulk-gate-preservation.json`: checks that pass on 5f91835f3 and on the change. That run
-  exits 1 by design, because none of them shows a repair.
+  exits 1 by design, because none of them shows a repair. In the run regenerated on b599d4d7e,
+  EnergyStatePollerTest's later method energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot
+  (added by ea0c311cb) fails on 5f91835f3 by assertion. That method is repaired behaviour of
+  b6d536-b64-status-counter (its entry 1), not preservation; this changeset's whole-file check
+  picks it up. The methods present at 5f91835f3 all pass there.
 - `b6d536-bulk-gate-new.json`: checks whose expectations use API added in this change, so they
   have no before-state.
 
@@ -34,7 +43,7 @@ Evidence files (all written by run-evidence.mjs):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Through the production OperatingStateAssembler with status views built only from API that exists on 5f91835f3: (a) E-IDLE row 1: an empty job queue with embedding enabled and 3,000 documents pending embedding reads RUNNING, not IDLE; before the change it read IDLE because IDLE looked at pendingJobs only. (b) In OperatingStateAssemblerTest#indexingProjection, indexing paused for energy saver now carries the reasonCode indexing.paused_energy_saver; before the change the reasonCode was null. That one assertion replaces 'assertNull(paused.reasonCode(), \"no lifecycle code exists for this reason yet\")'; every other assertion of the method, IDLE with nothing pending, RUNNING with work, PAUSED [energy_saver] with affects INDEXING, and IDLE with the energy reason still listed, is unchanged. OperatingStateAssemblerTest is named as a whole class because its methods carry display names, which the evidence runner cannot select by method; on 5f91835f3 only indexingProjection fails, by assertion, and the other cases pass.",
+      "behaviour": "Through the production OperatingStateAssembler with status views built only from API that exists on 5f91835f3: (a) E-IDLE row 1: an empty job queue with embedding enabled and 3,000 documents pending embedding reads RUNNING, not IDLE; before the change it read IDLE because IDLE looked at pendingJobs only. (b) In OperatingStateAssemblerTest#indexingProjection, indexing paused for energy saver now carries the reasonCode indexing.paused_energy_saver; before the change the reasonCode was null. That one assertion replaces 'assertNull(paused.reasonCode(), \"no lifecycle code exists for this reason yet\")'; every other assertion of the method, IDLE with nothing pending, RUNNING with work, PAUSED [energy_saver] with affects INDEXING, and IDLE with the energy reason still listed, is unchanged. OperatingStateAssemblerTest is named as a whole class because its methods carry display names, which the evidence runner cannot select by method; on 5f91835f3 with the compat patch, two of its methods fail, both by assertion, and the other cases pass. indexingProjection fails on the missing energy-saver reasonCode, which is this repair. ledgerWriteFailureIsVisibleUntilDurableRecovery, added later by 32d00dda8 (covered by b91-ix-lifecycle), fails on its own behaviour under test, \"failed owner receipts must be visible through the production status projection\": 5f91835f3 declares DegradationCode.EXIT_LEDGER_UNWRITABLE, but nothing there projects it, because ExitLedgerHealth and the assembler's projection arrived with 32d00dda8. The patch's HELPER_START only lets that method compile, and the method's own precondition (the append to an unwritable path fails) holds there. Fail-before: 5f91835f3 with b6d536-bulk-gate-repaired-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -71,7 +80,7 @@ Evidence files (all written by run-evidence.mjs):
         "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java"
       ],
       "class": "New",
-      "behaviour": "Preservation, passing on 5f91835f3 and on the change. E-IDLE row 2: an empty queue with 3,000 documents pending embedding but embedding disabled reads IDLE. E-P7a: the existing energy poller checks are unchanged and pass; the poll still writes the GPU-scheduling gauge, which still yields GPU backfill for energy alone.",
+      "behaviour": "Preservation, passing on 5f91835f3 and on the change. E-IDLE row 2: an empty queue with 3,000 documents pending embedding but embedding disabled reads IDLE. E-P7a: the existing energy poller checks are unchanged and pass; the poll still writes the GPU-scheduling gauge, which still yields GPU backfill for energy alone. The whole-file EnergyStatePollerTest check now also holds b6d536-b64-status-counter's repaired method energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot, which fails on 5f91835f3 by assertion; the methods this entry preserves pass there.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

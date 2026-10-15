@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T07:05:59.529Z",
-  "revision": "f5877635f64c255b5fbb2eeeda1a95ade24f8cb2",
-  "tree": "576d3a10b26f0f5b6a1f3c709b6f0ac566df0065",
+  "createdAt": "2026-10-15T10:22:05.897Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "1807dadb879b19ef39cdeac7f8791f72f5f6b9fa",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.VramDetectorOwnedBootTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4231
+      "durationMs": 3954
     },
     {
-      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest.firstPassConfigurationProbeHasItsOwnWindow\" --tests \"io.justsearch.indexerworker.extract.TikaProductionOwnerCoverageTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProductionOwnerCoverageTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7429
+      "durationMs": 11354
     },
     {
       "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.CrashedEngineHelperReceiptTest.successorRecordsCrashConsequenceAndUnknownExitTime\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3709
+      "durationMs": 3556
     },
     {
       "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineSpawnOwnershipArchTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7557
+      "durationMs": 11269
     }
   ],
   "checks": [
@@ -54,21 +54,6 @@
       "cases": [
         {
           "name": "earlyNvidiaSmiProbeKeepsItsOwnerReceiptUntilLedgerAttaches()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#firstPassConfigurationProbeHasItsOwnWindow",
-      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:7c5005a471401f85c1570f46862193cd63f7b25182aff74ff9ac37837bd0b1a0",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "firstPassConfigurationProbeHasItsOwnWindow()",
           "status": "passed"
         }
       ]
@@ -100,7 +85,7 @@
       "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#successorRecordsCrashConsequenceAndUnknownExitTime",
       "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:43ab4591169f7d4731bd22c31997e9f719d27713248c6f2dd868826204ab3f2f",
+      "contentDigest": "sha256:cdb067567c90279d01acad2d620556a1315351a199a8f36a100abc3ee966c34f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -131,6 +116,64 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:04cf21b2bf02112bfccb8e52b5c3a3bdf85fc4b6a85523c04a26ed5c8c9db05f"
+  "failBefore": {
+    "ref": "f5877635f",
+    "revision": "f5877635f64c255b5fbb2eeeda1a95ade24f8cb2",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-owner-coverage-compat.patch",
+        "contentDigest": "sha256:37b73f6c5e5ef2233700b2920bcb05e5aaf79e0baa63a3e6f941cce5351c9902"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.VramDetectorOwnedBootTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6341
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProductionOwnerCoverageTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13779
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.CrashedEngineHelperReceiptTest.successorRecordsCrashConsequenceAndUnknownExitTime\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4473
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineSpawnOwnershipArchTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 12791
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/VramDetectorOwnedBootTest.java",
+        "classification": "assertion",
+        "detail": "earlyNvidiaSmiProbeKeepsItsOwnerReceiptUntilLedgerAttaches(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/late"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProductionOwnerCoverageTest.java",
+        "classification": "assertion",
+        "detail": "[2] structured: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: 12:21:44.323 [main] DEBUG org.apache.tika.config.TikaConfig -- loading tika config from defaults; no config file specified&#13;&#10;12:21:44.329 [main] DEBUG org.apache.tika.mime.MimeTypesFactory -- Loaded custom mimes file: jar:file:/F:/caches/gradle/caches/modu | [3] policy: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: 12:21:45.551 [main] DEBUG org.apache.tika.config.TikaConfig "
+      },
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#successorRecordsCrashConsequenceAndUnknownExitTime",
+        "classification": "assertion",
+        "detail": "successorRecordsCrashConsequenceAndUnknownExitTime(): java.lang.AssertionError java.lang.AssertionError: witnessed crash casualty has no final owner receipt"
+      },
+      {
+        "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineSpawnOwnershipArchTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:1e97366fc5f46c2bd06f5dc90d426d983f1ab19bbe3526ea76959332bc845a28"
 }

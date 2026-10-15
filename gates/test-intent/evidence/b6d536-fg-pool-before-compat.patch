@@ -1,0 +1,89 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java b/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java
+index d6a154814..5001ba676 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java
+@@ -4,7 +4,8 @@ package io.justsearch.app.api;
+ /** A typed admission refusal, independent from operation dispatch authorization. */
+ public final class EngineAdmissionException extends RuntimeException {
+   private static final long serialVersionUID = 1L;
+-  public enum Reason { CONTEXT_LIMIT, ENGINE_LIMIT, FROZEN, WORK_FINISHED }
++  // Compat (fail-before only): INFERENCE_BUSY is the later reason; nothing here raises it.
++  public enum Reason { CONTEXT_LIMIT, ENGINE_LIMIT, FROZEN, WORK_FINISHED, INFERENCE_BUSY }
+ 
+   private final Reason reason;
+   private final int retryAfterSeconds;
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
+index 38b40edf7..a3ee693e9 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
+@@ -1095,6 +1095,8 @@ public final class ConversationEngine {
+         case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+         case FROZEN -> "UPGRADE_PREPARING";
+         case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
++        // Compat (fail-before only): nothing here raises the later INFERENCE_BUSY.
++        case INFERENCE_BUSY -> throw new IllegalStateException("INFERENCE_BUSY is not raised here");
+       };
+       retryAfter = admission.retryAfterSeconds();
+     } else if (refused instanceof io.justsearch.core.execution.EngineExecutorRejectedException executor) {
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java b/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java
+index 1202fbf63..5bea3a4f1 100644
+--- a/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java
+@@ -308,6 +308,8 @@ public final class ApiErrorHandler {
+                 case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT;
+                 case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+                 case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
++                // Compat (fail-before only): nothing here raises the later INFERENCE_BUSY.
++                case INFERENCE_BUSY -> throw new IllegalStateException("INFERENCE_BUSY is not raised here");
+             };
+         }
+ 
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java b/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java
+index 8ecfea36b..fcc9a9a7c 100644
+--- a/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java
+@@ -23,6 +23,8 @@ public final class RequestEngineWork {
+       case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT.name();
+       case FROZEN -> "UPGRADE_PREPARING";
+       case WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE.name();
++      // Compat (fail-before only): nothing here raises the later INFERENCE_BUSY.
++      case INFERENCE_BUSY -> throw new IllegalStateException("INFERENCE_BUSY is not raised here");
+     };
+   }
+ 
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+index 4348ccff8..02dc1303d 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+@@ -97,7 +97,30 @@ public interface EmbeddingProvider {
+   int dimension();
+ 
+   /** Returns true if the embedding model is loaded and ready for inference. */
+-  boolean isAvailable();
++  default boolean isAvailable() {
++    // Compat (fail-before only): a provider that implements only the later availability().
++    Availability availability = availability();
++    return availability != null && availability.state() == Availability.State.READY;
++  }
++
++  /** Compat (fail-before only): the later availability; nothing here reads it. */
++  default Availability availability() {
++    return null;
++  }
++
++  /** Compat (fail-before only): the later availability record; nothing here reads it. */
++  record Availability(State state, Throwable failure) {
++    public enum State {
++      READY,
++      STARTING,
++      ABSENT,
++      FAILED
++    }
++
++    public static final Availability READY = new Availability(State.READY, null);
++    public static final Availability STARTING = new Availability(State.STARTING, null);
++    public static final Availability ABSENT = new Availability(State.ABSENT, null);
++  }
+ 
+   /** Returns true if the embedding model is using GPU acceleration. */
+   boolean isUsingGpu();

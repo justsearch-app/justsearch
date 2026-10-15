@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T16:51:26.124Z",
-  "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
-  "tree": "b79f5157906f71f86431c04233764e9142ceb27d",
+  "createdAt": "2026-10-14T15:58:56.572Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "984a0293df5c3d9a3c6705195bcb493f131dcb50",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,31 +21,31 @@
       "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.gpuProfileRows\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.energyIsStatusOnly\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.reasonsAccumulate\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.noGpu\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.unresolved\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.gateDefaultsAndActuation\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.sinceTracksTransitions\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1769
+      "durationMs": 4089
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.unavailableEmbeddingBacklogIsIdle\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.vduBacklogCountsOnlyWhenAvailable\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.eachStageBacklog\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.generatingSlows\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.holdPausesAndReasonsAccumulate\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.energyFromPowerView\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.unreadableGate\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2462
+      "durationMs": 7039
     },
     {
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.status.operating.BulkWorkVocabularyMirrorTest.reasons\" --tests \"io.justsearch.app.api.status.operating.BulkWorkVocabularyMirrorTest.profiles\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1571
+      "durationMs": 7001
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStatePollerBulkWorkMirrorTest.pollMirrorsIntoTheGate\" --tests \"io.justsearch.app.services.power.EnergyStatePollerBulkWorkMirrorTest.mirrorPublishesTheCurrentState\" --tests \"io.justsearch.app.services.worker.WorkerStatusMapperStageAvailabilityTest.mapsFieldForField\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1946
+      "durationMs": 7980
     },
     {
       "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.EmbeddedAndSparseCountTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3888
+      "durationMs": 6035
     }
   ],
   "checks": [
@@ -53,7 +53,7 @@
       "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#gpuProfileRows",
       "file": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:df376897b762927f2efd3b6bcecce6f8dd5687ff0af8dfac1007adcd4cea5b4a",
+      "contentDigest": "sha256:03a6dbd7218dacf854ccb97258636278adcb6c26c33d9c1e763b97cc39bf587c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -76,7 +76,7 @@
       "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#energyIsStatusOnly",
       "file": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:df376897b762927f2efd3b6bcecce6f8dd5687ff0af8dfac1007adcd4cea5b4a",
+      "contentDigest": "sha256:03a6dbd7218dacf854ccb97258636278adcb6c26c33d9c1e763b97cc39bf587c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -107,7 +107,7 @@
       "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#reasonsAccumulate",
       "file": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:df376897b762927f2efd3b6bcecce6f8dd5687ff0af8dfac1007adcd4cea5b4a",
+      "contentDigest": "sha256:03a6dbd7218dacf854ccb97258636278adcb6c26c33d9c1e763b97cc39bf587c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -122,7 +122,7 @@
       "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#noGpu",
       "file": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:df376897b762927f2efd3b6bcecce6f8dd5687ff0af8dfac1007adcd4cea5b4a",
+      "contentDigest": "sha256:03a6dbd7218dacf854ccb97258636278adcb6c26c33d9c1e763b97cc39bf587c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -137,7 +137,7 @@
       "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#unresolved",
       "file": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:df376897b762927f2efd3b6bcecce6f8dd5687ff0af8dfac1007adcd4cea5b4a",
+      "contentDigest": "sha256:03a6dbd7218dacf854ccb97258636278adcb6c26c33d9c1e763b97cc39bf587c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -152,7 +152,7 @@
       "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#gateDefaultsAndActuation",
       "file": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:df376897b762927f2efd3b6bcecce6f8dd5687ff0af8dfac1007adcd4cea5b4a",
+      "contentDigest": "sha256:03a6dbd7218dacf854ccb97258636278adcb6c26c33d9c1e763b97cc39bf587c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -167,7 +167,7 @@
       "id": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java#sinceTracksTransitions",
       "file": "modules/core/src/test/java/io/justsearch/core/scheduling/BulkWorkPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:df376897b762927f2efd3b6bcecce6f8dd5687ff0af8dfac1007adcd4cea5b4a",
+      "contentDigest": "sha256:03a6dbd7218dacf854ccb97258636278adcb6c26c33d9c1e763b97cc39bf587c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -379,5 +379,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ecb5574886ce47dea6d1c97978f2b31d631e6a0c19bf3c654c4f4835052b175a"
+  "digest": "sha256:c2858b3fe376718aa877a2ba67315eab07fc9e808fcca66b861597f9630593d3"
 }

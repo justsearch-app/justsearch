@@ -1,0 +1,16 @@
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+index 6ea7fa2ae..6da517510 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+@@ -42,6 +42,11 @@ public final class HealthEventChangeRegistry {
+     this.channel = new SseStreamChannel(STREAM_ID);
+   }
+ 
++  /** Compatibility declaration for checks written against the later API; nothing here calls it. */
++  public HealthEventChangeRegistry(java.util.concurrent.ExecutorService deliveryOwner) {
++    this();
++  }
++
+   public HealthEventChangeRegistry(SseStreamChannel channel) {
+     this.channel = Objects.requireNonNull(channel, "channel");
+   }

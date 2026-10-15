@@ -14,6 +14,35 @@ and the search's semantic deadline, which both count from the start of the call;
 refuses with ADMISSION_INFERENCE_BUSY, and a closed call pool is reported as closed, not as a
 capacity refusal. This changeset covers only this task's files.
 
+Evidence regenerated on b599d4d7e. The fail-before of b6d536-fg-pool-before.json runs on f648453b5,
+the parent of f8c4967ed, which added the checks. It applies
+`gates/test-intent/evidence/b6d536-fg-pool-before-compat.patch`, because the test provider in
+EngineKnowledgeClientInferenceQueueTest now uses the later provider-availability API and the checks
+name `Reason.INFERENCE_BUSY`. The patch makes these changes:
+
+- It adds `EmbeddingProvider.Availability` and a default `availability()` that returns null.
+- It turns `isAvailable()` into a default that reads `availability()`. Every production provider
+  at f648453b5 implements `isAvailable()` itself.
+- It appends `INFERENCE_BUSY` to `EngineAdmissionException.Reason`.
+- It gives the three exhaustive switches over that enum (ConversationEngine, RequestEngineWork and
+  ApiErrorHandler) an arm that throws, because nothing there raises it.
+
+The repaired check closedExecutorsAreReportedAsClosedNotAsCapacity fails there by assertion: the
+closed pool reads as ENGINE_LIMIT, not CLOSED.
+
+b6d536-fg-pool-candidate.json (entries 11 and 12) now also has a before run on f648453b5, without a
+compat patch. admissionFetch.test.ts compiles there. The ADMISSION_INFERENCE_BUSY retry case fails
+by assertion: send is called once, not twice. The never-replays case passes there. The three Java
+checks of entry 11 do not compile on f648453b5, so the before-state is not reproducible for them:
+they name `EngineAdmissionException.Reason.INFERENCE_BUSY` and
+`ApiErrorCode.ADMISSION_INFERENCE_BUSY`, both introduced by f8c4967ed. Walking that reason through
+ApiErrorHandler and the MCP handler needs a mapping for it. Any mapping a compat patch supplied
+would be the behaviour these checks test, which an add-only patch may not carry. The thrown arm in
+b6d536-fg-pool-before-compat.patch makes the walk end in an exception, not an assertion. The
+candidate check queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline passed in five further
+broad candidate runs of all 29 b6d536-fg-pool-before.json checks on 3166f2506. The verifier saw it
+fail once with an untyped deadline in a broader run, and that failure was not reproduced here.
+
 ```json
 {
   "entries": [
@@ -111,7 +140,7 @@ capacity refusal. This changeset covers only this task's files.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "closedExecutorsAreReportedAsClosedNotAsCapacity: with the inference lane pool or the text lane pool shut down, as the client close does before it stops its deadline timer, a search is answered with EngineExecutorRejectedException reason CLOSED (which ApiErrorHandler reports as SERVICE_UNAVAILABLE), never an EngineAdmissionException; no admission slot stays held and the body never runs. Before, withBudget answered every rejection with ENGINE_LIMIT.",
+      "behaviour": "closedExecutorsAreReportedAsClosedNotAsCapacity: with the inference lane pool or the text lane pool shut down, as the client close does before it stops its deadline timer, a search is answered with EngineExecutorRejectedException reason CLOSED (which ApiErrorHandler reports as SERVICE_UNAVAILABLE), never an EngineAdmissionException; no admission slot stays held and the body never runs. Before, withBudget answered every rejection with ENGINE_LIMIT. Fail-before: f648453b5 with b6d536-fg-pool-before-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -348,7 +377,7 @@ capacity refusal. This changeset covers only this task's files.
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java"
       ],
       "class": "New",
-      "behaviour": "The three checks that walk every EngineAdmissionException reason now cover INFERENCE_BUSY: its front-door code is ADMISSION_INFERENCE_BUSY (HTTP and MCP), it is in the capacity group with 429 and Retry-After, and retrySafe stays false. Every other reason keeps its expected code, status and header.",
+      "behaviour": "The three checks that walk every EngineAdmissionException reason now cover INFERENCE_BUSY: its front-door code is ADMISSION_INFERENCE_BUSY (HTTP and MCP), it is in the capacity group with 429 and Retry-After, and retrySafe stays false. Every other reason keeps its expected code, status and header. Before-state not reproducible: the checks do not compile on f648453b5 because Reason.INFERENCE_BUSY and ApiErrorCode.ADMISSION_INFERENCE_BUSY arrive with f8c4967ed, and a compat mapping for the reason would be the behaviour under test.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -377,7 +406,7 @@ capacity refusal. This changeset covers only this task's files.
         "modules/ui-web/src/api/admissionFetch.test.ts"
       ],
       "class": "New",
-      "behaviour": "A 429 ADMISSION_INFERENCE_BUSY refusal that promises a safe replay waits the named 2 s delay and is sent once more; one raised mid-request (retrySafe false) is returned to the caller and never replayed.",
+      "behaviour": "A 429 ADMISSION_INFERENCE_BUSY refusal that promises a safe replay waits the named 2 s delay and is sent once more; one raised mid-request (retrySafe false) is returned to the caller and never replayed. Before run on f648453b5 (no patch): the retry case fails by assertion (send called once, not twice); the never-replays case passes there.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

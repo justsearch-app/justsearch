@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-11T22:24:55.950Z",
-  "revision": "469d8f10f6dbbb4c1cb52801d12b033697c979e5",
-  "tree": "f64d79d72add5523c4812152bb87200b567c9cbb",
+  "createdAt": "2026-10-14T16:46:35.960Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.collectionCannotSmuggleQueryFiltersPipelineOrDocumentFields\" --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.pathLabelCannotInvokeAnotherOperationOrResolveByRawPath\" --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.collectionMalformedJsonPreservesExistingSearchError\" --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.existingInvocationMalformedJsonRemainsClientError\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 101467
+      "durationMs": 13489
     },
     {
-      "command": "npx vitest run \"src/shell-v0/state/legacyTitleMount.test.ts\" \"src/shell-v0/state/conversationListStore.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-10952-1791757493534.json\"",
+      "command": "npx vitest run \"src/shell-v0/state/legacyTitleMount.test.ts\" \"src/shell-v0/state/conversationListStore.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-33868-1791996393697.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2414
+      "durationMs": 2262
     }
   ],
   "checks": [
@@ -110,7 +110,7 @@
       "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#does NOT erase a legacy title the locked store refused, and stops re-POSTing it",
       "file": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:962c744cf8c0b4ede9a6edae55d196697d03ec4d53330b346c1282e966ffe3ce",
+      "contentDigest": "sha256:323d7e3b5e6842c00268df2b3f0508b0af2f8eca262cb751d247c16d621425a9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#drops a legacy entry the backend has already outgrown, without a second write",
       "file": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:962c744cf8c0b4ede9a6edae55d196697d03ec4d53330b346c1282e966ffe3ce",
+      "contentDigest": "sha256:323d7e3b5e6842c00268df2b3f0508b0af2f8eca262cb751d247c16d621425a9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -138,5 +138,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:8578188221252d30a7ee4eaaa90b0ac2c3b6e92e4853a6b2c58513cf4773faf9"
+  "digest": "sha256:f52180b70cbfb030aefcf1437025a8d2f496bab29d9919f41318d5512451470a"
 }

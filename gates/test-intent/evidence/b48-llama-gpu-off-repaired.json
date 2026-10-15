@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-09T23:12:58.936Z",
-  "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
-  "tree": "e5ebf5755f19c567abcf9459bd78192df309c740",
+  "createdAt": "2026-10-14T15:49:57.894Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1ad80f7419b3e2fa7b6e25260bcaefa189094fdd",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaGpuOffPlanTest\" --tests \"io.justsearch.app.inference.LlamaDevicePlanArchitectureTest\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.cpuLaunchDisablesDevices\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 18568
+      "durationMs": 6633
     }
   ],
   "checks": [
@@ -59,7 +59,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6fc0f3898bf041fdf0d26277740adf1d2463d6efa2ae252bb790360cd1dee3dc",
+      "contentDigest": "sha256:595544a9c61ea4a35316ef03700e9829d92bcb1e20f95598113554af4327fd38",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -142,12 +142,13 @@
     "ref": "f6d579a86",
     "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaGpuOffPlanTest\" --tests \"io.justsearch.app.inference.LlamaDevicePlanArchitectureTest\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.cpuLaunchDisablesDevices\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 50140
+        "durationMs": 15911
       }
     ],
     "checks": [
@@ -164,7 +165,7 @@
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
         "classification": "assertion",
-        "detail": "the CPU argv carries the CPU rung and -ngl 0, same flag set: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[-c, 8192, -ngl, 0, --device, none, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]> but was: <[-c, 8192, -ngl, 0, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]>"
+        "detail": "the CPU argv carries the CPU rung and -ngl 0, same flag set: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[-c, 8192, -ngl, 0, --device, none, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]> but was: <[-c, 8192, -ngl, 0, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]> | the full GPU argv, in order, including -fit off: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[bin\\llama-server.exe, -m, models\\ch"
       },
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#cpuLaunchDisablesDevices",
@@ -173,5 +174,5 @@
       }
     ]
   },
-  "digest": "sha256:922543fc4d84b439eccb9a6bfc44f32df81c083a9954a5e05d1eeb81b26096df"
+  "digest": "sha256:c66d6451dfa09b51bb6a86c7306c12753f294970247d64a992f9dd5a66eef41c"
 }

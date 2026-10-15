@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-11T17:10:08.350Z",
-  "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
-  "tree": "27d3a925fcd320e04f7dbbe68426bf1e5a7c413d",
+  "createdAt": "2026-10-15T10:11:29.215Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "fb5d421305b59eb78723440efa6e3daeed1e64d5",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerPromptCacheTest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6374
+      "durationMs": 11240
     }
   ],
   "checks": [
@@ -100,7 +100,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:921a15042da0b67bfa70921825801994ab8e44c57457d8d7954d71849dabfb40",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -118,7 +118,19 @@
           "status": "passed"
         },
         {
+          "name": "settingsPreparationCannotReplaceAHeldVduServer(false)",
+          "status": "passed"
+        },
+        {
+          "name": "settingsPreparationCannotReplaceAHeldVduServer(true)",
+          "status": "passed"
+        },
+        {
           "name": "candidateFailureRollsBackUsingActualAContextDespiteGlobalC()",
+          "status": "passed"
+        },
+        {
+          "name": "aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()",
           "status": "passed"
         },
         {
@@ -130,7 +142,11 @@
           "status": "passed"
         },
         {
-          "name": "failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence()",
+          "name": "aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure()",
           "status": "passed"
         },
         {
@@ -155,6 +171,10 @@
         },
         {
           "name": "coldEnablePublishesModeAtCommitBeforeRetirement()",
+          "status": "passed"
+        },
+        {
+          "name": "aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad()",
           "status": "passed"
         },
         {
@@ -191,6 +211,10 @@
         },
         {
           "name": "appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence()",
           "status": "passed"
         },
         {
@@ -254,6 +278,10 @@
           "status": "passed"
         },
         {
+          "name": "adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart()",
+          "status": "passed"
+        },
+        {
           "name": "admittedRecoveryRestartsServingAButNeverNewDesiredB()",
           "status": "passed"
         },
@@ -278,6 +306,10 @@
           "status": "passed"
         },
         {
+          "name": "aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure()",
+          "status": "passed"
+        },
+        {
           "name": "preparedCandidateDeathRefusesCommitAndRestoresIncumbent()",
           "status": "passed"
         },
@@ -287,6 +319,10 @@
         },
         {
           "name": "insufficientVramRefusesBeforeStopOrCacheClearAndEmitsOneFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()",
           "status": "passed"
         },
         {
@@ -308,12 +344,13 @@
     "ref": "f6d579a86",
     "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerPromptCacheTest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 20248
+        "durationMs": 8879
       }
     ],
     "checks": [
@@ -325,9 +362,9 @@
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
         "classification": "assertion",
-        "detail": "[1] 1024: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (5 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: initial chat ==> expected: <1> but was: <0>&#13;&#10;&#9;org.opentest4j.AssertionFailedError: mode change ==> expected: <1> but was: <0>&#13;&#10;&#9;org.opentest4j.AssertionFailedE | [2] 0: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (5 failures)&#13;&#10;&#9;org.opentest4j.Assertion"
+        "detail": "settingsPreparationCannotReplaceAHeldVduServer(false): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.ModeTransitionException to be thrown, but nothing was thrown. | settingsPreparationCannotReplaceAHeldVduServer(true): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.ModeTransitionException to be thrown, but nothing was thrown. | aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnAct"
       }
     ]
   },
-  "digest": "sha256:eb8f86cdfe5820643afeb73b3ed7d9311ecac01cc264adc5432333563fadee49"
+  "digest": "sha256:899d141e35e05a0f7c29c25c9b0c0afd8412de2ea81ce296f7dd192813a0c7ca"
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T08:17:31.194Z",
-  "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
-  "tree": "bf687e02a610c58c94311c1bd5a46cd024a2840a",
+  "createdAt": "2026-10-15T10:27:35.025Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "4d020e5f434fc8eb31c5483a7e9857c361177235",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingSavedChatIsUnavailableAndNamesItsMissingFile\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingCandidateDoesNotReplaceTheReadyServersObservedState\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 39190
+      "durationMs": 4725
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingSavedChatIsUnavailableAndNamesItsMissingFile",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:74d6631a47b86fb2e5445139de211c9aabdbb4173aca6a61bceb2b2d29be100f",
+      "contentDigest": "sha256:30768369e41b518685be71ce6e2b953b3b29aca27d2966d1aedd0d740d541eea",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:74d6631a47b86fb2e5445139de211c9aabdbb4173aca6a61bceb2b2d29be100f",
+      "contentDigest": "sha256:30768369e41b518685be71ce6e2b953b3b29aca27d2966d1aedd0d740d541eea",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java#missingCandidateDoesNotReplaceTheReadyServersObservedState",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingChatModelDiagnosticTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:74d6631a47b86fb2e5445139de211c9aabdbb4173aca6a61bceb2b2d29be100f",
+      "contentDigest": "sha256:30768369e41b518685be71ce6e2b953b3b29aca27d2966d1aedd0d740d541eea",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -111,7 +111,7 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingSavedChatIsUnavailableAndNamesItsMissingFile\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage\" --tests \"io.justsearch.ui.api.OperatingChatModelDiagnosticTest.missingCandidateDoesNotReplaceTheReadyServersObservedState\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 49300
+        "durationMs": 15121
       }
     ],
     "checks": [
@@ -142,5 +142,5 @@
       }
     ]
   },
-  "digest": "sha256:44cd9ddc02306a24ee87e4196f7178c84517ae764ee667affc0db809b8100ab8"
+  "digest": "sha256:9013813f0cbdcf0a4d3c96bc45e0661375af48f50e41c96b6ed3b0a66c349c7b"
 }
