@@ -490,3 +490,14 @@ This replaces the earlier note that `b6d536-no-adoption-launch.json` was not re-
   "note": "Entry 7 (ManagedLlamaAdoptionTest Adaptation) loses an oracle. Base repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup asserted that a llama-server surviving the rollback of a refused registration blocks the next start ('survived terminal cleanup', no launch). On 1c6f8da2c ChildControl.start throws after the ROLLBACK stop survives, LlamaServerOps never holds the handle (child null, reservation removed) and DefaultChildControl.start has no survivor check, so the next startLlamaServer launches a second server beside the survivor. Verifier scratch test VerifierRollbackSurvivorTest fails on the candidate: 'a second llama-server was launched beside the rollback survivor'. The cited DefaultChildControlTest refusedRegistrationRollsBack / survivorIsRetriedUnderTheSameIntent do not assert that later starts are refused. Entry 9 drops the matching unregisteredRollbackProcess terminal case. Other entries: oracles kept (checked diffs; the 16 checks named by the five stale evidence files change only stop signatures/helpers)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:c43583cd69e7311289cbfcccaa3df53492b8e7541a8588d225053cd01337dc64",
+  "note": "Reviewed the changed checks, preserved stop/ownership oracles and explicit new-API candidate-only context; both compatibility patches are additive forwarding scaffolding. Current named and adapted checks passed; declared stop-code, registration and survivor before assertions reproduced."
+}
+```

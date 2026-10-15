@@ -237,3 +237,14 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
   "note": "Reviewed baseline tests, scenarios and sources before candidate changes; independent full suites and reflective/native fail-before checks support the New/Adaptation entries. Two direct new APIs cannot compile unchanged before and are honestly disclosed; no compile-failure claimed. This accepts test intent only: real S15 OCR clean-quit census still fails with seven nested tesseract gaps; overall slice fails."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:61b3c8b08e0f2c923d1bda7a60ba3b6ed25a988b5caad7e559b0dbc88a2fbf02",
+  "note": "Reviewed the containment, self-intent and reconciler expectations against item 6 and the current tests. Candidate checks passed and declared before assertions reproduced; the JobMembership and composition-root API absence reasons are truthful."
+}
+```

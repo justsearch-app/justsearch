@@ -57,3 +57,14 @@ Pending independent verification. The builder does not accept its own check chan
   "note": "Independent before/after: the added JVM assertion fails on 738c61aa4 for UNKNOWN instead of OWNER_DIED and passes on e882e30f7. Real kill-on-close jobs with 2.5 and 8 second receipt delays retain helper and console-host crash receipts on the candidate. Timing preservation controls and seven module suites pass. This accepts test intent; live delivery checks remain pending and older owner-coverage evidence is still stale."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4a-20261015",
+  "verdict": "accept",
+  "digest": "sha256:349423666987c04df2cd4824b4d3da45a419ed4df0e2d7958b058886804aafec",
+  "note": "Reviewed supervisor re-encoding and the add-only census lookup compatibility exports; the historical census ignores the added context, so the stubs cannot create this failure. Current check passed and the declared delayed-receipt assertion failure reproduced on 738c61aa4."
+}
+```
