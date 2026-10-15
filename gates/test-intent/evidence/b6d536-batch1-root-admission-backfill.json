@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T11:22:22.370Z",
+  "revision": "75917a07325f85c402b837e5a17eba4cb4b2bd5c",
+  "tree": "868cf232d3df962c51c949bb0ff8922f59c87f05",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4623
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f4d35559478f88a551611d1fbe58a6045d9b5f3072af3975df27c4528f33f336"
+}

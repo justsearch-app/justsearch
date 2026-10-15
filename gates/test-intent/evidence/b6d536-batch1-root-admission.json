@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T15:52:21.531Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "33e5fed58f977fed13cafa78c23ba9ef7ff1d221",
+  "createdAt": "2026-10-15T11:21:53.598Z",
+  "revision": "75917a07325f85c402b837e5a17eba4cb4b2bd5c",
+  "tree": "9ff2b5db14fcbbb400dfbae9a36a9f79153a7767",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,15 +18,15 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.missingChunksAreNotCertifiedByTheParentTimestamp\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9240
+      "durationMs": 6394
     }
   ],
   "checks": [
     {
-      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#missingChunksAreNotCertifiedByTheParentTimestamp",
       "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
       "runner": "gradle",
       "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
@@ -37,34 +37,115 @@
         {
           "name": "missingChunksAreNotCertifiedByTheParentTimestamp()",
           "status": "passed"
-        },
-        {
-          "name": "legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren()",
-          "status": "passed"
-        },
-        {
-          "name": "equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete()",
-          "status": "passed"
-        },
-        {
-          "name": "backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot()",
-          "status": "passed"
-        },
-        {
-          "name": "parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate()",
-          "status": "passed"
-        },
-        {
-          "name": "backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot()",
-          "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes()",
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren()",
+          "status": "passed"
+        }
+      ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:227826018ffbaa3e8b0e77b02d141196fc54373598776590c16be062e6a47b8d"
+  "failBefore": {
+    "ref": "04368bfca",
+    "revision": "04368bfca99cd243b4b68f75a9a05b345be284d0",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-batch1-root-admission-compat.patch",
+        "contentDigest": "sha256:3a400ea2ce5ddcec0d7ad0ce66c97cd6cb43a3a857256e8c29bbee2f50a8b8b0"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.missingChunksAreNotCertifiedByTheParentTimestamp\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8088
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#missingChunksAreNotCertifiedByTheParentTimestamp",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes",
+        "classification": "assertion",
+        "detail": "committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: O9: committed incomplete chunks cannot count as unchanged before background refresh ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:319004c0884816ce81ae52d555e69b7c34a208bd028c0951397067ac82e95bce"
 }

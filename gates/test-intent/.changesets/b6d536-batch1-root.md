@@ -11,6 +11,33 @@ The orchestrator's b40 root-repair brief (agent wording under the owner's end-to
 
 Evidence for b6d536-batch1-root.json was regenerated on b599d4d7e (phase B). CapabilityHealthBridgeCurrentStateTest now builds HealthEventChangeRegistry with an ExecutorService, which 04368bfca lacks, so it did not compile there. The compat before-patch gates/test-intent/evidence/b6d536-batch1-root-compat.patch adds only that constructor. It ignores the executor and calls the existing no-argument constructor, and no production code in that state calls it. With it, the check fails before by assertion. The two ChunkUnchangedAdmissionTest checks also fail before by assertion. The third check entry 3 named, legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists, no longer exists: 24a3fc682 retired its behaviour, and entry 4 records it as Obsolete.
 
+Phase B verifier repair (integration base 181363e86):
+
+- **Entry 5's wording is corrected.** The old text said a complete legacy parent bypasses unchanged
+  admission. `legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren` asserts the
+  opposite: `isUnmodified` is true. Since 24a3fc682, a complete legacy parent keeps unchanged
+  admission while its declaration is backfilled. That also supersedes the preamble's sentence above
+  about older parents bypassing unchanged admission until a rewrite, and the delegated choice cited
+  in entries 5 and 6, which describes the 65daf680a behaviour that 24a3fc682 retired.
+- **Entry 5 now names its five cases.** `b6d536-batch1-root-admission.json` runs them with a
+  before-state run at 04368bfca, this changeset's before-ref. The compat before-patch
+  `gates/test-intent/evidence/b6d536-batch1-root-admission-compat.patch` lets the file compile
+  there. It adds only `ChunkSetCompleteness.Declaration` and an
+  `IndexingCoordinator.backfillChunkDeclaration` that throws. No production code at 04368bfca calls
+  either, and none of the five selected cases reaches them.
+- **Results at 04368bfca:** `committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes`
+  fails by assertion. Its O9 behaviour came later, with fe62ed231. The other four pass there:
+  - the missing, duplicate-ordinal, revision and total oracles already held at 04368bfca;
+  - the parent-content RMW invalidation already held there;
+  - a complete legacy parent already kept unchanged admission through the old check.
+
+  None of these four is claimed as a repair.
+- **New entry 6** holds the two backfill cases, in
+  `b6d536-batch1-root-admission-backfill.json`. Before-state not reproducible: both call
+  `IndexingCoordinator.backfillChunkDeclaration` and assert its return value. 24a3fc682 adds that
+  method after 04368bfca, so any compat stub of it would itself decide both cases. Both pass on the
+  candidate.
+
 ```json
 {
   "entries": [
@@ -51,10 +78,18 @@ Evidence for b6d536-batch1-root.json was regenerated on b599d4d7e (phase B). Cap
     {
       "items": ["modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java"],
       "class": "New",
-      "behaviour": "Existing missing, duplicate ordinal, revision and total oracles retain their inputs and assertions; complete fixture parents now carry the writer's declaration. Added cases require a complete legacy parent to bypass unchanged admission and require a parent content RMW, even without a caller-supplied digest, to invalidate the old declaration. This is fresh candidate execution; the splitter and writer regression assertion proof is in ChunkUnchangedAdmissionTest.",
+      "behaviour": "Existing missing, duplicate ordinal, revision and total oracles retain their inputs and assertions; complete fixture parents now carry the writer's declaration. missingChunksAreNotCertifiedByTheParentTimestamp: a matching timestamp certifies no parent with a missing chunk or a missing chunk set. equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete: equal counts with duplicate ordinals, a wrong revision or a disagreeing total are not unchanged. parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate: a parent content RMW without a caller-supplied digest invalidates the old declaration. committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes: a committed child deletion is not unchanged before the reader refreshes. legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren: a complete legacy parent (no declaration) keeps unchanged admission (isUnmodified is true) while its declaration is backfilled, without rewriting its children. The splitter and writer regression assertion proof is in ChunkUnchangedAdmissionTest.",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "A parent written by an older version without the record falls back to the 04368bfca check once and is then treated as not unchanged", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: b40 root-repair builder brief, 2026-10-09, item 2'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b6d536-batch1-root-admission.json",
-      "newChecks": ["modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java"]
+      "newChecks": ["modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#missingChunksAreNotCertifiedByTheParentTimestamp","modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes","modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete","modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate","modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren"]
+    },
+    {
+      "items": ["modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java"],
+      "class": "New",
+      "behaviour": "The legacy backfill writes a declaration only for the snapshot it admitted. backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot: when a child is deleted after the admission snapshot, backfillChunkDeclaration returns false and certifies nothing. backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot: when the parent changed after the snapshot, the backfill returns false and the new parent content stays.",
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "A parent written by an older version without the record falls back to the 04368bfca check once and is then treated as not unchanged", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: b40 root-repair builder brief, 2026-10-09, item 2'; the text does not appear in the owner's turns of session 886833dd"}],
+      "evidence": "gates/test-intent/evidence/b6d536-batch1-root-admission-backfill.json",
+      "newChecks": ["modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot","modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot"]
     }
   ]
 }
