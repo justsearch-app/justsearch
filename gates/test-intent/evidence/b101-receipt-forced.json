@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T21:11:45.778Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "da9d7605584855cff989c66c5d152ed431dd2227",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.HelperReceiptGroupFlushTest.receiptsOutsideAnyWindowStayForced\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1817
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/HelperReceiptGroupFlushTest.java#receiptsOutsideAnyWindowStayForced",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/HelperReceiptGroupFlushTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7afa4d7da57fd575a3a9b18b9a0a4aefa2dd300ac029c56e94b2c431f8090c8c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "receiptsOutsideAnyWindowStayForced()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3895e684642c2719f4c1eeeac0c22b0de014b43983c10e60998e53dcd4c8fc89"
+}

@@ -32,6 +32,13 @@ import org.slf4j.LoggerFactory;
  */
 public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider, AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(PolicyDrivenTikaExtractor.class);
+
+  /**
+   * The one owner window for Tesseract launches during OCR-capable parses in this process, shared
+   * by every extractor: opened by the first such parse, ended 30 s after the last, and at close.
+   */
+  static final OwnedHelper.SharedWindow TESSERACT_WINDOW = OwnedHelper.sharedWindow(
+      "tesseract.exe", "Tesseract OCR during extraction", java.time.Duration.ofMinutes(5));
   private static final String OCR_FALLBACK_DIRECT_TESSERACT = "direct_tesseract";
   private static final String OCR_FALLBACK_RENDERED_PDF = "rendered_pdf";
 
@@ -87,11 +94,11 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     this.ocrMetricCatalog = ocrMetricCatalog == null ? OcrMetricCatalog.noop() : ocrMetricCatalog;
     // The MIME this extractor detects drives OCR/VDU routing, so it must agree with the detector
     // the structured extractor parses under (tempdoc 803).
-    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
-      org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
-      this.tika = new Tika(detector, OwnedTikaParsers.create(detector),
-          new org.apache.tika.language.translate.DefaultTranslator());
-    }
+    // No owner window: constructing the parser graph launches nothing beyond the recorded
+    // runtime's one-time check, which carries its own window (task b6d536 b101).
+    org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
+    this.tika = new Tika(detector, OwnedTikaParsers.create(detector),
+        new org.apache.tika.language.translate.DefaultTranslator());
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
     this.structuredExtractor =
         new StructuredContentExtractor(this.policy.maxExtractedChars(), this.policy, inputFactory);
@@ -106,6 +113,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   public void close() {
     try {
       ocrEngine.close();
+      TESSERACT_WINDOW.close();
     } finally {
       try { inputFactory.close(); } catch (IOException e) {
         log.warn("Could not remove extraction snapshot directory", e);
@@ -148,7 +156,20 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       return ExtractionArtifact.full(
           new ExtractionResult("", null, "text/plain"), policy, "tika-policy", false);
     }
+    // Only a parse that may reach Tesseract holds the shared owner window: OCR enabled and a PDF
+    // or raster image. Tika's own graph cannot launch it (OwnedTikaParsers excludes its OCR
+    // parser), so a text, markdown or HTML parse opens no window and writes no record.
+    OwnedHelper.SharedWindow.Lease tesseractLease =
+        ocrConfig.enabled() && isOcrEligibleFile(file, detectedMime) ? TESSERACT_WINDOW.acquire() : null;
+    try {
+      return extractStructured(input, file, detectedMime, documentStartedAtNanos);
+    } finally {
+      if (tesseractLease != null) tesseractLease.close();
+    }
+  }
 
+  private ExtractionArtifact extractStructured(PreparedExtractionInput input, Path file,
+      String detectedMime, long documentStartedAtNanos) throws IOException, ExtractionException {
     StructuredContentExtractor.StructuredExtractionResult structured =
         structuredExtractor.extractWithStatus(input);
     ExtractionResult result = structured.result();

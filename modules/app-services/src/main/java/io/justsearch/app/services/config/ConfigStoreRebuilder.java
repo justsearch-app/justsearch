@@ -111,7 +111,8 @@ public final class ConfigStoreRebuilder {
     }
     synchronized (ConfigStoreRebuilder.class) {
       if (!java.util.Objects.equals(lastLoggedPlan, plan)) {
-        LOG.info("GPU plan changed: profile={} reasons={}", plan.placementProfile(), plan.unmetSettings());
+        LOG.info("GPU plan changed: profile={} unmet={} diagnostics={}",
+            plan.placementProfile(), plan.unmetSettings(), plan.diagnosticReasons());
         lastLoggedPlan = plan;
       }
     }

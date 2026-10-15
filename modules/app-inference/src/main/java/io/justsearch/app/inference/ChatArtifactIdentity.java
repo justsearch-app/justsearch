@@ -89,6 +89,19 @@ public final class ChatArtifactIdentity {
     return false;
   }
 
+  /** Whether this version of the selected file is queued for background identity verification. */
+  public static boolean pending(Path file) {
+    try {
+      Observation current = observe(file);
+      synchronized (LOCK) {
+        Request request = PENDING.get(current.path());
+        return request != null && request.observation().sameFileVersion(current);
+      }
+    } catch (IOException unavailable) {
+      return false;
+    }
+  }
+
   /** Called after a writer verified these bytes; a changed file never earns that verification. */
   public static void rememberVerified(Path file, long size, String digest, Observation before)
       throws IOException {

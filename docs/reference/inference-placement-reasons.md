@@ -7,7 +7,9 @@ description: Additive placement and refusal reasons for GPU planning and chat ow
 
 # Inference placement reasons
 
-`chat_model_unmeasured` means the selected chat artifact has no confirmed measured profile identity. Its GPU reservation is the model file plus a GPU projector, KV at the configured context and cache precision, and 770 MiB of runtime overhead. CPU chat reserves no device memory. The remaining memory continues to plan the encoders; this reason alone does not mean insufficient encoder memory.
+`chat_model_unmeasured` is a diagnostic emitted only when a custom chat artifact without a confirmed measured profile actually reserves GPU memory; it is never a `user_setting_unmet` cause. Its GPU reservation is the model file plus a GPU projector, KV at the configured context and cache precision, and 770 MiB of runtime overhead. CPU chat reserves no device memory. The remaining memory continues to plan the encoders; this reason alone does not mean insufficient encoder memory.
+
+`chat_identity_pending` means background verification of the selected chat artifact's identity is running. A restart applies the result. If vision is off during verification, its blocked reason names `chat_identity_pending`.
 
 `chat_model_missing:<path>` means the saved chat artifact is unavailable at the named path. It reserves no GPU memory, and the encoders are planned as if no chat artifact were selected. Status names the missing file and reports chat unavailable with `MODEL_LOAD_FAILED` when no server is running. A running server keeps its observed status.
 

@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:55:56.566Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "fe54f77df35068b896b3ecdce162bf0a52d87cab",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvmlSnapshotSectionTest.nvmlFiguresFillTheSectionAndNameTheirSource\" --tests \"io.justsearch.gpu.NvmlSnapshotSectionTest.aFigureNvmlDidNotGiveIsNamed\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4166
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvmlSnapshotSectionTest.java#nvmlFiguresFillTheSectionAndNameTheirSource",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvmlSnapshotSectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3e4ad8c0d42ecc86c2a38793b63d84b14ac0daf0247aba89431b6f29cdc74e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nvmlFiguresFillTheSectionAndNameTheirSource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvmlSnapshotSectionTest.java#aFigureNvmlDidNotGiveIsNamed",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvmlSnapshotSectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3e4ad8c0d42ecc86c2a38793b63d84b14ac0daf0247aba89431b6f29cdc74e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFigureNvmlDidNotGiveIsNamed()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvmlSnapshotSectionTest.nvmlFiguresFillTheSectionAndNameTheirSource\" --tests \"io.justsearch.gpu.NvmlSnapshotSectionTest.aFigureNvmlDidNotGiveIsNamed\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 9532
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvmlSnapshotSectionTest.java#nvmlFiguresFillTheSectionAndNameTheirSource",
+        "classification": "assertion",
+        "detail": "nvmlFiguresFillTheSectionAndNameTheirSource(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the section names where its figures came from: {available=true, error=null, driverVersion=610.88, driverVersionMajor=610, driverVersionMinor=88, totalVramBytes=12878610432, freeVramBytes=11409555456, vramDescription=12.0 GB} ==> expected: <read in-process (NVML)>"
+      },
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvmlSnapshotSectionTest.java#aFigureNvmlDidNotGiveIsNamed",
+        "classification": "assertion",
+        "detail": "aFigureNvmlDidNotGiveIsNamed(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {available=true, error=null, driverVersion=610.88, driverVersionMajor=610, driverVersionMinor=88, totalVramBytes=12878610432, freeVramBytes=11410604032, vramDescription=12.0 GB} ==> expected: <read in-process (NVML)> but was: <null>"
+      }
+    ]
+  },
+  "digest": "sha256:b9daa50a34faab0a0564fc914f1ae872925b75f4260a025050ddab6043657431"
+}

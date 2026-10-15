@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T02:50:04.892Z",
+  "revision": "2d06eaf7ef5481e15dee6262229f99bbe80863d0",
+  "tree": "6a71ca71ee2809205caef3ec63087f67c486aa7e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WitnessWindowRaceTest.localHelperExitReceiptDelayDoesNotOverrideItsLiveWindow\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24827
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WitnessWindowRaceTest.java#localHelperExitReceiptDelayDoesNotOverrideItsLiveWindow",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WitnessWindowRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f10f7c023fed6bf4c42de864ab15d77e3fc3bf6a866b71a7cecaec7fb705668",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "localHelperExitReceiptDelayDoesNotOverrideItsLiveWindow()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2d06eaf7e",
+    "revision": "2d06eaf7ef5481e15dee6262229f99bbe80863d0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WitnessWindowRaceTest.localHelperExitReceiptDelayDoesNotOverrideItsLiveWindow\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 29458
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WitnessWindowRaceTest.java#localHelperExitReceiptDelayDoesNotOverrideItsLiveWindow",
+        "classification": "assertion",
+        "detail": "localHelperExitReceiptDelayDoesNotOverrideItsLiveWindow(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: helper identity=28388/134365061948352382&#13;&#10;helper.exit.publication.delayed=true&#13;&#10;native.start={witnessId=j-759417cd-7ed1-4793-83f1-ef0d5be70d78, pid=28388, creationFileTime=134365061948352382, executable=F:\\scoop\\apps\\tesseract\\5.5.0.20241111\\tesse"
+      }
+    ]
+  },
+  "digest": "sha256:14e0cd07fd92ce443e8816169c8b0fd3453db0d04a5729db47e05d09c8b40bc2"
+}

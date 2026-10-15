@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:57:08.238Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "e89a32ed47005c4ed1b7b991cf563274c0b592e5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.atrest.DiskEncryptionProbeRateTest.readersEveryFewSecondsProbeOncePerTenMinutes\" --tests \"io.justsearch.app.services.atrest.DiskEncryptionProbeRateTest.aFailedProbeKeepsTheLastKnownValueMarkedStale\" --tests \"io.justsearch.app.services.atrest.DiskEncryptionProbeRateTest.aStaleProtectedValueIsNeverReportedAsProtected\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3049
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java#readersEveryFewSecondsProbeOncePerTenMinutes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbee02a25c85110015eb6136ee097493c78079dea88cc52038cb384350046aba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readersEveryFewSecondsProbeOncePerTenMinutes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java#aFailedProbeKeepsTheLastKnownValueMarkedStale",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbee02a25c85110015eb6136ee097493c78079dea88cc52038cb384350046aba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedProbeKeepsTheLastKnownValueMarkedStale()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java#aStaleProtectedValueIsNeverReportedAsProtected",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbee02a25c85110015eb6136ee097493c78079dea88cc52038cb384350046aba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStaleProtectedValueIsNeverReportedAsProtected()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.atrest.DiskEncryptionProbeRateTest.readersEveryFewSecondsProbeOncePerTenMinutes\" --tests \"io.justsearch.app.services.atrest.DiskEncryptionProbeRateTest.aFailedProbeKeepsTheLastKnownValueMarkedStale\" --tests \"io.justsearch.app.services.atrest.DiskEncryptionProbeRateTest.aStaleProtectedValueIsNeverReportedAsProtected\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 9648
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java#readersEveryFewSecondsProbeOncePerTenMinutes",
+        "classification": "assertion",
+        "detail": "readersEveryFewSecondsProbeOncePerTenMinutes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: 30 minutes of readers: at most one probe per ten minutes, got 334 ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java#aFailedProbeKeepsTheLastKnownValueMarkedStale",
+        "classification": "assertion",
+        "detail": "aFailedProbeKeepsTheLastKnownValueMarkedStale(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the last known value is kept ==> expected: <NOT_ENCRYPTED> but was: <UNKNOWN>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionProbeRateTest.java#aStaleProtectedValueIsNeverReportedAsProtected",
+        "classification": "assertion",
+        "detail": "aStaleProtectedValueIsNeverReportedAsProtected(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the failure is visible as staleness: AtRestProtection[state=UNKNOWN, source=none, confidence=UNKNOWN] ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:852dc31a49e102a5a2fcca33fc0d6d514ea58357a054233c6a1fdb7841d286f9"
+}

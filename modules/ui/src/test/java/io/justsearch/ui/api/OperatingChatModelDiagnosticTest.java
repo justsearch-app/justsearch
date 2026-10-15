@@ -80,15 +80,67 @@ final class OperatingChatModelDiagnosticTest {
   @Test
   void unmeasuredSavedChatExplainsItsPlacementWithoutAnEncoderShortage() throws Exception {
     Path custom = Files.writeString(models.resolve("custom-small-chat.gguf"), "custom fixture");
-    var view = assemble(rebuild(custom), ComponentState.ABSENT, null, "Down");
+    var plan = rebuild(custom);
+    var view = assemble(plan, ComponentState.ABSENT, null, "Down");
 
     assertTrue(view.degradations().stream().anyMatch(degradation ->
-        degradation.code() == DegradationCode.USER_SETTING_UNMET
+        degradation.code().token().equals("chat_model_unmeasured")
             && degradation.cause().contains("chat_model_unmeasured")),
         "an extrapolated chat allocation must have a visible placement diagnostic");
     assertFalse(view.degradations().stream().anyMatch(degradation ->
+        degradation.code() == DegradationCode.USER_SETTING_UNMET
+            && degradation.cause().contains("chat_model_unmeasured")),
+        "an unmeasured allocation is diagnostic, never an unmet user setting");
+    assertFalse(view.degradations().stream().anyMatch(degradation ->
         degradation.cause().contains("encoder_memory")),
         "the small custom model leaves enough memory for the encoder plan");
+  }
+
+  @Test
+  void pendingIdentityHasItsOwnStatusDiagnostic() {
+    var plan = new GpuProfileResolver.Resolution(Optional.empty(), null, -1, false,
+        io.justsearch.app.api.status.operating.Profile.UNRESOLVED,
+        java.util.Set.of("chat_identity_pending"));
+    var view = assemble(plan, ComponentState.ABSENT, null, "Down");
+    assertTrue(view.degradations().stream().anyMatch(degradation ->
+        degradation.code().token().equals("chat_identity_pending")
+            && degradation.cause().equals("chat_identity_pending")),
+        "status must name chat_identity_pending while verification is running");
+    assertFalse(view.degradations().stream().anyMatch(degradation ->
+        degradation.code() == DegradationCode.USER_SETTING_UNMET),
+        "identity verification does not make a user setting unmet");
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void visionOffDuringVerificationNamesPendingIdentity(boolean vision) throws Exception {
+    var plan = new GpuProfileResolver.Resolution(Optional.empty(), null, -1, false,
+        io.justsearch.app.api.status.operating.Profile.UNRESOLVED,
+        java.util.Set.of("chat_identity_pending"));
+    var online = org.mockito.Mockito.mock(io.justsearch.app.api.OnlineAiService.class,
+        org.mockito.Mockito.withSettings().extraInterfaces(
+            io.justsearch.app.api.OnlineAiRuntimeIntrospection.class));
+    org.mockito.Mockito.when(((io.justsearch.app.api.OnlineAiRuntimeIntrospection) online)
+        .hasVisionCapability()).thenReturn(vision);
+    try (var components = new StatusComponentFixture()) {
+      var graph = components.capabilities();
+      var handler = new StatusLifecycleHandler(online,
+          org.mockito.Mockito.mock(io.justsearch.agent.api.AgentService.class), () -> null,
+          null, null, null, Instant.parse(OBSERVED), () -> "OK", null, null, null,
+          graph.worker(), graph.inference());
+      components.attach(handler);
+      handler.setDevicePlanSupplier(() -> plan);
+      handler.sampleAndBuildStatusSnapshot();
+      var overlay = StatusLifecycleHandler.class.getDeclaredMethod("overlayVduCapability",
+          io.justsearch.app.api.status.WorkerOperationalView.class);
+      overlay.setAccessible(true);
+      var worker = io.justsearch.app.api.status.WorkerOperationalViewBuilder.builder()
+          .core(new io.justsearch.app.api.status.CoreIndexView(true, 0, 0, "IDLE", 0, 0)).build();
+      var observed = (io.justsearch.app.api.status.WorkerOperationalView) overlay.invoke(handler, worker);
+      assertEquals(vision ? null : "chat_identity_pending",
+          observed.visualExtraction() == null ? null : observed.visualExtraction().vduBlockedReason(),
+          "vision off during identity verification must name chat_identity_pending");
+    }
   }
 
   @Test

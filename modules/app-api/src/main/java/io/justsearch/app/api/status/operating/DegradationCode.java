@@ -20,6 +20,10 @@ public enum DegradationCode {
   DEVICE_MEMORY_OVERCOMMIT,
   /** BGE-M3 bulk uses the CPU until its GPU activation footprint has been measured. */
   BGE_M3_UNMEASURED,
+  /** A custom chat GPU allocation uses an estimate rather than a measured profile. */
+  CHAT_MODEL_UNMEASURED,
+  /** The selected chat artifact's identity is being verified in the background. */
+  CHAT_IDENTITY_PENDING,
   /** The exit ledger cannot be written, so exits are not being accounted. */
   EXIT_LEDGER_UNWRITABLE,
   /** A held child is still alive after both terminate attempts. */
