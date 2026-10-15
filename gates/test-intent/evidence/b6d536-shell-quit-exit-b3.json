@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T11:24:04.414Z",
+  "revision": "150a989ca2720acbd8955c22a22eadbf32808f18",
+  "tree": "28245fcc7cff5cd33e661bb3352993e2a07ed873",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::cancelled_session_end_still_requests_shell_exit_once\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14445
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::early_session_query_is_closed_when_tauri_is_ready\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 646
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+      "file": "modules/shell/src-tauri/src/quit.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:64c058ca909e8a0437e5b73204d342fef7a468dbb0ba665afbf9ee3e3e9625b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+      "file": "modules/shell/src-tauri/src/quit.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:64c058ca909e8a0437e5b73204d342fef7a468dbb0ba665afbf9ee3e3e9625b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5ad015773c4be1bead3c89358d20e0145d517d98eaf17ac0dcb99926e8301d1d"
+}

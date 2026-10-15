@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:21:14.735Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "e476a6a4546837eec51941d190e6d71c54ddf799",
+  "createdAt": "2026-10-15T11:39:06.238Z",
+  "revision": "150a989ca2720acbd8955c22a22eadbf32808f18",
+  "tree": "c9f89bff2b3eed90938dd4848b7e6110803c4ea5",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierStatusIsolationTest\" --tests \"io.justsearch.ui.api.VerifierStatus2Test\" --tests \"io.justsearch.ui.api.VerifierStatus3Test\" --tests \"io.justsearch.ui.api.VerifierStatus4Test\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 369337
+      "durationMs": 348828
     }
   ],
   "checks": [
@@ -294,6 +294,48 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:a75b06f1491ea36c5fafbd2c3b19ca30ceefa049d4359c242662b6145d836c86"
+  "failBefore": {
+    "ref": "93479e944",
+    "revision": "93479e944a42f6e64fdbf3d3e34b4a24c6ffcb21",
+    "overlays": [
+      "modules/ui/src/test/java/io/justsearch/ui/api/StatusLaneAging.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b67-status-backstop-compat.patch",
+        "contentDigest": "sha256:1c1392f24a3feea1596d9adbd7a5305c0d0a4eef5ebf292e98f1657670d2c14e"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierStatusIsolationTest\" --tests \"io.justsearch.ui.api.VerifierStatus2Test\" --tests \"io.justsearch.ui.api.VerifierStatus3Test\" --tests \"io.justsearch.ui.api.VerifierStatus4Test\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 374842
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
+        "classification": "assertion",
+        "detail": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: healthy worker must not be marked stale by blocked disk probe ==> expected: <false> but was: <true> | overlappingStatusPreservesAdmissionCapacityRefusal(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a saturated work pool must not refuse a status read ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+        "classification": "assertion",
+        "detail": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: healthy worker must not be marked stale by blocked disk probe ==> expected: <false> but was: <true> | overlappingStatusPreservesAdmissionCapacityRefusal(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a saturated work pool must not refuse a status read ==> expected: <true> but was: <false> | [1] inferenceSnapshotSupplier: org.opentest4j.AssertionFa"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+        "classification": "assertion",
+        "detail": "overlappingStatusPreservesAdmissionCapacityRefusal(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a saturated work pool must not refuse a status read ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+        "classification": "assertion",
+        "detail": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: healthy worker must not be marked stale by blocked disk probe ==> expected: <false> but was: <true> | overlappingStatusPreservesAdmissionCapacityRefusal(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a saturated work pool must not refuse a status read ==> expected: <true> but was: <false> | olderPendingFailureCannotOverrideQueuedHealthyConversatio"
+      }
+    ]
+  },
+  "digest": "sha256:f495e9fb31700d5b91bbd60acd7de5c4a71092ce0a085548c5934efbc641eb10"
 }

@@ -11,6 +11,8 @@ Refreshed after b82 (run b82g-status-records). Entry 2's evidence was re-run on 
 
 Records phase B (batch 3) re-ran `b64-status-counter-repaired.json` (entry 1) on b599d4d7e because its check files changed after the first run. All 13 checks pass on the change. The before ref stays 23b8679ee, the parent of the lane commit ea0c311cb that introduced the behaviour, with the TestActivationForwarders overlay. RuntimeReconcilerTest now builds RuntimeReconciler with the lease-free constructor that 5e4f4e698 left, so the fail-before also applies the compat before-patch `gates/test-intent/evidence/b64-status-counter-repaired-compat.patch`. It adds only that constructor, which delegates to 23b8679ee's own Engine constructor with a fresh RuntimeGpuLease, as ServicePhase builds it. No 23b8679ee code calls it, and it supplies no status counter behaviour. All 13 checks again fail by assertion there.
 
+Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 2 because `b64-status-signal.json` has no before-state and the entry gave no reason. Entry 2 now states it: both checks exercise the server-metadata functions ea0c311cb added to statusInvalidation, which do not exist at 23b8679ee. The evidence is unchanged.
+
 ```json
 {
   "entries": [
@@ -67,7 +69,7 @@ Records phase B (batch 3) re-ran `b64-status-counter-repaired.json` (entry 1) on
         "modules/ui-web/src/api/statusOwner-extra.test.ts"
       ],
       "class": "New",
-      "behaviour": "Additive server metadata coalesces bursts. It makes one fresh read per observed value. A value still unreflected after that read is followed up only by ordinary reads started by later signals, at most 3; a later value gets one fresh read. It isolates head epochs and preserves caller bodies. Read-only approvals and replayed completions with unchanged server counters cause no fresh read. Failed responses can convey a different client's completed publication. The copied verifier approval/replay assertions remain unchanged.",
+      "behaviour": "Additive server metadata coalesces bursts. It makes one fresh read per observed value. A value still unreflected after that read is followed up only by ordinary reads started by later signals, at most 3; a later value gets one fresh read. It isolates head epochs and preserves caller bodies. Read-only approvals and replayed completions with unchanged server counters cause no fresh read. Failed responses can convey a different client's completed publication. The copied verifier approval/replay assertions remain unchanged. Before-state not reproducible on 23b8679ee (parent of ea0c311cb, which added both checks): new API. Both files import observeStatusResponse, observeStatusEvent and statusSnapshotDisplayed from statusInvalidation, and statusCounterSignal.test.ts also observeStatusSignal and statusSnapshotCanDisplay; 23b8679ee's statusInvalidation exports only bindStatusRefresh, statusChanged, createStatusExecutionObserver and statusWriteCompleted, the completion inventory this change replaced. 23b8679ee had no server publication metadata to observe, so stand-ins for these functions would decide the assertions themselves.",
       "sources": [
         {
           "kind": "delegated-choice",

@@ -17,6 +17,8 @@ The current checks call StatusLaneAging, a b82 test helper, so the fail-before a
 
 Records phase B (batch 3) re-ran entry 2's evidence (`b67-status-backstop-preservation.json`) on b599d4d7e because VerifierStatusIsolationTest changed after that run. The entry has no fail-before; all four classes pass (9, 23, 10 and 14 cases).
 
+Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 2 because its evidence had no before-state and no reason. A before run is feasible: `b67-status-backstop-preservation.json` was re-run with `--before 93479e944`, the overlay modules/ui/src/test/java/io/justsearch/ui/api/StatusLaneAging.java and the compat before-patch `gates/test-intent/evidence/b67-status-backstop-compat.patch` (the same PROBE_ALLOWANCE_PERIODS constant entry 1 uses; no 93479e944 code reads it). All four classes pass on the change and fail by assertion on 93479e944. The runner's failure details (which it truncates) name: VerifierStatusIsolationTest blockedDiskProbeMustNotStaleHealthyWorkerOrAi and overlappingStatusPreservesAdmissionCapacityRefusal; VerifierStatus2Test those two and [1] inferenceSnapshotSupplier; VerifierStatus3Test overlappingStatusPreservesAdmissionCapacityRefusal; VerifierStatus4Test those two and olderPendingFailureCannotOverrideQueuedHealthyConversation. A second, direct Gradle run of the same before-state, patch and test files counted 1 of 9, 4 of 23, 2 of 10 and 3 of 14 cases failing: overlappingStatusPreservesAdmissionCapacityRefusal in every class ("a saturated work pool must not refuse a status read"); in VerifierStatus2Test the worker-independence cases for inferenceSnapshotSupplier, knowledgeServerLifecycleSupplier and gpuCapabilitiesSupplier; in VerifierStatus3Test blockedDiskProbeMustNotStaleHealthyWorkerOrAi; in VerifierStatus4Test olderPendingFailureCannotOverrideQueuedHealthyConversation and [1] at-rest. The staleness cases differ between the two runs, so they depend on timing at 93479e944. overlappingStatusPreservesAdmissionCapacityRefusal was rewritten after this change by cbe6650b5 (observation pool bounds), and the classes were adapted by b82 (ce7685a1c, entry 3). Entry 2 therefore records a before-state on which these checks fail, not a preservation witness; whether it should be reclassified is left open.
+
 ```json
 {
   "entries": [
@@ -59,7 +61,7 @@ Records phase B (batch 3) re-ran entry 2's evidence (`b67-status-backstop-preser
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java"
       ],
       "class": "New",
-      "behaviour": "Retain the independent verifier real-HTTP isolation, admission, owner, projection and provenance checks as preservation evidence. Their assertions remain unchanged; the fixture temporary directory uses the test runtime directory.",
+      "behaviour": "Retain the independent verifier real-HTTP isolation, admission, owner, projection and provenance checks as preservation evidence. Their assertions remain unchanged; the fixture temporary directory uses the test runtime directory. Before-state 93479e944 (parent of 6377d0030, the lane commit that added these four classes), run with the StatusLaneAging overlay and b67-status-backstop-compat.patch: all four classes fail by assertion there, so they do not pass before and after and are not a preservation witness against 93479e944 (see Records phase B, batch 3, verifier repair).",
       "sources": [
         {
           "kind": "delegated-choice",

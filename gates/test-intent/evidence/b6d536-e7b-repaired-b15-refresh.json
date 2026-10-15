@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T17:40:39.924Z",
-  "revision": "228c9da66221dd21e9ded4debbd9efc4a2c20584",
-  "tree": "e30168f822196f3e63f2eb8d2d7a88a6fe2847ec",
+  "createdAt": "2026-10-15T11:21:54.561Z",
+  "revision": "150a989ca2720acbd8955c22a22eadbf32808f18",
+  "tree": "f66f62a286ca076b66f7436d1d5bc47deab60fcd",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DevicePlanP16PacingTest.p16PlusGeneratingSlowsBulkAndExternalPressureIsReported\" --tests \"io.justsearch.app.inference.DevicePlanStartOrderTest.chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 52821
+      "durationMs": 11011
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.aPlannedRungTopsTheDerivedLadder\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.projectorOnTheCpuAddsOneFlagAfterTheProjector\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4493
+      "durationMs": 3584
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaPlanTest\" --tests \"io.justsearch.ort.GpuCallPackerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4118
+      "durationMs": 4121
     }
   ],
   "checks": [
@@ -213,7 +213,7 @@
     "patches": [
       {
         "path": "gates/test-intent/evidence/b6d536-e7b-repaired-compat.patch",
-        "contentDigest": "sha256:38ed7a3af1e6f647ad2eb0a624210caa392ef3adad735ba346379dfb3745126a"
+        "contentDigest": "sha256:acabbfe274b8c06135042544959480796a2c2ab126fc24ca50a7786623d839fd"
       }
     ],
     "runs": [
@@ -221,19 +221,19 @@
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DevicePlanP16PacingTest.p16PlusGeneratingSlowsBulkAndExternalPressureIsReported\" --tests \"io.justsearch.app.inference.DevicePlanStartOrderTest.chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 53515
+        "durationMs": 24453
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.aPlannedRungTopsTheDerivedLadder\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.projectorOnTheCpuAddsOneFlagAfterTheProjector\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5348
+        "durationMs": 5009
       },
       {
         "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaPlanTest\" --tests \"io.justsearch.ort.GpuCallPackerTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5656
+        "durationMs": 5443
       }
     ],
     "checks": [
@@ -245,7 +245,7 @@
       {
         "id": "modules/app-engine/src/test/java/io/justsearch/app/inference/DevicePlanStartOrderTest.java#chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing",
         "classification": "assertion",
-        "detail": "chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat activated first ==> expected: <Applied[profile=P12, capsMb={RERANKER=2468, EMBEDDING=2466, NER=2125, SPLADE=2342}, window=32768, projectorOnCpu=true, activationPerRunMiB=1867.0, lateMaxTokens=5632, shapes=[5, 8, 7, 2, 32, 18]]> but was: <Applied[profile=no p"
+        "detail": "chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat activated first ==> expected: <Applied[profile=P12, capsMb={SPLADE=2342, EMBEDDING=2466, RERANKER=2468, NER=2125}, window=32768, projectorOnCpu=true, activationPerRunMiB=1867.0, lateMaxTokens=5632, shapes=[5, 8, 7, 2, 32, 18]]> but was: <Applied[profile=no p"
       },
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#aPlannedRungTopsTheDerivedLadder",
@@ -269,5 +269,5 @@
       }
     ]
   },
-  "digest": "sha256:49ef112f0632b03d78ed5a4bb0479ffceabe0c16a77659cbfabee1995afe0175"
+  "digest": "sha256:8e082d2b5b8d4a16017d5ef0f3ff4e49a665c638a95724ce8c7388eea059c0b4"
 }
