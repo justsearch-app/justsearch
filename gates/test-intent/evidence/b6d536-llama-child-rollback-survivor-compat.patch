@@ -1,0 +1,19 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java
+index 6a812a318..3429d8d16 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java
+@@ -30,6 +30,14 @@ public record ChildSpec(
+ 
+   public static final int MAX_LABEL_LENGTH = 64;
+ 
++  /** Compat scaffolding for fail-before evidence: the path prefix is ignored; behaviour stays as before. */
++  public ChildSpec(ChildKind kind, List<String> argv, Path workingDir, Map<String, String> envOverrides,
++      Stdio stdio, boolean gpu, OptionalLong gpuFootprintBytes, Optional<GpuDevice> gpuDevice,
++      CooperativeStop cooperativeStop, String label, List<Path> ignoredPathPrefix) {
++    this(kind, argv, workingDir, envOverrides, stdio, gpu, gpuFootprintBytes, gpuDevice,
++        cooperativeStop, label);
++  }
++
+   public ChildSpec {
+     Objects.requireNonNull(kind, "kind");
+     argv = List.copyOf(Objects.requireNonNull(argv, "argv"));

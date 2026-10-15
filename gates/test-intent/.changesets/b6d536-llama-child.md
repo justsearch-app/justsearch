@@ -66,6 +66,31 @@ valid at their own stacked bases. The checks they name that this slice changed h
 entries below, and `gates/test-intent/evidence/b6d536-llama-child-adapted.json` shows all 16 pass
 on this branch.
 
+Phase B (integration base 181363e86, merge 98fd416d0): the five evidence files this changeset cites
+were regenerated on the current checks. `b6d536-llama-child.json` and
+`b6d536-llama-child-terminal.json` have no before-state and were re-run candidate-only; all their
+checks pass. `b6d536-llama-child-registration.json` keeps its before-state 56b1c91e3 and the
+`ChildControlHarness` overlay. The current harness and test use `DefaultChildControl.JobMembership`
+and the `ChildSpec` path-prefix constructor, which 56b1c91e3 lacks. The compat before-patch
+`gates/test-intent/evidence/b6d536-llama-child-registration-compat.patch` adds only these:
+- the `JobMembership` interface with its `NONE` constant;
+- a `DefaultChildControl` constructor that ignores the job and calls the existing one;
+- a `ChildSpec` constructor that ignores the path prefix and calls the canonical one.
+
+No production code at 56b1c91e3 calls them. The check again fails by assertion: the manifest keeps
+the dead child's entry. `b6d536-llama-child-rollback-survivor.json` keeps its before-state bca7dd0dd
+and the `SurvivingTerminator` overlay. Its three `DefaultChildControlTest` checks need the
+`ChildSpec` path-prefix constructor that the integration added. The compat before-patch
+`gates/test-intent/evidence/b6d536-llama-child-rollback-survivor-compat.patch` adds only that
+constructor, which ignores the prefix; no production code at bca7dd0dd calls it. All seven checks fail
+by assertion:
+- a chat-server start is not refused beside a survivor or a stop still running;
+- a second llama-server is launched beside the rollback survivor;
+- the terminal stop does not end the unregistered rollback survivor.
+
+This replaces the earlier note that `b6d536-no-adoption-launch.json` was not re-run; see
+`b6d536-no-adoption.md`.
+
 ```json
 {
   "entries": [
