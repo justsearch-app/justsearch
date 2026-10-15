@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T12:56:51.007Z",
-  "revision": "e26c94d53f11c33727d3811f2894ba2d71b28d62",
-  "tree": "9e911e04ac11dc754da4dffe914d6a4a8dbaa571",
+  "createdAt": "2026-10-14T16:32:54.920Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "dc6eeed22560e6c626c07d4357048803c1b5e385",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceLostTest.afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5892
+      "durationMs": 5664
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java#afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:04b2370fe034325b7aae000a13894694f27ee29d70059e51e2cadaeda06b783e",
+      "contentDigest": "sha256:f7fee4de4382a84beab1e91ab2f089be4900b339e6684935bad33ba1848e9dc0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -45,12 +45,18 @@
     "ref": "e26c94d53",
     "revision": "e26c94d53f11c33727d3811f2894ba2d71b28d62",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-device-lost-compat.patch",
+        "contentDigest": "sha256:242f04cc524f54465aa9fe9ef360e34c25b7b190241a0b657f3eb68eebfbf962"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceLostTest.afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 11998
+        "durationMs": 4960
       }
     ],
     "checks": [
@@ -61,5 +67,5 @@
       }
     ]
   },
-  "digest": "sha256:17237a18c2acd16bf24c2571d8ad99fa136d53bdf7cb478f3288e0722f4b6361"
+  "digest": "sha256:c5385f484be06078126ce8e6bfbcad4e8f97405f8936ade8e34d968c9229b22f"
 }

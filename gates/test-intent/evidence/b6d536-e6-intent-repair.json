@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:114bfca66efcf8587aa4e5aaf3db7527a6da4e90a718af1f0ecbc138ba3dd5b0"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T08:00:32.310Z",
-  "revision": "4cdbcfe793ef5c7a34ec5c5c74fa6b0be49d7460",
-  "tree": "fccde7ceb2c6901ccd790a829a326f8754524f08",
+  "createdAt": "2026-10-14T16:40:06.363Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "287eca146c4d5de8d1f6f419dab74b88f68e171e",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,10 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5416,
-      "environment": {
-        "LIGHTGBM_NATIVE_LIB_PATH": "F:\\justsearch-public\\.claude\\worktrees\\b6d536-bulk-gate-2\\build\\test-intent-native\\run-CZ5ugv"
-      }
+      "durationMs": 7718
     }
   ],
   "checks": [
@@ -32,7 +29,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5ff96dba6f0a5267b06fe269f2a0d218fa5b1a2da8f95698957602bec21bf795",
+      "contentDigest": "sha256:595544a9c61ea4a35316ef03700e9829d92bcb1e20f95598113554af4327fd38",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -82,7 +79,15 @@
           "status": "passed"
         },
         {
+          "name": "projectorOnTheCpuAddsOneFlagAfterTheProjector()",
+          "status": "passed"
+        },
+        {
           "name": "window flags carry the ladder rung and the offload layers, in that order",
+          "status": "passed"
+        },
+        {
+          "name": "aPlannedRungTopsTheDerivedLadder()",
           "status": "passed"
         }
       ]
@@ -92,24 +97,22 @@
     "ref": "79b5e2e25",
     "revision": "79b5e2e253bb03add7ced0b0774b69b819aa1717",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5564,
-        "environment": {
-          "LIGHTGBM_NATIVE_LIB_PATH": "F:\\justsearch-public\\.claude\\worktrees\\b6d536-bulk-gate-2\\build\\test-intent-native\\run-YFtwot"
-        }
+        "durationMs": 36753
       }
     ],
     "checks": [
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
         "classification": "assertion",
-        "detail": "the full GPU argv, in order, including -fit off: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[bin\\llama-server.exe, -m, models\\chat.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 8082, -c, 32768, -ngl, 99, --device, CUDA0, -sm, none, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fi"
+        "detail": "the CPU argv carries the CPU rung and -ngl 0, same flag set: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[-c, 8192, -ngl, 0, --device, none, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]> but was: <[-c, 8192, -ngl, 0, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]> | the full GPU argv, in order, including -fit off: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[bin\\llama-server.exe, -m, models\\ch"
       }
     ]
   },
-  "digest": "sha256:395387e4ca6a12f21f62c6f81d256356fb817c1dd8404c9facf5f8401f8b864c"
+  "digest": "sha256:09fd89c0089f437de350a43bfe0ba3faa07ae4c91be5728efef85fecec86352a"
 }

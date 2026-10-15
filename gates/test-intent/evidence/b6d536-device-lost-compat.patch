@@ -1,0 +1,21 @@
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/DeviceHealth.java b/modules/ort-common/src/main/java/io/justsearch/ort/DeviceHealth.java
+new file mode 100644
+index 000000000..8f250275a
+--- /dev/null
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/DeviceHealth.java
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ort;
++
++/** Compat declaration for fail-before runs only; nothing in this state reads it. */
++public final class DeviceHealth {
++  private DeviceHealth() {}
++
++  public static DeviceHealth forDevice(int cudaDevice) {
++    return new DeviceHealth();
++  }
++
++  public boolean reportLost(int code) {
++    return false;
++  }
++}

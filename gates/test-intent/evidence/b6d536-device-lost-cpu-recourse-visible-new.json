@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T06:38:10.394Z",
-  "revision": "93a8b20388d4f5bdb8f7cff4f242244074991154",
-  "tree": "16ae953676e599f4f788802ec16e7ba472741e47",
+  "createdAt": "2026-10-14T16:27:08.559Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ba2f3dba7c5e3d5ac5b492b52d8b59bd6bdb8264",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3830
+      "durationMs": 33129
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4432
+      "durationMs": 6603
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.WorkerStatusMapperQueryOnCpuTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2255
+      "durationMs": 6124
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3178
+      "durationMs": 9956
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:61e8ff6ecd30f50b875421efeae99fa1c961dc8ae297ea2b3d00eab970a4f6ff",
+      "contentDigest": "sha256:01fabfbec98772764c97084e00ab2191ccda35bec5a864476da31ffa5cfe926e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -66,13 +66,13 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9e1fae860c060f02e8fbd1a45e6cd3f432cc60d5e20606d7060908cebc0dd23d",
+      "contentDigest": "sha256:bba97e06eba6177911fbd8d5aa6ae926b22dd81eefd37ae6ddc3e6671a282e79",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "theHealthCheckReportsWhenTheCpuRecourseLastTookAQueryLeg()",
+          "name": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs()",
           "status": "passed"
         }
       ]
@@ -96,11 +96,15 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:66663471e1251afbaafda3776b72b5f9764cf1446fe06de0446f417852e123d3",
+      "contentDigest": "sha256:d10c1dee6e057371aec92ef1e311fa144454082534b33c3e5d5f8bc6bd8c795b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes()",
+          "status": "passed"
+        },
         {
           "name": "aStuckGpuStaysVisibleBesideSearchesAnsweredOnTheCpu()",
           "status": "passed"
@@ -113,5 +117,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:53bee6130d99e7cd827e744e08bebd8d02d69aee032b2a337f78016fd370de4d"
+  "digest": "sha256:fb384f5ed5cd6425f4090f39190450a914e3c9101d6eea5991bc0da8d8e64740"
 }

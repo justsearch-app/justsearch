@@ -19,6 +19,13 @@ files. Two evidence files of the step 2 changeset (`b6d536-chat-controller-repai
 `b6d536-chat-controller-guardrails.json`) were re-run unchanged in their checks, because this
 slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrailsTest`.
 
+Records phase B (batch 3) re-ran `b6d536-chat-controller-step56-unit.json`,
+`b6d536-chat-controller-step56-rewritten.json` and `b6d536-chat-controller-step56-reconciler.json`
+on b599d4d7e because their check files changed after the first runs. Every check passes. The
+reconciler file's preservation checks no longer compile against d3fe74ef2 even with the
+TestActivationForwarders overlay: RuntimeReconcilerTest builds RuntimeReconciler with the lease-free
+constructor that 5e4f4e698 left. So that file was re-run without a before-state.
+
 ```json
 {
   "entries": [

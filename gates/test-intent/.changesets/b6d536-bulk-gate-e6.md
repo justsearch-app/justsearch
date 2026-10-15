@@ -60,6 +60,16 @@ Evidence files (all written by run-evidence.mjs):
   These test files are unchanged, so no entry below names them.
 - `b6d536-bulk-gate-e6-new.json`: checks of classes and signatures added in this change.
 
+Records phase B (batch 3) re-ran `b6d536-bulk-gate-e6-new.json` and `b6d536-e6-intent-repair.json`
+on b599d4d7e because their check files changed after the first runs. In the intent repair (entry 7),
+LlamaServerLaunchFlagsTest passes on the change (14 cases) and again fails by assertion on
+79b5e2e25. LlamaServerPinnedDeviceEnvironmentTest#cpuLaunchNamesNoDevice no longer exists:
+3241289f5 (b48) deliberately changed a CPU launch to carry `--device none`, renamed the check
+cpuLaunchDisablesDevices, and covers it in b48's own changeset. So entry 2 no longer names it or
+describes the CPU launch, and the last entry records the old check as Obsolete, citing 3241289f5.
+`b6d536-bulk-gate-e6-new.json` was re-run without it, and its other 22 checks pass (no
+before-state).
+
 ```json
 {
   "entries": [
@@ -97,7 +107,7 @@ Evidence files (all written by run-evidence.mjs):
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java"
       ],
       "class": "New",
-      "behaviour": "The launch environment names the pinned device: a pinned UUID gives exactly CUDA_VISIBLE_DEVICES=GPU-<uuid>; no UUID, or a blank one, adds nothing. On a GPU launch the four flags --device CUDA0 -sm none follow -ngl <layers> directly; a CPU launch (-ngl 0) has neither --device nor -sm.",
+      "behaviour": "The launch environment names the pinned device: a pinned UUID gives exactly CUDA_VISIBLE_DEVICES=GPU-<uuid>; no UUID, or a blank one, adds nothing. On a GPU launch the four flags --device CUDA0 -sm none follow -ngl <layers> directly.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -111,7 +121,7 @@ Evidence files (all written by run-evidence.mjs):
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
           "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
-          "choice": "Without a pinned UUID the inherited environment is kept; the CPU launch names no device.",
+          "choice": "Without a pinned UUID the inherited environment is kept.",
           "label": "agent choice"
         }
       ],
@@ -119,8 +129,7 @@ Evidence files (all written by run-evidence.mjs):
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#pinnedUuidBecomesTheOnlyVisibleCudaDevice",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#nothingPinnedLeavesTheInheritedEnvironment",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#pinningFlagsFollowTheWindowFlagsOnAGpuLaunch",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#cpuLaunchNamesNoDevice"
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#pinningFlagsFollowTheWindowFlagsOnAGpuLaunch"
       ]
     },
     {
@@ -254,6 +263,24 @@ Evidence files (all written by run-evidence.mjs):
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java"
       ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java"
+      ],
+      "class": "Obsolete",
+      "removedChecks": "cpuLaunchNamesNoDevice: it expected a CPU launch (-ngl 0) to carry neither --device nor -sm. 3241289f5 (b48, gates/test-intent/.changesets/b48-llama-gpu-off.md) deliberately replaced that expectation: GPU off hides CUDA from the child and a CPU launch carries --device none. b48 renamed the check cpuLaunchDisablesDevices and records it, with its own source and evidence, in its own entry. This entry's GPU-launch and environment checks are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them.",
+          "choice": "make \"GPU off\" mean no CUDA use by the chat server and its self-test (b48, 3241289f5): a CPU launch carries --device none instead of naming no device",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for llama-server, --device, CUDA_VISIBLE_DEVICES, GPU off and -ngl 0; 0047 states only the CPU window rung, and no record decides which device flags a CPU launch carries)"
     }
   ]
 }

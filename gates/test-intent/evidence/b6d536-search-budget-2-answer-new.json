@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T08:34:17.538Z",
-  "revision": "fae202403f4df10184b967e9880797e96fb79041",
-  "tree": "cad2c2cf0407d99ece50d4280105c1825907fc07",
+  "createdAt": "2026-10-14T16:28:41.003Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "dd71dda088ce82c8c1c7fd386aa58aa1749c338b",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagLoadingObservedTest.loadingObservedByThePreSearchSkipsTheModelsWait\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagLoadingObservedTest.loadingObservedAfterTheModelsBecameReadyStillEmbedsTheQuestion\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6522
+      "durationMs": 7677
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.RemoteDocumentServicePreSearchLoadingTest.aPreSearchThatMissedOnLoadingModelsTellsTheRetrievalNotToWaitAgain\" --tests \"io.justsearch.app.services.worker.RemoteDocumentServicePreSearchLoadingTest.aPreSearchThatMissedForAnotherCauseLetsTheRetrievalWait\" --tests \"io.justsearch.app.services.worker.RemoteDocumentServicePreSearchLoadingTest.aPreSearchWithoutAMissLetsTheRetrievalWait\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3252
+      "durationMs": 5650
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java#loadingObservedByThePreSearchSkipsTheModelsWait",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:64cc6d19ea7de49b6b70b8808361338237e2ed549001213b1fafab4f4c0cec41",
+      "contentDigest": "sha256:77752254db7528ee3e87eb94afc03ecdecb905b36ed44a470d1b16b78e941238",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java#loadingObservedAfterTheModelsBecameReadyStillEmbedsTheQuestion",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:64cc6d19ea7de49b6b70b8808361338237e2ed549001213b1fafab4f4c0cec41",
+      "contentDigest": "sha256:77752254db7528ee3e87eb94afc03ecdecb905b36ed44a470d1b16b78e941238",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,5 +108,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:680189065ccd5c68c115861811d62d6d6ffc32842281be1157b6cb2df029b043"
+  "digest": "sha256:f0ef01365f18f33246ac7fd8ffcd741f2d9d24114e7d7811328ac6e0d3895b10"
 }

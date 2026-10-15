@@ -7,6 +7,8 @@ author-session: b56-nogpu-encoders
 
 # Test-intent entries
 
+Entry 2-5 evidence (`b56-nogpu-encoders.json`) was refreshed in records phase B (batch 3) on b599d4d7e, with the fail-before again at 6b317848e. The run sets CUDA_VISIBLE_DEVICES=-1 for the whole call, as the first run did, because NoDeviceTokenizerCacheTest runs only then. cbe6650b5 made KnowledgeServerRecoveryCloseTest stub WorkerSearchService.embeddingAvailability(), which 6b317848e lacks, so the fail-before applies the compat before-patch `gates/test-intent/evidence/b56-nogpu-encoders-compat.patch`. It adds only declarations: EmbeddingProvider.Availability with its STARTING constant, and embeddingAvailability() returning null at once. No production code at 6b317848e reads either. Every check again fails by assertion there and passes on the candidate.
+
 ```json
 {
   "entries": [

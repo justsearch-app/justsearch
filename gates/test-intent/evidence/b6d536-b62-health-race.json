@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-11T03:18:48.042Z",
-  "revision": "13950b0907c6c7d06a333a2ddfc4652e0ebec54b",
-  "tree": "99eb2f5c2fafb6410df7886d49dc820f15fb8fdb",
+  "createdAt": "2026-10-14T15:56:21.189Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "f5339b1e302a70631723f4daae78b9e78249c9ad",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAnEarlierMapperIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAPublicHealthObserverIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.failureConditionIsInstalledBeforeOrdinaryComponentObserversRun\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 809153
+      "durationMs": 4262
     },
     {
       "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 19085
+      "durationMs": 5045
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 24602
+      "durationMs": 9073
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#recoveryPublishesWhileAnEarlierMapperIsBlocked",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7c68ce756950cf0871eabae21c0a2585f681dbc86413fabc46246a76817236c5",
+      "contentDigest": "sha256:2dc8de32b6d637a55a619fe82b4991de096d0ad22973cf1e2b0ae8b154f5f597",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -56,7 +56,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#recoveryPublishesWhileAPublicHealthObserverIsBlocked",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7c68ce756950cf0871eabae21c0a2585f681dbc86413fabc46246a76817236c5",
+      "contentDigest": "sha256:2dc8de32b6d637a55a619fe82b4991de096d0ad22973cf1e2b0ae8b154f5f597",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -71,7 +71,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#failureConditionIsInstalledBeforeOrdinaryComponentObserversRun",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7c68ce756950cf0871eabae21c0a2585f681dbc86413fabc46246a76817236c5",
+      "contentDigest": "sha256:2dc8de32b6d637a55a619fe82b4991de096d0ad22973cf1e2b0ae8b154f5f597",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -117,25 +117,30 @@
     "ref": "13950b090",
     "revision": "13950b0907c6c7d06a333a2ddfc4652e0ebec54b",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b50-status-timeout-compat.patch",
+        "contentDigest": "sha256:3bbbee766497635af8f5895d446c6f96e510e311d00d82ed2cb7eea00b73e268"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAnEarlierMapperIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAPublicHealthObserverIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.failureConditionIsInstalledBeforeOrdinaryComponentObserversRun\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 503953
+        "durationMs": 54220
       },
       {
         "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 286603
+        "durationMs": 6665
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 140932
+        "exitCode": 0,
+        "durationMs": 10251
       }
     ],
     "checks": [
@@ -161,10 +166,10 @@
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
       }
     ]
   },
-  "digest": "sha256:a73d63e494ef360ddd5aa74ebe0a13fd98f7f90f6af73058ab194c09c40461bd"
+  "digest": "sha256:e43e412f2a4986c9d3f9e0a9442bba6de11adf193835d7f73b3a2527a1174216"
 }

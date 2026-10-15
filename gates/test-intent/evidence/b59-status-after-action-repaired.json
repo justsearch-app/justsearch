@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T23:10:13.538Z",
-  "revision": "1939ad02ce2c23bae1146e6b01b8055aa8b3fff8",
-  "tree": "207f4d349a4da448d197b867d3a5d30e9052857a",
+  "createdAt": "2026-10-14T17:11:54.920Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "122be582d9ccc27d8685be3137b3692ce73be0a6",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/BrainSurface.after-action.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b59\\\\status-after-action\\\\test-tmp\\\\test-intent-vitest-9136-1791673802250.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/BrainSurface.after-action.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-30976-1791997906280.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3357
+      "durationMs": 2017
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.after-action.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.after-action.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0eb98e8e1c4368483962036f951435802c3063f9901df60511f4393b06475d6c",
+      "contentDigest": "sha256:38ab8edad9fa3a258fb8a9d7b07825dddce1513137664c0ac08ed6d6f30240a1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,21 +57,27 @@
     "ref": "1939ad02c",
     "revision": "1939ad02ce2c23bae1146e6b01b8055aa8b3fff8",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b59-status-after-action-compat.patch",
+        "contentDigest": "sha256:da8ce2052baefb251e2a9b0e2701a6dfb5f0efdb5b72865948f59bdae288d688"
+      }
+    ],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/BrainSurface.after-action.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b59\\\\status-after-action\\\\test-tmp\\\\test-intent-vitest-9136-1791673808472.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/BrainSurface.after-action.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-30976-1791997910845.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3818
+        "durationMs": 2125
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.after-action.test.ts",
         "classification": "assertion",
-        "detail": "GPU setting completion refreshes shared canonical status before the next poll:  AssertionError: successful GPU action refreshes canonical status: expected [ '/api/settings/v2', …(1) ] to include '/api/status?fresh=true'\n    at Proxy.<anonymous> (file:///C:/agent-sandbox-tmp/b59/status-after-action/deps/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> | chat disable refreshes shared canonical status before the next poll:  AssertionError: canonical status shows completed"
+        "detail": "GPU setting completion refreshes shared canonical status before the next poll:  AssertionError: successful GPU action refreshes canonical status: expected [ '/api/settings/v2', …(1) ] to include '/api/status?fresh=true'\n    at Proxy.<anonymous> (file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb-3-ui/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15) | chat disable refreshes shared canonical status before the next poll:  AssertionError: canonical status shows completed a"
       }
     ]
   },
-  "digest": "sha256:eee1925e656ac8975818461b4da0b1a2b6e8f22b1383f2adb236539d68aa6967"
+  "digest": "sha256:3a141a63d36672802a4d292a6acbea809fcf200968a1c3f18a9b10fb91423fb4"
 }

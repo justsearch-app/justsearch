@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T12:10:22.624Z",
-  "revision": "342da67798936f4dafeaa81265acf6df6432a906",
-  "tree": "f3771989ff981b08d5e4f06da04b9b4d10dff312",
+  "createdAt": "2026-10-14T16:30:15.171Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ed47d4a6117541c6150814c48c05d0d07c96063f",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DeviceEncoderGateBreakerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2725
+      "durationMs": 7233
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleSemanticStuckTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4664
+      "durationMs": 11479
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.WorkerStatusMapperSemanticStuckTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3071
+      "durationMs": 5599
     }
   ],
   "checks": [
@@ -64,7 +64,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleSemanticStuckTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleSemanticStuckTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1c988fd849d91b8a3f91c986232e88caffb06bf87215dfb18757d45b028b6307",
+      "contentDigest": "sha256:99beb2f35fea348a702e435367734c1252f46bfc3b0d75304098aa8a0da9731a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,5 +92,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:1aa895dcaae79d70a13e0927849a7de2c7c3743907bac3fe0464e5ddbf86ad23"
+  "digest": "sha256:46a376679ddd051b32da2b1effe61d35031b160f65289c753383936c61be1340"
 }

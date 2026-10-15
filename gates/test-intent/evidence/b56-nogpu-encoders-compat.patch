@@ -1,0 +1,36 @@
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+index 4348ccff8..c0eb2a9fc 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+@@ -99,6 +99,15 @@ public interface EmbeddingProvider {
+   /** Returns true if the embedding model is loaded and ready for inference. */
+   boolean isAvailable();
+ 
++  /** Compat declaration for fail-before runs only; nothing in this state reads it. */
++  record Availability(State state, Throwable failure) {
++    public enum State {
++      STARTING
++    }
++
++    public static final Availability STARTING = new Availability(State.STARTING, null);
++  }
++
+   /** Returns true if the embedding model is using GPU acceleration. */
+   boolean isUsingGpu();
+ 
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java
+index b1f06f93a..dc249efb3 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java
+@@ -219,6 +219,11 @@ public final class WorkerSearchService {
+         new EmbeddingCompat(false, "REBUILD_IN_PROGRESS"));
+   }
+ 
++  /** Compat declaration for fail-before runs only; nothing in this state calls it. */
++  public EmbeddingProvider.Availability embeddingAvailability() {
++    return null;
++  }
++
+   /**
+    * Deferred injection of the embedding provider for query-time embedding.
+    *

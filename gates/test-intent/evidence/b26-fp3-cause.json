@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T01:31:33.799Z",
-  "revision": "f8c4967ed5af0f2db24f29dcf7ed37de7aebf06b",
-  "tree": "32d65f48ef97af77439dcc77a00f49c5282bd883",
+  "createdAt": "2026-10-14T15:30:13.868Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "122be582d9ccc27d8685be3137b3692ce73be0a6",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithReadyModelsStillReportsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.seatedHybridWithModelsLoadingKeepsLoadingCause\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 26186
+      "durationMs": 60371
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.semanticBudgetFallbackPublishesReasonAndCause\" --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.hybridPublishesItsReasonWithoutAnEmptyCause\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15776
+      "durationMs": 20876
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5cce73e369498b345705a62bfa2dca22484301be45d37830e0cfb42e155e118f",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5cce73e369498b345705a62bfa2dca22484301be45d37830e0cfb42e155e118f",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedHybridWithReadyModelsStillReportsContention",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5cce73e369498b345705a62bfa2dca22484301be45d37830e0cfb42e155e118f",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#seatedHybridWithModelsLoadingKeepsLoadingCause",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5cce73e369498b345705a62bfa2dca22484301be45d37830e0cfb42e155e118f",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -126,18 +126,19 @@
     "ref": "f8c4967ed",
     "revision": "f8c4967ed5af0f2db24f29dcf7ed37de7aebf06b",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithReadyModelsStillReportsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.seatedHybridWithModelsLoadingKeepsLoadingCause\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 26286
+        "durationMs": 91489
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.semanticBudgetFallbackPublishesReasonAndCause\" --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.hybridPublishesItsReasonWithoutAnEmptyCause\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 18146
+        "durationMs": 62106
       }
     ],
     "checks": [
@@ -173,5 +174,5 @@
       }
     ]
   },
-  "digest": "sha256:f9b6706c020d94430d957cabcc2aaeb2a0631d4ad3c8e6f4c6c81b012c597641"
+  "digest": "sha256:241b0f95ecf25e1628c421c1f9c7ab5c2b70ea6211583305a740999f23f135f8"
 }

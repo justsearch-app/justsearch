@@ -9,7 +9,11 @@ author-session: b14-shell-r2
 
 b18: repair the consumed-queue held-crash race using the actor transport no-write fact and bounded actor observation. Earlier entries and verdicts remain history; no acceptance added.
 
-b17 repair refresh: direct hold API and original P5 launch-oracle before witnesses are recorded; five actor-fixture before results remain explicitly UNVERIFIED. Native cancelled-session shell exit and held-crash installer completion have fail-before assertions against f6b5b019a. All prior entries and verifier verdicts remain history; this builder adds no acceptance.
+b17 repair refresh: direct hold API and original P5 launch-oracle before witnesses are recorded; five actor-fixture before results remain explicitly UNVERIFIED. Held-crash installer completion has a fail-before assertion against f6b5b019a; native cancelled-session shell exit has none (see Records phase B, batch 3 verifier repair). All prior entries and verifier verdicts remain history; this builder adds no acceptance.
+
+Records phase B (batch 3) re-ran `b6d536-shell-actors-b17.json` on b599d4d7e because engine_host.rs changed after the first run. The runner transplants the candidate's test module into 547b96083. That module now holds upgrade_stop_accepts_crash_before_command_consumption, which reads the private field `EngineHost.control` (19c16294d). The field does not exist at 547b96083, so the crate's tests did not compile. Besides `gates/test-intent/b6d536-shell-r2-before.patch`, the fail-before therefore applies the compat before-patch `gates/test-intent/evidence/b6d536-shell-actors-compat.patch`, after it. That patch adds only the declarations struct `Control { pending: Option<supervisor::HostQuit> }` and the field `control`, which the Default constructor initialises empty. HostQuit comes from the first patch. No 547b96083 code reads the field. All six checks pass on the change and again fail by the same panics there (the five actor checks at the `Instant::now() < until` wait, and the hold API check at "hold must preserve supervision of the live Engine").
+
+Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 14: `gates/test-intent/b6d536-shell-repair-before.patch` added set_session_exit and exit_app_if_session_quit as no-ops, so the count of 0 on f6b5b019a came from the patch, not from old shell behavior. f6b5b019a has no equivalent seam (see entry 14), so entry 14 is now candidate-only with that reason, no longer marked repaired, and cites the new `b6d536-shell-quit-exit-b3.json` (both checks pass on the change). `b6d536-shell-repair-f6-final.json` was re-run for entry 15 alone, `--before f6b5b019a` with the headless placeholder and updater_p5_oracle.rs overlays and no before-patch: held_crash_before_commit_still_launches_installer passes on the change and fails at f6b5b019a by its installer-count assertion (updater_handoff_tests.rs:289, 0 launches, "Head child process witness is unavailable"). The no-op patch is no longer applied by any cited evidence. Entries 16 and 18 state why their before-state is not reproducible.
 
 ```json
 {
@@ -462,8 +466,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/quit.rs#cfg(test)"
       ],
       "class": "New",
-      "repaired": true,
-      "behaviour": "S16 / Spec F 4.4: a quit begun for session end requests Tauri exit once even when Windows cancels ENDSESSION; a query before Tauri setup also closes once the app handle is ready. Non-session stops retain their exit behavior. f6b5b019a fails the two exit-count assertions (0 instead of 1) with only no-op interface scaffolding. The real Tauri shell receives native QUERY then END(FALSE) and has an empty process census afterwards.",
+      "behaviour": "S16 / Spec F 4.4: a quit begun for session end requests Tauri exit once even when Windows cancels ENDSESSION; a query before Tauri setup also closes once the app handle is ready. Non-session stops retain their exit behavior. The real Tauri shell receives native QUERY then END(FALSE) and has an empty process census afterwards (candidate). Before-state not reproducible: f6b5b019a has no session-exit seam. Its QuitCoordinator holds no exit callback and has neither set_session_exit nor exit_app_if_session_quit; on session end session_window.rs only calls QuitCoordinator::begin and wait, and AppHandle::exit is reached only from the tray quit, reset and updater paths. Both checks count calls made through set_session_exit, so any added method would itself decide the count (the phase B verifier rejected the earlier no-op stubs for exactly that), and the old behavior, no shell exit after a cancelled ENDSESSION, is observable only in a running Tauri app receiving native session messages, not in this unit check. Candidate-only evidence: b6d536-shell-quit-exit-b3.json.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -487,7 +490,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-shell-repair-f6-final.json",
+      "evidence": "gates/test-intent/evidence/b6d536-shell-quit-exit-b3.json",
       "newChecks": [
         "modules/shell/src-tauri/src/quit.rs#quit::tests::cancelled_session_end_still_requests_shell_exit_once",
         "modules/shell/src-tauri/src/quit.rs#quit::tests::early_session_query_is_closed_when_tauri_is_ready"
@@ -533,7 +536,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/quit.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Preservation: tray, window and upgrade causes do not request the session-only exit callback.",
+      "behaviour": "Preservation: tray, window and upgrade causes do not request the session-only exit callback. Before-state not reproducible: the session-exit callback this preserves against is new in cf9bd05a9; f6b5b019a has no set_session_exit or exit_app_if_session_quit, so the check cannot be built there without adding them, and an added no-op would make it pass vacuously rather than show old behavior.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -600,7 +603,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/shell_commit_transport_tests.rs"
       ],
       "class": "New",
-      "behaviour": "Real loopback sockets prove that a failed connection or exit guard writes no bytes, while a request write followed by a missing receipt is ambiguous delivery. The coordinator keeps normal receipt rules after sending begins, and refuses an unsent handoff without actor exit evidence. These are additional candidate counterexamples, not fail-before claims.",
+      "behaviour": "Real loopback sockets prove that a failed connection or exit guard writes no bytes, while a request write followed by a missing receipt is ambiguous delivery. The coordinator keeps normal receipt rules after sending begins, and refuses an unsent handoff without actor exit evidence. These are additional candidate counterexamples, not fail-before claims. Before-state not reproducible on 99373ec68 (parent of 22b8c3413): new API. post_before_send (shell_actuator), resolve_commit_delivery and finish_held_actor_exit (updater) and UPGRADE_COMMIT_NOT_SENT do not exist there; the old commit post reported no send boundary, so stand-ins for them would decide each assertion themselves.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

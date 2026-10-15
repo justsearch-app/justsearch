@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T00:37:55.035Z",
-  "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
-  "tree": "5af4e51bd7d0252cbeced7ada6ec30963a23ac6e",
+  "createdAt": "2026-10-15T09:11:43.366Z",
+  "revision": "947a6a72fa6b67b09e526242f0914ccf39cd3c09",
+  "tree": "52e65a353f63904850b5b06271ff479161e6bdd5",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest\" --tests \"io.justsearch.app.api.runtime.child.LedgerReconcilerTest\" --tests \"io.justsearch.app.api.runtime.child.EngineWrittenChildrenFixtureTest\" --tests \"io.justsearch.app.api.runtime.RuntimeManifestIncarnationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10565
+      "durationMs": 31118
     },
     {
       "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.memory.NvmlVramProbeTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1773
+      "durationMs": 6303
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 25437
+      "durationMs": 25435
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -60,6 +60,10 @@
         },
         {
           "name": "T9: a throwing ledger never blocks the stop; the outcome says the record was lost",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefixGoesInFrontOfTheInheritedPath()",
           "status": "passed"
         },
         {
@@ -220,7 +224,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestIncarnationPublishTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestIncarnationPublishTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a4c25cb88f12e47d7690e5b8fa68d7a2ef5e8217e1e9fbca4b182a13b25281d1",
+      "contentDigest": "sha256:ad84d5af51f40a021f8357f5fd26d2f82296d31699785ce63861d4a248517c17",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -232,10 +236,14 @@
         {
           "name": "unsupervisedEngineWritesNoIncarnation()",
           "status": "passed"
+        },
+        {
+          "name": "theEngineReadsItsIncarnationThroughTheConfigurationRegistry()",
+          "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d44d04269a974b3dfd310f2a2791203d5bb34fb827fad8edaccc5a0438050425"
+  "digest": "sha256:10e3706fab65498a8e751bb2bf07d23a79faae22ccee1718d40db5af3f03f9b9"
 }

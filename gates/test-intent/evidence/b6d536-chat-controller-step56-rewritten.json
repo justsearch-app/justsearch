@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T11:31:14.863Z",
-  "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
-  "tree": "e9bcaa52a19c3f0262161adb0d527381dbede45e",
+  "createdAt": "2026-10-14T16:25:14.160Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "cdef079496a6f12235c7c5546233f4f806d75efc",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorTest.pendingEmbeddingsNeverStopChatAndThePassCompletes\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorFailureCleanupTest.bodyFailureIsPrimaryAndReleasesTheGuardForTheNextPass\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorFailureCleanupTest.fatalBodyFailureIsPreservedAndReleasesTheGuard\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.queuedCancellationRunsNoBodyAndReleasesOwnershipExactlyOnce\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.runningCancellationRetainsStageGuardAndAdmissionThroughBlockedCleanup\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.admittedContextWithWorkIdFlowsToEveryProcedurePort\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.vduModeFailureIsVisibleAfterOwnershipRelease\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7702
+      "durationMs": 5372
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.completedOutcomePublishesOnlyAfterCleanupReleasesAdmission\" --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.acknowledgedFailureAndBlockedRemainderProduceRecordedIncompleteOutcomeAfterCleanup\" --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.cancellationDuringCleanupCannotPublishOrDetachEarly\" --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.postselectionModeEntryFailureRecordsCapturedRemainderAndPreservesCause\" --tests \"io.justsearch.ui.api.VduProcedureExecutorLifetimeTest.aRealRegistryTimeoutRefusesCloseAndRetainsTheOwnerUntilRetry\" --tests \"io.justsearch.ui.api.VduProcedureExecutorLifetimeTest.stopWaitsForTheActualProcedureAndRetainsItsAccountingUntilExit\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 14567
+      "durationMs": 10149
     }
   ],
   "checks": [
@@ -200,7 +200,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java#aRealRegistryTimeoutRefusesCloseAndRetainsTheOwnerUntilRetry",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e2beb83b5587dc8981b7df6a98428ad46a9c95a870a7816f024d5cc8d0268db9",
+      "contentDigest": "sha256:780462b0dcc542fa8b4bdf40102ce2d8d93ca76f9c009f1ac1daf1030fe0c64d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -215,7 +215,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java#stopWaitsForTheActualProcedureAndRetainsItsAccountingUntilExit",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e2beb83b5587dc8981b7df6a98428ad46a9c95a870a7816f024d5cc8d0268db9",
+      "contentDigest": "sha256:780462b0dcc542fa8b4bdf40102ce2d8d93ca76f9c009f1ac1daf1030fe0c64d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -228,5 +228,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:decaeb35bff54db59defc303684c972da207695247633eb10544d00dbd8054f8"
+  "digest": "sha256:7100e1ecdf5c71f81bff58830e89eaab870cbc291aa69587057e342a4f214ed0"
 }

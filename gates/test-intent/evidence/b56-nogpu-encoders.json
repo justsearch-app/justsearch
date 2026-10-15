@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T15:38:05.780Z",
-  "revision": "6b317848e4c00b326c9ae3c65b3e58477b4ea23a",
-  "tree": "06bb5007454a340d3c9a34377c20785e35770610",
+  "createdAt": "2026-10-14T15:52:07.395Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "148d5c53f654930b688ff0a4c0385cd6d811aa6b",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.NoDeviceEncoderPlanTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15618
+      "durationMs": 12161
     },
     {
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialNativeFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialCpuFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerStartupConfigurationTest.enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 34029
+      "durationMs": 17780
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15498
+      "durationMs": 9834
     },
     {
       "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.tokenizer.NoDeviceTokenizerCacheTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 17717
+      "durationMs": 11323
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatorRerankerPlacementStatusTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15628
+      "durationMs": 4010
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DevModeVariantProbeTest.witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13100
+      "durationMs": 8194
     }
   ],
   "checks": [
@@ -86,7 +86,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialNativeFailureRetainsTheCapturedDesiredPlan",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:afdbdeaecc88b7b6f03760acfd9237f1cef53ff6ddfcc4fe21c5f96ddc1432a2",
+      "contentDigest": "sha256:8b0527e65b29dba9644693da1d858c1b376d84c93f4df7aee71064a65a7842de",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -113,7 +113,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialCpuFailureRetainsTheCapturedDesiredPlan",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:afdbdeaecc88b7b6f03760acfd9237f1cef53ff6ddfcc4fe21c5f96ddc1432a2",
+      "contentDigest": "sha256:8b0527e65b29dba9644693da1d858c1b376d84c93f4df7aee71064a65a7842de",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -143,7 +143,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d258ffe843df691e6f6252874906bced92bfc91edf91e1f80b963680a83a1dbb",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -216,42 +216,48 @@
     "ref": "6b317848e",
     "revision": "6b317848e4c00b326c9ae3c65b3e58477b4ea23a",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b56-nogpu-encoders-compat.patch",
+        "contentDigest": "sha256:a73c075c5d94d1efb8bb412fc5bb9faf0541a3d79f1f2b9c0f3fad3f5c390ac2"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.NoDeviceEncoderPlanTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 70345
+        "durationMs": 28173
       },
       {
         "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialNativeFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialCpuFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerStartupConfigurationTest.enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 23347
+        "durationMs": 14450
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 15676
+        "durationMs": 5045
       },
       {
         "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.tokenizer.NoDeviceTokenizerCacheTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 17634
+        "durationMs": 11362
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatorRerankerPlacementStatusTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 27608
+        "durationMs": 9061
       },
       {
         "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DevModeVariantProbeTest.witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 13754
+        "durationMs": 3497
       }
     ],
     "checks": [
@@ -278,12 +284,12 @@
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
         "classification": "assertion",
-        "detail": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <{justsearch.gpu.enabled=false, justsearch.mmproj.offload=false, justsearch.gpu.memory_plan=no_gpu, justsearch.context.size=8192, justsearch.gpu.device_available=false, justsearch.gpu.layers=0}> but was: <{justsearch.gpu.memory_plan=no_gpu, justsearch.g"
+        "detail": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <{justsearch.gpu.layers=0, justsearch.gpu.device_available=false, justsearch.context.size=8192, justsearch.gpu.memory_plan=no_gpu, justsearch.mmproj.offload=false, justsearch.gpu.enabled=false}> but was: <{justsearch.gpu.memory_plan=no_gpu, justsearch.g"
       },
       {
         "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/tokenizer/NoDeviceTokenizerCacheTest.java",
         "classification": "assertion",
-        "detail": "cpuTokenizerStartsAfterAGpuArchitectureCacheWasCreated(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU native execution must survive a cache left by GPU use ==> Unexpected exception thrown: java.lang.UnsatisfiedLinkError: Can't load library: C:\\agent-sandbox-tmp\\b56\\test-tmp\\junit-2862939056515686430\\tokenizers\\0.21.0-0.36.0-cpu-win-x86_64\\libwinpthread-1.dll"
+        "detail": "cpuTokenizerStartsAfterAGpuArchitectureCacheWasCreated(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU native execution must survive a cache left by GPU use ==> Unexpected exception thrown: java.lang.UnsatisfiedLinkError: Can't load library: F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-3\\junit-7149452639698876824\\tokenizers\\0.21.0-0.36.0-cpu-win-x86_64\\libwinpthr"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatorRerankerPlacementStatusTest.java",
@@ -297,5 +303,5 @@
       }
     ]
   },
-  "digest": "sha256:c1c37513125ec50a5fd1f68518891c0d80c9ef89d487ca880f08453a4fa9840f"
+  "digest": "sha256:64a2df523686ffba7039a46c227e35c7119957ca6efaaf931e1d7077d3f9c699"
 }

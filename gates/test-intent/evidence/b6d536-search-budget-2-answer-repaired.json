@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T08:34:00.774Z",
-  "revision": "fae202403f4df10184b967e9880797e96fb79041",
-  "tree": "b0c0febb47bc94d51b83115583adfaeab53ea9d1",
+  "createdAt": "2026-10-14T16:50:27.250Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "d943286c0333dcdf9e9f8d6e0e158657a7ad408b",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest.anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit\" --tests \"io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest.aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 31916
+      "durationMs": 30177
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.RemoteDocumentServiceOpenRetrievalDeadlineTest.bothStepsOfAnOpenRetrievalRunInsideOneHeadDeadline\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3171
+      "durationMs": 3653
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAnswerModelsLoadingInProcessTest.java#anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAnswerModelsLoadingInProcessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:79769f35d592b22414f4defe9345fcd631d3769155918350bf2c5890fd666195",
+      "contentDigest": "sha256:67f5465c8ae0b9e787102636d4a907704b43183278f86ddad1591ca94eb8dd96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAnswerModelsLoadingInProcessTest.java#aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAnswerModelsLoadingInProcessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:79769f35d592b22414f4defe9345fcd631d3769155918350bf2c5890fd666195",
+      "contentDigest": "sha256:67f5465c8ae0b9e787102636d4a907704b43183278f86ddad1591ca94eb8dd96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -81,30 +81,36 @@
     "ref": "fae202403",
     "revision": "fae202403f4df10184b967e9880797e96fb79041",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-search-budget-2-answer-compat.patch",
+        "contentDigest": "sha256:4fc02b05fc60fbf9ef1ea3cca8f89abe1d9cee783d41e5e47a4bef336001c919"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest.anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit\" --tests \"io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest.aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 92694
+        "durationMs": 49022
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.RemoteDocumentServiceOpenRetrievalDeadlineTest.bothStepsOfAnOpenRetrievalRunInsideOneHeadDeadline\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 22285
+        "durationMs": 25382
       }
     ],
     "checks": [
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAnswerModelsLoadingInProcessTest.java#anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit",
         "classification": "assertion",
-        "detail": "anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the answer failed after 15031 ms: [{type=text, text=Answer failed: TimeoutException: no additional detail. Current component state is available via the justsearch_status tool.&#10;Error code: TIMEOUT. Error class: TRANSIENT. Retryable: true.}] ==> expected: <fals"
+        "detail": "anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the answer failed after 15031 ms: [{text=Answer failed: TimeoutException: no additional detail. Current component state is available via the justsearch_status tool.&#10;Error code: TIMEOUT. Error class: TRANSIENT. Retryable: true., type=text}] ==> expected: <fals"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAnswerModelsLoadingInProcessTest.java#aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline",
         "classification": "assertion",
-        "detail": "aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the retrieval took 16079 ms, past the request deadline ==> expected: <true> but was: <false>"
+        "detail": "aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the retrieval took 16078 ms, past the request deadline ==> expected: <true> but was: <false>"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceOpenRetrievalDeadlineTest.java#bothStepsOfAnOpenRetrievalRunInsideOneHeadDeadline",
@@ -113,5 +119,5 @@
       }
     ]
   },
-  "digest": "sha256:fb69e6c72c1694437a50c6ec05cf1bb709822f4ab05462b231f4d18fa3b40510"
+  "digest": "sha256:c9aadff437a0c92f08c6b6068f5ee12ec048fc62c361e2972ebcce55b3f6e839"
 }

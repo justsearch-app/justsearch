@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T23:19:43.406Z",
-  "revision": "1939ad02ce2c23bae1146e6b01b8055aa8b3fff8",
-  "tree": "92f5981cfd074a554c13b1974f24deb729210ab3",
+  "createdAt": "2026-10-15T11:27:41.086Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1c01287b9af4aef8d3238857eea3f5c1b59311fc",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/api/statusInvalidation.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b59\\\\status-after-action\\\\test-tmp\\\\test-intent-vitest-40800-1791674375040.json\"",
+      "command": "npx vitest run \"src/api/statusInvalidation.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-25744-1792063647749.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 8364
+      "durationMs": 1846
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/api/statusInvalidation.test.ts",
       "file": "modules/ui-web/src/api/statusInvalidation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:770976c9e9109e71c66af416641a4c228a27d5132922e25a7e1a8d6e56153b7c",
+      "contentDigest": "sha256:5fdde9637e322b647d7f59b300ff2cd5eb10da6f0907fbfe96f9ff797a6cd5fa",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -157,10 +157,34 @@
         {
           "name": "failed operations and read-only operations do not request fresh status",
           "status": "passed"
+        },
+        {
+          "name": "shows a change made by another client after this UI next makes a read-only request",
+          "status": "passed"
         }
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:720a11a6461fd52feded3055cea5564e941cf3d8ba431508577757a318797cf6"
+  "failBefore": {
+    "ref": "1939ad02c",
+    "revision": "1939ad02ce2c23bae1146e6b01b8055aa8b3fff8",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/api/statusInvalidation.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-25744-1792063652912.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1714
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/statusInvalidation.test.ts",
+        "classification": "assertion",
+        "detail": "core.set-chat-enabled publishes canonical state from its actual operation receipt:  AssertionError: expected 'READY' to be 'OFF' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-3/test-intent-before-sqAhwy/modules/ui-web/src/api/statusInvalidation.test.ts:48:44\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb-3-ui/modules/ui-web/node_modules | core.activate-runtime-variant publishes canonical state from its actual operation receipt:  AssertionError: expec"
+      }
+    ]
+  },
+  "digest": "sha256:26b326e03a35f50967dd5e018975157330d5b6208e23d373858adfe9284cd7e1"
 }

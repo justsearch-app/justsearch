@@ -1,0 +1,16 @@
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+index d771dbe8c..a0fea04ea 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+@@ -14,6 +14,11 @@ public final class NoOpEmbeddingProvider implements EmbeddingProvider {
+ 
+   private NoOpEmbeddingProvider() {}
+ 
++  /** Compat declaration for fail-before runs only; nothing in this state reads it. */
++  public static EmbeddingProvider starting() {
++    return INSTANCE;
++  }
++
+   @Override
+   public float[] embedDocument(String text) {
+     return new float[0];

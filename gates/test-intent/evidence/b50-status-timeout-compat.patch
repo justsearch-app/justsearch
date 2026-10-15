@@ -1,0 +1,16 @@
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+index 6ea7fa2ae..8d4781e8d 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+@@ -46,6 +46,11 @@ public final class HealthEventChangeRegistry {
+     this.channel = Objects.requireNonNull(channel, "channel");
+   }
+ 
++  /** Compat declaration for fail-before runs only; the executor is ignored. */
++  public HealthEventChangeRegistry(java.util.concurrent.ExecutorService deliveryOwner) {
++    this();
++  }
++
+   /**
+    * Returns the SSE wire's seq cursor — bumped on every published frame (broadcast
+    * UPDATE or per-client lifecycle). FE consumers compare on reconnect to decide whether

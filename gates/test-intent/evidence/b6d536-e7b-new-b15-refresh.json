@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T12:57:22.917Z",
-  "revision": "5970a2de5cd5a309f7aa701a2fbec06f60d7f730",
-  "tree": "85977478bcaf93555ae5d045b68ad4118585d751",
+  "createdAt": "2026-10-14T16:28:09.651Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "394eca286c3c230c34a25bf277f64933bd22b4e4",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.DevicePlanP8PreservationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5053
+      "durationMs": 26821
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4605
+      "durationMs": 6318
     },
     {
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.explicitCapsEqualToTodaysGiveTodaysEstimateBesideAPlan\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4773
+      "durationMs": 5192
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5308
+      "durationMs": 6548
     }
   ],
   "checks": [
@@ -70,17 +70,13 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f0473235f42571c19054aa7fdf484581f39eb060aa5ce44c0b67c3911bf9e019",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "bgeM3IsNeverPlacedOnTheGpuByAPlanUnlessTheUserPutsItThere()",
-          "status": "passed"
-        },
-        {
-          "name": "withoutAPlanOnlyTheProjectorMovesAndNoGpuOrUnresolvedAppliesNothing()",
           "status": "passed"
         },
         {
@@ -104,7 +100,15 @@
           "status": "passed"
         },
         {
+          "name": "statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan()",
+          "status": "passed"
+        },
+        {
           "name": "explicitSettingsKeepWinningAndABrokenPlanIsReportedUnmet()",
+          "status": "passed"
+        },
+        {
+          "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
           "status": "passed"
         }
       ]
@@ -113,7 +117,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#explicitCapsEqualToTodaysGiveTodaysEstimateBesideAPlan",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d8c75e060a6d61a57ab9be2cee81420c99803a7ef21c58ac9537a8be55bf8c39",
+      "contentDigest": "sha256:392044a3d3bb4e87bacb6706b174882024ece8d9001610b3aefb0b2a8b2b6b11",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,5 +153,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:5733b857f2d4f33cf38233324eef93ee068ce7cc6f4fd200f7a15c7321af6cef"
+  "digest": "sha256:3092ef7c0bde1613ce9622c418ee4b48ac1f5defaf56f87ab6aee52c3eabd545"
 }
