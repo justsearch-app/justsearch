@@ -57,6 +57,27 @@ final class ChatServerControllerImplTest {
   // ==================== U1: one thread, one step at a time ====================
 
   @Test
+  void chatStartAndStopDoNotResolveEncoderPlan() throws Exception {
+    var resolutions = new AtomicInteger();
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rememberDevicePlanner(config -> {
+      resolutions.incrementAndGet();
+      return io.justsearch.app.services.gpu.GpuProfileResolver.Resolution.unresolved();
+    });
+    try {
+      var c = controller();
+      c.setActivation(new ChatActuationRouter.Activation(true, TransitionReason.USER_SWITCH))
+          .toCompletableFuture().get(5, TimeUnit.SECONDS);
+      assertTrue(actuator.liveChild.get(), "the controller actually started chat");
+      c.setActivation(new ChatActuationRouter.Activation(false, TransitionReason.USER_SWITCH))
+          .toCompletableFuture().get(5, TimeUnit.SECONDS);
+      assertFalse(actuator.liveChild.get(), "the controller actually stopped chat");
+      assertEquals(0, resolutions.get(), "chat start and stop must not resolve the encoder plan");
+    } finally {
+      io.justsearch.app.services.config.ConfigStoreRebuilder.rememberDevicePlanner(null);
+    }
+  }
+
+  @Test
   void stepsRunOneAtATimeOnTheControllerThreadAndEachRequestPublishesAVersion() throws Exception {
     var c = controller();
     var running = new AtomicInteger();

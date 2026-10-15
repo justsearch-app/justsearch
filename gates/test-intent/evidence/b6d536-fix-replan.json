@@ -1,0 +1,290 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T16:27:23.483Z",
+  "revision": "0d90a33886e2136c68eab09c8ce4b3f3800fc84a",
+  "tree": "330a1a72316ee0efb6ec9e6567417c4703948b3d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.compactToStandardActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.standardToCompactActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.committedProfileRecoveryReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.unchangedProfileActivationDoesNotRecomposeEncoders\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.settingsChatModelSelectionReplansEncoderCaps\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.chatStartAndStopDoNotResolveEncoderPlan\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 54291
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7dec2bef4cc80cc8a6a75514e2dd9c4f37b9093cccba3724e75a844be03f9bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deactivationAppliesThePublishedOperatorGpuOverride()",
+          "status": "passed"
+        },
+        {
+          "name": "status omits the realized identity entirely when the engine is offline",
+          "status": "passed"
+        },
+        {
+          "name": "settingsChatModelSelectionReplansEncoderCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "an intervening self-test settings write refuses activation before runtime effect",
+          "status": "passed"
+        },
+        {
+          "name": "compact profile with no model on disk fails MODEL_NOT_FOUND naming the fetch script",
+          "status": "passed"
+        },
+        {
+          "name": "a concurrent settings write remains authoritative while activation is preparing",
+          "status": "passed"
+        },
+        {
+          "name": "activationAppliesPublishedOperatorGpuAndContextInsteadOfSettings()",
+          "status": "passed"
+        },
+        {
+          "name": "an operator executable matching the requested variant permits profile activation",
+          "status": "passed"
+        },
+        {
+          "name": "standardToCompactActivationReplansEncoderCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "profile activation never promotes its transient target to a JVM property",
+          "status": "passed"
+        },
+        {
+          "name": "aRefusedSessionFailsTheActivationBeforeAnySelfTestOrCommit()",
+          "status": "passed"
+        },
+        {
+          "name": "compactToStandardActivationReplansEncoderCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "unchangedProfileActivationDoesNotRecomposeEncoders()",
+          "status": "passed"
+        },
+        {
+          "name": "selfTestAndCommitRunInsideOneControllerSession()",
+          "status": "passed"
+        },
+        {
+          "name": "precommit component refusal leaves original settings and config",
+          "status": "passed"
+        },
+        {
+          "name": "no chatProfile keeps the pre-842 settings path (status-quo pin)",
+          "status": "passed"
+        },
+        {
+          "name": "explicit operator model path refuses profile before self-test or settings acceptance",
+          "status": "passed"
+        },
+        {
+          "name": "profile activation passes a transient target and installs it after settings commit",
+          "status": "passed"
+        },
+        {
+          "name": "committedProfileRecoveryReplansEncoderCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "status reports mmprojActive=false when the projector was dropped (the honesty case)",
+          "status": "passed"
+        },
+        {
+          "name": "status projects the RUNNING engine chat identity when the engine is up",
+          "status": "passed"
+        },
+        {
+          "name": "an operator executable differing from the requested variant blocks activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#compactToStandardActivationReplansEncoderCaps",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7dec2bef4cc80cc8a6a75514e2dd9c4f37b9093cccba3724e75a844be03f9bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compactToStandardActivationReplansEncoderCaps()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#standardToCompactActivationReplansEncoderCaps",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7dec2bef4cc80cc8a6a75514e2dd9c4f37b9093cccba3724e75a844be03f9bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standardToCompactActivationReplansEncoderCaps()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#committedProfileRecoveryReplansEncoderCaps",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7dec2bef4cc80cc8a6a75514e2dd9c4f37b9093cccba3724e75a844be03f9bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "committedProfileRecoveryReplansEncoderCaps()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#unchangedProfileActivationDoesNotRecomposeEncoders",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7dec2bef4cc80cc8a6a75514e2dd9c4f37b9093cccba3724e75a844be03f9bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unchangedProfileActivationDoesNotRecomposeEncoders()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#settingsChatModelSelectionReplansEncoderCaps",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7dec2bef4cc80cc8a6a75514e2dd9c4f37b9093cccba3724e75a844be03f9bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "settingsChatModelSelectionReplansEncoderCaps()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#chatStartAndStopDoNotResolveEncoderPlan",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88380644213f11e51e85dd8cd69ec1a867c35a3f99cf376563f85b044374f601",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatStartAndStopDoNotResolveEncoderPlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java#transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:367baa4049cdf9cc0a343275444f00f8279deed4d4ba9b40e4025d8ba64bd7af",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0d90a3388",
+    "revision": "0d90a33886e2136c68eab09c8ce4b3f3800fc84a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.compactToStandardActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.standardToCompactActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.committedProfileRecoveryReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.unchangedProfileActivationDoesNotRecomposeEncoders\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.settingsChatModelSelectionReplansEncoderCaps\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.chatStartAndStopDoNotResolveEncoderPlan\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 155611
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+        "classification": "assertion",
+        "detail": "standardToCompactActivationReplansEncoderCaps(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: standard to compact activation must install the compact encoder caps ==> expected: <[4972, 4848, 4974]> but was: <[2466, 2342, 2468]> | compactToStandardActivationReplansEncoderCaps(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: compact to standard activation must install the standard encoder caps ==> expected: <[2466, 2342, 2468]> but was: <[4972"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#compactToStandardActivationReplansEncoderCaps",
+        "classification": "assertion",
+        "detail": "compactToStandardActivationReplansEncoderCaps(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: compact to standard activation must install the standard encoder caps ==> expected: <[2466, 2342, 2468]> but was: <[4972, 4848, 4974]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#standardToCompactActivationReplansEncoderCaps",
+        "classification": "assertion",
+        "detail": "standardToCompactActivationReplansEncoderCaps(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: standard to compact activation must install the compact encoder caps ==> expected: <[4972, 4848, 4974]> but was: <[2466, 2342, 2468]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#committedProfileRecoveryReplansEncoderCaps",
+        "classification": "assertion",
+        "detail": "committedProfileRecoveryReplansEncoderCaps(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: committed profile recovery must publish the selected profile's encoder caps ==> expected: <[2466, 2342, 2468]> but was: <[4972, 4848, 4974]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#unchangedProfileActivationDoesNotRecomposeEncoders",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#settingsChatModelSelectionReplansEncoderCaps",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#chatStartAndStopDoNotResolveEncoderPlan",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java#transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta",
+        "classification": "assertion",
+        "detail": "transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: selected chat profile must be resolved before component preparation ==> expected: <compact> but was: <standard>"
+      }
+    ]
+  },
+  "digest": "sha256:d7d959b09c84ded62d7fe8033013ec144b94cd2119f439778834a3040e9a6f9c"
+}

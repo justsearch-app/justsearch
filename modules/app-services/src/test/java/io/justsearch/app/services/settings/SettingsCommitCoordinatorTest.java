@@ -949,7 +949,10 @@ final class SettingsCommitCoordinatorTest {
             io.justsearch.configuration.resolved.ResolvedConfig desired,
             Map<String, Set<String>> affected, SettingsCandidateContext context) {
           assertEquals(Set.of("generative"), affected.keySet());
-          assertEquals(Set.of("chatProfile"), affected.get("generative"));
+          assertEquals("compact", desired.ai().chatProfile(),
+              "selected chat profile must be resolved before component preparation");
+          assertEquals(Set.of("chatProfile", "justsearch.chat.profile", "justsearch.vlm.model",
+              "justsearch.mmproj.model"), affected.get("generative"));
           seen.set(context);
           return new Prepared() {
             @Override public void includeObservation(

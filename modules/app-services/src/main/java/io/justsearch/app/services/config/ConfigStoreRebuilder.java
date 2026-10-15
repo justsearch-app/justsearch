@@ -4,6 +4,8 @@ package io.justsearch.app.services.config;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.services.gpu.GpuProfileResolver;
 import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.resolved.ConfigChangedEvent;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -42,6 +44,9 @@ public final class ConfigStoreRebuilder {
    */
   private static volatile Map<String, String> autoDetected = Map.of();
 
+  private static final String ACTIVATION_SOURCE = "runtime_activation";
+  private static final int ACTIVATION_ORDINAL = 600;
+
   private ConfigStoreRebuilder() {}
 
   /**
@@ -69,6 +74,16 @@ public final class ConfigStoreRebuilder {
    * @return the prepared immutable configuration snapshot
    */
   public static ResolvedConfig prepare(UiSettings settings) {
+    return prepare(settings, null, null);
+  }
+
+  /**
+   * Prepares the activation's selected model before planning and component classification. The
+   * selection is attempt-scoped, not a stored model path. Later settings commits retain it until
+   * they select a different model path; failed preparations never change the serving selection.
+   */
+  public static ResolvedConfig prepare(UiSettings settings, ChatModelProfile chatProfile,
+      ResolvedConfig serving) {
     ResolvedConfigBuilder builder = ResolvedConfig.builder();
     builder.contributeAutoDetected(autoDetected);
     builder.contributeBaseSources();
@@ -76,6 +91,24 @@ public final class ConfigStoreRebuilder {
       contributeUiSettings(builder, settings);
     }
     ResolvedConfig selected = builder.build();
+    if (chatProfile == null && serving != null
+        && java.util.Objects.equals(selected.ai().llmModelPath(), serving.ai().llmModelPath())) {
+      var priorProfile = serving.resolution(EnvRegistry.CHAT_PROFILE.configKey());
+      if (priorProfile != null && ACTIVATION_SOURCE.equals(priorProfile.sourceName())) {
+        chatProfile = ChatModelProfile.resolve(priorProfile.value());
+      }
+    }
+    if (chatProfile != null) {
+      // Activation already owns the complete model/projector pair. Its transient intent also
+      // supersedes a launcher's profile, just as the generative settings owner does.
+      builder.put(EnvRegistry.CHAT_PROFILE.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
+          "chatProfile", chatProfile.id());
+      builder.put(EnvRegistry.VLM_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
+          "chatProfile", chatProfile.modelFile());
+      builder.put(EnvRegistry.MMPROJ_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
+          "chatProfile", chatProfile.mmprojFile());
+      selected = builder.build();
+    }
     Map<String, String> derived = new LinkedHashMap<>();
     var gpuSelection = selected.resolution("justsearch.gpu.layers");
     if (autoDetected.containsKey("justsearch.context.size") && gpuSelection != null && gpuSelection.isResolved()) {
