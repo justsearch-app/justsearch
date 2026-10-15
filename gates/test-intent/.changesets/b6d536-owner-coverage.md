@@ -10,9 +10,19 @@ author-session: codex-b32-owner-coverage-20261008
 The source is the orchestrator's b32 builder brief (agent wording under the owner's end-to-end
 delegation, cited below as delegated choices). Assertion failures on f5877635f and native sibling
 evidence are retained in F:/agent-sandbox/design-b6d536/codex/b32-owner-coverage/report.md.
-The canonical evidence producer ran the candidate. Its optional before runner creates a worktree
-outside the mandated directory and removes it with force after linking node_modules. The owner's
-worktree rules prohibit that route; manually executed detached baseline evidence remains separate.
+Evidence regenerated on 688a340f9 (b6d536/integration 181363e86 merged), with the canonical before
+runner: `gates/test-intent/evidence/b6d536-owner-coverage.json` runs on f5877635f, the parent of
+58a51a608, which added these checks. It applies
+`gates/test-intent/evidence/b6d536-owner-coverage-compat.patch`, which is the gpu-bridge test
+dependency on mockito-core and its lockfile lines as 58a51a608 added them. VramDetectorOwnedBootTest
+needs them to compile. They are test-classpath build lines; no production code reads them.
+VramDetectorOwnedBootTest, TikaProductionOwnerCoverageTest and
+CrashedEngineHelperReceiptTest#successorRecordsCrashConsequenceAndUnknownExitTime fail there by
+assertion. EngineSpawnOwnershipArchTest (entry 4, not repaired) passes there. b101 (47981cfa6)
+replaced TikaProbeOwnerIntentTest#firstPassConfigurationProbeHasItsOwnWindow with
+firstPassConfigurationLaunchesNothingAndWritesNoWindow. The first-pass OCR configuration now
+launches nothing and writes no window, so b101-probe-churn covers it. That check is no longer in
+this file or in entry 2.
 The builder does not fabricate canonical fail-before evidence or accept its own test intent.
 
 ```json
@@ -22,7 +32,7 @@ The builder does not fabricate canonical fail-before evidence or accept its own 
       "items": ["modules/gpu-bridge/src/test/java/io/justsearch/gpu/VramDetectorOwnedBootTest.java"],
       "class": "New",
       "repaired": true,
-      "behaviour": "The production nvidia-smi spawn path retains its original held-process owner receipts even when it completes before the Engine attaches the recorder. The test substitutes a finite CPU-only command at ProcessBuilder.start.",
+      "behaviour": "The production nvidia-smi spawn path retains its original held-process owner receipts even when it completes before the Engine attaches the recorder. The test substitutes a finite CPU-only command at ProcessBuilder.start. Fail-before: f5877635f with b6d536-owner-coverage-compat.patch, by assertion (early production nvidia-smi receipt absent).",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "Three early nvidia-smi exits (around Engine start, before the VramDetector-owned ones) are unowned: find their spawn site and route it through OwnedHelper.", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b32 builder, user turn 2026-10-08)'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b6d536-owner-coverage.json",
       "newChecks": ["modules/gpu-bridge/src/test/java/io/justsearch/gpu/VramDetectorOwnedBootTest.java"]
@@ -31,16 +41,16 @@ The builder does not fabricate canonical fail-before evidence or accept its own 
       "items": ["modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java", "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProductionOwnerCoverageTest.java"],
       "class": "New",
       "repaired": true,
-      "behaviour": "Structured extractor detector construction and first-pass OCR configuration are inside owner windows. Every real Tesseract initialization or parse probe in flat, structured and policy extractors has its actual creator PID/birth and a closed intent window. Flat extraction is a preservation control; structured and policy baseline failures identify the missed detector constructor.",
+      "behaviour": "Structured extractor detector construction and first-pass OCR configuration are inside owner windows. Every real Tesseract initialization or parse probe in flat, structured and policy extractors has its actual creator PID/birth and a closed intent window. Flat extraction is a preservation control; structured and policy baseline failures identify the missed detector constructor. Superseded in part by b101-probe-churn (47981cfa6): the first-pass OCR configuration launches nothing and writes no window, so it has no owner window to cover. The Tesseract probe coverage stays. Fail-before of TikaProductionOwnerCoverageTest: f5877635f with b6d536-owner-coverage-compat.patch, by assertion.",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "Find every path Tesseract runs on (Engine, worker, extraction sandbox children, persistent sandbox, PDF OCR, initialisation and parsing) and cover each with an owner record or a window, bound as in item 1.", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b32 builder, user turn 2026-10-08)'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b6d536-owner-coverage.json",
-      "newChecks": ["modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#firstPassConfigurationProbeHasItsOwnWindow", "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProductionOwnerCoverageTest.java"]
+      "newChecks": ["modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProductionOwnerCoverageTest.java"]
     },
     {
       "items": ["modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java"],
       "class": "New",
       "repaired": true,
-      "behaviour": "A real disposable Engine job crashes with a live witnessed helper. Its successor records OWNER_DIED with ENGINE_CRASH as cause, an explicit reason, and null exit code/time when neither can be recovered. This remains distinct from an intended exit.",
+      "behaviour": "A real disposable Engine job crashes with a live witnessed helper. Its successor records OWNER_DIED with ENGINE_CRASH as cause, an explicit reason, and null exit code/time when neither can be recovered. This remains distinct from an intended exit. Fail-before: f5877635f with b6d536-owner-coverage-compat.patch, by assertion.",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "A helper ended by its owner's crash needs a recorded final outcome from the surviving owner (the dev runner or the successor Engine), with the crash named as its cause and kept apart from intended exits.", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b32 builder, user turn 2026-10-08)'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b6d536-owner-coverage.json",
       "newChecks": ["modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#successorRecordsCrashConsequenceAndUnknownExitTime"]

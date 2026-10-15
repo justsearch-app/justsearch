@@ -13,6 +13,10 @@ a kill-on-close job of its own as the first statement of `HeadlessApp.main`, so 
 starts ends with it. This changeset covers only this slice's files; the other flagged files on the
 branch belong to other tasks.
 
+The exit-ledger fixture governance/fixtures/exit-ledger/engine.v1.jsonl is no longer listed as an
+item of entry 1. It is outside the gate's flagged test scope, and ExitLedgerFixtureTest, which reads
+it, stays an item.
+
 Evidence regenerated on b599d4d7e. The fail-before of b6d536-engine-job.json runs on f75486245, the
 parent of 624dcfc92, which added the checks. It applies
 `gates/test-intent/evidence/b6d536-engine-job-compat.patch`, because the containment check now kills
@@ -28,8 +32,7 @@ the helper ends on its own.
     {
       "items": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java",
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerFixtureTest.java",
-        "governance/fixtures/exit-ledger/engine.v1.jsonl"
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerFixtureTest.java"
       ],
       "class": "New",
       "repaired": true,
