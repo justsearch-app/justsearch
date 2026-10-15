@@ -1,0 +1,36 @@
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/chat/ChatActuator.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/chat/ChatActuator.java
+index b6a215874..eefe544e3 100644
+--- a/modules/app-inference/src/main/java/io/justsearch/app/inference/chat/ChatActuator.java
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/chat/ChatActuator.java
+@@ -103,5 +103,13 @@ public interface ChatActuator {
+    * Stops the server for good and fences every later launch. Callable while another step is still
+    * running on the controller thread: the fence makes that step's launch fail.
+    */
+-  void terminalStop(Duration timeout);
++  default void terminalStop(Duration timeout) {
++    // Compat (fail-before only): an actuator that implements only the later reasoned stop.
++    terminalStop(io.justsearch.app.api.runtime.child.StopReason.QUIT, timeout);
++  }
++
++  /** Compat (fail-before only): the later reasoned stop, delegating to the existing stop. */
++  default void terminalStop(io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout) {
++    terminalStop(timeout);
++  }
+ }
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java b/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java
+index 780037f75..f35bd1e43 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java
+@@ -144,6 +144,12 @@ public final class ChatServerControllerImpl
+         BOOT_GATE_TIMEOUT);
+   }
+ 
++  /** Compat (fail-before only): the later constructor taking a self-test launcher. */
++  public ChatServerControllerImpl(
++      EngineExecutorRegistry executors, ChatActuator actuator, SelfTestLauncher selfTestLauncher) {
++    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, selfTestLauncher, BOOT_GATE_TIMEOUT);
++  }
++
+   ChatServerControllerImpl(
+       EngineExecutorRegistry executors, ChatActuator actuator, Duration drainBound) {
+     this(executors, actuator, drainBound, new ProcessSelfTestLauncher(), BOOT_GATE_TIMEOUT);

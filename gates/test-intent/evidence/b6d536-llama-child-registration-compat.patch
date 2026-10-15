@@ -1,0 +1,45 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java
+index 6a812a318..3429d8d16 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java
+@@ -30,6 +30,14 @@ public record ChildSpec(
+ 
+   public static final int MAX_LABEL_LENGTH = 64;
+ 
++  /** Compat scaffolding for fail-before evidence: the path prefix is ignored; behaviour stays as before. */
++  public ChildSpec(ChildKind kind, List<String> argv, Path workingDir, Map<String, String> envOverrides,
++      Stdio stdio, boolean gpu, OptionalLong gpuFootprintBytes, Optional<GpuDevice> gpuDevice,
++      CooperativeStop cooperativeStop, String label, List<Path> ignoredPathPrefix) {
++    this(kind, argv, workingDir, envOverrides, stdio, gpu, gpuFootprintBytes, gpuDevice,
++        cooperativeStop, label);
++  }
++
+   public ChildSpec {
+     Objects.requireNonNull(kind, "kind");
+     argv = List.copyOf(Objects.requireNonNull(argv, "argv"));
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java
+index e0dac9d6d..c2de87180 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java
+@@ -126,6 +126,21 @@ public final class DefaultChildControl implements ChildControl {
+     this.threads = Objects.requireNonNull(threads, "threads");
+   }
+ 
++  /** Compat scaffolding for fail-before evidence: never consulted by the before-state. */
++  @FunctionalInterface
++  interface JobMembership {
++    JobMembership NONE = child -> java.util.Optional.empty();
++
++    java.util.Optional<Boolean> contains(ProcessHandle child);
++  }
++
++  /** Compat scaffolding for fail-before evidence: the job is ignored; behaviour stays as before. */
++  DefaultChildControl(LedgerSink ledger, ProcessTerminator terminator, VramProbe vram, Clock clock,
++      Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads,
++      JobMembership ignored) {
++    this(ledger, terminator, vram, clock, sleeper, registry, owner, threads);
++  }
++
+   /**
+    * The Engine's control over {@code <dataDir>/runtime/exit-ledger/children.v1.jsonl}. Call only
+    * while holding {@code app.lock}: it first closes what an earlier Engine left open ({@link

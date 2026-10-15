@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T08:02:54.912Z",
-  "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
-  "tree": "5fb2989919ce60b1cdf679202f48531c674dca9e",
+  "createdAt": "2026-10-15T10:29:16.577Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "fb5d421305b59eb78723440efa6e3daeed1e64d5",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatVocabularyTest\" --tests \"io.justsearch.app.api.status.operating.OperatingStateViewTest\" --tests \"io.justsearch.app.api.runtime.child.ChildControlVocabularyTest\" --tests \"io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriterTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerReaderTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerSchemaTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest\" --tests \"io.justsearch.app.api.gpu.GpuMemorySampleTest\" --tests \"io.justsearch.app.api.status.StatusRecordSchemaTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5720
+      "durationMs": 13026
     },
     {
       "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.memory.WindowsGpuMemoryReaderTest\" --tests \"io.justsearch.gpu.memory.WindowsGpuMemoryReaderMachineTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4218
+      "durationMs": 3914
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest\" --tests \"io.justsearch.ui.api.StatusOperatingStateTest\" --tests \"io.justsearch.ui.api.OperatingGpuProjectionTest\" --tests \"io.justsearch.ui.api.mcp.ChatUnavailableErrorTest\" --tests \"io.justsearch.ui.api.LocalApiCorsPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6854
+      "durationMs": 12054
     },
     {
-      "command": "npx vitest run \"src/api/contract.test.ts\" \"src/api/generated/schema-types/status-response.test.ts\" \"src/api/clientKind.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-8580-1791273773324.json\"",
+      "command": "npx vitest run \"src/api/contract.test.ts\" \"src/api/generated/schema-types/status-response.test.ts\" \"src/api/clientKind.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-3028-1792060154910.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1586
+      "durationMs": 1663
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0315aaa1fd58b962e38830dfa5d8ba4fee95f5a7d8f2f269aced01e2667bd346",
+      "contentDigest": "sha256:d228a9c561fafa0ff8f2cd1725b645955435d01fd0f605f07d358ec34f0285de",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -73,7 +73,7 @@
           "status": "passed"
         },
         {
-          "name": "every enum has exactly the reconciled members, in order",
+          "name": "exactMembers() — every enum keeps its members and the additive external-server refusal",
           "status": "passed"
         },
         {
@@ -261,7 +261,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ac8fbe6cfb2f433e9fbfa5919718e5f905e23eb08322670f448fa6476b1615cb",
+      "contentDigest": "sha256:67fa959765ef32f68e5d454655e3a4fb83634da6fcbd765e9d0032a513271abf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -275,7 +275,7 @@
           "status": "passed"
         },
         {
-          "name": "a rotating writer rotates at session start over the session size, keeping one older file",
+          "name": "sessionRotation()",
           "status": "passed"
         },
         {
@@ -300,6 +300,10 @@
         },
         {
           "name": "a rotation failure keeps appending and records a ROTATE_FAILED gap",
+          "status": "passed"
+        },
+        {
+          "name": "persistenceFailureWarnsOnceAndRecoveryIsReported()",
           "status": "passed"
         }
       ]
@@ -417,7 +421,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f1a328277a5a8516864a94626a3f13c58232fbed3bfca6d14fe410c02daaf8f7",
+      "contentDigest": "sha256:ecf8c1c6dc2cf7618ccc810d377916539d09e4e63192732d1624f4832552fadf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -487,6 +491,10 @@
           "status": "passed"
         },
         {
+          "name": "ledgerWriteFailureIsVisibleUntilDurableRecovery(Path)",
+          "status": "passed"
+        },
+        {
           "name": "indexing is absent without a Worker view, and listed stale when the sample is",
           "status": "passed"
         },
@@ -512,7 +520,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusOperatingStateTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusOperatingStateTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5f5cc5e29d6097e25372209db1c5b7d9a1c6381baf918456fb00d417e906987b",
+      "contentDigest": "sha256:2d1aa5011dccb8e353b01954d59b1c765394b4baf5bf9e4ed7f190094acde737",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -535,7 +543,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProjectionTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProjectionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:087fdb5f321c5142b77855b2f4ef10a012ac34c2a29eeb6af1887289f8ecd2e0",
+      "contentDigest": "sha256:4654073b7f03a993d7a187b0a0f6a75e0a50df250b9b91ae86f8209b99a704c0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -582,6 +590,14 @@
         },
         {
           "name": "concurrent status passes after the window take exactly one new sample",
+          "status": "passed"
+        },
+        {
+          "name": "aDepartedChildKeepsTheOwnershipCapturedWithItsMemorySample()",
+          "status": "passed"
+        },
+        {
+          "name": "pdhWithoutProcessFiguresPreservesUnknownAttribution()",
           "status": "passed"
         },
         {
@@ -765,7 +781,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3c020fc91ca736a10a86feadd0490016c589840c2f93543c6ff34e0b28b8b5b5",
+      "contentDigest": "sha256:b923b07be2772b4cabeb59c9255d554985670abdf78af45020b9621edd1d3519",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -790,5 +806,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:0c1b24733071003eafeba4fb94af8b0c36d8a0acd6563d675febace6c1f64ed5"
+  "digest": "sha256:ab319ae927a17a6e8b9b37842bd213159510b4a3c639930287802b71db75cec6"
 }

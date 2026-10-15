@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T05:46:05.551Z",
-  "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
-  "tree": "c984b4b9660b983675e3dba349dd78acb410a8c6",
+  "createdAt": "2026-10-14T17:09:19.420Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "0091997415706e6dc7b4ac4c2eb0efe7fd810f13",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.concurrentInferenceRequestsBeyondTheThreadsWaitAndAllRun\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.inferenceLaneQueuesAsManyRequestsAsItHasThreadsWithinTheForegroundQueueBound\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.fullInferenceThreadsAndQueueRefuseTheNextRequestWithInferenceBusy\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedRequestRunsUnderTheDeadlineItWasSubmittedWith\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedSearchPastItsSemanticCapAnswersKeywordOnlyWithoutStartingItsEncoder\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.shutdownCancelsQueuedRequestsReleasesTheirSlotsAndDrains\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.clientCancellationRemovesAQueuedRequestWithoutRunningIt\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.fullInferenceLaneLeavesTextSearchAndIngestAdmittedAndTheTextSlotReserved\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedRequestIsNotForegroundLoadUntilItStarts\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedSearchBehindExpiredNativeWorkEndsByItsOwnDeadline\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.admissionLimitsKeepTheirCodesWhileTheInferenceLaneHasRoom\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.closedExecutorsAreReportedAsClosedNotAsCapacity\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientExecutorTest.inferencePartitionUsesExistingForegroundThreadBudgetAndQueuesUpToItsThreadCount\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientExecutorTest.expiredNativeCallsLeaveTextSearchAndFetchAvailableWithoutReleasingOwnership\" --tests \"io.justsearch.app.engine.EngineSearchAdmissionUnderStallTest.searchesBeyondTheInferenceThreadsWaitAndOnlyAFullQueueRefusesAsInferenceBusy\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 44969
+      "durationMs": 43620
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.hybridSearchThatWaitedPastItsSemanticCapAnswersKeywordOnlyWithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.autoDenseSearchThatWaitedPastItsSemanticCapAnswersKeywordOnlyWithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.spladeSearchThatWaitedPastItsSemanticCapSkipsSpladeWithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.vectorOnlySearchThatWaitedPastItsSemanticBudgetIsTheTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.ragRetrievalThatWaitedPastItsSemanticCapAnswersWithBm25WithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.hybridSearchThatDidNotWaitRunsItsDenseLeg\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15577
+      "durationMs": 20201
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.IndexingControllerSaturationTest.admittedRequestPreservesActualSubmissionRefusal\" --tests \"io.justsearch.ui.api.InferenceBusyRefusalTransportTest.inferenceBusyIsItsOwnCapacityCodeWithRetryAfterAndNoSafeReplay\" --tests \"io.justsearch.ui.api.mcp.McpInferenceBusyRefusalTest.inferenceBusyRefusalKeepsItsOwnCodeOverMcp\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4999
+      "durationMs": 12111
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.ConversationInferenceBusyRefusalTest.inferenceBusyRefusalStreamsItsOwnCode\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2069
+      "durationMs": 9714
     },
     {
       "command": ".\\gradlew.bat :modules:app-agent:test --tests \"io.justsearch.agent.BackgroundRunServiceTest.inferenceBusyRefusalIsRecordedWithItsOwnCode\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2525
+      "durationMs": 9970
     },
     {
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.InferenceBusyErrorCodeTest.inferenceBusyIsATransientRegisteredCodeWithAMessage\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1596
+      "durationMs": 10285
     }
   ],
   "checks": [
@@ -59,7 +59,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#concurrentInferenceRequestsBeyondTheThreadsWaitAndAllRun",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -78,7 +78,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#inferenceLaneQueuesAsManyRequestsAsItHasThreadsWithinTheForegroundQueueBound",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -105,7 +105,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#fullInferenceThreadsAndQueueRefuseTheNextRequestWithInferenceBusy",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -120,7 +120,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#queuedRequestRunsUnderTheDeadlineItWasSubmittedWith",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -159,7 +159,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -198,7 +198,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#queuedSearchPastItsSemanticCapAnswersKeywordOnlyWithoutStartingItsEncoder",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -213,7 +213,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -228,7 +228,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#shutdownCancelsQueuedRequestsReleasesTheirSlotsAndDrains",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -247,7 +247,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#clientCancellationRemovesAQueuedRequestWithoutRunningIt",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -266,7 +266,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#fullInferenceLaneLeavesTextSearchAndIngestAdmittedAndTheTextSlotReserved",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -281,7 +281,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#queuedRequestIsNotForegroundLoadUntilItStarts",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -296,7 +296,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#queuedSearchBehindExpiredNativeWorkEndsByItsOwnDeadline",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -311,7 +311,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#admissionLimitsKeepTheirCodesWhileTheInferenceLaneHasRoom",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -326,7 +326,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#closedExecutorsAreReportedAsClosedNotAsCapacity",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7491c31283bcdfd718173ef5f002a789958e797470ce77168ecdedb9b654fb5c",
+      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -414,7 +414,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java#hybridSearchThatWaitedPastItsSemanticCapAnswersKeywordOnlyWithoutEncoding",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8b030d833bdabf5db25b9a7b0fe79d74e0977efcee12e31c8dcdada17f7d7042",
+      "contentDigest": "sha256:ac30f197a42bd0080d28a0ea1eabdfee971d8332c0a713c5fb25ecee73f92bbb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -429,7 +429,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java#autoDenseSearchThatWaitedPastItsSemanticCapAnswersKeywordOnlyWithoutEncoding",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8b030d833bdabf5db25b9a7b0fe79d74e0977efcee12e31c8dcdada17f7d7042",
+      "contentDigest": "sha256:ac30f197a42bd0080d28a0ea1eabdfee971d8332c0a713c5fb25ecee73f92bbb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -444,7 +444,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java#spladeSearchThatWaitedPastItsSemanticCapSkipsSpladeWithoutEncoding",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8b030d833bdabf5db25b9a7b0fe79d74e0977efcee12e31c8dcdada17f7d7042",
+      "contentDigest": "sha256:ac30f197a42bd0080d28a0ea1eabdfee971d8332c0a713c5fb25ecee73f92bbb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -459,7 +459,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java#vectorOnlySearchThatWaitedPastItsSemanticBudgetIsTheTypedDeadline",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8b030d833bdabf5db25b9a7b0fe79d74e0977efcee12e31c8dcdada17f7d7042",
+      "contentDigest": "sha256:ac30f197a42bd0080d28a0ea1eabdfee971d8332c0a713c5fb25ecee73f92bbb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -474,7 +474,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java#ragRetrievalThatWaitedPastItsSemanticCapAnswersWithBm25WithoutEncoding",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8b030d833bdabf5db25b9a7b0fe79d74e0977efcee12e31c8dcdada17f7d7042",
+      "contentDigest": "sha256:ac30f197a42bd0080d28a0ea1eabdfee971d8332c0a713c5fb25ecee73f92bbb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -489,7 +489,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java#hybridSearchThatDidNotWaitRunsItsDenseLeg",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8b030d833bdabf5db25b9a7b0fe79d74e0977efcee12e31c8dcdada17f7d7042",
+      "contentDigest": "sha256:ac30f197a42bd0080d28a0ea1eabdfee971d8332c0a713c5fb25ecee73f92bbb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -504,7 +504,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerSaturationTest.java#admittedRequestPreservesActualSubmissionRefusal",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerSaturationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4723640793163ff9926702bf3049eede6b69596df11f0ed9fb1a515e9fbb8fd5",
+      "contentDigest": "sha256:8e24a7a76efd450d01127eb4aab4d744e7fb951c2b8ff105a35cf9660703ab79",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -627,42 +627,48 @@
     "ref": "f648453b5",
     "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-fg-pool-before-compat.patch",
+        "contentDigest": "sha256:fde4723e13cfff141e29d58f76987b4d158170bb1848b75df3042c1bf4c124c1"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.concurrentInferenceRequestsBeyondTheThreadsWaitAndAllRun\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.inferenceLaneQueuesAsManyRequestsAsItHasThreadsWithinTheForegroundQueueBound\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.fullInferenceThreadsAndQueueRefuseTheNextRequestWithInferenceBusy\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedRequestRunsUnderTheDeadlineItWasSubmittedWith\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedSearchPastItsSemanticCapAnswersKeywordOnlyWithoutStartingItsEncoder\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.shutdownCancelsQueuedRequestsReleasesTheirSlotsAndDrains\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.clientCancellationRemovesAQueuedRequestWithoutRunningIt\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.fullInferenceLaneLeavesTextSearchAndIngestAdmittedAndTheTextSlotReserved\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedRequestIsNotForegroundLoadUntilItStarts\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedSearchBehindExpiredNativeWorkEndsByItsOwnDeadline\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.admissionLimitsKeepTheirCodesWhileTheInferenceLaneHasRoom\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.closedExecutorsAreReportedAsClosedNotAsCapacity\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientExecutorTest.inferencePartitionUsesExistingForegroundThreadBudgetAndQueuesUpToItsThreadCount\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientExecutorTest.expiredNativeCallsLeaveTextSearchAndFetchAvailableWithoutReleasingOwnership\" --tests \"io.justsearch.app.engine.EngineSearchAdmissionUnderStallTest.searchesBeyondTheInferenceThreadsWaitAndOnlyAFullQueueRefusesAsInferenceBusy\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 64213
+        "durationMs": 55453
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.hybridSearchThatWaitedPastItsSemanticCapAnswersKeywordOnlyWithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.autoDenseSearchThatWaitedPastItsSemanticCapAnswersKeywordOnlyWithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.spladeSearchThatWaitedPastItsSemanticCapSkipsSpladeWithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.vectorOnlySearchThatWaitedPastItsSemanticBudgetIsTheTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.ragRetrievalThatWaitedPastItsSemanticCapAnswersWithBm25WithoutEncoding\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest.hybridSearchThatDidNotWaitRunsItsDenseLeg\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 21164
+        "durationMs": 40184
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.IndexingControllerSaturationTest.admittedRequestPreservesActualSubmissionRefusal\" --tests \"io.justsearch.ui.api.InferenceBusyRefusalTransportTest.inferenceBusyIsItsOwnCapacityCodeWithRetryAfterAndNoSafeReplay\" --tests \"io.justsearch.ui.api.mcp.McpInferenceBusyRefusalTest.inferenceBusyRefusalKeepsItsOwnCodeOverMcp\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 10657
+        "durationMs": 9533
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.ConversationInferenceBusyRefusalTest.inferenceBusyRefusalStreamsItsOwnCode\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 7575
+        "durationMs": 19805
       },
       {
         "command": ".\\gradlew.bat :modules:app-agent:test --tests \"io.justsearch.agent.BackgroundRunServiceTest.inferenceBusyRefusalIsRecordedWithItsOwnCode\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 4278
+        "exitCode": 0,
+        "durationMs": 6217
       },
       {
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.InferenceBusyErrorCodeTest.inferenceBusyIsATransientRegisteredCodeWithAMessage\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3434
+        "durationMs": 6592
       }
     ],
     "checks": [
@@ -783,35 +789,35 @@
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerSaturationTest.java#admittedRequestPreservesActualSubmissionRefusal",
-        "classification": "assertion",
-        "detail": "admittedRequestPreservesActualSubmissionRefusal(openRetrieve): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <ADMISSION_INFERENCE_BUSY> but was: <ADMISSION_ENGINE_LIMIT>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/InferenceBusyRefusalTransportTest.java#inferenceBusyIsItsOwnCapacityCodeWithRetryAfterAndNoSafeReplay",
-        "classification": "assertion",
-        "detail": "inferenceBusyIsItsOwnCapacityCodeWithRetryAfterAndNoSafeReplay(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no INFERENCE_BUSY admission reason ==> expected: <true> but was: <false>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpInferenceBusyRefusalTest.java#inferenceBusyRefusalKeepsItsOwnCodeOverMcp",
-        "classification": "assertion",
-        "detail": "inferenceBusyRefusalKeepsItsOwnCodeOverMcp(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no INFERENCE_BUSY admission reason ==> expected: <true> but was: <false>"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationInferenceBusyRefusalTest.java#inferenceBusyRefusalStreamsItsOwnCode",
-        "classification": "assertion",
-        "detail": "inferenceBusyRefusalStreamsItsOwnCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no INFERENCE_BUSY admission reason ==> expected: <true> but was: <false>"
+        "classification": "exception",
+        "detail": "the check failed with an exception or panic other than an assertion"
       },
       {
         "id": "modules/app-agent/src/test/java/io/justsearch/agent/BackgroundRunServiceTest.java#inferenceBusyRefusalIsRecordedWithItsOwnCode",
-        "classification": "assertion",
-        "detail": "inferenceBusyRefusalIsRecordedWithItsOwnCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no INFERENCE_BUSY admission reason ==> expected: <true> but was: <false>"
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
       },
       {
         "id": "modules/app-api/src/test/java/io/justsearch/app/api/InferenceBusyErrorCodeTest.java#inferenceBusyIsATransientRegisteredCodeWithAMessage",
         "classification": "assertion",
-        "detail": "inferenceBusyIsATransientRegisteredCodeWithAMessage(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no INFERENCE_BUSY admission reason ==> expected: <true> but was: <false>"
+        "detail": "inferenceBusyIsATransientRegisteredCodeWithAMessage(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no ADMISSION_INFERENCE_BUSY error code ==> expected: <true> but was: <false>"
       }
     ]
   },
-  "digest": "sha256:99bc9f0521bdf4f6d88654925f54ebd80192e3721569e6ed87f173035a11442d"
+  "digest": "sha256:36f22e55a7052cd33c09485eb476ca7f6202c5a557ac4e48ab03e70d1f6e9e29"
 }

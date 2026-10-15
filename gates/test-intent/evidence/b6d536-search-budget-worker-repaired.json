@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T10:39:05.285Z",
-  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
-  "tree": "59324eb5f73b12bb48735d77c81df6236bb73542",
+  "createdAt": "2026-10-14T17:49:20.277Z",
+  "revision": "228c9da66221dd21e9ded4debbd9efc4a2c20584",
+  "tree": "6182003f4a599e9ddfa3dac7855e0c9a9dd7728a",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.explicitHybridWithModelsLoadingAnswersWithKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.autoDenseWithModelsLoadingReportsTheBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedEmbeddingHandleGivesKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedSpladeHandleSkipsOnlyThatLeg\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.stalledDenseRunGivesKeywordResultsInTime\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.allowlistsMatchTheReasonCodeEnum\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.parentEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.chunkEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.inlineDocumentEmbeddingAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.spladeBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.bgeM3BackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.nerBackfillAcquiresBackground\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 26788
+      "durationMs": 19143
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#explicitHybridWithModelsLoadingAnswersWithKeywordResults",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#autoDenseWithModelsLoadingReportsTheBudgetReason",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#contendedEmbeddingHandleGivesKeywordResults",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#contendedSpladeHandleSkipsOnlyThatLeg",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#stalledDenseRunGivesKeywordResultsInTime",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#allowlistsMatchTheReasonCodeEnum",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:057d5ec39c0ead955499866a484c3855104ab34110ffbf0c7433748b05756788",
+      "contentDigest": "sha256:31df94434a61fc592afd8750307e170dd2f2cd0e03b4508ec5bd45690176ae3a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -210,12 +210,18 @@
     "ref": "68547f75a",
     "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-search-budget-worker-compat.patch",
+        "contentDigest": "sha256:5348894f07badaeaba2067b2b7ba542e982ed8446c94acc27fe3816f5e8ac873"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.explicitHybridWithModelsLoadingAnswersWithKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.autoDenseWithModelsLoadingReportsTheBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedEmbeddingHandleGivesKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedSpladeHandleSkipsOnlyThatLeg\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.stalledDenseRunGivesKeywordResultsInTime\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.allowlistsMatchTheReasonCodeEnum\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.parentEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.chunkEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.inlineDocumentEmbeddingAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.spladeBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.bgeM3BackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.nerBackfillAcquiresBackground\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 82146
+        "durationMs": 41895
       }
     ],
     "checks": [
@@ -281,5 +287,5 @@
       }
     ]
   },
-  "digest": "sha256:2d9fcd2ae49c7d0ad39fd2f83da00a7282b0eace59e7ead96b0d9609e44a29c3"
+  "digest": "sha256:09df51ae8f8b115925dad5e513b0649f507e2b2d422e53d63de155718941333f"
 }

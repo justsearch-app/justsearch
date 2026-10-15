@@ -28,6 +28,27 @@ Evidence files (all written by run-evidence.mjs):
 - `b6d536-search-budget-preservation.json`: preservation checks that pass before and after. That run
   exits 1 by design, because none of them shows a repair.
 
+Records phase B (batch 3) re-ran three files on b599d4d7e because their check files changed after
+the first runs. `b6d536-search-budget-new.json` passes (no before-state). In
+`b6d536-search-budget-preservation.json`, WorkerSearchServiceSemanticBudgetTest no longer compiles
+on 68547f75a: its embedding fixture implements availability() in place of the then-abstract
+isAvailable(). The file holds preservation checks only, so it was re-run without a before-state and
+passes on the change. `b6d536-search-budget-worker-repaired.json` passes on the change. Its before
+ref stays 68547f75a, the parent of the lane commit 3d181a70c that introduced the behaviour, but the
+worker-services test sources no longer compile there. The fail-before therefore applies the compat
+before-patch `gates/test-intent/evidence/b6d536-search-budget-worker-compat.patch`, which:
+
+- makes EmbeddingProvider.isAvailable() a default returning true. Every implementation at 68547f75a
+  overrides it, and the fixture reports READY.
+- adds availability() as a default returning READY, and the Availability record.
+- adds NoOpEmbeddingProvider.starting(), returning the existing INSTANCE.
+- adds SessionAcquireDeadlineExceededException.Phase, with a constructor that ignores the phase.
+- adds the proto fields hybrid_fallback_cause and splade_skip_cause.
+
+No 68547f75a code reads any of these. All twelve checks fail there by assertion on the budget and
+urgency behaviour: searches time out or throw "inference deadline exceeded", the reason allowlist
+lacks SEMANTIC_BUDGET_EXCEEDED, and bulk work acquires FOREGROUND.
+
 Three pre-existing files only follow a signature change (Adaptation entries). Two others gain a
 vocabulary row that S2 requires (see their entries). Repair round 1 adds the rerank stage to the head
 deadline with a new cross-encoder drop reason, SEARCH_DEADLINE_EXCEEDED; the pre-existing

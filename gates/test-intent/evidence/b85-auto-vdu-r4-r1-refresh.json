@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T00:10:18.665Z",
-  "revision": "83f07cc4cdef58a63b043979e4c480390314a7d8",
-  "tree": "833e8defea8cd9a3db7103294aa042065cd933fc",
+  "createdAt": "2026-10-14T17:12:58.575Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "4389304ce9ee1a1c968a09e363a66b4b8d041b34",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.failedAutomaticLaunchRestoresLoadedChatAndBacksOff\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.explicitPassStillWorksWithoutAnIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.chatOffAutomaticPathStillReturnsToTheOffIntent\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 38616
+      "durationMs": 21782
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#failedAutomaticLaunchRestoresLoadedChatAndBacksOff",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#explicitPassStillWorksWithoutAnIdleWindow",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#chatOffAutomaticPathStillReturnsToTheOffIntent",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f4285e1d28ba9c60f00998be437bf676b96ba8514f2dc466ef599464acc470ce",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,15 +164,19 @@
   "failBefore": {
     "ref": "0a79303bb",
     "revision": "0a79303bb10f7a1194c7d04f6f7bc9b4fe3bee7b",
-    "overlays": [
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b85-auto-vdu-r4-r1-refresh-compat.patch",
+        "contentDigest": "sha256:f955a6ddef6e864a600995d61f66cf28906fccf33be0d444281d9cdf41841073"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.failedAutomaticLaunchRestoresLoadedChatAndBacksOff\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.explicitPassStillWorksWithoutAnIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.chatOffAutomaticPathStillReturnsToTheOffIntent\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 93409
+        "durationMs": 68577
       }
     ],
     "checks": [
@@ -223,5 +227,5 @@
       }
     ]
   },
-  "digest": "sha256:ca4674af07691b017954ef64d6a66b1fc0e1d49816024e0b6cc8171c3ef4c4bb"
+  "digest": "sha256:fbc8a3e59176736d44f4e2037898e5c7b938fcbe0a6780ffe6fa224b9114ea3a"
 }

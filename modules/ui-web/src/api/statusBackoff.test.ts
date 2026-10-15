@@ -195,6 +195,9 @@ describe('b76 back-off ends at recovery; follow-ups stay bounded', { timeout: 12
   });
 
   it('a lane held after the fresh read costs one fresh read and a bounded number of ordinary follow-ups per value', async () => {
+    // Only the 10 s scheduled poll is held: under load the real interval could fire during the
+    // 20 actions and its reads would be counted as follow-ups. Timeouts and the clock stay real.
+    vi.useFakeTimers({ toFake: ['setInterval'] });
     const { poll, http } = await load();
     const seen: (string | null)[] = [];
     const un = poll.subscribeStatus((s: Seen) => seen.push(state(s)));

@@ -9,6 +9,13 @@ author-session: b36-fp3-unavailable-20261008
 
 Existing checks and intent records are unchanged.
 
+Evidence regenerated on b599d4d7e. The check file now uses the later provider-availability API, so
+the fail-before on c8c7e1c58 applies `gates/test-intent/evidence/b36-fp3-unavailable-compat.patch`.
+It adds only declarations: `EmbeddingProvider.Availability` (its state enum and the READY, STARTING
+and ABSENT constants), a default `availability()` that returns null, and
+`NoOpEmbeddingProvider.starting()`, which returns the existing `INSTANCE`. No production code at
+c8c7e1c58 reads any of them. The nine repaired checks fail there by assertion; the seven others pass.
+
 ```json
 {
   "entries": [

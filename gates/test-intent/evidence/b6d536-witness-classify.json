@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T04:24:58.688Z",
-  "revision": "cd406ca13c90760003e9fa8d6686500ab564305e",
-  "tree": "82175617292b62885750d0279bfb1f4068b3d518",
+  "createdAt": "2026-10-15T10:16:40.879Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "ff7a93ab1ab4b05813ed991eaa92ed79cd678d8e",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedNonzeroProbeHasItsPurpose\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.interruptionWritesIntentBeforeNativeTermination\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedCrashStatusRemainsUnexpected\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.allFiveIncarnationsSurvivePerFileRotation\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.boundWritesLostIdentitiesBeforeDroppingEvidence\" --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessTest.recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.sessionRotation\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.realCrashAfterIntentBeforeTerminateStaysUnexpected\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.cooperativeInputCloseRecordsIntentBeforeEof\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9997
+      "durationMs": 13586
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest.normalTesseractAvailabilityIsCoveredByClosedOwnerIntent\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2480
+      "durationMs": 4927
     }
   ],
   "checks": [
@@ -110,7 +110,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#normalTesseractAvailabilityIsCoveredByClosedOwnerIntent",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:505668f54472d12ad46cc1bf593302eb9b0493261c8775f1d232708c66aadd99",
+      "contentDigest": "sha256:4b9ac69e4d88e2e9b9f63d67999d97f2e2d718ab7a11a80af0f1b556c18e0401",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +140,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#sessionRotation",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d1167c707730a5df0c86c9ae3678060826d78e1170ac49336cc9981c8ebc0efc",
+      "contentDigest": "sha256:67fa959765ef32f68e5d454655e3a4fb83634da6fcbd765e9d0032a513271abf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -186,18 +186,24 @@
     "ref": "cd406ca13",
     "revision": "cd406ca13c90760003e9fa8d6686500ab564305e",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-witness-classify-compat.patch",
+        "contentDigest": "sha256:5c5063448666470538e760ea11ffab924fdfea6f6156bbee765bb8b9f1f123e0"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedNonzeroProbeHasItsPurpose\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.interruptionWritesIntentBeforeNativeTermination\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedCrashStatusRemainsUnexpected\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.allFiveIncarnationsSurvivePerFileRotation\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.boundWritesLostIdentitiesBeforeDroppingEvidence\" --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessTest.recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.sessionRotation\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.realCrashAfterIntentBeforeTerminateStaysUnexpected\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.cooperativeInputCloseRecordsIntentBeforeEof\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 12068
+        "durationMs": 12623
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest.normalTesseractAvailabilityIsCoveredByClosedOwnerIntent\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5989
+        "durationMs": 6716
       }
     ],
     "checks": [
@@ -229,12 +235,12 @@
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#normalTesseractAvailabilityIsCoveredByClosedOwnerIntent",
         "classification": "assertion",
-        "detail": "normalTesseractAvailabilityIsCoveredByClosedOwnerIntent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the successful code-1 probe needs owner intent: 06:24:57.067 [main] DEBUG org.apache.tika.parser.external.ExternalParser -- exit value for C:\\Users\\Elias\\AppData\\Roaming\\io.justsearch.shell\\native-bin\\tesseract\\tesseract.exe: 1&#13;&#10;06:24:57.070 [main] DEBUG"
+        "detail": "normalTesseractAvailabilityIsCoveredByClosedOwnerIntent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the successful code-1 probe needs owner intent: 12:16:38.627 [main] DEBUG org.apache.tika.parser.external.ExternalParser -- exit value for C:\\Users\\Elias\\AppData\\Roaming\\io.justsearch.shell\\native-bin\\tesseract\\tesseract.exe: 1&#13;&#10;12:16:38.631 [main] DEBUG"
       },
       {
         "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java#recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild",
         "classification": "assertion",
-        "detail": "recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: NEW and EXIT carry exact held-handle PID/birth/code: witness.normal=false&#13;&#10;witness.crash=true&#13;&#10;witness.outside=true&#13;&#10;witness.host=true&#13;&#10;witness.drain=true&#13;&#10;witness.record={witnessId=j-95544151-185e-4f2a-b051-a46aeb6884b3, p"
+        "detail": "recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: NEW and EXIT carry exact held-handle PID/birth/code: witness.normal=false&#13;&#10;witness.crash=true&#13;&#10;witness.outside=true&#13;&#10;witness.host=true&#13;&#10;witness.drain=true&#13;&#10;witness.record={witnessId=j-61df44f7-1960-49db-98cb-807c37514ffd, p"
       },
       {
         "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#sessionRotation",
@@ -253,5 +259,5 @@
       }
     ]
   },
-  "digest": "sha256:2b9a59ef63c901da3ff4bfc84c0283d7919ce9dea89cfc03f13a23c73f45f493"
+  "digest": "sha256:065a2e79f676690b3e415c58137d119edb08bb9c536894a4360b6d89183fc918"
 }

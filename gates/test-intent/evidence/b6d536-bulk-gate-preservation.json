@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T13:08:37.409Z",
-  "revision": "5f91835f366032a75d856d796967c35ec1c769ea",
-  "tree": "4e694c81924ecf5756b73cb37682e47e32800650",
+  "createdAt": "2026-10-14T16:01:44.755Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "b7f242710e63acfda45a469ce022776cae3d948a",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.disabledEmbeddingBacklogIsIdle\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4533
+      "durationMs": 8558
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStatePollerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6558
+      "durationMs": 22091
     }
   ],
   "checks": [
@@ -50,11 +50,15 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8d0ad081cbab9b798c6fb00b1014361b20e03ee6906e3e3445067a1fd52949d9",
+      "contentDigest": "sha256:c1945dbc858f05a94b201ad3eeeb1d43e17fe695f2831f753500908ff2f955ba",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot()",
+          "status": "passed"
+        },
         {
           "name": "energyState() is UNKNOWN — not null — before the first poll",
           "status": "passed"
@@ -86,18 +90,19 @@
     "ref": "5f91835f3",
     "revision": "5f91835f366032a75d856d796967c35ec1c769ea",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.disabledEmbeddingBacklogIsIdle\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 58738
+        "durationMs": 113965
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStatePollerTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
-        "exitCode": 0,
-        "durationMs": 9157
+        "exitCode": 1,
+        "durationMs": 8736
       }
     ],
     "checks": [
@@ -108,10 +113,10 @@
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
+        "classification": "assertion",
+        "detail": "energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: UNKNOWN to known power changes canonical status ==> expected: <1> but was: <0>"
       }
     ]
   },
-  "digest": "sha256:51422e30cb004a6b1d69bb3eeb56c1e8789bafbdea1534a388f841aeaa938034"
+  "digest": "sha256:f921245b6437fe0da6e6b5651d1cc0e864a716cc3de55f03e785f518c3f3d018"
 }

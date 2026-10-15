@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T01:25:44.543Z",
-  "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
-  "tree": "c80057b5665829d40d7914a93cd9ea647e96042c",
+  "createdAt": "2026-10-15T09:16:10.962Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "1fff4c12cf3363d9dcc9fb5146b70355e1e4592d",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.pathPrefixGoesInFrontOfTheInheritedPath\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3725
+      "durationMs": 20448
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest.theEngineReadsItsIncarnationThroughTheConfigurationRegistry\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6544
+      "durationMs": 7840
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#pathPrefixGoesInFrontOfTheInheritedPath",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f23e2b73c6e9fd8186c1927de74a9119771a73489d53750d896b240a3105dbd0",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -76,13 +76,13 @@
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.pathPrefixGoesInFrontOfTheInheritedPath\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4850
+        "durationMs": 24575
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest.theEngineReadsItsIncarnationThroughTheConfigurationRegistry\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6937
+        "durationMs": 83850
       }
     ],
     "checks": [
@@ -98,5 +98,5 @@
       }
     ]
   },
-  "digest": "sha256:2b563ebe1ed02edf01427ba0138ec0204025cfe71cbe6c82abbc632498bc2aed"
+  "digest": "sha256:576b0fcb1bbdd3ddb1695c9b2007988f590b6d07fbd721865ebc735ed465d867"
 }

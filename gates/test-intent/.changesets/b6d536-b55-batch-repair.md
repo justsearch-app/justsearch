@@ -13,6 +13,13 @@ constant child work for unchanged admission, and bounded migration work for the 
 Existing mapping-failure and completeness expectations are preserved. Independent acceptance is
 left to the orchestrator/verifier; the builder does not supply an acceptance record.
 
+Evidence regenerated on b599d4d7e. The Health check now builds its registry with a delivery
+executor, so the fail-before on 2f42b4d50 applies
+`gates/test-intent/evidence/b6d536-b55-batch-repair-compat.patch`. It adds only a
+`HealthEventChangeRegistry(ExecutorService)` constructor that ignores the executor and delegates to
+the existing no-argument constructor. No production code at 2f42b4d50 calls it. All four checks fail
+there by assertion.
+
 ```json
 {
   "entries": [

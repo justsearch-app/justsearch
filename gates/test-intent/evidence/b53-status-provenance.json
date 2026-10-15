@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T14:14:09.888Z",
-  "revision": "ff0c00f5e7358b6e0876cfee1dfeb09f41899d62",
-  "tree": "3cc186fa3301a5ef88e71e9be814382367607966",
+  "createdAt": "2026-10-15T11:26:46.913Z",
+  "revision": "75917a07325f85c402b837e5a17eba4cb4b2bd5c",
+  "tree": "f1b2b986fdd9239736f7cf1a960857f4bdaddd59",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusReadinessStalenessTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 55502
+      "durationMs": 5288
     }
   ],
   "checks": [
@@ -61,6 +61,31 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:8afc60b2f0cd0c36f66ea6811c4b34af2550d3d9268ffcb8d8d9895768d50554"
+  "failBefore": {
+    "ref": "ff0c00f5e",
+    "revision": "ff0c00f5e7358b6e0876cfee1dfeb09f41899d62",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b53-status-provenance-compat.patch",
+        "contentDigest": "sha256:8dab5098f57b50d11c103c563798cd75aac7306c4d256a2bbd3540fe79a7dcaa"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusReadinessStalenessTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 34951
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:eabc5871fa7de28c8fbc785f2e634c6a9c128b8edcc9d18dc5bfe8917481cc37"
 }

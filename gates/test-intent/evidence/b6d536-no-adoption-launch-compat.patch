@@ -1,0 +1,220 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildControl.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildControl.java
+index eca81b84c..b5871b8db 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildControl.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildControl.java
+@@ -17,14 +17,39 @@ public interface ChildControl extends AutoCloseable {
+    * Spawns the child, opens an OS handle and records {@code child-spawn} (before) and {@code
+    * child-start} (after). It never waits on the GPU unless {@code spec.gpu()}.
+    */
+-  ChildHandle start(ChildSpec spec) throws IOException;
++  default ChildHandle start(ChildSpec spec) throws IOException {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
++  /** Compat scaffolding for fail-before evidence: the manifest entry a start registers. */
++  record ManifestEntry(String endpoint, String modelPath, String declaredConfigHash) {}
++
++  /** Compat scaffolding for fail-before evidence. */
++  default ChildHandle start(ChildSpec spec, ManifestEntry manifest) throws IOException {
++    throw new UnsupportedOperationException("compat stub");
++  }
+ 
+   /** Idempotent: the first reason wins. The intent is durable, or recorded as a gap, first. */
+-  CompletionStage<ExitOutcome> stop(ChildHandle child, StopReason reason, StopMode mode);
++  default CompletionStage<ExitOutcome> stop(ChildHandle child, StopReason reason, StopMode mode) {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
++  /** Compat scaffolding for fail-before evidence. */
++  default CompletionStage<ExitOutcome> stop(ChildHandle child, StopRequest request) {
++    throw new UnsupportedOperationException("compat stub");
++  }
+ 
+   /** Stops several children with one shared cooperative grace window. */
+-  CompletionStage<List<ExitOutcome>> stopAll(
+-      Collection<ChildHandle> children, StopReason reason, StopMode mode);
++  default CompletionStage<List<ExitOutcome>> stopAll(
++      Collection<ChildHandle> children, StopReason reason, StopMode mode) {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
++  /** Compat scaffolding for fail-before evidence. */
++  default CompletionStage<List<ExitOutcome>> stopAll(
++      Collection<ChildHandle> children, StopRequest request) {
++    throw new UnsupportedOperationException("compat stub");
++  }
+ 
+   /**
+    * Appends an owner-supplied diagnosis as {@code child-note}. The token is bounded (for example
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java
+new file mode 100644
+index 000000000..603e1535f
+--- /dev/null
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.api.runtime.child;
++
++import io.justsearch.app.api.runtime.ManagedChildRegistry;
++
++/** Compat scaffolding for fail-before evidence: cannot be built; no before-state code reads it. */
++public abstract class DefaultChildControl implements ChildControl {
++  private DefaultChildControl() {}
++
++  public static DefaultChildControl of(
++      LedgerSink ledger, ProcessTerminator terminator, ManagedChildRegistry registry) {
++    throw new UnsupportedOperationException("compat stub");
++  }
++}
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/LedgerSink.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/LedgerSink.java
+new file mode 100644
+index 000000000..868f3694c
+--- /dev/null
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/LedgerSink.java
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.api.runtime.child;
++
++import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
++import java.util.Map;
++
++/** Compat scaffolding for fail-before evidence: no before-state code reads it. */
++@FunctionalInterface
++public interface LedgerSink {
++  boolean append(LedgerRecordType type, Map<String, ?> fields);
++}
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ProcessTerminator.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ProcessTerminator.java
+new file mode 100644
+index 000000000..9d1ee4fa8
+--- /dev/null
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ProcessTerminator.java
+@@ -0,0 +1,38 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.api.runtime.child;
++
++import java.io.IOException;
++import java.time.Duration;
++import java.time.Instant;
++import java.util.Optional;
++import java.util.OptionalInt;
++
++/** Compat scaffolding for fail-before evidence: no before-state code reads it. */
++public interface ProcessTerminator {
++  OsProcess open(Process process) throws IOException;
++
++  int ourCode();
++
++  boolean codeDistinctive();
++
++  Optional<String> creationFileTime(long pid);
++
++  static ProcessTerminator forCurrentOs() {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
++  /** Compat scaffolding for fail-before evidence. */
++  interface OsProcess {
++    Optional<String> creationFileTime();
++
++    TerminateResult terminate(int code);
++
++    boolean awaitExit(Duration max) throws InterruptedException;
++
++    OptionalInt exitCode();
++
++    Optional<Instant> exitedAt();
++
++    void close();
++  }
++}
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/StopRequest.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/StopRequest.java
+new file mode 100644
+index 000000000..a80723668
+--- /dev/null
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/StopRequest.java
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.api.runtime.child;
++
++import java.util.Optional;
++
++/** Compat scaffolding for fail-before evidence: a stop's arguments; no before-state code reads it. */
++public record StopRequest(
++    StopReason reason, Optional<StopDetail> detail, StopMode mode, String requestedBy) {
++
++  public static StopRequest of(StopReason reason, StopMode mode) {
++    return new StopRequest(reason, Optional.empty(), mode, "owner");
++  }
++
++  public static StopRequest of(StopReason reason, StopMode mode, String requestedBy) {
++    return new StopRequest(reason, Optional.empty(), mode, requestedBy);
++  }
++}
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java
+index 473504650..432d144e3 100644
+--- a/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java
+@@ -267,6 +267,22 @@ final class LlamaServerOps {
+         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+   }
+ 
++  /** Compat scaffolding for fail-before evidence: cannot be built from a ChildControl. */
++  @SuppressWarnings("ParameterNumber")
++  LlamaServerOps(
++      InferenceExecutorRegistrations executors,
++      HttpClient httpClient,
++      ObjectMapper objectMapper,
++      GpuCapabilitiesService gpuCapabilitiesService,
++      Supplier<Mode> currentMode,
++      PropsObserver propsObserver,
++      Consumer<BooleanSupplier> managedServerFailed,
++      BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
++      InferenceTelemetryEvents events,
++      io.justsearch.app.api.runtime.child.ChildControl ignored) {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
+   @SuppressWarnings("ParameterNumber")
+   LlamaServerOps(
+       InferenceExecutorRegistrations executors,
+@@ -567,6 +583,17 @@ final class LlamaServerOps {
+     this.contextKvType = null;
+   }
+ 
++  /** Compat scaffolding for fail-before evidence: the request is ignored; the stop is the before-state's own. */
++  void stopLlamaServer(io.justsearch.app.api.runtime.child.StopRequest ignored) {
++    stopLlamaServer();
++  }
++
++  /** Compat scaffolding for fail-before evidence: the request is ignored; the stop is the before-state's own. */
++  void stopServerForTerminalShutdown(
++      io.justsearch.app.api.runtime.child.StopRequest ignored, Duration timeout) {
++    stopServerForTerminalShutdown(timeout);
++  }
++
+   void stopLlamaServer() {
+     if (!stopLlamaServerAndConfirm()) {
+       throw new IllegalStateException("Managed llama-server survived terminal cleanup");
+diff --git a/modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerTestAccess.java b/modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerTestAccess.java
+index 558b642e8..63b98623f 100644
+--- a/modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerTestAccess.java
++++ b/modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerTestAccess.java
+@@ -7,6 +7,18 @@ import java.lang.reflect.InvocationTargetException;
+ final class LlamaServerTestAccess {
+   private LlamaServerTestAccess() {}
+ 
++  /** Compat scaffolding for fail-before evidence: the stop request current tests pass. */
++  static final io.justsearch.app.api.runtime.child.StopRequest TEST_STOP =
++      io.justsearch.app.api.runtime.child.StopRequest.of(
++          io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE,
++          io.justsearch.app.api.runtime.child.StopMode.NOW, "test");
++
++  /** Compat scaffolding for fail-before evidence. */
++  static void installChild(LlamaServerOps ops, LlamaServerOps.StartResult start,
++      io.justsearch.app.api.runtime.child.ChildHandle child) throws Exception {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
+   static void crashCurrent(LlamaServerOps ops) throws Exception {
+     invokeCurrent(ops, "handleServerCrash");
+   }

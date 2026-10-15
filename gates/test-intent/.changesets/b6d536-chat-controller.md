@@ -15,6 +15,23 @@ runtime reconciler is cut down to forwarding boot, spec and procedure intent as 
 the controller, with its foreign-flip convergence and anti-flap hold deleted. This changeset covers
 only this task's files; the other flagged files on the branch belong to other tasks.
 
+Phase B (b599d4d7e): `b6d536-chat-controller-repaired.json` was regenerated with before ref
+f75486245, the parent of the lane commit 981aeb298 that introduced the repaired behaviour. The
+current checks and their helpers need API that f75486245 lacks, so the compat before-patch
+gates/test-intent/evidence/b6d536-chat-controller-repaired-compat.patch is applied there.
+- Production, declarations only: ChatActuationRouter.Activation and
+  RuntimeReconciler.ActivationForwarder. Also one RuntimeReconciler constructor that ignores the
+  forwarder and delegates to the existing constructor, so the reconciler drives its control exactly
+  as before. No production code in that state reads or calls any of them.
+- Test helpers, before-API variants carried by the patch instead of overlays:
+  - ManagedChatSeam without its ChildControl branch, which the named checks never use.
+  - SlowStartFakeLlamaServer with ProcessHandle in place of ProcessTerminator for its fixture
+    identity and cleanup.
+
+TestActivationForwarders is overlaid. All three checks fail before by assertion: A and B launch
+before C, a start holds the lifecycle lock while it waits for health, and a foreign unload is
+reloaded.
+
 ```json
 {
   "entries": [

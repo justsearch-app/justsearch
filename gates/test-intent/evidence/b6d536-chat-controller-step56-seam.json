@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T12:47:27.535Z",
-  "revision": "0b7b9df4429aa1f6016907948f892eae5f11682c",
-  "tree": "d692ec19e0e51b7517a70469bf5be169a38fad1d",
+  "createdAt": "2026-10-14T17:35:01.134Z",
+  "revision": "228c9da66221dd21e9ded4debbd9efc4a2c20584",
+  "tree": "4a2354163bf6d721f4dc0931fdad20d6005dc6fa",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest.theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter\" --tests \"io.justsearch.app.services.vdu.OfflinePassChatSeamTest.aPassWithEmbeddingsPendingLeavesChatRunning\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 14027
+      "durationMs": 11938
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java#theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:018b2b7fd36c98a81348e2633d3e118bf2f611f48deb886ac09180dd3d74e11f",
+      "contentDigest": "sha256:6effa64492e3b2d6659d1211e55c562bfeca0c99ed50f8f0c71b1d4aaad1836f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java#aPassWithEmbeddingsPendingLeavesChatRunning",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8a0cc17423f39e6d25525b0e6285c8c32b257d4f3beb91745323d1d78fcc4d6d",
+      "contentDigest": "sha256:90b95b0694e01156a158aaf8a3505e48b841e207ed34c8851381a050313ac172",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,15 +59,19 @@
   "failBefore": {
     "ref": "d3fe74ef2",
     "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
-    "overlays": [
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java"
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-step56-seam-compat.patch",
+        "contentDigest": "sha256:be36287b29e997a6a6a7bc80a818366fbe86d966a4704602ea538ff6558571bc"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest.theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter\" --tests \"io.justsearch.app.services.vdu.OfflinePassChatSeamTest.aPassWithEmbeddingsPendingLeavesChatRunning\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 54780
+        "durationMs": 49092
       }
     ],
     "checks": [
@@ -79,9 +83,9 @@
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java#aPassWithEmbeddingsPendingLeavesChatRunning",
         "classification": "assertion",
-        "detail": "aPassWithEmbeddingsPendingLeavesChatRunning(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat stays up through the pass ==> expected: <0> but was: <1643>"
+        "detail": "aPassWithEmbeddingsPendingLeavesChatRunning(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat stays up through the pass ==> expected: <0> but was: <1775>"
       }
     ]
   },
-  "digest": "sha256:0b97d5eac03463abd12b3e2f33f89ba9d1a5875fa82df0581e38d965f2705ec2"
+  "digest": "sha256:15e56e001d9e85afdd9cbbfd63c73996a2b9d52a433085ce4053ccbbc938baaa"
 }

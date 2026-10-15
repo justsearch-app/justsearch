@@ -20,7 +20,8 @@ agent's specific choices.
 Evidence files (all written by run-evidence.mjs):
 
 - `b6d536-search-budget-2-rag-repaired.json`: repaired RAG behaviour, with an assertion fail-before
-  on 3d181a70c (the steps 1-4 commit this slice builds on).
+  on 3d181a70c (the steps 1-4 commit this slice builds on). Records phase B moved it to 900bdf4a0;
+  see below.
 - `b6d536-search-budget-2-vector-repaired.json`: repaired VECTOR-only behaviour, with an assertion
   fail-before on 68547f75a. The VECTOR-only production change landed in 3d181a70c (steps 1-4), so
   on 3d181a70c this check already passes; its fail-before is shown on the commit before that change,
@@ -36,6 +37,32 @@ Evidence files (all written by run-evidence.mjs):
   `semantic_loading_observed`, no before-state.
 - `b6d536-search-budget-2-answer-preservation.json`: a preservation check that passes before
   (fae202403) and after. That run exits 1 by design.
+
+Records phase B (batch 3) re-ran six files on b599d4d7e because their check files changed after the
+first runs:
+
+- `b6d536-search-budget-2-new.json` and `b6d536-search-budget-2-answer-new.json` pass (no
+  before-state).
+- `b6d536-search-budget-2-answer-repaired.json`: McpAnswerModelsLoadingInProcessTest now sets
+  NoOpEmbeddingProvider.starting() (0c5159476), which fae202403 lacks. The fail-before applies the
+  compat before-patch `gates/test-intent/evidence/b6d536-search-budget-2-answer-compat.patch`. It
+  adds only the declaration starting(), which returns the existing NoOpEmbeddingProvider.INSTANCE at
+  once: the provider such a service already has when none is set, as the test had before 0c5159476.
+  No fae202403 code reads it. All three checks again fail by assertion there.
+- `b6d536-search-budget-2-contract-repaired.json`: its check calls the same starting(), so its
+  fail-before on 3d181a70c applies the same patch, and it again fails by the same assertion.
+- `b6d536-search-budget-2-rag-repaired.json`: every check passes on the change. Its check files now
+  use the embedding availability API (EmbeddingProvider.Availability, availability() in place of
+  isAvailable(), from a37c6ef33), NoOpEmbeddingProvider.starting() and
+  RetrieveContextResponse.getRetrievalModeCause(). So the fail-before moved from 3d181a70c to
+  900bdf4a0, the parent of the lane commit 7df6a0a7d that introduced the behaviour, and applies the
+  compat before-patch `gates/test-intent/evidence/b6d536-search-budget-2-rag-compat.patch`. It makes
+  isAvailable() a default returning true. Every implementation at 900bdf4a0 overrides it, and the
+  checks' fixture reports READY. It also adds availability() as a default returning READY, the
+  Availability record, starting() returning the existing INSTANCE (which this lane's checks used),
+  and the proto field retrieval_mode_cause. No 900bdf4a0 code reads any of these. All four checks
+  fail there by assertion on the budget behaviour: two RAG retrievals throw "inference deadline
+  exceeded", one with models loading times out, and the in-process RAG turn emits no rag.meta.
 
 ```json
 {

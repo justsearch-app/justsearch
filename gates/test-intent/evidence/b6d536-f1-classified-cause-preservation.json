@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T07:10:50.364Z",
-  "revision": "5e4f4e6983f647c89f979b7b12e751d70789c895",
-  "tree": "17038f2c4476849ca98b8e01456c2018a33652da",
+  "createdAt": "2026-10-14T17:20:20.597Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.aFailureWithoutAClassifiedCauseKeepsItsMessage\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2903
+      "durationMs": 13885
     },
     {
-      "command": "npx vitest run \"src/shell-v0/state/chatFailureCause.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-8420-1791357000406.json\"",
+      "command": "npx vitest run \"src/shell-v0/state/chatFailureCause.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-23536-1791998418639.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2865
+      "durationMs": 1956
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#aFailureWithoutAClassifiedCauseKeepsItsMessage",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4b95b816c64fa72adf4e8667d1d1bf1ae75d41d672e25baafdb341f66ed95479",
+      "contentDigest": "sha256:15273c990c23102a9ec716b6d2bf0e41ed05aaad429cd37a5e477cdf26b2d381",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,46 +92,6 @@
       ]
     }
   ],
-  "failBefore": {
-    "ref": "5e4f4e698",
-    "revision": "5e4f4e6983f647c89f979b7b12e751d70789c895",
-    "overlays": [],
-    "runs": [
-      {
-        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.aFailureWithoutAClassifiedCauseKeepsItsMessage\" --rerun -PskipWebBuild=true --console=plain",
-        "cwd": "<before-worktree>",
-        "exitCode": 0,
-        "durationMs": 32151
-      },
-      {
-        "command": "npx vitest run \"src/shell-v0/state/chatFailureCause.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-8420-1791357041284.json\"",
-        "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 4011
-      }
-    ],
-    "checks": [
-      {
-        "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#aFailureWithoutAClassifiedCauseKeepsItsMessage",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a chat model that is merely offline still says offline",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts#a condition's own message still wins over the catalog's per-reason sentence",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#F1: an AI Engine that is merely offline still says Offline",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      }
-    ]
-  },
-  "digest": "sha256:c52055b7dc7d7901651d6a86467c376693c92c18cbbdb33f2d791e81cc91ee10"
+  "failBefore": null,
+  "digest": "sha256:4fca049e632057cb749462c80b3959494e02598a0edc35010d4640f52518a67a"
 }

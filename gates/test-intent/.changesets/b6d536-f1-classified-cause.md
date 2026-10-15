@@ -35,6 +35,22 @@ Evidence, written by run-evidence.mjs with --before 5e4f4e698:
   fail on the old rendering, not on a missing catalog key.
 - `b6d536-f1-classified-cause-preservation.json`: preservation checks, passing before and after.
 
+Records phase B (batch 3) re-ran `b6d536-f1-classified-cause-repaired-java.json` after merging
+b6d536/integration at 181363e86, because InferenceLifecycleManagerApplyConfigTest and
+CapabilityHealthBridgeChatCauseTest changed after the first run. The before ref stays 5e4f4e698, the
+parent of the lane commit f7cd27765. Since ee3c86b19, CapabilityHealthBridgeChatCauseTest builds
+HealthEventChangeRegistry with a delivery executor, so the fail-before applies the compat before-patch
+`gates/test-intent/evidence/b6d536-f1-classified-cause-repaired-java-compat.patch`. It adds only
+that constructor, which ignores the executor and delegates to 5e4f4e698's own no-argument
+constructor. No 5e4f4e698 code calls it, and it supplies no chat-cause wording. All nine checks pass
+on the change and again fail by assertion there.
+
+Records phase B (batch 3) re-ran `b6d536-f1-classified-cause-preservation.json` on b599d4d7e because
+its check files changed after the first run. CapabilityHealthBridgeChatCauseTest no longer compiles
+on 5e4f4e698 (ee3c86b19 made it build HealthEventChangeRegistry with its delivery executor). The
+three ui-web checks still pass there. The file holds preservation checks only, so it was re-run
+without a before-state, and all four pass on the change.
+
 ```json
 {
   "entries": [

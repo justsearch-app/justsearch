@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T15:37:17.479Z",
-  "revision": "98cad099f27ce769f501104885c05883b272b666",
-  "tree": "79cc98d909e49954ff9050be559d603b000e997e",
+  "createdAt": "2026-10-14T16:37:56.645Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "aef351fc6656da8fd961c1638410c912d3c196f7",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest\" --tests \"io.justsearch.ui.api.VerifierStatusIsolationTest\" --tests \"io.justsearch.ui.api.VerifierStatus2Test\" --tests \"io.justsearch.ui.api.VerifierStatus3Test\" --tests \"io.justsearch.ui.api.VerifierStatus4Test\" --tests \"io.justsearch.ui.api.VerifierStatus5Test\" --tests \"io.justsearch.ui.api.StatusIsolationHttpTest\" --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.StatusProbeHangTest.aLaneWhoseProbeHangsAfterSlowProbesStillGoesStaleWithinTheCap\" --tests \"io.justsearch.ui.api.StatusProbeHangTest.probesLongerThanTheAllowanceEarnNoCadenceSoAHungProbeIsStaleAfterThreePeriods\" --tests \"io.justsearch.ui.api.StatusProbeHangTest.aLaneWhoseFastProbeHangsGoesStaleAfterThreeOfItsPeriods\" --tests \"io.justsearch.ui.api.StatusGpuStaleSourceTest.aSourceReadingOlderThanTheCapIsStale\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 743405
+      "durationMs": 718263
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.settings.SettingsResetCoordinatorTest\" --tests \"io.justsearch.app.services.settings.SettingsResetProducerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 36652
+      "durationMs": 9449
     }
   ],
   "checks": [
@@ -94,7 +94,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e13fafb2c13416a8fdb1458f2a529c12e2e4b441201a9db1a52ca6788068df03",
+      "contentDigest": "sha256:f8c6df480d3ce5984e92f5b2b2da69b96ede0c4b5b14fe48e7a32febd8fe150e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -421,7 +421,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:bd17a8e225f056161582481dad48ce643df6ef0188839adb05c9dc5f90859a5a",
+      "contentDigest": "sha256:358da8fcc3b133aeaf7a1714427eed1b7327844a0482a671175470c2268813a4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -851,5 +851,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ff44b894c18b35b6afaa602c2072b39967f82824163e019f6070f02d63f3556d"
+  "digest": "sha256:d4edf97cc12dc72e41561d70c57c715ed6d921e695bd42a0c0c19601d67f3a40"
 }

@@ -7,6 +7,8 @@ author-session: codex-b13-shell-r1-20261007
 
 # Test-intent entries
 
+Records phase B (batch 3) re-ran `b6d536-shell-r1-new.json` after merging b6d536/integration at 181363e86, because exit_ledger.rs changed after the first run. It keeps --before f7cd27765, the headless placeholder overlay and `gates/test-intent/evidence/b6d536-shell-r1-before-api.patch`. All 17 checks pass on the change. On f7cd27765 all 17 again fail to compile, as in the earlier record, and that is still not claimed as fail-before proof. The exit_ledger.rs checks read the shared fixtures under governance/fixtures/exit-ledger, not the stop-census scripts under scripts/dev that the unmerged b102 lane changes.
+
 b17 repair refresh: direct hold API and original P5 launch-oracle before witnesses are recorded; five actor-fixture before results remain explicitly UNVERIFIED. Native cancelled-session shell exit and held-crash installer completion have fail-before assertions against f6b5b019a. All prior entries and verifier verdicts remain history; this builder adds no acceptance.
 
 ```json

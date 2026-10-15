@@ -13,14 +13,42 @@ a kill-on-close job of its own as the first statement of `HeadlessApp.main`, so 
 starts ends with it. This changeset covers only this slice's files; the other flagged files on the
 branch belong to other tasks.
 
+The exit-ledger fixture governance/fixtures/exit-ledger/engine.v1.jsonl is no longer listed as an
+item of entry 1. It is outside the gate's flagged test scope, and ExitLedgerFixtureTest, which reads
+it, stays an item.
+
+Evidence regenerated on b599d4d7e. The fail-before of b6d536-engine-job.json runs on f75486245, the
+parent of 624dcfc92, which added the checks. It applies
+`gates/test-intent/evidence/b6d536-engine-job-compat.patch`, because the containment check now kills
+its holder through the later `ProcessTerminator`. The patch adds that interface, reduced to what the
+check calls. Its terminate is the `taskkill /F /PID` the check itself used at 624dcfc92. No
+production code at f75486245 reads it. All three checks fail there by assertion. The before-state
+run leaves behind the 600-second ping helper of the containment check, which nothing contains there;
+the helper ends on its own.
+
+b6d536-containment-surface.json runs its before-state on f75486245, the parent of 624dcfc92, which
+added these checks together with the API they call. It applies no patch.
+onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne reaches no added API, and it passes
+there: a preservation pass. The other five checks are candidate-only, and their recorded before
+results are compile failures.
+
+- unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired and containedOrInapplicableNeverRefuses:
+  before-state not reproducible: HeadlessApp.containmentRefusesBoot does not exist at f75486245,
+  and any stub decides the outcome.
+- unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall and
+  containedOrInapplicableEnginePublishesNothing: before-state not reproducible:
+  EngineContainmentNotice.publish does not exist at f75486245, and any stub decides the outcome.
+- manifestCarriesTheBootContainmentFromTheFirstWrite: before-state not reproducible:
+  EngineContainment and RuntimeManifest.ContainmentInfo do not exist at f75486245, and the check
+  builds its expected value from them, so a stub would supply it.
+
 ```json
 {
   "entries": [
     {
       "items": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java",
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerFixtureTest.java",
-        "governance/fixtures/exit-ledger/engine.v1.jsonl"
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerFixtureTest.java"
       ],
       "class": "New",
       "repaired": true,
@@ -56,7 +84,7 @@ branch belong to other tasks.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Spec F step 1. killedEngineLeavesNoHelperOrConsoleHost (T23): a JVM that boots Engine containment and starts a ping helper, then is killed with taskkill /F, leaves nothing it started alive 3000 ms later, its console host included, and reported CONTAINED. bootJoinsAKillOnCloseJobWithExactlyThatLimit: after EngineContainment.installAtBoot() the process is in a job whose extended limit flags are exactly KILL_ON_JOB_CLOSE (0x2000), a second call returns the same installed containment, current() is it, and before install current() reads UNAVAILABLE not_installed. engineMainJoinsItsJobBeforeAnyOtherCall: the first call HeadlessApp.main makes is EngineContainment.installAtBoot(). onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: CreateJobObjectW appears in Java main only in WindowsEngineJob and WindowsParserContainment, TerminateJobObject in no Java main source, and TerminateJobObject( in no shell source but containment.rs.",
+      "behaviour": "Spec F step 1. killedEngineLeavesNoHelperOrConsoleHost (T23): a JVM that boots Engine containment and starts a ping helper, then is killed with taskkill /F, leaves nothing it started alive 3000 ms later, its console host included, and reported CONTAINED. bootJoinsAKillOnCloseJobWithExactlyThatLimit: after EngineContainment.installAtBoot() the process is in a job whose extended limit flags are exactly KILL_ON_JOB_CLOSE (0x2000), a second call returns the same installed containment, current() is it, and before install current() reads UNAVAILABLE not_installed. engineMainJoinsItsJobBeforeAnyOtherCall: the first call HeadlessApp.main makes is EngineContainment.installAtBoot(). onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: CreateJobObjectW appears in Java main only in WindowsEngineJob and WindowsParserContainment, TerminateJobObject in no Java main source, and TerminateJobObject( in no shell source but containment.rs. Fail-before: f75486245 with b6d536-engine-job-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -88,7 +116,7 @@ branch belong to other tasks.
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec F step 1, the surfaces of the Engine job. onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: see the entry above (no fail-before claimed). unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired and containedOrInapplicableNeverRefuses: an Engine whose job could not be created refuses to boot (before the instance lock, exit FATAL_OR_UNCAUGHT) only under the conformance harness or JUSTSEARCH_REQUIRE_CONTAINMENT; contained, absent or inapplicable containment never refuses. manifestCarriesTheBootContainmentFromTheFirstWrite: the runtime manifest on disk and every head publish carry the boot containment status and reason, and the public projection keeps it. unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall and containedOrInapplicableEnginePublishesNothing: an unavailable Engine job is a sticky WARNING health condition EngineContainmentUnavailable whose detail names the failed call; a contained or inapplicable Engine publishes none.",
+      "behaviour": "Spec F step 1, the surfaces of the Engine job. onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne: see the entry above. unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired and containedOrInapplicableNeverRefuses: an Engine whose job could not be created refuses to boot (before the instance lock, exit FATAL_OR_UNCAUGHT) only under the conformance harness or JUSTSEARCH_REQUIRE_CONTAINMENT; contained, absent or inapplicable containment never refuses. manifestCarriesTheBootContainmentFromTheFirstWrite: the runtime manifest on disk and every head publish carry the boot containment status and reason, and the public projection keeps it. unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall and containedOrInapplicableEnginePublishesNothing: an unavailable Engine job is a sticky WARNING health condition EngineContainmentUnavailable whose detail names the failed call; a contained or inapplicable Engine publishes none. Before-state f75486245, no patch: onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne passes there (preservation). The other five checks are candidate-only, because before-state not reproducible: HeadlessApp.containmentRefusesBoot, EngineContainmentNotice.publish, EngineContainment and RuntimeManifest.ContainmentInfo do not exist at f75486245, and any stub decides the outcome or supplies the expected value.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

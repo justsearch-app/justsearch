@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T07:08:14.798Z",
-  "revision": "5e4f4e6983f647c89f979b7b12e751d70789c895",
-  "tree": "90e7676e974878f528f8003e8c98782cfb11eb09",
+  "createdAt": "2026-10-15T09:14:44.592Z",
+  "revision": "947a6a72fa6b67b09e526242f0914ccf39cd3c09",
+  "tree": "b71b8207110a72e23efe37d6d5c674eb4a4e5b19",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3904
+      "durationMs": 3684
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.everyChatFailureCauseHasWordsOnBothHealthEvents\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2548
+      "durationMs": 2288
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9749ae4ab35042f6d919b223fe432add1d917bd6afd5f8a0b27f20e92012a6d0",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9749ae4ab35042f6d919b223fe432add1d917bd6afd5f8a0b27f20e92012a6d0",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9749ae4ab35042f6d919b223fe432add1d917bd6afd5f8a0b27f20e92012a6d0",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9749ae4ab35042f6d919b223fe432add1d917bd6afd5f8a0b27f20e92012a6d0",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9749ae4ab35042f6d919b223fe432add1d917bd6afd5f8a0b27f20e92012a6d0",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9749ae4ab35042f6d919b223fe432add1d917bd6afd5f8a0b27f20e92012a6d0",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9749ae4ab35042f6d919b223fe432add1d917bd6afd5f8a0b27f20e92012a6d0",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +140,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4b95b816c64fa72adf4e8667d1d1bf1ae75d41d672e25baafdb341f66ed95479",
+      "contentDigest": "sha256:15273c990c23102a9ec716b6d2bf0e41ed05aaad429cd37a5e477cdf26b2d381",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -155,7 +155,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#everyChatFailureCauseHasWordsOnBothHealthEvents",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4b95b816c64fa72adf4e8667d1d1bf1ae75d41d672e25baafdb341f66ed95479",
+      "contentDigest": "sha256:15273c990c23102a9ec716b6d2bf0e41ed05aaad429cd37a5e477cdf26b2d381",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -171,18 +171,24 @@
     "ref": "5e4f4e698",
     "revision": "5e4f4e6983f647c89f979b7b12e751d70789c895",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-f1-classified-cause-repaired-java-compat.patch",
+        "contentDigest": "sha256:8a603a700622c975dc8f6fcc08a72f1135588e2425a30b2157ad06ed88d9f64f"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 30041
+        "durationMs": 7154
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.everyChatFailureCauseHasWordsOnBothHealthEvents\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 35351
+        "durationMs": 50236
       }
     ],
     "checks": [
@@ -233,5 +239,5 @@
       }
     ]
   },
-  "digest": "sha256:d35f69e9d093aa6ab6ed9a27f7cdc8466c19f3219eccc17872c8e76c834ecc9b"
+  "digest": "sha256:8b9e302e320ee03f55eb111a2af118256b0bad4b62cf01fc7cb050b5685c37ba"
 }

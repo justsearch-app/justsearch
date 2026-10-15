@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T23:51:12.400Z",
-  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
-  "tree": "6eb43899bb1f64b9f590f4ecc409f6e3d40bae5c",
+  "createdAt": "2026-10-14T16:01:16.767Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "819c4a06663e73c2650ff6e6d2c60f71308566d0",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,22 +18,22 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12292
+      "durationMs": 11190
     },
     {
-      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 24782
+      "durationMs": 15153
     },
     {
-      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8568
+      "durationMs": 8530
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java#cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:06d8ca92bdb7fbb1f95e5bb3b45877b6b81fd903379c0b1ecceddb6680f7dc52",
+      "contentDigest": "sha256:d10c1dee6e057371aec92ef1e311fa144454082534b33c3e5d5f8bc6bd8c795b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -102,25 +102,30 @@
     "ref": "1e333857b",
     "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-batch1-cpu-repair-compat.patch",
+        "contentDigest": "sha256:c182bf0d739827af4b2ee4fb19e8b37c77aa193c9c69fa681d0fc63749ea87cb"
+      }
+    ],
     "runs": [
       {
-        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 33870
+        "durationMs": 64074
       },
       {
-        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 27335
+        "durationMs": 22799
       },
       {
-        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 14846
+        "durationMs": 7312
       }
     ],
     "checks": [
@@ -132,19 +137,19 @@
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause",
         "classification": "assertion",
-        "detail": "aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU-only misses must not claim successfully served searches ==> expected: <OptionalLong[278531915960200]> but was: <OptionalLong[278536818224300]>"
+        "detail": "aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU-only misses must not claim successfully served searches ==> expected: <OptionalLong.empty> but was: <OptionalLong[55652322631700]>"
       },
       {
         "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java#aTurnedAwayLegIsRecordedForItsTraceAndForStatus",
         "classification": "assertion",
-        "detail": "aTurnedAwayLegIsRecordedForItsTraceAndForStatus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: selecting a CPU lease does not certify a successful encoding ==> expected: <OptionalLong.empty> but was: <OptionalLong[278553072117500]>"
+        "detail": "aTurnedAwayLegIsRecordedForItsTraceAndForStatus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: selecting a CPU lease does not certify a successful encoding ==> expected: <OptionalLong.empty> but was: <OptionalLong[55661259744100]>"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java#theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs",
         "classification": "assertion",
-        "detail": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a lease selection cannot claim successful CPU service ==> expected: <OptionalLong.empty> but was: <OptionalLong[278531915960200]>"
+        "detail": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a lease selection cannot claim successful CPU service ==> expected: <OptionalLong.empty> but was: <OptionalLong[55647128328000]>"
       }
     ]
   },
-  "digest": "sha256:1fe7b945fc562cf0826146b8618794db5f8dabf6db8551d1bd7c4680aca99f3b"
+  "digest": "sha256:4bc179cf049dd736037e87059523392264951903520afc6b7c10523ee93a42c4"
 }

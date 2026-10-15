@@ -1,0 +1,76 @@
+Compat before-patch for b58-mcp-admission, applied to 7655b8a20 (coordinator decision 2).
+
+The current checks name EngineAdmissionException.Reason.INFERENCE_BUSY, which 7655b8a20 lacks. This
+patch adds only that constant, plus the minimal case arms that exhaustive switches over Reason need
+to compile: ConversationEngine, ApiErrorHandler and RequestEngineWork (production), and the
+before-state test ApiErrorHandlerResolveTest (not one of the checks). Each arm throws
+IllegalStateException("compat: unreachable before-state reason"). Nothing in the before-state
+produces this reason, so no before-state behaviour changes.
+
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java b/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java
+index d6a154814..32e39c1f1 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionException.java
+@@ -4,7 +4,9 @@ package io.justsearch.app.api;
+ /** A typed admission refusal, independent from operation dispatch authorization. */
+ public final class EngineAdmissionException extends RuntimeException {
+   private static final long serialVersionUID = 1L;
+-  public enum Reason { CONTEXT_LIMIT, ENGINE_LIMIT, FROZEN, WORK_FINISHED }
++  // Compatibility only (compat before-patch): INFERENCE_BUSY lets later checks compile; nothing in
++  // this state produces it, and every exhaustive switch over Reason throws for it.
++  public enum Reason { CONTEXT_LIMIT, ENGINE_LIMIT, INFERENCE_BUSY, FROZEN, WORK_FINISHED }
+ 
+   private final Reason reason;
+   private final int retryAfterSeconds;
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
+index 38b40edf7..842643304 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
+@@ -1095,6 +1095,8 @@ public final class ConversationEngine {
+         case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+         case FROZEN -> "UPGRADE_PREPARING";
+         case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
++        // Compatibility only: nothing in this state produces INFERENCE_BUSY.
++        case INFERENCE_BUSY -> throw new IllegalStateException("compat: unreachable before-state reason");
+       };
+       retryAfter = admission.retryAfterSeconds();
+     } else if (refused instanceof io.justsearch.core.execution.EngineExecutorRejectedException executor) {
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java b/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java
+index 1202fbf63..1ce13a787 100644
+--- a/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java
+@@ -308,6 +308,8 @@ public final class ApiErrorHandler {
+                 case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT;
+                 case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+                 case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
++                // Compatibility only: nothing in this state produces INFERENCE_BUSY.
++                case INFERENCE_BUSY -> throw new IllegalStateException("compat: unreachable before-state reason");
+             };
+         }
+ 
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java b/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java
+index 8ecfea36b..d3cd4b4d7 100644
+--- a/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/RequestEngineWork.java
+@@ -23,6 +23,8 @@ public final class RequestEngineWork {
+       case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT.name();
+       case FROZEN -> "UPGRADE_PREPARING";
+       case WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE.name();
++      // Compatibility only: nothing in this state produces INFERENCE_BUSY.
++      case INFERENCE_BUSY -> throw new IllegalStateException("compat: unreachable before-state reason");
+     };
+   }
+ 
+diff --git a/modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java b/modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java
+index b3d9d9086..bda9d7603 100644
+--- a/modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java
++++ b/modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java
+@@ -42,6 +42,8 @@ final class ApiErrorHandlerResolveTest {
+         case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT;
+         case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+         case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
++        // Compatibility only: nothing in this state produces INFERENCE_BUSY.
++        case INFERENCE_BUSY -> throw new IllegalStateException("compat: unreachable before-state reason");
+       }, ApiErrorHandler.resolve(failure));
+       assertEquals(false, ApiErrorHandler.toResponse(ApiErrorHandler.resolve(failure), failure).get("retrySafe"));
+       assertNull(ApiErrorHandler.admissionRefusal(new RuntimeException(refusal)));

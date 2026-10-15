@@ -1,0 +1,38 @@
+Compat before-patch for b64-status-counter-repaired, applied to 23b8679ee (the parent of the lane
+commit ea0c311cb that introduced the repaired behaviour; coordinator decision 3).
+
+Production, one constructor only: RuntimeReconciler's lease-free Engine constructor, which
+RuntimeReconcilerTest calls (5e4f4e698 deleted the lease). It delegates to this state's own Engine
+constructor with a fresh RuntimeGpuLease, as ServicePhase builds it, so the reconciler behaves
+exactly as this state does. No production code in this state calls it, and it supplies no status
+counter behaviour.
+
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java b/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
+index 9484678a9..1225dcca0 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
+@@ -194,6 +194,24 @@ public final class RuntimeReconciler implements AutoCloseable {
+         componentRecoveryPending);
+   }
+ 
++  /**
++   * Compatibility only (compat before-patch): the lease-free constructor later checks call. It
++   * delegates to this state's Engine constructor with a fresh lease, as ServicePhase builds it, so
++   * the reconciler drives {@code control} exactly as this state does. No production code in this
++   * state calls it.
++   */
++  public RuntimeReconciler(
++      OnlineAiLifecycleControl control,
++      Supplier<Mode> modeSupplier,
++      BooleanSupplier externalAdoption,
++      EnterprisePolicyService policy,
++      RuntimeSpecStore specStore,
++      ActivationForwarder forwarder,
++      BooleanSupplier componentRecoveryPending) {
++    this(control, modeSupplier, externalAdoption, policy, specStore, new RuntimeGpuLease(),
++        forwarder, componentRecoveryPending);
++  }
++
+   /**
+    * The Engine's reconciler: every boot, spec and procedure request becomes one {@code
+    * setActivation} on the chat controller.

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T20:46:39.237Z",
-  "revision": "14a7eb8a2493e8c2273833c50f92db2165ab8948",
-  "tree": "d11b8f5c19c35516ef40d7a5359121568e88e0f9",
+  "createdAt": "2026-10-14T17:21:13.120Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "ab9befdd0bc20d524adf77606f208e56ba228d23",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.cpuPendingRestoreKeepsNormalResidencyPressureExemption\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.explicitEntryShutdownPreservesGeneratingChatUntilInteractiveCancellation\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.humanDemandDuringExplicitHoldWithPendingRestoreMatchesOriginalExplicitPass\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerPreparedPublicationSupersedesPendingRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerRecordedConfigurationIsStartedByPendingHumanDemand\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerResolvedConfigurationSupersedesPendingRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerRunningConfigurationSupersedesPendingRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.pendingHumanDemandUnderGameGetsUsualRefusalAndLoadAnyway\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.pendingRestorationWaitsFortySecondsUnderGamePressure\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.pendingRestorationWaitsUnderExternalMemoryPressure\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.samplerStartRaceRetriesAtNextWindowWithoutHumanActivity\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownFenceRejectsModelLaunchBeforeCancellingTheCurrentDocument\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.slowOwnedModelStopDuringPassUsesTerminalAllowanceAndKeepsDocumentPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.waitingHumanSeesConfigApplyFailedWhenAutomaticRestorationFails\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 70146
+      "durationMs": 45898
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppVduShutdownTest.activePassAllowsThreeSecondStopAndRunsLaterSteps\" --tests \"io.justsearch.ui.HeadlessAppVduShutdownTest.noPassPreservesOriginalCancellationAndStopOrder\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 23040
+      "durationMs": 9358
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.VduMutationCommitTest.shutdownResetCannotResetAnotherProceduresClaim\" --tests \"io.justsearch.indexerworker.services.VduMutationCommitTest.shutdownResetWinningLateSuccessKeepsPendingWithOriginalText\" --tests \"io.justsearch.indexerworker.services.VduMutationCommitTest.successWinningShutdownResetKeepsItsTerminalStateAndText\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 18322
+      "durationMs": 6946
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#cpuPendingRestoreKeepsNormalResidencyPressureExemption",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -56,7 +56,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#explicitEntryShutdownPreservesGeneratingChatUntilInteractiveCancellation",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -71,7 +71,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#humanDemandDuringExplicitHoldWithPendingRestoreMatchesOriginalExplicitPass",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -86,7 +86,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerPreparedPublicationSupersedesPendingRestore",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -101,7 +101,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerRecordedConfigurationIsStartedByPendingHumanDemand",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -116,7 +116,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerResolvedConfigurationSupersedesPendingRestore",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -131,7 +131,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerRunningConfigurationSupersedesPendingRestore",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -146,7 +146,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingHumanDemandUnderGameGetsUsualRefusalAndLoadAnyway",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -161,7 +161,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingRestorationWaitsFortySecondsUnderGamePressure",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -176,7 +176,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingRestorationWaitsUnderExternalMemoryPressure",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -191,7 +191,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#samplerStartRaceRetriesAtNextWindowWithoutHumanActivity",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -206,7 +206,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownFenceRejectsModelLaunchBeforeCancellingTheCurrentDocument",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -221,7 +221,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#slowOwnedModelStopDuringPassUsesTerminalAllowanceAndKeepsDocumentPending",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -236,7 +236,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#waitingHumanSeesConfigApplyFailedWhenAutomaticRestorationFails",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58650038951e12b4eb31d3cbafec58b89d3728b5c4601f6f819672f12e6e48f7",
+      "contentDigest": "sha256:a053fbaa4183c55ec36abf3f018cbcb17d83a63601b52c9ee4aa3e02f0f2ce8c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -251,7 +251,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#activePassAllowsThreeSecondStopAndRunsLaterSteps",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:48c9654c6e00d8a0a7bf718e8f187add15db02e3706544cd3f5a4adbe9b839b9",
+      "contentDigest": "sha256:1f73a7661ddb99ab6cb36b8c216eb0f49b1c66e492788292ac4d023e8afddd55",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -266,7 +266,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#noPassPreservesOriginalCancellationAndStopOrder",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:48c9654c6e00d8a0a7bf718e8f187add15db02e3706544cd3f5a4adbe9b839b9",
+      "contentDigest": "sha256:1f73a7661ddb99ab6cb36b8c216eb0f49b1c66e492788292ac4d023e8afddd55",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -326,27 +326,31 @@
   "failBefore": {
     "ref": "14a7eb8a2",
     "revision": "14a7eb8a2493e8c2273833c50f92db2165ab8948",
-    "overlays": [
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b85-auto-vdu-r3-java-compat.patch",
+        "contentDigest": "sha256:65ff75605a7d8ca52810c1facf2495bdc84096a95687a83b274ce78f97b465fe"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.cpuPendingRestoreKeepsNormalResidencyPressureExemption\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.explicitEntryShutdownPreservesGeneratingChatUntilInteractiveCancellation\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.humanDemandDuringExplicitHoldWithPendingRestoreMatchesOriginalExplicitPass\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerPreparedPublicationSupersedesPendingRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerRecordedConfigurationIsStartedByPendingHumanDemand\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerResolvedConfigurationSupersedesPendingRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.newerRunningConfigurationSupersedesPendingRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.pendingHumanDemandUnderGameGetsUsualRefusalAndLoadAnyway\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.pendingRestorationWaitsFortySecondsUnderGamePressure\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.pendingRestorationWaitsUnderExternalMemoryPressure\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.samplerStartRaceRetriesAtNextWindowWithoutHumanActivity\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.shutdownFenceRejectsModelLaunchBeforeCancellingTheCurrentDocument\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.slowOwnedModelStopDuringPassUsesTerminalAllowanceAndKeepsDocumentPending\" --tests \"io.justsearch.app.services.vdu.AutomaticVduRecoveryTest.waitingHumanSeesConfigApplyFailedWhenAutomaticRestorationFails\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 70959
+        "durationMs": 57823
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppVduShutdownTest.activePassAllowsThreeSecondStopAndRunsLaterSteps\" --tests \"io.justsearch.ui.HeadlessAppVduShutdownTest.noPassPreservesOriginalCancellationAndStopOrder\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 30119
+        "durationMs": 8062
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.VduMutationCommitTest.shutdownResetCannotResetAnotherProceduresClaim\" --tests \"io.justsearch.indexerworker.services.VduMutationCommitTest.shutdownResetWinningLateSuccessKeepsPendingWithOriginalText\" --tests \"io.justsearch.indexerworker.services.VduMutationCommitTest.successWinningShutdownResetKeepsItsTerminalStateAndText\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 21795
+        "durationMs": 7273
       }
     ],
     "checks": [
@@ -368,22 +372,22 @@
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerPreparedPublicationSupersedesPendingRestore",
         "classification": "assertion",
-        "detail": "newerPreparedPublicationSupersedesPendingRestore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: committed publication supersedes the saved restore ==> expected: <InferenceConfig[serverExecutable=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\junit-7490904766360401142\\fake-llama\\llama-server.cmd, modelPath=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\junit-7"
+        "detail": "newerPreparedPublicationSupersedesPendingRestore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: committed publication supersedes the saved restore ==> expected: <InferenceConfig[serverExecutable=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-2929066651649542756\\fake-llama\\llama-server.cmd, modelPath=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-29290"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerRecordedConfigurationIsStartedByPendingHumanDemand",
         "classification": "assertion",
-        "detail": "newerRecordedConfigurationIsStartedByPendingHumanDemand(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: offline normal apply must replace the restoration target ==> expected: <InferenceConfig[serverExecutable=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\junit-5466746250987376693\\fake-llama\\llama-server.cmd, modelPath=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\j"
+        "detail": "newerRecordedConfigurationIsStartedByPendingHumanDemand(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: offline normal apply must replace the restoration target ==> expected: <InferenceConfig[serverExecutable=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-10798793157796074728\\fake-llama\\llama-server.cmd, modelPath=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\juni"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerResolvedConfigurationSupersedesPendingRestore",
         "classification": "assertion",
-        "detail": "newerResolvedConfigurationSupersedesPendingRestore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: resolved config is the newest normal authority ==> expected: <InferenceConfig[serverExecutable=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\junit-11131217576287755622\\fake-llama\\llama-server.cmd, modelPath=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\junit-1113"
+        "detail": "newerResolvedConfigurationSupersedesPendingRestore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: resolved config is the newest normal authority ==> expected: <InferenceConfig[serverExecutable=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-13055259729786126297\\fake-llama\\llama-server.cmd, modelPath=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-13055259"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerRunningConfigurationSupersedesPendingRestore",
         "classification": "assertion",
-        "detail": "newerRunningConfigurationSupersedesPendingRestore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a later normal apply supersedes the saved restore ==> expected: <InferenceConfig[serverExecutable=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\junit-4562830060551543602\\fake-llama\\llama-server.cmd, modelPath=C:\\agent-sandbox-tmp\\b85-auto-vdu-r3\\test-tmp\\junit-45"
+        "detail": "newerRunningConfigurationSupersedesPendingRestore(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a later normal apply supersedes the saved restore ==> expected: <InferenceConfig[serverExecutable=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-5386825206837304382\\fake-llama\\llama-server.cmd, modelPath=F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-1\\junit-538682"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingHumanDemandUnderGameGetsUsualRefusalAndLoadAnyway",
@@ -393,7 +397,7 @@
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingRestorationWaitsFortySecondsUnderGamePressure",
         "classification": "assertion",
-        "detail": "pendingRestorationWaitsFortySecondsUnderGamePressure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no restoration launch during forty seconds of game pressure ==> expected: <3> but was: <4>"
+        "detail": "pendingRestorationWaitsFortySecondsUnderGamePressure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no restoration launch during forty seconds of game pressure ==> expected: <3> but was: <5>"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingRestorationWaitsUnderExternalMemoryPressure",
@@ -447,5 +451,5 @@
       }
     ]
   },
-  "digest": "sha256:409c32e1d84de1bdc79b12366ef9db3392251ca95aae867fa1a755443526c607"
+  "digest": "sha256:8ced192ebf9a3e2a14b34c059edaf9f589a7b8a687c2bcf990e0221fed5aa21b"
 }

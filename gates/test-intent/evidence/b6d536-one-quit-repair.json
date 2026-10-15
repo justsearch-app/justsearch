@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T00:27:14.142Z",
-  "revision": "b1cfcac8ec990b6a9854aff7cd23c194b4ba37df",
-  "tree": "5685bd4596806a06b106480782ad31832420f86e",
+  "createdAt": "2026-10-14T16:19:50.801Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ab6fa9d03e4e22d1513b0d6f8e7a7034212f3f7d",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest\" --tests \"io.justsearch.app.engine.RecoverableQuitReplayTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 45892
+      "durationMs": 15315
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppBootQuitTest\" --tests \"io.justsearch.ui.HeadlessAppExtractionQuitTest\" --tests \"io.justsearch.ui.HeadlessAppUpgradeShutdownWiringTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 24915
+      "durationMs": 12820
     }
   ],
   "checks": [
@@ -70,7 +70,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableQuitReplayTest.java",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableQuitReplayTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0aff367c20d2300b9467139efabd0e6bb8470c352141dfd3c37511cb39cd0908",
+      "contentDigest": "sha256:853010c261ccac2b54b78123355259de9eff098ec0754871a5461e2e5d8e0a59",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -191,18 +191,19 @@
     "ref": "b1cfcac8e",
     "revision": "b1cfcac8ec990b6a9854aff7cd23c194b4ba37df",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest\" --tests \"io.justsearch.app.engine.RecoverableQuitReplayTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 33724
+        "durationMs": 94169
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppBootQuitTest\" --tests \"io.justsearch.ui.HeadlessAppExtractionQuitTest\" --tests \"io.justsearch.ui.HeadlessAppUpgradeShutdownWiringTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 21718
+        "durationMs": 26355
       }
     ],
     "checks": [
@@ -233,5 +234,5 @@
       }
     ]
   },
-  "digest": "sha256:c1241c4316fbe8902747c21df018f60551a80aa95b74fd7b0c89d98483e5da3c"
+  "digest": "sha256:9faca507c2455405e65fb7618d2e5b4f20dce8c154b9284fc9a0f32834eefe85"
 }

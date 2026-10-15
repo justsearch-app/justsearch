@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T17:30:30.528Z",
-  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
-  "tree": "f71f461bd1443053b49c761d55b63d7d907a4a00",
+  "createdAt": "2026-10-15T10:24:44.060Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "a334015e798c0edf8a37f9ffac6f8ea8fca06fca",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.containsAnswersWhetherAProcessIsInTheEngineJob\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1854
+      "durationMs": 3881
     },
     {
       "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2577
+      "durationMs": 4928
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4633
+      "durationMs": 7538
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.escalatedRestartRecordsAnEngineRestartExpectingCodeFive\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.updaterExitRecordsAnUpgradeExpectingCodeZero\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aCloseTheJvmHookStartsRecordsItsReasonOnce\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2200
+      "durationMs": 4162
     }
   ],
   "checks": [
@@ -62,7 +62,7 @@
       "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
       "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58607d6d3fccfba729af9e4f987a23edb760c367dd50251e73d76ad85b9379dd",
+      "contentDigest": "sha256:42f17ad604f0fc0b4dddd59e13ccea287908b5ddb060eb66cda7ef339c05fc43",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -153,30 +153,31 @@
     "ref": "1c6f8da2c",
     "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.containsAnswersWhetherAProcessIsInTheEngineJob\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 16394
+        "durationMs": 16803
       },
       {
         "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4480
+        "durationMs": 5923
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 33425
+        "durationMs": 61643
       },
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.escalatedRestartRecordsAnEngineRestartExpectingCodeFive\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.updaterExitRecordsAnUpgradeExpectingCodeZero\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aCloseTheJvmHookStartsRecordsItsReasonOnce\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4580
+        "durationMs": 4844
       }
     ],
     "checks": [
@@ -188,7 +189,7 @@
       {
         "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
         "classification": "assertion",
-        "detail": "killedEngineChildrenDieWithItAndTheNextEngineRecordsOwnerDied(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: every child-start records that the child is in the Engine job ==> expected: <{c-bf83cfb0-6389-4df7-868c-af4ea8071c25=true, c-ea4e8731-8769-4956-9f2d-2c3dbead5268=true}> but was: <{c-bf83cfb0-6389-4df7-868c-af4ea8071c25=null, c-ea4e8731-8769-4956-9f2d-2c3dbead5268"
+        "detail": "killedEngineChildrenDieWithItAndTheNextEngineRecordsOwnerDied(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: every child-start records that the child is in the Engine job ==> expected: <{c-c14f4d73-7520-4259-8a30-453305d89da4=true, c-d6651c0e-be97-4cf1-bcc4-244004a266d6=true}> but was: <{c-c14f4d73-7520-4259-8a30-453305d89da4=null, c-d6651c0e-be97-4cf1-bcc4-244004a266d6"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded",
@@ -217,5 +218,5 @@
       }
     ]
   },
-  "digest": "sha256:61e95f0ae3d514acb2f67b3b1ebf0e9cae9dc06054e3f59ea264f75dd19ed775"
+  "digest": "sha256:2c393ef137d295d37faa940072e7224c8373f8b09e547380265ddd1a063fdc5b"
 }

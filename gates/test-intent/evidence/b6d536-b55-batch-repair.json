@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-10T14:16:03.666Z",
-  "revision": "2f42b4d504ae7ef9f55a6eb1baa4bbd423245a9b",
-  "tree": "a1521d953309a8654b63e9b26dede0b43cc71979",
+  "createdAt": "2026-10-14T15:55:36.031Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "0911d7c6476b1ef3a38fe787c13b9769259c220a",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeSubscriberRecoveryTest.subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1724581
+      "durationMs": 2998
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.repeatedUnchangedAdmissionReadsNoChildren\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.legacyMigrationPreservesCompletedSparseFeatures\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 18909
+      "durationMs": 5522
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeSubscriberRecoveryTest.java#subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeSubscriberRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:90b65b7a6c084312980a85b15417f609ed44cbb5fcbc0cf8f96ebcf415375a24",
+      "contentDigest": "sha256:380e33a8473074c3e001148f936945bf0b776958aa671f8ed2ca42ba16ff2d05",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#repeatedUnchangedAdmissionReadsNoChildren",
       "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f500c56b3fe8cfdd2253a8cf828887e58de6d07b1e01b6f89977dd93d380cc22",
+      "contentDigest": "sha256:53b77b292360d38f2f33131e911d502612dcf590ff76c591fdbbf0718e37c4ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent",
       "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f500c56b3fe8cfdd2253a8cf828887e58de6d07b1e01b6f89977dd93d380cc22",
+      "contentDigest": "sha256:53b77b292360d38f2f33131e911d502612dcf590ff76c591fdbbf0718e37c4ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#legacyMigrationPreservesCompletedSparseFeatures",
       "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f500c56b3fe8cfdd2253a8cf828887e58de6d07b1e01b6f89977dd93d380cc22",
+      "contentDigest": "sha256:53b77b292360d38f2f33131e911d502612dcf590ff76c591fdbbf0718e37c4ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -96,19 +96,24 @@
     "ref": "2f42b4d50",
     "revision": "2f42b4d504ae7ef9f55a6eb1baa4bbd423245a9b",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b55-batch-repair-compat.patch",
+        "contentDigest": "sha256:79b99e95e6496f6f972d86fff175441d6f3fcff2d173941d09f6f3105dec82f2"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeSubscriberRecoveryTest.subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 537159
+        "durationMs": 30490
       },
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.repeatedUnchangedAdmissionReadsNoChildren\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.legacyMigrationPreservesCompletedSparseFeatures\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 32129
+        "durationMs": 15336
       }
     ],
     "checks": [
@@ -134,5 +139,5 @@
       }
     ]
   },
-  "digest": "sha256:8705bb1d28b7930ec0c0bd3f355c3b89fe6ed3a4db90fe121292c79eaaf68286"
+  "digest": "sha256:ed27751d9c2ff70b00bf8a57d3f97209728a15accfd615ebb6aa50f090ae8687"
 }

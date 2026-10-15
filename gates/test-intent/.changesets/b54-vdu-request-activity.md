@@ -7,6 +7,8 @@ author-session: b54-vdu-chat-activity
 
 Common admitted requests now publish activity to the VDU source. Independent acceptance is pending; the earlier b49 rejection is preserved for the verifier to reassess.
 
+Evidence regenerated on b599d4d7e (phase B). VduRequestActivityTest now registers its routes with ActivityRole, which 164a24b1a lacks, so the check did not compile there. The compat before-patch gates/test-intent/evidence/b54-vdu-request-activity-compat.patch adds only the ActivityRole enum and its three constants, with no methods, and no production code in that state reads it or any route role. With it the check fails before by assertion.
+
 ```json
 {
   "entries": [

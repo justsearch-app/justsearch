@@ -4,16 +4,16 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T13:19:37.376Z",
-  "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
-  "tree": "c38ace0f675a347287ac3318fa498bb84d814da0",
+  "createdAt": "2026-10-14T17:08:51.912Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "e0ef7c8a46a92ba0fbff1ef62bfb8ed8e217a788",
   "environment": {
     "platform": "win32",
     "arch": "x64",
     "osRelease": "10.0.26200",
     "node": "v24.12.0",
     "java": null,
-    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
     "ci": false
   },
   "runs": [
@@ -21,37 +21,37 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3772
+      "durationMs": 13955
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 758
+      "durationMs": 2346
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 821
+      "durationMs": 2048
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::quit_while_held_wins_and_refuses_upgrade\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 692
+      "durationMs": 1478
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1068
+      "durationMs": 992
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 664
+      "durationMs": 935
     }
   ],
   "checks": [
@@ -59,7 +59,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -156,6 +156,10 @@
       {
         "path": "gates/test-intent/b6d536-shell-r2-before.patch",
         "contentDigest": "sha256:21b7ace08286a5c354b15b70fd1764d036b95e6a505bd63d27bb93368ddd7c70"
+      },
+      {
+        "path": "gates/test-intent/evidence/b6d536-shell-actors-compat.patch",
+        "contentDigest": "sha256:e006d1ebcbb7146c1bdf3b762b5fbf9297c67317462d942c45e8a1d9d2b4d019"
       }
     ],
     "runs": [
@@ -163,71 +167,71 @@
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 12179
+        "durationMs": 24321
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 2468
+        "durationMs": 2633
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 2497
+        "durationMs": 2443
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::quit_while_held_wins_and_refuses_upgrade\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 2447
+        "durationMs": 2524
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 2496
+        "durationMs": 2605
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 540
+        "durationMs": 556
       }
     ],
     "checks": [
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
         "classification": "assertion",
-        "detail": "engine_host::tests::hold_returns_at_once_and_engine_stays_supervised:  ---- engine_host::tests::hold_returns_at_once_and_engine_stays_supervised stdout ----\n\nthread 'engine_host::tests::hold_returns_at_once_and_engine_stays_supervised' (31096) panicked at src\\engine_host.rs:1727:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\n\ntest result"
+        "detail": "engine_host::tests::hold_returns_at_once_and_engine_stays_supervised:  ---- engine_host::tests::hold_returns_at_once_and_engine_stays_supervised stdout ----\n\nthread 'engine_host::tests::hold_returns_at_once_and_engine_stays_supervised' (27616) panicked at src\\engine_host.rs:1735:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\n\ntest result"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
         "classification": "assertion",
-        "detail": "engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff:  ---- engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff stdout ----\n\nthread 'engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff' (19496) panicked at src\\engine_host.rs:1727:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::actor_upgrade_records_intent_and_e"
+        "detail": "engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff:  ---- engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff stdout ----\n\nthread 'engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff' (24392) panicked at src\\engine_host.rs:1735:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::actor_upgrade_records_intent_and_e"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
         "classification": "assertion",
-        "detail": "engine_host::tests::exit_while_held_is_unexpected_and_not_restarted:  ---- engine_host::tests::exit_while_held_is_unexpected_and_not_restarted stdout ----\n\nthread 'engine_host::tests::exit_while_held_is_unexpected_and_not_restarted' (31860) panicked at src\\engine_host.rs:1727:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\n\ntest result: FA"
+        "detail": "engine_host::tests::exit_while_held_is_unexpected_and_not_restarted:  ---- engine_host::tests::exit_while_held_is_unexpected_and_not_restarted stdout ----\n\nthread 'engine_host::tests::exit_while_held_is_unexpected_and_not_restarted' (36608) panicked at src\\engine_host.rs:1735:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\n\ntest result: FA"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
         "classification": "assertion",
-        "detail": "engine_host::tests::quit_while_held_wins_and_refuses_upgrade:  ---- engine_host::tests::quit_while_held_wins_and_refuses_upgrade stdout ----\n\nthread 'engine_host::tests::quit_while_held_wins_and_refuses_upgrade' (34152) panicked at src\\engine_host.rs:1727:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::quit_while_held_wins_and_refuses_upgrade\n\ntest result: FAILED. 0 passed; 1 failed; 0 "
+        "detail": "engine_host::tests::quit_while_held_wins_and_refuses_upgrade:  ---- engine_host::tests::quit_while_held_wins_and_refuses_upgrade stdout ----\n\nthread 'engine_host::tests::quit_while_held_wins_and_refuses_upgrade' (10804) panicked at src\\engine_host.rs:1735:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::quit_while_held_wins_and_refuses_upgrade\n\ntest result: FAILED. 0 passed; 1 failed; 0 "
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
         "classification": "assertion",
-        "detail": "engine_host::tests::release_after_failed_prepare_resumes_the_same_actor:  ---- engine_host::tests::release_after_failed_prepare_resumes_the_same_actor stdout ----\n\nthread 'engine_host::tests::release_after_failed_prepare_resumes_the_same_actor' (20636) panicked at src\\engine_host.rs:1727:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\n"
+        "detail": "engine_host::tests::release_after_failed_prepare_resumes_the_same_actor:  ---- engine_host::tests::release_after_failed_prepare_resumes_the_same_actor stdout ----\n\nthread 'engine_host::tests::release_after_failed_prepare_resumes_the_same_actor' (14380) panicked at src\\engine_host.rs:1735:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\n"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision",
         "classification": "assertion",
-        "detail": "engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision:  ---- engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision stdout ----\nhold result=Ok(()), elapsed=20.1322ms, continues=false, actor=false, live=true\n\nthread 'engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision' (27752) panicked at src\\engine_host.rs:1902:9:\nassertion `left == right` failed: hold must preserve supervision of the live Engine\n  left: false\n right: true\nnote: run with `RU"
+        "detail": "engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision:  ---- engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision stdout ----\nhold result=Ok(()), elapsed=20.2225ms, continues=false, actor=false, live=true\n\nthread 'engine_host::hold_api_tests::hold_api_preserves_live_engine_supervision' (26112) panicked at src\\engine_host.rs:2001:9:\nassertion `left == right` failed: hold must preserve supervision of the live Engine\n  left: false\n right: true\nnote: run with `RU"
       }
     ]
   },
-  "digest": "sha256:a6ad2235bfbbb9eb701e4264b18a309ebbae8216a5a6a9aff85c301d84fe048f"
+  "digest": "sha256:daa079cbfff59f1a29052f2258d6ebe549c1ef77df3d7d4678fff59bb1a15b90"
 }

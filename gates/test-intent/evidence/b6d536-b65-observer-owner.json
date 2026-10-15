@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-11T14:29:43.640Z",
-  "revision": "8eb24a8704f3a23a5f3efbeec28c3ecabc2e5437",
-  "tree": "48d242184cb1ad7487806cfce5a50b34b8891844",
+  "createdAt": "2026-10-14T15:44:49.301Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "90397ca517a0e7b1242f848ca65a5b0b6762cad9",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.SseAdmissionShutdownTest.streamsRelinquishAdmissionBeforeOrderedWorkDrain\" --tests \"io.justsearch.ui.api.SseTransportOwnerShutdownTest.normalShutdownEndsOpenStreamsBeforeGracefulDrain\" --tests \"io.justsearch.ui.api.LocalApiServerTransportShutdownTest.selectorTeardownThatNeverReturnsCannotConsumeWholeGrace\" --tests \"io.justsearch.ui.api.LocalApiServerTransportShutdownTest.wedgedRequestStillReachesOrderedHeadIndexCloseAndExit\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 273606
+      "durationMs": 39066
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.retiredRegistrationDoesNotBeginHealthPrefix\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.initialHealthReplayPrefixAlsoEndsAtItsOwnerBoundary\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.synchronousHealthDeliveryAlsoEndsAtItsOwnerBoundary\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.eachOwnerBoundaryReleasesBlockedObserver\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 156586
+      "durationMs": 4911
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/SseAdmissionShutdownTest.java#streamsRelinquishAdmissionBeforeOrderedWorkDrain",
       "file": "modules/ui/src/test/java/io/justsearch/ui/SseAdmissionShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:938c4fe911f420fce26c94b47e7f875e401ccddf0a92fe460182616b2fe0a716",
+      "contentDigest": "sha256:f1b8a9b748c43feddb00dfdda4961b0a23dec9a5dbdc224643890c516e625066",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -70,7 +70,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java#retiredRegistrationDoesNotBeginHealthPrefix",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2143f8c473d21966528f09abdd7e3c9566cc89ac395362032b969339bcc3640e",
+      "contentDigest": "sha256:d3c8b29fda5a9f81d2f0b77b7864e54f4aca0dc0e75b0405ace31d13854e8ea5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -85,7 +85,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java#initialHealthReplayPrefixAlsoEndsAtItsOwnerBoundary",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2143f8c473d21966528f09abdd7e3c9566cc89ac395362032b969339bcc3640e",
+      "contentDigest": "sha256:d3c8b29fda5a9f81d2f0b77b7864e54f4aca0dc0e75b0405ace31d13854e8ea5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,7 +108,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java#synchronousHealthDeliveryAlsoEndsAtItsOwnerBoundary",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2143f8c473d21966528f09abdd7e3c9566cc89ac395362032b969339bcc3640e",
+      "contentDigest": "sha256:d3c8b29fda5a9f81d2f0b77b7864e54f4aca0dc0e75b0405ace31d13854e8ea5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -131,7 +131,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java#eachOwnerBoundaryReleasesBlockedObserver",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeObserverLifetimeTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2143f8c473d21966528f09abdd7e3c9566cc89ac395362032b969339bcc3640e",
+      "contentDigest": "sha256:d3c8b29fda5a9f81d2f0b77b7864e54f4aca0dc0e75b0405ace31d13854e8ea5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -158,7 +158,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/SseTransportOwnerShutdownTest.java#normalShutdownEndsOpenStreamsBeforeGracefulDrain",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/SseTransportOwnerShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5ecef153ab365e6125682f31140af216d877af76a1b14427601fd001780c9957",
+      "contentDigest": "sha256:dec91b046066c80eebd2c94be98fb5123011bbdeefe44d3e388f023c1cc880c3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -232,19 +232,24 @@
     "ref": "8eb24a870",
     "revision": "8eb24a8704f3a23a5f3efbeec28c3ecabc2e5437",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b65-observer-owner-compat.patch",
+        "contentDigest": "sha256:0827609d76cc53d2fa08f556de61d487c6bc9d256d8959c885d61c0a5bdf5157"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.SseAdmissionShutdownTest.streamsRelinquishAdmissionBeforeOrderedWorkDrain\" --tests \"io.justsearch.ui.api.SseTransportOwnerShutdownTest.normalShutdownEndsOpenStreamsBeforeGracefulDrain\" --tests \"io.justsearch.ui.api.LocalApiServerTransportShutdownTest.selectorTeardownThatNeverReturnsCannotConsumeWholeGrace\" --tests \"io.justsearch.ui.api.LocalApiServerTransportShutdownTest.wedgedRequestStillReachesOrderedHeadIndexCloseAndExit\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 164361
+        "durationMs": 114246
       },
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.retiredRegistrationDoesNotBeginHealthPrefix\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.initialHealthReplayPrefixAlsoEndsAtItsOwnerBoundary\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.synchronousHealthDeliveryAlsoEndsAtItsOwnerBoundary\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest.eachOwnerBoundaryReleasesBlockedObserver\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 34941
+        "durationMs": 36922
       }
     ],
     "checks": [
@@ -290,5 +295,5 @@
       }
     ]
   },
-  "digest": "sha256:193575393a4d6d31cb46e5790c28968d576118305d79f5e87059d717c973c24a"
+  "digest": "sha256:009e5ba8ad318a55b806e8a354b25012e0133e5a0d508ad6b5c0ab1af60653e5"
 }

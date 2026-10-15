@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T00:41:07.892Z",
-  "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
-  "tree": "d340e480cbecc8523533b26194b612471d93af58",
+  "createdAt": "2026-10-15T09:23:35.421Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "df038348330205f81995633da852ab8a346bc812",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerRollbackSurvivorBlocksEveryChatServerStart\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aSelfTestThatSurvivedItsStopBlocksTheMainServer\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerStartWaitsForAStopStillRunning\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3282
+      "durationMs": 3283
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.aRegistrationRollbackSurvivorBlocksTheNextStart\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.failedRegistrationRollbackRetainsHandleForRootCleanup\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4457
+      "durationMs": 4333
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerRollbackSurvivorBlocksEveryChatServerStart",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aSelfTestThatSurvivedItsStopBlocksTheMainServer",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerStartWaitsForAStopStillRunning",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#aRegistrationRollbackSurvivorBlocksTheNextStart",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0bbae8d2bbc17d8f8b5e7dd92161ba332b3de855b82269ee0d4f6e1ced8cf924",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#failedRegistrationRollbackRetainsHandleForRootCleanup",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0bbae8d2bbc17d8f8b5e7dd92161ba332b3de855b82269ee0d4f6e1ced8cf924",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0bbae8d2bbc17d8f8b5e7dd92161ba332b3de855b82269ee0d4f6e1ced8cf924",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7dde9b477b52d59ab6287f32a180584409c986fefc55d97112ad1870c4f9aad2",
+      "contentDigest": "sha256:842e585d22b5320d037107bf3e792508cdb68e035b6425c09be9a0c0303357b3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -171,18 +171,24 @@
     "overlays": [
       "modules/app-inference/src/test/java/io/justsearch/app/inference/SurvivingTerminator.java"
     ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-llama-child-rollback-survivor-compat.patch",
+        "contentDigest": "sha256:a1b18be1779a321c25e92328532abf7edafa7f58b6d05ce14352f509a9edb711"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerRollbackSurvivorBlocksEveryChatServerStart\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aSelfTestThatSurvivedItsStopBlocksTheMainServer\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerStartWaitsForAStopStillRunning\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 33569
+        "durationMs": 18060
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.aRegistrationRollbackSurvivorBlocksTheNextStart\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.failedRegistrationRollbackRetainsHandleForRootCleanup\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 25342
+        "durationMs": 12997
       }
     ],
     "checks": [
@@ -223,5 +229,5 @@
       }
     ]
   },
-  "digest": "sha256:f40b2f984b94155a010dae527b3525809cb6c5ce512135c86f42a7373acd2007"
+  "digest": "sha256:5a2d83fefbed4079eba43db693b4fb2470d28c230368c1294bdecc80748f9417"
 }

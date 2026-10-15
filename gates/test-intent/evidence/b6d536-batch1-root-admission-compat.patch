@@ -1,0 +1,32 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ChunkSetCompleteness.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ChunkSetCompleteness.java
+index 9e6ef7a38..f6edf3579 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ChunkSetCompleteness.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ChunkSetCompleteness.java
+@@ -15,6 +15,9 @@ import org.apache.lucene.search.TermQuery;
+ final class ChunkSetCompleteness {
+   private ChunkSetCompleteness() {}
+ 
++  /** Compat scaffolding for fail-before evidence: no before-state code reads it. */
++  record Declaration(int total, String revision) {}
++
+   static boolean isComplete(IndexSearcher searcher, int parent, String parentId) throws IOException {
+     var stored = searcher.storedFields();
+     var fields = SearchResultFormatter.extractFromStoredFields(stored, parent, true,
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+index ff5eb8bef..a0d59ddf9 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+@@ -37,6 +37,13 @@ import org.slf4j.LoggerFactory;
+  * can reject callers without serializing on the writer path.
+  */
+ public final class IndexingCoordinator {
++
++  /** Compat scaffolding for fail-before evidence: no before-state code calls it. */
++  boolean backfillChunkDeclaration(
++      org.apache.lucene.search.IndexSearcher searcher, int parent, String docId,
++      ChunkSetCompleteness.Declaration declaration) {
++    throw new UnsupportedOperationException("compat stub");
++  }
+   private static final Logger log = LoggerFactory.getLogger(IndexingCoordinator.class);
+ 
+   private final RuntimeSession session;

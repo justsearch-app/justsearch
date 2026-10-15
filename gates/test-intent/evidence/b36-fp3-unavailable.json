@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T20:45:30.798Z",
-  "revision": "c8c7e1c5815bbad236664d006bb82ddaf7ec57d9",
-  "tree": "c68b1979071a3a7c07c9b10ed1a5d9f4af15fb20",
+  "createdAt": "2026-10-14T15:42:33.926Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1e6d7a4cfe46af654f7a8b598860f051d851b1e3",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedHybridWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedAutoWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedRagWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyHybridWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyAutoWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedReadyProviderKeepsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedUnavailableVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.permanentlyAbsentProviderKeepsExistingOutcomes\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.unexpiredUnavailableProviderKeepsExistingRouting\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderHybridKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderAutoKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderSpladeKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderRagKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedPermanentlyMissingModelKeepsCompatibilityOutcome\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 130929
+      "durationMs": 121439
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedHybridWithUnavailableProviderKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedAutoWithUnavailableProviderKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedRagWithUnavailableProviderKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyHybridWithUnavailableProviderKeepsLoadingCause",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyAutoWithUnavailableProviderKeepsLoadingCause",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedReadyProviderKeepsContention",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedUnavailableVectorKeepsTypedDeadline",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#permanentlyAbsentProviderKeepsExistingOutcomes",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#unexpiredUnavailableProviderKeepsExistingRouting",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderHybridKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -194,7 +194,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderAutoKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -209,7 +209,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderSpladeKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -224,7 +224,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderRagKeepsBudgetOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -239,7 +239,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderVectorKeepsTypedDeadline",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -254,7 +254,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedPermanentlyMissingModelKeepsCompatibilityOutcome",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f74f1faab6a78d1d250ff7186e272320e80db6035924e551ac79e52e1ab0e328",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -270,12 +270,18 @@
     "ref": "c8c7e1c58",
     "revision": "c8c7e1c5815bbad236664d006bb82ddaf7ec57d9",
     "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b36-fp3-unavailable-compat.patch",
+        "contentDigest": "sha256:4ba52fd15e6bff5a43ffd2a737cd96ed0f9946932bc781d8611541e0a8415a49"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedHybridWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedAutoWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedRagWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyHybridWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyAutoWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedReadyProviderKeepsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedUnavailableVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.permanentlyAbsentProviderKeepsExistingOutcomes\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.unexpiredUnavailableProviderKeepsExistingRouting\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderHybridKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderAutoKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderSpladeKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderRagKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedPermanentlyMissingModelKeepsCompatibilityOutcome\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 142107
+        "durationMs": 122878
       }
     ],
     "checks": [
@@ -361,5 +367,5 @@
       }
     ]
   },
-  "digest": "sha256:871b9a097784a9f3825f82ec700039269cb93f5be45d2f07526f4a9d1edffe00"
+  "digest": "sha256:6fb7906045dd8793b5d792fd44d6d7cb367472a0bebc5d1af9a8f264eb057472"
 }

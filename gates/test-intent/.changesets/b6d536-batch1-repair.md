@@ -9,6 +9,11 @@ author-session: b38-batch1-repair-20261009-builder
 
 This repair implements the supplied builder brief. Fresh detached evidence uses actual parents, no saved-state revert. Existing unsafe cleanup is excluded, not a pass. The f648 replay signature patch delegates only shutdown cleanup to that parent's existing API; it changes no indexing or replay decision. Step11's API is absent on its real parent 64e04b891; synthetic null-stub failures are not real-parent assertion proof. Independent acceptance and live verification are pending; this builder supplies no acceptance record.
 
+Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before again at 1e333857b. Later commits made the checks call production interfaces 1e333857b lacks, so each fail-before applies a compat before-patch. No production code at 1e333857b reads what these patches add, and each check again fails by assertion there.
+- Entry 1 (`b6d536-batch1-replay-1e333857b.json`): ChunkCompletenessAdmissionTest gained five cases from 24a3fc682 and fe62ed231 (7 cases now). `gates/test-intent/evidence/b6d536-batch1-replay-compat.patch` adds the type ChunkSetCompleteness with its Declaration record, and IndexingCoordinator.backfillChunkDeclaration returning false at once.
+- Entry 2 (`b6d536-batch1-health-repair.json`): ee3c86b19 builds HealthEventChangeRegistry with its delivery executor. `gates/test-intent/evidence/b50-status-timeout-compat.patch` adds only HealthEventChangeRegistry(ExecutorService), which ignores its argument and calls the existing no-argument constructor.
+- Entry 3 (`b6d536-batch1-cpu-repair.json`): cbe6650b5 calls buildReadinessEnvelope with a fourth (cached) argument. `gates/test-intent/evidence/b6d536-batch1-cpu-repair-compat.patch` adds only that four-argument overload, which ignores the flag and calls the existing three-argument method.
+
 ```json
 {
   "entries": [

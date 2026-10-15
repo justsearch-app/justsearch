@@ -7,7 +7,16 @@ author-session: codex-b31-witness-classify-20261008
 
 # Witness classification and retention intent
 
-Sources are the explicit builder brief. The detached fail-before checks use cd406ca13; the original candidate is never reverted. Node script checks and verifier harness results are linked from the external report, because the evidence producer supports Java, frontend and Rust checks.
+Sources are the explicit builder brief. The detached fail-before checks use cd406ca13; the original candidate is never reverted.
+
+Evidence regenerated on 688a340f9 (b6d536/integration 181363e86 merged). b101 (47981cfa6) added a
+probe to TikaProbeOwnerIntentTest that names `OwnedHelper.recordTo(LedgerSink, EngineIdentity)`
+directly, and cd406ca13 has no OwnedHelper. The fail-before therefore applies
+`gates/test-intent/evidence/b6d536-witness-classify-compat.patch`. The patch adds a
+compile-time-only stub of that one method in a worker-services `beforeCompatStubs` source set, wired
+as testCompileOnly. The stub is never on a runtime classpath, so the checks that look up OwnedHelper
+reflectively still find no class there, and no production code can call it. All ten checks fail on
+cd406ca13 by assertion. Node script checks and verifier harness results are linked from the external report, because the evidence producer supports Java, frontend and Rust checks.
 
 ```json
 {
@@ -87,7 +96,7 @@ Sources are the explicit builder brief. The detached fail-before checks use cd40
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Real Tika availability probes that normally return code 1 execute inside a closed image-specific owner-declared intent window.",
+      "behaviour": "Real Tika availability probes that normally return code 1 execute inside a closed image-specific owner-declared intent window. Fail-before: cd406ca13 with b6d536-witness-classify-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",

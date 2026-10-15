@@ -84,6 +84,19 @@ The MCP refusal mapping fails before in the ui-repaired evidence, because it com
 entry says so. They are ChatResidencyUnloadStepTest, InferenceResidencyStatusTest,
 ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
 
+Evidence regenerated on b599d4d7e. The fail-before of
+b6d536-chat-controller-step9-loop-repaired.json runs on 43564e20f, the parent of dee93cc5a, which
+added the check. It applies
+`gates/test-intent/evidence/b6d536-chat-controller-step9-loop-repaired-compat.patch`, because the
+check now uses the later stop and self-test launcher API. The patch adds a public
+`ChatServerControllerImpl(executors, actuator, selfTestLauncher)` constructor that delegates to the
+existing one with the default drain bound. It gives `ChatActuator` a default
+`terminalStop(StopReason, Duration)` that calls `terminalStop(Duration)`. It also turns the abstract
+`terminalStop(Duration)` into a default that calls the reasoned form with QUIT, so that an actuator
+implementing only the later method compiles. Every production actuator at 43564e20f implements
+`terminalStop(Duration)` itself, so none of them changes. The check fails there by assertion: the
+caller gets TimeoutException instead of "UnsupportedOperationException: drain broke".
+
 ```json
 {
   "entries": [
@@ -158,7 +171,7 @@ ChatRefusalWireTest, the dev-trigger route checks and chatResidency.test.ts.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The chat controller's single thread survives a step that fails unexpectedly. aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing: a draining step whose policy drain throws UnsupportedOperationException fails alone (its caller gets 'UnsupportedOperationException: drain broke' within 5 s); the next activation still runs and starts the server, and a later draining step answers 'applied'. On 43564e20f (the check compiles there) the loop ended on the throw, so the caller was never answered ('the step that raised the failure gets it ==> expected: <UnsupportedOperationException: drain broke> but was: <TimeoutException: null>').",
+      "behaviour": "The chat controller's single thread survives a step that fails unexpectedly. aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing: a draining step whose policy drain throws UnsupportedOperationException fails alone (its caller gets 'UnsupportedOperationException: drain broke' within 5 s); the next activation still runs and starts the server, and a later draining step answers 'applied'. On 43564e20f (the check compiles there) the loop ended on the throw, so the caller was never answered ('the step that raised the failure gets it ==> expected: <UnsupportedOperationException: drain broke> but was: <TimeoutException: null>'). Fail-before: 43564e20f with b6d536-chat-controller-step9-loop-repaired-compat.patch, by assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

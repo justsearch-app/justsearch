@@ -20,6 +20,14 @@ All checks ran in one evidence run: `gates/test-intent/evidence/b6d536-child-con
 fail-before is claimed through run-evidence: on a0d6c4c50 every new check fails to compile because
 the classes and the manifest field it exercises do not exist there.
 
+Records phase B (batch 3) re-ran `b6d536-child-control.json` after merging b6d536/integration at
+181363e86 (the accepted b101 probe-churn lane), because DefaultChildControlTest and
+RuntimeManifestIncarnationPublishTest changed after the first run. All six checks pass on the
+change. As before, no before-state is claimed. None of these checks reads the stop-census scripts
+under scripts/dev that the unmerged b102 lane changes.
+
+Records phase B (batch 3), gate tidy. Entry 3 listed governance/fixtures/exit-ledger/engine-written/children.v1.jsonl as an item. The gate deliberately does not flag governance registers that tests read by path (scope.mjs, tempdoc 966 D1), so it was reported as a stale entry item. The item was removed. The fixture still exists unchanged, and its coverage stays in this entry: EngineWrittenChildrenFixtureTest compares the Engine-written ledger with it, and scripts/dev/test-dev-runner-exit-census.mjs reads it.
+
 ```json
 {
   "entries": [
@@ -96,8 +104,7 @@ the classes and the manifest field it exercises do not exist there.
     },
     {
       "items": [
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/EngineWrittenChildrenFixtureTest.java",
-        "governance/fixtures/exit-ledger/engine-written/children.v1.jsonl"
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/EngineWrittenChildrenFixtureTest.java"
       ],
       "class": "New",
       "behaviour": "The ledger the Engine's own ChildControl (openForEngine) writes for three extraction children: a timeout stop (REQUESTED TIMEOUT, forced), a cooperative quit after stdin EOF (REQUESTED QUIT, code 0), and a crash with exit 1 followed by an oom note (UNEXPECTED). It conforms to the ledger schema and equals the committed fixture once volatile fields, ids and the platform's terminate code are normalized. scripts/dev/test-dev-runner-exit-census.mjs reads the same fixture and the census reports exit accounting complete for every extraction child in it.",

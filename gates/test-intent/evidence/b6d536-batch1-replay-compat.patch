@@ -1,0 +1,31 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+@@ -127,6 +127,13 @@ public final class IndexingCoordinator {
+     return joinOrUnwrap(op.completion());
+   }
+ 
++  /** Compat declaration for fail-before runs only; nothing in this state calls it. */
++  boolean backfillChunkDeclaration(
++      org.apache.lucene.search.IndexSearcher searcher, int parent, String docId,
++      ChunkSetCompleteness.Declaration declaration) {
++    return false;
++  }
++
+   public BatchUpdateResult updateDocumentsBatch(
+       List<Map.Entry<String, Map<String, Object>>> batchUpdates) {
+     if (batchUpdates == null || batchUpdates.isEmpty()) {
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ChunkSetCompleteness.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ChunkSetCompleteness.java
+new file mode 100644
+--- /dev/null
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ChunkSetCompleteness.java
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.adapters.lucene.runtime;
++
++/** Compat declaration for fail-before runs only; nothing in this state reads it. */
++final class ChunkSetCompleteness {
++  private ChunkSetCompleteness() {}
++
++  record Declaration(int total, String revision) {}
++}
