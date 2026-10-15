@@ -103,7 +103,7 @@ const RECORD_TYPES = Object.freeze({
 const WRITER_ROLES = Object.freeze(['engine', 'shell', 'dev-runner', 'dev-cli']);
 
 /** In LedgerGapReason declaration order, which is also the order pending gaps are written in. */
-const GAP_REASONS = Object.freeze(['WRITE_FAILED', 'ROTATE_FAILED', 'CORRUPT_LINES', 'EVIDENCE_LOST', 'UNKNOWN_SCHEMA']);
+const GAP_REASONS = Object.freeze(['WRITE_FAILED', 'ROTATE_FAILED', 'CORRUPT_LINES', 'EVIDENCE_LOST', 'UNKNOWN_SCHEMA', 'FORCE_FAILED']);
 
 const ENVELOPE = new Set(['schemaVersion', 'type', 'seq', 'at', 'writer']);
 

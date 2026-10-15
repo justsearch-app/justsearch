@@ -9,7 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,16 +23,26 @@ import org.slf4j.LoggerFactory;
  * only the coarse on/off state, not configuration quality.
  *
  * <p>Other platforms / any failure → {@link AtRestProtection.State#UNKNOWN}. The probe never throws;
- * it mirrors the GPU subprocess-probe discipline (best-effort, short timeout, force-kill on hang,
- * cf. {@code VramDetector}) and caches its result for {@link #CACHE_TTL} so both the status View and
- * the {@code AtRestHealthTap} share one subprocess per window.
+ * it mirrors the GPU subprocess-probe discipline (best-effort, short timeout, force-kill on hang).
+ *
+ * <p>Task b6d536 b101: the state of a volume changes rarely, so each volume is probed at most once
+ * per {@link #CACHE_TTL} (ten minutes) for the whole process, whichever probe instance asks; other
+ * reads are served from that reading, whose age and read time {@link #reading()} reports (the
+ * read time is on {@code /api/status} as {@code atRestProtection.probedAtMs}). A volume not read
+ * before is probed on its first read. A failed probe keeps the last known value, marked stale (source {@code stale:<source>}, LOW
+ * confidence), and a stale value is never reported as protected: a stale ENCRYPTED or ENCRYPTING
+ * reads as UNKNOWN.
  */
 public final class DiskEncryptionProbe {
 
   private static final Logger log = LoggerFactory.getLogger(DiskEncryptionProbe.class);
-  static final Duration CACHE_TTL = Duration.ofSeconds(5);
+  static final Duration CACHE_TTL = Duration.ofMinutes(10);
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(4);
   private static final String SOURCE = "shell-property";
+  static final String STALE_PREFIX = "stale:";
+
+  /** Every production probe shares these per-volume readings. */
+  private static final Volumes SHARED = new Volumes();
 
   /**
    * Sentinel the PowerShell script emits when {@code ExtendedProperty} returns {@code $null} (798
@@ -49,14 +58,45 @@ public final class DiskEncryptionProbe {
   private final Path volumePath;
   private final java.util.function.LongSupplier nowMs;
   private final java.util.function.Function<Path, AtRestProtection> readMechanism;
+  private final Volumes volumes;
 
-  private final AtomicReference<Cached> cache = new AtomicReference<>();
+  /**
+   * One volume's reading: the value the last successful probe gave, when it was taken, and whether
+   * the latest probe failed so the value is only the last known one. {@code age} is as of this read.
+   */
+  public record Reading(AtRestProtection value, long probedAtMs, Duration age, boolean stale) {
+    /** What this reading tells consumers ({@link DiskEncryptionProbe#verdict}); same reading, same time. */
+    public AtRestProtection verdict() {
+      return DiskEncryptionProbe.verdict(this);
+    }
+  }
 
-  private record Cached(AtRestProtection value, long atMs) {}
+  /** The per-volume readings, keyed by volume root. */
+  private static final class Volumes {
+    private final java.util.concurrent.ConcurrentHashMap<String, Volume> byRoot =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    Volume of(Path volumePath) {
+      Path root = volumePath == null ? null : volumePath.toAbsolutePath().getRoot();
+      String key = root == null ? "" : root.toString().toLowerCase(java.util.Locale.ROOT);
+      return byRoot.computeIfAbsent(key, k -> new Volume());
+    }
+  }
+
+  /** One volume; its lock keeps at most one probe of the volume in flight. */
+  private static final class Volume {
+    private final java.util.concurrent.locks.ReentrantLock lock =
+        new java.util.concurrent.locks.ReentrantLock();
+    private AtRestProtection lastKnown;
+    private long probedAtMs;
+    private long attemptedAtMs;
+    private boolean stale;
+    private boolean probed;
+  }
 
   /** Production: probe the volume hosting {@code volumePath} (e.g. the index base path). */
   public DiskEncryptionProbe(Path volumePath) {
-    this(volumePath, System::currentTimeMillis, DiskEncryptionProbe::readWindowsShellProperty);
+    this(volumePath, System::currentTimeMillis, DiskEncryptionProbe::readWindowsShellProperty, SHARED);
   }
 
   /** Test seam: inject the clock + read mechanism so the probe is unit-testable without a host. */
@@ -64,30 +104,76 @@ public final class DiskEncryptionProbe {
       Path volumePath,
       java.util.function.LongSupplier nowMs,
       java.util.function.Function<Path, AtRestProtection> readMechanism) {
+    this(volumePath, nowMs, readMechanism, new Volumes());
+  }
+
+  private DiskEncryptionProbe(
+      Path volumePath,
+      java.util.function.LongSupplier nowMs,
+      java.util.function.Function<Path, AtRestProtection> readMechanism,
+      Volumes volumes) {
     this.volumePath = volumePath;
     this.nowMs = nowMs;
     this.readMechanism = readMechanism;
+    this.volumes = volumes;
   }
 
-  /** The current at-rest protection, cached for {@link #CACHE_TTL}. Never throws. */
+  /** The current at-rest protection, probed at most once per volume per {@link #CACHE_TTL}. Never throws. */
   public AtRestProtection current() {
-    long now = nowMs.getAsLong();
-    Cached c = cache.get();
-    if (c != null && (now - c.atMs()) < CACHE_TTL.toMillis()) {
-      return c.value();
+    return verdict(reading());
+  }
+
+  /** The current reading with its age, probing only when the volume's reading is older than the TTL. */
+  public Reading reading() {
+    Volume volume = volumes.of(volumePath);
+    volume.lock.lock();
+    try {
+      long now = nowMs.getAsLong();
+      if (!volume.probed || now - volume.attemptedAtMs >= CACHE_TTL.toMillis()) {
+        probe(volume, now);
+      }
+      return new Reading(volume.lastKnown, volume.probedAtMs,
+          Duration.ofMillis(Math.max(0, now - volume.probedAtMs)), volume.stale);
+    } finally {
+      volume.lock.unlock();
     }
-    AtRestProtection fresh;
+  }
+
+  private void probe(Volume volume, long now) {
+    AtRestProtection fresh = null;
     try {
       fresh = readMechanism.apply(volumePath);
-      if (fresh == null) {
-        fresh = AtRestProtection.unknown();
-      }
     } catch (Throwable t) {
       log.debug("disk-encryption probe failed: {}", t.toString());
-      fresh = AtRestProtection.unknown();
     }
-    cache.set(new Cached(fresh, now));
-    return fresh;
+    volume.probed = true;
+    volume.attemptedAtMs = now;
+    if (fresh != null) {
+      volume.lastKnown = fresh;
+      volume.probedAtMs = now;
+      volume.stale = false;
+    } else if (volume.lastKnown == null || volume.lastKnown.state() == AtRestProtection.State.UNKNOWN) {
+      // Nothing known to keep: unknown as of now; the failed probe is retried after the TTL.
+      volume.lastKnown = AtRestProtection.unknown();
+      volume.probedAtMs = now;
+      volume.stale = false;
+    } else {
+      // Keep the last known value and its age; it stays stale until a probe succeeds again. The
+      // next probe still waits for the TTL, counted from this attempt.
+      volume.stale = true;
+    }
+  }
+
+  /** What a reading tells consumers: a stale value is marked, and never reported as protected. */
+  static AtRestProtection verdict(Reading reading) {
+    AtRestProtection value = reading.value() == null ? AtRestProtection.unknown() : reading.value();
+    if (!reading.stale()) {
+      return value;
+    }
+    boolean protective = value.state() == AtRestProtection.State.ENCRYPTED
+        || value.state() == AtRestProtection.State.ENCRYPTING;
+    return new AtRestProtection(protective ? AtRestProtection.State.UNKNOWN : value.state(),
+        STALE_PREFIX + value.source(), AtRestProtection.Confidence.LOW);
   }
 
   /**
@@ -96,8 +182,8 @@ public final class DiskEncryptionProbe {
    * 4=NotApplicable, 5=DecryptionInProgress, 6=EncryptionInProgress.
    *
    * <p>No explicit OS gate (app-services may not read {@code System.getProperty}): on a non-Windows
-   * host {@code powershell.exe} is simply not found, the subprocess fails, and the probe degrades to
-   * {@link AtRestProtection#unknown()} — the same result a Windows probe failure yields.
+   * host {@code powershell.exe} is simply not found, the subprocess fails, and this returns null (no
+   * answer), which reads as {@link AtRestProtection#unknown()} unless a last known value is kept.
    */
   static AtRestProtection readWindowsShellProperty(Path volumePath) {
     if (volumePath == null) {
@@ -108,7 +194,9 @@ public final class DiskEncryptionProbe {
       return AtRestProtection.unknown();
     }
     String drive = root.toString().replace("'", "''"); // e.g. C:\
-    return parseShellPropertyOutput(runPowerShell(buildProbeScript(drive)));
+    String out = runPowerShell(buildProbeScript(drive));
+    // A probe that did not run to a clean exit has no answer: null keeps the last known value.
+    return out == null ? null : parseShellPropertyOutput(out);
   }
 
   /**
@@ -173,7 +261,7 @@ public final class DiskEncryptionProbe {
     };
   }
 
-  /** Best-effort PowerShell runner: short timeout, force-kill on hang, empty string on any failure. */
+  /** Best-effort PowerShell runner: short timeout, force-kill on hang, null when the probe failed. */
   private static String runPowerShell(String script) {
     Process p = null;
     try {
@@ -185,7 +273,7 @@ public final class DiskEncryptionProbe {
       boolean exited = p.waitFor(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
       if (!exited) {
         OwnedHelper.terminate(p, "timeout");
-        return "";
+        return null;
       }
       String firstLine;
       try (BufferedReader r =
@@ -193,14 +281,14 @@ public final class DiskEncryptionProbe {
         firstLine = r.readLine();
       }
       if (p.exitValue() != 0 || firstLine == null) {
-        return "";
+        return null;
       }
       return firstLine;
     } catch (Exception e) {
       if (p != null) {
         p.destroyForcibly();
       }
-      return "";
+      return null;
     }
   }
 }

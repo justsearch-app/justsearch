@@ -208,7 +208,9 @@ public final class TikaOcrRuntime {
 
   private static void checkExecutable(Path executable) throws java.io.IOException {
     Process process = null;
-    try (var intent = OwnedHelper.window(executable.getFileName().toString(), "Tesseract recorded availability",
+    // A real launch, once per recorded resolution: its window is written only when it spawns, its
+    // start forced before the helper's receipts, its end with them as one group.
+    try (var intent = OwnedHelper.launchWindow(executable.getFileName().toString(), "Tesseract recorded availability",
         Duration.ofSeconds(5))) {
       process = OwnedHelper.start(new ProcessBuilder(executable.toString(), "--version")
           .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD),

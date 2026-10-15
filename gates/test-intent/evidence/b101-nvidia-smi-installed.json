@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T20:53:07.704Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "ef9e75cc484fc9a9e5bdc42d8916cfc143f272dc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest.anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6177
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/NvidiaSmiAvailabilityHttpTest.java#anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/NvidiaSmiAvailabilityHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88a31ec17fed016e73ae04698d9235b41084686c5b59e445bd0970a948a336f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f9d16d40184e139ef87aac51b304524c5fbaf4d0b83443cc76f3c748ce113a45"
+}

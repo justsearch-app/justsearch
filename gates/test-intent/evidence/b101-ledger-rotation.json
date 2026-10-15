@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T23:53:32.726Z",
+  "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+  "tree": "0f3606e2b42e5f63fc0b6ec9fb3a162b6b42f6cd",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.LedgerWindowsRotationTest.rotationDoesNotSkipAWindowWhenNewCurrentIsAtLeastThePreviousOffset\" --tests \"io.justsearch.app.api.runtime.containment.ChildWindowBoundaryTest.rotationWithAlreadyGrownReplacementStillFindsChildWindow\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6887
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerWindowsRotationTest.java#rotationDoesNotSkipAWindowWhenNewCurrentIsAtLeastThePreviousOffset",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerWindowsRotationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3a671f7a1fd3279daf22177228c9209672ec093dc0a0747d68965001ed89f39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rotationDoesNotSkipAWindowWhenNewCurrentIsAtLeastThePreviousOffset()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java#rotationWithAlreadyGrownReplacementStillFindsChildWindow",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6f8c04f1299c03c3d689102fae245ea4edd6baeb8b474211242146846253e7ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rotationWithAlreadyGrownReplacementStillFindsChildWindow()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0d9b84e2a",
+    "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.LedgerWindowsRotationTest.rotationDoesNotSkipAWindowWhenNewCurrentIsAtLeastThePreviousOffset\" --tests \"io.justsearch.app.api.runtime.containment.ChildWindowBoundaryTest.rotationWithAlreadyGrownReplacementStillFindsChildWindow\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 26177
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerWindowsRotationTest.java#rotationDoesNotSkipAWindowWhenNewCurrentIsAtLeastThePreviousOffset",
+        "classification": "assertion",
+        "detail": "rotationDoesNotSkipAWindowWhenNewCurrentIsAtLeastThePreviousOffset(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a rotation changed the file identity; its new window must be read even when new size >= old offset ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java#rotationWithAlreadyGrownReplacementStillFindsChildWindow",
+        "classification": "assertion",
+        "detail": "rotationWithAlreadyGrownReplacementStillFindsChildWindow(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: ledger.rotatedBeforeChild=true&#13;&#10;child identity=26908/134364956050138951&#13;&#10;child.window.unendedAtLaunch=true&#13;&#10;tesseract-pid=23244&#13;&#10;tesseract identity=23244/134364956054993401&#13;&#10;native.creator=child&#13;&#10;tesseract-witness=U"
+      }
+    ]
+  },
+  "digest": "sha256:d630e127aadcb82341149f90a795f360afb6b5a76e5657bd4772e872781b179b"
+}

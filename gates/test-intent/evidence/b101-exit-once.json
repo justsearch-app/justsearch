@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:01:16.694Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "78bd74efc2cfe049672cef3faf5ce11afabfd7b2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperExitOnceTest.anExitSeenBeforeTheOwnersWaitIsRecordedOnceAsRequested\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperExitOnceTest.anExitNobodyAwaitedOrStoppedIsRecordedOnceWithAReason\" --tests \"io.justsearch.app.api.runtime.containment.JobWitnessIntentTest.jobProcessExitsCarryTheOwnersIntent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18708
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperExitOnceTest.java#anExitSeenBeforeTheOwnersWaitIsRecordedOnceAsRequested",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperExitOnceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:de7e39fa5a5bd792a508c3ec46ac2134f25af9f584b504045b88b47b3c17eb73",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExitSeenBeforeTheOwnersWaitIsRecordedOnceAsRequested()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperExitOnceTest.java#anExitNobodyAwaitedOrStoppedIsRecordedOnceWithAReason",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperExitOnceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:de7e39fa5a5bd792a508c3ec46ac2134f25af9f584b504045b88b47b3c17eb73",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExitNobodyAwaitedOrStoppedIsRecordedOnceWithAReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/JobWitnessIntentTest.java#jobProcessExitsCarryTheOwnersIntent",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/JobWitnessIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:091f11d88612b350a1b95d1a8a316bc266bc3187f34e033a865534a30bde54d1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jobProcessExitsCarryTheOwnersIntent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperExitOnceTest.anExitSeenBeforeTheOwnersWaitIsRecordedOnceAsRequested\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperExitOnceTest.anExitNobodyAwaitedOrStoppedIsRecordedOnceWithAReason\" --tests \"io.justsearch.app.api.runtime.containment.JobWitnessIntentTest.jobProcessExitsCarryTheOwnersIntent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 30884
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperExitOnceTest.java#anExitSeenBeforeTheOwnersWaitIsRecordedOnceAsRequested",
+        "classification": "assertion",
+        "detail": "anExitSeenBeforeTheOwnersWaitIsRecordedOnceAsRequested(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: one helper-exit record per helper exit: [{helperId=h-a8c0b275-eb71-4d76-af56-f6cdcd486174, pid=26604, creationFileTime=134364708578061162, creatorPid=27156, creatorCreationFileTime=134364708520044637, code=0, exitClass=UNEXPECTED, reason=null, exitedAt=Optional[2"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperExitOnceTest.java#anExitNobodyAwaitedOrStoppedIsRecordedOnceWithAReason",
+        "classification": "assertion",
+        "detail": "anExitNobodyAwaitedOrStoppedIsRecordedOnceWithAReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unexpected exit says why it is unexpected ==> expected: not <null>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/JobWitnessIntentTest.java#jobProcessExitsCarryTheOwnersIntent",
+        "classification": "assertion",
+        "detail": "jobProcessExitsCarryTheOwnersIntent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an exit after a stop intent is REQUESTED with that intent's reason: stopped=UNEXPECTED|null&#13;&#10;awaited=UNEXPECTED|null&#13;&#10;unowned=UNEXPECTED|null&#13;&#10;hosts.owned=2&#13;&#10;hosts.unexpected=2&#13;&#10;record={helperId=h-16569fd0-5332-4b23-8fe1-be"
+      }
+    ]
+  },
+  "digest": "sha256:118fceddccf55eaf1f81d6d30877506947907a5067a6b692573bd7c34d1aad7a"
+}

@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T21:12:10.696Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "1fbf01e735f07cf2804eda00b3515ac95507bf0c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.ChildWindowLedgerWitnessTest.aWindowOpenedInAChildJvmReachesTheEngineWitness\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3806
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowLedgerWitnessTest.java#aWindowOpenedInAChildJvmReachesTheEngineWitness",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowLedgerWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a16cb83b08e3db05810aba3d30bc810affc34e4f6a76be961f134316c09f4db5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWindowOpenedInAChildJvmReachesTheEngineWitness()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "47981cfa6",
+    "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.ChildWindowLedgerWitnessTest.aWindowOpenedInAChildJvmReachesTheEngineWitness\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8257
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowLedgerWitnessTest.java#aWindowOpenedInAChildJvmReachesTheEngineWitness",
+        "classification": "assertion",
+        "detail": "aWindowOpenedInAChildJvmReachesTheEngineWitness(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the witness attributes the child's launch to the child's window: launched.pid=14308&#13;&#10;ledger.window.start.owner=child&#13;&#10;native.creator=child&#13;&#10;witness=UNEXPECTED|no recorded intent|none&#13;&#10;ledger={\"schemaVersion\":1,\"type\":\"job-process-s"
+      }
+    ]
+  },
+  "digest": "sha256:f8147ada1f075d8048e40222740ef6f46c2eea49db5d6ba889d50692cfec1823"
+}

@@ -249,7 +249,7 @@ final class StatusFieldClassification {
             "usedVramBytes", "freeVramBytes", "recentUtilizationPercent",
             "recentMemoryUtilizationPercent"));
     put(table, AtRestProtectionView.class,
-        state("diskEncryption", "source", "confidence", "qualityKnown"));
+        state("diskEncryption", "source", "confidence", "qualityKnown"), time("probedAtMs"));
     put(table, ConversationProtectionView.class, state("state"));
     put(table, ModelDistributionStatusView.class,
         state("installProfile", "modelVariants", "upgradeGuidance"));

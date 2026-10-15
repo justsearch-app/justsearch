@@ -662,11 +662,14 @@ message GpuStatusView {
 // (needs admin). NOT_APPLICABLE (the volume cannot be OS-encrypted at all) is deliberately distinct
 // from UNKNOWN (indeterminate) — only the latter is a case elevation could resolve. This is a `string`
 // rather than a proto enum precisely so the state set can grow without a wire-shape change.
+// probed_at_ms (task b6d536 b101): when the probe that gave this value read the volume (epoch ms);
+// the volume is read at most once per ten minutes, and a value kept after a failed probe keeps it.
 message AtRestProtectionView {
   optional string disk_encryption = 1 [json_name = "diskEncryption"];
   optional string source = 2 [json_name = "source"];
   optional string confidence = 3 [json_name = "confidence"];
   bool quality_known = 4 [json_name = "qualityKnown"];
+  optional int64 probed_at_ms = 5 [json_name = "probedAtMs"];
 }
 
 // Tempdoc 629 (#2): conversation (AUTHORED-store) encryption state.
