@@ -65,6 +65,35 @@ Phase B (integration base 181363e86, merge 98fd416d0):
 - `b6d536-no-adoption-rewrites-inference-b15-refresh.json` has no before-state. It was re-run
   candidate-only, and all seven checks pass.
 
+Phase B verifier repair (integration base 181363e86):
+
+- **Provenance.** The parent of the no-adoption commit f90c16237 is 68547f75a. 6f7895a79, the
+  before-ref in this changeset's earlier evidence, differs from it only in records under `gates/`
+  (the shared-foundation changeset and its evidence). Production code, configuration and tests are
+  identical, so the runs at 6f7895a79 above show the same before-state. The new runs below use
+  68547f75a.
+- **Entry 3, candidate-only.** Before-state not reproducible: both checks build
+  `ManagedChildReconciler(registry)` without a declared configuration hash. The reconciler at
+  68547f75a needs the process executors and the declared llama configuration hash, and that hash
+  decides whether a healthy predecessor is adopted or terminated. A compat constructor would have to
+  pick the hash, so it would itself decide the check.
+- **Entry 6 now names four checks.** `b6d536-no-adoption-endpoint.json` was re-run on the
+  candidate, and all four pass. Before-state not reproducible: they assert the result of
+  `ExternalInferenceEndpoint.parse` or of `LlamaServerOps.externalServerNote()`. Both arrive with
+  f90c16237 and are absent at 68547f75a, so any compat stub of them would decide those assertions.
+- **Its fifth check, `refusedEndpointFailsTheStartAsInvalidConfiguration`,** moves to new entry 18
+  with a real before-run: `b6d536-no-adoption-endpoint-start.json`, at 68547f75a. The compat
+  before-patch `gates/test-intent/evidence/b6d536-no-adoption-endpoint-compat.patch` adds only
+  declarations the test file needs in order to compile:
+  - an `ExternalInferenceEndpoint` record whose `CONFIG_KEY` is a constant and whose `parse`
+    throws;
+  - an `EXTERNAL_SERVER_IGNORED_NOTE` constant;
+  - an `externalServerNote()` that throws.
+
+  No production code at 68547f75a calls these, and the selected check reaches none of them. The
+  check passes on the candidate. At 68547f75a it fails by assertion (`EXECUTABLE_NOT_FOUND` instead
+  of `INVALID_CONFIG`): the before-state ignores the refused endpoint and goes on to launch.
+
 ```json
 {
   "entries": [
@@ -187,7 +216,7 @@ Phase B (integration base 181363e86, merge 98fd416d0):
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java"
       ],
       "class": "New",
-      "behaviour": "The explicit endpoint setting: blank means none; a loopback http URL with a port (127.0.0.1 or localhost, optional trailing slash) is accepted with that port; another host, https, no port, port 0, a path or a query is refused with a message naming the setting; a refused value fails startLlamaServer as INVALID_CONFIG; a server answering on the configured port while the setting is unset makes externalServerNote() report external_server_ignored after a start attempt, and the note clears once nothing answers there.",
+      "behaviour": "The explicit endpoint setting: blank means none; a loopback http URL with a port (127.0.0.1 or localhost, optional trailing slash) is accepted with that port; another host, https, no port, port 0, a path or a query is refused with a message naming the setting; a server answering on the configured port while the setting is unset makes externalServerNote() report external_server_ignored after a start attempt, and the note clears once nothing answers there.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -210,7 +239,6 @@ Phase B (integration base 181363e86, merge 98fd416d0):
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#blankMeansJustSearchRunsItsOwnServer",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#loopbackHttpUrlWithPortIsAccepted",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#unusableValuesAreRefusedWithAReason",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#refusedEndpointFailsTheStartAsInvalidConfiguration",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#serverOnConfiguredPortWithoutEndpointIsReportedAsIgnored"
       ]
     },
@@ -503,6 +531,34 @@ Phase B (integration base 181363e86, merge 98fd416d0):
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-no-adoption-executor-floor.json"
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A refused explicit endpoint value (here http://example.com:8080, not loopback) fails startLlamaServer as INVALID_CONFIG instead of being ignored.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S14",
+          "quote": "If the Engine crashes, hangs or is restarted, every helper ends with it (including a chat server just started but not yet registered); the supervisor restarts it and chat returns without user action (D2). Unless a game or low GPU memory blocks it, in which case chat shows why.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
+          "choice": "Reconciliation ruling CH4 as the builder implements it: the explicit configuration is justsearch.inference.external_endpoint (env JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT), accepted only as a loopback http URL with a port because every request is built against the loopback host; anything else is refused with a reason, never reinterpreted. Without it, a server on the configured port is ignored with one WARN and the status note external_server_ignored.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-no-adoption-endpoint-start.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#refusedEndpointFailsTheStartAsInvalidConfiguration"
+      ]
     }
   ]
 }
