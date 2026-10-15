@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-15T16:27:23.483Z",
-  "revision": "0d90a33886e2136c68eab09c8ce4b3f3800fc84a",
-  "tree": "330a1a72316ee0efb6ec9e6567417c4703948b3d",
+  "createdAt": "2026-10-15T17:16:25.701Z",
+  "revision": "2c499df0da395f14c011ef2dd48655c71fe0d09e",
+  "tree": "9255a2ad191ff68ad42e37e1a0ce1865e3b083da",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.compactToStandardActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.standardToCompactActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.committedProfileRecoveryReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.unchangedProfileActivationDoesNotRecomposeEncoders\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.settingsChatModelSelectionReplansEncoderCaps\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.chatStartAndStopDoNotResolveEncoderPlan\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 54291
+      "durationMs": 22010
     }
   ],
   "checks": [
@@ -240,7 +240,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.compactToStandardActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.standardToCompactActivationReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.committedProfileRecoveryReplansEncoderCaps\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.unchangedProfileActivationDoesNotRecomposeEncoders\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.settingsChatModelSelectionReplansEncoderCaps\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.chatStartAndStopDoNotResolveEncoderPlan\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 155611
+        "durationMs": 109067
       }
     ],
     "checks": [
@@ -286,5 +286,5 @@
       }
     ]
   },
-  "digest": "sha256:d7d959b09c84ded62d7fe8033013ec144b94cd2119f439778834a3040e9a6f9c"
+  "digest": "sha256:fccb6b7dae4bf285cc68df7a8a116bc40e4c6d9bcdb7c7921c24bc5f73093148"
 }

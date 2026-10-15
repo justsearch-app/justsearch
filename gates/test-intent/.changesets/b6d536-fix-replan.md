@@ -7,12 +7,17 @@ author-session: codex-b6d536-fix-replan-20261015
 
 # Activation profile planning
 
-The before-state is 0d90a3388. The stock run-evidence producer runs the candidate checks and
+The before-state for the original planning checks is 0d90a3388. The new physical-session checks
+use 2c499df0d, the round 1 fix that resolves the plan but retains old bulk sessions. The stock
+run-evidence producer runs the candidate checks and
 overlays those checks into a detached before-state worktree. Its JVM runs need no node_modules;
 an external Node preload suppresses the producer's optional cross-checkout junction and checks
 and unlinks junctions before its temporary worktree is removed. No production compatibility patch
 or overlay is used. Process identities and command logs are under
-F:/agent-sandbox/build-b6d536-replan/.
+F:/agent-sandbox/build-b6d536-replan-r2/ (round 1: F:/agent-sandbox/build-b6d536-replan/).
+The physical fixture runs activation, the settings transaction, the physical encoder owner and
+session policy composition. Native loading, tokenizer assembly, inference and producer services
+are stand-ins; it does not establish live GPU allocation, search continuity or E2/E3 timing.
 
 ```json
 {
@@ -98,6 +103,64 @@ F:/agent-sandbox/build-b6d536-replan/.
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#unchangedProfileActivationDoesNotRecomposeEncoders",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#settingsChatModelSelectionReplansEncoderCaps",
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#chatStartAndStopDoNotResolveEncoderPlan"
+      ]
+    },
+    {
+      "items": ["modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Compact-to-standard and standard-to-compact activation publish physical embedding, SPLADE and reranker sessions with the selected profile's steady caps. The checks inspect the serving owners' policies and per-handle construction caps, and require each source session to retire before its corresponding replacement is constructed, permitting role-by-role release. The permitted before-state for these physical checks is 2c499df0d.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn Builder brief (round 2), Task 2",
+          "quote": "Make a changed plan actually rebuild every encoder session whose cap changed, bulk and query alike, through the existing recompose path."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn Builder brief (round 2), Task 3",
+          "quote": "after a compact-to-standard activation, the physical sessions (bulk and query) carry the standard caps. Add the reverse direction too."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-fix-replan-physical.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#compactToStandardActivationReplacesPhysicalBulkAndQueryCaps",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#standardToCompactActivationReplacesPhysicalBulkAndQueryCaps"
+      ]
+    },
+    {
+      "items": ["modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java"],
+      "class": "New",
+      "behaviour": "Preservation: refusal after native preparation restores the source resolved configuration, captured index plan, physical bulk/query caps and a warm query handle, with no extra open physical sessions. The same check passes against 2c499df0d, where the unchanged bulk owner remains usable.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn Builder brief (round 2), Task 2",
+          "quote": "searches keep serving during recomposition the way they do during any settings recompose (a lexical fallback with a reason is acceptable);"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Make a changed plan actually rebuild every encoder session whose cap changed, bulk and query alike, through the existing recompose path.",
+          "delegationLocation": "task t-20261005-b6d536 user turn Builder brief (round 2), Task 2",
+          "delegationScope": "Keep the existing settings transaction's refusal recovery while extending it to physical bulk replacement.",
+          "choice": "Exercise refusal after preparation and require usable source sessions, exact source plan and no extra native owners after restoration.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-fix-replan-physical.json",
+      "newChecks": ["modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery"]
+    },
+    {
+      "items": ["modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java"],
+      "class": "Adaptation",
+      "moved": ["rename"],
+      "whatMoved": "Clarify that the automatic-cap preservation fixture has an empty physical bulk surface: its index owner is retained because it has no sessions to rebuild. The existing assertions and inputs remain; remove one redundant assertion qualifier. The new activation checks separately cover real bulk handles.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn Builder brief (round 2), Task 2",
+          "quote": "Make a changed plan actually rebuild every encoder session whose cap changed, bulk and query alike, through the existing recompose path."
+        }
       ]
     }
   ]

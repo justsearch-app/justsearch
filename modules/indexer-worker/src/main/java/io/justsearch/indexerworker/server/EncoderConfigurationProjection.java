@@ -226,8 +226,8 @@ final class EncoderConfigurationProjection {
   String indexDigest() {
     Set<String> keys = new HashSet<>(DEPENDENCIES);
     keys.removeAll(QUERY_ONLY_DEPENDENCIES);
-    // Device-plan caps are scheduling limits, not index model ownership. The current plan
-    // packs every call, bounded by the physical session's original cap, until recomposition.
+    // Automatic caps do not change index model identity. They still change physical sessions:
+    // the settings owner compares indexSessionDigest before retaining the bulk owner.
     // Keep explicit caps in the ownership guard: query-only changes cannot replace those.
     for (EnvRegistry cap : Set.of(EnvRegistry.EMBED_GPU_MEM_MB, EnvRegistry.SPLADE_GPU_MEM_MB,
         EnvRegistry.NER_GPU_MEM_MB, EnvRegistry.BGE_M3_GPU_MEM_MB)) {
@@ -237,6 +237,12 @@ final class EncoderConfigurationProjection {
         keys.remove(key(cap));
       }
     }
+    return AppliedConfigurationVersion.digest(keys, values());
+  }
+
+  String indexSessionDigest() {
+    Set<String> keys = new HashSet<>(DEPENDENCIES);
+    keys.removeAll(QUERY_ONLY_DEPENDENCIES);
     return AppliedConfigurationVersion.digest(keys, values());
   }
 

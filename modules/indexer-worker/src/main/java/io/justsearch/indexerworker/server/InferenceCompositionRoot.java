@@ -368,6 +368,28 @@ public final class InferenceCompositionRoot {
     return withCompositionHeadroom(retainedBytes);
   }
 
+  /** Same retained-session admission as query replacement, for a settings-owned full rebuild. */
+  static long estimateSettingsFootprintBytes(IndexCompositionPlan plan,
+      EncoderConfigurationProjection queryProjection, QueryRoleSelection selection) {
+    long indexBytes = 0L;
+    for (var entry : plan.roles().entrySet()) {
+      if (plan.bgeM3Selected() && (entry.getKey() == EncoderRole.BGE_M3
+          || entry.getKey() == EncoderRole.SPLADE)) continue;
+      indexBytes = Math.addExact(indexBytes, capturedCompositionBytes(entry.getValue()));
+    }
+    if (plan.bgeM3Selected()) {
+      indexBytes = Math.addExact(indexBytes, Math.max(
+          capturedCompositionBytes(plan.role(EncoderRole.BGE_M3)),
+          capturedCompositionBytes(plan.role(EncoderRole.SPLADE))));
+    }
+    return Math.addExact(withCompositionHeadroom(indexBytes),
+        estimateQueryFootprintBytes(queryProjection, selection, plan.hardware()));
+  }
+
+  private static long capturedCompositionBytes(IndexCompositionPlan.RolePlan role) {
+    return role.variant() == null ? 0L : sessionCompositionBytes(role.variant(), role.policy());
+  }
+
   /**
    * Returns a conservative lower bound on memory released by the source query sessions.
    *
@@ -383,14 +405,19 @@ public final class InferenceCompositionRoot {
   private static long queryPlanCompositionBytes(EncoderRole role, QueryPlan plan,
       ResolvedConfig cfg, HardwareProfile hardware) {
     if (plan.variant() == null) return 0L;
-    var gpu = ModelSessionPolicyResolver.resolve(role, cfg, hardware, plan.variant()).gpu();
+    return sessionCompositionBytes(plan.variant(),
+        ModelSessionPolicyResolver.resolve(role, cfg, hardware, plan.variant()));
+  }
+
+  private static long sessionCompositionBytes(VariantSelection variant, ModelSessionPolicy policy) {
+    var gpu = policy.gpu();
     if (gpu.arenaCapBytes() == 0L) return 0L;
     if (!gpu.plannedProfile()) return gpu.arenaCapBytes();
     try {
-      if (io.justsearch.ort.OnnxExternalData.hasExternalData(plan.variant().modelFile())) {
+      if (io.justsearch.ort.OnnxExternalData.hasExternalData(variant.modelFile())) {
         return gpu.arenaCapBytes();
       }
-      return java.nio.file.Files.size(plan.variant().modelFile());
+      return java.nio.file.Files.size(variant.modelFile());
     } catch (IOException unmeasuredLayout) {
       // A graph alone cannot prove retained weights for external or uninspectable layouts.
       return gpu.arenaCapBytes();
