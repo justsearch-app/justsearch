@@ -59,6 +59,15 @@ final class NvidiaSmiReadings {
   /** What one probe process returned; {@code output} is null when it did not finish in time. */
   record Outcome(int exitCode, String output) {}
 
+  /**
+   * The readers of one probe: its outcome for them, set once when the probe settles. A reader keeps
+   * the cohort it joined, so a later probe never changes what it receives.
+   */
+  private static final class Cohort {
+    private Reading outcome;
+    private boolean done;
+  }
+
   /** Runs one probe process; an exception means it could not be started. */
   @FunctionalInterface
   interface Runner {
@@ -72,9 +81,7 @@ final class NvidiaSmiReadings {
   private final Condition settled = lock.newCondition();
   private Reading last;
   private Reading lastGood;
-  private boolean probing;
-  private long settledProbes;
-  private Reading forWaiters;
+  private Cohort inFlight;
   private Instant probedAt;
   private boolean staleRequested;
   private boolean unavailable;
@@ -103,13 +110,15 @@ final class NvidiaSmiReadings {
    */
   Reading read() {
     Instant now;
+    Cohort cohort;
     lock.lock();
     try {
-      if (probing) {
-        // One probe is in flight: wait for it and share its outcome, whatever the clock says now.
-        long awaited = settledProbes;
-        while (settledProbes == awaited) settled.awaitUninterruptibly();
-        return forWaiters;
+      if (inFlight != null) {
+        // One probe is in flight: wait for it and return its outcome, whatever the clock says now
+        // and whatever probe runs after it.
+        Cohort joined = inFlight;
+        while (!joined.done) settled.awaitUninterruptibly();
+        return joined.outcome;
       }
       now = clock.instant();
       boolean allowed = probedAt == null || Duration.between(probedAt, now).compareTo(MIN_INTERVAL) >= 0;
@@ -122,7 +131,8 @@ final class NvidiaSmiReadings {
       staleRequested = false;
       unavailable = false;
       probedAt = now;
-      probing = true;
+      cohort = new Cohort();
+      inFlight = cohort;
     } finally {
       lock.unlock();
     }
@@ -131,12 +141,12 @@ final class NvidiaSmiReadings {
       probed = probe(now);
       return probed.reading();
     } finally {
-      settle(probed, now);
+      settle(cohort, probed, now);
     }
   }
 
-  /** Publishes the probe's outcome and wakes every reader waiting on it. */
-  private void settle(Probed probed, Instant now) {
+  /** Publishes the probe's outcome to its cohort and wakes every reader waiting on it. */
+  private void settle(Cohort cohort, Probed probed, Instant now) {
     Reading reading = probed != null ? probed.reading()
         : new Reading(false, "nvidia-smi probe failed", null, null, null, now);
     lock.lock();
@@ -144,9 +154,9 @@ final class NvidiaSmiReadings {
       last = reading;
       unavailable = probed != null && probed.sticky();
       if (reading.available()) lastGood = reading;
-      forWaiters = reading.available() || lastGood == null ? reading : lastGood.markedStale();
-      probing = false;
-      settledProbes++;
+      cohort.outcome = reading.available() || lastGood == null ? reading : lastGood.markedStale();
+      cohort.done = true;
+      inFlight = null;
       settled.signalAll();
     } finally {
       lock.unlock();

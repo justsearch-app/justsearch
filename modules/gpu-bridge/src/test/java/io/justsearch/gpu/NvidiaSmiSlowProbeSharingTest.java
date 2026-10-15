@@ -23,8 +23,8 @@ import org.junit.jupiter.api.Test;
  * Task b6d536 b101: callers already waiting on a slow nvidia-smi probe share its outcome, a
  * timeout included, even when the probe used up the five-second interval. They receive the last
  * good reading marked stale, or the failure when there is none, and never start a probe of their
- * own. The next probe still waits for the interval. From the round-4 verifier's slow-sharing
- * check.
+ * own. The next probe still waits for the interval, and a later probe never changes what an
+ * earlier probe's waiters receive. From the round-4 and round-5 verifiers' sharing checks.
  */
 final class NvidiaSmiSlowProbeSharingTest {
   private final AtomicLong millis = new AtomicLong();
@@ -84,6 +84,85 @@ final class NvidiaSmiSlowProbeSharingTest {
     millis.set(25_004);
     assertFalse(readings.read().stale());
     assertEquals(5, launches.get());
+  }
+
+  /**
+   * A cohort of eight waiters on a slow probe, then the caller that ran it reads again at once and
+   * runs the next probe, which the interval now allows. Each waiter receives the outcome of the probe
+   * it joined, never the later probe's, whichever thread the lock goes to first. Repeated, since the
+   * overwrite this guards against depends on the order the woken threads take the lock; the
+   * round-5 verifier saw it within two trials. From the verifier's cohort check.
+   */
+  @Test void everyWaiterReceivesTheOutcomeOfTheProbeItJoined() throws Exception {
+    for (boolean firstTimesOut : new boolean[] {true, false}) {
+      for (int trial = 0; trial < 100; trial++) {
+        cohortTrial(firstTimesOut, trial);
+      }
+    }
+  }
+
+  private static void cohortTrial(boolean firstTimesOut, int trial) throws Exception {
+    AtomicLong ms = new AtomicLong();
+    Clock trialClock = new Clock() {
+      @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+      @Override public Clock withZone(ZoneId zone) { return this; }
+      @Override public Instant instant() { return Instant.EPOCH.plusMillis(ms.get()); }
+    };
+    CountDownLatch inFirst = new CountDownLatch(1);
+    CountDownLatch releaseFirst = new CountDownLatch(1);
+    AtomicInteger runs = new AtomicInteger();
+    var readings = new NvidiaSmiReadings(trialClock, () -> {
+      int run = runs.incrementAndGet();
+      if (run == 1) {
+        inFirst.countDown();
+        if (!releaseFirst.await(10, TimeUnit.SECONDS)) throw new AssertionError("probe release missing");
+        if (firstTimesOut) return new NvidiaSmiReadings.Outcome(-1, null);
+      }
+      return new NvidiaSmiReadings.Outcome(0, "8192, " + (run == 1 ? 4096 : 2048) + ", probe-" + run);
+    });
+    var answers = new CopyOnWriteArrayList<NvidiaSmiReadings.Reading>();
+    var failures = new CopyOnWriteArrayList<Throwable>();
+    Thread leader = Thread.ofPlatform().priority(Thread.MAX_PRIORITY).unstarted(() -> {
+      try {
+        readings.read(); // runs the first probe
+        readings.read(); // at once runs the second, which the interval allows
+      } catch (Throwable t) {
+        failures.add(t);
+      }
+    });
+    leader.start();
+    assertTrue(inFirst.await(10, TimeUnit.SECONDS));
+    var waiters = new ArrayList<Thread>();
+    for (int i = 0; i < 8; i++) {
+      waiters.add(Thread.ofPlatform().priority(Thread.MIN_PRIORITY).start(() -> {
+        try {
+          answers.add(readings.read());
+        } catch (Throwable t) {
+          failures.add(t);
+        }
+      }));
+    }
+    try {
+      long limit = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (waiters.stream().anyMatch(t -> t.getState() != Thread.State.WAITING) && System.nanoTime() < limit) {
+        Thread.sleep(1);
+      }
+      assertTrue(waiters.stream().allMatch(t -> t.getState() == Thread.State.WAITING),
+          "all eight readers wait on the first probe before it completes");
+      ms.set(5_001); // the first probe used the interval: the next one may run at once
+    } finally {
+      releaseFirst.countDown();
+      leader.join(10_000);
+      for (Thread waiter : waiters) waiter.join(10_000);
+    }
+    assertEquals(List.of(), failures);
+    assertEquals(2, runs.get(), "the caller that ran the first probe ran the second; no waiter ran one");
+    assertEquals(8, answers.size());
+    long other = answers.stream().filter(answer -> firstTimesOut
+        ? answer.available() || !"nvidia-smi timed out".equals(answer.error())
+        : !"probe-1".equals(answer.driverVersion())).count();
+    assertEquals(0, other, (firstTimesOut ? "timeout" : "success") + " trial " + trial
+        + ": waiters received another probe's outcome instead of the one they joined: " + answers);
   }
 
   /**
