@@ -17,6 +17,17 @@ also exercises the writer fence before data-directory lock release.
   "entries": [
     {
       "items": ["modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java"],
+      "class": "Adaptation",
+      "moved": ["instrumentation"],
+      "whatMoved": "Wait for all existing positive observations (the normal child's exact NEW/EXIT pair, the crash child's exact NEW/EXIT pair and the console-host start witness) for up to 30 seconds instead of using only the crash receipt as a five-second barrier. The observer and ledger writer advance independently for each process. Three natural combined attempts passed the witness; a fourth unchanged combined attempt with the owned normal helper briefly preempted reproduced witness.normal=false, with its matching PID/birth/code-0 records arriving later in the same printed ledger. This is a test-only exit-order assumption, not a product durability failure. The exact PID, birth, contained flag, exit code, classification and exactly-one-record predicates, the outside-child exclusion, host predicate and writer-fence assertion all remain unchanged. Enclosing bounds become 90 seconds for the probe and 120 seconds for the test. Emit spawned probe/helper PID plus creation instant for process accounting. No product behavior changes; the New entry keeps its original e546e9e54 before-state.",
+      "sources": [{
+        "kind": "owner-words",
+        "quote": "Make the test robust without weakening its assertion. Waiting on the condition with a generous bound is fine; loosening what is asserted is not.",
+        "location": "task t-20261005-b6d536 builder brief 2026-10-15 part 1"
+      }]
+    },
+    {
+      "items": ["modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java"],
       "class": "New",
       "repaired": true,
       "behaviour": "The Engine job owner records identity-bound NEW and EXIT evidence for helpers and console hosts, preserves nonzero unexpected outcomes during its natural-completion await, excludes a real out-of-job child, and fences its writer before releasing app.lock.",

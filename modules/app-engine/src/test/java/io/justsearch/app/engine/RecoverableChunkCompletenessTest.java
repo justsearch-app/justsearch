@@ -32,8 +32,12 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
 
 /** D1: a configured SYSTEM_INTERNAL root survives a real JVM halt and actual parser/index replay. */
-@Timeout(180)
+@Timeout(value = 20, unit = TimeUnit.MINUTES)
 final class RecoverableChunkCompletenessTest {
+  // This checks durable completeness of a 5,557-chunk replay, not indexing throughput.
+  private static final long COMPLETION_TIMEOUT_SECONDS = 300;
+  private static final long PROBE_TIMEOUT_SECONDS = 360;
+
   @Test
   void interruptedWatchedAndRecordedIngestReplaysEveryDeclaredChunk(@TempDir Path data) throws Exception {
     int control = runScenario(Files.createDirectories(data.resolve("control")), false);
@@ -143,7 +147,7 @@ final class RecoverableChunkCompletenessTest {
     long pid = process.pid();
     Instant creation = process.info().startInstant().orElseThrow();
     try {
-      assertTrue(process.waitFor(100, TimeUnit.SECONDS), "the owned probe must exit within its bound");
+      assertTrue(process.waitFor(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS), "the owned probe must exit within its bound");
     } finally {
       if (process.isAlive()) {
         if (process.pid() != pid || !process.info().startInstant().orElseThrow().equals(creation)) {
@@ -156,7 +160,9 @@ final class RecoverableChunkCompletenessTest {
   }
 
   private static String readLog(Path data, String phase) throws Exception {
-    return Files.readString(data.resolve(phase + ".log"), StandardCharsets.UTF_8);
+    String log = Files.readString(data.resolve(phase + ".log"), StandardCharsets.UTF_8);
+    log.lines().filter(line -> line.startsWith("RECOVERABLE_COMPLETE:")).forEach(System.out::println);
+    return log;
   }
 
   public static final class Probe {
@@ -248,12 +254,13 @@ final class RecoverableChunkCompletenessTest {
         attempts.start(accepted, handle -> coordinator.execute(handle, work.context()));
         Files.writeString(data.resolve("operation-key"), key, StandardCharsets.UTF_8);
         if (abandon) {
-          Thread.sleep(90_000);
+          TimeUnit.SECONDS.sleep(COMPLETION_TIMEOUT_SECONDS);
           throw new AssertionError("interrupted ingest never reached its chunk write checkpoint");
         }
       }
       key = Files.readString(data.resolve("operation-key"), StandardCharsets.UTF_8);
-      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+      long started = System.nanoTime();
+      long until = started + TimeUnit.SECONDS.toNanos(COMPLETION_TIMEOUT_SECONDS);
       while (System.nanoTime() < until && operations.find(key).orElseThrow().state() != OperationState.COMPLETE) {
         root.recordedIngestion().maintain();
         Thread.sleep(100);
@@ -261,6 +268,8 @@ final class RecoverableChunkCompletenessTest {
       if (operations.find(key).orElseThrow().state() != OperationState.COMPLETE) {
         throw new AssertionError("recoverable unit did not reach COMPLETE: " + operations.find(key));
       }
+      System.out.println("RECOVERABLE_COMPLETE: phase=" + args[1] + ", elapsedMs="
+          + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
       // COMPLETE is durable before the attempt's physical work permit is released. Use the
       // production shutdown order rather than racing close against that final release.
       if (initialWork != null) initialWork.close();

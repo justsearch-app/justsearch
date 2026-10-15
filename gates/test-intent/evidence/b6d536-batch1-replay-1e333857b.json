@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:11:21.789Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "37235d081d39a8a2b6bbd6d8859ec205319de3cc",
+  "createdAt": "2026-10-15T17:20:18.216Z",
+  "revision": "0d90a33886e2136c68eab09c8ce4b3f3800fc84a",
+  "tree": "2cf9b6ed631db6762891184bda1b1b8d55c96f20",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 115962
+      "durationMs": 129120
     },
     {
       "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8334
+      "durationMs": 23075
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:80ee4c56e3b70809c4596fd8b346ded201127d8d48c372f48568a57b85c66069",
+      "contentDigest": "sha256:f5853fa72c5ab59bf2e094c37c3d29a146bfee66781d0cf744e5b3ee393357e3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -101,13 +101,13 @@
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 146375
+        "durationMs": 166643
       },
       {
         "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5722
+        "durationMs": 26087
       }
     ],
     "checks": [
@@ -123,5 +123,5 @@
       }
     ]
   },
-  "digest": "sha256:552956b1ef2f4f3697905f0316dc47f2cd691358ef62a3285c2c16d2048990db"
+  "digest": "sha256:07e31fbdd711607a1ada9d69934d179ed63b318292644421b5099c25d223c956"
 }
