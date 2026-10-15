@@ -263,3 +263,14 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
   "digest": "sha256:e73cc7ead1fb0f78b1fc874cfdb1cad0611064fb3aee5ba8bb0d6069b4ba7a58"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:21f9f4e8e46a1c03b0e576c61d38ca2e2775b5a0ee1d68d413ee6851e5ce07be",
+  "note": "The preamble and New entries present manual failures from candidate device-loss/resume methods replaced by no-op or fixed-result stubs as fail-before proof. Those reached stubs determine the asserted missing effects; candidate checks passing does not make these manufactured failures valid before-state evidence."
+}
+```

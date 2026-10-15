@@ -288,3 +288,14 @@ reloaded.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:ce7f74cab73f2c6d523f3c6c082f8a9d1afbbff8b306a982859e26df8ffe09ed",
+  "note": "Before rerun mismatch for entries 1 and 2: the exact declared f75486245 test/helper overlay, with no patch, fails compileTestJava because ChildControl and ProcessTerminator are absent. The separate repaired-seam evidence records assertion failures; the older combined evidence's compatibility patch does not repair this unpatched record."
+}
+```

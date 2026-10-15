@@ -128,3 +128,14 @@ ManagedChatSeam overlay alone.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:3a85330ec451e677dd2b72bcf90bcbac647d7a10259fdbc117ff0046f3b54f72",
+  "note": "Reviewed current fixtures, evidence and corrected sources; selected current candidate checks pass. Today's independent reruns exactly match both declared repaired-seam before assertions and the shared API-absence explanation covers the separate candidate-only cases."
+}
+```

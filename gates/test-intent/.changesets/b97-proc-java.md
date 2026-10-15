@@ -361,3 +361,14 @@ Accepted without change (round 4):
   "note": "VC-procjava3 (independent Claude verifier) over two rounds on 1eb01f51e vs a164833f5 (rejected f40ba7da8 for SystemAccessFunnelTest): funnel test and all 39 ArchUnit classes pass; app-api 383, app-inference 487, app-services 3701 pass, PMD clean; new checks fail on f40ba7da8 for their reason (GPU release pending 6250 ms, raw native message, CreateProcessW text); adapted SynchronousGpuReleaseTest still checks a pending poll refuses then retry succeeds (fails on a164833f5); real processes: self-test with surviving server records intended_cleanup then cleanup_ended and the main start succeeds (12.4 s early variant), crash leftover ended, job listing failure refuses starts with chat start blocked and recovers, Engine death ends all helpers in 5 s incl. an unregistered suspended child, 0 ms idle CPU over 35 s, launch parity 34/34 incl. strict mode, job end failure keeps the member counted then records leftover_exited, launch failure text identical to the JDK in 5 cases, a never-returning VRAM read ends the poll unmeasured after 2.25 s. Named limits: failed self-test with survivor 12-14 s; no per-member records at clean quit; a VRAM read that never returns leaves later polls unmeasured for the process lifetime. Unverified: live self-test, model switch and GPU release on the real model (stack held by another session). Digest bound with --base a164833f5, the lane's base."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:94d4ad78ce85207887f377dea6312d593105c08025251e228fe8ee202d643122",
+  "note": "Entry 6 has candidate-only preservation evidence with no stated before-state reason for aFailureBeforeResumeLeavesNoProcessBehind and aFailureJoiningTheJobLeavesNoProcessBehind. The archived before XML proves only the original pipe/argument case; it does not cover these two later checks."
+}
+```

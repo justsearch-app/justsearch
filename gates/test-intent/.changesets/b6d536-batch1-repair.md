@@ -153,3 +153,14 @@ Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before 
   "note": "New Health, CPU-service and real Engine/parser chunk checks independently fail on their old parent and pass on this candidate. Full preservation evidence for every adaptation is unavailable under mandatory unsafe-cleanup exclusions; those skips are not passes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:f42ea7fac7d19d5943917f4e48b45ad8fce80d73f78668265616419d90acdfea",
+  "note": "Candidate rerun mismatch: RecoverableChunkCompletenessTest reached the real replay but the operation remained RUNNING at its 60-second deadline and the probe exited 99, contradicting the recorded candidate pass. An isolated retry passed; this documents intermittency without clearing the observed mismatch under the requested stopping rule."
+}
+```

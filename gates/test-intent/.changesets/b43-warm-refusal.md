@@ -61,3 +61,14 @@ Pending independent verifier acceptance.
   "note": "Accept New/repaired test intent: exact baseline has two intended warm assertion failures and 35 queue passes; candidate passes all 37. Tight deadline cases preserve existing outcomes. Independent cancel/purge pool case fails check 2; this acceptance does not accept the implementation. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-fpwarm/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:696ea4813b8e948cbb3e83576a670b1f8848107602c70fd955ac2a7dcca8f7a2",
+  "note": "Reviewed the corrected source declaration against the unchanged warm-refusal check and before evidence. The current candidate rerun passes and the entry preserves the existing refusal obligation."
+}
+```

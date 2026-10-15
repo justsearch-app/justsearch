@@ -71,3 +71,14 @@ was: <false>".
   "digest": "sha256:949fa79d0193a661709a744066ee46513fc1d61e91e67e2617a52df4a5e77c15"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:78f32a8633e73c2ac2363a3ec704af82e26b2bd110e2c10a7f7214ecd0fb8f21",
+  "note": "The current preamble and entry explicitly claim fail-before by transplanting candidate EngineRoot and reducing bindPowerEvents to a no-op. All four checks directly require those removed effects, so the declared assertion failures are stub-created rather than evidence from the old implementation."
+}
+```

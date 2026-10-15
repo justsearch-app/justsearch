@@ -82,3 +82,14 @@ Pending independent verifier acceptance.
   "digest": "sha256:7e1c8c2cedd98b1100d40092b4164d1bb44fd7ae42b07b8a0fb761fd490427d1"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:5a1101bbdf572c65e2fe9f5b9ca44b1fa7569c2b990425b2ab7e78869af5d88c",
+  "note": "Reviewed the current replay fixture/evidence changes and selected candidate passes. The exact declared b1cfcac8e before run matches all five recorded check outcomes: three assertion classifications and two preservation passes."
+}
+```
