@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T15:41:36.087Z",
+  "revision": "0d90a33886e2136c68eab09c8ce4b3f3800fc84a",
+  "tree": "63a1745062576d6c4c4286b0b494cc3f343a0890",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline\" --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest.requestDeadlineWinningBeforeVectorCaptureStaysUntyped\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 21523
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb126beaa6f3fd66cc761c135c41cf3180c73ee1b1db02316d9e33d07223dce7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java#requestDeadlineWinningBeforeVectorCaptureStaysUntyped",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb126beaa6f3fd66cc761c135c41cf3180c73ee1b1db02316d9e33d07223dce7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "requestDeadlineWinningBeforeVectorCaptureStaysUntyped()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6d726500acf03e3f4bb2904234f2cfdcf701489c8fa86aa82f28b468c3be2ecd"
+}
