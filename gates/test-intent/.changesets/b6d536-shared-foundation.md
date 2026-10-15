@@ -348,3 +348,14 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
   "note": "Verifier f12: refreshed evidence digest matches the current ChildControlVocabularyTest; the candidate test fails exactMembers on f75486245 and passes on ef6df5aec."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "reject",
+  "digest": "sha256:a3d37b28b69c80d7b2433d49efc72c51d3d4e6dee0cc04f74a390118eead74e9",
+  "note": "All current selected checks pass, but the eight New entries cite candidate-only evidence without a concrete reason for omitting before proof. Entry 8 is decisive: its CORS preflight check uses APIs already present on main yet supplies neither before evidence nor an obstacle to reproduction."
+}
+```

@@ -231,3 +231,14 @@ Pending independent verifier acceptance.
   "note": "Reviewed the availability-state matrix, retained failures and API-only candidate reason against current tests and sources. Candidate state/behavior and adapted provider-fixture checks passed; unchanged before evidence remains truthful."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:6cafded2da64a81c8813dbcec12f6c0e0a3ab1184a64e7e5933a34025005bf6f",
+  "note": "Reviewed retained availability expectations and scoped the shared-file timing changes to deadline-load; its two candidate checks pass. The unchanged availability entries and evidence still truthfully describe the current API and fixtures."
+}
+```

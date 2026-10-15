@@ -337,3 +337,14 @@ and eleven passes is superseded by these actual current-class counts.
   "note": "Reject entry 7: the exact 79b5e2e25 whole-class replay runs fourteen tests with four failures (CPU argv, full GPU argv, projector-on-CPU and planned rung), contradicting its claim that only the GPU ordered-line assertion fails and eleven other checks pass. The current candidate whole class passes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:7a8af5f9d3b2cd5caaaa727dd97ab9bdde0a6ba4edaf00ccab6cbed967ff14e1",
+  "note": "Reviewed the corrected mixed whole-class evidence and the original change history against VS1. All 14 candidate cases pass; the unpatched 79b5e2e25 rerun reproduces four declared assertion failures and ten passes, with unrelated failures disclosed."
+}
+```

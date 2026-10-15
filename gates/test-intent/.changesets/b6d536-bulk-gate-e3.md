@@ -363,3 +363,14 @@ Evidence files (all written by run-evidence.mjs):
   "note": "Reject the repaired before evidence: exact 124def8a1 plus the two declared current sampler overlays fails app-services compilation with ten errors for absent context/game APIs and GAME_AND_EXTERNAL_MEMORY, so all three checks execute zero cases instead of the recorded assertions. Candidate checks pass, but the declared before replay does not reproduce its evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:83302eee852017765faf9274957c94a1dac696d88dd541efe6ff6f404412151e",
+  "note": "Reviewed the correction against VS1: the patch adds exactly the two historical sampler classes, without stubs or a behavior replacement. Four candidate checks pass and the 124def8a1 rerun reproduces all four declared assertion failures and reasons."
+}
+```

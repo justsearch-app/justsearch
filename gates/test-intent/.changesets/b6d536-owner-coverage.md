@@ -103,3 +103,14 @@ Pending independent verifier acceptance. No builder acceptance is recorded.
   "note": "Independent rerun: new owner-coverage assertions fail on f5877635f and pass on 58a51a608; O9 native sibling/orphan cases repaired. Reject acceptance: the canonical repaired-check evidence omits fail-before, and the crash-helper check validates the ledger receipt without the final census, which loses a real delayed OWNER_DIED receipt (S15). Evidence: F:/agent-sandbox/design-b6d536/codex/verify-census5/candidate-delayed-native-analysis-repeat.json. Full verification report pending."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:c057085d5e6726f278368953a941b2ef6a5893297aa096581a2b1b8fd4e5fdbd",
+  "note": "Reviewed corrected sources, canonical before proof, the crash-receipt extension and held-identity fixture cleanup. Four selected candidate checks pass; f5877635f with the declared patches reproduces three assertion-failing checks and the architecture preservation pass."
+}
+```

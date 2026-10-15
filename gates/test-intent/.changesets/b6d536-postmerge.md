@@ -76,3 +76,14 @@ Pending separate verification. The builder records no acceptances.
   "note": "Codex VX-postmerge ACCEPT ecb5ca073; evidence F:/js-verify-b6d536-20261015/verification-report.md"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:8d25f891f50b52533dde511e8694e51234d2c73944c4b882e56b6852204535ff",
+  "note": "re-bound to main; no change since 181363e86. Reading review confirms the diagnostics, negative reservation cases, pending-identity expectations and sampler adaptation still match the current items and cited independent verification."
+}
+```
