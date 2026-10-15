@@ -35,7 +35,6 @@ final class WindowsParserContainmentTest {
     List<String> command = PersistentExtractionSandboxTest.javaCommand(
         mode.equals("slow-recycle") ? SlowNativeChild.class : NativeChild.class,
         "--enable-native-access=ALL-UNNAMED");
-    ProcessHandle nativeChild = null;
     try (PersistentExtractionSandbox sandbox = new PersistentExtractionSandbox(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(), command,
         // This response clock includes cold JVM/native bootstrap. Hosted Windows launch exceeded
@@ -56,7 +55,7 @@ final class WindowsParserContainmentTest {
       }
       assertTrue(Files.exists(pidFile), "bootstrap and native spawn must actually execute");
       long pid = Long.parseLong(Files.readAllLines(pidFile).getFirst());
-      nativeChild = ProcessHandle.of(pid).orElseThrow();
+      ProcessHandle nativeChild = ProcessHandle.of(pid).orElseThrow();
       assertTrue(nativeChild.isAlive(), "capture a LIVE native child before parser termination");
       Files.writeString(Path.of(request + ".release"), "parent observed live child");
       if (termination.equals("timeout")) {
@@ -77,10 +76,8 @@ final class WindowsParserContainmentTest {
         assertTrue(nativeChild.isAlive());
         sandbox.close();
       }
-      if (nativeChild != null) {
-        nativeChild.onExit().get(10, TimeUnit.SECONDS);
-        assertFalse(nativeChild.isAlive(), "native process must die with recycled parser");
-      }
+      nativeChild.onExit().get(10, TimeUnit.SECONDS);
+      assertFalse(nativeChild.isAlive(), "native process must die with recycled parser");
     } finally {
       if (Files.exists(pidFile)) {
         List<String> identity = Files.readAllLines(pidFile);

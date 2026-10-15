@@ -82,6 +82,8 @@ class McpProtocolHandlerTest {
       when(ctx.result(result.capture())).thenReturn(ctx);
       try (var search = admission.admit(incoming, false);
           var chat = admission.admit(incoming, false)) {
+        assertNotNull(search, "search capacity must be occupied before observing native status");
+        assertNotNull(chat, "chat capacity must be occupied before observing native status");
         try {
           protocol.handlePost(ctx);
           var wire = MAPPER.readTree(result.getValue());

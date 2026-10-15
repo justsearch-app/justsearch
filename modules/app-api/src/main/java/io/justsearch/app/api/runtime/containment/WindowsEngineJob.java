@@ -178,7 +178,7 @@ public final class WindowsEngineJob implements EngineContainment {
     if (witness != null) witness.attach(ledger, owner);
     else if (witnessFailure != null) ledger.append(
         io.justsearch.app.api.runtime.ledger.LedgerRecordType.LEDGER_GAP,
-        java.util.Map.of("reason", "WRITE_FAILED", "count", 1, "since", java.time.Instant.now(),
+        Map.of("reason", "WRITE_FAILED", "count", 1, "since", java.time.Instant.now(),
             "source", "job_witness_unavailable", "failure", witnessFailure));
   }
 

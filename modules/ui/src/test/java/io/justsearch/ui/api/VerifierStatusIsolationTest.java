@@ -246,9 +246,3 @@ class VerifierStatusIsolationTest {
     assertEquals("TRANSIENT",body.get("errorClass").asText(),response.body());
   }
 }
-
-
-
-
-
-

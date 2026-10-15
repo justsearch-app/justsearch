@@ -194,7 +194,7 @@ final class DeviceEncoderGateTest {
                   : SessionAcquisitionRequest.Urgency.BACKGROUND,
               Duration.ofMinutes(2));
       caller.thread = new Thread(() -> {
-        try (DeviceEncoderGate.Seat seat = gate.seat(caller.session, request)) {
+        try (DeviceEncoderGate.Seat _ = gate.seat(caller.session, request)) {
           caller.seatedAtMs.set(nowMs());
           seatedEvents.add(caller);
           assertTrue(caller.mayRelease.await(2, TimeUnit.MINUTES));

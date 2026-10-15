@@ -63,7 +63,9 @@ class CrashedEngineHelperReceiptTest {
       if (delayed) Thread.sleep(2500); // Beyond the census's 2 s containment grace.
       // The previous Engine's job has closed; the successor only observes identities.
       try (var next = DefaultChildControl.openForEngine(data, "successor", ManagedChildRegistry.noop(),
-          VramProbe.none(), EngineContainment.current())) { }
+          VramProbe.none(), EngineContainment.current())) {
+        assertNotNull(next, "the successor must open its child control to reconcile crash receipts");
+      }
       long target = helperPid;
       var records = ExitLedgerReader.read(LedgerFamily.directory(data), LedgerFamily.CHILDREN).records();
       var receipt = records.stream().filter(r -> r.type() == LedgerRecordType.JOB_PROCESS_EXIT
@@ -138,6 +140,7 @@ class CrashedEngineHelperReceiptTest {
       // Its start is its supervisor's record (the test's), as the Engine never writes its own.
       try (var control = DefaultChildControl.openForEngine(data, "crash-owner", ManagedChildRegistry.noop(),
           VramProbe.none(), job)) {
+        assertNotNull(control, "the crashing owner must install its child control before starting helpers");
         Process helper = OwnedHelper.start(new ProcessBuilder("ping.exe", "-t", "127.0.0.1")
             .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD), "crash fixture helper");
         long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);

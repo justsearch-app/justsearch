@@ -39,7 +39,7 @@ final class NativeSessionHandleCpuRecourseBoundsTest {
         OrtSession.Result ignored = warm.run(Map.of())) {
       assertTrue(warm.isCpu(), "precondition: the CPU session ran");
     }
-    try (SessionHandle.Lease bulk = holdBackground(handle)) {
+    try (SessionHandle.Lease _ = holdBackground(handle)) {
       var background =
           assertThrows(
               SessionAcquireDeadlineExceededException.class,
@@ -65,7 +65,7 @@ final class NativeSessionHandleCpuRecourseBoundsTest {
   @Test
   void aQueryLegWithoutAWarmCpuSessionIsStillTurnedAwayAtItsDeadline() throws Exception {
     NativeSessionHandle handle = handle("cpu-recourse-cold", 84);
-    try (SessionHandle.Lease bulk = holdBackground(handle)) {
+    try (SessionHandle.Lease _ = holdBackground(handle)) {
       var turnedAway =
           assertThrows(
               SessionAcquireDeadlineExceededException.class,

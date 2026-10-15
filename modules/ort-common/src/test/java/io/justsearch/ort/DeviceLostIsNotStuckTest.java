@@ -118,7 +118,7 @@ final class DeviceLostIsNotStuckTest {
     Map<String, Integer> devices = Map.of("out-of-memory", 66, "bfc-arena", 67, "error-46", 68);
     Set<Integer> ours = Set.copyOf(devices.values());
     List<Integer> told = new CopyOnWriteArrayList<>();
-    try (AutoCloseable listening =
+    try (AutoCloseable _ =
         DeviceHealth.addLossListener(
             (cudaDevice, code) -> {
               if (ours.contains(cudaDevice)) told.add(cudaDevice);
@@ -164,7 +164,7 @@ final class DeviceLostIsNotStuckTest {
     cpuSession.set(handle, cpu);
     int device = cpuOnly.gpu().cudaDeviceId();
     List<Integer> told = new CopyOnWriteArrayList<>();
-    try (AutoCloseable listening = DeviceHealth.addLossListener(
+    try (AutoCloseable _ = DeviceHealth.addLossListener(
             (d, code) -> {
               if (d == device) told.add(d);
             })) {

@@ -41,7 +41,7 @@ final class NativeSessionHandleCpuRecourseTest {
       assertFalse(idle.isCpu(), "an idle device serves the query leg on the GPU");
     }
 
-    try (SessionHandle.Lease bulk = holdBackground(handle)) {
+    try (SessionHandle.Lease _ = holdBackground(handle)) {
       long start = System.nanoTime();
       SessionHandle.Lease lease =
           assertDoesNotThrow(
@@ -61,7 +61,7 @@ final class NativeSessionHandleCpuRecourseTest {
   void aContendedVectorOnlyLegAlsoRunsOnTheWarmCpuSession() throws Exception {
     NativeSessionHandle handle = handle("cpu-recourse-vector", 82);
     warmCpu(handle);
-    try (SessionHandle.Lease bulk = holdBackground(handle)) {
+    try (SessionHandle.Lease _ = holdBackground(handle)) {
       long start = System.nanoTime();
       try (SessionHandle.Lease lease =
           assertDoesNotThrow(

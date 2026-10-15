@@ -105,4 +105,3 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     }
   }
 }
-

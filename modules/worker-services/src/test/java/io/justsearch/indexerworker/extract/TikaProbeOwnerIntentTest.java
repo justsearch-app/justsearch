@@ -93,7 +93,8 @@ final class TikaProbeOwnerIntentTest {
             .invoke(null, "tesseract.exe", "Tika Tesseract availability", Duration.ofSeconds(10));
       } catch (ClassNotFoundException before) { /* assertion, not linkage failure */ }
       boolean available;
-      try (AutoCloseable close = intent) {
+      AutoCloseable close = intent;
+      try (close) {
         var parserClass = Class.forName("org.apache.tika.parser.ocr.TesseractOCRParser");
         var parser = parserClass.getConstructor().newInstance();
         parserClass.getMethod("setTesseractPath", String.class).invoke(parser, args[0]);

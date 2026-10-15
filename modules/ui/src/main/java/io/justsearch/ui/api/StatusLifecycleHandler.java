@@ -97,8 +97,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private final OnlineAiService onlineAi;
   private final AgentService agentService;
   private final Supplier<InferenceRuntimeView> inferenceSnapshotSupplier;
-  private final io.justsearch.app.api.lifecycle.Capability workerCapability;
-  private final io.justsearch.app.api.lifecycle.Capability inferenceCapability;
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private volatile String knowledgeServerStartError;
   private EngineComponentRegistry componentRegistry;
@@ -344,8 +342,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       Supplier<RerankerService> lambdamartRerankerSupplier,
       Supplier<GplStatusProvider> gplCoordinatorSupplier,
       Supplier<GpuCapabilitiesService> gpuCapabilitiesSupplier,
-      io.justsearch.app.api.lifecycle.Capability workerCapability,
-      io.justsearch.app.api.lifecycle.Capability inferenceCapability) {
+      // Preserve constructor compatibility for fixtures; status reads the component registry.
+      io.justsearch.app.api.lifecycle.Capability unusedWorkerCapability,
+      io.justsearch.app.api.lifecycle.Capability unusedInferenceCapability) {
     // Tempdoc 412 Phase 3: engineMonitorSupplier removed (Phase 0 finding 2: EngineMonitor was
     // dead code; setters never called in production, so the supplier was always null in
     // practice). Inference status is now sourced from {@link InferenceLifecycleManager}'s
@@ -353,8 +352,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.onlineAi = onlineAi;
     this.agentService = agentService;
     this.inferenceSnapshotSupplier = inferenceSnapshotSupplier;
-    this.workerCapability = workerCapability;
-    this.inferenceCapability = inferenceCapability;
     this.knowledgeServer = knowledgeServer;
     this.knowledgeServerStartError = knowledgeServerStartError;
     this.indexBasePath = indexBasePath;

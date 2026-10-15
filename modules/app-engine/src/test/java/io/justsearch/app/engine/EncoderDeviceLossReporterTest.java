@@ -68,7 +68,7 @@ final class EncoderDeviceLossReporterTest {
     AtomicInteger generationChanges = new AtomicInteger();
     first.addGenerationListener(generationChanges::incrementAndGet);
 
-    try (EncoderDeviceLossReporter reporter = EncoderDeviceLossReporter.start(controller)) {
+    try (EncoderDeviceLossReporter _ = EncoderDeviceLossReporter.start(controller)) {
       try (SessionHandle.Lease warm = first.acquire(required())) {
         warm.run(Map.of()).close();
       }

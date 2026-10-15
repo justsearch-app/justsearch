@@ -69,4 +69,3 @@ class VerifierStatus4Test extends VerifierStatusIsolationTest {
   now.addAndGet(7100);assertTrue(idle.stale(now.get()));assertTrue(busy.stale(now.get()));
  }
 }
-

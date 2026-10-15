@@ -76,7 +76,7 @@ final class DeviceEncoderGateBreakerTest {
 
     stuck.close();
     assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "closed with the release, no timer");
-    try (DeviceEncoderGate.Seat next = gate.seat(new Object(), queryLeg(Duration.ofSeconds(5)))) {
+    try (DeviceEncoderGate.Seat _ = gate.seat(new Object(), queryLeg(Duration.ofSeconds(5)))) {
       assertEquals(0, gate.waiting());
     }
   }

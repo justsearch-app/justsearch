@@ -190,7 +190,7 @@ final class WorkerSearchServiceRagBudgetTest
   void contendedQueryEmbeddingGivesBm25ContextWithTheReason() throws Exception {
     lifecycle = openIndex("position", "Hello world from the retrieval budget test");
     try (SessionHandle embeddingHandle = gpuHandle("r1-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       var embeddings = new HandleBackedEmbeddings(embeddingHandle, false);
       var service = new WorkerSearchService(lifecycle, embeddings);
 
@@ -230,7 +230,7 @@ final class WorkerSearchServiceRagBudgetTest
             "Hello world, second passage about deadlines",
             "Hello world, third passage about fallbacks");
     try (SessionHandle embeddingHandle = gpuHandle("r1c-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       // The query embedding answers; only the per-candidate MMR embeddings wait for the device.
       var embeddings = new HandleBackedEmbeddings(embeddingHandle, true);
       var service = new WorkerSearchService(lifecycle, embeddings);
@@ -360,7 +360,7 @@ final class WorkerSearchServiceRagBudgetTest
     }
 
     private float[] embedOnDevice(InferenceRequest request) {
-      try (SessionHandle.Lease lease = handle.acquire(SessionAcquisitionRequest.from(request))) {
+      try (SessionHandle.Lease _ = handle.acquire(SessionAcquisitionRequest.from(request))) {
         return new float[] {1f, 0f, 0f, 0f};
       }
     }

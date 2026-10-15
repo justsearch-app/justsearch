@@ -69,7 +69,7 @@ final class IndexingPacingGateWaitTest {
             },
             "gate-wait-foreground");
     foregroundFinisher.start();
-    try (DeviceEncoderGate.Seat bulkRun =
+    try (DeviceEncoderGate.Seat _ =
         gate.seat(new Object(), request(SessionAcquisitionRequest.Urgency.BACKGROUND))) {
       clock.addAndGet(WORKED_NANOS); // the bulk run's own GPU work
     }

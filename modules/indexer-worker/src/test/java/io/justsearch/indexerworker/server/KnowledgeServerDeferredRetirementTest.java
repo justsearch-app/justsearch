@@ -235,15 +235,15 @@ final class KnowledgeServerDeferredRetirementTest {
       var preparation = mock(DeferredRuntime.PreparedUpgrade.class);
       var owner = new Object();
       var mutations = new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner);
-      var entered = new java.util.concurrent.CountDownLatch(1);
-      var publish = new java.util.concurrent.CountDownLatch(1);
-      var callbackFinished = new java.util.concurrent.CountDownLatch(1);
-      var callbackFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+      var entered = new CountDownLatch(1);
+      var publish = new CountDownLatch(1);
+      var callbackFinished = new CountDownLatch(1);
+      var callbackFailure = new AtomicReference<Throwable>();
       setField(server, "searchLifecycle", runtime);
       setField(server, "ingestLifecycle", runtime);
       server.publishServingView(source);
       Thread callback = Thread.ofPlatform().start(() -> {
-        try (var mutation = mutations.enter(owner)) {
+        try (var _ = mutations.enter(owner)) {
           entered.countDown();
           assertTrue(publish.await(5, TimeUnit.SECONDS));
           try (var view = server.captureServingView()) { assertNotNull(view.services()); }

@@ -97,7 +97,7 @@ final class WorkerSearchServiceCpuRecourseTest
       assertEquals(1, gpuRuns.get(), "the idle dense leg ran on the GPU");
       assertEquals(0, cpuRuns.get(), "the idle dense leg did not run on the CPU");
 
-      try (SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+      try (SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
         long start = System.nanoTime();
         SearchResponse busy =
             service.search(query(SearchMode.SEARCH_MODE_HYBRID), foreground(REQUEST_BUDGET));

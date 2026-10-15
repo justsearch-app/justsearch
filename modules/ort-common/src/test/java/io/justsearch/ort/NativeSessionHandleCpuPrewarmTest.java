@@ -47,7 +47,7 @@ final class NativeSessionHandleCpuPrewarmTest {
     set(handle, "cpuSession", cpu);
 
     // Before the prewarm the CPU session has never run, so a turned-away leg misses its deadline.
-    try (SessionHandle.Lease bulk = holdBackground(handle)) {
+    try (SessionHandle.Lease _ = holdBackground(handle)) {
       assertThrows(
           SessionAcquireDeadlineExceededException.class,
           () -> handle.acquire(hybridLeg(Duration.ofMillis(400))));
@@ -66,7 +66,7 @@ final class NativeSessionHandleCpuPrewarmTest {
     assertTrue(handle.prewarmCpuForQueries(prewarmRequest()));
     verify(cpu, times(1)).run(anyMap());
 
-    try (SessionHandle.Lease bulk = holdBackground(handle);
+    try (SessionHandle.Lease _ = holdBackground(handle);
         SessionHandle.Lease lease = handle.acquire(hybridLeg(Duration.ofSeconds(3)))) {
       assertTrue(lease.isCpu(), "after the prewarm the turned-away leg runs on the CPU session");
     }

@@ -2479,7 +2479,7 @@ public class HeadlessApp {
                   || !operationsClosed.get() || !processResourcesClosed.get()) {
                 throw new IllegalStateException("Instance lock retained until stateful owners close");
               }
-              io.justsearch.app.api.runtime.containment.EngineContainment.current()
+              EngineContainment.current()
                   .finishProcessRecording(budget.waitFor(java.time.Duration.ofSeconds(2), 2000));
               if (appInstanceLock != null) appInstanceLock.close();
               return null;

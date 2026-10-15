@@ -60,7 +60,8 @@ public class IndependentDeclaredActivityTest {
    var a=new EngineAdmissionController(1,1,1);var ex=Executors.newSingleThreadExecutor();var app=Javalin.create();
    new ApiSecurityFilters(false,null,new EventBuffer(),ex,null,a,a).install(app);app.post("/api/ui/activity",c->c.result("ok"),declared("post","/api/ui/activity"));app.start("127.0.0.1",0);
    var ctx=io.justsearch.app.services.intent.EngineProvenance.internal("independent-capacity",io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
-   try(var held=a.admit(ctx,false);var client=HttpClient.newHttpClient()){
+    try(var held=a.admit(ctx,false);var client=HttpClient.newHttpClient()){
+     assertNotNull(held, "the capacity holder must be admitted before testing refusal");
      long b=version(a);var res=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+app.port()+"/api/ui/activity")).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
      assertEquals(429,res.statusCode());assertEquals(b,version(a));
    }finally{app.stop();ex.shutdownNow();}

@@ -43,7 +43,7 @@ final class HeadlessAppVduShutdownTest {
             mock(io.justsearch.app.api.operations.OperationStore.class), attempts,
             wait -> calls.add("producers")), ignored -> {});
     assertTrue(sequence.run(ShutdownRequest.Reason.QUIT).clean());
-    assertEquals(java.util.List.of("admission-close", "attempts-close", "freeze", "interactive-cancel",
+    assertEquals(List.of("admission-close", "attempts-close", "freeze", "interactive-cancel",
         "producers", "admission-drain", "attempts-drain", "head-close"), calls,
         "no picture pass: the original cancellation and drain order is preserved exactly");
   }

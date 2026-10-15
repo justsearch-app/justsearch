@@ -264,7 +264,7 @@ class ExtractionSandboxOrphanE2ETest {
         Instant nativeBirth = Instant.ofEpochMilli(ticks.divide(java.math.BigInteger.valueOf(10000)).longValueExact());
         if (!nativeBirth.equals(startedAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS))) return;
         held.terminate(1);
-        assertTrue(held.awaitExit(java.time.Duration.ofSeconds(10)));
+        assertTrue(held.awaitExit(Duration.ofSeconds(10)));
       } finally { held.close(); }
       assertFalse(isCurrentAndAlive(), "owned process must exit during bounded cleanup");
     }

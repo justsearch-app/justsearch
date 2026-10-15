@@ -2,6 +2,7 @@
 package io.justsearch.app.api.runtime.containment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
@@ -106,7 +107,7 @@ final class EngineJobChildLedgerTest {
       // The next Engine on the same data directory.
       try (AutoCloseable next = openForEngine(dataDir, "holder-2",
           EngineContainment.current())) {
-        // opening reconciles what the holder left open
+        assertNotNull(next, "the next Engine must open its control to reconcile the holder's records");
       }
 
       List<LedgerRecord> records = ExitLedgerReader.read(

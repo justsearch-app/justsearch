@@ -34,8 +34,8 @@ final class VduActivityCheckpointTest {
     when(server.msSinceLastUserActivity(org.mockito.ArgumentMatchers.anyLong())).thenReturn(45_000L);
     activityVersion(server, 1L);
     var captured = new AtomicReference<Object>();
-    try (var reconciler = mockConstruction(RuntimeReconciler.class);
-         var builder = mockStatic(OfflineCoordinatorBuilder.class, invocation -> {
+    try (var _ = mockConstruction(RuntimeReconciler.class);
+         var _ = mockStatic(OfflineCoordinatorBuilder.class, invocation -> {
            captured.set(invocation.getArgument(6));
            throw new IllegalStateException("composition checkpoint captured");
          })) {

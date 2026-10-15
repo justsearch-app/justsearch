@@ -75,7 +75,7 @@ final class WorkerSearchServiceVectorOnlyBudgetTest
   // V1a: VECTOR-only, blocked past D - margin, ends in a typed DEADLINE_EXCEEDED with the reason
   void vectorOnlyBlockedPastItsBudgetIsADeadlineWithTheReason() throws Exception {
     try (SessionHandle embeddingHandle = gpuHandle("v1a-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       var embeddings = new HandleBackedEmbeddings(embeddingHandle);
       var service = new WorkerSearchService(lifecycle, embeddings);
       SearchRequest request = vectorOnly();
@@ -105,7 +105,7 @@ final class WorkerSearchServiceVectorOnlyBudgetTest
               .name("v1b-bulk-holder")
               .start(
                   () -> {
-                    try (SessionHandle.Lease lease = holdBackground(embeddingHandle)) {
+                    try (SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
                       held.countDown();
                       Thread.sleep(HELD_FOR.toMillis());
                     } catch (InterruptedException e) {

@@ -36,7 +36,7 @@ final class NativeSessionHandleCpuRecourseTraceTest {
     NativeSessionHandle handle = handle("cpu-recourse-trace", 86);
     warmCpu(handle);
     RecordingSpan leg = new RecordingSpan();
-    try (SessionHandle.Lease bulk = holdBackground(handle);
+    try (SessionHandle.Lease _ = holdBackground(handle);
         Scope ignored = leg.makeCurrent();
         SessionHandle.Lease lease = handle.acquire(hybridLeg(Duration.ofSeconds(3)))) {
       assertTrue(lease.isCpu(), "the turned-away leg runs on the CPU session");

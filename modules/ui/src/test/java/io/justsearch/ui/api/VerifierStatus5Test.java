@@ -15,7 +15,7 @@ class VerifierStatus5Test extends VerifierStatusIsolationTest {
       f.handler.setConversationProtectionSupplier(()->keys.state().name().toLowerCase(java.util.Locale.ROOT));
       f.handler.sampleAndBuildStatusSnapshot();
       try {var headers=Class.forName("io.justsearch.ui.api.StatusChangeHeaders");var install=headers.getDeclaredMethod("install",io.javalin.Javalin.class);install.setAccessible(true);install.invoke(null,f.app);}
-      catch(ClassNotFoundException baseline){}
+      catch(ClassNotFoundException baseline){/* Baseline lacks headers; the signal assertions below must expose that. */}
       var controller=new ConversationEncryptionController(keys);
       f.app.post("/api/conversations/encryption/lock",controller::handleLock);
       f.app.get("/api/own-readonly",ctx->ctx.json(java.util.Map.of("ok",true)));
@@ -35,7 +35,7 @@ class VerifierStatus5Test extends VerifierStatusIsolationTest {
   @Test void samplerFailureAndRecoveryPublishCanonicalFreshnessChanges() throws Exception {
     try(var f=new Fixture(true)) {
       try {var headers=Class.forName("io.justsearch.ui.api.StatusChangeHeaders");var install=headers.getDeclaredMethod("install",io.javalin.Javalin.class);install.setAccessible(true);install.invoke(null,f.app);}
-      catch(ClassNotFoundException baseline){}
+      catch(ClassNotFoundException baseline){/* Baseline lacks headers; the signal assertions below must expose that. */}
       f.app.get("/api/own-readonly",ctx->ctx.json(java.util.Map.of("ok",true)));
       var uri=URI.create("http://127.0.0.1:"+f.app.port()+"/api/own-readonly");
       var before=client.send(HttpRequest.newBuilder(uri).GET().build(),HttpResponse.BodyHandlers.ofString());
@@ -79,6 +79,3 @@ class VerifierStatus5Test extends VerifierStatusIsolationTest {
     }
   }
 }
-
-
-

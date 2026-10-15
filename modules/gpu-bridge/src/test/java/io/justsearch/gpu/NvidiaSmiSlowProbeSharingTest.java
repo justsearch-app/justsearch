@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -17,6 +18,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -144,9 +147,13 @@ final class NvidiaSmiSlowProbeSharingTest {
     }
     try {
       long limit = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-      while (waiters.stream().anyMatch(t -> t.getState() != Thread.State.WAITING) && System.nanoTime() < limit) {
+      while ((probeWaiterCount(readings) != 8
+          || waiters.stream().anyMatch(t -> t.getState() != Thread.State.WAITING))
+          && System.nanoTime() < limit) {
         Thread.sleep(1);
       }
+      assertEquals(8, probeWaiterCount(readings),
+          "all eight readers joined the first probe's completion condition");
       assertTrue(waiters.stream().allMatch(t -> t.getState() == Thread.State.WAITING),
           "all eight readers wait on the first probe before it completes");
       ms.set(5_001); // the first probe used the interval: the next one may run at once
@@ -163,6 +170,22 @@ final class NvidiaSmiSlowProbeSharingTest {
         : !"probe-1".equals(answer.driverVersion())).count();
     assertEquals(0, other, (firstTimesOut ? "timeout" : "success") + " trial " + trial
         + ": waiters received another probe's outcome instead of the one they joined: " + answers);
+  }
+
+  /** Readers on the completion condition have joined the probe, rather than only its lock queue. */
+  private static int probeWaiterCount(NvidiaSmiReadings readings) throws ReflectiveOperationException {
+    Field lockField = NvidiaSmiReadings.class.getDeclaredField("lock");
+    Field settledField = NvidiaSmiReadings.class.getDeclaredField("settled");
+    lockField.setAccessible(true);
+    settledField.setAccessible(true);
+    ReentrantLock lock = (ReentrantLock) lockField.get(readings);
+    Condition settled = (Condition) settledField.get(readings);
+    lock.lock();
+    try {
+      return lock.getWaitQueueLength(settled);
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**

@@ -30,6 +30,7 @@ public class IndependentObserverHttpTest {
   new ApiSecurityFilters(false,null,new EventBuffer(),executor,null,admission,admission).install(app);
   var calls=new java.util.concurrent.atomic.AtomicInteger();app.post("/api/user-action",c->{calls.incrementAndGet();c.json(Map.of());});app.start("127.0.0.1",0);
   try(var held=admission.admit(context,false);var http=HttpClient.newHttpClient()) {
+   assertNotNull(held, "the capacity holder must be admitted before testing refusal");
    long before=version(admission);
    var response=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+app.port()+"/api/user-action")).timeout(Duration.ofSeconds(10)).POST(HttpRequest.BodyPublishers.ofString("{}")).header("Content-Type","application/json").build(),HttpResponse.BodyHandlers.ofString());
    assertEquals(429,response.statusCode());assertEquals(0,calls.get());assertEquals(before,version(admission));
@@ -38,6 +39,6 @@ public class IndependentObserverHttpTest {
  @Test void backgroundInternalAttachDoesNotInventUserInput() throws Exception {
   var admission=new EngineAdmissionController(10,10,1);long before=version(admission);
   var context=io.justsearch.app.services.intent.EngineProvenance.internal("independent-background-owner",io.justsearch.core.context.EngineContext.Survival.DURABLE,io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
-  try(var held=admission.attach(context)){assertEquals(before,version(admission));}
+  try(var held=admission.attach(context)){assertNotNull(held, "background work must attach successfully");assertEquals(before,version(admission));}
  }
 }

@@ -417,10 +417,10 @@ public final class WatchedRootsState {
   private Object statusContent() {
     var indexed = new java.util.HashMap<Path, Boolean>();
     watchedRoots.forEach((root, at) -> indexed.put(root, !WatchedRootsStore.NEVER_INDEXED.equals(at)));
-    return java.util.List.of(java.util.Map.copyOf(indexed), java.util.Map.copyOf(walkErrors),
+    return java.util.List.of(Map.copyOf(indexed), Map.copyOf(walkErrors),
         java.util.Set.copyOf(walkCompleted), java.util.Set.copyOf(deleteDetectionUnverified),
         java.util.Set.copyOf(driftCorrected.keySet()), java.util.Set.copyOf(lastVerifiedAt.keySet()),
-        java.util.Map.copyOf(collections));
+        Map.copyOf(collections));
   }
 
   private static Instant normalizeTimestamp(Instant timestamp) {

@@ -87,8 +87,8 @@ public final class SlowStartFakeLlamaServer {
         .creationFileTime(pid).orElseGet(() -> "instant:"
             + ProcessHandle.current().info().startInstant().orElseThrow());
     Files.writeString(dir.resolve("identities.txt"), pid + " " + birth + "\n",
-        StandardCharsets.US_ASCII, java.nio.file.StandardOpenOption.CREATE,
-        java.nio.file.StandardOpenOption.APPEND);
+        StandardCharsets.US_ASCII, StandardOpenOption.CREATE,
+        StandardOpenOption.APPEND);
   }
 
   public static void main(String[] args) throws Exception {

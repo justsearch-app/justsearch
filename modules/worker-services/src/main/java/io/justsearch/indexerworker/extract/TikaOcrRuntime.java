@@ -32,6 +32,7 @@ public final class TikaOcrRuntime {
 
   private static ResolutionInputs recordedInputs;
   private static RuntimePaths recordedRuntime;
+  @SuppressWarnings("PMD.UnusedPrivateField") // Read reflectively by RecordedTesseractExecutableTest.
   private static long resolutionCount;
 
   private TikaOcrRuntime() {}
@@ -170,7 +171,7 @@ public final class TikaOcrRuntime {
         OwnedHelper.terminate(process, "timeout");
         return cached;
       }
-      String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+      String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
       Set<String> languages = new HashSet<>();
       for (String line : output.split("\\R")) {
         String value = line.trim().toLowerCase(Locale.ROOT);
@@ -210,8 +211,9 @@ public final class TikaOcrRuntime {
     Process process = null;
     // A real launch, once per recorded resolution: its window is written only when it spawns, its
     // start forced before the helper's receipts, its end with them as one group.
-    try (var intent = OwnedHelper.launchWindow(executable.getFileName().toString(), "Tesseract recorded availability",
-        Duration.ofSeconds(5))) {
+    var intent = OwnedHelper.launchWindow(executable.getFileName().toString(), "Tesseract recorded availability",
+        Duration.ofSeconds(5));
+    try (intent) {
       process = OwnedHelper.start(new ProcessBuilder(executable.toString(), "--version")
           .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD),
           "Tesseract recorded availability");

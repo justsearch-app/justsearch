@@ -41,7 +41,7 @@ final class GpuOffNativeRerankerSessionTest {
         var lease = sessions.acquire(SessionAcquisitionRequest.within(
             SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(30), () -> false));
         var tensor = OnnxTensor.createTensor(sessions.environment(), new float[] {1, 2, 3, 4});
-        var result = lease.session().run(Map.of("input", tensor))) {
+        var _ = lease.session().run(Map.of("input", tensor))) {
       String profile = Files.readString(Path.of(lease.session().endProfiling()), StandardCharsets.UTF_8);
       assertAll(
           () -> assertTrue(lease.isCpu(), "effective GPU-off policy must select a native CPU session"),

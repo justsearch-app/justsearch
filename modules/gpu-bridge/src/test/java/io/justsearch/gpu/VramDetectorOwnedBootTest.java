@@ -36,7 +36,7 @@ class VramDetectorOwnedBootTest {
   public static class Probe {
     public static void main(String[] args) throws Exception {
       Process finite = new ProcessBuilder("cmd.exe", "/c", "echo 12345").start();
-      try (var seam = Mockito.mockConstruction(ProcessBuilder.class, (builder, context) ->
+      try (var _ = Mockito.mockConstruction(ProcessBuilder.class, (builder, context) ->
           Mockito.when(builder.start()).thenReturn(finite))) {
         assertEquals(12345L * 1024 * 1024, new VramDetector().getTotalVramBytes());
       } finally { if (finite.isAlive()) finite.destroyForcibly(); }

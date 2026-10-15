@@ -28,7 +28,8 @@ public interface EngineAdmissionService {
 
   /** Compatibility read of admission state; callers that do work must reserve it instead. */
   default void checkStatusAdmission(EngineContext context) {
-    try (var reservation = reserveStatusAdmission(context)) { /* inspection only */ }
+    var reservation = reserveStatusAdmission(context);
+    try (reservation) { /* inspection only */ }
   }
 
   /**

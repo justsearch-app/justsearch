@@ -148,7 +148,7 @@ final class SearchLegCauseContractTest
   @Test
   void aHeldDeviceIsTheContendedCauseOnTheLegThatWaited() throws Exception {
     try (SessionHandle embeddingHandle = gpuHandle("c2-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       var service =
           new WorkerSearchService(
               lifecycle, new WorkerSearchServiceSemanticBudgetTest.HandleBackedEmbeddings(embeddingHandle));
@@ -200,7 +200,7 @@ final class SearchLegCauseContractTest
   @Test
   void aHeldSpladeDeviceCarriesTheCauseOnTheSpladeLegOnly() throws Exception {
     try (SessionHandle spladeHandle = gpuHandle("c2-splade", 1);
-        SessionHandle.Lease bulk = holdBackground(spladeHandle);
+        SessionHandle.Lease _ = holdBackground(spladeHandle);
         SessionHandle denseHandle = gpuHandle("c2-dense")) {
       var bindings = new EncoderBindings();
       bindings.bindSpladeEncoder(handleBackedSplade(spladeHandle));

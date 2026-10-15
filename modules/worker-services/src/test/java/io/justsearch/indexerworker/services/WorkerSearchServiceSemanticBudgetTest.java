@@ -225,7 +225,7 @@ final class WorkerSearchServiceSemanticBudgetTest
   // B2: a background lease held on the embedding handle gives keyword results in time
   void contendedEmbeddingHandleGivesKeywordResults() throws Exception {
     try (SessionHandle embeddingHandle = gpuHandle("b2-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       var embeddings = new HandleBackedEmbeddings(embeddingHandle);
       var service = new WorkerSearchService(lifecycle, embeddings);
       SearchRequest request = query(SearchMode.SEARCH_MODE_HYBRID);
@@ -244,7 +244,7 @@ final class WorkerSearchServiceSemanticBudgetTest
   // B3: a held SPLADE handle skips only SPLADE, with the reason; dense still runs
   void contendedSpladeHandleSkipsOnlyThatLeg() throws Exception {
     try (SessionHandle spladeHandle = gpuHandle("b3-splade", 1);
-        SessionHandle.Lease bulk = holdBackground(spladeHandle);
+        SessionHandle.Lease _ = holdBackground(spladeHandle);
         SessionHandle denseHandle = gpuHandle("b3-dense")) {
       var bindings = new EncoderBindings();
       bindings.bindSpladeEncoder(handleBackedSplade(spladeHandle));
@@ -305,7 +305,7 @@ final class WorkerSearchServiceSemanticBudgetTest
   // B5: a request deadline too short for any semantic budget still ends in DEADLINE_EXCEEDED
   void deadlineTooShortForASemanticBudgetIsStillADeadline() throws Exception {
     try (SessionHandle embeddingHandle = gpuHandle("b5-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       var service = new WorkerSearchService(lifecycle, new HandleBackedEmbeddings(embeddingHandle));
       SearchRequest request = query(SearchMode.SEARCH_MODE_HYBRID);
 
@@ -336,7 +336,7 @@ final class WorkerSearchServiceSemanticBudgetTest
   // P6b: a lexical-only search with a blocked encoder never acquires it and never falls back
   void lexicalOnlySearchNeverTouchesTheSemanticBudget() throws Exception {
     try (SessionHandle embeddingHandle = gpuHandle("p6b-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       var embeddings = new HandleBackedEmbeddings(embeddingHandle);
       var service = new WorkerSearchService(lifecycle, embeddings);
       SearchRequest request = query(SearchMode.SEARCH_MODE_TEXT);
@@ -485,7 +485,7 @@ final class WorkerSearchServiceSemanticBudgetTest
         .thenAnswer(
             invocation -> {
               InferenceRequest request = invocation.getArgument(1);
-              try (SessionHandle.Lease lease =
+              try (SessionHandle.Lease _ =
                   handle.acquire(SessionAcquisitionRequest.from(request))) {
                 return Map.of("hello", 1.0f);
               }

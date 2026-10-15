@@ -239,7 +239,7 @@ class StatusIsolationHttpTest {
           } finally {unsubscribe();poller.__resetStatusPollForTest();}
           """, java.nio.charset.StandardCharsets.UTF_8);
       Process child = null;
-      java.time.Instant childBirth = null;
+      Instant childBirth = null;
       try {
         child = new ProcessBuilder("node", script.toString(), root.toString(),
             "http://127.0.0.1:" + f.app.port(), output.toString())
@@ -271,7 +271,7 @@ class StatusIsolationHttpTest {
     var publicationRelease = new CountDownLatch(1);
     var healthyContact = new CountDownLatch(1);
     try (var f = new Fixture(true);
-        var threads = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+        var threads = Executors.newFixedThreadPool(2)) {
       var handle = spy(f.components.handle("index"));
       doAnswer(call -> {
         publicationEntered.countDown();

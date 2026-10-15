@@ -158,7 +158,7 @@ final class BulkDutyFloorUnderDeviceGateTest {
                   while (!Thread.currentThread().isInterrupted()) {
                     foregroundQueued.incrementAndGet();
                     boolean seated = false;
-                    try (DeviceEncoderGate.Seat seat =
+                    try (DeviceEncoderGate.Seat _ =
                         gate.seat(session, request(SessionAcquisitionRequest.Urgency.FOREGROUND))) {
                       seated = true;
                       foregroundQueued.decrementAndGet();
@@ -191,7 +191,7 @@ final class BulkDutyFloorUnderDeviceGateTest {
                 while (!Thread.currentThread().isInterrupted()) {
                   pacing.pace();
                   for (int run = 0; run < BULK_RUNS_PER_SLICE; run++) {
-                    try (DeviceEncoderGate.Seat seat =
+                    try (DeviceEncoderGate.Seat _ =
                         gate.seat(bulkSession, request(SessionAcquisitionRequest.Urgency.BACKGROUND))) {
                       run(
                           clock,

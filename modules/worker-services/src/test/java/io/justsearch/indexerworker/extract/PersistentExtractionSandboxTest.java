@@ -124,13 +124,12 @@ final class PersistentExtractionSandboxTest {
     var registry = new ChildControlFixtures.RefusingRegistry();
     var control = DefaultChildControl.of(
         new ChildControlFixtures.RecordingLedger(), terminator, registry);
-    long pid = -1;
     try (var sandbox = ChildControlFixtures.pool(
         javaCommand(ScriptedChild.class), Duration.ofSeconds(10), 500, null, control)) {
       var failure = assertThrows(SandboxExtractionException.class,
           () -> sandbox.extract(file("rollback.txt")));
       assertTrue(failure.getCause() instanceof java.io.IOException, failure.toString());
-      pid = registry.attempted.getFirst().pid();
+      long pid = registry.attempted.getFirst().pid();
       assertTrue(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
       assertEquals(2, terminator.terminateCalls.get(), "the rollback tried to end the child");
       List<ChildView> held = control.list();
@@ -160,11 +159,10 @@ final class PersistentExtractionSandboxTest {
     var registry = new ChildControlFixtures.RefusingRegistry();
     var ledger = new ChildControlFixtures.RecordingLedger();
     var control = DefaultChildControl.of(ledger, terminator, registry);
-    long pid = -1;
     try (var sandbox = ChildControlFixtures.pool(
         javaCommand(ScriptedChild.class), Duration.ofSeconds(10), 500, null, control)) {
       assertThrows(SandboxExtractionException.class, () -> sandbox.extract(file("rollback.txt")));
-      pid = registry.attempted.getFirst().pid();
+      long pid = registry.attempted.getFirst().pid();
 
       control.close();
       assertTrue(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
@@ -222,12 +220,11 @@ final class PersistentExtractionSandboxTest {
   void gracefulCloseForceKillsChildIgnoringEofOnlyAfterGracePeriod() throws Exception {
     var ledger = new ChildControlFixtures.RecordingLedger();
     var terminator = ProcessTerminator.forCurrentOs();
-    long pid = -1;
     try (var control = DefaultChildControl.of(ledger, terminator, ManagedChildRegistry.noop());
         var sandbox = ChildControlFixtures.pool(javaCommand(IgnoringShutdownChild.class),
             Duration.ofSeconds(30), 500, null, control)) {
       sandbox.extract(file("ignores-close.txt"));
-      pid = sandbox.firstChildPid();
+      long pid = sandbox.firstChildPid();
       ProcessHandle child = ProcessHandle.of(pid).orElseThrow();
       assertTrue(child.isAlive());
       java.time.Instant closeStarted = java.time.Instant.now();

@@ -44,7 +44,7 @@ final class RagRetrievalCauseTest
   void aHeldEmbeddingDeviceIsContended() throws Exception {
     lifecycle = openIndex(previousProperties, testLuceneExecutors(), "position", "Hello world, a contended retrieval");
     try (SessionHandle embeddingHandle = gpuHandle("rag-cause-embedding");
-        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+        SessionHandle.Lease _ = holdBackground(embeddingHandle)) {
       var service =
           new WorkerSearchService(lifecycle, new HandleBackedEmbeddings(embeddingHandle, false));
 

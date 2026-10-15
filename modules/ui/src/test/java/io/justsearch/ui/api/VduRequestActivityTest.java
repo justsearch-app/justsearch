@@ -234,6 +234,8 @@ final class VduRequestActivityTest {
              captured.set(call.getArgument(6));
              throw new IllegalStateException("captured production checkpoint factory");
            })) {
+        assertFalse(reconciler.isClosed(), "the reconciler mock must remain active during bootstrap");
+        assertFalse(builder.isClosed(), "the checkpoint factory capture must remain active during bootstrap");
         ServicePhase.runWithOutcome(input);
       }
       interruptFactory = Objects.requireNonNull(captured.get());
@@ -279,6 +281,8 @@ final class VduRequestActivityTest {
             0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null));
       })) {
         var search = new KnowledgeSearchController(readyBootstrap, null);
+        assertEquals(List.of(search.getAdapter()), adapter.constructed(),
+            "the real controller must use the constructed adapter fixture");
         app.post("/api/knowledge/search", search::handleSearch, ActivityRole.USER_ACTION);
         app.get("/api/knowledge/suggest", search::handleSuggest, ActivityRole.USER_ACTION);
         app.post("/api/knowledge/folders", search::handleListFolders, ActivityRole.USER_ACTION);

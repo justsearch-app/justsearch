@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.adapters.lucene.runtime.CommitOps;
@@ -24,6 +26,7 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkSplitter;
@@ -44,6 +47,8 @@ final class VduReplayFailureRetentionTest {
   private static final String DOC_ID = "d:/docs/replay-parent.txt";
   private static final String PARENT_UID = "stable-replay-parent";
   private static final String CONTENT = "replay content ".repeat(2_000);
+  private static final String CONTENT_SHA256 =
+      "395a73e023d786862f90b341a1114c89781a63f2be1cc54827adcad6d742b20a";
 
   @TempDir Path tempDir;
 
@@ -83,7 +88,11 @@ final class VduReplayFailureRetentionTest {
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
       assertBuffered(queue, payload);
-      verify(indexingCoordinator).updateDocument(eq(DOC_ID), anyMap());
+      verify(indexingCoordinator).updateDocument(DOC_ID, chunkDeclaration());
+      verify(indexingCoordinator).updateDocument(DOC_ID, terminalParentUpdate());
+      verify(indexingCoordinator, never())
+          .updateDocument(eq(DOC_ID), argThat(updates ->
+              !updates.equals(chunkDeclaration()) && !updates.equals(terminalParentUpdate())));
     }
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
@@ -138,8 +147,13 @@ final class VduReplayFailureRetentionTest {
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
       assertBuffered(queue, payload);
+      verify(indexingCoordinator).deleteChunksForParentDocId(DOC_ID);
       verify(indexingCoordinator, times(2)).indexSingle(any(IndexDocument.class));
-      verify(indexingCoordinator, never()).updateDocument(anyString(), anyMap());
+      // The declaration is recoverable metadata, never a terminal VDU/content update.
+      verify(indexingCoordinator).updateDocument(DOC_ID, chunkDeclaration());
+      verify(indexingCoordinator, never())
+          .updateDocument(anyString(), argThat(updates -> !updates.equals(chunkDeclaration())));
+      verifyNoMoreInteractions(indexingCoordinator);
     }
   }
 
@@ -207,6 +221,25 @@ final class VduReplayFailureRetentionTest {
       assertTrue(commitSawBufferedOperation.get(), "commit must observe the durable replay row");
       assertEquals(0, queue.switchBufferDepth());
     }
+  }
+
+  private Map<String, Object> chunkDeclaration() {
+    return Map.of(
+        SchemaFields.CHUNK_TOTAL, 18,
+        SchemaFields.CHUNK_PARENT_CONTENT_SHA256, CONTENT_SHA256);
+  }
+
+  private Map<String, Object> terminalParentUpdate() {
+    String preview = CONTENT.strip().substring(0, ChunkSplitter.CONTENT_PREVIEW_MAX_CHARS);
+    return Map.of(
+        SchemaFields.VDU_PROCESSED, "true",
+        SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_COMPLETED,
+        SchemaFields.CONTENT, CONTENT,
+        SchemaFields.CONTENT_SHA256, CONTENT_SHA256,
+        SchemaFields.CONTENT_PREVIEW, preview,
+        SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview),
+        SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU,
+        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
   }
 
   private RunningRuntime mockRuntime(

@@ -387,7 +387,7 @@ final class KnowledgeServerRecoveryCloseTest {
       assertEquals(projection.digest(), encoder.snapshot().desiredVersion(),
           "ownerless recovery must compare with the captured start plan, not earlier discovery");
       Method reserve = KnowledgeServer.class.getDeclaredMethod("captureEncoderRecoveryReservation",
-          io.justsearch.core.component.EngineComponentSnapshot.Component.class);
+          EngineComponentSnapshot.Component.class);
       reserve.setAccessible(true);
       assertNotNull(reserve.invoke(server, encoder.snapshot()),
           "the real recovery admission accepts the failed initial plan");

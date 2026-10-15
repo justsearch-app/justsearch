@@ -50,7 +50,9 @@ class LauncherConsoleReceiptTest {
           "exitClass", "UNEXPECTED", "code", 1, "observedAt", Instant.now()));
       Thread.sleep(2500);
       try (var next = DefaultChildControl.openForEngine(data, "successor", ManagedChildRegistry.noop(),
-          VramProbe.none(), EngineContainment.current())) { }
+          VramProbe.none(), EngineContainment.current())) {
+        assertNotNull(next, "the successor must open its child control to reconcile crash receipts");
+      }
       var records = ExitLedgerReader.read(LedgerFamily.directory(data), LedgerFamily.CHILDREN).records();
       var console = records.stream().filter(r -> r.type() == LedgerRecordType.JOB_PROCESS_START
           && r.field("consoleClient").asBoolean(false)
@@ -78,7 +80,9 @@ class LauncherConsoleReceiptTest {
           "reason", "QUIT", "code", 0, "observedAt", Instant.now()));
       assertCensus("clean-final");
       try (var next = DefaultChildControl.openForEngine(data, "successor", ManagedChildRegistry.noop(),
-          VramProbe.none(), EngineContainment.current())) { }
+          VramProbe.none(), EngineContainment.current())) {
+        assertNotNull(next, "the successor must open its child control before checking history");
+      }
       assertCensus("clean-history");
     }
   }
@@ -245,6 +249,7 @@ class LauncherConsoleReceiptTest {
           "creationFileTime", ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()).orElseThrow(),
           "executable", ProcessHandle.current().info().command().orElseThrow(), "incarnation", incarnation()));
       try (var control = DefaultChildControl.openForEngine(dir, "fixture", ManagedChildRegistry.noop(), VramProbe.none(), job)) {
+        assertNotNull(control, "the fixture owner must install its child control before starting helpers");
         if (mode.endsWith("console")) {
           Process helper = OwnedHelper.start(new ProcessBuilder("ping.exe", "-t", "127.0.0.1")
               .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD), "crash job helper");
