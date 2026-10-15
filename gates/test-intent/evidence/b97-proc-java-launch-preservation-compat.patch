@@ -1,0 +1,12 @@
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/containment/WindowsEngineJob.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/containment/WindowsEngineJob.java
+@@ -196,4 +196,9 @@
+   public String toString() {
+     return "WindowsEngineJob[" + status + reason.map(r -> ", " + r).orElse("") + "]";
+   }
++  /** Compile-only declaration for an unselected candidate test. Never called by the preservation checks. */
++  public static Process createChat(ProcessBuilder ignored) throws java.io.IOException {
++    throw new UnsupportedOperationException("before-state has no contained chat launch");
++  }
++
+ }

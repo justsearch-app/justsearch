@@ -13,14 +13,15 @@ power events, and the llama-child rollback-survivor repair) into b6d536/integrat
 (Spec A §7.4; the step-10 changeset left reportResume without a caller until this merge). The
 merged branches keep their own changesets. This changeset covers only the wiring test.
 
-Fail-before for checks on API new in this change (manual run, not a run-evidence file). The run
-used a temporary `git worktree add` of 48326a1ce outside the repo, merged with b1cfcac8e without
-a commit, removed after the run; the script, the stub patch and the JUnit result are kept in the
-builder sandbox (stubs-merge/run.sh, stub-logsm). Before-state: that merge plus the candidate's
-EngineRoot with bindPowerEvents reduced to a no-op (the merge alone, without the wiring). All 4
-checks fail by AssertionFailedError: the three delivery checks at "expected: <1> but was: <0>" and
-theSubscriptionClosesWithTheProcessResources at "the subscription closed ==> expected: <true> but
-was: <false>".
+The earlier no-op bindPowerEvents experiment is withdrawn as fail-before proof: that reached
+stub directly removed every effect the checks require. This entry is candidate-only. A fresh
+run-evidence attempt uses the actual 48326a1ce parent plus the add-only compatibility patch
+in gates/test-intent/evidence/b6d536-resume-wiring-compat.patch: PowerEvent's data record and
+only SystemPowerEvents' abstract input/subscription signatures. It adds no power producer,
+EngineRoot transplant or binding method. Neither actual merge parent (48326a1ce or b1cfcac8e)
+has EngineRoot.bindPowerEvents. The attempted-run logs and API audit are in
+F:/phaseb-fix3-b6d536-20261015; an initial full-interface attempt stopped earlier at its missing
+BootPowerEvents dependency, so the declaration-only replay removes that unrelated dependency.
 
 ```json
 {
@@ -30,7 +31,7 @@ was: <false>".
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec A §7.4 with Spec F §3.5 on the Engine root, on API new in this change (EngineRoot.bindPowerEvents; the layer-stub run below records the fail-before by assertion). aResumeReachesTheControllerBoundBeforeThePowerEvents: with the chat controller's input bound first, a RESUME power event reaches reportResume once and a SUSPEND does not. aResumeReachesTheControllerBoundAfterThePowerEvents: bound in the other order, nothing subscribes until the controller binds, then a RESUME reaches it. aReboundControllerGetsTheResumesThroughOneSubscription: after a rebinding only the latest controller gets the resume, a second power source is ignored, and there is one subscription. theSubscriptionClosesWithTheProcessResources: closing the process resources closes the subscription and later resumes reach nothing.",
+      "behaviour": "Spec A §7.4 with Spec F §3.5 on the Engine root, on API new in this change (EngineRoot.bindPowerEvents). aResumeReachesTheControllerBoundBeforeThePowerEvents: with the chat controller's input bound first, a RESUME power event reaches reportResume once and a SUSPEND does not. aResumeReachesTheControllerBoundAfterThePowerEvents: bound in the other order, nothing subscribes until the controller binds, then a RESUME reaches it. aReboundControllerGetsTheResumesThroughOneSubscription: after a rebinding only the latest controller gets the resume, a second power source is ignored, and there is one subscription. theSubscriptionClosesWithTheProcessResources: closing the process resources closes the subscription and later resumes reach nothing. Candidate-only. before-state not reproducible: EngineRoot has no bindPowerEvents at either actual merge parent (48326a1ce or b1cfcac8e); 48326a1ce also has no power-event types. There is no old EngineRoot resume-binding operation to re-encode the checks against. Adding a no-op binding makes all four missing effects fail by construction, so it is not fail-before proof.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

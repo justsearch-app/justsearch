@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T17:53:56.781Z",
-  "revision": "d7bbe9600230dc9a42bcbb9f9f25bf7fb38409c3",
-  "tree": "3cbf8db00afb0c8bc653a0846e31cb66f0f7bee9",
+  "createdAt": "2026-10-15T15:44:58.010Z",
+  "revision": "9f1f6257b39280b39df6b7e638d2fce4ef4ae50b",
+  "tree": "4b05a15353c27bd97b417f024dd1c4ccbcecb0f6",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureBeforeResumeLeavesNoProcessBehind\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureJoiningTheJobLeavesNoProcessBehind\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureBeforeResumeLeavesNoProcessBehind\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 34057
+      "durationMs": 205292
     }
   ],
   "checks": [
@@ -54,23 +54,38 @@
           "status": "passed"
         }
       ]
-    },
-    {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aFailureJoiningTheJobLeavesNoProcessBehind",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:d1c83a39c367701e40d2ad26fc94f054fa7599f081cc183dacddd5c3da5c5557",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "aFailureJoiningTheJobLeavesNoProcessBehind()",
-          "status": "passed"
-        }
-      ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:56d6be41f9c22745181bec55e49aa51f3b84fbcbd9480739d62adaa8032a50c7"
+  "failBefore": {
+    "ref": "a164833f5",
+    "revision": "a164833f5275f02496c74a3422cad0bf66ec87e1",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b97-proc-java-launch-preservation-compat.patch",
+        "contentDigest": "sha256:498644c304985b4a795812d63d1c4dc1860b683e89a306190e19d2b4b1bec277"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureBeforeResumeLeavesNoProcessBehind\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 366041
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aFailureBeforeResumeLeavesNoProcessBehind",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d963123d0ccab399d0a6e9f8cd922db1922c79ad665c77acc9e5ef185b34fa29"
 }

@@ -32,6 +32,12 @@ TestActivationForwarders is overlaid. All three checks fail before by assertion:
 before C, a start holds the lifecycle lock while it waits for health, and a foreign unload is
 reloaded.
 
+Signoff repair: the separate b6d536-chat-controller-repaired-seam.json now records the same
+f75486245 compatibility patch explicitly, with only TestActivationForwarders overlaid. Its two
+checks pass on the candidate and fail by the declared coalescing and lifecycle-lock assertions
+on that before-state. The patch supplies the before-API helpers; candidate helpers are not
+overlaid on top of them.
+
 ```json
 {
   "entries": [

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T07:43:11.558Z",
-  "revision": "981aeb2983b77dc775ab8a02f76c62f810df690c",
-  "tree": "ecffc26db2f72489d5773458cf066684cd66b130",
+  "createdAt": "2026-10-15T15:17:58.896Z",
+  "revision": "9f1f6257b39280b39df6b7e638d2fce4ef4ae50b",
+  "tree": "78e203317f446d6e6e3a4d93c1a78b5c8395d155",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 23324
+      "durationMs": 71895
     }
   ],
   "checks": [
@@ -60,15 +60,20 @@
     "ref": "f75486245",
     "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
     "overlays": [
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java",
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java"
+      "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/TestActivationForwarders.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-repaired-compat.patch",
+        "contentDigest": "sha256:c789f5931949a86d92a7c74cf63d5ed799fa4e6f3bb33d50b81664e0862dc4e9"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 54467
+        "durationMs": 175842
       }
     ],
     "checks": [
@@ -84,5 +89,5 @@
       }
     ]
   },
-  "digest": "sha256:71474602d57d76c30aacea3b9c435f554599656c853f3fcf08d33d91d01cfb0c"
+  "digest": "sha256:1e2e9bdcbd5c42129cef38e2265d66981183634941d7e5b9b71414b21c2c3ef9"
 }
