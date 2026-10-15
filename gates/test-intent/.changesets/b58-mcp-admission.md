@@ -82,3 +82,14 @@ five checks fail before by assertion.
   "digest": "sha256:83bc2730ac21d92d74bd454eb962d326a95a01eea312eac8003876de287d79f5"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:37d1855663c5c97b468e35796c84c499150927409649ecec47454d004b4a1b97",
+  "note": "Reviewed the independent observation admission and deferred publication obligations; current evidence/patch/test source match the independent 75917a073 reruns. All five listed checks passed on the candidate and have matching genuine before assertions at 7655b8a20."
+}
+```

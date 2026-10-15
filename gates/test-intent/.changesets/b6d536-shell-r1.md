@@ -676,3 +676,14 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
   "note": "Same independent slice-1 judgment, bound separately to the requested 547b96083 comparison-base digest. The before item identity differs; candidate covered test content did not change in 22b8c3413."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:95cb69453830924dadc5afbe0f7a822fa4d2ee2da044128682807f4275c5df4d",
+  "note": "Current entries, evidence and test source match the independent 150a989ca review of allowed overlays and the original P5 launch-count assertion. Own current engine_host run passed all 31 cases, including the four listed host checks; the recorded compile-only and UNVERIFIED boundaries are not behavior passes."
+}
+```

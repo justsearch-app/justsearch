@@ -427,3 +427,14 @@ fail once with an untyped deadline in a broader run, and that failure was not re
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:a774b476a2dc8b5571dfd59512a9682761dc0d815c694573454d3727f7c65128",
+  "note": "Reviewed admission/deadline/typed refusal obligations and allowed compatibility additions. Own candidate checks passed; exact-source independent reruns match the declared before assertions/preservation and corrected entries 11-12, while compile/exception outcomes remain unverified behavior proof."
+}
+```

@@ -220,3 +220,14 @@ Existing behaviour assertions are retained. Fixture changes encode the same inte
 ## Acceptance records
 
 Pending independent verifier acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:6b82d3be1b4f117e8e858f1caef8b48c881bcf8bfd19a0ea3ae731caba119f8a",
+  "note": "Reviewed the availability-state matrix, retained failures and API-only candidate reason against current tests and sources. Candidate state/behavior and adapted provider-fixture checks passed; unchanged before evidence remains truthful."
+}
+```

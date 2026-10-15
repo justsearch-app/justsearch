@@ -87,3 +87,14 @@ Independent verifier acceptance remains pending. The private execution adapter c
   "note": "verify-batch6 on e331c571b: PMD on adapters-lucene, worker-services, app-services, app-engine, app-observability, ui, core equals 2f42b4d50 (18 vs 18, no additions). The re-recorded evidence shim passes the session DocumentFieldOps exactly as the old constructor did; reproduced on bc2965b52: both checks fail by assertion (43 per-document refreshes; 1259 reopen cost) and pass on the candidate. Same-session quiet in-process bulk medians candidate 496/516/521/496 vs 1e333857b 556/513/513/532 docs/s (overlapping); idle 505-document seed complete 37.8/35.4/35.8 s vs 1e333857b 35.4/35.4/38.2 s, bc2965b52 116.2 s; restart on a bc2965b52 index: 500 unchanged, 0 reindexed."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:c3ee1c85fc6c4df57a8b34566f7ad3e6653a437c510912e7f0abc0f38aec9f34",
+  "note": "Reviewed source relabel, bulk declaration cost and orphan-parent cache oracles; forwarding compatibility constructor preserves the old writer. Candidate checks passed and unchanged bc2965b52 before evidence remains truthful."
+}
+```

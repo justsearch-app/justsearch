@@ -145,7 +145,7 @@ The patch is recorded in the producer's evidence; it contains no repair.
       ],
       "behaviour": "When the pressure clears, the next status pass publishes reloadAllowed=true with no nextReloadNotBefore and a higher servedOperating seq.",
       "class": "New",
-      "evidence": "gates/test-intent/evidence/b6d536-b84-reload-instant-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-b84-gpu-health-2-round-2-6.json",
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java"
       ]
@@ -164,5 +164,27 @@ The patch is recorded in the producer's evidence; it contains no repair.
   "verdict": "accept",
   "digest": "sha256:992433cce8de90b02d0d965aae6a748eee4bff7514dcb7d9e024b5adcf530ecf",
   "note": "VC-gpu3 (independent Claude verifier) on b6d536/integration-gpu vs 217804ac8: accepted b48ef2fcc (GPU lane merged with integration) and the delta c55059360. Live on the real GPU and device plan (P12): external memory pressure unloads idle chat in 0.4 s with gpu_busy, a person's next chat reloads with loading and answers, MCP gets a typed 503 GPU_BUSY with no force and load-anyway 403 REFUSED, a person's load-anyway holds through pressure returning in the 15 s window, indexing shows paused for external GPU use; 20 of its 44 own cases fail on the base for the reason under test; health-stall observer bounded; one unload after short holds; merge kept both sides. Delta: one fixed nextReloadNotBefore per wait and retry-after counting down that wait (both fail on b48ef2fcc). Suites, ArchUnit and PMD show only the base's failures. Evidence refreshed after the merge (dc5facc0c compat before-patches add only missing symbols; before-assertion messages match the original records). Unverified: live repeat of the delta, game plus memory pressure live, residency debug route live (eval-only). Named limit: after sleep or resume a running pressure wait's published instant may be up to 30 s in the past. Digest bound with --base 217804ac8, the combined branch base."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:c128ba2a1ecaaa35a98e84068116ed9218b87e59e24252ece346a2a38ae6a9cb",
+  "note": "Entry 6 attaches b6d536-b84-reload-instant-preservation.json with failBefore null; neither the entry nor preamble gives a reason for candidate-only execution of clearedPressureEndsThePublishedReloadWaitAndRaisesSeq. The executable preservation check has no applicable before-state obstacle declared."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:b0aa6ebbc77e01ea1cf8bbde4fd7d05b0a7538b4ef87b74bba345f2549eb69cc",
+  "note": "Re-reviewed the corrected entry 6 and reran its current check on the candidate and b48ef2fcc; both execute and pass, matching the new preservation evidence. Other entries, tests and retained evidence are unchanged since 6f85a257a."
 }
 ```

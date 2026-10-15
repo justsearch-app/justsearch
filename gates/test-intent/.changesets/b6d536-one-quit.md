@@ -214,7 +214,7 @@ the coordinator's review.
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec F step 8 (S11-U1), the Engine's suspend and resume producer. registersWithWindowsAndUnregisters: PowerRegisterSuspendResumeNotification with DEVICE_NOTIFY_CALLBACK returns ERROR_SUCCESS (0) and PowerUnregisterSuspendResumeNotification of the handle returns 0. theUpcallStubEnqueuesTheSuspendAndNeverThrows: calling the registered upcall stub through a native call with this registration's context and PBT_APMSUSPEND (4) returns 0 and delivers SUSPEND with epoch 1 to a subscriber, even beside a subscriber that throws; a second suspend, an unknown type and an unknown context return 0 and deliver nothing; PBT_APMRESUMEAUTOMATIC (0x12) delivers RESUME with the same epoch and the following PBT_APMRESUMESUSPEND (7) delivers nothing; the throwing subscriber was called for both events; suspendedNanosBetween counts exactly the suspend inside the window and 0 outside it. beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended: before installAtBoot, SystemPowerEvents.current() is NoPowerEvents and reports no suspended time. No fail-before is claimed (Spec F section 8.1).",
+      "behaviour": "Spec F step 8 (S11-U1), the Engine's suspend and resume producer. registersWithWindowsAndUnregisters: PowerRegisterSuspendResumeNotification with DEVICE_NOTIFY_CALLBACK returns ERROR_SUCCESS (0) and PowerUnregisterSuspendResumeNotification of the handle returns 0. theUpcallStubEnqueuesTheSuspendAndNeverThrows: calling the registered upcall stub through a native call with this registration's context and PBT_APMSUSPEND (4) returns 0 and delivers SUSPEND with epoch 1 to a subscriber, even beside a subscriber that throws; a second suspend, an unknown type and an unknown context return 0 and deliver nothing; PBT_APMRESUMEAUTOMATIC (0x12) delivers RESUME with the same epoch and the following PBT_APMRESUMESUSPEND (7) delivers nothing; the throwing subscriber was called for both events; suspendedNanosBetween counts exactly the suspend inside the window and 0 outside it. beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended: before installAtBoot, SystemPowerEvents.current() is NoPowerEvents and reports no suspended time. All three checks fail by assertion on d20c300d1^: assertDoesNotThrow reports that the Engine has no suspend/resume producer because WindowsPowerNotifications or SystemPowerEvents is absent. All three pass on the candidate.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -232,7 +232,7 @@ the coordinator's review.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-power-events.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-one-quit-5.json",
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#registersWithWindowsAndUnregisters",
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#theUpcallStubEnqueuesTheSuspendAndNeverThrows",
@@ -253,5 +253,27 @@ the coordinator's review.
   "verdict": "reject",
   "digest": "sha256:534f4b2f10ae370d4cfbc141f5cf312aa6bf37b858f8778bb0b84358f8ffcef9",
   "note": "Q2 rejects requests without incarnation or nonce. The candidate intentionally honours a nonce-less legacy request at later boot checkpoints; independently reproduced by verify-oq/ProbeBootOwnership.java, laterCheckpointHonoured=true and exitCode=0. Delegation does not override the explicit Q2 contract. Live stack checks and durable chunk replay remain pending."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:3c3a3435f7dd7f51914e49ef93fe1464e331c62c46c7ce8272bab4ca14e39c6a",
+  "note": "Entry 5's b6d536-power-events.json is candidate-only and supplies no reason for omitting before execution; saying no fail-before is claimed is not a reason. The test intentionally uses reflection so an absent production class still compiles and can fail an assertion."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:d0aa4f9b471cd8263ae163b66949052546a8b61099ded739d33bcba3edbfb17c",
+  "note": "Reran all three corrected power checks on the candidate and d20c300d1^, reproducing the declared passes and wrapped ClassNotFoundException assertions without a patch or stub. The before failures establish absence of the new producer/API only, not native registration or delivery failure; this limit is truthfully declared, so it is nonblocking under the stopping rule."
 }
 ```

@@ -119,3 +119,14 @@ safety wrapper are recorded in the builder report.
   "note": "Independent verifier on 65f1c2e8e: earlier checks fail on f6d579a86 by assertion and pass on the candidate. Live, 44 conversations each: base chat child private memory grew 8654 to 17256 MiB (8192 MiB limit); candidate held at about 10.1 GB with limit 1024 MiB, 52 evictions, cache max 1003 MiB; resumed early conversations answered correctly on both; token rate 70.6 vs 71.2 tok/s. Eval mode logs prompt cache disabled for chat and self-test; VDU child logs cache disabled and chat returns at 1024 MiB. Sources now quote the owner's delegation; the policy is labelled agent choice."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:6282eb2ec59317546c0c2d06e553ec323bf2f832f09da3a97cd1d6e8b1eaaafd",
+  "note": "Reviewed cache bounds, captured relaunch policy and the obsolete exact-argv expectation against the delegated choice. Own candidate checks passed and f6d579a86 reruns reproduced the missing-cache/identity/validation assertions, including relaunch checks."
+}
+```

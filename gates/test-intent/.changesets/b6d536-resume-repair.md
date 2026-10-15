@@ -73,7 +73,7 @@ New regression files leave the established controller oracles unchanged. Fail-be
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-resume-repair-preserved.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-resume-repair-2.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded"
       ]
@@ -93,5 +93,27 @@ Independent acceptance remains for the orchestrator/verifier; this builder does 
   "session": "verify-batch1-20261008-independent",
   "verdict": "accept",
   "digest": "sha256:65c52340e542bf822b3a79adedac91230d9f7c41062ab00aab8753d890816adb"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:e1c235bfcd51cf3b6eaa2f5588ab4c6744db14dc07bf8340bf91a6729a4c8a71",
+  "note": "Entry 2's b6d536-resume-repair-preserved.json has failBefore null with no applicable candidate-only reason in the entry or shared preamble. The sibling repaired entry already compiles the same ChatResumeRepairTest class on its declared before-state."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:794c45c5bc4b7b5fe50e2537d63200c2c93ce15a6e4b7227e1ad4b9f75f0bb33",
+  "note": "Reran corrected entry 2 on the candidate and 9e8c7fae2: the resume-after-reload and subsequent refused-boot check executes and passes on both, matching the new preservation evidence. Other entries, tests and retained evidence are unchanged since 6f85a257a."
 }
 ```

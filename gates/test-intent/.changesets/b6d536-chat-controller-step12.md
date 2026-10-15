@@ -119,3 +119,14 @@ candidate, recorded in the adapted evidence.
   "digest": "sha256:ebfbd34bcde271747a1f6523526ce7e591f1dbf8b13ca5cffdf6de613fd578f0"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:07ed692e940e4ea3f05c3652eb59a62063c34fb43005690a30c8fd0365e248c5",
+  "note": "Reviewed constructor/signature adaptations and retained self-test/demand oracles against the sources. Candidate scoped checks and the changed self-test seam class passed; manual old-state claims are observations rather than attached execution proof."
+}
+```

@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T15:12:46.723Z",
+  "revision": "6f85a257a07cbe374d76a059fb310a1ec0df4a23",
+  "tree": "d5e4ca5161964191c91c1fbc4b963521d32c0b47",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23209
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d667f9657397ab271b10ca00971335247ca9123af13d739a05ab4495b35e5c11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9e8c7fae2",
+    "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 87611
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:e8d83028a21dd7e0ae583e4ec77e600c21fc69eb5827b02892352fd8f01e5d6b"
+}

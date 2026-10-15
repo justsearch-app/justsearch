@@ -53,3 +53,14 @@ Evidence regenerated on b599d4d7e (phase B). VduRequestActivityTest now register
   "note": "FAIL LIVE-UNTYPED-TIMER and LIVE-IDLE-UI at exact 7d536ae4f: no-input GET inference/transitions interrupts before the first unit and leaves the document PENDING; 420 seconds of Brain polling prevents automatic capture. Baseline 164a24b1a completes its unit and automatically captures under the same effective UI attribution. Bare-Origin native GET also fails. Real chat interruption/resume now passes. Seven unattended request kinds fail independent bare HTTP/admission/feed checks. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-vdu2/report.md; candidate-live-bare-timer-summary.json; candidate-auto-brain-summary.json. Actual open GUI remains unverified."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:1473e5fea0030d037d2e86907bcf66fca2f851314236f86df03ebca18cd6ed5b",
+  "note": "Current entries, evidence, patch and test source match the independent 75917a073 review, including the 164a24b1a assertion rerun and add-only scaffolding. Own candidate HTTP activity checks also passed."
+}
+```

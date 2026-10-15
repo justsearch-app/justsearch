@@ -24,9 +24,10 @@ Complete legacy parents now keep unchanged admission and acquire declarations fr
     {
       "items": ["modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java"],
       "class": "New",
+      "repaired": true,
       "behaviour": "The legacy expectation changes from compulsory rewrite to unchanged admission with immediate backfill and no repeated splitter call. Declared admission, canonical chunked/zero-child declarations and the 5,000-child/1,000-small-file timing workloads are preserved. Fresh candidate execution includes every case.",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "After backfill the legacy check never runs again for that parent, across restarts.", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: b42 builder brief, 2026-10-09, item 1'; the text does not appear in the owner's turns of session 886833dd"}],
-      "evidence": "gates/test-intent/evidence/b6d536-batch1-legacy-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-batch1-legacy-backfill-2.json",
       "newChecks": ["modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java"]
     },
     {
@@ -51,5 +52,27 @@ Complete legacy parents now keep unchanged admission and acquire declarations fr
   "verdict": "reject",
   "digest": "sha256:853b59219280da25aa575dfa5fa8d43d080aef08ad70a960fc1aef176951751e",
   "note": "The two shared-interface legacy regression checks fail on 65daf680a and pass on freshly built candidate artifacts; incomplete preservation passes. The newly added race checks call new backfill interfaces and have no real-parent assertion fail-before. Required real old-build upgrade counts and comparable quiet scan times are still unverified. See verify-batch2/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:89edea8272447f7cf7935e2453cf72f181c93c80bc6ec2e397d76c22f7b704c2",
+  "note": "Entry 2 attaches candidate-only b6d536-batch1-legacy-preservation.json without explaining the missing before run. Entry 3's absent package-private race APIs concern different checks; the existing legacy isUnmodified oracle does not use them."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:b233c2249160a927cb2a8bda8e9c05ebcf90440c63655b83f9cd7faec8f45805",
+  "note": "Reran all four corrected entry-2 cases on the candidate and 65daf680a: the candidate passes all, while the old complete-legacy admission fails the declared assertion and the other three cases pass. No patch or stub supplies the failure; retained entries and evidence are unchanged since 6f85a257a."
 }
 ```

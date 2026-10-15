@@ -28,6 +28,7 @@ Evidence files (all written by run-evidence.mjs):
   with the steps 1-4 fixture file `WorkerSearchServiceSemanticBudgetTest.java` overlaid (that file
   uses only API present on 68547f75a).
 - `b6d536-search-budget-2-new.json`: checks of new API, no before-state.
+- `b6d536-signoff2-search-budget-2-6.json`: entry 6 preserves detached run-thread lifetime; both checks pass on 3d181a70c and on the candidate.
 - `b6d536-search-budget-2-preservation.json`: preservation checks that pass before (3d181a70c) and
   after. That run exits 1 by design, because none of them shows a repair.
 - `b6d536-search-budget-2-answer-repaired.json`: the repair for the verifier's R1/MCP finding (an
@@ -239,7 +240,7 @@ first runs:
         "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java"
       ],
       "class": "New",
-      "behaviour": "The run thread of a detached native run (a real NativeSessionHandle whose native session never returns, run through the production Lease.run) is a platform daemon thread named ort-query-run-<n>. A child JVM whose main thread leaves such a run detached and still running, closes nothing and returns, exits on its own with status 0 inside 20 s: a stuck native run cannot keep the process alive after the Engine shuts down.",
+      "behaviour": "The run thread of a detached native run (a real NativeSessionHandle whose native session never returns, run through the production Lease.run) is a platform daemon thread named ort-query-run-<n>. A child JVM whose main thread leaves such a run detached and still running, closes nothing and returns, exits on its own with status 0 inside 20 s: a stuck native run cannot keep the process alive after the Engine shuts down. Preservation: both checks pass on 3d181a70c and on the candidate; the acquisition/lease APIs and daemon run-thread construction already exist at that before-state.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -257,7 +258,7 @@ first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-search-budget-2-6.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java"
       ]
@@ -376,5 +377,27 @@ first runs:
   "verdict": "accept",
   "digest": "sha256:1009c824eb709173e9fd4d42580d2eaf584113c6bbab7c282d6d9d0afebbb4a9",
   "note": "verify-d57: fail-before re-run on 1392fdfbc (assertion, reason under test), mutation run on 370d82b33 (cause plumbing, readiness one-way/bound, cold->DEGRADED, daemon), behaviour claims match test code"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:01d629fc14661c8fda4e2c66bc30054b13989fc948da62e8db98250c08ce5efe",
+  "note": "Entry 6's DetachedRunThreadLifetimeTest has candidate-only evidence without an applicable reason: the shared new-API label does not describe it. The acquisition/handle/lease APIs and daemon ort-query-run thread construction already exist at 3d181a70c, so their absence cannot explain omitting this before run."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:4335480387401ea7d1ab89a317f94654ea4c4463e207dcf149a90a02d3f44556",
+  "note": "Reran both corrected detached-thread lifetime cases on the candidate and 3d181a70c; both execute and pass on both revisions, matching the new preservation evidence. The acquisition/lease APIs and daemon construction exist before, and the corrected declaration now says so; retained content is unchanged since 6f85a257a."
 }
 ```

@@ -29,7 +29,7 @@ self-test) is unchanged. This changeset covers only these files.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A chat switch made while the activation self-test runs is deferred, never a conflict. chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes: with chat off, the user turns chat on through RuntimeSpecStore (the settings owner of the mode route) during a passing self-test; the activation completes, chat is on, and the settings carry the variant executable and 99 GPU layers. chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated: with chat on, the user turns chat off during the self-test; the activation completes with the variant executable and chat stays off. On dee93cc5a both fail the activation as the verifier saw it ('code=RUNTIME_ACTIVATION_FAILED message=Runtime apply failed: Settings changed since this candidate was read ==> expected: <completed> but was: <failed>').",
+      "behaviour": "A chat switch made while the activation self-test runs is deferred, never a conflict. chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes: with chat off, the user turns chat on through RuntimeSpecStore (the settings owner of the mode route) during a passing self-test; the activation completes, chat is on, and the settings carry the variant executable and null configuredGpuLayers for automatic profile selection. chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated: with chat on, the user turns chat off during the self-test; the activation completes with the variant executable and chat stays off. On dee93cc5a both fail the activation as the verifier saw it ('code=RUNTIME_ACTIVATION_FAILED message=Runtime apply failed: Settings changed since this candidate was read ==> expected: <completed> but was: <failed>').",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -79,3 +79,25 @@ self-test) is unchanged. This changeset covers only these files.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:6aee54d6ee945e7759b7b6ace6e7c34d7da9e715b415a807a4af50c32c4392f0",
+  "note": "Entry 1 says activation preserves 99 GPU layers, while the current chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes assertion requires configuredGpuLayers to be null for automatic profile selection. The declaration was not corrected when that oracle changed."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:ecc337c3811e66606382a089350e0023ea72a3cb389bb8036eec45eca404645f",
+  "note": "Reran both corrected activation checks on the candidate and confirmed automatic profile selection asserts null configuredGpuLayers, with the chat choice and variant executable preserved. The existing before-state evidence and remaining entry are unchanged since 6f85a257a."
+}
+```

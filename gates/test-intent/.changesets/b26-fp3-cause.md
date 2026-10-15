@@ -113,3 +113,14 @@ Pending independent verifier acceptance; the builder supplies execution proof an
   "note": "The identical six checks pass on the candidate; four fail on f8c4967ed by the intended assertion and two preservation controls pass, corroborated by direct compilation and ordinary Gradle. Closed and ready available-provider probes corroborate the repaired queue cause. Test intent is accepted; implementation verdict is FAIL FP3: a transiently unavailable/loading compatible provider substitutes NO_EMBEDDING_SERVICE for explicit HYBRID and loses reason/cause for AUTO after queued expiry. Independent worker probes establish the elapsed queue; cold real HTTP reproduces the wrong-reason pattern. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-fp2/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:70226e9f22cb4014a6bf19f4040d87c63545a4aba230c1179be02df2b33b6499",
+  "note": "Reviewed queued/loading cause and real HTTP reason projections against the intent sources. Candidate checks passed; own f8c4967ed reruns reproduced the declared assertions and preservation outcomes."
+}
+```

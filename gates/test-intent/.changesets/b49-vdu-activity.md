@@ -60,3 +60,14 @@ The verifier's mixed PDF, search, 45-second cooldown and explicit enrichment pas
   "note": "Verified exact 7d536ae4f against 164a24b1a. Quiet GPU-on, administrator GPU-off CPU, real chat interruption and later pending-document completion pass. Reject integrated quiet-pass/idle behavior: unattended Brain polling interrupts an accepted pass and blocks automatic capture, while baseline completes and auto-starts. Native bare-Origin GET reproduces interruption. Full checks, exclusions, scope and unverified native cases: F:/agent-sandbox/design-b6d536/codex/verify-vdu2/report.md. Evidence: candidate-live-bare-timer-summary.json; candidate-auto-brain-summary.json; candidate-cpu-proof.json."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "accept",
+  "digest": "sha256:52fe0e803dcde349aee1e5f1e37aa96d78726f7864182b67642ef0e32bd4878b",
+  "note": "Reviewed the delegated-choice relabel and both production checkpoint/projector oracles against current code. Candidate checks passed, with unchanged assertion before evidence at f6d579a86."
+}
+```

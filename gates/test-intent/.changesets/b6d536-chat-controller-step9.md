@@ -42,42 +42,19 @@ Follow-up round (coordinator, before commit):
   sends it again. The shared stream-error words use the refusal's own message, so the search
   window's ask says why instead of showing the raw 503.
 
-Fail-before for checks on API new in this change (manual run, not a run-evidence file). The run
-used a temporary `git worktree add` of 43564e20f outside the repo, removed after the run. Stubs and
-logs are kept in the builder sandbox (stub-logs/step1-*, step2-*). Two before-states:
+Entries 7 and 9 are candidate-only. A direct run on 43564e20f with the current check
+files overlaid fails to compile; it is not an assertion fail-before. The earlier all-stub and
+layer-stub runs do not establish old behavior and are withdrawn as evidence for these entries.
 
-1. All-stub: 43564e20f plus signature-only stubs of every new API. The controller ignores
-   pressure, never unloads, completes every demand and load anyway at once, and has the
-   six-argument constructor. ChatResidency is the interface only. The gate admits everything, the
-   routes do nothing and the setters are no-ops. New enum constants and interface defaults are
-   copied in, because they are types. ChatResidencyTest: 22 of 26 fail, every one by
-   AssertionFailedError.
-   - CH7 fails at its own assertion: "Expected java.util.concurrent.ExecutionException to be
-     thrown, but nothing was thrown".
-   - U19's contrast half fails: p3OnSixteenGigabytesAGameAloneDoesNotUnloadButAnotherAppDoes,
-     "EXTERNAL_MEMORY always unloads ==> expected: <[unload:gpu_busy]> but was: <[]>".
-   - u19NoPressureNeverUnloadsAnIdleServer passes, as a negative property must on a stub.
-2. Layer stubs: the candidate's app-api, app-inference and app-services, with only the
-   controller's demand() and loadAnyway() reduced to stubs that complete at once. The UI API is
-   stubbed as in run 1. This isolates the demand policy, the dwell, load anyway and the HTTP
-   refusals from the unload. ChatResidencyTest: 10 fail; ChatResidencyRoutesTest: 9 of 9 fail.
-   Every failure is an AssertionFailedError:
-   - U17: u17UnderPressureEveryDemandKindIsRefusedOrWaitsAndNoneLoads. A HUMAN_CHAT demand under
-     pressure was not refused; the failure is at refused().
-   - U18 and the dwell: u18NoDemandReloadsWithinTwoMinutesOfAPressureUnload and
-     u17WithinTheDwellAnAgentUnderPressureIsToldToWaitForTheDwell. A demand inside the dwell was
-     not refused.
-   - Load anyway (controller): t26APersonLoadsAnywayAndOnlyANewPressureEdgeUnloadsAgain, "load
-     anyway skips the pressure and the dwell ==> expected: <[up:RESIDENCY_RELOAD]> but was:
-     <[]>". f8OnlyAPersonMayLoadAnyway: "Expected ChatRefusal to be thrown, but nothing was
-     thrown".
-   - I7: "expected: <CHAT_UNAVAILABLE> but was: <SERVICE_UNAVAILABLE>". The refused connection
-     to the unloaded server answered instead.
-   - Load anyway (route): t26LoadAnywayFromTheAppLoadsUnderPressure, "the model loads in spite of
-     the pressure ==> expected: <true> but was: <false>". f8LoadAnywayWithoutThePersonsEvidence
-     IsRefused: "expected: <403> but was: <200>".
-   - CH7: ch7AGpuStartUnderPressureIsRefusedIntoUnloadedWithoutADwell, "expected:
-     <[unload:gpu_busy, up:RESIDENCY_RELOAD]> but was: <[unload:gpu_busy]>".
+before-state not reproducible: entry 7 reaches residency methods that do not exist on the
+43564e20f ChatServerControllerImpl, including reportPressure, demand, loadAnyway and unloaded;
+the old controller has no pressure/residency transition for a before-API adapter to call.
+Supplying no-op pressure handling or fixed demand outcomes would decide the assertions.
+
+before-state not reproducible: entry 9 reaches the same absent controller residency methods,
+and 43564e20f has no ChatResidencyController or ChatResidencyGate (including its refusalBody mapping).
+Supplying replacement routes, a permissive gate or immediate-success demand/load-anyway methods
+would decide the asserted HTTP/refusal outcomes. No stub-decided failure is claimed.
 
 The MCP refusal mapping fails before in the ui-repaired evidence, because it compiles on
 43564e20f. Checks that only test plumbing of a new type stay New without fail-before, and their
@@ -288,7 +265,7 @@ caller gets TimeoutException instead of "UnsupportedOperationException: drain br
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec A §9.2 U17-U19 and the residency rows of step 9, on new API (the ChatResidency interface, reportPressure and demand are new in this change; the manual stub runs described above record which checks fail before by assertion), with a stand-in actuator, a hand clock and a fake generation tracker. U19: with pressure NONE an idle GPU server is never unloaded. T21: pressure from another GPU user unloads an idle GPU server (RESIDENCY_UNLOAD, IF_IDLE) and chat reads UNLOADED with GPU_BUSY; a CPU server is never unloaded. P3: on P16_PLUS a GAME report alone does not unload and EXTERNAL_MEMORY does; on P12 a game unloads with GAME_MODE; until the profile is known (UNRESOLVED) a game alone leaves chat loaded and a person's chat goes straight through, while no VDU pass may start and EXTERNAL_MEMORY still unloads. T22: a reply in progress defers the unload to the next idle edge, and a lease opened before the drain does the same; pressure that clears before the stop leaves chat loaded. F6: ten minutes of forwarded chatEnabled activations do not reload an unloaded chat. U18: no demand reloads within 120 s of a pressure unload; an agent demand reloads once pressure is gone and the dwell is over. U17: under pressure a person's chat (webview or paired device) is refused GPU_BUSY with forceAllowed true and a 30 s retry; a HUMAN_CHAT demand from an MCP client, the CLI, an internal caller or the supervisor, and an agent's chat, are refused GPU_BUSY without forceAllowed and told when to ask again; assist and aux are refused and never load (also with pressure gone); a background demand waits and nothing loads; within the dwell an agent under a game on P12 is told to retry after the dwell. A waiting background demand ends with the reload a person starts; switching chat off ends it as OFF (and chat reads OFF, not unloaded); a demand while chat runs goes straight through. T26: a person's loadAnyway loads under pressure and only a new pressure edge unloads again; F8: loadAnyway without a person's evidence is refused REFUSED. CH7: a GPU start under pressure is refused into UNLOADED without a dwell. T40: an open VDU hold is asked to finish under pressure and the idle server then unloads; U13: no VDU pass starts under pressure or while chat is unloaded for another GPU user; a running hold starts an unloaded server and clears the latch. After shutdown a demand is refused ENGINE_STOPPING, a waiting background demand ends ENGINE_STOPPING, and the idle-edge subscription is closed.",
+      "behaviour": "Spec A §9.2 U17-U19 and the residency rows of step 9, on new residency API (candidate-only, with the concrete before-state limitation stated above), with a stand-in actuator, a hand clock and a fake generation tracker. U19: with pressure NONE an idle GPU server is never unloaded. T21: pressure from another GPU user unloads an idle GPU server (RESIDENCY_UNLOAD, IF_IDLE) and chat reads UNLOADED with GPU_BUSY; a CPU server is never unloaded. P3: on P16_PLUS a GAME report alone does not unload and EXTERNAL_MEMORY does; on P12 a game unloads with GAME_MODE; until the profile is known (UNRESOLVED) a game alone leaves chat loaded and a person's chat goes straight through, while no VDU pass may start and EXTERNAL_MEMORY still unloads. T22: a reply in progress defers the unload to the next idle edge, and a lease opened before the drain does the same; pressure that clears before the stop leaves chat loaded. F6: ten minutes of forwarded chatEnabled activations do not reload an unloaded chat. U18: no demand reloads within 120 s of a pressure unload; an agent demand reloads once pressure is gone and the dwell is over. U17: under pressure a person's chat (webview or paired device) is refused GPU_BUSY with forceAllowed true and a 30 s retry; a HUMAN_CHAT demand from an MCP client, the CLI, an internal caller or the supervisor, and an agent's chat, are refused GPU_BUSY without forceAllowed and told when to ask again; assist and aux are refused and never load (also with pressure gone); a background demand waits and nothing loads; within the dwell an agent under a game on P12 is told to retry after the dwell. A waiting background demand ends with the reload a person starts; switching chat off ends it as OFF (and chat reads OFF, not unloaded); a demand while chat runs goes straight through. T26: a person's loadAnyway loads under pressure and only a new pressure edge unloads again; F8: loadAnyway without a person's evidence is refused REFUSED. CH7: a GPU start under pressure is refused into UNLOADED without a dwell. T40: an open VDU hold is asked to finish under pressure and the idle server then unloads; U13: no VDU pass starts under pressure or while chat is unloaded for another GPU user; a running hold starts an unloaded server and clears the latch. After shutdown a demand is refused ENGINE_STOPPING, a waiting background demand ends ENGINE_STOPPING, and the idle-edge subscription is closed.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -385,7 +362,7 @@ caller gets TimeoutException instead of "UnsupportedOperationException: drain br
         "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec A I7 and the step-9 routes, on new API (the residency gate, the load-anyway route and the dev trigger are new in this change; I7, the person/agent gate and the load-anyway checks fail before by assertion in the layer-stub run described above, while the dev-trigger checks and ChatRefusalWireTest test plumbing of new types and stay New without fail-before), with the real controller on a stand-in actuator. I7: /v1/chat/completions while chat is unloaded under pressure is 503 CHAT_UNAVAILABLE TRANSIENT, reason GPU_BUSY, forceAllowed false, retryAfterMs over 30 s and at most 120 s, with Retry-After, conforming to api-error-response.v1; no request reaches the server (which, unloaded, would refuse the connection) and nothing loads. A header-less POST /api/chat/runs without allowLoad is an agent's and is refused GPU_BUSY without creating a run. A person's chat (allowLoad, webview) under a game is refused GAME_MODE with forceAllowed true; an MCP-client caller claiming allowLoad gets forceAllowed false. With the pressure gone a person's chat reloads an unloaded model (RESIDENCY_RELOAD) and goes on once it is ready. POST /api/chat/load-anyway from the app loads under pressure; without allowLoad, or from an MCP client, it is 403 AI_OFFLINE reason REFUSED and nothing loads. The dev pressure trigger is 404 outside eval mode and leaves the pressure NONE; in eval mode EXTERNAL_MEMORY is reported and chat unloads, and an unknown signal is 400; GAME without a profile leaves chat loaded, and GAME with profile p12 sets P12 and unloads with GAME_MODE. ChatRefusalWireTest: every RefusalReason maps to its wire code (CHAT_UNAVAILABLE for GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, SELF_TEST, BUSY, DEVICE_RECOVERING; AI_STARTING for LOADING; AI_OFFLINE for OFF, FAILED, REFUSED; SERVICE_UNAVAILABLE for ENGINE_STOPPING) with reason and forceAllowed, a permanent code carries no retry time, and every body conforms to api-error-response.v1.",
+      "behaviour": "Spec A I7 and the step-9 routes, on new residency routes and refusal mapping (candidate-only, with the concrete before-state limitation stated above), with the real controller on a stand-in actuator. I7: /v1/chat/completions while chat is unloaded under pressure is 503 CHAT_UNAVAILABLE TRANSIENT, reason GPU_BUSY, forceAllowed false, retryAfterMs over 30 s and at most 120 s, with Retry-After, conforming to api-error-response.v1; no request reaches the server (which, unloaded, would refuse the connection) and nothing loads. A header-less POST /api/chat/runs without allowLoad is an agent's and is refused GPU_BUSY without creating a run. A person's chat (allowLoad, webview) under a game is refused GAME_MODE with forceAllowed true; an MCP-client caller claiming allowLoad gets forceAllowed false. With the pressure gone a person's chat reloads an unloaded model (RESIDENCY_RELOAD) and goes on once it is ready. POST /api/chat/load-anyway from the app loads under pressure; without allowLoad, or from an MCP client, it is 403 AI_OFFLINE reason REFUSED and nothing loads. The dev pressure trigger is 404 outside eval mode and leaves the pressure NONE; in eval mode EXTERNAL_MEMORY is reported and chat unloads, and an unknown signal is 400; GAME without a profile leaves chat loaded, and GAME with profile p12 sets P12 and unloads with GAME_MODE. ChatRefusalWireTest: every RefusalReason maps to its wire code (CHAT_UNAVAILABLE for GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, SELF_TEST, BUSY, DEVICE_RECOVERING; AI_STARTING for LOADING; AI_OFFLINE for OFF, FAILED, REFUSED; SERVICE_UNAVAILABLE for ENGINE_STOPPING) with reason and forceAllowed, a permanent code carries no retry time, and every body conforms to api-error-response.v1.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -422,3 +399,25 @@ caller gets TimeoutException instead of "UnsupportedOperationException: drain br
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2-20261015",
+  "verdict": "reject",
+  "digest": "sha256:19cd264dbb241fdabf2d612213bfa10e3b57c2d2029e1748162da63cea29f036",
+  "note": "Entries 7 and 9 claim assertion fail-before from the manual all-stub/layer-stub runs described in the preamble. Those runs replace the controller/gate/routes or demand/loadAnyway behavior with no-op or immediate-success stubs that determine the asserted failures, so they are not old-behavior witnesses."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:7acc16dda3aabe5b7ff39c448f9819bea7362734571971056b1918eac204209e",
+  "note": "Reran all 36 checks in corrected entries 7 and 9 on the candidate and confirmed the declared old controller, residency controller and gate APIs are absent at 43564e20f. The new candidate-only reasons are true and the stub-decided runs are explicitly withdrawn; retained content is unchanged since 6f85a257a."
+}
+```
