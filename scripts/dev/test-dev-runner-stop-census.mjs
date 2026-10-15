@@ -4331,3 +4331,181 @@ test('round 12 final check after the Engine job step: a tracked job member the j
     await member.end();
   }
 });
+
+/**
+ * Round 13 (the verifier's late-repaired-cli-final): a crashed Engine's writer left the start of its
+ * child torn (a whole JSON record without its final line feed), so no read of the ledger shows it.
+ * A real CLI stop of that run looks up what it knows; a successor Engine's real ledger writer then
+ * repairs the torn line (owner-died IDENTITY_UNKNOWN, then a new session) only once the stop's census
+ * is finishing, after the stop's last lookup. The census's final read is the first to show the start.
+ * `subjectAlive`: the child still runs. Returns the stop's report, the PIDs each lookup was asked of,
+ * and `retry()`, a second real CLI stop of the same run (after `endSubject()` when wanted).
+ */
+async function lateRepairedRun(label, { subjectAlive = false } = {}) {
+  const oldSupervisor = await liveChild(), oldEngine = await liveChild(1), subject = await liveChild();
+  const top = freshDir(`r13-late-repaired-${label}`);
+  const gate = path.join(top, 'repair.gate'), done = path.join(top, 'repair.done'), ready = path.join(top, 'repair.ready');
+  const trace = path.join(top, 'trace.jsonl');
+  // The successor Engine: a separate process whose own writer appends to the children ledger.
+  const successorProgram = `const fs=require('node:fs'),path=require('node:path');let timer;process.on('message',m=>{
+    if(m==='end'){process.exit(0);return;}
+    const lib=require(path.join(m.root,'scripts/dev/lib/exit-ledger.cjs'));
+    const w=lib.createLedgerWriter({ledgerDir:m.ledgerDir,family:'children',rotates:true,writer:{role:'engine',pid:process.pid,startedAt:m.startedAt}});
+    fs.writeFileSync(m.ready,'ready');
+    timer=setInterval(()=>{if(!fs.existsSync(m.gate))return;clearInterval(timer);
+      w.append('owner-died',{childId:'old-child',previousOwner:m.oldOwner,basis:'OPEN_SPAWN',osCheck:'IDENTITY_UNKNOWN',exitClass:'UNKNOWN'});
+      w.startSession();fs.writeFileSync(m.done,'done');},10);});
+    setTimeout(()=>process.exit(0),120000);`;
+  const successorProc = cp.spawn(process.execPath, ['-e', successorProgram], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+  let successorErr = '';
+  successorProc.stderr.on('data', (b) => { successorErr += b; });
+  const successorExited = new Promise((resolve) => successorProc.once('exit', resolve));
+  await new Promise((resolve) => successorProc.once('spawn', resolve));
+  const successorBirth = String(cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `[Diagnostics.Process]::GetProcessById(${successorProc.pid}).StartTime.ToUniversalTime().ToFileTimeUtc()`],
+  { encoding: 'utf8', windowsHide: true, timeout: 60000 }).stdout).trim();
+  const ends = [subject, oldEngine, oldSupervisor];
+  const cleanup = async () => {
+    for (const p of ends) await p.end();
+    if (successorProc.exitCode === null) { try { successorProc.send('end'); } catch { /* ending */ } }
+    await successorExited;
+  };
+  try {
+    const runId = `stop-census-r13-late-repaired-${label}`, inc = { session: runId, n: 1 };
+    const data = path.join(top, 'data'), ld = ledgerLib.ledgerDirectory(data);
+    fs.mkdirSync(ld, { recursive: true });
+    const cim = (b) => String(BigInt(b) / 10n * 10n);
+    const oldOwner = { pid: oldEngine.pid, creationFileTime: oldEngine.creationFileTimeUtc, instanceId: 'crashed-old-engine' };
+    const oldWriter = { role: 'engine', pid: oldEngine.pid, startedAt: isoMs(oldEngine.creationFileTimeUtc) };
+    const supervisorWriter = { role: 'dev-runner', pid: oldSupervisor.pid, startedAt: isoMs(oldSupervisor.creationFileTimeUtc) };
+    let seq = 0;
+    const row = (type, fields, writer = oldWriter) => ({ schemaVersion: 1, type, seq: ++seq, at: new Date().toISOString(), writer, ...fields });
+    const ef = path.join(ld, 'engine.v1.jsonl'), cf = path.join(ld, 'children.v1.jsonl');
+    const engineStart = (pid, birth, incarnation, writer) => row('engine-start', { incarnation, pid, creationFileTime: birth,
+      executable: process.execPath, processStartedAt: isoMs(birth), cause: 'INITIAL', supervisorKind: 'dev-runner' }, writer);
+    fs.writeFileSync(ef, JSON.stringify(engineStart(oldEngine.pid, cim(oldEngine.creationFileTimeUtc), inc, supervisorWriter)) + '\n');
+    fs.writeFileSync(cf, JSON.stringify(row('child-spawn', { childId: 'old-child', kind: 'EXTRACTION', owner: oldOwner,
+      label: 'fixture', gpu: false })) + '\n');
+    // The crash: the child's start is written whole but without its final line feed.
+    fs.appendFileSync(cf, JSON.stringify(row('child-start', { childId: 'old-child', pid: subject.pid,
+      creationFileTime: subject.creationFileTimeUtc, birthTick: '1', executable: process.execPath, contained: true,
+      processStartedAt: isoMs(subject.creationFileTimeUtc), argvHash: '0'.repeat(64), gpuDevice: null })));
+    if (!subjectAlive) await subject.end();
+    await oldEngine.end();
+    fs.appendFileSync(ef, JSON.stringify(row('engine-exit', { incarnation: inc, code: 1, exitClass: 'UNEXPECTED', reason: null,
+      forced: false, exitedAt: new Date().toISOString(), detail: null, codeName: null, observedAt: new Date().toISOString(),
+      terminateCalledAt: null, phase: 'RUNNING', codeDistinctive: true,
+      contract: { action: 'stop', exitClass: 'UNEXPECTED', counted: true } }, supervisorWriter)) + '\n');
+    await oldSupervisor.end();
+    // The successor belongs to another run: this run's stop neither accounts nor ends it.
+    fs.appendFileSync(ef, JSON.stringify(engineStart(successorProc.pid, successorBirth, { session: `${runId}-successor`, n: 1 },
+      { role: 'dev-runner', pid: process.pid, startedAt: new Date().toISOString() })) + '\n');
+    assert.ok(!census.readRunLedger(data).children.records.some((r) => r.type === 'child-start'), 'the torn start is not read');
+    const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({ schemaVersion: 1, runId, dataDir: data, apiPortActual: 0,
+      uiPortActual: 0, incarnation: 1, control: { stopRequest: true }, pids: { runnerPid: oldSupervisor.pid,
+        backendRootPid: oldEngine.pid, frontendRootPid: null }, identities: { runner: { pid: oldSupervisor.pid,
+        creationFileTimeUtc: cim(oldSupervisor.creationFileTimeUtc), executable: process.execPath }, backend: { pid: oldEngine.pid,
+        creationFileTimeUtc: cim(oldEngine.creationFileTimeUtc), executable: process.execPath } } }));
+    successorProc.send({ root, ledgerDir: ld, startedAt: Number((BigInt(successorBirth) - EPOCH) / 10000n), oldOwner, gate, done, ready });
+    for (const by = Date.now() + 15000; !fs.existsSync(ready) && successorProc.exitCode === null && Date.now() < by;) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.ok(fs.existsSync(ready), `the successor's ledger writer is ready: ${successorErr}`);
+    // In the stop's process: the repair is let through when the census reads its observer's output at
+    // finish, and every identity-checked lookup is traced.
+    const preload = path.join(top, 'preload.cjs');
+    fs.writeFileSync(preload, `'use strict';
+const fs = require('node:fs'), path = require('node:path');
+const originalRead = fs.readFileSync;
+let fired = false;
+fs.readFileSync = function (file, ...args) {
+  const value = originalRead.call(this, file, ...args);
+  if (!fired && typeof file === 'string' && path.basename(file) === 'process-exits.json'
+    && fs.existsSync(path.join(path.dirname(file), 'exit-census-finish.json'))) {
+    fired = true;
+    fs.writeFileSync(process.env.R13_GATE, 'repair after the last lookup');
+    const end = Date.now() + 10000, sleep = new Int32Array(new SharedArrayBuffer(4));
+    while (!fs.existsSync(process.env.R13_DONE) && Date.now() < end) Atomics.wait(sleep, 0, 0, 10);
+    if (!fs.existsSync(process.env.R13_DONE)) throw new Error('the successor did not repair the ledger');
+  }
+  return value;
+};
+const a = require(path.join(process.env.R13_ROOT, 'scripts/dev/lib/engine-actuator.cjs'));
+const lookup = a.lookupProcessIdentities;
+a.lookupProcessIdentities = async function (...args) {
+  fs.appendFileSync(process.env.R13_TRACE, JSON.stringify({ pids: args[0] }) + '\\n');
+  return lookup.apply(this, args);
+};
+`);
+    const stop = (session) => {
+      const env = { ...process.env, JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', CI: '', R13_GATE: gate, R13_DONE: done,
+        R13_TRACE: trace, R13_ROOT: root };
+      delete env.NODE_OPTIONS;
+      const out = cp.spawnSync(process.execPath, ['-r', preload, path.join(root, 'scripts/dev/dev-runner.cjs'), 'stop', '--json',
+        '--run', runId, '--session-id', session], { cwd: root, env, encoding: 'utf8', windowsHide: true, timeout: 180000 });
+      return { status: out.status, report: JSON.parse(String(out.stdout).trim().split(/\r?\n/).filter(Boolean).at(-1) ?? '{}') };
+    };
+    const lookups = () => (fs.existsSync(trace) ? fs.readFileSync(trace, 'utf8').trim().split('\n').filter(Boolean)
+      .map((l) => JSON.parse(l).pids) : []);
+    const first = stop(`r13-late-repaired-${label}`);
+    assert.ok(fs.existsSync(done), 'the successor repaired the torn start during the stop');
+    assert.ok(census.readRunLedger(data).children.records.some((r) => r.type === 'child-start'), 'the repaired start is read');
+    const alive = () => Promise.race([subject.exited.then(() => false), new Promise((resolve) => setTimeout(() => resolve(true), 500))]);
+    return { subject, successorPid: successorProc.pid, ...first, lookups, alive, cleanup,
+      endSubject: () => subject.end(), retry: () => stop(`r13-late-repaired-${label}-retry`) };
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+}
+
+test('round 13 late-repaired start (the verifier\'s late-repaired-cli-final): a start only the census\'s final read shows, of a child already gone, is looked up once more and accounted; the real CLI stop is STOPPED and complete', { skip: !windows && 'identity-checked stop', timeout: 300000 }, async () => {
+  const run = await lateRepairedRun('gone');
+  try {
+    assert.ok(run.lookups().flat().includes(run.subject.pid), `the late start reaches an identity-checked lookup: ${JSON.stringify(run.lookups())}`);
+    assert.ok(!run.lookups().flat().includes(run.successorPid), 'the other run\'s Engine is never looked up as this run\'s');
+    assert.equal(run.report.outcome, 'STOPPED', JSON.stringify({ errors: run.report.errors, unresolved: run.report.unresolvedProcesses }));
+    assert.equal(run.status, 0);
+    assert.equal(run.report.exitAccountingComplete, true, JSON.stringify(run.report.exitAccountingGaps));
+    assert.ok((run.report.endedByLookup ?? []).some((o) => o.pid === run.subject.pid
+      && o.creationFileTimeUtc === run.subject.creationFileTimeUtc), JSON.stringify(run.report.endedByLookup));
+  } finally {
+    await run.cleanup();
+  }
+});
+
+test('round 13 late-repaired start of a child still running: looked up once, reported by its birth, never ended; the real CLI stop is incomplete, never STOPPED and complete', { skip: !windows && 'identity-checked stop', timeout: 300000 }, async () => {
+  const run = await lateRepairedRun('alive', { subjectAlive: true });
+  try {
+    assert.equal(await run.alive(), true, 'the stop never ends a process it knows only from the ledger');
+    assert.ok(run.lookups().flat().includes(run.subject.pid), JSON.stringify(run.lookups()));
+    assert.equal(run.report.outcome, 'STOP_INCOMPLETE', JSON.stringify({ errors: run.report.errors, unresolved: run.report.unresolvedProcesses }));
+    assert.notEqual(run.status, 0);
+    assert.notEqual(run.report.exitAccountingComplete, true);
+    assert.ok((run.report.unresolvedProcesses ?? []).some((p) => p.pid === run.subject.pid
+      && p.creationFileTimeUtc === run.subject.creationFileTimeUtc), JSON.stringify(run.report.unresolvedProcesses));
+    assert.ok(!(run.report.killedPids ?? []).includes(run.subject.pid), 'never ended');
+  } finally {
+    await run.cleanup();
+  }
+});
+
+test('round 13 retry: the left-over exit_unproven of a late-repaired child that has since exited is resolved by the next stop\'s lookup; that real CLI stop is STOPPED and complete', { skip: !windows && 'identity-checked stop', timeout: 300000 }, async () => {
+  const run = await lateRepairedRun('retry', { subjectAlive: true });
+  try {
+    assert.equal(run.report.outcome, 'STOP_INCOMPLETE', JSON.stringify(run.report.unresolvedProcesses));
+    assert.ok((run.report.exitAccountingGaps ?? []).some((g) => g.pid === run.subject.pid && g.reason === 'exit_unproven'),
+      `the first stop leaves the child's exit unproven: ${JSON.stringify(run.report.exitAccountingGaps)}`);
+    await run.endSubject();
+    const asked = run.lookups().length;
+    const second = run.retry();
+    assert.ok(run.lookups().slice(asked).flat().includes(run.subject.pid), 'the retry looks the child up');
+    assert.equal(second.report.outcome, 'STOPPED', JSON.stringify({ errors: second.report.errors, unresolved: second.report.unresolvedProcesses }));
+    assert.equal(second.report.exitAccountingComplete, true, JSON.stringify(second.report.exitAccountingGaps));
+    assert.ok(!(second.report.exitAccountingGaps ?? []).some((g) => g.pid === run.subject.pid), 'the exit_unproven gap is resolved');
+  } finally {
+    await run.cleanup();
+  }
+});

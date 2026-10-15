@@ -776,11 +776,22 @@ Merge onto b101 (branch b6d536/integration at 181363e86, merging b6d536/stop-cen
   by assertion on the merge before this change (`final_owner_receipt_unavailable`; nothing
   `unproven`), 17 and 19 pass there (verifier-r11/merge/selfmember/census-identity-before.tap,
   -after.tap).
+- Round 13 on 3bc5c6f57 (the orchestrator's decision under the agreed fallback, look up whatever
+  an exact match does not prove; the verifier's `late-repaired-cli-final.cjs`, inherited: the
+  verifier's base run fails it too): a successor Engine can complete a crashed writer's torn child
+  start after the stop's last lookup, so only the census's final read of the ledger shows it, and
+  the stop returned
+  `STOPPED` with `exit_unproven` for a child already gone, never looked up. Now each start that final
+  read leaves unproven (`ledgerResolution`) and the stop did not know is looked up once before the
+  verdict (`finish({ lookUpLate })`, one bounded pass, no loop). Found absent or reborn, it is
+  accounted by that lookup as the first lookup's are (the stop never acted on it, so Spec B step 9
+  holds); still running or unreadable, it is reported in `unresolvedProcesses` and kept for the next
+  stop, never ended, and the stop is `STOP_INCOMPLETE`.
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (100 cases; 40 and 41 rewritten and
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (103 cases; 40 and 41 rewritten and
 42 to 61 added in round 8, 62 to 71 in round 9, 69 rewritten and 72 to 82 added in round 10, 40, 41
 and 71 extended, 58 changed and 83 to 95 added in round 11, 96 in round 12, 97 to 100 in the merge
-onto b101, with their own before-results below). Cases 1 to 6 fail by
+onto b101, 101 to 103 in round 13, with their own before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -1307,6 +1318,21 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    the stop's last lookup; the job step (`stopEngineJob` given to `stopRun`) ends it and reports it
    ended. The stop is `STOPPED` with nothing unresolved. Fails by assertion on the merge before this
    change (the member "recorded process is still alive", judged on the lookup before the job step).
+101. Round 13, the verifier's `late-repaired-cli-final.cjs` ported: a crashed Engine's child start
+   is torn (whole record, no final line feed); the child, the Engine and its supervisor have exited;
+   a successor Engine of another run, a separate process with the real ledger writer, repairs the
+   line (owner-died `IDENTITY_UNKNOWN`, a new session) only when the real CLI stop's census reads its
+   observer's output at finish, after the stop's last lookup. The child's PID reaches an
+   identity-checked lookup, the successor's never does; the stop is `STOPPED`, exits 0, complete,
+   and `endedByLookup` names the child's PID and birth. Fails by assertion on 3bc5c6f57 (the child's
+   PID never looked up).
+102. Round 13, the same with the child still running: it is looked up, reported in
+   `unresolvedProcesses` with its birth, never ended (alive after the stop), and the stop is
+   `STOP_INCOMPLETE`, not complete. Fails by assertion on 3bc5c6f57 (never looked up; `STOPPED`).
+103. Round 13, the retry: the first stop of case 102's run leaves `exit_unproven` for the running
+   child; once it has exited, the next real CLI stop looks it up and is `STOPPED` and complete, the
+   gap resolved. Fails by assertion on 3bc5c6f57 (its first stop is `STOPPED`, with nothing left
+   to retry).
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -1569,5 +1595,13 @@ all four pass on the candidate. Its before-state is f5877635f with
 `VramDetectorOwnedBootTest`, `TikaProductionOwnerCoverageTest` and
 `CrashedEngineHelperReceiptTest#successorRecordsCrashConsequenceAndUnknownExitTime` fail by
 assertion, and `EngineSpawnOwnershipArchTest` (not declared repaired) passes.
+
+After round 13 (verifier-r11/merge/r13/): the check passes 103 of 103 (the 17 MB stops 3,267 and
+3,041 ms, the generated cases 40 and 41 65,173 and 18,001 ms, cases 101 to 103 2,115, 2,636 and
+3,291 ms; suite/test-dev-runner-stop-census.rerun.log); 101, 102 and 103 fail by assertion on
+3bc5c6f57 (stop-census-r13-before-3bc5c6f57.tap, -after.tap). `test-dev-runner-census-identity.mjs`
+(19), every one of the 44 `test-dev-runner-*.mjs` files (suite/summary.txt; the stop-census file
+there before the self-PID test moved out of the identity region, then run again),
+`e-pair-identity.test.mjs` (12) and `fixture-cleanup.test.mjs` (10) pass.
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r11/).
