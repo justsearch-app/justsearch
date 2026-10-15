@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T16:40:06.363Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "287eca146c4d5de8d1f6f419dab74b88f68e171e",
+  "createdAt": "2026-10-15T16:31:10.581Z",
+  "revision": "d1c278ba32023c378a667460046ab7aae8ee7134",
+  "tree": "a283e0ca4df3ce0b4e7de2ff6c5fe33322fd04d4",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7718
+      "durationMs": 33608
     }
   ],
   "checks": [
@@ -103,7 +103,7 @@
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 36753
+        "durationMs": 104811
       }
     ],
     "checks": [
@@ -114,5 +114,5 @@
       }
     ]
   },
-  "digest": "sha256:09fd89c0089f437de350a43bfe0ba3faa07ae4c91be5728efef85fecec86352a"
+  "digest": "sha256:8ad8110edaa1360fd65296ac996085c54ba24ecd2016f410bcf2d57407cdc7cc"
 }

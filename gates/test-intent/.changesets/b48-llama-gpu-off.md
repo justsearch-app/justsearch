@@ -122,18 +122,19 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-new.json",
+      "evidence": "gates/test-intent/evidence/b48-new-api-replay.json",
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanTest.java"
-      ]
+      ],
+      "beforeState": "before-state not reproducible: f6d579a86 has no LlamaDevicePlan type. The real unpatched replay fails compileTestJava with cannot find symbol LlamaDevicePlan. Supplying resolve, layerFlags, deviceFlags, projectorFlags and environment would implement the policy values this class asserts, so such a patch or stub would decide its outcome. run-evidence transplants the current test file after patches, so a before-API variant cannot replace this class under the recorded id."
     },
     {
       "items": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java"
       ],
       "class": "New",
-      "repaired": false,
-      "behaviour": "The self-test child receives the plan environment together with its matching argv and GPU ownership, for CPU and pinned GPU launches.",
+      "repaired": true,
+      "behaviour": "The self-test child receives the plan environment together with its matching argv and GPU ownership, for CPU and pinned GPU launches. The before-state is f6d579a86 plus the digest-bound b48-selftest-environment-compat.patch: LlamaDevicePlan only constructs the command/environment input fixture, and SelfTestSpec captures an extra environment component while retaining its original constructor. ChildSelfTestLauncher and ChildSpec are unmodified; only the real launcher can propagate the captured environment into ChildSpec.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -145,7 +146,7 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-new.json",
+      "evidence": "gates/test-intent/evidence/b48-selftest-environment-repaired.json",
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java"
       ]
@@ -168,10 +169,11 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b48 builder role contract)'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b48-llama-gpu-off-new.json",
+      "evidence": "gates/test-intent/evidence/b48-new-api-replay.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java"
-      ]
+      ],
+      "beforeState": "before-state not reproducible: f6d579a86 has neither LlamaDevicePlan nor RuntimeActivationService.selfTestDevicePlan(UiSettings), and its SelfTestSpec has no environment component. The real unpatched replay fails compileTestJava on the missing plan type. Adding the reflected helper would supply the exact automatic/explicit/environment layer-selection values asserted by the first case, thereby implementing the behaviour under test rather than neutral compatibility. A before-API variant is overwritten by run-evidence when it transplants this current test file."
     },
     {
       "items": [
@@ -199,6 +201,25 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
   ]
 }
 ```
+
+### Signoff repair, entries 5–7 (2026-10-15)
+
+The original new evidence remains attached only to entry 8; that entry and every other entry
+outside 5–7 are unchanged. `b48-new-api-replay.json` was produced by run-evidence with the three
+current classes and `--before f6d579a86`, without overlays or patches. All nine candidate cases
+passed (6 device-plan, 1 child-environment, 2 activation); neither before Gradle invocation reached
+a case because the plan type is absent. Entries 5 and 7 state the concrete candidate-only reasons
+in their `beforeState` fields; the compile failures are attempted replay records, not repair proof.
+The absence of the reflected activation helper and environment component was also checked in
+the sources at that exact ref.
+
+Entry 6 instead has its own repaired evidence and digest-bound compatibility patch. Its added
+plan type is an input fixture here: the expected environment is supplied to SelfTestSpec, while
+the assertion reads the ChildSpec actually received by ChildControl. The patch adds no launcher
+propagation, child ownership decision, or expected output. It must not be used as fail-before
+evidence for entry 5 (whose subject is that type). The before run fails in the first (CPU)
+iteration: `expected: <-1> but was: <null>`, so the GPU iteration is not reached there. The
+candidate case passes both iterations, including argv and GPU-ownership assertions.
 
 ## Acceptance records
 
