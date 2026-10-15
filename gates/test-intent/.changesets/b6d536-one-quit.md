@@ -266,3 +266,14 @@ the coordinator's review.
   "note": "Entry 5's b6d536-power-events.json is candidate-only and supplies no reason for omitting before execution; saying no fail-before is claimed is not a reason. The test intentionally uses reflection so an absent production class still compiles and can fail an assertion."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:d0aa4f9b471cd8263ae163b66949052546a8b61099ded739d33bcba3edbfb17c",
+  "note": "Reran all three corrected power checks on the candidate and d20c300d1^, reproducing the declared passes and wrapped ClassNotFoundException assertions without a patch or stub. The before failures establish absence of the new producer/API only, not native registration or delivery failure; this limit is truthfully declared, so it is nonblocking under the stopping rule."
+}
+```

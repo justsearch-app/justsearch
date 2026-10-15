@@ -65,3 +65,14 @@ Complete legacy parents now keep unchanged admission and acquire declarations fr
   "note": "Entry 2 attaches candidate-only b6d536-batch1-legacy-preservation.json without explaining the missing before run. Entry 3's absent package-private race APIs concern different checks; the existing legacy isUnmodified oracle does not use them."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:b233c2249160a927cb2a8bda8e9c05ebcf90440c63655b83f9cd7faec8f45805",
+  "note": "Reran all four corrected entry-2 cases on the candidate and 65daf680a: the candidate passes all, while the old complete-legacy admission fails the declared assertion and the other three cases pass. No patch or stub supplies the failure; retained entries and evidence are unchanged since 6f85a257a."
+}
+```

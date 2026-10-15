@@ -106,3 +106,14 @@ Independent acceptance remains for the orchestrator/verifier; this builder does 
   "note": "Entry 2's b6d536-resume-repair-preserved.json has failBefore null with no applicable candidate-only reason in the entry or shared preamble. The sibling repaired entry already compiles the same ChatResumeRepairTest class on its declared before-state."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:794c45c5bc4b7b5fe50e2537d63200c2c93ce15a6e4b7227e1ad4b9f75f0bb33",
+  "note": "Reran corrected entry 2 on the candidate and 9e8c7fae2: the resume-after-reload and subsequent refused-boot check executes and passes on both, matching the new preservation evidence. Other entries, tests and retained evidence are unchanged since 6f85a257a."
+}
+```

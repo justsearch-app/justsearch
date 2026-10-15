@@ -177,3 +177,14 @@ The patch is recorded in the producer's evidence; it contains no repair.
   "note": "Entry 6 attaches b6d536-b84-reload-instant-preservation.json with failBefore null; neither the entry nor preamble gives a reason for candidate-only execution of clearedPressureEndsThePublishedReloadWaitAndRaisesSeq. The executable preservation check has no applicable before-state obstacle declared."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:b0aa6ebbc77e01ea1cf8bbde4fd7d05b0a7538b4ef87b74bba345f2549eb69cc",
+  "note": "Re-reviewed the corrected entry 6 and reran its current check on the candidate and b48ef2fcc; both execute and pass, matching the new preservation evidence. Other entries, tests and retained evidence are unchanged since 6f85a257a."
+}
+```

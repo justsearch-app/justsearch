@@ -410,3 +410,14 @@ caller gets TimeoutException instead of "UnsupportedOperationException: drain br
   "note": "Entries 7 and 9 claim assertion fail-before from the manual all-stub/layer-stub runs described in the preamble. Those runs replace the controller/gate/routes or demand/loadAnyway behavior with no-op or immediate-success stubs that determine the asserted failures, so they are not old-behavior witnesses."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:7acc16dda3aabe5b7ff39c448f9819bea7362734571971056b1918eac204209e",
+  "note": "Reran all 36 checks in corrected entries 7 and 9 on the candidate and confirmed the declared old controller, residency controller and gate APIs are absent at 43564e20f. The new candidate-only reasons are true and the stub-decided runs are explicitly withdrawn; retained content is unchanged since 6f85a257a."
+}
+```

@@ -390,3 +390,14 @@ first runs:
   "note": "Entry 6's DetachedRunThreadLifetimeTest has candidate-only evidence without an applicable reason: the shared new-API label does not describe it. The acquisition/handle/lease APIs and daemon ort-query-run thread construction already exist at 3d181a70c, so their absence cannot explain omitting this before run."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:4335480387401ea7d1ab89a317f94654ea4c4463e207dcf149a90a02d3f44556",
+  "note": "Reran both corrected detached-thread lifetime cases on the candidate and 3d181a70c; both execute and pass on both revisions, matching the new preservation evidence. The acquisition/lease APIs and daemon construction exist before, and the corrected declaration now says so; retained content is unchanged since 6f85a257a."
+}
+```

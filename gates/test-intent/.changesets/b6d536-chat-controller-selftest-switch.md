@@ -90,3 +90,14 @@ self-test) is unchanged. This changeset covers only these files.
   "note": "Entry 1 says activation preserves 99 GPU layers, while the current chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes assertion requires configuredGpuLayers to be null for automatic profile selection. The declaration was not corrected when that oracle changed."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS2b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:ecc337c3811e66606382a089350e0023ea72a3cb389bb8036eec45eca404645f",
+  "note": "Reran both corrected activation checks on the candidate and confirmed automatic profile selection asserts null configuredGpuLayers, with the chat choice and variant executable preserved. The existing before-state evidence and remaining entry are unchanged since 6f85a257a."
+}
+```
