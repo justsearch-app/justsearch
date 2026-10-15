@@ -168,6 +168,9 @@ check):
   `final_owner_receipt_unavailable`, the teardown and pre-stop handle gaps); a gap naming a PID
   alone only when every unproven identity of that PID was found ended. Disagreements, conflicts,
   damage and lost evidence stay. A lookup that failed or could not read the birth ends nothing.
+  An earlier stop's gap of those kinds (`unrecorded_exit` aside, which is looked for again) is
+  carried into a later stop until that stop proves its exact PID and birth ended, by a bound
+  record or by such a lookup; a gap naming a PID alone names no exact identity and stays carried.
 
 - Precision: when both sides are exact (a native read, `birthTick` 1, against a ledger birth an
   Engine wrote), they match only when equal. They are compared at a coarser tick only when one
@@ -423,6 +426,10 @@ later real CLI stop lost completeness, and the live CLI read the whole Engine le
   carried, and the later stop is complete through its own lookup.
 - The actuator uses the same incremental, handle-identified reader as the census: unchanged files
   are not reopened, and grown files are read only for their tail.
+- `exit_unproven`, and every other kind that says only that one identity's exit was not yet seen,
+  belongs on the not-yet-seen list. A later stop clears an earlier one only by proving that exact
+  identity ended: a bound ledger record proving it, or an identity-checked lookup that finds it
+  absent or reborn. Disagreements, damage and unreadable evidence stay sticky, as agreed.
 
 What changed:
 
@@ -592,6 +599,17 @@ What changed:
   incremental reader to the dev CLI recorder. `engine-actuator.cjs`: `createEngineActuator` and
   `createCliEngineRecorder` take a `ledgerReader` (default: a new incremental reader) and read the
   Engine ledger only through it (`reconcile`, the self-intent check, `exitRecorded`).
+- Round 11, not-yet-seen carry, `stop-exit-census.cjs`: `NOT_SEEN_UNTIL_PROVEN` (`exit_unproven`,
+  `ledger_record_missing`, `final_owner_receipt_unavailable`, the teardown gap, and the pre-stop
+  handle gap) and `stopProves({ isEnded, lookupEnded })`, true for such a gap naming a PID and
+  birth that a bound record proves ended (`ledgerResolution`'s `isEnded`) or that the stop's lookup
+  found ended (`endedByObservation`). `carryFindings(result, earlier, { proves })` does not carry
+  an earlier gap the stop proves; the census verdict passes its final ledger read and lookup for
+  the earlier census files, and `stopRun` reads its ledger again (with its own records) and passes
+  its lookup for the earlier stop reports. A self-exit report proves nothing and carries them all.
+  The teardown gap and `ledger_record_missing`/`unrecorded_exit` of a target now name the target's
+  birth (`creationFileTimeUtc`) beside its PID, so a later stop can prove that exact identity; they
+  named the PID alone, and an earlier incomplete stop's teardown gap could never be cleared.
 - Round 11 test fixtures: in `test-dev-runner-stop-census.mjs`, the later receipt of the
   disagreement case (39) was written by a dev runner writer with the right PID but started at that
   moment, which is not the writer that recorded the start; it now carries that writer's start
@@ -614,9 +632,9 @@ What changed:
   Engine's PID and birth) through `ledgerView`, as `stopRun` passes it. Without these, seven cases
   failed by assertion (the Engine's exit unproven).
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (90 cases; 40 and 41 rewritten and
-42 to 61 added in round 8, 62 to 71 in round 9, 69 rewritten and 72 to 82 added in round 10, 40 and
-71 extended and 83 to 90 added in round 11, with their own before-results below). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (92 cases; 40 and 41 rewritten and
+42 to 61 added in round 8, 62 to 71 in round 9, 69 rewritten and 72 to 82 added in round 10, 40, 41
+and 71 extended and 83 to 92 added in round 11, with their own before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -814,6 +832,11 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    unreadable file and finding is named, and a contradiction an earlier stop found is carried
    from it. On a2c0400b3, 148 of the 250 disagree: 30 drop a containment contradiction an earlier
    stop of the history found, the rest drop a finding that is no longer on the not-seen-yet list.
+   Extended in round 11: the table also holds `exit_unproven` and the teardown gap naming the run's
+   Engine's own PID and birth, which every stop of the history proves ended (its bound exit
+   record), so neither is carried nor keeps a stop incomplete; the same kinds naming a PID alone or
+   an identity nothing proves are still carried. On adfae1e10, 5 of the 250 histories are
+   misjudged (incomplete, the Engine's gap carried from stop-report.1.json or process-exits.1.json).
 42. to 50. Round 8 identity edges, each through the real census (its PowerShell observer) and a
    whole real `stopRun` of a run tracking a running child of the test, the OS lookups the real ones:
    an exit naming the child's PID, birth and owner but not the incarnation its start carries (42),
@@ -1061,6 +1084,17 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    and every Engine record is parsed once. Fails by assertion on 5b4cea41b ("no ledger file is read
    whole": the recorder's `exitRecorded` read the whole file) and on b599d4d7e (no incremental
    reader).
+91. Round 11, later stop after an incomplete one: a crashed Engine whose open start another dev
+   runner recorded OWNER_DIED (GONE, unbound), stopped twice with the stand-in observer. The first
+   stop's lookup cannot read the PID's birth: incomplete, its report and census holding
+   `exit_unproven` and the teardown gap for the Engine's PID and birth. The second stop's lookup
+   finds the PID absent, or reborn (another readable birth): complete with no gap, in its output
+   and on disk, the Engine's row "ended, observed by identity-checked lookup", and stop-report.1.json
+   kept and listed in `earlierReports`. Fails by assertion on adfae1e10 for both (not complete: the
+   earlier census's `exit_unproven` and teardown gap carried from process-exits.1.json).
+92. Round 11, the same two stops, the second lookup unreadable as well: incomplete
+   (`STOP_INCOMPLETE`), in its output and on disk, with `exit_unproven` for the Engine's PID and
+   birth still there, and stop-report.1.json listed. Passes on adfae1e10, as preservation.
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -1266,5 +1300,13 @@ its fixture change above, run again on its own), as does `fixture-cleanup.test.m
 full run of the check (90 of 90), the 17 MB stops took 2,462 and 2,712 ms, case 58 13,632 ms, cases
 82 and 89 16,035 and 16,142 ms, and the generated cases 40, 41 and 71 took 98,208, 30,467 and
 212,488 ms.
+
+After the not-yet-seen carry decision, run again here: the check passes 92 of 92 (the 17 MB stops
+2,265 and 2,297 ms, case 58 14,335 ms, cases 82 and 89 16,294 and 16,762 ms, the generated cases
+40, 41 and 71 106,332, 36,663 and 205,038 ms); the 41 `test-dev-runner-*.mjs` files and
+`e-pair-identity.test.mjs` pass (251 tests), as does `fixture-cleanup.test.mjs` (10)
+(verifier-r11/stop-census-final.log, verifier-r11/suite-final). The stop reads its ledger again
+for the earlier reports only when one holds such a gap naming a PID and birth: read on every stop,
+case 58 took 25,714 ms (verifier-r11/stop-census-final-before-lazy.log).
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r11/).

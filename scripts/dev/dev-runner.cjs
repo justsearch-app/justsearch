@@ -22,7 +22,7 @@ const { spawn, spawnSync, execFile } = require('child_process');
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
 const { engineIdentityAsync, startStopExitCensus, readRunLedger, ledgerView, ledgerResolution,
-  carryFindings } = require('./lib/stop-exit-census.cjs');
+  carryFindings, stopProves } = require('./lib/stop-exit-census.cjs');
 const { TICK, compareIdentity, identityOf, identityKey, hasPid, birthOrder, bornAfter } = require('./lib/ledger-identity.cjs');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
@@ -4471,9 +4471,18 @@ async function stopRun(opts, {
   // A retried stop keeps the earlier stop's report and names it (run-directory file names, oldest
   // first); stop-report.json is always this stop's. What an earlier stop found (a disagreement, lost
   // or unreadable evidence, or a report that cannot be read at all) is carried into this stop's
-  // accounting: no later record or stop clears it (exitCensus.carryFindings).
+  // accounting: no later record or stop clears it (exitCensus.carryFindings). Only a gap that said an
+  // identity's exit was not yet seen is cleared, when this stop proves that exact identity ended: by a
+  // bound ledger record (read again, with this stop's own records, only when such a gap is asked
+  // about) or its identity-checked lookup.
   const kept = await keepEarlierReports(runDir);
-  const exitAccounting = carryFindings(censusAccounting, kept.earlierFindings);
+  let ledgerReadAgain = false;
+  const endedInLedger = (gap) => {
+    if (!ledgerReadAgain) { ledgerReadAgain = true; readLedgerEnded(); }
+    return provenEnded(gap);
+  };
+  const exitAccounting = carryFindings(censusAccounting, kept.earlierFindings,
+    { proves: stopProves({ isEnded: endedInLedger, lookupEnded }) });
 
   const stopReport = buildStopReport({
     ...exitAccounting,

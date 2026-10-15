@@ -2898,6 +2898,68 @@ test('round 11 CLI read-once: the dev CLI recorder reads the Engine ledger throu
   assert.deepEqual(Object.values(counts).filter((n) => n !== 1), [], `each record parsed once: ${JSON.stringify(counts)}`);
 });
 
+/**
+ * A crashed Engine whose open start an unbound supervisor recorded OWNER_DIED (exit_unproven), stopped
+ * twice: the first stop's lookup cannot read the process's birth, the second's sees `second`. The
+ * earlier stop's report and census are real, written by that stop.
+ */
+async function r11StopsAfterIncomplete(label, second) {
+  const runId = `stop-census-r11-later-${label}`;
+  const engine = noProcess(974731, genFar(16));
+  const dataDir = freshDir(`r11-later-${label}`);
+  const inc = { session: runId, n: 1 };
+  writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4081, startedAt: isoMs(engine.creationFileTimeUtc) }, 'engine-start', {
+    incarnation: inc, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, executable: process.execPath,
+    processStartedAt: isoMs(engine.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
+  rec('engine', { role: 'dev-runner', pid: 4085, startedAt: new Date().toISOString() }, 'engine-owner-died', { incarnation: inc,
+    pid: engine.pid, basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' }),
+  rec('children', { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) }, 'child-note', { note: 'present' })]);
+  const fixture = stopFixture({ runId, dataDir, engine });
+  const rows = { absent: () => ({ present: false }),
+    reborn: () => ({ present: true, creationFileTime: String(BigInt(engine.creationFileTimeUtc) / 10n * 10n + 600000000n), name: 'other.exe' }),
+    unreadable: () => ({ present: true, creationFileTime: null, name: 'node.exe' }) };
+  const stop = (kind) => api.stopRun({}, { ...fixture.io, census: standInCensus,
+    lookupIdentities: async (ids) => new Map(ids.map((pid) => [pid, pid === engine.pid ? rows[kind]() : { present: false }])) });
+  try {
+    const first = await stop('unreadable');
+    const later = await stop(second);
+    return { engine, first, later, onDisk: JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8')),
+      files: fs.readdirSync(fixture.dir) };
+  } finally {
+    fs.rmSync(fixture.dir, { recursive: true, force: true });
+  }
+}
+
+test('round 11 later stop: after an earlier incomplete stop whose exit_unproven named the Engine, a later stop whose identity-checked lookup finds that exact Engine gone or reborn is complete, and still lists the earlier report', async () => {
+  const wrong = [];
+  for (const kind of ['absent', 'reborn']) {
+    const { engine, first, later, onDisk, files } = await r11StopsAfterIncomplete(kind, kind);
+    const named = (g) => g.reason === 'exit_unproven' && g.pid === engine.pid;
+    // The first stop is the incomplete one the later stop follows: its gap names the Engine's PID and birth.
+    if (first.exitAccountingComplete !== false || !first.exitAccountingGaps.some((g) => named(g) && g.creationFileTimeUtc)) {
+      wrong.push({ kind, first: first.exitAccountingGaps });
+      continue;
+    }
+    const got = { complete: later.exitAccountingComplete, onDisk: onDisk.exitAccountingComplete, gaps: later.exitAccountingGaps ?? [],
+      earlierReports: later.earlierReports ?? onDisk.earlierReports ?? null, kept: files.includes('stop-report.1.json'),
+      row: (later.processExits ?? []).find((x) => x.pid === engine.pid && x.role === 'engine')?.ledgerReason ?? null };
+    const expected = { complete: true, onDisk: true, gaps: [], earlierReports: ['stop-report.1.json'], kept: true, row: R11_LOOKUP_ENDED };
+    if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push({ kind, got, expected });
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('round 11 later stop: when the later identity-checked lookup cannot read the birth of the Engine either, the earlier exit_unproven stays and the stop is incomplete', async () => {
+  const { engine, later, onDisk } = await r11StopsAfterIncomplete('unreadable', 'unreadable');
+  for (const r of [later, onDisk]) {
+    assert.equal(r.exitAccountingComplete, false, JSON.stringify(r.exitAccountingGaps));
+    assert.ok(r.exitAccountingGaps.some((g) => g.reason === 'exit_unproven' && g.pid === engine.pid
+      && g.creationFileTimeUtc === engine.creationFileTimeUtc), JSON.stringify(r.exitAccountingGaps));
+  }
+  assert.deepEqual(onDisk.earlierReports, ['stop-report.1.json']);
+  assert.equal(later.outcome, 'STOP_INCOMPLETE');
+});
+
 // ---------------------------------------------------------------------------------------------
 // The generated checks. Random ledgers over the schema, each judged by the real census and stop and
 // by the oracle below, which is the round-8 identity rule (b102 changeset, "One identity") written
@@ -3351,7 +3413,10 @@ test(`the census and the stop agree with the identity rule on ${GEN_IDENTITY_CAS
 /**
  * Earlier gaps a stop can have found: findings (carried for good: every kind but the short list of
  * exits not yet seen, round 8's "carry by default") and exits not yet seen (looked for again: an
- * unrecorded exit, a torn last line).
+ * unrecorded exit, a torn last line). Round 11: a gap that only says one identity's exit was not yet
+ * seen is carried until a later stop proves that exact identity ended; every stop here proves the
+ * run's Engine (its bound exit record), so such a gap naming the Engine's PID and birth is not
+ * carried, while one naming a PID alone, or an identity nothing proves, is.
  */
 const EARLIER_GAPS = [
   { finding: true, gap: { reason: 'ledger_os_disagree', pid: 972201, creationFileTimeUtc: genFar(0), role: 'engine', ledgerCode: 0, osCode: 7 } },
@@ -3363,6 +3428,8 @@ const EARLIER_GAPS = [
   { finding: false, gap: { reason: 'unrecorded_exit', pid: 972201, role: 'engine', osCode: 0 } },
   { finding: true, gap: { reason: 'identity-bound OS exit code/time unavailable through teardown', pid: 972201, role: 'engine' } },
   { finding: true, gap: { reason: 'exit_unproven', pid: 972205, creationFileTimeUtc: genFar(1), detail: 'owner-died IDENTITY_UNKNOWN does not prove the exit' } },
+  { finding: false, gap: { reason: 'exit_unproven', pid: 972201, creationFileTimeUtc: genFar(0), role: 'engine', detail: 'owner-died IDENTITY_UNKNOWN does not prove the exit' } },
+  { finding: false, gap: { reason: 'identity-bound OS exit code/time unavailable through teardown', pid: 972201, creationFileTimeUtc: genFar(0), role: 'engine' } },
   { finding: true, gap: { reason: 'identity_metadata_conflict', pid: 972205, creationFileTimeUtc: genFar(1), role: 'extraction-child' } },
   { finding: true, gap: { reason: 'a kind added later', pid: 972205 } },
   { finding: false, gap: { reason: 'ledger-damaged', family: 'engine', file: 'engine.v1.jsonl', lines: 1, corruptLines: 0, tornTail: true } },

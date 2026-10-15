@@ -1220,8 +1220,10 @@ function exitResult(input, output, source, ledger = null, view = null, { lookupE
   const accounted = new Map();
   for (const target of input.targets.filter(t => t.role !== 'console-host')) {
     const exit = osExitOf(target);
+    // A not-yet-seen gap names the target's PID and birth: the one identity a later stop must prove (stopProves).
     if (!exit || !Number.isInteger(exit.exitCode)) {
-      gaps.push({ pid: target.pid, role: target.role, reason: 'identity-bound OS exit code/time unavailable through teardown' }); continue;
+      gaps.push({ pid: target.pid, creationFileTimeUtc: target.creationFileTimeUtc, role: target.role,
+        reason: 'identity-bound OS exit code/time unavailable through teardown' }); continue;
     }
     rowWrittenFor(target);
     const atMs = knownExitMs(exit.atMs);
@@ -1273,7 +1275,7 @@ function exitResult(input, output, source, ledger = null, view = null, { lookupE
     // No ledger record: a gap, never classified from the code (the gap's name only says whether
     // the code is our own stop code, i.e. whether the record of our own stop was lost).
     processExits.push({ ...base, ledgerClass: null, expectedTermination: false });
-    gaps.push({ pid: target.pid, role: target.role, osCode: exit.exitCode,
+    gaps.push({ pid: target.pid, creationFileTimeUtc: target.creationFileTimeUtc, role: target.role, osCode: exit.exitCode,
       reason: sameCode(exit.exitCode, jsCode) ? 'ledger_record_missing' : 'unrecorded_exit' });
   }
   // CH9: a console host is accounted iff its console parent is, and it exited no later than the
@@ -1608,11 +1610,35 @@ const namedIn = (keys, x) => Boolean(x) && keys.has(identityKey(x));
  * Every gap a stop reports is a finding, carried into every later stop of the run, and accounting
  * stays incomplete until a person forgets the run, unless its kind only says an exit was not yet seen
  * (NOT_SEEN_YET): the retry looks again, and a later record or observation can account it. A torn last
- * line is not lost evidence either: its writer completes it, and a later read reads it whole. Any other
- * kind, a disagreement, lost or unreadable evidence, a contradicted containment, a conflict in the
- * ledger's metadata, and any kind added later, is carried forever.
+ * line is not lost evidence either: its writer completes it, and a later read reads it whole. The other
+ * kinds that say an exit was not yet seen (NOT_SEEN_UNTIL_PROVEN) are carried until a later stop proves
+ * that identity ended (carryFindings, stopProves). Any other kind, a disagreement, lost or unreadable
+ * evidence, a contradicted containment, a conflict in the ledger's metadata, and any kind added later,
+ * is carried forever.
  */
 const NOT_SEEN_YET = new Set(['unrecorded_exit']);
+/**
+ * The other kinds that say only that one identity's exit was not yet seen (the round-11 decision):
+ * its end unproven, its record or final receipt missing, its OS exit or handle unavailable. Each is
+ * carried into a later stop like a finding, until that stop proves that exact identity ended
+ * (stopProves). A disagreement, damage or unreadable evidence is never one of them.
+ */
+const NOT_SEEN_UNTIL_PROVEN = new Set(['exit_unproven', 'ledger_record_missing', 'final_owner_receipt_unavailable',
+  'identity-bound OS exit code/time unavailable through teardown']);
+const notSeenUntilProven = (gap) => NOT_SEEN_UNTIL_PROVEN.has(gap?.reason)
+  || String(gap?.reason ?? '').startsWith(PRE_STOP_HANDLE_GAP);
+/**
+ * Whether this stop proves the exact identity an earlier stop's not-yet-seen gap names
+ * (NOT_SEEN_UNTIL_PROVEN): its PID and birth, through a bound ledger record proving that identity
+ * ended (`isEnded`, ledgerResolution's), or through the stop's identity-checked lookup finding it
+ * absent or reborn (`lookupEnded`, endedByObservation). A gap naming only a PID names no exact
+ * identity, so no later stop proves it; a lookup that could not read the process proves nothing.
+ */
+function stopProves({ isEnded = () => false, lookupEnded = [] } = {}) {
+  const observations = lookupEndedIdentities(lookupEnded);
+  return (gap) => notSeenUntilProven(gap) && Number.isInteger(gap.pid) && Boolean(gap.creationFileTimeUtc)
+    && (Boolean(isEnded(gap)) || endedByObservation(observations, gap));
+}
 function isFinding(gap) {
   if (!gap || typeof gap !== 'object') return false;
   if (gap.reason === 'ledger-damaged') return !gap.tornTail || (gap.lines ?? 0) > 1;
@@ -1626,13 +1652,15 @@ const findingKey = (gap) => JSON.stringify(Object.keys(gap).filter(k => k !== 'c
  * (`earlier`: `{ gap, from }`, `from` the run-directory file that held it). Each finding not already
  * among the result's gaps is added, marked `carriedFrom` (the file it was first read from), and
  * accounting is then not complete. Used for both the earlier census files and the earlier stop reports.
+ * `proves` (stopProves) is what this stop proves: an earlier gap that only said an identity's exit was
+ * not yet seen, and whose exact identity this stop proves ended, is not carried.
  */
-function carryFindings(result, earlier) {
+function carryFindings(result, earlier, { proves = () => false } = {}) {
   const gaps = Array.isArray(result?.exitAccountingGaps) ? result.exitAccountingGaps : [];
   const have = new Set(gaps.map(findingKey));
   const carried = [];
   for (const { gap, from } of earlier ?? []) {
-    if (!isFinding(gap)) continue;
+    if (!isFinding(gap) || proves(gap)) continue;
     const key = findingKey(gap);
     if (have.has(key)) continue;
     have.add(key);
@@ -1782,9 +1810,11 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
       gaps: [...armed.gaps.slice(armingReadGaps), ...refreshed.gaps.filter(g => !membershipGap(g)
         || !armed.targets.some(t => compareIdentity(t, g, 'same')))],
       accountedProcesses: refreshed.accountedProcesses.filter(p => !armed.targets.some(t => compareIdentity(t, p, 'same'))) };
-    // What an earlier census of the run found is carried forward: no later record clears it.
+    // What an earlier census of the run found is carried forward: no later record clears it, unless
+    // it only said an identity's exit was not yet seen and this stop proves that identity ended.
     const result = carryFindings(exitResult(finalInput, output, outputFile, finalLedger, finalView, { lookupEnded }),
-      earlier.findings);
+      earlier.findings, { proves: stopProves({ isEnded: finalView ? ledgerResolution(finalView).isEnded : undefined,
+        lookupEnded }) });
     // An earlier census file that could not be renamed stays as it was; this census names where it went.
     const written = earlier.notArchived.length ? { earlierCensusNotArchived: earlier.notArchived,
       censusWrittenAs: [path.basename(inputFile), path.basename(outputFile)] } : {};
@@ -1835,7 +1865,7 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     return verdict(output, beforeVerdict, lookupEnded);
   } };
 }
-module.exports = { CONHOST_EXIT_GRACE_MS, NOT_SEEN_YET, fileTimeFromInstant, isFinding, carryFindings,
+module.exports = { CONHOST_EXIT_GRACE_MS, NOT_SEEN_YET, NOT_SEEN_UNTIL_PROVEN, stopProves, fileTimeFromInstant, isFinding, carryFindings,
   engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult,
   endedIdentitiesOf, ledgerResolution, reconcileCrashedHelpers, startStopExitCensus, isProven, stopWriterBinding,
   lookupEndedIdentities, LOOKUP_ENDED_REASON };
