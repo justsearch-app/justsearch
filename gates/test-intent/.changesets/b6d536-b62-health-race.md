@@ -13,6 +13,8 @@ chunk completeness, and preservation of R3/R4. Independent verifier acceptance r
 
 Evidence refreshed in records phase B (batch 3) on b599d4d7e, fail-before again at 13950b090. ee3c86b19 made CapabilityHealthBridgeConcurrentPublicationTest build HealthEventChangeRegistry with its delivery executor, which 13950b090 lacks, so the fail-before applies the compat before-patch `gates/test-intent/evidence/b50-status-timeout-compat.patch`. It adds only the declaration HealthEventChangeRegistry(ExecutorService), which ignores its argument and calls the existing no-argument constructor; no production code at 13950b090 calls it. Entries 1 and 2 again fail by assertion there. Entry 4's check (not a repair) now compiles before and passes there; the earlier run recorded a compile failure.
 
+Records phase B (batch 3), gate tidy. Against main, ChunkAdmissionCostTest.java is an added file, so the gate flags it as one file-level item, not per method. Entry 4's item named the method `#firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren` and was reported as a stale entry item; it now names the file, which is the item the gate flags. The method, its newChecks selector and its evidence are unchanged.
+
 ```json
 {
   "entries": [
@@ -92,7 +94,7 @@ Evidence refreshed in records phase B (batch 3) on b599d4d7e, fail-before again 
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren"
+        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java"
       ],
       "class": "New",
       "behaviour": "The first unchanged decision for a complete 5,000-chunk parent after another parent loses a committed child performs zero child metadata reads and zero parent content-block reads. This is a preservation scenario; the baseline already meets it.",
