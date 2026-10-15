@@ -349,3 +349,14 @@ Evidence files (all written by run-evidence.mjs):
   "digest": "sha256:2bde07be7161037e0598e9a37fd8146ba3331630714eda458b8cdb44bc874c98"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "reject",
+  "digest": "sha256:82adf49b32200ee08e942aba87be73cc8dbc9a0dbb9f6bfd1ce0496406a1b187",
+  "note": "Reject the repaired before evidence: exact 124def8a1 plus the two declared current sampler overlays fails app-services compilation with ten errors for absent context/game APIs and GAME_AND_EXTERNAL_MEMORY, so all three checks execute zero cases instead of the recorded assertions. Candidate checks pass, but the declared before replay does not reproduce its evidence."
+}
+```

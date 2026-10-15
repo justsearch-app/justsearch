@@ -218,3 +218,14 @@ names the stale port. This changeset covers only this slice's files.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:052472af57bddfd4de194205144f7dd31ef0af8ab37e41aec15874d3ecc55ae0",
+  "note": "Re-reviewed lexical fallback and VDU drain deferral intent; candidate and declared before checks reproduce the recorded assertion repairs and preservation controls."
+}
+```

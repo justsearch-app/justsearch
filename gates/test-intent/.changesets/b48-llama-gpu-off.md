@@ -267,3 +267,14 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
   "note": "Bind the same independent acceptance of these demonstrated test intents to the normal local governance base. The preceding f6-specific record and report contain the replay/live evidence. This is not acceptance of the overall functional behavior: NO_GPU encoder startup still fails on baseline and candidate, and the documented operator reranker exception conflicts with the all-CPU profile. Report: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff3/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "reject",
+  "digest": "sha256:3c6a80566e419698a31de0a3c4990e81704be865105062cca90cd1bafeb73cee",
+  "note": "Reject entries 5-7: their candidate-only b48-llama-gpu-off-new.json evidence has failBefore null, and neither the entries nor shared preamble explains why before execution is not reproducible. Candidate checks and the separately declared repaired before checks pass their required outcomes; they do not supply the missing reason."
+}
+```

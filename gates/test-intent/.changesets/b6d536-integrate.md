@@ -204,3 +204,14 @@ re-run here.
   "note": "Whole-changeset acceptance withdrawn: corrected count oracle independently fails on incoming 75e70d488 (282 versus284) and passes on candidate. Other original New entries lack fresh real adding-parent assertion proof, and the actual child PATH-prefix fixture is excluded for process-safety reasons. Selected previous/candidate preservation passes do not fill these gaps. Reject whole changeset; count-entry repair itself verified."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:b39f7189c6d8de43566e44486d6b22df49113a8d7b97b68bde8e810a5abe0ba1",
+  "note": "Re-reviewed the corrected concrete API-absence explanation, system reads and merged register count; candidate and declared before checks reproduce the recorded outcomes."
+}
+```

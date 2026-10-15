@@ -181,3 +181,14 @@ without a before-state, and all four pass on the change.
   "digest": "sha256:0b11cf782778ab66f0fe573536f7b5ceadff44aea74b250092328a125b352cdf"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:92296a816b7ff24ce2c04d4c05e7f5ae281c94230c81847b0ab2efa12a4edfd2",
+  "note": "Re-reviewed classified causes and the constructor delegating to the unchanged old implementation; candidate and declared before checks reproduce the recorded failures and preservation."
+}
+```

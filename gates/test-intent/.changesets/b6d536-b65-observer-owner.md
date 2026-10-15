@@ -143,3 +143,14 @@ Evidence for b6d536-b65-observer-owner.json was regenerated on b599d4d7e (phase 
   "note": "verify-batch6 on e331c571b: the B5-H1 regression is repaired: an unsubscribe from another thread during a synchronous Health publish leaves the producer uninterrupted in 400/400 races with FileChannel reads succeeding (b639e82c5: 3 failing cases); previous verifier cases H1-H3, O1-O10, V1-V6, R2-R4, B5-H2, B5-C1, B5-C2 unchanged (H4 fails on both revisions as since verify-batch4, probe design)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:a9d4e89f9da1a7242e5b39e053b3f16a81724abe655508fff8b72a23c00a79f8",
+  "note": "Re-reviewed observer retention and transport shutdown ownership, including the delegating constructor patch; candidate and declared before checks match their recorded outcomes."
+}
+```

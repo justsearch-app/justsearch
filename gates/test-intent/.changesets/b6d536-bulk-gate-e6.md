@@ -308,3 +308,14 @@ before-state).
   "digest": "sha256:554876a32103128d96e1183d7fc4c4967010f50fa85960124165a6c33f0fe339"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "reject",
+  "digest": "sha256:5493f05aa3d0222aa3fa3999eaf3ba0aec3d42adb2c712e8688573498ee3c876",
+  "note": "Reject entry 7: the exact 79b5e2e25 whole-class replay runs fourteen tests with four failures (CPU argv, full GPU argv, projector-on-CPU and planned rung), contradicting its claim that only the GPU ordered-line assertion fails and eleven other checks pass. The current candidate whole class passes."
+}
+```
