@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-15T15:17:58.896Z",
-  "revision": "9f1f6257b39280b39df6b7e638d2fce4ef4ae50b",
-  "tree": "78e203317f446d6e6e3a4d93c1a78b5c8395d155",
+  "createdAt": "2026-10-15T17:54:44.185Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "bbbd8b79372c1ade60c9c1fd0f695be69c31a5b3",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 71895
+      "durationMs": 41454
     }
   ],
   "checks": [
@@ -73,7 +73,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 175842
+        "durationMs": 35693
       }
     ],
     "checks": [
@@ -89,5 +89,5 @@
       }
     ]
   },
-  "digest": "sha256:1e2e9bdcbd5c42129cef38e2265d66981183634941d7e5b9b71414b21c2c3ef9"
+  "digest": "sha256:25de82cace4974d0e02643f88a83492aa227bfadf730ace9a0ac9fc68eeee5d4"
 }

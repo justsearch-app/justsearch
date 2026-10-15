@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-14T17:37:36.338Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "1dca628b5784c422bb2052d7e6618306e28794e7",
+  "createdAt": "2026-10-15T18:14:00.304Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "d6cfd02f091c823f8dec183e1fd8ffa4d01b1015",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DefaultEngineComponentRegistryTest.statusCounterTracksPublicationAndNotSnapshotOrNoop\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5937
+      "durationMs": 14459
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.TransitionRunnerTest.statusCounterTracksBothChatTransitionEdges\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2528
+      "durationMs": 13463
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.PlacementStageTest.statusCounterTracksInstalledDistributionAndNotTimestampOnlyRewrite\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan\" --tests \"io.justsearch.app.services.power.EnergyStatePollerTest.energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.statusCounterTracksActivationProcedureAndNotStatusRead\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.statusCounterTracksSettingsCommitAndNotExactReplay\" --tests \"io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest.statusCounterTracksJobsAndNotReadOnlyReattachment\" --tests \"io.justsearch.app.services.worker.WatchedRootsStatusCounterTest.statusCounterTracksRootsAndNotDuplicateRemoval\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3921
+      "durationMs": 15482
     },
     {
       "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.statusCounterTracksVerdictChangesAndNotRepeatedInputs\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2545
+      "durationMs": 13231
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusChangeCounterHttpTest.statusCounterResponseReflectsACompletedSampleAndNeverSamplesForMetadata\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8191
+      "durationMs": 17513
     },
     {
-      "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-37836-1791999393107.json\"",
+      "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\b6d536-evidence-refresh\\\\tmp\\\\test-intent-vitest-21580-1792087920566.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1436
+      "durationMs": 1797
     }
   ],
   "checks": [
@@ -149,7 +149,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java#statusCounterTracksSettingsCommitAndNotExactReplay",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:aaab8932b63f7138764fcd438866cfb1e58143f9221b533303bf77c72cb5158d",
+      "contentDigest": "sha256:367baa4049cdf9cc0a343275444f00f8279deed4d4ba9b40e4025d8ba64bd7af",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -268,37 +268,37 @@
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DefaultEngineComponentRegistryTest.statusCounterTracksPublicationAndNotSnapshotOrNoop\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 24938
+        "durationMs": 17077
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.TransitionRunnerTest.statusCounterTracksBothChatTransitionEdges\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2659
+        "durationMs": 15642
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.PlacementStageTest.statusCounterTracksInstalledDistributionAndNotTimestampOnlyRewrite\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan\" --tests \"io.justsearch.app.services.power.EnergyStatePollerTest.energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.statusCounterTracksActivationProcedureAndNotStatusRead\" --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest.statusCounterTracksSettingsCommitAndNotExactReplay\" --tests \"io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest.statusCounterTracksJobsAndNotReadOnlyReattachment\" --tests \"io.justsearch.app.services.worker.WatchedRootsStatusCounterTest.statusCounterTracksRootsAndNotDuplicateRemoval\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 7357
+        "durationMs": 29976
       },
       {
         "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.statusCounterTracksVerdictChangesAndNotRepeatedInputs\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2314
+        "durationMs": 16499
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusChangeCounterHttpTest.statusCounterResponseReflectsACompletedSampleAndNeverSamplesForMetadata\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 18204
+        "durationMs": 26112
       },
       {
-        "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-37836-1791999452473.json\"",
+        "command": "npx vitest run \"src/api/statusOwner-raw-settings.test.ts\" \"src/api/statusOwner-reattach.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\b6d536-evidence-refresh\\\\tmp\\\\test-intent-vitest-21580-1792088035481.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1355
+        "durationMs": 1507
       }
     ],
     "checks": [
@@ -360,14 +360,14 @@
       {
         "id": "modules/ui-web/src/api/statusOwner-raw-settings.test.ts",
         "classification": "assertion",
-        "detail": "OWN-RAW-SETTINGS: a successful trusted raw settings completion reaches canonical status:  AssertionError: raw trusted plugin writes share the canonical completion owner: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-3/test-intent-before-56hNeG/modules/ui-web/src/api/statusOwner-raw-settings.test.ts:14:84\n    at processTicksAndRe"
+        "detail": "OWN-RAW-SETTINGS: a successful trusted raw settings completion reaches canonical status:  AssertionError: raw trusted plugin writes share the canonical completion owner: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at F:/agent-sandbox/b6d536-evidence-refresh/tmp/test-intent-before-4SeKBt/modules/ui-web/src/api/statusOwner-raw-settings.test.ts:14:84\n    at processTicksAndR"
       },
       {
         "id": "modules/ui-web/src/api/statusOwner-reattach.test.ts",
         "classification": "assertion",
-        "detail": "OWN-REATTACH-READONLY: a resumed read-only execution causes zero fresh reads:  AssertionError: replaying a successful read does not mutate any status state: expected 1 to be +0 // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-3/test-intent-before-56hNeG/modules/ui-web/src/api/statusOwner-reattach.test.ts:22:80\n    at file:///F:/justsearch-public/.claude/w"
+        "detail": "OWN-REATTACH-READONLY: a resumed read-only execution causes zero fresh reads:  AssertionError: replaying a successful read does not mutate any status state: expected 1 to be +0 // Object.is equality\n    at F:/agent-sandbox/b6d536-evidence-refresh/tmp/test-intent-before-4SeKBt/modules/ui-web/src/api/statusOwner-reattach.test.ts:22:80\n    at file:///F:/agent-sandbox/b6d536-evide"
       }
     ]
   },
-  "digest": "sha256:b5f5fc2d267a7d6f653dc1c188ee4195e9f437dd6aea9eecc49fbdd64f1da4fc"
+  "digest": "sha256:2ee21fbf1ce97055b2ca46097a14de4d40c0b733ea28e5f257262fdefaf02e59"
 }

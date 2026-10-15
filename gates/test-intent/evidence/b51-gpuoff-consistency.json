@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-15T07:20:06.724Z",
-  "revision": "4cd8c540d4dc15a91ef25b480482bec7ed106348",
-  "tree": "7c123f5ff792af2fac81af1e4136f969709467db",
+  "createdAt": "2026-10-15T18:16:06.222Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "4322be6b7914e1b457253a9da61f837cb5e8b0e2",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationAutomaticCpuTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuCommitTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13742
+      "durationMs": 14283
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.GpuOffUnmetStatusTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7872
+      "durationMs": 11944
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.CpuCrashClassificationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6429
+      "durationMs": 8897
     },
     {
       "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest.cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10351
+      "durationMs": 16788
     }
   ],
   "checks": [
@@ -157,7 +157,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:be69a14c8679ee1ccbd0b350c2820aaf0683e32f4a73099872221f8a963968cc",
+      "contentDigest": "sha256:d7dec2bef4cc80cc8a6a75514e2dd9c4f37b9093cccba3724e75a844be03f9bb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -168,6 +168,10 @@
         },
         {
           "name": "status omits the realized identity entirely when the engine is offline",
+          "status": "passed"
+        },
+        {
+          "name": "settingsChatModelSelectionReplansEncoderCaps()",
           "status": "passed"
         },
         {
@@ -191,11 +195,23 @@
           "status": "passed"
         },
         {
+          "name": "standardToCompactActivationReplansEncoderCaps()",
+          "status": "passed"
+        },
+        {
           "name": "profile activation never promotes its transient target to a JVM property",
           "status": "passed"
         },
         {
           "name": "aRefusedSessionFailsTheActivationBeforeAnySelfTestOrCommit()",
+          "status": "passed"
+        },
+        {
+          "name": "compactToStandardActivationReplansEncoderCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "unchangedProfileActivationDoesNotRecomposeEncoders()",
           "status": "passed"
         },
         {
@@ -219,6 +235,10 @@
           "status": "passed"
         },
         {
+          "name": "committedProfileRecoveryReplansEncoderCaps()",
+          "status": "passed"
+        },
+        {
           "name": "status reports mmprojActive=false when the projector was dropped (the honesty case)",
           "status": "passed"
         },
@@ -237,31 +257,36 @@
     "ref": "3241289f5",
     "revision": "3241289f51f748cbfe1145d64d9428aab263caaf",
     "overlays": [],
-    "patches": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b51-gpuoff-consistency-compat.patch",
+        "contentDigest": "sha256:ed02d524f38ed9bd925cf00d16569fe038e3dd7a025a77a9165690c829b0eedd"
+      }
+    ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationAutomaticCpuTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuCommitTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 48429
+        "durationMs": 65242
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.GpuOffUnmetStatusTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 20354
+        "durationMs": 46353
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.CpuCrashClassificationTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 9152
+        "durationMs": 18284
       },
       {
         "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest.cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 20392
+        "durationMs": 25140
       }
     ],
     "checks": [
@@ -288,7 +313,7 @@
       {
         "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java#cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice",
         "classification": "assertion",
-        "detail": "cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {\"schema_version\":2,\"observed_at\":\"2026-10-15T07:19:56.683777200Z\",\"lifecycle\":{\"state\":\"LIFECYCLE_STATE_READY\",\"reason_code\":null,\"message\":null},\"components\":{\"api\":{\"state\":\"READY\",\"reason_code\":null,\"state_since\":\"2026-10-15T07:19:55.072676200Z\"},\"index\":{\"st"
+        "detail": "cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {\"schema_version\":2,\"observed_at\":\"2026-10-15T18:16:02.037721700Z\",\"lifecycle\":{\"state\":\"LIFECYCLE_STATE_READY\",\"reason_code\":null,\"message\":null},\"components\":{\"api\":{\"state\":\"READY\",\"reason_code\":null,\"state_since\":\"2026-10-15T18:16:00.584929700Z\"},\"index\":{\"st"
       },
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java#chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes",
@@ -298,9 +323,9 @@
       {
         "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
         "classification": "assertion",
-        "detail": "activationAppliesPublishedOperatorGpuAndContextInsteadOfSettings(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[99]> | profile activation passes a transient target and installs it after settings commit: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[99]>"
+        "detail": "settingsChatModelSelectionReplansEncoderCaps(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: not equal but was: <[2466, 2342, 2468]> | activationAppliesPublishedOperatorGpuAndContextInsteadOfSettings(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[99]> | standardToCompactActivationReplansEncoderCaps(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: standard to compact activation"
       }
     ]
   },
-  "digest": "sha256:13b29841e7b02d95afd8c4f6ff264827d61a0b4b04afc5280c6bb6542ce6fa83"
+  "digest": "sha256:c2e103781363471584c3fbb23ced4ab6a2137db2cf897037fdec90329ff35e13"
 }

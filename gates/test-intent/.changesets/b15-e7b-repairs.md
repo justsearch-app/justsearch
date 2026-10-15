@@ -21,7 +21,7 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "HTTP settings partial context 131072 commits, survives a fresh store load, retains index ownership, and status exposes user_setting_unmet / inference.setting_unmet with chat enabled or disabled. The harness adds a real KnowledgeServer query owner with empty model roles and a fake chat actuator whose publication callback runs; native loading is absent. Automatic caps can vary through the real query guard while explicit index caps remain guarded. The test-only module dependency makes this integration seam compile; existing harness callers keep their original defaults.",
+      "behaviour": "HTTP settings partial context 131072 commits, survives a fresh store load, retains index ownership, and status exposes user_setting_unmet / inference.setting_unmet with chat enabled or disabled. The harness adds a real KnowledgeServer query owner with empty model roles and a fake chat actuator whose publication callback runs; native loading is absent. Automatic caps can vary through the real query guard without rebuilding an index owner when its physical bulk-session surface is empty; explicit index caps remain guarded. The renamed automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions retains the original inputs and assertions and states that fixture limit explicitly. The test-only module dependency makes this integration seam compile; existing harness callers keep their original defaults.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -36,7 +36,7 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
       "evidence": "gates/test-intent/evidence/b15-e7b-repairs.json",
       "newChecks": [
         "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions"
       ]
     },
     {

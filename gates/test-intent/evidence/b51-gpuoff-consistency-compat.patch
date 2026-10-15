@@ -1,0 +1,28 @@
+Compatibility before-patch for b51-gpuoff-consistency on 3241289f5 only.
+
+The later chat-profile planning fixture calls ChatArtifactIdentity.rememberWritten to seed
+verified-file receipts. That class and every production consumer of it are absent at 3241289f5
+(git grep ChatArtifactIdentity 3241289f5 -- modules returns no matches). The old production model
+identity and planning paths are retained unchanged. This adds only the declaration needed by the
+fixture; its no-op supplies no identity decision, layer value, activation behavior or repair.
+The original CPU and profile checks can then execute on their original before-state.
+
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/ChatArtifactIdentity.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/ChatArtifactIdentity.java
+new file mode 100644
+--- /dev/null
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/ChatArtifactIdentity.java
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.inference;
++
++import java.nio.file.Path;
++
++/** Compatibility only: this before-state has no receipt producer or consumer. */
++public final class ChatArtifactIdentity {
++  private ChatArtifactIdentity() {}
++
++  /** No-op: retain the before-state's own model-identity and planning paths. */
++  public static void rememberWritten(Path file, long size, String digest) {
++    // No production code in this before-state reads receipts from this later API.
++  }
++}

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-15T07:37:59.125Z",
-  "revision": "4cd8c540d4dc15a91ef25b480482bec7ed106348",
-  "tree": "84077ee6b8f0fe41be69fcf58fa9fe3cd786e87f",
+  "createdAt": "2026-10-15T18:05:03.794Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "a62107ea9f8c613e00da90dea652c884b65f23b6",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,31 +21,31 @@
       "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 14286
+      "durationMs": 29438
     },
     {
-      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 11929
+      "durationMs": 22486
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6584
+      "durationMs": 17029
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4820
+      "durationMs": 15506
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4632
+      "durationMs": 15976
     }
   ],
   "checks": [
@@ -73,16 +73,16 @@
       ]
     },
     {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner",
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ac8e52ca8bfb30abcfbd3309f80d61564f3e93dee37816a63ba822770c997c02",
+      "contentDigest": "sha256:1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner(Path)",
+          "name": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path)",
           "status": "passed"
         }
       ]
@@ -197,31 +197,31 @@
         "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 138273
+        "durationMs": 32721
       },
       {
-        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 12118
+        "durationMs": 25486
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5787
+        "durationMs": 16383
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 25286
+        "durationMs": 16665
       },
       {
         "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6860
+        "durationMs": 13840
       }
     ],
     "checks": [
@@ -231,9 +231,9 @@
         "detail": "[1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: partial context write: {\"error\":\"Settings update could not complete\",\"errorCode\":\"SETTINGS_RECOVERY_REQUIRED\",\"errorClass\":\"PERMANENT\",\"retryable\":false,\"i18nKey\":\"errors.INVALID_STATE\"} ==> expected: <200> but was: <503> | [2] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: partial context write: {\"error\":\"Settings update could not complete\",\"errorCode\":\"SETTINGS_RECOVERY_REQUIRED\""
       },
       {
-        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner",
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions",
         "classification": "assertion",
-        "detail": "automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a memory-plan cap is not index model ownership ==> Unexpected exception thrown: java.lang.IllegalStateException: Query-only settings cannot change index model ownership"
+        "detail": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a cap change has no bulk session to replace when the physical bulk surface is empty ==> Unexpected exception thrown: java.lang.IllegalStateException: Query-only settings cannot change index model ownership"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved",
@@ -262,5 +262,5 @@
       }
     ]
   },
-  "digest": "sha256:b0ad5255070fd1acaaffc51f0375ee33a45294843b39432174e8b28539b0b63e"
+  "digest": "sha256:3606b81574ebaf55e9ce8326b8353b66287bcd96c2a095fd7cd05f649a037093"
 }

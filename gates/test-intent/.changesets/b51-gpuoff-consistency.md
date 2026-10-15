@@ -7,6 +7,13 @@ author-session: b51-codex-builder
 
 # Test-intent entries
 
+Evidence is regenerated on 2e6fca66d against the original 3241289f5 before-state. The later
+chat-profile fixture now calls ChatArtifactIdentity.rememberWritten; its absent declaration
+initially prevented all four selected app-services checks from compiling. The add-only
+b51-gpuoff-consistency-compat.patch declares that method as a no-op. No production code at
+3241289f5 names the class, so the before-state keeps its own model-identity, planning, layer
+selection and activation behavior. No assertion or test input is patched.
+
 ```json
 {
   "entries": [

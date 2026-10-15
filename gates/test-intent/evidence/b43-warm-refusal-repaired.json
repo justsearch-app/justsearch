@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-09T06:35:20.647Z",
-  "revision": "a37c6ef33eb7c966d5a6c0874e26d48b6f8357ec",
-  "tree": "2d6ee078fa7dc75fbfe806e38d8141bfd3ac410b",
+  "createdAt": "2026-10-15T18:08:04.007Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "db444552a38bc57d6def53fe55a859058f54dd2c",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 33907
+      "durationMs": 32650
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:17e8a380152873e996e47a82cd12667b8519e986592589a89a37fddc801a1d5a",
+      "contentDigest": "sha256:fb126beaa6f3fd66cc761c135c41cf3180c73ee1b1db02316d9e33d07223dce7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -111,6 +111,10 @@
           "status": "passed"
         },
         {
+          "name": "requestDeadlineWinningBeforeVectorCaptureStaysUntyped()",
+          "status": "passed"
+        },
+        {
           "name": "queuedSearchBehindExpiredNativeWorkEndsByItsOwnDeadline()",
           "status": "passed"
         },
@@ -189,12 +193,13 @@
     "ref": "a37c6ef33",
     "revision": "a37c6ef33eb7c966d5a6c0874e26d48b6f8357ec",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 73929
+        "durationMs": 41426
       }
     ],
     "checks": [
@@ -205,5 +210,5 @@
       }
     ]
   },
-  "digest": "sha256:fd5a5ee41284a604701cfc3f499dc1d4611f9ec6c63dad4d2b94c2a2ab81c64d"
+  "digest": "sha256:b74b2fdde5cfcbad8a09c1323513c5dc941a07720c9a2e8adf0c4b44d8d073de"
 }

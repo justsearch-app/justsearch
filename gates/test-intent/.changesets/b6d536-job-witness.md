@@ -23,7 +23,7 @@ also exercises the writer fence before data-directory lock release.
       "sources": [{
         "kind": "owner-words",
         "quote": "Make the test robust without weakening its assertion. Waiting on the condition with a generous bound is fine; loosening what is asserted is not.",
-        "location": "task t-20261005-b6d536 builder brief 2026-10-15 part 1"
+        "location": "task t-20261005-b6d536 agreement"
       }]
     },
     {
