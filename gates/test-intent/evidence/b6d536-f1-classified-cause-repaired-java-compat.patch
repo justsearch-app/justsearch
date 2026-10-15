@@ -1,0 +1,28 @@
+Compat before-patch for b6d536-f1-classified-cause-repaired-java, applied to 5e4f4e698 (the parent
+of the lane commit f7cd27765 that introduced the repaired behaviour).
+
+Production, one constructor only: HealthEventChangeRegistry(Executor), which
+CapabilityHealthBridgeChatCauseTest calls since ee3c86b19. It ignores the executor and delegates to
+this state's no-argument constructor, so the registry delivers exactly as this state does. No
+production code in this state calls it, and it supplies no chat-cause wording.
+
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+index 6ea7fa2ae..fdd01fb21 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+@@ -42,6 +42,15 @@ public final class HealthEventChangeRegistry {
+     this.channel = new SseStreamChannel(STREAM_ID);
+   }
+ 
++  /**
++   * Compat (fail-before only): the later constructor that takes a delivery executor. It ignores the
++   * executor and builds the registry exactly as this state's no-argument constructor does. No
++   * production code in this state calls it.
++   */
++  public HealthEventChangeRegistry(java.util.concurrent.Executor ignoredDelivery) {
++    this();
++  }
++
+   public HealthEventChangeRegistry(SseStreamChannel channel) {
+     this.channel = Objects.requireNonNull(channel, "channel");
+   }

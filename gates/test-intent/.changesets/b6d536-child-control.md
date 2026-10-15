@@ -20,6 +20,12 @@ All checks ran in one evidence run: `gates/test-intent/evidence/b6d536-child-con
 fail-before is claimed through run-evidence: on a0d6c4c50 every new check fails to compile because
 the classes and the manifest field it exercises do not exist there.
 
+Records phase B (batch 3) re-ran `b6d536-child-control.json` after merging b6d536/integration at
+181363e86 (the accepted b101 probe-churn lane), because DefaultChildControlTest and
+RuntimeManifestIncarnationPublishTest changed after the first run. All six checks pass on the
+change. As before, no before-state is claimed. None of these checks reads the stop-census scripts
+under scripts/dev that the unmerged b102 lane changes.
+
 ```json
 {
   "entries": [
