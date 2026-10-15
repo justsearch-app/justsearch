@@ -33,6 +33,14 @@ Phase B (integration base 181363e86, merge 98fd416d0): `b6d536-integrate-system-
 was regenerated with its before-state f648453b5 and overlays unchanged. Both checks pass on the
 candidate and fail there by assertion, as entry 4 states.
 
+Entry 5 (`b6d536-integrate-system-reads-new.json`) stays candidate-only. Before-state not
+reproducible: each of its checks asserts directly on API that this integration's commit a3e96417e
+adds, and f648453b5 has none of it. `ChildPathPrefixTest` asserts the environment
+`DefaultChildControl.prependPath` leaves. The two `EnvRegistryTest` checks assert the names,
+default and boolean read of `EnvRegistry.ENGINE_INCARNATION` and `EnvRegistry.EVAL_MODE`. Any compat
+stub would have to supply exactly the values these checks assert, so the stub, not the before-state,
+would decide them.
+
 ## Evidence that goes stale on the integration branch only
 
 Each slice below ships as its own stacked PR, where its evidence was run against the test files
