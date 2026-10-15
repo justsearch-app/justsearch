@@ -44,10 +44,14 @@ import org.junit.jupiter.api.io.TempDir;
  * over all of them; use an even number of rounds. Run:
  * {@code JS_PROBE_CHURN_MEASURE=1 gradlew :modules:app-engine:test --tests *ProbeChurnPrimaryRate*}.
  * {@code JS_PROBE_CHURN_ARMS=off,nosink JS_PROBE_CHURN_ASSERT=1} turns it into check (c), which
- * asserts the ledger's cost directly: in every {@code off} trial the helper owner's ledger writes
- * take at most {@link #MAX_WRITE_SHARE} of the trial's indexing time, and their number stays within
- * {@link #MAX_HELPER_RECORDS_PER_TRIAL} however many documents the trial indexes (a trial is one
- * burst; b599d4d7e wrote two forced records per document). The ledger writes counted are every
+ * asserts the ledger's cost directly. The deterministic bound: every {@code off} trial writes at
+ * most {@link #MAX_LEDGER_RECORDS_PER_TRIAL} ledger records, Engine and extraction child together,
+ * however many documents it indexes (a trial is one burst; b599d4d7e wrote about 3,600 records per
+ * 900-document trial, four per document). A guard on the time: those writes take at most {@link
+ * #MAX_WRITE_SHARE} of the trial's indexing time, a share printed for every trial. The guard is
+ * loose because a forced write's latency on a shared volume varies by a factor of four or more
+ * between trials of the same code; the defect it guards against took 41 to 46%. The ledger writes
+ * counted are every
  * record the trial adds to the ledger: the Engine's helper owner records, timed as they happen, and
  * the rest (the Engine job witness's process records and the extraction child's own records, the
  * child being another process), read back after the trial and replayed, every one forced, through a
@@ -64,10 +68,16 @@ import org.junit.jupiter.api.io.TempDir;
 final class ProbeChurnPrimaryRateMeasurement {
 
   private static final int DOCS = intEnv("JS_PROBE_CHURN_DOCS", 1500);
-  /** Largest share of a trial's indexing time the helper owner's ledger writes may take. */
-  static final double MAX_WRITE_SHARE = 0.02;
-  /** Most helper owner records one indexing burst may write, independent of its document count. */
-  static final int MAX_HELPER_RECORDS_PER_TRIAL = 32;
+  /**
+   * Largest share of a trial's indexing time its ledger writes may take: a guard, not the bound. The
+   * same write path measured 0.6% to 3.7% per trial on a shared host; b599d4d7e took 41 to 46%.
+   */
+  static final double MAX_WRITE_SHARE = 0.05;
+  /**
+   * Most ledger records, Engine and extraction child together, one indexing burst may write,
+   * independent of its document count. A 900-document trial writes 12 to 18; b599d4d7e about 3,600.
+   */
+  static final int MAX_LEDGER_RECORDS_PER_TRIAL = 24;
   private static final int ROUNDS = intEnv("JS_PROBE_CHURN_ROUNDS", 3);
 
   @Test
@@ -89,7 +99,8 @@ final class ProbeChurnPrimaryRateMeasurement {
     Object realRecorder = recorderField.get(null);
     Map<String, List<Double>> rates = new LinkedHashMap<>();
     Map<String, List<Integer>> processes = new LinkedHashMap<>();
-    List<String> costFailures = new ArrayList<>();
+    List<String> countFailures = new ArrayList<>();
+    List<String> shareFailures = new ArrayList<>();
     arms.forEach(a -> { rates.put(a, new ArrayList<>()); processes.put(a, new ArrayList<>()); });
     var os = (com.sun.management.OperatingSystemMXBean)
         java.lang.management.ManagementFactory.getOperatingSystemMXBean();
@@ -128,12 +139,13 @@ final class ProbeChurnPrimaryRateMeasurement {
         if (arm.equals("off")) {
           double seconds = files.size() / result[0];
           double share = timing.seconds() / seconds;
-          if (share > MAX_WRITE_SHARE || timing.writes() > MAX_HELPER_RECORDS_PER_TRIAL) {
-            costFailures.add(String.format(java.util.Locale.ROOT,
-                "round %d: %d ledger records (%.2f per document) took %.3f s of %.2f s indexing (%.2f%%)",
-                round, timing.writes(), timing.writes() / (double) files.size(), timing.seconds(), seconds,
-                100 * share));
-          }
+          String cost = String.format(java.util.Locale.ROOT,
+              "round %d: %d ledger records (%.2f per document) took %.3f s of %.2f s indexing (%.2f%%)",
+              round, timing.writes(), timing.writes() / (double) files.size(), timing.seconds(), seconds,
+              100 * share);
+          System.out.println("PROBE-CHURN cost " + cost);
+          if (timing.writes() > MAX_LEDGER_RECORDS_PER_TRIAL) countFailures.add(cost);
+          if (share > MAX_WRITE_SHARE) shareFailures.add(cost);
         }
       }
     }
@@ -150,10 +162,13 @@ final class ProbeChurnPrimaryRateMeasurement {
       // Check (c): the ledger's cost to indexing, measured directly in each ledger-on trial.
       assertTrue(rates.containsKey("off"), "check (c) needs the 'off' arm (the real ledger)");
       assertTrue(realRecorder != null, "check (c) needs the Engine's helper ledger to be open");
-      assertTrue(costFailures.isEmpty(), String.format(java.util.Locale.ROOT,
-          "ledger writes must take at most %.0f%% of indexing time and at most %d records per"
-              + " burst, whatever the document count:%n  %s", 100 * MAX_WRITE_SHARE,
-          MAX_HELPER_RECORDS_PER_TRIAL, String.join("\n  ", costFailures)));
+      assertTrue(countFailures.isEmpty(), String.format(java.util.Locale.ROOT,
+          "a burst may write at most %d ledger records, Engine and extraction child together,"
+              + " whatever the document count:%n  %s", MAX_LEDGER_RECORDS_PER_TRIAL,
+          String.join("\n  ", countFailures)));
+      assertTrue(shareFailures.isEmpty(), String.format(java.util.Locale.ROOT,
+          "ledger writes must take at most %.0f%% of indexing time:%n  %s", 100 * MAX_WRITE_SHARE,
+          String.join("\n  ", shareFailures)));
     }
   }
 
