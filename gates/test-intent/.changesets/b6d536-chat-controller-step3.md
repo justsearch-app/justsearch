@@ -189,3 +189,14 @@ changeset covers only this slice's files.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:0a44897d6ddf5494e9f79fccd3395d2ce37885ac56bd8df864e5c2595842f035",
+  "note": "Reviewed current tracker/lease adaptations, source corrections and evidence; selected current candidate checks pass. The independent verify-a23 report explicitly records the unchanged noOtherMainClassNamesALlamaServerExchange preservation check passing before, resolving the candidate-only concern."
+}
+```

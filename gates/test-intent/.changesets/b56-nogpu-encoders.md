@@ -136,3 +136,14 @@ F:/agent-sandbox/design-b6d536/codex/b56-nogpu-encoders/report.md.
   "note": "Independent verification: 18 fail-before assertions pass on 3be25dfa2; all six candidate live cases pass (retained-cache CPU cold/restart, empty-cache CPU, visible GPU initial/restored, operator-off truthful CUDA reranker exemption). Own hardware-veto/forgery and two-process partial/empty native-cache checks pass. 7817 full safe suite cases pass, 23 skipped; 84 unsafe process/link fixture classes excluded. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md. Unrelated governance and architecture-document gates remain failing."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:95df8e41785a352bb96722b3cd980389261c6e3ba73215fc7e5f1edf53bb6993",
+  "note": "Reviewed current tests, fixtures and evidence; candidate selectors pass, including NoDeviceTokenizerCacheTest in its required CUDA_VISIBLE_DEVICES=-1 JVM. Today's independent report exactly matches the current files/patch and all eight declared before outcomes."
+}
+```

@@ -32,6 +32,12 @@ TestActivationForwarders is overlaid. All three checks fail before by assertion:
 before C, a start holds the lifecycle lock while it waits for health, and a foreign unload is
 reloaded.
 
+Signoff repair: the separate b6d536-chat-controller-repaired-seam.json now records the same
+f75486245 compatibility patch explicitly, with only TestActivationForwarders overlaid. Its two
+checks pass on the candidate and fail by the declared coalescing and lifecycle-lock assertions
+on that before-state. The patch supplies the before-API helpers; candidate helpers are not
+overlaid on top of them.
+
 ```json
 {
   "entries": [
@@ -288,3 +294,25 @@ reloaded.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:ce7f74cab73f2c6d523f3c6c082f8a9d1afbbff8b306a982859e26df8ffe09ed",
+  "note": "Before rerun mismatch for entries 1 and 2: the exact declared f75486245 test/helper overlay, with no patch, fails compileTestJava because ChildControl and ProcessTerminator are absent. The separate repaired-seam evidence records assertion failures; the older combined evidence's compatibility patch does not repair this unpatched record."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:7605fd552e776453d91613f68e7c47266ea22d796aa67f523c73c9099725ea61",
+  "note": "Re-reviewed the corrected entries since 9f1f6257b: both candidate checks pass and the exact f75486245 compatibility-patch replay reproduces the declared coalescing and lifecycle-lock assertion failures. The patch does not decide those outcomes; other entries, listed items and evidence remain truthful and unchanged; bound to main."
+}
+```

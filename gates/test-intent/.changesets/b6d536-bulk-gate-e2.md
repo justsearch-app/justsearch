@@ -221,3 +221,14 @@ Evidence files (all written by run-evidence.mjs):
   "digest": "sha256:03d74179acf0adae6f79c3e5bbfd30a315863b9d092cf096392288d1b3832d30"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:9fa1abea8c5f779aeb82f9da0b96aaf02337910a8081931b607a84d512ed9966",
+  "note": "Reviewed corrected intent sources and unchanged before evidence against current tests. All selected current candidate checks pass; no changed before-state execution or evidence falsehood was found."
+}
+```

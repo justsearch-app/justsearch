@@ -499,3 +499,14 @@ after the first runs:
   "digest": "sha256:97e3abc1dfa529c3ab41c0e03b5d27d20be24fd6d1801d8327140a5ff1d2fad4"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:f721fdef4c070e7c67c05ec2b0a85002f213b395050f81d24d38d2298cb8cfce",
+  "note": "Reviewed changed CPU-recourse fixtures/evidence and current selected candidate reruns, which pass. Today's exact-file reruns cover the changed repaired evidence; stale timestamp prose is an observation rather than a false execution record."
+}
+```

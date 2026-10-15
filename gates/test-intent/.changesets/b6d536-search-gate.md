@@ -464,3 +464,16 @@ Evidence files (all written by run-evidence.mjs):
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:a86b34d015d9da96c13a987a51c2c883bb7e2abdc50cd0a57f21dd7dcebb2dc3",
+  "note": "Reviewed current admission/breaker fixtures, evidence and selected candidate passes. Exact declared before reruns at 68547f75a and 342da6779 reproduce all four recorded assertion classifications; the other before evidence is unchanged."
+}
+```

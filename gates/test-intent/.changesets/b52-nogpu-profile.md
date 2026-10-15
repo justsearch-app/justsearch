@@ -132,3 +132,14 @@ Independent acceptance pending. Fail-before assertion XML and guarded execution 
   "note": "The attached evidence is stale because GpuProfileResolverTest changed. Independent assertion replay and live CPU tier/positive-preference preservation pass, but this record does not accept stale attached evidence. Only the authorized verdict records were edited; the evidence JSON must be refreshed by its owner. Independent evidence: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:6ae313344df4559b71120537ef378093c652a54348daed1d06f3e0fb383b2b21",
+  "note": "Reviewed current test/evidence changes and the corrected sources; selected candidate checks pass. Replayed the declared before run at 7f908530c: all four check outcomes match, including the preserved refusal-key pass."
+}
+```

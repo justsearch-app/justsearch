@@ -21,44 +21,12 @@ is built (Spec A O8): reportResume stays unwired here; its source, the Engine po
 (SystemPowerEvents) on branch b6d536/one-quit (d20c300d1), is wired at that merge. This changeset
 covers only these files.
 
-Fail-before for checks on API new in this change (manual run, not a run-evidence file). The run
-used a temporary `git worktree add` of a3e96417e outside the repo, removed after the run; the
-stub script, the stub patch and the JUnit results are kept in the builder sandbox
-(stubs10/stub10.py, stub-logs10). Before-state (layer stubs): a3e96417e plus the candidate's
-files, with each new step-10 behaviour reduced to a no-behaviour stub of the same signature:
-reportDeviceLost and reportResume return at once and withinDeviceLostLimit says yes; the manager's
-deviceLostStop does nothing and answers no restart, noteResume nothing and resumeProbe answers NOT_SERVING; the manager
-reports no llama exit; LlamaServerOps.noteResume does nothing; deviceLostCode is always empty and no line names a listed code;
-DeviceLostRestartHistory.read is empty; runAndExitDeviceLost is the plain requested restart
-(ENGINE_RESTART self-intent) and deviceLostSelfIntent is that intent; EngineRoot binds nothing;
-the HeadlessApp recovery is empty and requests nothing. Of 46 checks, 38 fail, every one by
-AssertionFailedError. Examples:
-
-- U21: withinTheLimitTheServerStopsNowAndTheEngineRestarts, "the Engine restart is requested ==>
-  expected: <true> but was: <false>"; the over-limit cases fail at "the server is stopped for the
-  lost device and chat is FAILED"; theServerStopsBeforeTheLedgerIsRead, "expected: <true> but
-  was: <false>".
-- Code list: everyCodeOnSpecEsListIsDeviceLossByItsCudaErrorText, "CUDA error: invalid program
-  counter ==> expected: <DEVICE_SUSPECT> but was: <OTHER>"; numberedAndNamedCodesOnTheListAreDeviceLoss,
-  "expected: <Optional[700]> but was: <Optional.empty>".
-- U22: theResidencyDwellRestartsInFullOnResume, "Expected ChatRefusal to be thrown, but nothing was
-  thrown"; theBootOrderDeadlineRestartsInFullOnResume, "it does not expire at the first deadline
-  ==> expected: <false> but was: <true>"; theResumeClearsAFailureLatchAndSendsTheIntentAgain,
-  "expected: <null> but was: <CRASH_LOOP>".
-- Seam: aResumeRestartsTheStartsHealthDeadlineInFull, "the start still waits for health ==>
-  expected: <false> but was: <true>"; aFailedOneTokenProbeStopsTheServerAndRelaunchesItOnce,
-  "expected: <RELAUNCHED> but was: <NOT_SERVING>"; aStartExitNamingALostDeviceIsReportedToTheController,
-  "expected: <[LLAMA_EXIT 719]> but was: <[]>".
-- Engine: EngineShutdownDeviceLostTest, "expected: <[intent DEVICE_LOST - 4, close restart]> but
-  was: <[intent ENGINE_RESTART - 4, close restart]>"; EngineDeviceLossWitnessTest, "the bound
-  Engine restart is requested ==> expected: <true> but was: <false>".
-
-The eight that pass on the stubs are negative or preservation properties, as they must:
-anEmptyDataDirectoryHasNoEarlierRestarts, otherDeviceSuspectExitsAndOutOfMemoryAreNotDeviceLoss,
-codesOffTheListAreNotDeviceLoss,
-withChatOffThereIsNothingToProbe, withoutAResumeTheStartsHealthDeadlineStillEnds,
-aStartExitWithoutDeviceLostTextIsNotReported, withoutALatchTheResumeDoesNotReplan and
-aResumeAfterTheControllerStoppedDoesNothing.
+The earlier layer-stub experiment is withdrawn as fail-before proof: its reached no-op and
+fixed-result methods determined the missing effects. The four New entries are candidate-only.
+A fresh run-evidence attempt overlays the current checks and HealthyFakeLlamaServer onto the
+actual a3e96417e parent, without production transplants or outcome stubs. The old APIs needed
+by these checks are absent; the specific limitation is stated in each entry. The parent API
+audit and attempted-run logs are in F:/phaseb-fix3-b6d536-20261015. No assertion repair is claimed.
 
 Preservation: the pre-existing checks on the touched seams (the crash relaunch through the
 extended stand-in, the restart dispatch HeadlessApp now shares with the device-lost restart, the
@@ -73,7 +41,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec A §9.2 U21 on the chat controller, on new API (ChatDeviceLoss, DeviceLostRecovery and the recovery constructor are new in this change; the layer-stub run described above records the fail-before by assertion), with a stand-in actuator and a fixed wall clock. withinTheLimitTheServerStopsNowAndTheEngineRestarts: with one earlier device-lost restart 30 minutes ago, a device loss reported while a step waits on the device interrupts that step (its caller gets InterruptedException), the device-lost step stops the server now (draining with DEVICE_LOST), then the controller stops for good with DEVICE_LOST (terminalStop(DEVICE_LOST), desired terminal DEVICE_LOST) and the Engine restart is requested once; nothing is latched. theServerStopsBeforeTheLedgerIsRead and overTheLimitTheServerAlsoStopsBeforeTheLedgerIsRead: the server stop comes before the ledger read, within the limit and over it (Spec A §7.3 items 2 then 3). twoEarlierRestartsInTheHourStillLeaveRoomForAThird: restarts 50 and 11 minutes ago (and one 61 minutes ago) leave room. aRestartInTheLastTenMinutesFailsChatInsteadOfRestarting (5 minutes ago), threeRestartsInTheLastHourFailChatInsteadOfRestarting (55, 35, 15 minutes ago; LLAMA_EXIT 700), anUnreadableLedgerFailsClosed (the history throws IOException) and noBoundRestartPathFailsClosed (the three-argument constructor): the server stops once, draining with DEVICE_LOST, then device_lost_limit is latched, nothing restarts and the controller stays operable. aSecondReportWhileTheFirstIsHandledIsIgnored: a report while the first is handled runs no second stop. theLimitCountsTheNewRestartAgainstBothWindows: no restart in the last 10 minutes (exactly 10 minutes ago is outside) and at most two in the last hour; a record dated ahead counts.",
+      "behaviour": "Spec A §9.2 U21 on the chat controller, on new API (ChatDeviceLoss, DeviceLostRecovery and the recovery constructor are new in this change), with a stand-in actuator and a fixed wall clock. withinTheLimitTheServerStopsNowAndTheEngineRestarts: with one earlier device-lost restart 30 minutes ago, a device loss reported while a step waits on the device interrupts that step (its caller gets InterruptedException), the device-lost step stops the server now (draining with DEVICE_LOST), then the controller stops for good with DEVICE_LOST (terminalStop(DEVICE_LOST), desired terminal DEVICE_LOST) and the Engine restart is requested once; nothing is latched. theServerStopsBeforeTheLedgerIsRead and overTheLimitTheServerAlsoStopsBeforeTheLedgerIsRead: the server stop comes before the ledger read, within the limit and over it (Spec A §7.3 items 2 then 3). twoEarlierRestartsInTheHourStillLeaveRoomForAThird: restarts 50 and 11 minutes ago (and one 61 minutes ago) leave room. aRestartInTheLastTenMinutesFailsChatInsteadOfRestarting (5 minutes ago), threeRestartsInTheLastHourFailChatInsteadOfRestarting (55, 35, 15 minutes ago; LLAMA_EXIT 700), anUnreadableLedgerFailsClosed (the history throws IOException) and noBoundRestartPathFailsClosed (the three-argument constructor): the server stops once, draining with DEVICE_LOST, then device_lost_limit is latched, nothing restarts and the controller stays operable. aSecondReportWhileTheFirstIsHandledIsIgnored: a report while the first is handled runs no second stop. theLimitCountsTheNewRestartAgainstBothWindows: no restart in the last 10 minutes (exactly 10 minutes ago is outside) and at most two in the last hour; a record dated ahead counts. Candidate-only. before-state not reproducible: a3e96417e has no ChatDeviceLoss, DeviceLostEvidence or DeviceLostRecovery types, no recovery constructor and no reportDeviceLost or withinDeviceLostLimit entry points on ChatServerControllerImpl. Adding reached implementations or fixed-result stubs would determine the outcomes.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -110,7 +78,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec A §9.2 U22 and T34 on the chat controller, on new API (reportResume, noteResume and resumeProbe are new in this change; the layer-stub run records the fail-before by assertion). theResidencyDwellRestartsInFullOnResume: 60 s into the 120 s reload dwell after a pressure unload, a resume restarts it, so 60 s later a person's chat is still refused RELOAD_BACKOFF with 60 s to wait and loads after them. theServerTimersResetAtOnceAndAServingServerIsProbedAfterTheStepInProgress: while a step runs, the resume resets the server's timers at once (noteResume before the step ends) and the probe runs after the step, in that order. aProbeThatFindsTheDeviceLostTakesTheDeviceLostPath: a probe result DEVICE_LOST 719 takes the device-lost path (within the limit: terminal DEVICE_LOST and the Engine restart). aPassingProbeChangesNothing. theResumeClearsAFailureLatchAndSendsTheIntentAgain: a latched CRASH_LOOP is cleared and the activation intent is sent again once; withoutALatchTheResumeDoesNotReplan. theBootOrderDeadlineRestartsInFullOnResume: a 3 s boot-order gate resumed after 2 s does not expire at the first deadline and expires about 3 s after the resume. aResumeAfterTheControllerStoppedDoesNothing.",
+      "behaviour": "Spec A §9.2 U22 and T34 on the chat controller, on new API (reportResume, noteResume and resumeProbe are new in this change). theResidencyDwellRestartsInFullOnResume: 60 s into the 120 s reload dwell after a pressure unload, a resume restarts it, so 60 s later a person's chat is still refused RELOAD_BACKOFF with 60 s to wait and loads after them. theServerTimersResetAtOnceAndAServingServerIsProbedAfterTheStepInProgress: while a step runs, the resume resets the server's timers at once (noteResume before the step ends) and the probe runs after the step, in that order. aProbeThatFindsTheDeviceLostTakesTheDeviceLostPath: a probe result DEVICE_LOST 719 takes the device-lost path (within the limit: terminal DEVICE_LOST and the Engine restart). aPassingProbeChangesNothing. theResumeClearsAFailureLatchAndSendsTheIntentAgain: a latched CRASH_LOOP is cleared and the activation intent is sent again once; withoutALatchTheResumeDoesNotReplan. theBootOrderDeadlineRestartsInFullOnResume: a 3 s boot-order gate resumed after 2 s does not expire at the first deadline and expires about 3 s after the resume. aResumeAfterTheControllerStoppedDoesNothing. Candidate-only. before-state not reproducible: a3e96417e has no reportResume entry point on ChatServerControllerImpl and no noteResume or resumeProbe actuator contract. There is no old resume operation to re-encode these calls against; reached resume stubs would determine the timer, probe and latch outcomes.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -146,7 +114,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java"
       ],
       "class": "New",
-      "behaviour": "The manager's step-10 primitives on the real seam, on new API (resumeProbe, deviceLostStop, noteResume and deviceLostCode are new in this change; the layer-stub run records the fail-before by assertion): a lifecycle manager runs llama-server as the separate stand-in process. aServerThatAnswersHealthAndOneTokenPassesTheProbe: PASSED, no relaunch. aFailedOneTokenProbeStopsTheServerAndRelaunchesItOnce: a /completion answering 500 gives RELAUNCHED; the probed server is stopped and a second launch with the same window serves; no failure is latched. aProbeFailureWithDeviceLostTextReportsTheCodeAndLeavesTheServerToTheController: a /completion that prints 'CUDA error: unspecified launch failure' gives DEVICE_LOST 719 and no relaunch. withChatOffThereIsNothingToProbe: NOT_SERVING. theDeviceLostStopEndsTheServerAndLatchesDeviceLostLimit: the server process has ended when the ledger decision is asked; told no restart, chat goes offline with device_lost_limit, nothing relaunches, and noteResume clears the latch (T34). withinTheLimitTheDeviceLostStopEndsTheServerFirstAndLatchesNothing: the server has ended when the decision is asked; told restart, the step returns true and latches nothing. aResumeRestartsTheStartsHealthDeadlineInFull: a start whose /health answers 503 (loading) survives a resume 5 s before its deadline followed by 30 s of the test clock, and serves once loading ends; withoutAResumeTheStartsHealthDeadlineStillEnds (preservation of the monotonic deadline). aStartExitNamingALostDeviceIsReportedToTheController: a start that exits printing the 719 text is reported to the installed router as LLAMA_EXIT 719; aStartExitWithoutDeviceLostTextIsNotReported: out of memory is not (F17). LlamaServerDeviceLostCodeTest: exactly Spec E §6.1's closed list (100, 214, 700, 702, 714-718, 719, 803, 35, 999): each code's CUDA error text in a llama-server exit is DEVICE_SUSPECT with that line as evidence and names its code; numbered ('CUDA error 700', ORT's 'CUDA failure 719:'), runtime and driver names name theirs; 46 (cudaErrorDevicesUnavailable), 2 (out of memory), 713, 7190, 'device lost' without a code, an 'unknown error' line without CUDA and empty output name nothing; server output names the code while the process lives.",
+      "behaviour": "The manager's step-10 primitives on the real seam, on new API (resumeProbe, deviceLostStop, noteResume and deviceLostCode are new in this change): a lifecycle manager runs llama-server as the separate stand-in process. aServerThatAnswersHealthAndOneTokenPassesTheProbe: PASSED, no relaunch. aFailedOneTokenProbeStopsTheServerAndRelaunchesItOnce: a /completion answering 500 gives RELAUNCHED; the probed server is stopped and a second launch with the same window serves; no failure is latched. aProbeFailureWithDeviceLostTextReportsTheCodeAndLeavesTheServerToTheController: a /completion that prints 'CUDA error: unspecified launch failure' gives DEVICE_LOST 719 and no relaunch. withChatOffThereIsNothingToProbe: NOT_SERVING. theDeviceLostStopEndsTheServerAndLatchesDeviceLostLimit: the server process has ended when the ledger decision is asked; told no restart, chat goes offline with device_lost_limit, nothing relaunches, and noteResume clears the latch (T34). withinTheLimitTheDeviceLostStopEndsTheServerFirstAndLatchesNothing: the server has ended when the decision is asked; told restart, the step returns true and latches nothing. aResumeRestartsTheStartsHealthDeadlineInFull: a start whose /health answers 503 (loading) survives a resume 5 s before its deadline followed by 30 s of the test clock, and serves once loading ends; withoutAResumeTheStartsHealthDeadlineStillEnds (preservation of the monotonic deadline). aStartExitNamingALostDeviceIsReportedToTheController: a start that exits printing the 719 text is reported to the installed router as LLAMA_EXIT 719; aStartExitWithoutDeviceLostTextIsNotReported: out of memory is not (F17). LlamaServerDeviceLostCodeTest: exactly Spec E §6.1's closed list (100, 214, 700, 702, 714-718, 719, 803, 35, 999): each code's CUDA error text in a llama-server exit is DEVICE_SUSPECT with that line as evidence and names its code; numbered ('CUDA error 700', ORT's 'CUDA failure 719:'), runtime and driver names name theirs; 46 (cudaErrorDevicesUnavailable), 2 (out of memory), 713, 7190, 'device lost' without a code, an 'unknown error' line without CUDA and empty output name nothing; server output names the code while the process lives. Candidate-only. before-state not reproducible: a3e96417e has no InferenceLifecycleManager.resumeProbe, deviceLostStop or noteResume, and no LlamaServerOps.deviceLostCode. The checks directly call these new operations; supplying their return values or effects would determine the probe, stop, timer and code assertions.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -192,7 +160,7 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "The Engine's device-lost restart path, on new API (DeviceLostRestartHistory, runAndExitDeviceLost, bindDeviceLostRecovery and the HeadlessApp recovery are new in this change; the layer-stub run records the fail-before by assertion). DeviceLostRestartHistoryTest: only engine-self-intent records with reason DEVICE_LOST count, in ledger order, among ENGINE_RESTART and QUIT records; an empty data directory has none; an unreadable line makes the history an IOException; a torn tail (a write in progress) is not an error. EngineShutdownDeviceLostTest: the restart records the self-intent DEVICE_LOST, no detail, expected code 4, closes in restart order and exits 4; an unclean close exits 1; a second exit request adds nothing. EngineDeviceLossWitnessTest: wired as the Engine composes it, an encoder loss on CUDA device 73 (DeviceHealth) reaches the controller the inference factory builds, which reads the bound restart path once, stops for good with DEVICE_LOST and requests the restart. HeadlessAppDeviceLostRestartTest: the recovery counts this data directory's DEVICE_LOST self-intents (2 of 3 records), throws IOException when a self-intent write failed, and its restart publishes the pending restart, records the self-intent, closes, exits 4, and the next incarnation counts it.",
+      "behaviour": "The Engine's device-lost restart path, on new API (DeviceLostRestartHistory, runAndExitDeviceLost, bindDeviceLostRecovery and the HeadlessApp recovery are new in this change). DeviceLostRestartHistoryTest: only engine-self-intent records with reason DEVICE_LOST count, in ledger order, among ENGINE_RESTART and QUIT records; an empty data directory has none; an unreadable line makes the history an IOException; a torn tail (a write in progress) is not an error. EngineShutdownDeviceLostTest: the restart records the self-intent DEVICE_LOST, no detail, expected code 4, closes in restart order and exits 4; an unclean close exits 1; a second exit request adds nothing. EngineDeviceLossWitnessTest: wired as the Engine composes it, an encoder loss on CUDA device 73 (DeviceHealth) reaches the controller the inference factory builds, which reads the bound restart path once, stops for good with DEVICE_LOST and requests the restart. HeadlessAppDeviceLostRestartTest: the recovery counts this data directory's DEVICE_LOST self-intents (2 of 3 records), throws IOException when a self-intent write failed, and its restart publishes the pending restart, records the self-intent, closes, exits 4, and the next incarnation counts it. Candidate-only. before-state not reproducible: a3e96417e has no DeviceLostRestartHistory or DeviceLostRecovery, no EngineShutdownSequence.runAndExitDeviceLost, no EngineRoot.bindDeviceLostRecovery and no HeadlessApp.deviceLostRecovery. The old requested restart is ENGINE_RESTART rather than the new device-loss restart/history/binding contract; adding or replacing these operations would determine the recorded intent, count and restart outcomes.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -261,5 +229,27 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
   "session": "verify-batch1-20261008-independent",
   "verdict": "reject",
   "digest": "sha256:e73cc7ead1fb0f78b1fc874cfdb1cad0611064fb3aee5ba8bb0d6069b4ba7a58"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:21f9f4e8e46a1c03b0e576c61d38ca2e2775b5a0ee1d68d413ee6851e5ce07be",
+  "note": "The preamble and New entries present manual failures from candidate device-loss/resume methods replaced by no-op or fixed-result stubs as fail-before proof. Those reached stubs determine the asserted missing effects; candidate checks passing does not make these manufactured failures valid before-state evidence."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:035dc988c2f1f8b7208f521a1e6a8d9885ca9b6b9be60cabd0ba0cdec3a224b2",
+  "note": "Reran all 46 changed-entry checks successfully; the actual a3e96417e replay and API audit confirm the stated missing APIs, so the candidate-only reasons are true and withdrawn outcome-stub failures are not proof. Declarations match assertions; other entries and evidence are unchanged since 9f1f6257b; bound to main."
 }
 ```

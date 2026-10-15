@@ -159,3 +159,14 @@ GpuResidencyGameTest#gameOutranksExternalMemory keeps its inputs, ticks and gate
   "note": "VC-gpu3 (independent Claude verifier) on b6d536/integration-gpu vs 217804ac8: accepted b48ef2fcc (GPU lane merged with integration) and the delta c55059360. Live on the real GPU and device plan (P12): external memory pressure unloads idle chat in 0.4 s with gpu_busy, a person's next chat reloads with loading and answers, MCP gets a typed 503 GPU_BUSY with no force and load-anyway 403 REFUSED, a person's load-anyway holds through pressure returning in the 15 s window, indexing shows paused for external GPU use; 20 of its 44 own cases fail on the base for the reason under test; health-stall observer bounded; one unload after short holds; merge kept both sides. Delta: one fixed nextReloadNotBefore per wait and retry-after counting down that wait (both fail on b48ef2fcc). Suites, ArchUnit and PMD show only the base's failures. Evidence refreshed after the merge (dc5facc0c compat before-patches add only missing symbols; before-assertion messages match the original records). Unverified: live repeat of the delta, game plus memory pressure live, residency debug route live (eval-only). Named limit: after sleep or resume a running pressure wait's published instant may be up to 30 s in the past. Digest bound with --base 217804ac8, the combined branch base."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:6d49deeaa24823454c0b6c0d0185416e450e0a36e1a0da9b0255c51c61e8383f",
+  "note": "Reviewed the source corrections and current candidate reruns, which pass. The independent VC-gpu review documents the P12 game-plus-memory preservation before-pass; its selected oracle/helpers are unchanged, so entry 3 is not unsupported candidate-only evidence."
+}
+```

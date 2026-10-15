@@ -143,3 +143,14 @@ Evidence for b6d536-b77-health-interrupt.json was regenerated on the integration
   "note": "verify-batch6 on e331c571b: the listed new checks fail on b639e82c5 by assertion (HealthPublisherInterruptTest 8/8, HealthProducerInterruptTest 7/7 producers 50/50 races, plain-channel close 1/1; the preservation race check passes on both) and pass on the candidate. Own probes: 8 production Health publishers x 6 interrupt scenarios pass (previous fails S1-S4, S6); owned delivery keeps per-listener order, bounds a stalled listener to about 1 s, handles reentrancy and own-frame Errors, 2,000 subscribers with 500 stalled served; plain channels keep publishers uninterrupted. Suites of adapters-lucene, worker-services, app-services, app-engine, app-observability pass; live R1 with Health SSE attach and 8 SSE disconnects during recovery passes; normal stop with 3 open Health SSE attachments and a walk in flight exits 0, no kills. Observations (not blocking): a persistently slow observer costs each synchronous publish up to 1 s; an observer Error after the bounded wait is reported to nobody; an owner interrupt coinciding with channel close during an attach prefix is cleared."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:56e9411eb89e10a7a072bd87861c098925f6a2f218ad78907c3e62122c34720a",
+  "note": "Reviewed the injected-executor changes and add-only compatibility constructor: it delegates to the old implementation and does not create the failure. Candidate checks pass; today's exact-file review reproduces all 10 repaired assertions and the earlier acceptance documents the preservation pass."
+}
+```

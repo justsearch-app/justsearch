@@ -14,6 +14,14 @@ Accepted without change (round 4):
 
 # Test-intent entries
 
+Signoff repair of entry 6: launch/registration preservation and the new job-assignment fault
+injection are declared separately below. The preservation run uses a164833f5 plus an add-only
+createChat declaration needed solely to compile the unselected job-assignment test method.
+The two selected checks never call it; it throws if reached and cannot decide their outcomes.
+The job-assignment check stays candidate-only for the concrete API reason in its entry.
+The initial unpatched parent replay and native PID/creation-time logs are retained in
+F:/phaseb-fix3-b6d536-20261015.
+
 ```json
 {
   "entries": [
@@ -127,7 +135,7 @@ Accepted without change (round 4):
         "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java"
       ],
       "class": "New",
-      "behaviour": "Replacing JDK launch with suspended native launch preserves UTF-8 pipe bytes, Unicode and quoted/trailing-backslash arguments, overridden environment, working directory, separate stderr, and NUL-argument refusal. A start whose registration fails after the suspended chat root exists, and a contained launch whose job assignment fails after creation, leave no process behind, as the JDK launch of the same command leaves none.",
+      "behaviour": "Replacing JDK launch with suspended native launch preserves UTF-8 pipe bytes, Unicode and quoted/trailing-backslash arguments, overridden environment, working directory, separate stderr, and NUL-argument refusal. aFailureBeforeResumeLeavesNoProcessBehind injects a registry failure after process creation for EXTRACTION and LLAMA_SERVER, asserts start throws IOException and registration saw a process, and checks that exact PID and creation instant is gone within five seconds. These are preservation checks on the a164833f5 JDK path and on the candidate suspended-chat path; the before-state has no suspended-chat path.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -141,7 +149,28 @@ Accepted without change (round 4):
       "evidence": "gates/test-intent/evidence/b97-proc-java-preservation.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory",
-        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aFailureBeforeResumeLeavesNoProcessBehind",
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aFailureBeforeResumeLeavesNoProcessBehind"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "aFailureJoiningTheJobLeavesNoProcessBehind calls WindowsEngineJob.createChat directly, injects IOException at AssignProcessToJobObject after CreateProcessW, checks the injected failure is returned, confirms the created PID and creation instant were captured, and checks that exact suspended process is gone within five seconds. Candidate-only. before-state not reproducible: a164833f5 WindowsEngineJob has neither createChat nor the nested Kernel used to inject the post-creation job-assignment failure; it only joins the current Engine to its own job. DefaultChildControl starts chat via ProcessBuilder.start, so no suspended chat process joins a per-chat job. Adding that launch/assignment path or a reached replacement would determine the check outcome.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting), including round-2 process accounting repairs.",
+          "choice": "Use the existing Windows Engine FFM layer to assign a suspended chat root to its own nested job before any instruction can spawn descendants. Query membership only on demand; idle chat adds at most one percent of a core. Retry transient verification failures on later admission or cleanup, retain unresolved ownership, and distinguish confirmed root exit with unverified descendants from actual survival. Recheck the retained scope after an earlier descendant snapshot drains, before declaring self-test success. Preserve launch pipes, arguments, environment, working directory, and rejection of NUL arguments.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b97-proc-java-job-assignment-candidate.json",
+      "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java#aFailureJoiningTheJobLeavesNoProcessBehind"
       ],
       "repaired": false
@@ -359,5 +388,27 @@ Accepted without change (round 4):
   "verdict": "accept",
   "digest": "sha256:337eb77280de9b292e65b75aab0789d8c8223912a164ff3e02ad6782be96781a",
   "note": "VC-procjava3 (independent Claude verifier) over two rounds on 1eb01f51e vs a164833f5 (rejected f40ba7da8 for SystemAccessFunnelTest): funnel test and all 39 ArchUnit classes pass; app-api 383, app-inference 487, app-services 3701 pass, PMD clean; new checks fail on f40ba7da8 for their reason (GPU release pending 6250 ms, raw native message, CreateProcessW text); adapted SynchronousGpuReleaseTest still checks a pending poll refuses then retry succeeds (fails on a164833f5); real processes: self-test with surviving server records intended_cleanup then cleanup_ended and the main start succeeds (12.4 s early variant), crash leftover ended, job listing failure refuses starts with chat start blocked and recovers, Engine death ends all helpers in 5 s incl. an unregistered suspended child, 0 ms idle CPU over 35 s, launch parity 34/34 incl. strict mode, job end failure keeps the member counted then records leftover_exited, launch failure text identical to the JDK in 5 cases, a never-returning VRAM read ends the poll unmeasured after 2.25 s. Named limits: failed self-test with survivor 12-14 s; no per-member records at clean quit; a VRAM read that never returns leaves later polls unmeasured for the process lifetime. Unverified: live self-test, model switch and GPU release on the real model (stack held by another session). Digest bound with --base a164833f5, the lane's base."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:94d4ad78ce85207887f377dea6312d593105c08025251e228fe8ee202d643122",
+  "note": "Entry 6 has candidate-only preservation evidence with no stated before-state reason for aFailureBeforeResumeLeavesNoProcessBehind and aFailureJoiningTheJobLeavesNoProcessBehind. The archived before XML proves only the original pipe/argument case; it does not cover these two later checks."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3b-20261015",
+  "verdict": "accept",
+  "digest": "sha256:be756e5344de0b5f085061734838985b2135a746b11c843bb2db0820c9820752",
+  "note": "All three corrected checks pass; both preservation checks also pass at a164833f5 with the declared add-only createChat stub, which their paths cannot reach. The job-assignment candidate-only reason is true, declarations match assertions, and remaining entries/items/evidence are unchanged since 9f1f6257b; bound to main."
 }
 ```

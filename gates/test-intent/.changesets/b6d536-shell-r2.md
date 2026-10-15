@@ -1609,3 +1609,14 @@ Prior active entries amended only to name their superseding before witnesses; or
   "note": "Same narrow test-intent acceptance bound to comparison base 547b96083. The upgrade, held-exit ledger, and quit-held behavioral before results remain UNVERIFIED; acceptance applies the stated orchestrator ruling, not a claim that setup failures prove behavior. Both new lifetime witnesses and 139 library tests independently reproduced. Report F:/agent-sandbox/design-b6d536/codex/verify-shell-ti/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:69b15ae8c4c8e6ca83f18b0292c02ae778f9b9a4ad576b7af6bde7cca8053fe3",
+  "note": "Reviewed the corrected before declarations, patches and exact current snapshots against today's independent original/correction reports. All 15 changed-entry Rust selectors pass on a fresh current-candidate build; corrected before assertions, candidate-only API reasons and allowed actor scaffolding match those reports."
+}
+```

@@ -42,3 +42,14 @@ Independent acceptance is pending; the builder does not approve its own test int
   "note": "The real Windows probe fails by assertion on e546e9e54 because NEW and EXIT witnesses are absent, and passes on 6f78776b6. Independent held-handle probes also match all births and codes for a 25 ms helper and a burst of 64 helpers. This accepts test intent only; live S15/S18 behavior is still under verification."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "reject",
+  "digest": "sha256:2b4200130f9f1352b287c8e79b8b237c9209ef6894d4eb6dce8e8836e9545739",
+  "note": "Candidate rerun mismatch: recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild reports witness.normal=false and fails its exact PID/birth/code assertion, while the other four flags pass. Matching normal records arrive later in the printed ledger, suggesting an observation race; the executed assertion failure still conflicts with the recorded pass."
+}
+```

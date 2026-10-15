@@ -667,3 +667,14 @@ bc5978095 on (first failing first-parent commit; they pass on a000e15c7 and on 8
   "note": "VC-vduauto (independent Claude verifier) over four rounds, accepting 5554abe87 vs 0a79303bb (rejected 83f07cc4c for uncovered tests and a dead wrapper only): automatic restoration stops after 5 failures and a person's chat request, a settings apply or chat off/on resets it (live with a launch fault injector: exactly 5 attempts, status says retries stopped, no sixth in 2.5 min); a quit during chat-off and loaded-chat passes is clean (exit 0, no llama-server left) and the interrupted picture returns PENDING with its retry count; an explicit pass during a pending restore starts its first document in 5.4 s live; a committed settings publication while offline becomes the restore target (live context 16384 restored through passes and restart); automatic passes start about 305 s after the last activity and never while chat is offline; game mode, later settings, chat off, start race and shutdown during entry hold. Each new check fails on 83f07cc4c by assertion. Suites show no test passing at the base that fails now; ArchUnit failures identical to the base; PMD clean on changed lines. Named limits: worker document ownership is in memory; loaded-chat automatic reading off on non-Windows unknown power source. Digest bound with --base 0a79303bb, the lane's base."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:f6c6d90b538be12d74431f45424a22d9ecc772dc1a08c3691286be23e8e0918b",
+  "note": "Reviewed current tests, fixture adaptations, refreshed evidence and patches; selected current candidate checks pass. Every changed before record/patch matches today's b1 independent review exactly, including the separately executed entry-25 preservation before-pass."
+}
+```

@@ -117,3 +117,14 @@ Acceptance on the new content belongs to the independent verifier, not this buil
   "digest": "sha256:43c0547f9f087cbf5972dca05ee0dde27afe32c7623e106052fe2aa721d8400e"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:904f832a498e76fb1fbec890655e79bb387b4b38404dc2b2cb2a4942a6d1f809",
+  "note": "Reviewed source corrections against the unchanged hot-settings API/client oracles and before evidence. All selected current candidate checks pass and no evidence falsehood was found."
+}
+```

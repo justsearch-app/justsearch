@@ -329,3 +329,14 @@ Evidence files (all written by run-evidence.mjs):
   "note": "Corrected changed entry is New with owner authority for the merged 284-key oracle. Exact original parent register/resource fails by assertion (281), candidate passes count, scope and byte identity. Fresh native-context and candidate game checks pass; live settings source is hot settings.json. This intent judgment is separate from unfinished full live contract checks."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:21e71330d3be70026aaa76d85405c10a259ca9d01d42a1668fb92db9cd64c4cf",
+  "note": "Reviewed current checks and refreshed evidence, including the separately declared b81 game-plus-memory supersession and updated register count. Current selected checks pass and today's exact-file review reproduces the changed packaged-register before assertion; stale summary wording is an observation."
+}
+```
