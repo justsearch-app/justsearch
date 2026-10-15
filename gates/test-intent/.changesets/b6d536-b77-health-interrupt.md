@@ -11,6 +11,8 @@ Independent verifier acceptance remains pending. The private execution adapter c
 
 The P1 PMD repair also touches two tests that b6d536-b71-bulk-throughput.md covers as New: BulkWriteChunkDeclarationTest no longer passes the DocumentFieldOps argument the JobBatchWriter constructor dropped with its unused field, and ChunkCompletenessReopenCostTest names its unused mockStatic resource `_`. Their assertions, inputs and expected outcomes are unchanged. Their evidence (gates/test-intent/evidence/b6d536-b71-bulk-throughput.json) was re-recorded by run-evidence.mjs on bc2965b52 with the before-state signature shim gates/test-intent/evidence/b6d536-b77-jobbatchwriter-signature.patch (a constructor overload that passes the session's own DocumentFieldOps, exactly the wiring the old test passed); both checks still fail there by assertion.
 
+Evidence for b6d536-b77-health-interrupt.json was regenerated on the integration base 181363e86 (phase B). The current checks build HealthEventChangeRegistry with an ExecutorService, which b639e82c5 lacks, so they did not compile there. The compat before-patch gates/test-intent/evidence/b6d536-b77-health-interrupt-compat.patch adds only that constructor. It ignores the executor and calls the existing no-argument constructor, so delivery stays the before-state's own, and no production code in that state calls it. With it, all ten checks fail before by assertion.
+
 ```json
 {
   "entries": [
