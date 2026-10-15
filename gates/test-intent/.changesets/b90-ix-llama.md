@@ -392,7 +392,7 @@ Round 3 repairs start at 1f8ce3e01; round 2 starts at 7de3976a1. The whole-chang
       "evidence": "gates/test-intent/evidence/b90-ix-llama-ui.json"
     },
     {
-      "behaviour": "An explicit false evaluation system property wins over a true environment value and preserves an explicit positive cache bound.",
+      "behaviour": "An explicit false evaluation system property wins over a true environment value and preserves an explicit positive cache bound. Preservation rerun: explicitFalseEvaluationPropertyWins passes on 61ff9b955 (the declared whole-change before-state) and on candidate 628bb419f, with no production overlays or compatibility patches. Both child JVMs report CACHE_RAM=256 with environment evaluation true and system-property evaluation false.",
       "class": "New",
       "items": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java"
