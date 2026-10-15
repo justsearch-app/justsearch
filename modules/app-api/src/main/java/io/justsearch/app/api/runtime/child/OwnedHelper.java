@@ -45,6 +45,8 @@ public final class OwnedHelper extends Process {
   private final String purpose;
   private final String birth;
   private final String creatorBirth;
+  private final String command;
+  private final Instant launchedAt = Instant.now();
   private final boolean grouped;
   private String stopReason;
   private boolean cooperative;
@@ -185,11 +187,13 @@ public final class OwnedHelper extends Process {
     terminator = ProcessTerminator.forCurrentOs();
     // A launch inside an open window of this process for its image: the forced window start
     // already attributes it, so its receipts are written unforced and forced as a group.
-    grouped = ProcessIntents.openWindowFor(process.info().command().orElse(null), Instant.now());
+    command = process.info().command().orElse(null);
+    grouped = ProcessIntents.openWindowFor(command, Instant.now());
     held = terminator.open(process);
     try {
       birth = held.creationFileTime().orElse(null);
       creatorBirth = SelfIdentity.BIRTH;
+      if (grouped) Intent.launched(command); // a launch window's forced start precedes the receipts
       Map<String, Object> fields = identity();
       fields.put("purpose", purpose);
       append(LedgerRecordType.HELPER_START, fields);
@@ -237,7 +241,8 @@ public final class OwnedHelper extends Process {
   /**
    * The OS reports the exit, possibly before the owner's wait returns. Record it now only when a
    * forced stop intent already decides its class; otherwise let a waiting owner record it, or
-   * give a late owner a short grace before recording an exit no one asked for.
+   * give a late owner a short grace before recording it. An exit inside an owner window is
+   * intended however late its wait comes (see {@link #complete}).
    */
   private synchronized void exitObserved() {
     if (recorded) return;
@@ -265,10 +270,16 @@ public final class OwnedHelper extends Process {
     int code = process.exitValue();
     boolean forced = stopReason != null && TerminateResult.OK.equals(terminated)
         && code == terminator.ourCode();
-    // A recorded stop intent, or an owner that awaited the helper, makes the exit intended; a
-    // cooperative stop also needs the child's clean code. A crash code is never intended.
-    boolean intended = !crashCode(code) && (stopReason == null ? awaited : !cooperative || code == 0);
-    String reason = intended ? (stopReason != null ? stopReason : purpose + ": awaited completion")
+    // A recorded stop intent, an owner that awaited the helper, or an owner window of this process
+    // that covers its launch and exit makes the exit intended; when the owner awaits does not
+    // matter. A cooperative stop also needs the child's clean code. A crash code is never intended.
+    String window = stopReason != null || awaited || crashCode(code) ? null
+        : ProcessIntents.windowReason(command, bornAt(), exitTime.orElse(null), SelfIdentity.PID, creatorBirth)
+            .orElse(null);
+    boolean intended = !crashCode(code)
+        && (stopReason == null ? awaited || window != null : !cooperative || code == 0);
+    String reason = intended ? (stopReason != null ? stopReason
+            : awaited ? purpose + ": awaited completion" : window)
         : crashCode(code) ? purpose + ": crash exit code"
         : stopReason != null ? stopReason + "; exit code " + code + " was not the expected clean exit"
         : purpose + ": exited with no owner wait or stop request";
@@ -283,6 +294,13 @@ public final class OwnedHelper extends Process {
     recorded = true;
     ProcessIntents.outcome(process.pid(), birth, intended ? "REQUESTED" : "UNEXPECTED", reason);
     held.close();
+  }
+
+  /** The native birth; the launch call's time when the birth is unknown. */
+  private Instant bornAt() {
+    if (birth == null) return launchedAt;
+    long ticks = Long.parseLong(birth) - 116_444_736_000_000_000L;
+    return Instant.ofEpochSecond(Math.floorDiv(ticks, 10_000_000L), Math.floorMod(ticks, 10_000_000L) * 100L);
   }
 
   private Map<String, Object> identity() {
@@ -342,7 +360,11 @@ public final class OwnedHelper extends Process {
         .execute(OwnedHelper::flushPending);
   }
 
-  /** Forces every unforced record written so far to disk, one force per ledger. */
+  /**
+   * Forces every unforced record written so far to disk, one force per ledger. A ledger whose force
+   * fails keeps its records pending: the next periodic or explicit flush forces them again. Its
+   * writer reports the failed force as a durability gap until a force succeeds.
+   */
   public static void flushPending() {
     java.util.List<Recorder> due;
     synchronized (OwnedHelper.class) {
@@ -350,30 +372,80 @@ public final class OwnedHelper extends Process {
       unflushed.clear();
       flushScheduled = false;
     }
-    for (Recorder target : due) target.sink().flush();
+    java.util.List<Recorder> failed = new java.util.ArrayList<>();
+    for (Recorder target : due) {
+      boolean durable;
+      try {
+        durable = target.sink().flush();
+      } catch (RuntimeException failure) {
+        durable = false;
+      }
+      if (!durable) failed.add(target);
+    }
+    for (Recorder target : failed) pendingFlush(target);
   }
 
   /** Third-party helper admission is limited to the declared image and this closed time window. */
   public static Intent window(String image, String purpose, Duration max) {
-    return new Intent(recorder, image, purpose, max);
+    return new Intent(recorder, image, purpose, max, false);
+  }
+
+  /**
+   * A window for one launch that may fail to happen, such as an availability check: its start is
+   * recorded, forced, only when a helper of {@code image} is launched under it, before that
+   * helper's receipts. A launch that fails to spawn leaves no record, as no process exists to
+   * account for. Its end, like every window end, is written unforced and forced with the group.
+   */
+  public static Intent launchWindow(String image, String purpose, Duration max) {
+    return new Intent(recorder, image, purpose, max, true);
   }
 
   public static final class Intent implements AutoCloseable {
+    /** Launch windows whose start is not recorded yet; guarded by the OwnedHelper class lock. */
+    private static final java.util.Set<Intent> unstarted = new java.util.LinkedHashSet<>();
     private final Recorder records;
     private final String id = "i-" + UUID.randomUUID();
     private final Instant started = nativePrecisionNow();
     private final Instant deadline;
     private final String image;
     private final String purpose;
+    private boolean startRecorded;
     private boolean closed;
-    private Intent(Recorder records, String image, String purpose, Duration max) {
+    private Intent(Recorder records, String image, String purpose, Duration max, boolean onLaunch) {
       this.records = records;
       this.image = image;
       this.purpose = purpose;
       deadline = started.plus(max);
       ProcessIntents.windowOpened(id, image, purpose, started, deadline, SelfIdentity.PID, SelfIdentity.BIRTH);
+      if (onLaunch) {
+        synchronized (OwnedHelper.class) { unstarted.add(this); }
+      } else {
+        recordStart();
+      }
+    }
+
+    /** A helper of {@code executable}'s image was launched: open launch windows record their start. */
+    static void launched(String executable) {
+      java.util.List<Intent> due;
+      synchronized (OwnedHelper.class) {
+        due = unstarted.stream().filter(i -> i.admits(executable)).toList();
+        due.forEach(unstarted::remove);
+      }
+      due.forEach(Intent::recordStart);
+    }
+
+    private boolean admits(String executable) {
+      if (executable == null) return false;
+      String name = executable.substring(Math.max(executable.lastIndexOf('\\'), executable.lastIndexOf('/')) + 1);
+      return name.equalsIgnoreCase(image);
+    }
+
+    private synchronized void recordStart() {
+      if (startRecorded || closed) return;
+      startRecorded = true;
       append(LedgerRecordType.HELPER_WINDOW_START, started);
     }
+
     private void append(LedgerRecordType type, Instant at) {
       Map<String, Object> fields = new LinkedHashMap<>();
       fields.put("intentId", id);
@@ -383,14 +455,17 @@ public final class OwnedHelper extends Process {
       fields.put("requestedAt", started.toString());
       fields.put("deadlineAt", deadline.toString());
       fields.put("closedAt", type == LedgerRecordType.HELPER_WINDOW_END ? at.toString() : null);
-      record(records, type, fields);
+      // The start gates attribution, so it is forced. The end is not forced on its own: a lost end
+      // is reconstructed from the forced start and its owner's exit; the group flush forces it.
+      record(records, type, fields, type != LedgerRecordType.HELPER_WINDOW_END);
     }
     @Override public synchronized void close() {
       if (!closed) {
         Instant at = nativePrecisionNow();
-        append(LedgerRecordType.HELPER_WINDOW_END, at);
+        if (startRecorded) append(LedgerRecordType.HELPER_WINDOW_END, at);
         ProcessIntents.windowClosed(id, at);
         closed = true;
+        synchronized (OwnedHelper.class) { unstarted.remove(this); }
         flushPending(); // the receipts written unforced inside this window
       }
     }
@@ -471,8 +546,8 @@ public final class OwnedHelper extends Process {
 
       private void end() {
         Instant at = nativePrecision(clock.instant());
-        // Not forced on its own: a lost end is reconstructed from the forced start, its deadline
-        // and its owner's exit. The flush forces it with the receipts written inside the window.
+        // Not forced on its own: a lost end is reconstructed from the forced start and
+        // its owner's exit. The flush forces it with the receipts written inside the window.
         record(records, LedgerRecordType.HELPER_WINDOW_END, fields(at), false);
         ProcessIntents.windowClosed(id, at);
         flushPending();

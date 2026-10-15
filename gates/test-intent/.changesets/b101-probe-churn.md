@@ -12,7 +12,14 @@ author-session: b101-probe-churn
 - On a host where NVML reports a GPU, the snapshot's nvidia-smi section is filled from NVML with source `read in-process (NVML)`, also when nvidia-smi itself is not installed. `nvidiaSmiAvailable` on `/api/inference/status` there says whether nvidia-smi is installed where a launch would find it (System32, the Windows directory, PATH), or what its last reading said, without starting it: an installed nvidia-smi that would fail to run reads available.
 - An invalidated nvidia-smi reading inside the 5 s interval is served stale (marked so) rather than re-read; an admission decision taken inside the interval sees figures up to 5 s old.
 - Helper receipts written inside an open window are forced to disk as a group at most a second later. They survive a crash of the process that wrote them; a host crash or power loss within that second can lose them, and the census then sees the process without its receipt under an open window.
-- The Engine job witness reads windows from the children ledger only for processes started by another process (a child JVM); the Engine's own windows are resolved in memory. A child window whose start record is not yet on disk when its process exits is not seen.
+- The Engine job witness reads windows and helper receipts from the children ledger only for processes started by another process (a child JVM); the Engine's own are resolved in memory. A child record not yet written when its process exits and the 2 s owner wait ends is not seen. A child's receipt counts only when the child wrote it about a process it created (writer PID equals the creator PID, and the member's native creator PID and birth equal the receipt's).
+- A window with no recorded end whose owner neither ends it nor exits keeps covering that owner's launches of its image: the deadline no longer ends coverage, for ended windows either (their recorded end does). An owner that holds a window open for hours accounts every launch of that image it makes meanwhile.
+- The shared-ledger reader identifies the file by the volume serial and 128-bit file id of the handle it opened (Windows, through kernel32). Off Windows it uses the path's file key when the platform gives one, otherwise the old size test. It reads only the newest archive after a rotation: if two rotations happen between two reads, the rest of the older file is not read.
+- The availability check's window start is written after the spawn, with the time taken before it. A host crash between the spawn and that write leaves the helper with no window on disk; its receipts, unforced inside the window, can be lost with it.
+- A durability gap is recorded in the ledger file only when a write succeeds: on a read-only or full volume the FORCE_FAILED record is written before the next record that can be written, and the writer reports itself unhealthy meanwhile. A process that ends before any such write leaves no record of the gap. Clearing needs a later successful flush; a forced record does not clear it.
+- `gpu.context.UserContextSignalsTest#readsTheRealUserContext` fails on this host on b599d4d7e and on this change alike, unchanged code: the foreground window belongs to an elevated Task Manager, which `ProcessHandle.of` cannot open, so it reads as not live. Environmental, not covered by this change.
+- `NvidiaSmiToolAvailabilityTest`: before-state not reproducible, new API. It drives `NvidiaSmiReadings` with an injected clock, runner and installed-tool lookup and asks `VramDetector.isToolAvailable` and `GpuCapabilitiesService.nvidiaSmiToolAvailable`; none of these exists on b599d4d7e, where availability was not answered separately from a reading.
+- The census cases in `scripts/dev/test-dev-runner-census-windows.mjs` are node tests, outside the gate. On 0d9b84e2a the two past-deadline cases and the 100 ns cutoff case fail by assertion (UNEXPECTED, and OWNER_DIED for the zero code); the durability-gap case fails with a TypeError (the census had no such export); the owner-died case passes (preservation).
 - The verifier's `VXProbeChurnCrossJvmWindowTest` passes the child's window to the witness only on the child's stdout, with no shared ledger; under the ledger design it cannot pass, and `ChildWindowLedgerWitnessTest` checks the same path through the real shared ledger. The verifier's `VxProbeChurnDiskHttpVerifierTest` requires the status build to read the probe's clock twice (it expects the reading at 600000 ms after one clock read at 599999 ms); with one reading per build the status shows the reading at 0 ms with its own time, which `StatusAtRestOneReadingHttpTest` accepts. The verifier's `VXProbeChurnWindowRaceTest` calls the six-argument `ProcessIntents.resolve`, replaced by one that names the creating process.
 - In `ProbeChurnPrimaryRateMeasurement` the ledger records not written through the Engine's helper owner recorder (the job witness's process records and the extraction child's records) are timed by replaying them afterwards, each forced, through a writer on the same volume: an upper bound on, not a measurement of, their own write time.
 - `DiskEncryptionProbe` has no person-initiated re-read: no existing status or health action asks for one, so none was added and the unused `refresh()` was removed. A changed disk-encryption state shows within ten minutes.
@@ -35,7 +42,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "Record each helper exit once, with its final class and a non-null reason: an exit the owner awaited or stopped is REQUESTED with the owner's reason, and one nobody awaited or stopped within a 2 s grace is UNEXPECTED with a reason saying so. The Engine job witness resolves an exiting process's class and reason from the owner's published intent (owned, stop intent, outcome) and records which basis it used (intentBasis).",
+          "choice": "Record each helper exit once, with its final class and a non-null reason: an exit the owner awaited or stopped is REQUESTED with the owner's reason; one nobody awaited or stopped within a 2 s grace is REQUESTED with the window's reason when a window of its owner covers its launch and exit, otherwise UNEXPECTED with a reason saying so. The Engine job witness resolves an exiting process's class and reason from the owner's published intent (owned, stop intent, outcome; for a child JVM's helpers, the receipts that child recorded in the shared children ledger) and records which basis it used (intentBasis).",
           "label": "agent choice"
         }
       ],
@@ -59,7 +66,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "Record each helper exit once, with its final class and a non-null reason: an exit the owner awaited or stopped is REQUESTED with the owner's reason, and one nobody awaited or stopped within a 2 s grace is UNEXPECTED with a reason saying so. The Engine job witness resolves an exiting process's class and reason from the owner's published intent (owned, stop intent, outcome) and records which basis it used (intentBasis).",
+          "choice": "Record each helper exit once, with its final class and a non-null reason: an exit the owner awaited or stopped is REQUESTED with the owner's reason; one nobody awaited or stopped within a 2 s grace is REQUESTED with the window's reason when a window of its owner covers its launch and exit, otherwise UNEXPECTED with a reason saying so. The Engine job witness resolves an exiting process's class and reason from the owner's published intent (owned, stop intent, outcome; for a child JVM's helpers, the receipts that child recorded in the shared children ledger) and records which basis it used (intentBasis).",
           "label": "agent choice"
         }
       ],
@@ -73,14 +80,14 @@ author-session: b101-probe-churn
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java"
       ],
       "class": "New",
-      "behaviour": "The shared helper window, on a deterministic clock: 100 consecutive leases write one start and one end after the idle period; concurrent leases share it; a lease at the end of an idle period is never outside an open window; a lease that could outlive the deadline opens a fresh window; shutdown ends an idle window at once and a leased one at its release.",
+      "behaviour": "The shared helper window, on a deterministic clock: 100 consecutive leases write one start and one end after the idle period; concurrent leases share it; a lease at the end of an idle period is never outside an open window.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
@@ -88,7 +95,27 @@ author-session: b101-probe-churn
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#consecutiveLeasesShareOneWindowThatEndsOnceAfterIdle",
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#concurrentLeasesShareTheWindow",
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#aLeaseAtTheEndOfAnIdlePeriodIsNeverOutsideAnOpenWindow",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#aLeaseAtTheEndOfAnIdlePeriodIsNeverOutsideAnOpenWindow"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation, on a deterministic clock: a lease that could outlive the window's deadline opens a fresh window, and shutdown ends an idle window at once and a leased one at its release. Both behaviours already held on b599d4d7e. The check uses API new in this change and does not compile on b599d4d7e; adapted to the base API by the verifier, it passes there.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-shared-window-preservation.json",
+      "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#aLeaseThatCouldOutliveTheDeadlineOpensAFreshWindow",
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#shutdownEndsAnIdleWindowNowAndALeasedOneAtItsRelease"
       ]
@@ -106,7 +133,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
@@ -146,7 +173,7 @@ author-session: b101-probe-churn
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java"
       ],
       "class": "New",
-      "behaviour": "The shared nvidia-smi reading, on an injected clock and runner: one probe answers every reader for 5 s; probes never overlap and waiting readers share the answer; a start failure is sticky until invalidated; partial and unparseable output is handled; a section built from a shared reading names nvidia-smi as its source and lists no missing figure.",
+      "behaviour": "The shared nvidia-smi reading, on an injected clock and runner: one probe answers every reader for 5 s; probes never overlap and waiting readers share the answer; partial and unparseable output is handled; a section built from a shared reading names nvidia-smi as its source and lists no missing figure.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -161,9 +188,29 @@ author-session: b101-probe-churn
       "newChecks": [
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#oneProbeAnswersEveryReaderForFiveSeconds",
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#probesNeverRunConcurrentlyAndWaitingReadersShareTheAnswer",
-        "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#aStartFailureIsStickyUntilInvalidated",
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#partialAndUnparseableOutputs",
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#snapshotSectionFromASharedReadingNamesNvidiaSmi"
+      ]
+    },
+    {
+      "items": [
+        "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation, on an injected clock and runner: a start failure of nvidia-smi is sticky until invalidated. The behaviour already held on b599d4d7e. The check uses API new in this change and does not compile on b599d4d7e; adapted to the base API by the verifier, it passes there.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "Read GPU memory in process through NVML when it answers, with no nvidia-smi process. The snapshot's nvidia-smi section then carries the same driver and memory figures read from NVML, names its source ('read in-process (NVML)') and names each figure NVML did not give; a section read from nvidia-smi names 'nvidia-smi'. Without NVML, one process-wide nvidia-smi reading (one combined query for total, free and driver) answers every caller for 5 s, never two probes at once. An invalidation marks the reading stale and never shortens the 5 s interval: a read inside it gets the last reading marked stale, and the next allowed probe answers every reader waiting for it. A start failure is sticky until invalidated. nvidiaSmiAvailable on /api/inference/status reports whether the nvidia-smi tool itself is available, from its detector (its last reading, otherwise whether it is installed where a launch would find it), whatever supplied the memory figures.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-nvidia-smi-readings-preservation.json",
+      "newChecks": [
+        "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiReadingsTest.java#aStartFailureIsStickyUntilInvalidated"
       ]
     },
     {
@@ -218,7 +265,7 @@ author-session: b101-probe-churn
         "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java"
       ],
       "class": "New",
-      "behaviour": "A cached reading shows its age and the read time of the probe that gave it; a failed probe keeps the value's own age and is retried after the ten minutes, not on every read, and a later success clears the stale mark; each volume is probed on its first read.",
+      "behaviour": "A cached reading shows its age and the read time of the probe that gave it; a failed probe keeps the value's own age and is retried after the ten minutes, not on every read, and a later success clears the stale mark.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -232,7 +279,27 @@ author-session: b101-probe-churn
       "evidence": "gates/test-intent/evidence/b101-disk-encryption-reading.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java#cachedReadsShowTheirAge",
-        "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java#aFailedProbeKeepsTheValuesOwnAgeAndRetriesAfterTheTtl",
+        "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java#aFailedProbeKeepsTheValuesOwnAgeAndRetriesAfterTheTtl"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: each volume's disk-encryption state is probed on its first read. The behaviour already held on b599d4d7e. The check uses API new in this change and does not compile on b599d4d7e; adapted to the base API by the verifier, it passes there.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "Probe a volume's disk-encryption state at most once per ten minutes, shared by every reader in the process; the reading carries its age and read time, and /api/status carries the read time next to the value (atRestProtection.probedAtMs, epoch ms), both taken from one immutable reading fetched once per status build. A failed probe keeps the last value marked stale (source 'stale:<source>', LOW confidence) with its own read time, retries after the ten minutes, and a stale ENCRYPTED or ENCRYPTING value reads as UNKNOWN, never as protected.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-disk-encryption-preservation.json",
+      "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java#eachVolumeIsProbedOnItsFirstRead"
       ]
     },
@@ -285,7 +352,7 @@ author-session: b101-probe-churn
         "modules/dead-code-audit/src/test/java/io/justsearch/deadcode/ProcessLaunchFunnelTest.java"
       ],
       "class": "New",
-      "behaviour": "The launch scan's self-test on fixtures: it sees ProcessBuilder.start, startPipeline, Runtime.exec, OwnedHelper.start and a launch inside a lambda, folds the lambda onto its class, and ignores a class that only builds a ProcessBuilder.",
+      "behaviour": "Preservation: the launch scan's self-test on fixtures sees ProcessBuilder.start, startPipeline, Runtime.exec, OwnedHelper.start and a launch inside a lambda, folds the lambda onto its class, and ignores a class that only builds a ProcessBuilder. Passes on b599d4d7e as well.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -351,7 +418,7 @@ author-session: b101-probe-churn
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiToolAvailabilityTest.java"
       ],
       "class": "New",
-      "behaviour": "Whether nvidia-smi is available is answered without starting it: without a reading, from whether the tool is installed, looked up at most once per 5 s; after a reading, from that reading; with NVML supplying the figures the tool's own answer still decides, and no nvidia-smi starts.",
+      "behaviour": "Whether nvidia-smi is available is answered without starting it: without a reading, from whether the tool is installed, looked up at most once per 5 s; after a reading, from that reading; with NVML supplying the figures the tool's own answer still decides, and no nvidia-smi starts. Before-state not reproducible: new API (see Named limits).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -446,7 +513,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
@@ -468,7 +535,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
@@ -489,7 +556,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
@@ -511,7 +578,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
@@ -533,7 +600,7 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
@@ -556,13 +623,152 @@ author-session: b101-probe-churn
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
-          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything; the recorded Tesseract runtime's one-time availability check is a real launch and keeps its own window. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only the window's start record is forced to disk; helper receipts written while a window is open are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. Each window names its owner process (PID and creation time) and covers only processes that owner started. A window opened in a child JVM is read from the shared children ledger by the Engine job witness, and the stop census counts an open window, or one whose end record was lost, as covering until its owner's proven exit.",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/b101-ocr-receipt-forcing.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OcrReceiptForcingTest.java#threeRealOcrsForceOnlyTheWindowStart"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OpenWindowLifetimeTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A window with a start and no end covers its owner's launches past its deadline until the owner's proven exit: in the registry, a launch after the deadline is REQUESTED and one after the owner's recorded exit UNEXPECTED; inside a real Engine job, a child JVM keeps its 200 ms window open, launches real Tesseract after 500 ms, and the Engine job witness records it REQUESTED with the window's reason. 0d9b84e2a: UNEXPECTED, no recorded intent.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-open-window-lifetime.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OpenWindowLifetimeTest.java#startWithoutEndCoversLaunchesPastDeadlineUntilProvenOwnerExit",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java#unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerWindowsRotationTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The shared-ledger reader follows a rotation by file identity: a replacement file that already grew past the last read offset is read from byte 0 (its window is found); inside a real Engine job with a pre-existing 64 KiB ledger rotated away, a child's window followed by 200 KiB of blank lines still reaches the witness, which records the child's real Tesseract REQUESTED. 0d9b84e2a: no window read; UNEXPECTED.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-ledger-rotation.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerWindowsRotationTest.java#rotationDoesNotSkipAWindowWhenNewCurrentIsAtLeastThePreviousOffset",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java#rotationWithAlreadyGrownReplacementStillFindsChildWindow"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildHelperReceiptWitnessTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Inside a real Engine job, a child JVM starts and awaits real Tesseract through its helper owner with no window; the Engine job witness records it with the child's recorded class and reason (REQUESTED, awaited completion) from the shared ledger, matched on PID, birth and native creator. 0d9b84e2a: UNEXPECTED, no recorded intent.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-child-receipts.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildHelperReceiptWitnessTest.java#childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/HelperFlushRetryTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterDurabilityGapTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A group force that fails on the real ledger (made read-only) keeps the records pending and the next flush forces them again; the ledger names the durability gap (FORCE_FAILED, schema-valid) and its clearing after the successful force, and the writer is unhealthy until then. 0d9b84e2a: one force attempt only; the writer reported healthy.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-flush-retry.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/HelperFlushRetryTest.java#failedGroupForceRetainsPendingRecordsForTheNextFlush",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterDurabilityGapTest.java#aFailedForceIsAnOpenDurabilityGapUntilAForceSucceeds"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LateWindowExitTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Real Tesseract started inside a held shared window exits; its owner waits only 2.6 s later. Exactly one helper-exit record is written, REQUESTED. 0d9b84e2a: UNEXPECTED.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-late-window-exit.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LateWindowExitTest.java#realTesseractInsideAWindowNeverBecomesUnexpectedBeforeALateOwnerWait"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AvailabilityWindowTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The recorded Tesseract runtime's availability check: an executable that fails to spawn writes no record at all; a real successful check forces only its window start, its helper receipts and window end being written unforced. 0d9b84e2a: a window start and end for the failed spawn; the end forced on success.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Items 5 (GPU co-residence) and 6 (process ownership and exit accounting).",
+          "choice": "The extraction worker declares no helper window where Tesseract cannot run: markdown, text, HTML, the text fallback used when Tesseract cannot be started, constructing an extractor and the first-pass OCR configuration, none of which launches anything. The recorded Tesseract runtime's one-time availability check is a real launch with its own window, recorded only once the launch spawns: its start forced before the helper's receipts, its end unforced and forced with them as one group; a spawn that fails writes no window, as no process exists to account for. OCR-capable parses share one process-wide Tesseract window, opened on demand, ended after 30 s idle and at shutdown; a lease that could outlive the window's deadline opens a fresh one. Only a window's start record is forced to disk; helper receipts written while a window is open, and window ends, are not forced one by one but as a group, when the window closes, at shutdown and at least once a second while any is pending. A failed group force keeps the records pending and is retried at the next periodic or explicit flush; until a force succeeds the ledger writer reports a named durability gap (a FORCE_FAILED ledger-gap record, closed by a forced one carrying clearedAt, and an unhealthy writer), which the stop census lists as a durability_gap. Each window names its owner process (PID and creation time) and covers only processes that owner started, from its start to its recorded end; a window with no recorded end (still open, or an end lost in a crash) covers until its owner's proven exit or crash/owner-died record, and while the owner lives; its deadline bounds a lease, not the coverage. Every owner cutoff compares native 100 ns times, in the Engine job witness and in the stop census. A helper exit inside its owner's window is REQUESTED with the window's reason however late the owner awaits it, in exactly one record. The Engine job witness reads a child JVM's windows and helper receipts (matched on full PID, birth and the native creator identity) from the shared children ledger, identifying the file by the handle it opened (volume and file id), so a rotation is followed even when the replacement file already grew past the last read offset.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b101-availability-window.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AvailabilityWindowTest.java#failedAvailabilitySpawnDoesNotWriteAWindow",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AvailabilityWindowTest.java#realAvailabilityForcesOnlyItsWindowStart"
       ],
       "repaired": true
     }

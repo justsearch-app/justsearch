@@ -19,8 +19,14 @@ import java.util.Optional;
  * <p>A window is its owner's: it covers a launch only when the launched process's creator (its
  * parent PID and birth, read natively) is the process that opened the window. Windows opened in
  * another process, such as the extraction child, reach this registry from the shared children
- * ledger ({@link #readWindowsFrom}). An open window, one whose end was not recorded, covers until
- * its deadline, or until its owner's recorded exit when that is known.
+ * ledger ({@link #readWindowsFrom}). A window covers from its start to its recorded end; a window
+ * with no recorded end covers until its owner's proven exit (its exit or owner-died record), and
+ * without one for as long as its owner lives. Its deadline bounds a lease, not the coverage.
+ * Cutoffs compare native 100 ns instants.
+ *
+ * <p>The helpers another process owns, such as the extraction child's, reach this registry the
+ * same way: their owner receipts in the shared ledger apply to a member only when its PID, birth
+ * and native creator are the receipt's.
  */
 public final class ProcessIntents {
   /** A classified exit: its class, reason and what the class rests on. */
@@ -45,15 +51,13 @@ public final class ProcessIntents {
     private final String image;
     private final String reason;
     private final Instant start;
-    private final Instant deadline;
     private final Key owner;
     private Instant closed;
 
-    Window(String image, String reason, Instant start, Instant deadline, long ownerPid, String ownerBirth) {
+    Window(String image, String reason, Instant start, long ownerPid, String ownerBirth) {
       this.image = image;
       this.reason = reason;
       this.start = start;
-      this.deadline = deadline;
       this.owner = new Key(ownerPid, ownerBirth);
     }
 
@@ -71,18 +75,24 @@ public final class ProcessIntents {
       if (born == null || creatorPid == null || creatorBirth == null || owner.birth() == null) return false;
       if (owner.pid() != creatorPid || !owner.birth().equals(creatorBirth)) return false;
       if (!admits(executable)) return false;
+      Instant end = end();
+      if (born.isBefore(start) || (end != null && born.isAfter(end))) return false;
+      return exited == null || end == null || !exited.isAfter(end);
+    }
+
+    /** The recorded end, else the owner's proven exit; null while neither is known. */
+    private Instant end() {
       Instant end = closed;
       Owned ownerFacts = OWNED.get(owner);
       if (ownerFacts != null && ownerFacts.ended != null && (end == null || ownerFacts.ended.isBefore(end))) {
         end = ownerFacts.ended;
       }
-      if (born.isBefore(start) || born.isAfter(deadline) || (end != null && born.isAfter(end))) return false;
-      return exited == null || (!exited.isAfter(deadline) && (end == null || !exited.isAfter(end)));
+      return end;
     }
 
     /** Whether this window is open at {@code now} for launches of {@code executable}'s image. */
     private boolean openFor(String executable, Instant now) {
-      return closed == null && !now.isBefore(start) && !now.isAfter(deadline) && admits(executable);
+      return closed == null && !now.isBefore(start) && admits(executable);
     }
   }
 
@@ -134,11 +144,12 @@ public final class ProcessIntents {
 
   /**
    * An owner window opened by the process {@code ownerPid}/{@code ownerBirth}: launches of {@code
-   * image} that process makes within it are intended.
+   * image} that process makes within it are intended. {@code deadline} is the lease span the owner
+   * declared; it does not end the window (see the class comment).
    */
   public static synchronized void windowOpened(String intentId, String image, String reason,
       Instant start, Instant deadline, long ownerPid, String ownerBirth) {
-    WINDOWS.put(intentId, new Window(image, reason, start, deadline, ownerPid, ownerBirth));
+    WINDOWS.put(intentId, new Window(image, reason, start, ownerPid, ownerBirth));
   }
 
   /** The owner window ended. */
@@ -154,8 +165,20 @@ public final class ProcessIntents {
   }
 
   /**
-   * The Engine reads the windows other processes record in the children ledger of {@code
-   * ledgerDir} (the extraction child's Tesseract window), from the ledger's current end onward.
+   * The reason of the latest window of {@code creatorPid}/{@code creatorBirth} that covers a launch
+   * of {@code executable} born at {@code born} and exited at {@code exited}: what an owner records
+   * for a helper exit it neither stopped nor awaited.
+   */
+  static synchronized Optional<String> windowReason(String executable, Instant born, Instant exited,
+      long creatorPid, String creatorBirth) {
+    return WINDOWS.values().stream().filter(w -> w.covers(executable, born, exited, creatorPid, creatorBirth))
+        .reduce((a, b) -> b).map(w -> w.reason);
+  }
+
+  /**
+   * The Engine reads the windows and helper receipts other processes record in the children ledger
+   * of {@code ledgerDir} (the extraction child's Tesseract window and helpers), from the ledger's
+   * current end onward.
    */
   public static synchronized void readWindowsFrom(java.nio.file.Path ledgerDir) {
     ledgerWindows = ledgerDir == null ? null : new LedgerWindows(ledgerDir);
@@ -171,6 +194,10 @@ public final class ProcessIntents {
       Instant born, Instant exited, boolean ownerWaitOver, Long creatorPid, String creatorBirth) {
     Optional<Resolution> owner = ownerOf(pid, birth, ownerWaitOver);
     if (owner == null) return Optional.empty();
+    if (owner.isEmpty()) {
+      owner = ledgerOwnerOf(pid, birth, ownerWaitOver, creatorPid, creatorBirth);
+      if (owner == null) return Optional.empty();
+    }
     Resolution resolution = owner.orElseGet(() -> window(executable, born, exited, creatorPid, creatorBirth)
         .map(w -> new Resolution("REQUESTED", w.reason, "owner window"))
         .orElse(new Resolution("UNEXPECTED", NO_INTENT, "none")));
@@ -189,6 +216,26 @@ public final class ProcessIntents {
     // Launched by another process: its windows are in the shared ledger, not in this JVM.
     return ledgerWindows.read().stream()
         .filter(w -> w.covers(executable, born, exited, creatorPid, creatorBirth)).reduce((a, b) -> b);
+  }
+
+  /**
+   * The receipts the member's creator recorded in the shared ledger, when that creator is another
+   * process: its recorded exit, else (once the owner wait is over) its stop intent. Null: still
+   * waiting for that owner. Empty: no receipt of that creator names this PID and birth.
+   */
+  private static Optional<Resolution> ledgerOwnerOf(long pid, String birth, boolean ownerWaitOver,
+      Long creatorPid, String creatorBirth) {
+    if (ledgerWindows == null || birth == null || creatorPid == null || creatorBirth == null
+        || creatorPid == ProcessHandle.current().pid()) {
+      return Optional.empty();
+    }
+    ledgerWindows.read();
+    LedgerWindows.Receipt receipt = ledgerWindows.receipt(pid, birth);
+    if (receipt == null || !receipt.createdBy(creatorPid, creatorBirth)) return Optional.empty();
+    if (receipt.outcome() != null) return Optional.of(receipt.outcome());
+    if (!ownerWaitOver) return null;
+    return receipt.intent() == null ? Optional.empty()
+        : Optional.of(new Resolution("REQUESTED", receipt.intent(), "owner intent"));
   }
 
   /**

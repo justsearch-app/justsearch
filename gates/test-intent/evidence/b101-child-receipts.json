@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T23:18:21.474Z",
+  "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+  "tree": "7f46d9dc2fca197e1d1a41296ba2d17c1bae971d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.ChildHelperReceiptWitnessTest.childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7494
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildHelperReceiptWitnessTest.java#childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildHelperReceiptWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:87b02bf6aa782e3d0dbbb5f018abc6dfe2c9478fbbc9c33b61d850fcf5142fa1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0d9b84e2a",
+    "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.ChildHelperReceiptWitnessTest.childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21983
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildHelperReceiptWitnessTest.java#childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow",
+        "classification": "assertion",
+        "detail": "childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the witness must carry the intent already recorded by the child's real helper owner: child identity=5352/134364934941433693&#13;&#10;tesseract-pid=35040&#13;&#10;tesseract identity=35040/134364934945522502&#13;&#10;native.creator=child&#13;&#10;child.actualReceip"
+      }
+    ]
+  },
+  "digest": "sha256:ad2b53e691aa9a81d77c098a6740a596cd43ee7f980171583b1e7ed1da2f9218"
+}

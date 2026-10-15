@@ -163,9 +163,10 @@
       "then": {
         "required": ["reason", "count", "since"],
         "properties": {
-          "reason": { "enum": ["WRITE_FAILED", "ROTATE_FAILED", "CORRUPT_LINES", "UNKNOWN_SCHEMA", "EVIDENCE_LOST"] },
+          "reason": { "enum": ["WRITE_FAILED", "ROTATE_FAILED", "CORRUPT_LINES", "UNKNOWN_SCHEMA", "EVIDENCE_LOST", "FORCE_FAILED"] },
           "count": { "type": "integer", "minimum": 1 },
-          "since": { "$ref": "#/$defs/instant" }
+          "since": { "$ref": "#/$defs/instant" },
+          "clearedAt": { "$ref": "#/$defs/instant" }
         }
       }
     },

@@ -73,6 +73,9 @@ public final class ExitLedgerWriter {
   private final long hardCapBytes;
 
   private final Map<LedgerGapReason, PendingGap> pendingGaps = new EnumMap<>(LedgerGapReason.class);
+  /** A failed force not yet followed by a successful one: unforced records may not be durable. */
+  private volatile PendingGap durabilityGap;
+  private boolean durabilityGapRecorded;
   private long seq;
   private volatile boolean healthy = true;
 
@@ -185,6 +188,10 @@ public final class ExitLedgerWriter {
       gapFields.put("since", gap.getValue().since());
       lines.add(new Line(gap.getKey(), encode(LedgerRecordType.LEDGER_GAP, gapFields, now, ++seq)));
     }
+    if (durabilityGap != null && !durabilityGapRecorded) {
+      lines.add(new Line(LedgerGapReason.FORCE_FAILED,
+          encode(LedgerRecordType.LEDGER_GAP, durabilityGapFields(null), now, ++seq)));
+    }
     lines.add(new Line(null, encode(type, fields, now, ++seq)));
 
     // Another writer may have left a torn line since the last append; close it in the same write.
@@ -198,7 +205,8 @@ public final class ExitLedgerWriter {
         ExitLedgerHealth.failed(this, ledgerDir, now, e);
         return false;
       }
-      if (line.gap() != null) pendingGaps.remove(line.gap());
+      if (line.gap() == LedgerGapReason.FORCE_FAILED) durabilityGapRecorded = true;
+      else if (line.gap() != null) pendingGaps.remove(line.gap());
     }
     healthy = true;
     ExitLedgerHealth.recovered(this);
@@ -209,6 +217,11 @@ public final class ExitLedgerWriter {
    * Forces what {@link #appendUnforced} wrote to disk: one force of the current file, and of the
    * newest archive in case a rotation moved unforced lines there. A group of unforced records
    * costs one force instead of one each.
+   *
+   * <p>A failed force opens a named durability gap: a {@code ledger-gap} record with reason {@code
+   * FORCE_FAILED}, written as soon as a write succeeds, and the writer is not {@link #healthy()}.
+   * The gap stays open, and the caller keeps its records pending, until a later force succeeds;
+   * then a forced {@code FORCE_FAILED} record with {@code clearedAt} closes it.
    */
   public synchronized boolean flush() {
     boolean durable = true;
@@ -221,12 +234,50 @@ public final class ExitLedgerWriter {
         durable = false;
       }
     }
+    Instant now = clock.instant();
+    if (!durable) {
+      durabilityGap = durabilityGap == null ? new PendingGap(1, LedgerTimestamps.format(now))
+          : new PendingGap(durabilityGap.count() + 1, durabilityGap.since());
+      if (!durabilityGapRecorded) durabilityGapRecorded = writeDurabilityGap(now, null);
+    } else if (durabilityGap != null && writeDurabilityGap(now, now)) {
+      durabilityGap = null;
+      durabilityGapRecorded = false;
+    }
     return durable;
   }
 
-  /** Whether the last write succeeded and no gap is waiting to be written. */
+  /**
+   * Writes the durability gap's record: unforced while it is open (the force just failed), forced
+   * when {@code clearedAt} closes it, so the close is written only when it is itself durable. An
+   * open record that cannot be written now is written before the next record.
+   */
+  private boolean writeDurabilityGap(Instant now, Instant clearedAt) {
+    Path current = family.current(ledgerDir);
+    Line line = new Line(null, encode(LedgerRecordType.LEDGER_GAP, durabilityGapFields(clearedAt), now, ++seq));
+    if (endsTorn(current)) line = line.afterNewline();
+    try {
+      writeLine(current, line.bytes(), clearedAt != null);
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private Map<String, Object> durabilityGapFields(Instant clearedAt) {
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("reason", LedgerGapReason.FORCE_FAILED.name());
+    fields.put("count", durabilityGap.count());
+    fields.put("since", durabilityGap.since());
+    if (clearedAt != null) fields.put("clearedAt", LedgerTimestamps.format(clearedAt));
+    return fields;
+  }
+
+  /**
+   * Whether the last write succeeded, no gap is waiting to be written and no durability gap is
+   * open.
+   */
   public boolean healthy() {
-    return healthy;
+    return healthy && durabilityGap == null;
   }
 
   /**

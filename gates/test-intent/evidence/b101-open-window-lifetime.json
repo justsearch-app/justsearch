@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T23:52:46.847Z",
+  "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+  "tree": "55407efa3bbc33645536eaf45e8a0c94a0963f5a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OpenWindowLifetimeTest.startWithoutEndCoversLaunchesPastDeadlineUntilProvenOwnerExit\" --tests \"io.justsearch.app.api.runtime.containment.ChildWindowBoundaryTest.unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7383
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OpenWindowLifetimeTest.java#startWithoutEndCoversLaunchesPastDeadlineUntilProvenOwnerExit",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OpenWindowLifetimeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bff23be5226a536be1a73353a32c02ae5715d836639ec3cca558fcd63ff03342",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "startWithoutEndCoversLaunchesPastDeadlineUntilProvenOwnerExit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java#unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6f8c04f1299c03c3d689102fae245ea4edd6baeb8b474211242146846253e7ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0d9b84e2a",
+    "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OpenWindowLifetimeTest.startWithoutEndCoversLaunchesPastDeadlineUntilProvenOwnerExit\" --tests \"io.justsearch.app.api.runtime.containment.ChildWindowBoundaryTest.unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 30475
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OpenWindowLifetimeTest.java#startWithoutEndCoversLaunchesPastDeadlineUntilProvenOwnerExit",
+        "classification": "assertion",
+        "detail": "startWithoutEndCoversLaunchesPastDeadlineUntilProvenOwnerExit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: No window end or owner exit was proven: Resolution[exitClass=UNEXPECTED, reason=no recorded intent, basis=none] ==> expected: <REQUESTED> but was: <UNEXPECTED>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java#unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds",
+        "classification": "assertion",
+        "detail": "unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: child identity=21380/134364955582248418&#13;&#10;child.window.unendedAtLaunch=true&#13;&#10;tesseract-pid=30076&#13;&#10;tesseract identity=30076/134364955592319417&#13;&#10;native.creator=child&#13;&#10;tesseract-witness=UNEXPECTED|no recorded intent|none&#13;&#"
+      }
+    ]
+  },
+  "digest": "sha256:8fe3753f846babbf352dd49ddec3a22b96ef80c68e80b7f088903c1235dc85c3"
+}

@@ -24,6 +24,17 @@ function fileTimeFromInstant(instant) {
   if (fraction.slice(7) !== '00') return null; // Windows process starts have 100 ns precision.
   return (BigInt(Date.parse(instant)) * 10000n + 116444736000000000n + BigInt(fraction.slice(3, 7))).toString();
 }
+/**
+ * A wire instant as FILETIME ticks at its full native (100 ns) precision, or null when unknown.
+ * Every owner cutoff compares these: the millisecond would place an exit inside a later owner
+ * exit's millisecond after it (task b6d536 b101).
+ */
+function nativeTicks(instant) {
+  const ms = ledgerLib.knownTimestamp(instant);
+  if (ms == null) return null;
+  const fraction = /\.(\d{1,9})Z$/i.exec(instant)?.[1] ?? '';
+  return BigInt(ms) * 10000n + 116444736000000000n + BigInt(fraction.padEnd(9, '0').slice(3, 7));
+}
 const WITNESS_INTENT_BASES = new Set(['owner exit record', 'owner intent', 'owner window', 'console client']);
 const isFileTime = (v) => typeof v === 'string' && /^[1-9][0-9]{0,19}$/.test(v);
 /** The shared birth-identity rule (exit-ledger.cjs `sameBirth`): equal at the coarser clock's precision. */
@@ -105,7 +116,9 @@ function exitOf(record) {
     runnerJobClose: line.runnerJobClose ?? null,
     terminateCalledAtMs: ledgerLib.knownTimestamp(line.terminateCalledAt),
     exitedAtMs: ledgerLib.knownTimestamp(line.exitedAt), exitedFileTime: fileTimeFromInstant(line.exitedAt),
-    observedAtMs: ledgerLib.knownTimestamp(line.observedAt) ?? ledgerLib.knownTimestamp(line.at) };
+    exitedTicks: nativeTicks(line.exitedAt)?.toString() ?? null,
+    observedAtMs: ledgerLib.knownTimestamp(line.observedAt) ?? ledgerLib.knownTimestamp(line.at),
+    observedTicks: (nativeTicks(line.observedAt) ?? nativeTicks(line.at))?.toString() ?? null };
 }
 
 /**
@@ -115,6 +128,13 @@ function exitOf(record) {
 const recordedEndMs = (exit) => exit?.exitedAtMs ?? null;
 /** A confirmed death observation can reject later live sightings; it cannot date that death. */
 const closedByMs = (exit) => recordedEndMs(exit) ?? exit?.observedAtMs ?? null;
+/** An exit's native exit time as a BigInt FILETIME, or null. Exits keep it as a string (JSON). */
+const exitedTicksOf = (exit) => (exit?.exitedTicks == null ? null : BigInt(exit.exitedTicks));
+/** {@link closedByMs} at native precision, as a BigInt: an owner's proven end as an owner cutoff. */
+const closedByTicks = (exit) => {
+  const ticks = exit?.exitedTicks ?? exit?.observedTicks ?? null;
+  return ticks == null ? null : BigInt(ticks);
+};
 /**
  * Negative containment evidence: once the Engine is observed dead, its kill-on-close job has
  * closed by that observation. This upper bound can reject a later live sighting, but is never
@@ -244,16 +264,16 @@ function ledgerView(ledger, runId) {
     }
   }
   // A window's end: its recorded end; when that is absent (an open window, or an unforced end a
-  // host crash lost), its owner's recorded exit or crash/owner-died record, or its Engine's exit;
-  // with none of those the owner is alive and the window runs to its deadline (task b6d536 b101).
-  const msToFileTime = ms => (Number.isFinite(ms) ? (BigInt(Math.trunc(ms)) * 10000n + 116444736000000000n).toString() : null);
-  const windowEnd = (i, deadline) => {
-    const recorded = fileTimeFromInstant(i.closedAt);
-    if (recorded) return recorded;
+  // host crash lost), its owner's recorded exit or crash/owner-died record, or its Engine's exit,
+  // at native precision. With none of those the owner is alive and the window has not ended: its
+  // deadline bounds a lease, never the window (task b6d536 b101). Null: not ended.
+  const windowEnd = (i) => {
+    const recorded = nativeTicks(i.closedAt);
+    if (recorded != null) return recorded;
     const owner = sameBirth(i.engine.creationFileTimeUtc, i.owner?.creationFileTime) && i.engine.pid === Number(i.owner?.pid)
       ? i.engine : children.find(c => c.pid === Number(i.owner?.pid) && sameBirth(c.creationFileTimeUtc, i.owner?.creationFileTime));
-    const ends = [owner?.exit, i.engine.exit].filter(Boolean).map(e => msToFileTime(closedByMs(e))).filter(Boolean);
-    return ends.length ? ends.reduce((a, b) => (BigInt(a) < BigInt(b) ? a : b)) : deadline;
+    const ends = [owner?.exit, i.engine.exit].filter(Boolean).map(closedByTicks).filter(t => t != null);
+    return ends.length ? ends.reduce((a, b) => (a < b ? a : b)) : null;
   };
   const valid = [...witnesses.values()].filter(w => !w.invalid);
   for (const r of ledger?.children?.records ?? []) {
@@ -289,14 +309,12 @@ function ledgerView(ledger, runId) {
     } else {
       const born = BigInt(w.creationFileTimeUtc);
       const intent = [...windows.values()].find(i => {
-        const start = fileTimeFromInstant(i.requestedAt), deadline = fileTimeFromInstant(i.deadlineAt);
-        const close = windowEnd(i, deadline);
+        const start = nativeTicks(i.requestedAt), close = windowEnd(i), exited = exitedTicksOf(w.exit);
         return i.engine === w.engine && createdBy(w, i.owner) && typeof i.reason === 'string' && i.reason.length > 0
           && path.win32.basename(w.executable ?? '').toLowerCase() === i.image?.toLowerCase()
-          && start && deadline && close && BigInt(close) >= BigInt(start)
-          && born >= BigInt(start) && born <= BigInt(deadline) && born <= BigInt(close)
-          && w.exit.exitedFileTime != null && BigInt(w.exit.exitedFileTime) >= BigInt(start)
-          && BigInt(w.exit.exitedFileTime) <= BigInt(deadline) && BigInt(w.exit.exitedFileTime) <= BigInt(close);
+          && start != null && (close == null || close >= start)
+          && born >= start && (close == null || born <= close)
+          && exited != null && exited >= start && (close == null || exited <= close);
       });
       // An image alone, including a successful code, is never intended.
       w.exit = { ...w.exit, exitClass: intent && !crashCode(w.exit.code) ? 'REQUESTED' : 'UNEXPECTED',
@@ -314,17 +332,16 @@ function ledgerView(ledger, runId) {
       && createdBy(w, { pid: c.pid, creationFileTime: c.creationFileTimeUtc }) && c.exit);
     if (!parser || !['REQUESTED', 'UNEXPECTED'].includes(parser.exit.exitClass)) continue;
     if (parser.exit.exitClass === 'REQUESTED' && (!parser.exit.forced || !parser.exit.reason)) continue;
-    const end = recordedEndMs(parser.exit), helperEnd = recordedEndMs(w.exit);
-    if (end == null || helperEnd == null || helperEnd < end || helperEnd > end + CONHOST_EXIT_GRACE_MS) continue;
+    const end = exitedTicksOf(parser.exit), helperEnd = exitedTicksOf(w.exit);
+    if (end == null || helperEnd == null || helperEnd < end
+      || helperEnd > end + BigInt(CONHOST_EXIT_GRACE_MS) * 10000n) continue;
     const declares = [...receipts.values()].some(c => c.engine === w.engine
       && c.ownerContainment === 'KILL_ON_CLOSE' && createdBy(w, c.owner)
       && c.pid === w.pid && sameBirth(c.creationFileTime, w.creationFileTimeUtc, BIRTH_TICKS.EXACT))
       || [...windows.values()].some(i => i.engine === w.engine && i.ownerContainment === 'KILL_ON_CLOSE'
         && createdBy(w, i.owner) && !i.closedAt
         && path.win32.basename(w.executable ?? '').toLowerCase() === i.image?.toLowerCase()
-        && fileTimeFromInstant(i.requestedAt) != null && fileTimeFromInstant(i.deadlineAt) != null
-        && BigInt(w.creationFileTimeUtc) >= BigInt(fileTimeFromInstant(i.requestedAt))
-        && BigInt(w.creationFileTimeUtc) <= BigInt(fileTimeFromInstant(i.deadlineAt)));
+        && nativeTicks(i.requestedAt) != null && BigInt(w.creationFileTimeUtc) >= nativeTicks(i.requestedAt));
     if (!declares) continue;
     w.exit = { ...w.exit, exitClass: parser.exit.exitClass === 'REQUESTED' ? 'REQUESTED' : 'OWNER_DIED',
       reason: parser.exit.exitClass === 'REQUESTED' ? parser.exit.reason : 'parser owner died' };
@@ -352,12 +369,13 @@ function ledgerView(ledger, runId) {
   for (const w of valid.filter(w => path.win32.basename(w.executable ?? '').toLowerCase() === 'conhost.exe')) {
     const parent = [...engines, ...children, ...valid].find(p => p.pid === w.parentPid
       && sameBirth(p.creationFileTimeUtc, w.parentCreationFileTime));
-    const end = recordedEndMs(parent?.exit), hostEnd = recordedEndMs(w.exit);
-    const born = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
+    const end = exitedTicksOf(parent?.exit), hostEnd = exitedTicksOf(w.exit);
+    const born = BigInt(w.creationFileTimeUtc);
     // Unknown times cannot establish a late exit. Preserve the identity-bound client's class
     // unless known native times contradict it; an unknown identity/code receipt stays unknown.
     if (parent?.exit && w.exit && w.exit.exitClass !== 'UNKNOWN' && Number.isInteger(w.exit.code)
-        && (end == null || born <= end) && (end == null || hostEnd == null || hostEnd <= end + CONHOST_EXIT_GRACE_MS)
+        && (end == null || born <= end)
+        && (end == null || hostEnd == null || hostEnd <= end + BigInt(CONHOST_EXIT_GRACE_MS) * 10000n)
         && !crashCode(w.exit.code)) {
       w.exit = { ...w.exit, exitClass: parent.exit.exitClass, reason: parent.exit.reason, forced: false };
       w.consoleClass = parent.exit.exitClass;
@@ -417,6 +435,30 @@ function witnessRole(pid, birth, executable, children) {
   if (CONSOLE_HOST_RE.test(executable ?? '')) return 'console-host';
   const child = (children ?? []).find(c => c.pid === Number(pid) && sameBirth(c.creationFileTimeUtc, birth));
   return child ? roleOfKind(child.kind) : 'job-helper';
+}
+
+/**
+ * The durability gaps a writer left open (task b6d536 b101): a `FORCE_FAILED` ledger gap with no
+ * later record of the same family, writer and `since` carrying `clearedAt`. Records written
+ * unforced before it may not have reached the disk. Gaps recorded before the run started are
+ * another run's.
+ */
+function openDurabilityGaps(ledger, run) {
+  const startMs = ledgerLib.knownTimestamp(run?.startedAt);
+  const open = new Map();
+  for (const family of ['engine', 'children']) {
+    for (const r of ledger?.[family]?.records ?? []) {
+      if (r.type !== 'ledger-gap' || r.line?.reason !== 'FORCE_FAILED') continue;
+      const key = `${family}|${JSON.stringify(r.writer ?? null)}|${r.line.since}`;
+      if (r.line.clearedAt) { open.delete(key); continue; }
+      const atMs = ledgerLib.knownTimestamp(r.line.at);
+      if (startMs != null && atMs != null && atMs < startMs) continue;
+      open.set(key, { reason: 'durability_gap', ledgerReason: 'FORCE_FAILED', family,
+        writer: r.writer ?? null, since: r.line.since ?? null, count: r.line.count ?? null,
+        detail: 'a force of unforced records failed and no later force cleared it' });
+    }
+  }
+  return [...open.values()];
 }
 
 /**
@@ -629,6 +671,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     const { parent } = parentOf(row);
     if (parent) host.consoleParent = `${parent.pid}/${parent.creationFileTimeUtc}`;
   }
+  gaps.push(...openDurabilityGaps(ledger, run));
   const allLosses = [...(ledger?.children?.records ?? []), ...(ledger?.engine?.records ?? [])]
     .filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST').map(r => r.line);
   const relevantLoss = loss => {
@@ -1079,4 +1122,5 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
 }
 module.exports = { CONHOST_EXIT_GRACE_MS, fileTimeFromInstant,
   engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult,
+  openDurabilityGaps,
   reconcileCrashedHelpers, startStopExitCensus };

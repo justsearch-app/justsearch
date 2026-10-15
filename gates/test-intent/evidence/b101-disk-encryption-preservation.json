@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T23:26:29.646Z",
+  "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+  "tree": "9edc8109efc19b21f4fec1027f666e62ddd2d5c5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.atrest.DiskEncryptionReadingTest.eachVolumeIsProbedOnItsFirstRead\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14488
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java#eachVolumeIsProbedOnItsFirstRead",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa32ba13fd7a0b40994e083bc024ec63943e50eaf075b0ae0e5c13c1d373782c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachVolumeIsProbedOnItsFirstRead()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.atrest.DiskEncryptionReadingTest.eachVolumeIsProbedOnItsFirstRead\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 49776
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/atrest/DiskEncryptionReadingTest.java#eachVolumeIsProbedOnItsFirstRead",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:68537c310bdb7a1e709b8ed4fabb25efa48fb1953b9cb9620564507f5cb57cf1"
+}
