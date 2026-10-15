@@ -359,3 +359,14 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
   "note": "All current selected checks pass, but the eight New entries cite candidate-only evidence without a concrete reason for omitting before proof. Entry 8 is decisive: its CORS preflight check uses APIs already present on main yet supplies neither before evidence nor an obstacle to reproduction."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4d-20261015",
+  "verdict": "accept",
+  "digest": "sha256:1c0783e12a834b94107420267c8e96d532cc9d81e19925f17cd46c120613ec97",
+  "note": "Reviewed all entries against ba4607de0 and unchanged listed tests/evidence; reran entry 8: all 8 frontend checks and 4 candidate CORS checks pass. All 4 CORS checks also pass on main 52e01bef4 with only the declared add-only preservation method patch; remaining foundation checks concern branch-added APIs absent on main."
+}
+```

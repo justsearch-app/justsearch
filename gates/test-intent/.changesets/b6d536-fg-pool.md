@@ -449,3 +449,14 @@ fail once with an untyped deadline in a broader run, and that failure was not re
   "note": "Reject entry 1: its VECTOR integration timing claim still says the request queued past D minus 500 ms, but the current check instead injects semantic expiry through a mocked policy while retaining a 60-second request budget. All 62 candidate case references pass and the 29 declared before check outcomes match exactly; the changed check is not truthfully described by that timing claim."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4d-20261015",
+  "verdict": "accept",
+  "digest": "sha256:c66fa8220cf21b71a2a7c1a3667949213085efb6c708b2476dd978e569e45782",
+  "note": "Reviewed all entries against 628bb419f and unchanged listed tests/evidence; reran entry 1 (31 candidate cases pass, before classifications and assertion details match f648453b5 with the declared compat patch). VECTOR now truthfully discloses mocked semantic expiry under a 60-second request budget and the before queue-precondition failure, which does not establish the unreached semantic outcome."
+}
+```
