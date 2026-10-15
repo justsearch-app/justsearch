@@ -71,3 +71,14 @@ agreement also exempts whole-deadline expiry (b43-warm-refusal). No product expe
 ## Acceptance records
 
 Pending independent verifier review. The builder records no acceptances.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:a54df084f2abe242f7a29438cd36296bf9a7c06c81d777270437a2a5d0828900",
+  "note": "re-bound to main; no change since b05f6387b. Reviewed the initial timing/preservation contract and reran both selected candidate checks successfully."
+}
+```

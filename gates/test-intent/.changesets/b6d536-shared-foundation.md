@@ -293,7 +293,7 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
         "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java"
       ],
       "class": "New",
-      "behaviour": "The webview declares X-JustSearch-Client-Kind: WEBVIEW only on requests that are already CORS-preflighted, so no simple request gains a preflight.\nclientKind.test.ts: the header is never added to a GET or HEAD (any casing, Request input included). It is never added to a non-JSON write: multipart, a text body, or no body. It is added to POST, PUT, DELETE and PATCH with a JSON content type (parameters and casing ignored), keeping every other init field and the caller's header shape (record, Headers or tuple list). A kind the caller declared is never overridden. A Request input's method and headers are read and kept. The admission seam sends the header on the first attempt and on every retry of a JSON write. shell-v0 authorizedFetch sends no header on a GET and the header on a JSON write.\nLocalApiCorsPolicyTest gains one check: in prod, a preflight from the desktop origin for a POST that requests content-type and x-justsearch-client-kind is answered 200, advertises POST, and allows x-justsearch-client-kind. The file's existing checks are unchanged.",
+      "behaviour": "The webview declares X-JustSearch-Client-Kind: WEBVIEW only on requests that are already CORS-preflighted, so no simple request gains a preflight.\nclientKind.test.ts: the header is never added to a GET or HEAD (any casing, Request input included). It is never added to a non-JSON write: multipart, a text body, or no body. It is added to POST, PUT, DELETE and PATCH with a JSON content type (parameters and casing ignored), keeping every other init field and the caller's header shape (record, Headers or tuple list). A kind the caller declared is never overridden. A Request input's method and headers are read and kept. The admission seam sends the header on the first attempt and on every retry of a JSON write. shell-v0 authorizedFetch sends no header on a GET and the header on a JSON write.\nLocalApiCorsPolicyTest gains one preservation check: in prod, a preflight from the desktop origin for a POST that requests content-type and x-justsearch-client-kind is answered 200, advertises POST, and allows x-justsearch-client-kind. This checks already-supported behaviour, not a repair. Before-state main (52e01bef49ad838972b61fb1ef03d8a44d8c483c), with only the candidate's prodModePreflightAllowsClientKindHeader method added to its test file, passes all four CORS checks. The method-only overlay is gates/test-intent/evidence/b6d536-cors-preservation-before.patch (apply with git apply --unidiff-zero). Main predates run-evidence, so the candidate's scripts/governance/gates/test-intent tooling was copied into the temporary before-worktree; no production code was overlaid. The run-evidence result is gates/test-intent/evidence/b6d536-cors-preservation.json (sha256:cf174c51b168e2567109da2316c920ff86c8397ad03c0db7ae08a467652c5def). The before file retains main's existing assertions, including its older Access-Control-Expose-Headers expectation. The candidate passes the same CORS check in this entry's existing evidence.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -346,5 +346,16 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
   "verdict": "accept",
   "digest": "sha256:33e5ce82a186f212e2b9ff15494e0f88cd8e8e98fecd00cdbd82c264fc2cc6fb",
   "note": "Verifier f12: refreshed evidence digest matches the current ChildControlVocabularyTest; the candidate test fails exactMembers on f75486245 and passes on ef6df5aec."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "reject",
+  "digest": "sha256:a3d37b28b69c80d7b2433d49efc72c51d3d4e6dee0cc04f74a390118eead74e9",
+  "note": "All current selected checks pass, but the eight New entries cite candidate-only evidence without a concrete reason for omitting before proof. Entry 8 is decisive: its CORS preflight check uses APIs already present on main yet supplies neither before evidence nor an obstacle to reproduction."
 }
 ```

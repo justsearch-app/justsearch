@@ -1,0 +1,32 @@
+diff --git a/modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java b/modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java
+index dccfeec6c..0a93f4d4e 100644
+--- a/modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java
++++ b/modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java
+@@ -165,0 +166,27 @@ class LocalApiCorsPolicyTest {
++  @Test
++  @DisplayName("Prod mode: the webview's JSON-write preflight may declare X-JustSearch-Client-Kind")
++  void prodModePreflightAllowsClientKindHeader() throws Exception {
++    startCorsTestServer(true);
++
++    HttpResponse<String> resp =
++        client.send(
++            HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/status"))
++                .timeout(Duration.ofSeconds(3))
++                .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
++                .header("Origin", "http://tauri.localhost")
++                .header("Access-Control-Request-Method", "POST")
++                .header("Access-Control-Request-Headers", "content-type,x-justsearch-client-kind")
++                .build(),
++            HttpResponse.BodyHandlers.ofString());
++
++    assertEquals(200, resp.statusCode());
++    assertTrue(
++        resp.headers().firstValue("Access-Control-Allow-Methods").orElse("").contains("POST"));
++    String allowed = resp.headers().firstValue("Access-Control-Allow-Headers").orElse("");
++    assertTrue(
++        java.util.Arrays.stream(allowed.split(","))
++            .map(String::trim)
++            .anyMatch("x-justsearch-client-kind"::equalsIgnoreCase),
++        "allowed headers were: " + allowed);
++  }
++

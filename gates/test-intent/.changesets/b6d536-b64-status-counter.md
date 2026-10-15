@@ -187,3 +187,14 @@ Pending independent verifier judgment; the builder does not accept its own chang
   "note": "Reviewed the changed fixtures/evidence and the corrected candidate-only server-metadata API-absence reason. Current selected checks pass; today's independent reruns match all 13 repaired before outcomes and the reason-only rereview matches current content."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:ad280cadc51ac4b88795ae3143bef90b994b33e3aa88156f7f1b20181b38bc03",
+  "note": "Reviewed refreshed repaired evidence and the unrelated settings method change; all 13 selected candidate checks pass and the declared 23b8679ee before rerun reproduces its recorded classifications. The unchanged metadata-only entry retains its explicit absent-before-API reason."
+}
+```

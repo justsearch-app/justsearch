@@ -177,3 +177,14 @@ Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before 
   "note": "Candidate rerun mismatch: RecoverableChunkCompletenessTest reached the real replay but the operation remained RUNNING at its 60-second deadline and the probe exited 99, contradicting the recorded candidate pass. An isolated retry passed; this documents intermittency without clearing the observed mismatch under the requested stopping rule."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:adff36927d74ca70b35b29c09ec05cf53521920b56c32f2bd9ae4f175665d669",
+  "note": "The timing adaptation retains the durable chunk-completeness assertions; both candidate test files pass. The declared 1e333857b before rerun with its compatibility patch reproduces the incomplete-chunk assertion failures without a patch-created failure."
+}
+```
