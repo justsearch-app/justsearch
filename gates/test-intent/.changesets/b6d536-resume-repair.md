@@ -73,7 +73,7 @@ New regression files leave the established controller oracles unchanged. Fail-be
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 user turn 2'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-resume-repair-preserved.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-resume-repair-2.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded"
       ]

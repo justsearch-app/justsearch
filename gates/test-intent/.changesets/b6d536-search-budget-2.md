@@ -28,6 +28,7 @@ Evidence files (all written by run-evidence.mjs):
   with the steps 1-4 fixture file `WorkerSearchServiceSemanticBudgetTest.java` overlaid (that file
   uses only API present on 68547f75a).
 - `b6d536-search-budget-2-new.json`: checks of new API, no before-state.
+- `b6d536-signoff2-search-budget-2-6.json`: entry 6 preserves detached run-thread lifetime; both checks pass on 3d181a70c and on the candidate.
 - `b6d536-search-budget-2-preservation.json`: preservation checks that pass before (3d181a70c) and
   after. That run exits 1 by design, because none of them shows a repair.
 - `b6d536-search-budget-2-answer-repaired.json`: the repair for the verifier's R1/MCP finding (an
@@ -239,7 +240,7 @@ first runs:
         "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java"
       ],
       "class": "New",
-      "behaviour": "The run thread of a detached native run (a real NativeSessionHandle whose native session never returns, run through the production Lease.run) is a platform daemon thread named ort-query-run-<n>. A child JVM whose main thread leaves such a run detached and still running, closes nothing and returns, exits on its own with status 0 inside 20 s: a stuck native run cannot keep the process alive after the Engine shuts down.",
+      "behaviour": "The run thread of a detached native run (a real NativeSessionHandle whose native session never returns, run through the production Lease.run) is a platform daemon thread named ort-query-run-<n>. A child JVM whose main thread leaves such a run detached and still running, closes nothing and returns, exits on its own with status 0 inside 20 s: a stuck native run cannot keep the process alive after the Engine shuts down. Preservation: both checks pass on 3d181a70c and on the candidate; the acquisition/lease APIs and daemon run-thread construction already exist at that before-state.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -257,7 +258,7 @@ first runs:
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-search-budget-2-6.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java"
       ]

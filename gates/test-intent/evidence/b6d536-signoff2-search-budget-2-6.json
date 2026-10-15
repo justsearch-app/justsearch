@@ -1,0 +1,70 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T15:32:10.862Z",
+  "revision": "6f85a257a07cbe374d76a059fb310a1ec0df4a23",
+  "tree": "c5314b09019dfb189abf20c4813e4d99d37a0bd1",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DetachedRunThreadLifetimeTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24437
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb1ae948f1b0527ba17d01cd83fcd9623e6037806ac2186381bca4226c6a15a2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDetachedRunThreadIsANamedDaemonPlatformThread()",
+          "status": "passed"
+        },
+        {
+          "name": "aRunThatNeverReturnsDoesNotKeepTheProcessAlive(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3d181a70c",
+    "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DetachedRunThreadLifetimeTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 46851
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:f97f7927dd0104650e5feb23e12d59103a61af81c5abfcccb8b34046377ffa0c"
+}

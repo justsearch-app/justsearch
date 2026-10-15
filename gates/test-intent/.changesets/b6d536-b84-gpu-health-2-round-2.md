@@ -145,7 +145,7 @@ The patch is recorded in the producer's evidence; it contains no repair.
       ],
       "behaviour": "When the pressure clears, the next status pass publishes reloadAllowed=true with no nextReloadNotBefore and a higher servedOperating seq.",
       "class": "New",
-      "evidence": "gates/test-intent/evidence/b6d536-b84-reload-instant-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-b84-gpu-health-2-round-2-6.json",
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java"
       ]

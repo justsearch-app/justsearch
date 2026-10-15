@@ -24,9 +24,10 @@ Complete legacy parents now keep unchanged admission and acquire declarations fr
     {
       "items": ["modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java"],
       "class": "New",
+      "repaired": true,
       "behaviour": "The legacy expectation changes from compulsory rewrite to unchanged admission with immediate backfill and no repeated splitter call. Declared admission, canonical chunked/zero-child declarations and the 5,000-child/1,000-small-file timing workloads are preserved. Fresh candidate execution includes every case.",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "After backfill the legacy check never runs again for that parent, across restarts.", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: b42 builder brief, 2026-10-09, item 1'; the text does not appear in the owner's turns of session 886833dd"}],
-      "evidence": "gates/test-intent/evidence/b6d536-batch1-legacy-preservation.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-batch1-legacy-backfill-2.json",
       "newChecks": ["modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java"]
     },
     {

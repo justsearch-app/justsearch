@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T15:33:38.413Z",
+  "revision": "6f85a257a07cbe374d76a059fb310a1ec0df4a23",
+  "tree": "0bbdfbe227781396ffe3b860bb29026a94e819c4",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.power.WindowsPowerNotificationsTest.registersWithWindowsAndUnregisters\" --tests \"io.justsearch.app.api.runtime.power.WindowsPowerNotificationsTest.theUpcallStubEnqueuesTheSuspendAndNeverThrows\" --tests \"io.justsearch.app.api.runtime.power.WindowsPowerNotificationsTest.beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12435
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#registersWithWindowsAndUnregisters",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f61abb698b695f8de6783ba4376524cb5687e58d4925a71f9d64521de0778e5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "registersWithWindowsAndUnregisters()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#theUpcallStubEnqueuesTheSuspendAndNeverThrows",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f61abb698b695f8de6783ba4376524cb5687e58d4925a71f9d64521de0778e5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theUpcallStubEnqueuesTheSuspendAndNeverThrows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f61abb698b695f8de6783ba4376524cb5687e58d4925a71f9d64521de0778e5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d20c300d1^",
+    "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.power.WindowsPowerNotificationsTest.registersWithWindowsAndUnregisters\" --tests \"io.justsearch.app.api.runtime.power.WindowsPowerNotificationsTest.theUpcallStubEnqueuesTheSuspendAndNeverThrows\" --tests \"io.justsearch.app.api.runtime.power.WindowsPowerNotificationsTest.beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 52152
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#registersWithWindowsAndUnregisters",
+        "classification": "assertion",
+        "detail": "registersWithWindowsAndUnregisters(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the Engine has no suspend/resume producer ==> Unexpected exception thrown: java.lang.ClassNotFoundException: io.justsearch.app.api.runtime.power.WindowsPowerNotifications"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#theUpcallStubEnqueuesTheSuspendAndNeverThrows",
+        "classification": "assertion",
+        "detail": "theUpcallStubEnqueuesTheSuspendAndNeverThrows(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the Engine has no suspend/resume producer ==> Unexpected exception thrown: java.lang.ClassNotFoundException: io.justsearch.app.api.runtime.power.WindowsPowerNotifications"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended",
+        "classification": "assertion",
+        "detail": "beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the Engine has no suspend/resume producer ==> Unexpected exception thrown: java.lang.ClassNotFoundException: io.justsearch.app.api.runtime.power.SystemPowerEvents"
+      }
+    ]
+  },
+  "digest": "sha256:e60aa4297d152fdf08eccf88e237d4d57d638a5ff417da4bb400a9e27a892a34"
+}

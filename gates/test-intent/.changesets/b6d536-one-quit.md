@@ -214,7 +214,7 @@ the coordinator's review.
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec F step 8 (S11-U1), the Engine's suspend and resume producer. registersWithWindowsAndUnregisters: PowerRegisterSuspendResumeNotification with DEVICE_NOTIFY_CALLBACK returns ERROR_SUCCESS (0) and PowerUnregisterSuspendResumeNotification of the handle returns 0. theUpcallStubEnqueuesTheSuspendAndNeverThrows: calling the registered upcall stub through a native call with this registration's context and PBT_APMSUSPEND (4) returns 0 and delivers SUSPEND with epoch 1 to a subscriber, even beside a subscriber that throws; a second suspend, an unknown type and an unknown context return 0 and deliver nothing; PBT_APMRESUMEAUTOMATIC (0x12) delivers RESUME with the same epoch and the following PBT_APMRESUMESUSPEND (7) delivers nothing; the throwing subscriber was called for both events; suspendedNanosBetween counts exactly the suspend inside the window and 0 outside it. beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended: before installAtBoot, SystemPowerEvents.current() is NoPowerEvents and reports no suspended time. No fail-before is claimed (Spec F section 8.1).",
+      "behaviour": "Spec F step 8 (S11-U1), the Engine's suspend and resume producer. registersWithWindowsAndUnregisters: PowerRegisterSuspendResumeNotification with DEVICE_NOTIFY_CALLBACK returns ERROR_SUCCESS (0) and PowerUnregisterSuspendResumeNotification of the handle returns 0. theUpcallStubEnqueuesTheSuspendAndNeverThrows: calling the registered upcall stub through a native call with this registration's context and PBT_APMSUSPEND (4) returns 0 and delivers SUSPEND with epoch 1 to a subscriber, even beside a subscriber that throws; a second suspend, an unknown type and an unknown context return 0 and deliver nothing; PBT_APMRESUMEAUTOMATIC (0x12) delivers RESUME with the same epoch and the following PBT_APMRESUMESUSPEND (7) delivers nothing; the throwing subscriber was called for both events; suspendedNanosBetween counts exactly the suspend inside the window and 0 outside it. beforeBootNothingIsInstalledAndNoTimeReadsAsSuspended: before installAtBoot, SystemPowerEvents.current() is NoPowerEvents and reports no suspended time. All three checks fail by assertion on d20c300d1^: assertDoesNotThrow reports that the Engine has no suspend/resume producer because WindowsPowerNotifications or SystemPowerEvents is absent. All three pass on the candidate.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -232,7 +232,7 @@ the coordinator's review.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-power-events.json",
+      "evidence": "gates/test-intent/evidence/b6d536-signoff2-one-quit-5.json",
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#registersWithWindowsAndUnregisters",
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/power/WindowsPowerNotificationsTest.java#theUpcallStubEnqueuesTheSuspendAndNeverThrows",
