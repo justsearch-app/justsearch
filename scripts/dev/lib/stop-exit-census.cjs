@@ -1121,11 +1121,15 @@ function lookupEndedIdentities(list) {
  * the lookup, and its PID was absent then, or named a process whose birth is not `x`'s at the coarser
  * of the two ticks. Judged for `x` itself, never through the record the stop looked up.
  */
+const observationIndex = new WeakMap();
 const endedByObservation = (observations, x) => {
   const id = identityOf(x);
   if (!id || id.pid === null || !id.birth) return false;
   const born = birthMs(x);
-  return observations.some(o => hasPid(x, o.pid) && born !== null && born <= o.observedAtMs && (o.observed === 'absent'
+  // The observations by PID (an index only: each candidate is then matched by hasPid and compareIdentity).
+  if (!observationIndex.has(observations)) observationIndex.set(observations, byPid(observations));
+  return (observationIndex.get(observations).get(id.pid) ?? []).some(o => hasPid(x, o.pid) && born !== null
+    && born <= o.observedAtMs && (o.observed === 'absent'
     || !compareIdentity(x, { pid: o.pid, creationFileTimeUtc: o.observedCreationFileTimeUtc,
       birthTick: String(o.observedBirthTick ?? TICK.MICROSECOND) }, 'same')));
 };
@@ -1388,8 +1392,11 @@ function exitResult(input, output, source, ledger = null, view = null, { lookupE
   const endedId = (x) => endedByObservation(endedByLookup, x);
   const resolvedByLookup = [];
   if (endedByLookup.length) {
-    const unprovenOfPid = (pid) => [...input.targets, ...[...view.engines, ...view.children, ...(view.witnesses ?? [])]
-      .filter(x => !x.proof)].filter(x => hasPid(x, pid));
+    // The unproven identities the census knows, by PID (an index only: each is then matched by hasPid),
+    // built once: a stop over thousands of children has a PID-only gap for each.
+    const unprovenIndex = byPid([...input.targets, ...[...view.engines, ...view.children, ...(view.witnesses ?? [])]
+      .filter(x => !x.proof)]);
+    const unprovenOfPid = (pid) => (unprovenIndex.get(pid) ?? []).filter(x => hasPid(x, pid));
     const resolves = (g) => {
       if (!(LOOKUP_ENDED_RESOLVES.has(g?.reason) || String(g?.reason ?? '').startsWith(PRE_STOP_HANDLE_GAP))) return false;
       if (!Number.isInteger(g.pid)) return false;
@@ -1428,8 +1435,10 @@ function exitResult(input, output, source, ledger = null, view = null, { lookupE
   }
   // The rows of the identities whose unproven end the lookup resolved say how their end is known.
   if (resolvedByLookup.length) {
+    // The resolved gaps by PID (an index only: each candidate is then matched as before).
+    const resolvedIndex = byPid(resolvedByLookup);
     for (const row of processExits) {
-      if (row.endedObservedBy || !endedId(row) || !resolvedByLookup.some(g => g.creationFileTimeUtc
+      if (row.endedObservedBy || !endedId(row) || !(resolvedIndex.get(identityOf(row)?.pid ?? null) ?? []).some(g => g.creationFileTimeUtc
         ? compareIdentity(g, row, 'same') : hasPid(row, g.pid))) continue;
       Object.assign(row, { ledgerClass: row.ledgerClass ?? 'UNKNOWN', ledgerReason: LOOKUP_ENDED_REASON,
         endedObservedBy: 'identity-checked lookup', exitCode: Number.isInteger(row.exitCode) ? row.exitCode : null,
@@ -1573,8 +1582,27 @@ function endedIdentitiesOf(view, starts = ledgerStartsOf(view)) {
 }
 
 /**
+ * The starts of the run the ledger records with a PID and birth and whose end nothing proves: each a
+ * whole identity value, as endedIdentitiesOf gives the proven ones. The stop looks every one of them
+ * up (the fallback the design rests on): whether or not a manifest or a tracked record still names it.
+ */
+function unprovenIdentitiesOf(starts) {
+  const unproven = [];
+  for (const { item, role } of starts) {
+    const id = identityOf(item);
+    if (item.proof || id.pid === null || id.birth === null) continue;
+    unproven.push({ pid: id.pid, creationFileTimeUtc: id.birth, role, birthTick: id.tick,
+      ...(id.childId ? { childId: id.childId } : {}), ...(id.witnessId ? { witnessId: id.witnessId } : {}),
+      ...(item.owner ? { owner: item.owner } : {}), ...(id.incarnation ? { incarnation: id.incarnation } : {}),
+      identity: id });
+  }
+  return unproven;
+}
+
+/**
  * What the ledger says of the identities a stop tracks (the runner's lookup suppression and job stop).
- * `ended` is endedIdentitiesOf. `isEnded(tracked)` is true only when at least one start of the run is
+ * `ended` is endedIdentitiesOf, `unproven` unprovenIdentitiesOf (every start the stop must look up).
+ * `isEnded(tracked)` is true only when at least one start of the run is
  * the tracked identity (compareIdentity 'same': its PID and birth at the coarser of their ticks, and
  * every other field both carry, the childId, owner and incarnation included) and every such start is
  * proven ended; a tracked record no start agrees with, or one an unended start also agrees with, is
@@ -1585,6 +1613,7 @@ function ledgerResolution(view) {
   const index = byPid(starts, s => s.item);
   return {
     ended: endedIdentitiesOf(view, starts),
+    unproven: unprovenIdentitiesOf(starts),
     isEnded(tracked) {
       const id = identityOf(tracked);
       if (!id || id.pid === null || id.birth === null) return false;

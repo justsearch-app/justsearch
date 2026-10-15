@@ -123,6 +123,13 @@ function fileTimeToMs(fileTime) {
 const { sameBirth } = ledgerLib;
 
 /**
+ * Above this many PIDs the CIM filter naming each would pass the command-line limit (a stop looks up
+ * every identity it cannot prove ended, thousands in a long run): the query then reads the whole
+ * process table, and the PIDs asked for are picked from it.
+ */
+const LOOKUP_FILTER_MAX_PIDS = 200;
+
+/**
  * Look up the OS identity of some pids in one bounded CIM query.
  *
  * @returns {Promise<Map<number, {present: true, creationFileTime: string|null, executable: string|null}
@@ -133,10 +140,10 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
   const wanted = [...new Set(pids.map(Number).filter((p) => Number.isInteger(p) && p > 0))];
   if (wanted.length === 0) return Promise.resolve(new Map());
   if (platform !== 'win32') return Promise.resolve(null);
-  const filter = wanted.map((p) => `ProcessId=${p}`).join(' OR ');
+  const filter = wanted.length <= LOOKUP_FILTER_MAX_PIDS ? ` -Filter '${wanted.map((p) => `ProcessId=${p}`).join(' OR ')}'` : '';
   const command = [
     '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
-    `$rows = @(Get-CimInstance Win32_Process -Filter '${filter}' -ErrorAction Stop | ForEach-Object {`,
+    `$rows = @(Get-CimInstance Win32_Process${filter} -ErrorAction Stop | ForEach-Object {`,
     '  [pscustomobject]@{ pid = [int]$_.ProcessId;',
     '    creation = $(if ($_.CreationDate) { $_.CreationDate.ToFileTimeUtc().ToString() } else { $null });',
     '    executable = $_.ExecutablePath; name = $_.Name } })',
@@ -144,7 +151,7 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
   ].join('\n');
   return new Promise((resolve) => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command],
-      { encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 1024 * 1024 },
+      { encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 },
       (error, stdout) => {
         if (error) { resolve(null); return; }
         let rows;

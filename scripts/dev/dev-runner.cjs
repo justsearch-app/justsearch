@@ -2135,6 +2135,33 @@ async function keepEarlierReports(runDir, { pause = (ms) => new Promise((resolve
   return { earlierReports, earlierReportFiles, earlierFindings, reportName: nextName(names), earlierReportNotArchived: notArchived };
 }
 
+/**
+ * The identities (PID and birth) the earlier stops of a run name in what they found: each stop
+ * report's accounting gaps and each census file's findings, as they were written, so a later stop
+ * looks each up. Read only, before this stop's census keeps its earlier files; a file that cannot be
+ * read names none (keepEarlierReports and the census make it a gap).
+ */
+const EARLIER_CENSUS_FILE_RE = /^process-exits(?:\.\d+)?\.json$/;
+function earlierReportIdentities(runDir) {
+  let names = [];
+  try {
+    names = fs.readdirSync(runDir).filter((n) => n === 'stop-report.json' || EARLIER_REPORT_RE.test(n) || EARLIER_CENSUS_FILE_RE.test(n));
+  } catch { return []; }
+  const identities = [];
+  for (const name of names) {
+    try {
+      const report = JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, ''));
+      const found = EARLIER_CENSUS_FILE_RE.test(name) ? report?.findings : report?.exitAccountingGaps;
+      for (const g of Array.isArray(found) ? found : []) {
+        if (!Number.isInteger(g?.pid) || g.pid <= 0 || typeof g.creationFileTimeUtc !== 'string') continue;
+        identities.push({ pid: g.pid, creationFileTimeUtc: g.creationFileTimeUtc, role: g.role ?? null,
+          ...(g.birthTick != null ? { birthTick: String(g.birthTick) } : {}), ...(g.childId ? { childId: g.childId } : {}) });
+      }
+    } catch { /* named as unreadable by keepEarlierReports */ }
+  }
+  return identities;
+}
+
 /** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
 function describeResolved(p) {
   return { pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc), role: p.role ?? null,
@@ -4012,6 +4039,8 @@ async function stopRun(opts, {
   // a row whose birth cannot be read, or a record without a birth adds nothing (S4 stays incomplete).
   // The census judges each identity it accounts against these observations (lookupEndedIdentities).
   const lookupEnded = [];
+  // The observations so far by PID (an index only: each candidate is then matched by compareIdentity).
+  const lookupEndedByPid = new Map();
   const noteLookupEnded = (entries, observedAtMs) => {
     for (const p of entries) {
       if (!p?.pid || !p.creationFileTimeUtc || provenEnded(p) || !phaseRows?.has(p.pid)) continue;
@@ -4020,11 +4049,14 @@ async function stopRun(opts, {
       if (row?.present === false) observed = 'absent';
       else if (row?.present && row.creationFileTime && !compareIdentity(p, { pid: p.pid, creationFileTime: String(row.creationFileTime),
         birthTick: String(row.birthTick ?? TICK.MICROSECOND) }, 'same')) observed = 'reused';
-      if (!observed || lookupEnded.some((o) => compareIdentity(o, p, 'same'))) continue;
-      lookupEnded.push({ pid: p.pid, creationFileTimeUtc: String(p.creationFileTimeUtc), ...(p.birthTick != null
+      const bucket = lookupEndedByPid.get(p.pid) ?? [];
+      if (!observed || bucket.some((o) => compareIdentity(o, p, 'same'))) continue;
+      const observation = { pid: p.pid, creationFileTimeUtc: String(p.creationFileTimeUtc), ...(p.birthTick != null
         ? { birthTick: String(p.birthTick) } : {}), role: p.role, observed, observedAtMs,
       ...(observed === 'reused' ? { observedCreationFileTimeUtc: String(row.creationFileTime),
-        ...(row.birthTick != null ? { observedBirthTick: String(row.birthTick) } : {}) } : {}) });
+        ...(row.birthTick != null ? { observedBirthTick: String(row.birthTick) } : {}) } : {}) };
+      lookupEnded.push(observation);
+      lookupEndedByPid.set(p.pid, [...bucket, observation]);
     }
   };
   const lookupOne = async (p) => {
@@ -4070,7 +4102,29 @@ async function stopRun(opts, {
       birthTick: child.creationFileTimeUtc ? 10 : 10000, owned: false };
   });
   for (const p of helperProcesses) remember(p);
-  const allEntries = () => [...processes, ...tracked].filter(p => p.pid && p.pid !== process.pid);
+  // <ledger-resolution> Every identity the stop knows of and cannot prove ended is looked up, the
+  // fallback the design rests on: the ledger's unproven starts (a predecessor's child another Engine
+  // stopped, whose receipt proves nothing, its manifest entry removed) and the identities an earlier
+  // stop report of the run names, never left out because no manifest entry or tracked record names
+  // them any more. Each is reported, never ended, while it runs or cannot be read (STOP_INCOMPLETE);
+  // one the lookup finds absent or reborn is accounted ended (noteLookupEnded). Its PID and birth are
+  // compared only through compareIdentity, against the records already listed with the same PID.
+  const knownByPid = new Map();
+  const knownAlready = (p) => {
+    const bucket = knownByPid.get(p.pid) ?? [];
+    if (bucket.some((q) => compareIdentity(q, p, 'same'))) return true;
+    knownByPid.set(p.pid, [...bucket, p]);
+    return false;
+  };
+  for (const p of [...processes, ...tracked]) if (p?.pid && p.creationFileTimeUtc) knownAlready(p);
+  const knownUnproven = [];
+  if (!opts.forgetUnresolved) {
+    for (const u of [...(ledgerResolved?.unproven ?? []), ...earlierReportIdentities(runDir)]) {
+      if (!provenEnded(u) && !knownAlready(u)) knownUnproven.push({ ...u, role: u.role ?? 'recorded identity', name: u.role ?? 'unknown' });
+    }
+  }
+  // </ledger-resolution>
+  const allEntries = () => [...processes, ...tracked, ...knownUnproven].filter(p => p.pid && p.pid !== process.pid);
   // Arm OS exit handles while the initial identity lookup starts. Actions still wait for both.
   let censusError;
   const pendingCensus = !opts.forgetUnresolved
@@ -4390,7 +4444,7 @@ async function stopRun(opts, {
       .map((p) => ({ ...p, role: 'Engine job member', state: 'unknown' })) : [];
 
   const unresolvedProcesses = [];
-  for (const p of tracked) {
+  for (const p of [...tracked, ...knownUnproven]) {
     const state = await lookupOne(p);
     if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
   }
