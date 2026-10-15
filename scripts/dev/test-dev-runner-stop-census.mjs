@@ -3103,6 +3103,106 @@ test('round 11 lookup of many PIDs: past the filter limit the real lookup reads 
   }
 });
 
+/**
+ * The verifier's late-start reproduction (round 12 audit of 4e605f761), as a case: Engine 2, after a
+ * restart, writes a child's spawn and starts it, but its `child-start` lands only as the stop's census
+ * arms (the Engine thread suspended between creating the process and recording it), after the stop
+ * collected what it knew; the manifest names no child. A preload of the real CLI appends the start
+ * when the census is armed, once; every lookup and termination is the real one.
+ */
+async function lateStartRun(label) {
+  const supervisorProcess = await liveChild(), engine1 = await liveChild();
+  let engine2 = null, child = null;
+  const runId = `stop-census-r12-late-start-${label}`;
+  const dataDir = freshDir(`r12-late-start-${label}`);
+  const ld = ledgerLib.ledgerDirectory(dataDir);
+  fs.mkdirSync(ld, { recursive: true });
+  const inc1 = { session: runId, n: 1 }, inc2 = { session: runId, n: 2 };
+  const cimOf = (b) => String(BigInt(b) / 10n * 10n);
+  const supervisor = { role: 'dev-runner', pid: supervisorProcess.pid, startedAt: isoMs(supervisorProcess.creationFileTimeUtc) };
+  let seq = 0;
+  const record = (type, writer, fields) => JSON.stringify({ schemaVersion: 1, type, seq: ++seq, at: new Date().toISOString(), writer, ...fields }) + '\n';
+  const append = (family, type, writer, fields) => fs.appendFileSync(path.join(ld, `${family}.v1.jsonl`), record(type, writer, fields));
+  const engineStart = (e, inc) => append('engine', 'engine-start', supervisor, { incarnation: inc, pid: e.pid,
+    creationFileTime: cimOf(e.creationFileTimeUtc), processStartedAt: isoMs(e.creationFileTimeUtc), executable: process.execPath,
+    cause: inc.n === 1 ? 'INITIAL' : 'RESTART', supervisorKind: 'dev-runner' });
+  try {
+    engineStart(engine1, inc1);
+    await engine1.end();
+    append('engine', 'engine-exit', supervisor, { incarnation: inc1, exitClass: 'UNEXPECTED', reason: null, detail: null, code: 0,
+      codeName: 'SUCCESS', exitedAt: new Date().toISOString(), observedAt: new Date().toISOString(), terminateCalledAt: null,
+      forced: false, phase: 'RUNNING', codeDistinctive: true, contract: { action: 'stop', exitClass: 'REQUESTED', counted: false } });
+    engine2 = await liveChild();
+    const writer2 = { role: 'engine', pid: engine2.pid, startedAt: isoMs(engine2.creationFileTimeUtc) };
+    engineStart(engine2, inc2);
+    const owner2 = { pid: engine2.pid, creationFileTime: engine2.creationFileTimeUtc, instanceId: 'engine-two' };
+    append('children', 'child-spawn', writer2, { childId: 'late-child', kind: 'EXTRACTION', label: 'fixture', owner: owner2, gpu: false });
+    child = await liveChild();
+    // The child's start, written only when the stop's census is armed.
+    const pending = path.join(dataDir, 'late-child-start.jsonl');
+    fs.writeFileSync(pending, record('child-start', writer2, { childId: 'late-child', pid: child.pid, creationFileTime: child.creationFileTimeUtc,
+      processStartedAt: isoMs(child.creationFileTimeUtc), executable: process.execPath, argvHash: '0'.repeat(64), contained: false,
+      gpuDevice: null }));
+    const preload = path.join(dataDir, 'late-start-preload.cjs');
+    fs.writeFileSync(preload, [
+      `'use strict';`,
+      `const fs = require('node:fs');`,
+      `const census = require(${JSON.stringify(path.join(root, 'scripts/dev/lib/stop-exit-census.cjs'))});`,
+      `const armed = census.startStopExitCensus;`,
+      `census.startStopExitCensus = function (...args) {`,
+      `  const done = ${JSON.stringify(pending)} + '.done';`,
+      `  if (!fs.existsSync(done)) { fs.writeFileSync(done, 'done'); fs.appendFileSync(${JSON.stringify(path.join(ld, 'children.v1.jsonl'))}, fs.readFileSync(${JSON.stringify(pending)})); }`,
+      `  return armed.apply(this, args);`,
+      `};`,
+      '',
+    ].join('\n'));
+    const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
+    fs.mkdirSync(runDir, { recursive: true });
+    const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: cimOf(p.creationFileTimeUtc), executable: process.execPath });
+    fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({ schemaVersion: 1, runId, dataDir, apiPortActual: 0, uiPortActual: 0,
+      incarnation: 2, control: { stopRequest: true }, pids: { runnerPid: supervisorProcess.pid, backendRootPid: engine2.pid,
+        frontendRootPid: null }, identities: { runner: identity(supervisorProcess), backend: identity(engine2) } }));
+    const scopeFile = path.join(dataDir, 'scope.json');
+    fs.writeFileSync(scopeFile, JSON.stringify({ processes: [] }));
+    fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ pid: engine2.pid, instanceId: 'engine-two',
+      incarnation: inc2, children: [] }));
+    await supervisorProcess.end();
+    const env = { ...process.env, JUSTSEARCH_EXIT_CENSUS_SCOPE: scopeFile, NODE_OPTIONS: `--require "${preload.replace(/\\/g, '/')}"`,
+      JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', CI: '' };
+    const cliStop = (session) => {
+      const out = cp.spawnSync(process.execPath, [path.join(root, 'scripts/dev/dev-runner.cjs'), 'stop', '--json', '--run', runId,
+        '--session-id', session], { cwd: root, env, encoding: 'utf8', windowsHide: true, timeout: 180000 });
+      return { status: out.status, report: JSON.parse(String(out.stdout).trim().split(/\r?\n/).filter(Boolean).at(-1) ?? '{}') };
+    };
+    const first = cliStop(`r12-late-start-${label}-1`);
+    const appendedAtArming = fs.existsSync(`${pending}.done`);
+    const second = cliStop(`r12-late-start-${label}-2`);
+    const childAlive = await Promise.race([child.exited.then(() => false), new Promise((resolve) => setTimeout(() => resolve(true), 500))]);
+    return { child, first, second, childAlive, appendedAtArming };
+  } finally {
+    for (const p of [child, engine2, engine1, supervisorProcess].filter(Boolean)) {
+      await Promise.race([p.exited, new Promise((resolve) => setTimeout(resolve, 2000))]);
+      await p.end();
+    }
+  }
+}
+
+test('round 12 late start (the verifier\'s reproduce-late): a child whose start the ledger records only as the stop\'s census arms is learned by the stop\'s next ledger read, looked up, found running and reported; neither real CLI stop is STOPPED, and neither ends it', { skip: !windows && 'identity-checked stop' }, async () => {
+  const { child, first, second, childAlive, appendedAtArming } = await lateStartRun('alive');
+  assert.equal(appendedAtArming, true, 'the child\'s start was written as the first stop armed its census');
+  assert.equal(childAlive, true, 'the stops never end a process they only know from the ledger');
+  for (const [name, { status, report }] of [['first', first], ['second', second]]) {
+    assert.equal(report.outcome, 'STOP_INCOMPLETE', `the ${name} CLI stop is not STOPPED while the child runs: ${JSON.stringify(report.unresolvedProcesses)}`);
+    assert.notEqual(status, 0, `the ${name} CLI stop does not exit 0`);
+    assert.notEqual(report.exitAccountingComplete, true, `the ${name} CLI stop is not complete`);
+    assert.ok((report.unresolvedProcesses ?? []).some((p) => p.pid === child.pid && p.creationFileTimeUtc === child.creationFileTimeUtc),
+      `the ${name} stop reports the running child: ${JSON.stringify(report.unresolvedProcesses)}`);
+    assert.ok(!(report.killedPids ?? []).includes(child.pid), `the ${name} stop never ends it`);
+  }
+});
+
+
 // ---------------------------------------------------------------------------------------------
 // The generated checks. Random ledgers over the schema, each judged by the real census and stop and
 // by the oracle below, which is the round-8 identity rule (b102 changeset, "One identity") written

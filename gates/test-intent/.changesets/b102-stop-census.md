@@ -441,6 +441,12 @@ later real CLI stop lost completeness, and the live CLI read the whole Engine le
   passed to the identity-checked lookup. Absent or reborn, it is accounted ended, exit code unknown;
   unreadable stays incomplete; nothing is left out of the lookup only because its manifest entry is
   gone.
+- After 4e605f761 (a late start: a child whose `child-start` lands as the census arms was in the
+  refreshed ledger but never looked up, and the stop returned `STOPPED` while it ran; inherited
+  from b599d4d7e): any start a refresh of the ledger shows during the stop joins the unresolved set
+  and goes through the same identity-checked lookup and final survivor check before the outcome is
+  decided. Nothing found late is ended except through the existing identity-checked termination of
+  manifest children; a live one makes the stop `STOP_INCOMPLETE`.
 
 What changed:
 
@@ -637,6 +643,11 @@ What changed:
   naming a PID alone is checked against are indexed by PID, so 19,000 observations take no
   quadratic pass (without the rows' index the stop of case 58 took 290 s; without the last, 191 s
   to 297 s in the full file).
+- Round 12, the late start: `dev-runner.cjs` `stopRun` learns the unproven starts each read of the
+  ledger shows for the first time (`learnUnproven`): each lookup phase reads the ledger and asks of
+  them too, and before the final check the ledger is read again and, if a start the latest lookup
+  was not asked of is known, the lookup runs once more; each is then checked with the rest of
+  `knownUnproven` and, running or unreadable, reported in `unresolvedProcesses`, never ended.
 - Round 11 test fixtures: in `test-dev-runner-stop-census.mjs`, the later receipt of the
   disagreement case (39) was written by a dev runner writer with the right PID but started at that
   moment, which is not the writer that recorded the start; it now carries that writer's start
@@ -659,9 +670,10 @@ What changed:
   Engine's PID and birth) through `ledgerView`, as `stopRun` passes it. Without these, seven cases
   failed by assertion (the Engine's exit unproven).
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (95 cases; 40 and 41 rewritten and
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (96 cases; 40 and 41 rewritten and
 42 to 61 added in round 8, 62 to 71 in round 9, 69 rewritten and 72 to 82 added in round 10, 40, 41
-and 71 extended, 58 changed and 83 to 95 added in round 11, with their own before-results below). Cases 1 to 6 fail by
+and 71 extended, 58 changed and 83 to 95 added in round 11, 96 in round 12, with their own
+before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -1163,6 +1175,13 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
 95. Round 11, lookup of many PIDs: the real `lookupProcessIdentities` asked of a live child and 300
    unused PIDs answers each, the child present with its birth (to the microsecond) and the rest
    absent. Passes on 60f3602a4 too (301 PIDs still fit its filter); 19,195 did not (case 58).
+96. Round 12, late start (the verifier's `reproduce-late.ps1` on 4e605f761, as a case): Engine 1
+   starts and exits; Engine 2 writes a child's `child-spawn` and starts it (real process,
+   uncontained), and its `child-start` is appended only when the first real CLI stop arms its
+   census (a preload of that CLI, once); the manifest names no child. Neither real CLI stop is
+   `STOPPED` or exits 0: each is `STOP_INCOMPLETE`, not complete, lists the child's PID and birth
+   in `unresolvedProcesses`, and never ends it; the child is alive after both. Fails by assertion
+   on 4e605f761 (the first stop `STOPPED`, `unresolvedProcesses` empty).
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -1390,5 +1409,13 @@ suite). One interleaved perf pair (`run-perf-r12.ps1`, the corrected generator):
 11,390 ms, 118,510 parses, not complete, its perf and read assertions failing; this change
 1,991 ms, 59,255 parses, complete, `assert-perf.cjs` and `assert-file-reads.cjs` passing
 (verifier-r11/harness-logs/perf/perf-summary-r12.json).
+
+After the late-start decision, run again here: the check passes 96 of 96 (the 17 MB stops 2,045 and
+2,053 ms, case 58 13,456 ms, the generated cases 40, 41 and 71 86,931, 30,169 and 182,918 ms;
+verifier-r11/r13/stop-census.log); the 41 `test-dev-runner-*.mjs` files pass (243 tests),
+`e-pair-identity.test.mjs` (12) and `fixture-cleanup.test.mjs` (10) pass (verifier-r11/r13/suite).
+One interleaved perf pair (`run-perf-r13.ps1`): b599d4d7e 11,468 ms, 118,510 parses, not
+complete, its perf and read assertions failing; this change 2,012 ms, 59,255 parses, complete,
+both assertions passing (verifier-r11/harness-logs/perf/perf-summary-r13.json).
 
 Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r11/).

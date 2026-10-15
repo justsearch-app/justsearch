@@ -4027,10 +4027,17 @@ async function stopRun(opts, {
   let phaseRows = new Map();
   // When the latest lookup was asked: a process its rows say nothing of may have been born after it.
   let phaseAskedMs = null;
+  // The PIDs the latest lookup was asked of: its rows say nothing of any other.
+  let phaseAskedPids = new Set();
+  // Adds each unproven start of the ledger the stop did not know yet, once (set with knownUnproven).
+  let learnUnproven = () => [];
   const lookupPhase = async (entries) => {
     readLedgerEnded();
-    const ids = [...new Set(entries.filter(p => p?.pid && !provenEnded(p)).map(p => p.pid))];
+    // A start this read of the ledger shows for the first time is asked of too (learnUnproven).
+    const learned = learnUnproven();
+    const ids = [...new Set([...entries, ...learned].filter(p => p?.pid && !provenEnded(p)).map(p => p.pid))];
     phaseAskedMs = Date.now();
+    phaseAskedPids = new Set(ids);
     phaseRows = ids.length ? await Promise.resolve().then(() => lookupIdentities(ids)).catch(() => null) : new Map();
   };
   // What the first identity-checked lookup of this stop observed of the recorded identities it found
@@ -4118,11 +4125,21 @@ async function stopRun(opts, {
   };
   for (const p of [...processes, ...tracked]) if (p?.pid && p.creationFileTimeUtc) knownAlready(p);
   const knownUnproven = [];
-  if (!opts.forgetUnresolved) {
-    for (const u of [...(ledgerResolved?.unproven ?? []), ...earlierReportIdentities(runDir)]) {
-      if (!provenEnded(u) && !knownAlready(u)) knownUnproven.push({ ...u, role: u.role ?? 'recorded identity', name: u.role ?? 'unknown' });
+  const learnUnprovenFrom = (identities) => {
+    const learned = [];
+    for (const u of identities) {
+      if (provenEnded(u) || knownAlready(u)) continue;
+      const entry = { ...u, role: u.role ?? 'recorded identity', name: u.role ?? 'unknown' };
+      knownUnproven.push(entry);
+      learned.push(entry);
     }
-  }
+    return learned;
+  };
+  // A start a later read of the ledger shows (one recorded while this stop runs) joins them, each
+  // time the ledger is read again for a lookup and before the final check: it is looked up and checked
+  // like the rest, and reported, never ended, while it runs or cannot be read.
+  learnUnproven = () => (opts.forgetUnresolved ? [] : learnUnprovenFrom(ledgerResolved?.unproven ?? []));
+  if (!opts.forgetUnresolved) learnUnprovenFrom([...(ledgerResolved?.unproven ?? []), ...earlierReportIdentities(runDir)]);
   // </ledger-resolution>
   const allEntries = () => [...processes, ...tracked, ...knownUnproven].filter(p => p.pid && p.pid !== process.pid);
   // Arm OS exit handles while the initial identity lookup starts. Actions still wait for both.
@@ -4443,6 +4460,14 @@ async function stopRun(opts, {
       creationFileTimeUtc: recordedJob?.host?.creationFileTimeUtc ?? null }])
       .map((p) => ({ ...p, role: 'Engine job member', state: 'unknown' })) : [];
 
+  // <ledger-resolution> The ledger as it is now: a start it shows that the latest lookup was not asked
+  // of is looked up before the final check, which otherwise would take it for absent.
+  readLedgerEnded();
+  learnUnproven();
+  if (knownUnproven.some((p) => p.pid && !provenEnded(p) && !phaseAskedPids.has(p.pid))) {
+    await lookupPhase(allEntries());
+  }
+  // </ledger-resolution>
   const unresolvedProcesses = [];
   for (const p of [...tracked, ...knownUnproven]) {
     const state = await lookupOne(p);
