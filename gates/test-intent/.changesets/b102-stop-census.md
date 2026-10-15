@@ -126,11 +126,12 @@ check):
   | --- | --- | --- |
   | Engine incarnation | `engine-exit` REQUESTED, UNEXPECTED with a code, or UNKNOWN without a code | true |
   | Engine incarnation | `engine-exit` marked reconciled | false |
-  | Engine incarnation | `engine-owner-died` osCheck GONE, with its PID or without one | true |
+  | Engine incarnation | `engine-owner-died` osCheck GONE, with its PID or without one, written by a writer bound to the start (round 10) | true |
   | Engine incarnation | `engine-owner-died` osCheck GONE naming another PID | false |
   | Engine incarnation | `engine-owner-died` ALIVE_MATCH (any class), IDENTITY_UNKNOWN, REUSED, or no osCheck | false |
   | Engine incarnation | `engine-intent`, `ledger-gap` | false |
   | Engine incarnation | `engine-exit` or `engine-owner-died` naming only the incarnation, written by an Engine that is neither the start's process nor the writer that recorded the start, or by a writer with its PID started at another millisecond (round 9) | false |
+  | Engine incarnation | `engine-exit` or `engine-owner-died` naming only the incarnation, written by a supervisor (shell, dev runner, dev CLI) that did not record the start, or by the start writer's PID with another start instant or role, unless it is the stopping process's own writer bound to the identity that stop checked (round 10) | false |
   | Engine incarnation | an exit or GONE reconciliation of another incarnation, or one naming another birth than the start (at the start's measured tick) | false |
   | Engine incarnation with two start identities | an exit or GONE reconciliation not naming the start's PID and birth | false |
   | Engine incarnation | two exits with different codes | true, and a `ledger_codes_disagree` gap |
@@ -354,7 +355,8 @@ Engine proved a live Engine start):
   first's, owned when either says so. Every other merge or overwrite of tracked identities is gone.
 - A birth read natively is exact whatever tick a record declares beside it (`identityOf`): two
   native births are compared to the tick, never at a coarser declared `birthTick`.
-- An Engine's incarnation-only record proves its one start only when a supervisor wrote it (the
+- (Superseded in round 10, below: a writer's role is never evidence, and the supervisor clause is
+  withdrawn.) An Engine's incarnation-only record proves its one start only when a supervisor wrote it (the
   dev runner, the dev CLI or the shell, the only writers of `engine-exit` and `engine-owner-died`
   that name only the incarnation: `engine-actuator.cjs`, `createCliEngineRecorder`), the Engine
   itself (its PID, its `startedAt` its birth to the millisecond), or the writer that recorded the
@@ -365,6 +367,32 @@ Engine proved a live Engine start):
 - Any other record of a childId (`child-note`, `stop-intent`, `stop-escalate`, `child-survived`,
   `gpu-release`) naming another owner or incarnation than a start of the childId is a conflict on
   that start, whichever was written first.
+
+Follow-up decisions after the independent verifier rejected ba109f4ab (decided by the
+orchestrator; an unbound supervisor writer proved a live Engine's exit through its role alone, and
+two whole child starts of one childId, PID and birth that differed in owner or incarnation were
+collapsed into one):
+
+- A writer's role is never evidence; the round-9 supervisor clause is withdrawn. An Engine's
+  incarnation-only record proves its one start only when its exact writer identity (role, PID and
+  start instant) is bound to that start: the Engine itself, or the writer that recorded the start.
+  A dev CLI stop's own `engine-intent` binds nothing: one real `dev-runner stop` from a second CLI
+  process against a fixture run (verifier-r10/real-cli-stop) wrote its intent and exit as
+  `dev-cli` with its own PID and the instant of its first write, and no record before them, nor
+  the run record or lease (they name an agent session), names that writer.
+- Within one stop, the stopping process's own writer is bound to an Engine start only when that
+  same process checked the Engine's identity (`checkRecordedProcess` `match`: the recorded PID and
+  birth against the OS row) before writing its intent and exit (`stopWriterBinding`). The binding
+  is the checked PID and birth with the writer and incarnation, held in memory and passed to the
+  census directly; it is never derived from the ledger. A stop that did not check (an unreadable
+  birth) has none, a checked identity other than the start's binds nothing, and a later stop never
+  inherits it, so it looks the Engine up. Recording the checked PID and birth on the dev CLI's own
+  intent and exit records is logged as a follow-up.
+- The no-merge rule for child starts: two child-starts of one childId and one process (PID and
+  birth) under another owner or incarnation are two starts. Both are kept and reported, the
+  disagreement is a conflict on each (an `identity_metadata_conflict` finding per start), and
+  neither is proven. Only a start recorded again with every field equal (compareIdentity `exact`)
+  is one start.
 
 What changed:
 
@@ -491,22 +519,46 @@ What changed:
   the same PID and birth, childId and witnessId, and incarnation for an Engine); other gaps and
   observed processes are covered by a row of their PID and birth, as before. `ledger-identity.cjs`: `identityOf` takes a native
   source as exact before any declared tick; `compareIdentity` `proves` takes an Engine's
-  incarnation-only record only from a supervisor (`SUPERVISOR_ROLES`), the Engine itself, or a
+  incarnation-only record only from a supervisor (`SUPERVISOR_ROLES`, removed in round 10), the Engine itself, or a
   writer that recorded the start (`startWriters`: `ledgerView` keeps each Engine start's writers,
   one per record of the same start).
   `dev-runner.cjs`: `trackedIdentities()` (in a `<ledger-resolution>` region, exported for the
   check) holds the stop's tracked records as a list; `stopRun` uses it for every source of tracked
   records (earlier trees, the run record, `stop-tracked-processes.json`, the manifest helpers and
   every phase's additions).
+- Round 10, `ledger-identity.cjs`: `compareIdentity` `proves` takes an Engine's incarnation-only
+  record only from the Engine itself or a writer of the start (`startWriters`); `SUPERVISOR_ROLES`
+  is gone. `writerOfThisProcess` tells a writer of the running process. `stop-exit-census.cjs`:
+  `stopWriterBinding` validates a stop's binding (its writer this process's, a checked PID and
+  birth, an incarnation); `ledgerView(ledger, runId, { stopBindings })` adds a bound writer to the
+  writers of the Engine start the checked identity names (compareIdentity `same`, incarnation
+  included); `startStopExitCensus` reads `runtime.stopBindings` when it builds each view. A
+  child-start is merged into an earlier one only when `exact`; one of the same process under
+  another owner or incarnation is pushed as its own start with a `restart` conflict on both.
+  `engine-actuator.cjs` `createCliEngineRecorder`: `writerIdentity()` returns the identity it
+  writes as once it has written (records unchanged). `dev-runner.cjs` `stopRun`: after the
+  recorder's first record for an Engine whose identity this stop checked, the stop adds that
+  binding (`stopBindings`), which its ledger resolution and its census use.
 - Round 9 test fixtures: the writers in `test-dev-runner-owner-coverage.mjs`,
   `test-dev-runner-delayed-crash-receipt.mjs` and `test-dev-runner-shim-console.mjs` now carry
   their start instant (`startedAt`, the writer's birth to the millisecond), as the ledger reader
   requires of every writer (`exit-ledger.cjs` `readWriter`). Without it their Engine's own
   incarnation-only exit no longer proved its start (the writer could not be told to be that
   Engine), and three cases failed; with it they pass here, on 3e9ebd546 and on b599d4d7e.
+- Round 10 test fixtures: the dev runner's Engine records in `test-dev-runner-exit-census.mjs`,
+  `test-dev-runner-exit-census-evidence.mjs` and `test-dev-runner-job-witness.mjs` were written by
+  a role alone (`{ role: 'dev-runner' }`, once with a PID but no start instant), which the ledger
+  reader never yields and which proved the Engine's exit only through the withdrawn supervisor
+  clause; they now carry one whole dev runner writer for the start and its exit, and pass here
+  and on ba109f4ab. `test-dev-runner-process-accounting-order.mjs` (runner job close) has a dev
+  CLI recorder of this process write the intent and exit after a dev runner's start, as a stop
+  does: its census now gets that stop's binding (the recorder's `writerIdentity()` and the
+  Engine's PID and birth) through `ledgerView`, as `stopRun` passes it. Without these, seven cases
+  failed by assertion (the Engine's exit unproven).
 
-New script check `scripts/dev/test-dev-runner-stop-census.mjs` (71 cases; 40 and 41 rewritten and
-42 to 61 added in round 8, 62 to 71 in round 9, with their own before-results below). Cases 1 to 6 fail by
+New script check `scripts/dev/test-dev-runner-stop-census.mjs` (82 cases; 40 and 41 rewritten and
+42 to 61 added in round 8, 62 to 71 in round 9, 69 rewritten and 72 to 82 added in round 10, with
+their own before-results below). Cases 1 to 6 fail by
 assertion on b599d4d7e, case 7 on ccd687b2d, cases 8 to 12 on f3a8282f7 (8 and 9 pass on
 b599d4d7e, as preservation), cases 6, 13 and 14 on 5b53911da, cases 15, 16 and 18 on bd198cc98
 (16 passes on b599d4d7e, as preservation), cases 17, 19, 20 and 22 to 26 on e3f82e1a9 (19 and 20
@@ -794,11 +846,14 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    naming only incarnation 2. The tracked start is looked up and the stop is `STOP_INCOMPLETE`,
    accounting incomplete. Fails by assertion on 3e9ebd546 (`STOPPED`, complete); passes on
    b599d4d7e.
-69. Round 9, Engine writer table: an `engine-exit` naming only the incarnation of an Engine's one
-   start proves it when the dev runner, the dev CLI, the shell, the Engine itself or the Engine
-   writer that recorded the start wrote it, and not when another Engine, a writer with the Engine's
-   PID started a millisecond later, or an Engine other than the start's recorder did. Fails by
-   assertion on 3e9ebd546 and b599d4d7e (those three rows prove there).
+69. Engine writer table (rewritten in round 10): an `engine-exit` naming only the incarnation of an
+   Engine's one start proves it when the Engine itself, the Engine writer that recorded the start,
+   the dev runner that recorded it or the shell that recorded it wrote it, and the Engine itself
+   after a dev runner recorded it; not when a dev runner, dev CLI or shell that did not record it,
+   another dev runner, the start writer's PID a second later or under another role, a dev CLI after
+   the dev runner recorded it, another Engine, a writer with the Engine's PID started a millisecond
+   later, or an Engine other than the start's recorder did. Fails by assertion on ba109f4ab (the
+   unbound supervisor rows prove there).
 70. Round 9, related shapes the verifier found, each through the real census of a running child
    with its own exit: a later `child-note` naming another owner instance; a second childId whose
    start names a relative executable; a job witness start of the same process. None is complete.
@@ -826,7 +881,61 @@ dev-runner Engine's microsecond birth through this round's change), and all pass
    (decision 590, census 113, stop 272; a case can be misjudged several ways): 624 starts proven
    there that isProven does not prove (552 Engine starts, mostly through another Engine's
    incarnation-only exit, and 72 child starts). On b599d4d7e the decision checks do not apply (no
-   `allStarts`).
+   `allStarts`). Extended in round 10: Engine starts are also recorded by the shell, and Engine
+   incarnation-only exits are also written by the shell, another dev runner and the dev runner's
+   PID a second later, a dev CLI's sometimes after its own `engine-intent`; a child-start is
+   sometimes recorded again for the same childId and process naming another owner or incarnation.
+   Two checks independent of isProven are added: the starts written are compared whole (childId,
+   PID, birth, owner and incarnation, each child-start's own or its latest spawn's in the order
+   the census reads the ledger), so a merged start is a misjudgment; and every Engine start proven
+   ended must have a record naming its PID and birth, or an incarnation-only one by a writer of
+   its start or by that Engine itself (the `writer` check). Run on ba109f4ab (this file copied
+   into its checkout, its own isProven the reference), 1,831 of the 3,000 are misjudged (writer
+   1,368, starts 867); none here. Round 8's generated identity check (case 40) now expects an
+   incarnation-only exit, all the dev runner's there, to prove only a start that dev runner
+   recorded, and a child-start of the same process under another owner or incarnation to be a
+   start of its own: on ba109f4ab it misjudges 33 of its 2,000 cases (census 32, lookup 19,
+   accounting 23), none here.
+72. to 75. Round 10, unbound supervisor (the verifier's `own-edges.cjs` reproductions), through a
+   whole real `stopRun` of a running Engine stand-in whose incarnation-2 start one writer recorded
+   and whose incarnation-only exit another wrote: another shell (72), another dev runner (73), a
+   dev CLI stop after its own `engine-intent` (74), and the start writer's PID started a second
+   later (75). The Engine is looked up and found running, the stop is `STOP_INCOMPLETE` and
+   accounting incomplete. Each fails by assertion on ba109f4ab (no lookup, the exit taken as
+   proof).
+76. Round 10, bound writer: the dev runner that recorded an Engine start writes its intent and
+   incarnation-only exit; the stop never looks the ended Engine up and no gap names it. Passes on
+   ba109f4ab, as preservation.
+77. Round 10, dev CLI fallback: an Engine that has gone, whose only exit a later dev CLI wrote
+   after its intent, is looked up, found gone, and the stop is `STOPPED` with nothing unresolved.
+   Fails by assertion on ba109f4ab (not looked up).
+78. and 79. Round 10, whole starts (the verifier's reproductions): two child-starts of one childId,
+   PID and birth of a running child, naming two incarnations (78) or two owner instances (79), and
+   an exit naming the first whole. `allStarts` holds two child starts, each with a conflict and
+   neither proven; the view reports both; the real census gives one `identity_metadata_conflict`
+   per start and is not complete; a stop tracking the first looks the child up and is
+   `STOP_INCOMPLETE`. Both fail by assertion on ba109f4ab (one start for two).
+80. Round 10, stop binding table, through `ledgerView` with `stopBindings`: a dev CLI intent and
+   incarnation-only exit written as this process prove the start only with a binding of this
+   process's writer (same start instant), the start's PID and birth checked, under its
+   incarnation; not with no binding (a later stop), an unchecked binding, a checked identity
+   without a birth, another birth, another PID or another incarnation, a writer of another process
+   or this process with another start instant. Fails by assertion on ba109f4ab (the role proves
+   every row).
+81. Round 10, unchecked stop: a whole `stopRun` of a run that asks its runner to stop, whose
+   running Engine's birth cannot be read, with a dev CLI intent and exit already in the ledger
+   written as this very process: the stop writes no Engine record, looks the Engine up, reports it
+   unresolved, is `STOP_INCOMPLETE` and accounting incomplete. Fails by assertion on ba109f4ab
+   (the exit proves it; no lookup).
+82. Round 10, real dev CLI stop: a runner and an Engine (live fixture processes) and a run record
+   asking the runner to stop; one real `dev-runner stop --json --run` from a second CLI process
+   checks the Engine, ends both through the identity-checked terminations, and writes its intent
+   and exit as `dev-cli` with its own PID. Its own stop is `STOPPED`, no gap names the Engine, and
+   its row is an expected termination. A later stop in another process (the test's `stopRun`)
+   looks the Engine up instead of taking the record. Fails by assertion on ba109f4ab (the later
+   stop takes the exit through the dev CLI role), and fails by assertion on this change with
+   `stopWriterBinding` returning null (`ledger_record_missing` for the Engine in the CLI's own
+   stop), as do 80's bound row.
 
 Timing on the verifier's own harness (`full-stop-perf.cjs` over its `lifecycle-perf.cjs` fixture:
 17 MB children ledger, 20,029 children, 60,089 records), b599d4d7e and this change interleaved
@@ -973,4 +1082,32 @@ run of the check, with other work loading the machine, the 17 MB stops took 2,63
 58 17,830 ms, and the generated cases 40, 41 and 71 took 122,037, 37,676 and 219,213 ms (in a run
 alone before: 1,748, 2,044, 11,639, 88,624, 30,952 and 182,234 ms).
 
-Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r9/).
+After the ba109f4ab fixes, every verifier harness of rounds 2 to 9 was run again from copies with
+fresh folders against this change (verifier-r10/harness-logs), with the round-9 verifier's
+`own-edges.cjs` added: the r2, r3 and r4 `independent.cjs` (19 each), r3 and r4
+`independent-extra.cjs` (22 each), `independent-edges.cjs` (21), `proof-probes.cjs` and
+`proof-extra.cjs` (5 each), `r5-retention.cjs` (3), `r6-retention.cjs` (6), `sticky-edges.cjs` (3),
+both `incremental-tail-probe.cjs` runs, `r8-corrected-identity.cjs` (12), round 8's
+`independent-edges.cjs` (3), `fresh-edges-r9.cjs` (9) and `own-edges.cjs` (6)
+pass; `r7-identity-edges.cjs` passes 7 of 8 (`missing-child-exit-native-fields`, as decided in round
+8). `audit-edges.cjs` passes 18 of 19 and `audit-more.cjs` 22 of 23: both fail
+`engine-owner-died-GONE`, as on b599d4d7e, because its `engine-owner-died` GONE is written by a dev
+runner writer (the harness process, started at that moment) that did not record the Engine start,
+which an Engine writer recorded; with a writer's role no longer evidence, the reconciliation
+proves nothing, the stop looks the tracked identity up, cannot read its birth, and is
+`STOP_INCOMPLETE`. The corrected boundary harnesses (`rotation-rename-gap-r8.cjs`, the four
+`enoent-states-r8.cjs` states) pass and fail by assertion on b599d4d7e; the originals give the same
+results as in round 9. With the corrected generator (`run-perf-r8.ps1`), interleaved three times,
+CPU load 13 to 62 %: b599d4d7e 15,334 / 12,654 / 14,259 ms, 118,510 parses, not complete; this
+change 2,105 / 2,135 / 2,342 ms, 59,255 parses, complete; `assert-perf.cjs`,
+`assert-file-reads.cjs` and `assert-comparison-r8.cjs` pass. Its census alone took 14,154 ms on
+b599d4d7e and 1,829 ms with this change (arming 1,396, verdict 432), complete. Over the original,
+misaligned fixtures, CPU load 31 to 68 %: b599d4d7e 15,332 / 14,554 / 16,165 ms, this change
+18,266 / 18,030 / 18,294 ms, both not complete (every child looked for); the legacy r2 and r3
+perf harnesses took 15,950 and 14,414 ms on b599d4d7e and 17,388 and 16,811 ms with this change.
+The 41 `test-dev-runner-*.mjs` files and `e-pair-identity.test.mjs` pass (241 tests), as does
+`fixture-cleanup.test.mjs` (10). In the full run of the check, the 17 MB stops took 2,813 and
+2,970 ms, case 58 17,419 ms, case 82 16,645 ms, and the generated cases 40, 41 and 71 took
+116,089, 47,106 and 262,583 ms.
+
+Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's in verifier-r10/).

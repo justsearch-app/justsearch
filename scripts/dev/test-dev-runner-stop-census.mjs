@@ -2360,20 +2360,29 @@ test('round 9 Engine writer: an incarnation-only exit another Engine wrote prove
   }
 });
 
-test('round 9 Engine writer table: an incarnation-only Engine exit proves its one start when a supervisor, that Engine itself or the writer of its start wrote it, never another Engine', () => {
+test('round 10 Engine writer table: an incarnation-only Engine exit proves its one start only when that Engine itself or the exact writer of its start (role, PID and start instant) wrote it; a supervisor role alone never does', () => {
   const runId = 'stop-census-r9-writers';
   const e = { pid: 974401, birth: genFar(4) }, inc = { session: runId, n: 1 };
   const startedAt = isoMs(e.birth);
   const self = { role: 'engine', pid: e.pid, startedAt };
-  // Another Engine, which in the last two rows recorded the start.
+  // Another Engine, which in two rows recorded the start.
   const other = { role: 'engine', pid: 974405, startedAt };
+  const runner = { role: 'dev-runner', pid: 4001, startedAt }, shell = { role: 'shell', pid: 4009, startedAt };
   const writers = {
-    'dev-runner': [self, { role: 'dev-runner', pid: 4001, startedAt }, true], 'dev-cli': [self, { role: 'dev-cli', pid: 4005, startedAt }, true],
-    shell: [self, { role: 'shell', pid: 4009, startedAt }, true], 'the Engine itself': [self, self, true],
+    'a dev runner that did not record the start': [self, runner, false],
+    'a dev CLI that did not record the start': [self, { role: 'dev-cli', pid: 4005, startedAt }, false],
+    'a shell that did not record the start': [self, shell, false], 'the Engine itself': [self, self, true],
     'another Engine': [self, other, false],
     'its PID, started a millisecond later': [self, { role: 'engine', pid: e.pid, startedAt: isoMs(BigInt(e.birth) + 10000n) }, false],
     'the Engine that recorded the start': [other, other, true],
     'an Engine other than the one that recorded the start': [other, { ...other, pid: 974409 }, false],
+    'the dev runner that recorded the start': [runner, runner, true],
+    'another dev runner than the one that recorded the start': [runner, { ...runner, pid: 4002 }, false],
+    'the start writer\'s PID, started a second later': [runner, { ...runner, startedAt: isoMs(BigInt(e.birth) + 10000000n) }, false],
+    'the start writer\'s PID under another role': [runner, { ...runner, role: 'dev-cli' }, false],
+    'the shell that recorded the start': [shell, shell, true],
+    'a dev CLI after the dev runner recorded the start': [runner, { role: 'dev-cli', pid: 4005, startedAt }, false],
+    'the Engine itself after the dev runner recorded the start': [runner, self, true],
   };
   const wrong = [];
   for (const [name, [startWriter, writer, proves]] of Object.entries(writers)) {
@@ -2427,6 +2436,198 @@ test('round 9 related shapes: a later note naming another owner, a second childI
     assert.deepEqual(wrong, []);
   } finally {
     await p.end();
+  }
+});
+
+const r10Exit = (incarnation) => ({ incarnation, exitClass: 'REQUESTED', reason: 'QUIT', detail: null, code: 0, codeName: 'ok',
+  exitedAt: null, observedAt: new Date().toISOString(), terminateCalledAt: null, forced: false, phase: 'STOPPING', codeDistinctive: true });
+const r10Intent = (incarnation) => ({ incarnation, intentId: 'r10-intent', reason: 'QUIT', detail: null, mode: 'NOW', channel: 'TERMINATE',
+  requestedAt: new Date().toISOString(), deadlineAt: null });
+// Round 10: who recorded a live Engine stand-in's start, and who wrote the incarnation-only records after it.
+const R10_UNBOUND = {
+  'another shell': { start: { role: 'shell', pid: 4009 }, after: [['engine-exit', { role: 'shell', pid: 4013 }]] },
+  'another dev runner': { start: { role: 'dev-runner', pid: 4001 }, after: [['engine-exit', { role: 'dev-runner', pid: 4017 }]] },
+  // The real dev CLI stop's shape: its intent before acting, then its exit; nothing in the ledger names it before.
+  'a dev CLI stop with its own intent': { start: { role: 'dev-runner', pid: 4001 },
+    after: [['engine-intent', { role: 'dev-cli', pid: 4005 }], ['engine-exit', { role: 'dev-cli', pid: 4005 }]] },
+  'the start writer\'s PID with another start instant': { start: { role: 'dev-runner', pid: 4001 },
+    after: [['engine-exit', { role: 'dev-runner', pid: 4001 }, 10000000n]] },
+};
+for (const [name, { start, after }] of Object.entries(R10_UNBOUND)) {
+  test(`round 10 unbound supervisor (${name}): an incarnation-only exit from a writer no record binds to a live Engine start proves nothing; the Engine is looked up and the stop is incomplete`, async () => {
+    const p = await liveChild();
+    try {
+      const r = identityRun(`r10-unbound-${name.replace(/\W+/g, '-')}`);
+      const n2 = { ...r.incarnation, n: 2 }, startedAt = isoMs(p.creationFileTimeUtc);
+      r.records.push(rec('engine', { ...start, startedAt }, 'engine-start', { incarnation: n2, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
+        executable: process.execPath, processStartedAt: startedAt, cause: 'RESTART', supervisorKind: start.role }));
+      for (const [type, writer, laterBy = 0n] of after) {
+        r.records.push(rec('engine', { ...writer, startedAt: isoMs(BigInt(p.creationFileTimeUtc) + laterBy) }, type,
+          type === 'engine-intent' ? r10Intent(n2) : r10Exit(n2)));
+      }
+      assertLiveChildFound(await trackedStop(r, { ...p, incarnation: n2 }), p, name);
+    } finally {
+      await p.end();
+    }
+  });
+}
+
+test('round 10 bound writer: the dev runner that recorded an Engine start (its role, PID and start instant) proves its incarnation-only exit, so the ended Engine is never looked up', async () => {
+  const r = identityRun('r10-bound-runner');
+  const q = noProcess(974501, genFar(9)), n2 = { ...r.incarnation, n: 2 }, runner = { role: 'dev-runner', pid: 4021, startedAt: isoMs(q.creationFileTimeUtc) };
+  r.records.push(rec('engine', runner, 'engine-start', { incarnation: n2, pid: q.pid, creationFileTime: q.creationFileTimeUtc,
+    executable: process.execPath, processStartedAt: isoMs(q.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }),
+  rec('engine', runner, 'engine-intent', r10Intent(n2)), rec('engine', runner, 'engine-exit', r10Exit(n2)));
+  const { out, lookups } = await trackedStop(r, { ...q, incarnation: n2 });
+  assert.ok(!lookups.includes(q.pid), `the start's own writer proves its exit: ${JSON.stringify(out.exitAccountingGaps)}`);
+  assert.ok(!namesProcess(out.exitAccountingGaps, q), JSON.stringify(out.exitAccountingGaps));
+  assert.deepEqual(out.unresolvedProcesses ?? [], []);
+});
+
+test('round 10 dev CLI fallback: an Engine that has gone, whose only exit record a later dev CLI stop wrote, is looked up and found gone instead of taken from that record', async () => {
+  const r = identityRun('r10-cli-gone');
+  const q = noProcess(974505, genFar(10)), n2 = { ...r.incarnation, n: 2 }, cli = { role: 'dev-cli', pid: 4025, startedAt: isoMs(BigInt(q.creationFileTimeUtc) + 600000000n) };
+  r.records.push(rec('engine', { role: 'dev-runner', pid: 4021, startedAt: isoMs(q.creationFileTimeUtc) }, 'engine-start', { incarnation: n2,
+    pid: q.pid, creationFileTime: q.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(q.creationFileTimeUtc),
+    cause: 'RESTART', supervisorKind: 'dev-runner' }), rec('engine', cli, 'engine-intent', r10Intent(n2)), rec('engine', cli, 'engine-exit', r10Exit(n2)));
+  const { out, lookups } = await trackedStop(r, { ...q, incarnation: n2 });
+  assert.ok(lookups.includes(q.pid), `the dev CLI's exit does not prove the start; the lookup decides: ${JSON.stringify(out.resolvedByLedger ?? [])}`);
+  assert.equal(out.outcome, 'STOPPED', JSON.stringify(out.errors));
+  assert.deepEqual(out.unresolvedProcesses ?? [], []);
+});
+
+for (const [mode, secondOf] of [['two incarnations', (r) => ({ owner: r.owner, incarnation: { ...r.incarnation, n: 2 } })],
+  ['two owners', (r) => ({ owner: { ...r.owner, instanceId: 'inst-2' }, incarnation: r.incarnation })]]) {
+  test(`round 10 whole starts (${mode}): two child-starts of one childId, PID and birth that differ in owner or incarnation are two starts, each reported with the conflict as a finding, and neither is proven`, async () => {
+    const p = await liveChild();
+    try {
+      const r = identityRun(`r10-whole-${mode.replace(/\W+/g, '-')}`);
+      const first = { owner: r.owner, incarnation: r.incarnation }, second = secondOf(r);
+      r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', ...first });
+      r.startOf(p, first);
+      r.startOf(p, second);
+      r.exitOf({ pid: p.pid, creationFileTime: p.creationFileTimeUtc, ...first });
+      writeLedger(r.dataDir, r.records);
+      const view = census.ledgerView(census.readRunLedger(r.dataDir), r.runId);
+      const starts = view.allStarts.filter((s) => s.family === 'child');
+      assert.equal(starts.length, 2, `two whole starts, not one: ${JSON.stringify(starts.map((s) => s.identity))}`);
+      assert.ok(starts.every((s) => s.identity.conflicts.length > 0 && !s.proven), 'each carries the conflict and neither is proven');
+      assert.equal(view.children.filter((c) => c.pid === p.pid).length, 2, 'both starts are reported');
+      const armed = await census.startStopExitCensus({ runId: r.runId, pids: { backendRootPid: r.engine.pid } }, r.dataDir,
+        freshDir(`r10-whole-${mode.replace(/\W+/g, '-')}-run`), scope);
+      const result = await armed.finish();
+      const findings = (result.exitAccountingGaps ?? []).filter((g) => g.reason === 'identity_metadata_conflict' && g.pid === p.pid);
+      assert.equal(findings.length, 2, `one conflict finding per start: ${JSON.stringify(result.exitAccountingGaps)}`);
+      assert.equal(result.exitAccountingComplete, false);
+      assertLiveChildFound(await trackedStop(r, { ...p, childId: 'c', ...first }), p, mode);
+    } finally {
+      await p.end();
+    }
+  });
+}
+
+test('round 10 stop binding table: a stop\'s own dev CLI writer proves an incarnation-only Engine exit only for the start whose PID and birth this same process checked, under that incarnation; never unchecked, for another identity, or for another writer', () => {
+  const runId = 'stop-census-r10-binding';
+  const e = { pid: 974601, birth: genFar(11) }, inc = { session: runId, n: 1 };
+  const runner = { role: 'dev-runner', pid: 4001, startedAt: isoMs(e.birth) };
+  const cliStartedAt = Date.parse(isoMs(BigInt(e.birth) + 600000000n));
+  const cli = { role: 'dev-cli', pid: process.pid, startedAt: new Date(cliStartedAt).toISOString() };
+  const dataDir = freshDir('r10-binding');
+  writeLedger(dataDir, [rec('engine', runner, 'engine-start', { incarnation: inc, pid: e.pid, creationFileTime: e.birth,
+    executable: process.execPath, processStartedAt: isoMs(e.birth), cause: 'START', supervisorKind: 'dev-runner' }),
+  rec('engine', cli, 'engine-intent', r10Intent(inc)), rec('engine', cli, 'engine-exit', r10Exit(inc))]);
+  const ledger = census.readRunLedger(dataDir);
+  const writer = { role: 'dev-cli', pid: process.pid, startedAt: cliStartedAt };
+  const checked = { pid: e.pid, creationFileTimeUtc: e.birth };
+  const rows = {
+    'no binding (a later stop)': [[], false],
+    'the checked start, this process\'s writer': [[{ writer, incarnation: inc, checked }], true],
+    'unchecked (no identity checked)': [[{ writer, incarnation: inc, checked: null }], false],
+    'checked without a birth': [[{ writer, incarnation: inc, checked: { pid: e.pid, creationFileTimeUtc: null } }], false],
+    'another birth checked': [[{ writer, incarnation: inc, checked: { pid: e.pid, creationFileTimeUtc: genFar(12) } }], false],
+    'another PID checked': [[{ writer, incarnation: inc, checked: { ...checked, pid: e.pid + 4 } }], false],
+    'another incarnation checked': [[{ writer, incarnation: { ...inc, n: 2 }, checked }], false],
+    'a writer of another process': [[{ writer: { ...writer, pid: process.pid + 4 }, incarnation: inc, checked }], false],
+    'this process, another start instant': [[{ writer: { ...writer, startedAt: cliStartedAt + 1 }, incarnation: inc, checked }], false],
+  };
+  const wrong = [];
+  for (const [name, [stopBindings, proves]] of Object.entries(rows)) {
+    const got = Boolean(census.ledgerView(ledger, runId, { stopBindings }).engines[0]?.exit);
+    if (got !== proves) wrong.push(`${name}: ${got ? 'proves' : 'does not prove'}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('round 10 unchecked stop: a stop whose Engine identity could not be read writes nothing for it and gets no binding, so a dev CLI exit from its own PID already in the ledger proves nothing and the Engine stays unresolved', async () => {
+  const p = await liveChild();
+  try {
+    const r = identityRun('r10-unchecked');
+    const n2 = { ...r.incarnation, n: 2 }, cli = { role: 'dev-cli', pid: process.pid, startedAt: new Date().toISOString() };
+    r.records.push(rec('engine', { role: 'dev-runner', pid: 4031, startedAt: isoMs(p.creationFileTimeUtc) }, 'engine-start', { incarnation: n2,
+      pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(p.creationFileTimeUtc),
+      cause: 'RESTART', supervisorKind: 'dev-runner' }), rec('engine', cli, 'engine-intent', r10Intent(n2)), rec('engine', cli, 'engine-exit', r10Exit(n2)));
+    writeLedger(r.dataDir, r.records);
+    const before = fs.readFileSync(path.join(ledgerLib.ledgerDirectory(r.dataDir), 'engine.v1.jsonl'), 'utf8');
+    const fixture = stopFixture({ runId: r.runId, dataDir: r.dataDir, engine: p });
+    const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
+    fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, incarnation: 2, control: { stopRequest: 1 } }));
+    const lookups = [];
+    const out = await api.stopRun({}, { ...fixture.io,
+      lookupIdentities: async (ids) => { lookups.push(...ids); return new Map(ids.map((pid) => [pid, pid === p.pid
+        ? { present: true, creationFileTime: null, name: 'node.exe', executable: process.execPath } : { present: false }])); } });
+    assert.ok(lookups.includes(p.pid), `the Engine is looked up: ${JSON.stringify(out.resolvedByLedger ?? [])}`);
+    assert.equal(fs.readFileSync(path.join(ledgerLib.ledgerDirectory(r.dataDir), 'engine.v1.jsonl'), 'utf8'), before,
+      'an unchecked stop writes no Engine record');
+    assert.equal(out.outcome, 'STOP_INCOMPLETE', JSON.stringify(out.errors));
+    assert.ok(out.unresolvedProcesses?.some((u) => u.pid === p.pid), JSON.stringify(out.unresolvedProcesses));
+    assert.equal(out.exitAccountingComplete, false, JSON.stringify(out.exitAccountingGaps));
+  } finally {
+    await p.end();
+  }
+});
+
+test('round 10 real dev CLI stop: a second CLI process that checked the Engine\'s identity accounts the exit it wrote in its own stop; a later stop has no binding and looks the Engine up', { skip: !windows && 'identity-checked stop' }, async () => {
+  const runner = await liveChild(), engine = await liveChild();
+  try {
+    const runId = 'stop-census-r10-real-cli';
+    const dataDir = freshDir('r10-real-cli');
+    const runnerWriter = { role: 'dev-runner', pid: runner.pid, startedAt: isoMs(runner.creationFileTimeUtc) };
+    writeLedger(dataDir, [rec('engine', runnerWriter, 'engine-start', { incarnation: { session: runId, n: 1 }, pid: engine.pid,
+      creationFileTime: engine.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(engine.creationFileTimeUtc),
+      cause: 'START', supervisorKind: 'dev-runner' }), rec('children', runnerWriter, 'child-note', { note: 'the family is present' })]);
+    const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
+    fs.mkdirSync(runDir, { recursive: true });
+    const runPath = path.join(runDir, 'run.json');
+    const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, executable: process.execPath });
+    fs.writeFileSync(runPath, JSON.stringify({ schemaVersion: 1, runId, apiPortActual: 0, uiPortActual: 0, dataDir, incarnation: 1,
+      control: { stopRequest: 1 }, pids: { runnerPid: runner.pid, backendRootPid: engine.pid, frontendRootPid: null },
+      identities: { runner: identity(runner), backend: identity(engine), frontend: null } }));
+    const env = { ...process.env, NODE_OPTIONS: '', JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', CI: '' };
+    const stop = cp.spawnSync(process.execPath, [path.join(root, 'scripts/dev/dev-runner.cjs'), 'stop', '--json', '--run', runId,
+      '--session-id', 'r10-second-cli'], { cwd: root, env, encoding: 'utf8', windowsHide: true, timeout: 180000 });
+    const first = JSON.parse(String(stop.stdout).trim().split(/\r?\n/).filter(Boolean).at(-1) ?? '{}');
+    await Promise.race([engine.exited, new Promise((resolve) => setTimeout(resolve, 10000))]);
+    const engineRecords = ledgerLib.readLedger(ledgerLib.ledgerDirectory(dataDir), 'engine').records;
+    const exit = engineRecords.find((x) => x.type === 'engine-exit');
+    assert.equal(exit?.writer?.role, 'dev-cli', JSON.stringify(engineRecords.map((x) => [x.type, x.writer])));
+    assert.equal(exit.writer.pid, stop.pid, 'the second CLI process wrote the exit');
+    assert.equal(first.outcome, 'STOPPED', JSON.stringify(first));
+    assert.deepEqual((first.exitAccountingGaps ?? []).filter((g) => g.pid === engine.pid), [],
+      `the CLI's own stop accounts the Engine exit it wrote: ${JSON.stringify(first.exitAccountingGaps)}`);
+    const row = (first.processExits ?? []).find((x) => x.role === 'engine' && x.pid === engine.pid);
+    assert.equal(row?.expectedTermination, true, JSON.stringify(first.processExits));
+    // A later stop, in another process (this one): no binding, so the record proves nothing and the Engine is looked up.
+    const lookups = [];
+    const later = await api.stopRun({}, { resolveTarget: async () => ({ run: JSON.parse(fs.readFileSync(runPath, 'utf8')), runPath }),
+      portOwner: async () => ({ closed: true }), portWaitMs: 0, askRunner: async () => ({ outcome: 'no_answer' }),
+      gracefulShutdown: async () => { throw new Error('nothing to quit'); }, terminateEngine: async () => { throw new Error('nothing to end'); },
+      terminateProcess: async () => { throw new Error('nothing to end'); },
+      lookupIdentities: async (ids) => { lookups.push(...ids); return actuator.lookupProcessIdentities(ids); } });
+    assert.ok(lookups.includes(engine.pid), `the later stop looks the Engine up: ${JSON.stringify(later.resolvedByLedger ?? [])}`);
+    assert.ok(!(later.resolvedByLedger ?? []).some((x) => x.pid === engine.pid), JSON.stringify(later.resolvedByLedger));
+  } finally {
+    await engine.end();
+    await runner.end();
   }
 });
 
@@ -2635,19 +2836,22 @@ function oracleStarts(c) {
   const exits = c.records.filter((x) => x.exit).map((x) => x.exit);
   if (c.kind === 'engine') {
     // A dev runner reads an Engine's birth through CIM, to the microsecond; the Engine itself exactly.
+    // The same start recorded twice is one start, recorded by each of its writers.
     const starts = [];
     for (const s of c.starts) {
-      if (!starts.some((o) => o.pid === s.pid && o.birth === s.birth && o.n === s.n)) {
-        starts.push({ ...s, inc: GEN_INCS[`n${s.n}`], tick: s.writer === 'dev-runner' ? 10n : 1n });
-      }
+      const same = starts.find((o) => o.pid === s.pid && o.birth === s.birth && o.n === s.n);
+      if (same) same.writers.add(s.writer);
+      else starts.push({ ...s, writers: new Set([s.writer]), inc: GEN_INCS[`n${s.n}`], tick: s.writer === 'dev-runner' ? 10n : 1n });
     }
     for (const s of starts) {
       const ofKey = exits.filter((e) => e.session === PROOF_RUN && e.n === s.n);
       const contradicts = (e) => (e.pid != null && e.pid !== s.pid) || (e.birth != null && !genBirthsAgree(e.birth, s.birth, s.tick));
       const contested = ofKey.some(contradicts);
       const keyStarts = starts.filter((o) => o.n === s.n).length;
+      // Every exit here is the dev runner's (by.runner): an incarnation-only one proves only a start that
+      // writer recorded, never through its role (round 10).
       Object.assign(s, proofOf(ofKey, (e) => (e.birth == null
-        ? keyStarts === 1 && !contested
+        ? keyStarts === 1 && !contested && s.writers.has('dev-runner')
         : e.pid === s.pid && genBirthsAgree(e.birth, s.birth, s.tick))));
     }
     return starts;
@@ -2667,9 +2871,12 @@ function oracleStarts(c) {
       const s = { pid: item.start.pid, birth: item.start.birth, tick: 1n, childId: 'c1',
         owner: ownerOf(item.start.owner) ?? spawn.owner, inc: incOf(item.start.inc) ?? spawn.inc };
       s.conflict = differs(spawn, s);
-      const prior = starts.find((o) => o.pid === s.pid && o.birth === s.birth);
-      if (!prior) starts.push(s);
-      else if (!genOwnersEqual(prior.owner, s.owner) || !genIncEqual(prior.inc, s.inc)) prior.conflict = true;
+      // The same start again is one start; the same process under another owner or incarnation is
+      // another start, and both carry the conflict (round 10: never merged).
+      const priors = starts.filter((o) => o.pid === s.pid && o.birth === s.birth);
+      if (priors.some((o) => genOwnersEqual(o.owner, s.owner) && genIncEqual(o.inc, s.inc))) continue;
+      for (const o of priors) o.conflict = s.conflict = true;
+      starts.push(s);
     }
   }
   const ofKey = exits.filter((e) => e.childId === 'c1');
@@ -2742,11 +2949,14 @@ function identityOracle(c) {
   // The OS row the lookup returns for the tracked PID (child cases; an Engine case's lookups find nothing).
   const row = c.kind === 'child' ? c.tracked.row : 'gone';
   const unresolved = lookedUp && ['alive', 'unreadable'].includes(row);
-  return { proven: proven.sort(), complete: starts.every(accounted),
+  // A child case's run Engine ends by the dev runner's incarnation-only exit, which proves it only when
+  // that dev runner recorded its start (round 10: a writer's role alone binds nothing).
+  const engineProven = c.kind !== 'child' || c.engine.writer === 'dev-runner';
+  return { proven: proven.sort(), complete: engineProven && starts.every(accounted),
     stop: { lookedUp, outcome: unresolved ? 'STOP_INCOMPLETE' : 'STOPPED',
       // Every start proven, without a conflict or two codes, by its exit or by a reconciliation that
       // classed it OWNER_DIED (one that could not class it leaves its final receipt unavailable).
-      accounting: starts.every((s) => s.proof && !s.conflict && s.codes.size <= 1
+      accounting: engineProven && starts.every((s) => s.proof && !s.conflict && s.codes.size <= 1
         && (s.proof.code != null || s.proof.exitClass === 'OWNER_DIED')) } };
 }
 
@@ -2981,6 +3191,9 @@ const R9_EXE = 'C:\\fixture\\proc.exe';
 const r9Writers = {
   runner: { role: 'dev-runner', pid: 4001, startedAt: isoMs(R9_E0.birth) }, cli: { role: 'dev-cli', pid: 4005, startedAt: isoMs(R9_E0.birth) },
   shell: { role: 'shell', pid: 4009, startedAt: isoMs(R9_E0.birth) },
+  // Round 10: supervisors no record binds to a start: another dev runner, and the dev runner's PID started a second later.
+  otherRunner: { role: 'dev-runner', pid: 4017, startedAt: isoMs(R9_E0.birth) },
+  runnerReborn: { role: 'dev-runner', pid: 4001, startedAt: isoMs(BigInt(R9_E0.birth) + 10000000n) },
   // The run's Engine (the children's owner) and the next Engine.
   owner: { role: 'engine', pid: R9_E0.pid, startedAt: isoMs(R9_E0.birth) },
   later: { role: 'engine', pid: 974021, startedAt: isoMs(genFar(3)) },
@@ -3000,15 +3213,15 @@ function generateProofCase(r) {
   starts.push({ family: 'engine', key: 1, pid: R9_E0.pid, birth: R9_E0.birth });
   // The children family is present whatever else the case writes.
   add(rec('children', r9Writers.owner, 'child-note', { childId: 'present', token: 'present' }));
-  const e0Exit = r.pick(['runner', 'runner', 'runner', 'cli', 'shell', 'owner', 'later', 'none']);
+  const e0Exit = r.pick(['runner', 'runner', 'runner', 'cli', 'shell', 'otherRunner', 'runnerReborn', 'owner', 'later', 'none']);
   if (e0Exit !== 'none') add(rec('engine', r9Writers[e0Exit], 'engine-exit', r9EngineExit({ incarnation: r9Inc(1) })), r.chance(0.15));
   // Engine starts of later incarnations, of processes children and witnesses also name.
   for (let i = r.int(3); i > 0; i--) {
     const proc = r.pick(R9_PROCS), n = r.pick([2, 2, 3]), late = lateness();
     // The same start recorded again is recorded by the same writer.
     const writer = starts.find((s) => s.family === 'engine' && s.key === n && s.pid === proc.pid && s.birth === proc.birth)?.writer
-      ?? r.pick(['runner', 'self']);
-    add(rec('engine', writer === 'self' ? r9Self(proc) : r9Writers.runner, 'engine-start', { incarnation: r9Inc(n), pid: proc.pid,
+      ?? r.pick(['runner', 'runner', 'self', 'shell']);
+    add(rec('engine', writer === 'self' ? r9Self(proc) : r9Writers[writer], 'engine-start', { incarnation: r9Inc(n), pid: proc.pid,
       creationFileTime: proc.birth, executable: R9_EXE, processStartedAt: isoMs(proc.birth), cause: 'RESTART', supervisorKind: 'dev-runner' }), late);
     if (!starts.some((s) => s.family === 'engine' && s.key === n && s.pid === proc.pid && s.birth === proc.birth)) {
       starts.push({ family: 'engine', key: n, pid: proc.pid, birth: proc.birth, writer });
@@ -3017,7 +3230,12 @@ function generateProofCase(r) {
       const shape = r.pick(['keyOnly', 'keyOnly', 'whole', 'ownerDied']);
       const exitLate = late || lateness();
       if (shape === 'keyOnly') {
-        const w = r.pick(['runner', 'cli', 'self', 'self', 'selfLateMs', 'owner', 'later']);
+        const w = r.pick(['runner', 'runner', 'cli', 'shell', 'otherRunner', 'runnerReborn', 'self', 'self', 'selfLateMs', 'owner', 'later']);
+        // A dev CLI stop announces its intent first, as the real one does; the intent binds nothing.
+        if (w === 'cli' && r.chance(0.5)) {
+          add(rec('engine', r9Writers.cli, 'engine-intent', { incarnation: r9Inc(n), intentId: 'gen-intent', reason: 'QUIT', detail: null,
+            mode: 'NOW', channel: 'TERMINATE', requestedAt: isoMs(genFar(5)), deadlineAt: null }), exitLate);
+        }
         add(rec('engine', w === 'self' ? r9Self(proc) : w === 'selfLateMs' ? r9Self(proc, 1n) : r9Writers[w], 'engine-exit',
           r9EngineExit({ incarnation: r9Inc(n) })), exitLate);
       } else if (shape === 'whole') {
@@ -3041,6 +3259,12 @@ function generateProofCase(r) {
     const own = r.chance(0.15) ? { owner: R9_OWNERS[r.pick(['same', 'instance'])] } : {};
     add(rec('children', r9Writers.owner, 'child-start', { childId, pid: proc.pid, creationFileTime: proc.birth, executable: R9_EXE,
       contained: false, ...(r.chance(0.15) ? { incarnation: r9Inc(1) } : {}), ...own }), late);
+    // Round 10: the same process under the same childId again, naming another owner or incarnation: a whole start of its own.
+    if (r.chance(0.2)) {
+      add(rec('children', r9Writers.owner, 'child-start', { childId, pid: proc.pid, creationFileTime: proc.birth, executable: R9_EXE,
+        contained: false, ...(r.chance(0.5) ? { owner: R9_OWNERS[r.pick(['same', 'instance', 'bare'])] } : { incarnation: r9Inc(r.pick([1, 2])) }) }),
+      late || lateness());
+    }
     if (!starts.some((s) => s.family === 'child' && s.key === childId && s.pid === proc.pid && s.birth === proc.birth)) {
       starts.push({ family: 'child', key: childId, pid: proc.pid, birth: proc.birth });
     }
@@ -3103,6 +3327,32 @@ function generateProofCase(r) {
 
 /** The case's records written before the census armed. */
 const r9Records = (c) => c.items.filter((x) => !x.late).map((x) => x.record);
+const r9OwnerKey = (o) => (o ? `${o.pid}/${o.creationFileTime}/${o.instanceId ?? ''}` : null);
+/**
+ * Every whole start the case wrote, in the order the census reads the final ledger (the late records
+ * after the rest): an Engine start by incarnation, PID and birth; a child-start by childId, PID, birth,
+ * and its owner and incarnation (its own, else its childId's latest child-spawn before it); a witness
+ * by witnessId, PID, birth, owner and incarnation. Records repeated whole are one start.
+ */
+function r9WrittenStarts(c) {
+  const ordered = [...c.items.filter((x) => !x.late), ...c.items.filter((x) => x.late)].map((x) => x.record);
+  const spawnOf = new Map(), keys = new Set();
+  for (const { type, fields: f } of ordered) {
+    if (type === 'engine-start' && f.incarnation?.session === R9_RUN) keys.add(['engine', f.incarnation.n, f.pid, f.creationFileTime, null, f.incarnation.n].join('|'));
+    else if (type === 'child-spawn') spawnOf.set(f.childId, f);
+    else if (type === 'child-start') {
+      const spawn = spawnOf.get(f.childId);
+      keys.add(['child', f.childId, f.pid, f.creationFileTime, r9OwnerKey(f.owner ?? spawn?.owner ?? null),
+        (f.incarnation ?? spawn?.incarnation ?? null)?.n ?? null].join('|'));
+    } else if (type === 'job-process-start') {
+      keys.add(['witness', f.witnessId, f.pid, f.creationFileTime, r9OwnerKey(f.owner), f.incarnation?.n ?? null].join('|'));
+    }
+  }
+  return [...keys].sort();
+}
+/** A writer's start instant in milliseconds (the reader gives a number, a fixture an ISO string). */
+const r9WriterMs = (w) => (Number.isFinite(w?.startedAt) ? w.startedAt : Date.parse(w?.startedAt));
+const r9SameWriter = (a, b) => Boolean(a && b) && a.role === b.role && a.pid === b.pid && r9WriterMs(a) === r9WriterMs(b);
 /** Every ledger record as the census reads it (both families). */
 const r9AllRecords = (ledger) => [...(ledger.engine?.records ?? []), ...(ledger.children?.records ?? [])];
 const r9Key = (family, id) => (family === 'engine' ? id.incarnation?.n : family === 'child' ? id.childId : id.witnessId);
@@ -3150,7 +3400,8 @@ function r9Decision(view, s) {
   const items = s.family === 'engine' ? view.engines : s.family === 'child' ? view.children : view.witnessStarts ?? [];
   const same = (items ?? []).filter((x) => x.identity && x.identity.pid === s.identity.pid
     && x.identity.rawBirth === s.identity.rawBirth && r9Key(s.family, x.identity) === r9Key(s.family, s.identity)
-    && r9Owner(x.identity.owner) === r9Owner(s.identity.owner));
+    && r9Owner(x.identity.owner) === r9Owner(s.identity.owner)
+    && (x.identity.incarnation?.n ?? null) === (s.identity.incarnation?.n ?? null));
   return same.length === 1 ? Boolean(same[0].proof) : undefined;
 }
 
@@ -3190,10 +3441,27 @@ async function judgeProofCase(c, dataDir, runDir, reference = census) {
   const misjudged = [];
   const got = await r9Census(c, dataDir, runDir);
   const ref = r9Reference(reference, got.armingLedger, got.finalLedger);
-  // Every start written is a start of the ledger, none merged into another.
-  const written = c.starts.map((s) => `${s.family}/${s.key}/${s.pid}/${s.birth}`).sort();
-  const read = ref.final.map((s) => `${s.family}/${r9Key(s.family, s.identity)}/${s.identity.pid}/${s.identity.rawBirth}`).sort();
+  // Every whole start written is a start of the ledger, none merged into another (round 10: not even
+  // one of the same process and key under another owner or incarnation).
+  const written = r9WrittenStarts(c);
+  const read = ref.final.map((s) => [s.family, r9Key(s.family, s.identity), s.identity.pid, s.identity.rawBirth,
+    r9Owner(s.identity.owner), s.identity.incarnation?.n ?? null].join('|')).sort();
   if (JSON.stringify(written) !== JSON.stringify(read)) misjudged.push({ kind: 'starts', written, read });
+  // An Engine start proven ended has a record that can prove it on its own terms (round 10, independent
+  // of isProven): one naming its PID and birth, or an incarnation-only one written by a writer the ledger
+  // binds to it (the writer of one of its start records, or that Engine itself: its PID, started the
+  // start's millisecond). A supervisor's role alone never binds.
+  for (const s of ref.final.filter((x) => x.family === 'engine' && x.ref)) {
+    const n = s.identity.incarnation.n;
+    const ofKey = (got.finalLedger.engine?.records ?? []).filter((x) => x.line?.incarnation?.session === R9_RUN && x.line.incarnation.n === n);
+    const bound = [...ofKey.filter((x) => x.type === 'engine-start' && x.line.pid === s.identity.pid
+      && x.line.creationFileTime === s.identity.rawBirth).map((x) => x.writer),
+    { role: 'engine', pid: s.identity.pid, startedAt: Number((BigInt(s.identity.rawBirth) - 116444736000000000n) / 10000n) }];
+    const can = ofKey.some((x) => ['engine-exit', 'engine-owner-died'].includes(x.type)
+      && (x.line.creationFileTime != null || bound.some((w) => r9SameWriter(x.writer, w))));
+    if (!can) misjudged.push({ kind: 'writer', start: `engine/${n}/${s.identity.pid}/${s.identity.rawBirth}`,
+      writers: ofKey.filter((x) => x.type !== 'engine-start').map((x) => x.writer) });
+  }
   // Each start's decision is isProven's over every record and start.
   const finalView = census.ledgerView(got.finalLedger, R9_RUN);
   for (const s of ref.final) {

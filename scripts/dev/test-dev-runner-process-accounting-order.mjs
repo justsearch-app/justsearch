@@ -74,21 +74,25 @@ test('runner job close is accounted only with matching native receipt and stop e
     runnerJobClose: { pid: 100, creationFileTimeUtc: birth, osCheck: 'GONE', containment: 'LIBUV_JOB' },
     observed: { exitCode: 0, atMs: Date.parse(stamp) + 200 } });
   const records = census.readRunLedger(dataDir);
+  // This process is the stop that checked the Engine's PID and birth before its recorder wrote: its
+  // writer is bound to that start in memory (round 10), as the stop passes it to its census.
+  const stopBindings = [{ writer: recorder.writerIdentity(), incarnation, checked: { pid: 4242, creationFileTimeUtc: birth } }];
+  const view = () => census.ledgerView(records, incarnation.session, { stopBindings });
   const input = { runId: incarnation.session, targets: [{ role: 'engine', pid: 4242,
     creationFileTimeUtc: birth, incarnation }], gaps: [], accountedProcesses: [] };
   const output = { processExits: [{ pid: 4242, creationFileTimeUtc: birth, osCreationFileTimeUtc: birth,
     exitCode: 0, atMs: Date.parse(stamp) + 200 }], gaps: [] };
-  const result = census.exitResult(input, output, 'fixture', records);
+  const result = census.exitResult(input, output, 'fixture', records, view());
   assert.equal(result.exitAccountingGaps.some(g => g.reason === 'ledger_os_disagree'), false);
   assert.equal(result.processExits[0].expectedTermination, true);
   const exit = records.engine.records.find(r => r.type === 'engine-exit').line;
   const proof = exit.runnerJobClose;
   delete exit.runnerJobClose;
-  assert.equal(census.exitResult(input, output, 'fixture', records).processExits[0].expectedTermination, false,
+  assert.equal(census.exitResult(input, output, 'fixture', records, view()).processExits[0].expectedTermination, false,
     'the runner must be identity-proven gone');
   exit.runnerJobClose = proof;
   delete exit.terminationMechanism;
-  assert.equal(census.exitResult(input, output, 'fixture', records).processExits[0].expectedTermination, false,
+  assert.equal(census.exitResult(input, output, 'fixture', records, view()).processExits[0].expectedTermination, false,
     'an arbitrary forced zero is not evidence of job closure');
 });
 

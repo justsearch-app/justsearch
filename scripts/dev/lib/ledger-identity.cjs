@@ -189,11 +189,10 @@ function writerIsOwner(writer, owner, { unknownBirth = false } = {}) {
   return O.birth !== null && birthMs(O) === startedMs;
 }
 
-/** The writer roles that supervise an Engine and write its records (exit-ledger.cjs WRITER_ROLES but 'engine'). */
-const SUPERVISOR_ROLES = new Set(['shell', 'dev-runner', 'dev-cli']);
-
 /** A writer's start instant in milliseconds (the ledger reader gives it as a number), or null. */
 const writerStartedMs = (w) => (Number.isFinite(w?.startedAt) ? w.startedAt : knownTimestamp(w?.startedAt) ?? null);
+/** A writer identity of this very process (its PID): a stop's own writer (stopWriterBinding). */
+const writerOfThisProcess = (w) => validPid(w?.pid) === process.pid;
 /** The same writer: one role, one PID, one start instant, all recorded. */
 const sameWriter = (a, b) => Boolean(a && b) && typeof a.role === 'string' && a.role === b.role
   && validPid(a.pid) !== null && validPid(a.pid) === validPid(b.pid)
@@ -215,12 +214,14 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
     : line.pid == null && line.creationFileTime == null && line.incarnation == null;
   if (keyOnly) {
     if (keyStarts !== 1 || contested || contradicts(R, S)) return false;
-    // An Engine's incarnation-only record is the word of its supervisor (the shell, the dev runner, a
-    // dev CLI stop), of that Engine itself (an Engine writer with the start's own PID, started the
-    // start's millisecond), or of the writer that recorded the start. Any other Engine's word about it
-    // proves nothing (round 9).
+    // An Engine's incarnation-only record proves only from a writer the ledger binds to that start: the
+    // Engine itself (an Engine writer with the start's own PID, started the start's millisecond), or
+    // the writer that recorded the start (its role, PID and start instant). A writer's role is never
+    // evidence: another supervisor instance, or the same PID with another start instant, proves
+    // nothing (round 10). No record binds any other writer to a start today (a dev CLI stop's own
+    // intent is its own word), so its exit leaves the start to the identity lookup.
     if (engine) {
-      return SUPERVISOR_ROLES.has(writer?.role) || writerIsOwner(writer, S) || startWriters.some(w => sameWriter(writer, w));
+      return writerIsOwner(writer, S) || startWriters.some(w => sameWriter(writer, w));
     }
     if (line.owner != null || line.previousOwner != null) return ownerCarries(R.owner, S.owner) && S.owner !== null;
     return writerIsOwner(writer, S.owner);
@@ -305,4 +306,4 @@ const bornAt = (fileTime, tick = TICK.EXACT) => identityOf({ creationFileTime: f
   birthTick: String(tick) });
 
 module.exports = { TICK, isFileTime, identityOf, startIdentity, noteConflict, compareIdentity, identityKey, namedBy, hasPid,
-  writerIsOwner, birthMs, birthFileTime, birthOrder, bornNotAfter, bornAfter, bornAt };
+  writerIsOwner, writerOfThisProcess, birthMs, birthFileTime, birthOrder, bornNotAfter, bornAfter, bornAt };

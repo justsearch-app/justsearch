@@ -3923,6 +3923,10 @@ async function stopRun(opts, {
   // by now, possibly one whose birth cannot be read, which never makes it ours. One reader serves
   // the stop and its census, so each ledger file is parsed once and later reads add what was appended.
   const ledgerReader = dataDirAbs ? ledgerLib.createIncrementalReader() : null;
+  // This stop's own Engine writer, bound in memory to the Engine identity this stop checked before it
+  // wrote that Engine's intent and exit (stopWriterBinding). Never read back from the ledger; a later
+  // stop has none, so it looks the Engine up.
+  const stopBindings = [];
   // <ledger-resolution> What the ledger says of the tracked identities (exitCensus.ledgerResolution):
   // `ledgerEnded` the identities it proves ended (for the job stop), `provenEnded(p)` whether the
   // tracked record `p` is one of them. The whole tracked record is compared (compareIdentity 'same'):
@@ -3938,7 +3942,7 @@ async function stopRun(opts, {
       // Judged again only when a ledger file changed since the last judgement.
       if (ledgerReader.version() !== ledgerVersion) {
         ledgerVersion = ledgerReader.version();
-        ledgerResolved = ledgerResolution(ledgerView(ledger, runId));
+        ledgerResolved = ledgerResolution(ledgerView(ledger, runId, { stopBindings }));
         ledgerEnded = ledgerResolved.ended;
       }
     } catch (err) {
@@ -4046,7 +4050,7 @@ async function stopRun(opts, {
   // Arm OS exit handles while the initial identity lookup starts. Actions still wait for both.
   let censusError;
   const pendingCensus = !opts.forgetUnresolved
-    ? Promise.resolve(census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE, { ledgerReader }))
+    ? Promise.resolve(census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE, { ledgerReader, stopBindings }))
       .catch(error => { censusError = error; return null; }) : null;
   if (!opts.forgetUnresolved) {
     await lookupPhase(allEntries());
@@ -4166,8 +4170,14 @@ async function stopRun(opts, {
     // on the Engine is announced as `dev-cli` before it is taken, and its exit is recorded however
     // it ended: on the quit, with the runner whose job held it, or killed here.
     const stopDetail = reason === 'takeover' ? 'takeover' : (opts.detail ?? null);
+    const engineIncarnation = { session: runId, n: Number.isInteger(run?.incarnation) && run.incarnation > 0 ? run.incarnation : null };
     const engineRecords = dataDirAbs && run?.control?.stopRequest && backendBefore === 'match'
-      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: { session: runId, n: Number.isInteger(run?.incarnation) && run.incarnation > 0 ? run.incarnation : null } })
+      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: engineIncarnation })
+      : null;
+    // The identity this process checked ('match': the recorded PID and birth against the OS row) before
+    // writing; with the writer it then wrote as, it binds this stop's records to that start (round 10).
+    const engineChecked = backendBefore === 'match' && byRole.backend.creationFileTimeUtc
+      ? { pid: byRole.backend.pid, creationFileTimeUtc: byRole.backend.creationFileTimeUtc, birthTick: byRole.backend.birthTick ?? null }
       : null;
     if (engineRecords) fallback.ledger = [];
     const recordEngine = (kind, fields) => {
@@ -4175,6 +4185,10 @@ async function stopRun(opts, {
       try {
         const written = engineRecords[kind]({ reason: 'QUIT', detail: stopDetail, ...fields });
         fallback.ledger.push(written);
+        const writer = written?.written ? engineRecords.writerIdentity?.() : null;
+        if (writer && engineChecked && !stopBindings.length) {
+          stopBindings.push({ writer, incarnation: engineIncarnation, checked: engineChecked });
+        }
         return written;
       } catch (err) {
         errors.push(`exit ledger: ${err?.message ?? err}`);

@@ -28,6 +28,10 @@ const extractionBirth = census.fileTimeFromInstant('2026-10-01T00:00:02.0000000Z
  */
 const engineWriterAt = (pid, fileTime) => ({ role: 'engine', pid,
   startedAt: new Date(Number((BigInt(fileTime) - 116444736000000000n) / 10000n)).toISOString() });
+// The dev runner writes the run's Engine records as itself, one writer for the start and its exit: a
+// role, a PID and its start instant, as the ledger reader requires of every writer. A role alone is
+// never evidence of an Engine exit (round 10).
+const DEV_RUNNER = { role: 'dev-runner', pid: 4000, startedAt: '2026-09-30T23:59:00.000Z' };
 const reasons = gaps => gaps.map(g => g.reason);
 
 /** Writes the run's ledger the way its writers do: the dev runner (engine family), the Engine (children). */
@@ -442,7 +446,7 @@ test('Spec F §6.1: one birth rule: an exact ledger birth is the CIM birth of th
 test('Spec F §6.1: a ledger child is observed under the shared rule: its CIM row binds to it and the held handle\'s exact birth must be its own', () => {
   const [exact, cim] = RECORDED_BIRTHS[0];
   const records = (family, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line,
-    writer: family === 'engine' ? engineWriterAt(10, birth) : { role: family } })) });
+    writer: family === 'engine' ? engineWriterAt(10, birth) : DEV_RUNNER })) });
   const ledgerOf = exits => ({
     engine: records('dev-runner', [['engine-start', { incarnation: { session: run.runId, n: 1 }, pid: 10, creationFileTime: birth, executable: exe }]]),
     children: records('engine', [['child-spawn', { childId: 'c-x', kind: 'EXTRACTION', owner: { pid: 10, creationFileTime: birth } }],
@@ -462,7 +466,7 @@ test('Spec F §6.1: a ledger child is observed under the shared rule: its CIM ro
     osCreationFileTimeUtc: x.pid === 24284 ? osBirth : x.pid === 26524 ? '134357749947062898' : x.creationFileTimeUtc }));
   const closed = ledgerOf([['child-exit', { childId: 'c-x', exitClass: 'REQUESTED', reason: 'QUIT', code: STOP, forced: true }]]);
   closed.engine.records.push({ type: 'engine-exit', line: { incarnation: { session: run.runId, n: 1 }, exitClass: 'REQUESTED',
-    reason: 'QUIT', code: 0 }, writer: { role: 'dev-runner' } });
+    reason: 'QUIT', code: 0 }, writer: DEV_RUNNER });
   const clean = census.exitResult(i, { processExits: exitsAs(exact) }, 'receipt', closed);
   assert.deepEqual(clean.exitAccountingGaps, []);
   assert.deepEqual(clean.processExits.map(e => [e.pid, e.role, e.role === 'console-host' ? e.accounted : e.expectedTermination]),
@@ -538,7 +542,7 @@ test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exac
 /** An in-memory run ledger: the run's Engine (pid 10) and the given children records. */
 function memoryLedger(childRecords, engineRecords = []) {
   const records = (role, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line,
-    writer: role === 'engine' ? engineWriterAt(10, birth) : { role } })) });
+    writer: role === 'engine' ? engineWriterAt(10, birth) : DEV_RUNNER })) });
   return {
     engine: records('dev-runner', [['engine-start', { incarnation: { session: run.runId, n: 1 }, pid: 10, creationFileTime: birth,
       executable: exe }], ...engineRecords]),
@@ -663,7 +667,7 @@ test('S15 census repair: three unproven generations and their console host remai
   assert.deepEqual(ordered.gaps.map(g => g.pid).sort(), clean.gaps.map(g => g.pid).sort());
   const finalLedger = records(true);
   finalLedger.engine.records.push({ type: 'engine-exit', line: { incarnation: { session: run.runId, n: 1 },
-    exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false }, writer: { role: 'dev-runner' } });
+    exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false }, writer: DEV_RUNNER });
   const result = census.exitResult(clean, { processExits: clean.targets.map(p => ({ ...p, exitCode: 0, atMs: at })) },
     'fixture', finalLedger);
   assert.equal(result.exitAccountingComplete, false);
@@ -701,7 +705,7 @@ test('S15 census repair: historical Engine job evidence does not prove an indivi
 
 test('S15 census repair O2 verbatim: helper PID reused by an unrelated cmd: its tesseract child must stay a gap', () => {
   const b = t => census.fileTimeFromInstant(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`);
-  const rec = (type, line) => ({ type, line, writer: type.startsWith('engine') ? { role: 'dev-runner' } : engineWriterAt(100, b(0)) });
+  const rec = (type, line) => ({ type, line, writer: type.startsWith('engine') ? DEV_RUNNER : engineWriterAt(100, b(0)) });
   const run = { runId: 'own-census', pids: { backendRootPid: 100 } };
   const manifest = { pid: 100, containment: { status: 'CONTAINED' }, incarnation: { session: run.runId } };
   const ledger = { engine: { present: true, records: [rec('engine-start', { incarnation: { session: run.runId, n: 1 },

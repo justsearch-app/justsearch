@@ -666,6 +666,7 @@ function createCliEngineRecorder({
   const validIncarnation = Boolean(incarnation && typeof incarnation.session === 'string'
     && Number.isInteger(incarnation.n));
   let writer = null;
+  let writerIdentity = null;
   let exitWritten = false;
 
   const exitRecorded = () => {
@@ -683,14 +684,17 @@ function createCliEngineRecorder({
   };
   const append = (type, fields) => {
     if (!writer) {
-      writer = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', clock,
-        writer: { role: 'dev-cli', pid: process.pid, startedAt: clock() } });
+      writerIdentity = { role: 'dev-cli', pid: process.pid, startedAt: clock() };
+      writer = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', clock, writer: writerIdentity });
       writer.startSession();
     }
     return writer.append(type, fields);
   };
 
   return {
+    /** The writer identity this recorder writes as (role, PID, start instant), once it has written; else null. */
+    writerIdentity: () => (writerIdentity ? { ...writerIdentity } : null),
+
     /** Before acting: `COOPERATIVE` over `HTTP_SHUTDOWN`, or `NOW` over `TERMINATE`. */
     intent({ reason = 'QUIT', detail = null, mode, channel, deadlineAt = null }) {
       const why = refusal();

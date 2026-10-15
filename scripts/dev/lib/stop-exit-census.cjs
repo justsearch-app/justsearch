@@ -30,7 +30,7 @@ function fileTimeFromInstant(instant) {
  * PID or a birth itself (a structural check in test-dev-runner-stop-census.mjs holds it to that).
  */
 const { TICK, isFileTime, identityOf, startIdentity, noteConflict, compareIdentity, identityKey, namedBy, hasPid,
-  writerIsOwner, birthMs, birthFileTime, birthOrder, bornNotAfter, bornAfter, bornAt } = require('./ledger-identity.cjs');
+  writerIsOwner, writerOfThisProcess, birthMs, birthFileTime, birthOrder, bornNotAfter, bornAfter, bornAt } = require('./ledger-identity.cjs');
 /** Records by PID: an index only, each candidate in a bucket is then matched by compareIdentity. */
 const byPid = (list, of = x => x) => {
   const index = new Map();
@@ -208,7 +208,7 @@ function proofBy(record, family, S, { keyStarts, contested, startWriters = [] })
  * the agreed rules (proofBy, compareIdentity 'proves'): a record agreeing with the start's whole
  * identity, births native-exact where both are native; a key-only record only for a key no other start
  * shares (`allStarts`) and no record of the key contradicts; its writer the start's owner (a child's),
- * a supervisor, the Engine itself or a writer that recorded the start (an Engine's); never a start
+ * the Engine itself or the exact writer that recorded the start (an Engine's; a role alone never); never a start
  * with a conflict. The census decides
  * every start with it; an index may only choose which records and starts to pass (each of the start's
  * key: a record or start of another key never changes the answer), never decide.
@@ -282,18 +282,40 @@ const fileTimeOf = (instant) => {
 };
 
 /**
+ * A stop's own Engine writer binding (round 10), or null: within one stop, the stop's writer (the
+ * dev CLI recorder of this very process: its role, PID and start instant) is bound to an Engine start
+ * only when this process checked that Engine's identity (its PID and recorded birth, compareIdentity
+ * 'same' against the OS row) before writing its intent and exit. `checked` is that identity with the
+ * incarnation the records name; it lives in memory, is passed by the stop directly, and is never
+ * derived from the ledger. A later stop has no binding, so it looks the Engine up. Nothing else binds:
+ * no binding without a checked PID and birth, none for a writer of another process, and a role never.
+ */
+function stopWriterBinding(b) {
+  const w = b?.writer, c = b?.checked;
+  if (!w || typeof w.role !== 'string' || !writerOfThisProcess(w) || !Number.isFinite(Number(w.startedAt))) return null;
+  if (!c || !Number.isInteger(c.pid) || c.pid <= 0 || !isFileTime(c.creationFileTimeUtc)) return null;
+  const inc = b.incarnation;
+  if (!inc || typeof inc.session !== 'string' || !Number.isInteger(inc.n)) return null;
+  const checked = identityOf({ pid: c.pid, creationFileTimeUtc: c.creationFileTimeUtc, birthTick: c.birthTick ?? null }, {
+    kind: 'engine', incarnation: inc });
+  return checked ? { writer: { role: w.role, pid: w.pid, startedAt: Number(w.startedAt) }, checked } : null;
+}
+
+/**
  * The run's Engine incarnations (`engine-start` with `incarnation.session = runId`) and the children
  * whose owner is one of them, each with its exit record (or null).
  *
  * Each start's identity (ledger-identity.cjs) is built once, from its own record, when it is read: an
  * Engine start's PID, birth (at the tick its writer measured it), and incarnation; a child-start's PID,
  * birth, childId, and its owner and incarnation (its own, else the latest child-spawn before it for its
- * childId). Nothing read later rewrites it. A child-spawn, or a second child-start of the same process,
- * that disagrees with it is a conflict on it (`identityConflicts`, which the census reports as finding
- * `identity_metadata_conflict`), and a start with a conflict is proven by no record.
+ * childId). Nothing read later rewrites it. A child-spawn that disagrees with it is a conflict on it; a
+ * second child-start of the same process under another owner or incarnation is a start of its own, and
+ * the disagreement a conflict on both (`identityConflicts`, which the census reports as finding
+ * `identity_metadata_conflict`). A start with a conflict is proven by no record.
  */
-function ledgerView(ledger, runId) {
+function ledgerView(ledger, runId, { stopBindings = [] } = {}) {
   const engines = [];
+  const bindings = (stopBindings ?? []).map(stopWriterBinding).filter(Boolean);
   const engineStarts = (ledger?.engine?.records ?? []).filter(r => r.type === 'engine-start' && runId
     && r.line?.incarnation?.session === runId && Number.isInteger(r.line?.incarnation?.n));
   // A dev runner or dev CLI reads an Engine's birth through CIM (the microsecond); any other writer exactly.
@@ -309,6 +331,10 @@ function ledgerView(ledger, runId) {
       continue;
     }
     engineIds.push({ r, id, writers: r.writer ? [r.writer] : [] });
+  }
+  // This stop's own writer, bound in memory to the start whose identity this stop checked (round 10).
+  for (const e of engineIds) {
+    for (const b of bindings) if (compareIdentity(b.checked, e.id, 'same')) e.writers.push(b.writer);
   }
   // Every start of the run, each decided by isProven. The records and starts of each start's key are
   // an index only: they choose what isProven is given, and it decides (a record or start of another key
@@ -365,16 +391,21 @@ function ledgerView(ledger, runId) {
       const start = { pid: Number(r.line.pid), creationFileTimeUtc: r.line.creationFileTime ?? null,
         executable: r.line.executable ?? null, contained: r.line.contained ?? null, kind: spawn?.kind ?? c.kind,
         owner: own.owner ?? spawn?.owner ?? null, incarnation: identity.incarnation, identity };
-      // The same process recorded twice is one start; its latest record describes it. The same process
-      // recorded with other metadata keeps its first identity, and the disagreement is a conflict on it.
-      const same = c.starts.findIndex(s => compareIdentity(s.identity, identity, 'native', { tick: TICK.EXACT }));
-      if (same < 0) c.starts.push(start);
-      else if (compareIdentity(c.starts[same].identity, identity, 'exact')) {
+      // The same start recorded twice (every field equal, compareIdentity 'exact') is one start; its
+      // latest record describes it. The same process (PID and birth) recorded under another owner or
+      // incarnation is another whole start, never merged (round 10): both are kept and reported, and
+      // the disagreement is a conflict on each.
+      const same = c.starts.findIndex(s => compareIdentity(s.identity, identity, 'exact'));
+      if (same >= 0) {
         c.starts[same] = { ...c.starts[same], executable: start.executable, contained: start.contained };
       } else {
-        noteConflict(c.starts[same].identity, { field: 'restart', value: JSON.stringify(own),
-          detail: 'a second child-start of the same process names another owner or incarnation' });
-        for (const conflict of identity.conflicts) noteConflict(c.starts[same].identity, conflict);
+        for (const s of c.starts) {
+          if (!compareIdentity(s.identity, identity, 'native', { tick: TICK.EXACT })) continue;
+          const detail = 'another child-start of the same process names another owner or incarnation';
+          noteConflict(s.identity, { field: 'restart', value: JSON.stringify(own), detail });
+          noteConflict(identity, { field: 'restart', value: JSON.stringify({ owner: s.owner, incarnation: s.incarnation }), detail });
+        }
+        c.starts.push(start);
       }
     } else if (CHILD_EXIT_TYPES.has(r.type)) c.exits.push(r);
     else if (CHILD_META_TYPES.has(r.type) && (r.line.owner != null || r.line.incarnation != null)) c.metas.push(r);
@@ -1636,7 +1667,9 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   const armingLedger = dataDir ? readLedger(dataDir) : null;
   // The arming view also gives each target's measured birth tick to the OS exits handed to
   // `beforeVerdict` (birthTickOf: a dev runner's Engine start is microsecond, not exact).
-  const armingView = armingLedger ? ledgerView(armingLedger, run?.runId) : null;
+  // `runtime.stopBindings`: the stop's own writer bindings (stopWriterBinding), read when each view is built.
+  const viewOf = (ledger) => ledgerView(ledger, run?.runId, { stopBindings: runtime.stopBindings ?? [] });
+  const armingView = armingLedger ? viewOf(armingLedger) : null;
   const input = exitTargets(run, manifest, observed, armingLedger, armingView);
   // The gaps of the arming read of the ledger; those added below are not the ledger's.
   const armingReadGaps = input.gaps.length;
@@ -1666,7 +1699,7 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
       await settle(TORN_TAIL_SETTLE_MS);
       finalLedger = readLedger(dataDir);
     }
-    const finalView = finalLedger ? ledgerView(finalLedger, run?.runId) : null;
+    const finalView = finalLedger ? viewOf(finalLedger) : null;
     const refreshed = exitTargets(run, manifest, observed, finalLedger, finalView);
     const membershipGap = g => ['unaccounted_process', 'orphan_console_host', 'evidence_lost'].includes(g.reason);
     // The ledger's gaps are the final read's: a gap of the arming read that a later read in this
@@ -1729,4 +1762,4 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
 }
 module.exports = { CONHOST_EXIT_GRACE_MS, NOT_SEEN_YET, fileTimeFromInstant, isFinding, carryFindings,
   engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult,
-  endedIdentitiesOf, ledgerResolution, reconcileCrashedHelpers, startStopExitCensus, isProven };
+  endedIdentitiesOf, ledgerResolution, reconcileCrashedHelpers, startStopExitCensus, isProven, stopWriterBinding };
