@@ -24,6 +24,23 @@ chat server's stop-reason table:
   the process `PATH`; `ChildSpec` carries a path prefix that child control puts in front of the
   `PATH` the child inherits. New checks pin both.
 
+Phase B (b599d4d7e): `b6d536-integrate-merged-count.json` was regenerated. Later merges added keys,
+so the packaged-register check now expects 289. It passes on the candidate and fails by assertion on
+75e70d488 (289 expected, 282 actual). The count changes with the change, so entry 6 is now marked
+repaired and its text names 289.
+
+Phase B (integration base 181363e86, merge 98fd416d0): `b6d536-integrate-system-reads-repaired.json`
+was regenerated with its before-state f648453b5 and overlays unchanged. Both checks pass on the
+candidate and fail there by assertion, as entry 4 states.
+
+Entry 5 (`b6d536-integrate-system-reads-new.json`) stays candidate-only. Before-state not
+reproducible: each of its checks asserts directly on API that this integration's commit a3e96417e
+adds, and f648453b5 has none of it. `ChildPathPrefixTest` asserts the environment
+`DefaultChildControl.prependPath` leaves. The two `EnvRegistryTest` checks assert the names,
+default and boolean read of `EnvRegistry.ENGINE_INCARNATION` and `EnvRegistry.EVAL_MODE`. Any compat
+stub would have to supply exactly the values these checks assert, so the stub, not the before-state,
+would decide them.
+
 ## Evidence that goes stale on the integration branch only
 
 Each slice below ships as its own stacked PR, where its evidence was run against the test files
@@ -142,7 +159,8 @@ re-run here.
           "provenance": "cited before as owner words at 'task t-20261005-b6d536 request: batch-1 repair builder brief, item 5, 2026-10-09'; the text does not appear in the owner's turns of session 886833dd"
         }
       ],
-      "behaviour": "The packaged register retains the byte-identity and scope assertions and expects the complete merge union: 282 incoming keys plus justsearch.engine.incarnation and justsearch.eval.mode, giving 284. This changes a concrete expected value; it is a new oracle with the owner authority quoted below, not a signature adaptation. Fresh execution evidence covers the merged packaged register check and fails by assertion on incoming 75e70d488: 284 expected, 282 actual.",
+      "behaviour": "The packaged register retains the byte-identity and scope assertions and expects the complete merge union. At integration that was 282 incoming keys plus justsearch.engine.incarnation and justsearch.eval.mode, giving 284. Later merges on the integration branch added justsearch.gpu.device_available (3be25dfa2), justsearch.gpu.memory_plan and justsearch.mmproj.offload (29d9cc527), justsearch.llm.prompt_cache_mib (65f1c2e8e) and justsearch.gpu.memory_plan_unplanned_roles (1f8ce3e01), so the check now expects 289. This changes a concrete expected value; it is a new oracle with the owner authority quoted below, not a signature adaptation. The count changes with the change, so the entry is a repair. Fresh execution evidence covers the merged packaged register check and fails by assertion on incoming 75e70d488: 289 expected, 282 actual.",
+      "repaired": true,
       "evidence": "gates/test-intent/evidence/b6d536-integrate-merged-count.json",
       "newChecks": [
         "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister"

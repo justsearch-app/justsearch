@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T05:20:12.079Z",
-  "revision": "88cbf13c3c3d3441138be8257a74500d859b7d3e",
-  "tree": "2f78498d27a098ca41d7cb4a696e6c075ae902c5",
+  "createdAt": "2026-10-14T16:26:41.619Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "7d2f4f1e73fd89a2c10e67c4341ade405f0bb610",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.queryEncodersAreWarmBeforeReadyAndTheFirstSearchDoesNotFallBack\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aReleasedQuerySessionIsWarmedAgainWithoutASearch\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aStalledPrewarmReleasesModelsAtItsBoundBeforeTheEmbeddingIsReady\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aFailedPrewarmReleasesModelsBeforeTheEmbeddingIsReady\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 23533
+      "durationMs": 34468
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegBeforeTheGpuSessionExistsRunsOnTheCpuSessionWithoutCreatingIt\" --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegAfterAGpuReleaseDoesNotRecreateTheGpuSession\" --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegWithNoUsableSessionReportsLoadingAndCreatesNothing\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2904
+      "durationMs": 4692
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#queryEncodersAreWarmBeforeReadyAndTheFirstSearchDoesNotFallBack",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ffd785527584076d47f17eb69eaa1c9bcd098bafd0ace1a70a9dfe5d993e6184",
+      "contentDigest": "sha256:f3de5778771ff8e8bf4b6454b384f020fb7056906d8b0c6f4bc43bda9a3d8139",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#aReleasedQuerySessionIsWarmedAgainWithoutASearch",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ffd785527584076d47f17eb69eaa1c9bcd098bafd0ace1a70a9dfe5d993e6184",
+      "contentDigest": "sha256:f3de5778771ff8e8bf4b6454b384f020fb7056906d8b0c6f4bc43bda9a3d8139",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#aStalledPrewarmReleasesModelsAtItsBoundBeforeTheEmbeddingIsReady",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ffd785527584076d47f17eb69eaa1c9bcd098bafd0ace1a70a9dfe5d993e6184",
+      "contentDigest": "sha256:f3de5778771ff8e8bf4b6454b384f020fb7056906d8b0c6f4bc43bda9a3d8139",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#aFailedPrewarmReleasesModelsBeforeTheEmbeddingIsReady",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ffd785527584076d47f17eb69eaa1c9bcd098bafd0ace1a70a9dfe5d993e6184",
+      "contentDigest": "sha256:f3de5778771ff8e8bf4b6454b384f020fb7056906d8b0c6f4bc43bda9a3d8139",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java#aQueryLegBeforeTheGpuSessionExistsRunsOnTheCpuSessionWithoutCreatingIt",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:03bcea886a0117f991556d022fe9199092edb853e27c2d2502a1d4d16f494f40",
+      "contentDigest": "sha256:71e6a2eff38f345a886c038e8938b62379d3b48894ddaf32ab4c75bfab7c8506",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java#aQueryLegAfterAGpuReleaseDoesNotRecreateTheGpuSession",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:03bcea886a0117f991556d022fe9199092edb853e27c2d2502a1d4d16f494f40",
+      "contentDigest": "sha256:71e6a2eff38f345a886c038e8938b62379d3b48894ddaf32ab4c75bfab7c8506",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java#aQueryLegWithNoUsableSessionReportsLoadingAndCreatesNothing",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:03bcea886a0117f991556d022fe9199092edb853e27c2d2502a1d4d16f494f40",
+      "contentDigest": "sha256:71e6a2eff38f345a886c038e8938b62379d3b48894ddaf32ab4c75bfab7c8506",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -143,25 +143,26 @@
     "overlays": [
       "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryPrewarmFixture.java"
     ],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.queryEncodersAreWarmBeforeReadyAndTheFirstSearchDoesNotFallBack\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aReleasedQuerySessionIsWarmedAgainWithoutASearch\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aStalledPrewarmReleasesModelsAtItsBoundBeforeTheEmbeddingIsReady\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aFailedPrewarmReleasesModelsBeforeTheEmbeddingIsReady\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 68450
+        "durationMs": 43421
       },
       {
         "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegBeforeTheGpuSessionExistsRunsOnTheCpuSessionWithoutCreatingIt\" --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegAfterAGpuReleaseDoesNotRecreateTheGpuSession\" --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegWithNoUsableSessionReportsLoadingAndCreatesNothing\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5152
+        "durationMs": 7893
       }
     ],
     "checks": [
       {
         "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#queryEncodersAreWarmBeforeReadyAndTheFirstSearchDoesNotFallBack",
         "classification": "assertion",
-        "detail": "queryEncodersAreWarmBeforeReadyAndTheFirstSearchDoesNotFallBack(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the embedding was reported ready while its query session was not warm ==> expected: <[]> but was: <[embeddingReady with a cold query session]>"
+        "detail": "queryEncodersAreWarmBeforeReadyAndTheFirstSearchDoesNotFallBack(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the query session is warm when models report ready ==> expected: <true> but was: <false>"
       },
       {
         "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#aReleasedQuerySessionIsWarmedAgainWithoutASearch",
@@ -195,5 +196,5 @@
       }
     ]
   },
-  "digest": "sha256:5f9eb0393049a2bf25ec28b9afb5bec51d8d4f06e3f97114baa2527ea11cb844"
+  "digest": "sha256:35e3acacffcff688633624e145732d5039c34b6d62b221cc44ec444584af1e27"
 }

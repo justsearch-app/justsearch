@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-12T08:36:20.123Z",
-  "revision": "80f03cb5459825e0e32660b386a87b624da9a450",
-  "tree": "bfb25ff8f57ede51a82edd19ec337d19327cfad6",
+  "createdAt": "2026-10-14T16:27:09.280Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ac366fd6064488930ad63160c9f6369f5e57f199",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatControllerAutoTitleTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8185
+      "durationMs": 9451
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.BackgroundDemandYieldTest\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 18203
+      "durationMs": 6077
     }
   ],
   "checks": [
@@ -82,7 +82,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/BackgroundDemandYieldTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/BackgroundDemandYieldTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9b8baa1710d519a8550eb1650b906c318023e741c20be2917323dd0f0d2880b7",
+      "contentDigest": "sha256:d9dc2d211f4018c1fddcf440d7e186ad473bafacc71e35719ed272ee03b075ac",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -278,5 +278,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:24430cae28a3d5e0164c0855586a2e89b26b9cd7b8a78d0cbf8e99a9be04c438"
+  "digest": "sha256:b9d6748d6f6abc910a5a0de3d31ebb6f18ed4caf023a11fe5b95a2242c3e63d1"
 }

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T11:15:57.814Z",
-  "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
-  "tree": "927bd28ac156340edde0e3dbf514187babf0c536",
+  "createdAt": "2026-10-14T16:01:29.473Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "0a086e003ba39f811216a9068e2e75986d60f82a",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt\" --tests \"io.justsearch.app.services.vdu.VduDeferralDuringChatDrainTest.aDrainingGateDefersTheDocumentInsteadOfFailingIt\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 49697
+      "durationMs": 15548
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.KnowledgeSearchDuringChatDrainTest.aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheSettingsRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheChatModeRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anInterruptedTransitionRefusalIsTransient\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anOccupiedSettingsTransactionIsATransientConflict\" --tests \"io.justsearch.ui.api.OpenAiCompatOfflineWordingTest.aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 20060
+      "durationMs": 10675
     }
   ],
   "checks": [
@@ -140,7 +140,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduDeferralDuringChatDrainTest.java#aDrainingGateDefersTheDocumentInsteadOfFailingIt",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduDeferralDuringChatDrainTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a6e548eb8e902c1f59844501c2427492afd69ce799b05bbeff9b3c697138f784",
+      "contentDigest": "sha256:4c0f30b21e803d52e4f19c2bfdd7a5653ffa7cf4f692fd073af791b565df5ede",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -155,7 +155,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchDuringChatDrainTest.java#aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchDuringChatDrainTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:84977c063891bd72998e06f42bb1ab409a075932bbc4d760505cf46a0f2d1ef9",
+      "contentDigest": "sha256:f5649542d592b825f8575a49c213ad3943cfc9862f7b39d93015ef4a3c03179d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -246,18 +246,19 @@
     "ref": "d3fe74ef2",
     "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt\" --tests \"io.justsearch.app.services.vdu.VduDeferralDuringChatDrainTest.aDrainingGateDefersTheDocumentInsteadOfFailingIt\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 124040
+        "durationMs": 86476
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.KnowledgeSearchDuringChatDrainTest.aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheSettingsRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheChatModeRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anInterruptedTransitionRefusalIsTransient\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anOccupiedSettingsTransactionIsATransientConflict\" --tests \"io.justsearch.ui.api.OpenAiCompatOfflineWordingTest.aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 51166
+        "durationMs": 92112
       }
     ],
     "checks": [
@@ -333,5 +334,5 @@
       }
     ]
   },
-  "digest": "sha256:e42a4a71e7b5d2656b4f6f2e735e03d1a585c38d82d2d6886e757dba39678efb"
+  "digest": "sha256:3262433be40995f5a964582a04b1177ef3d3282af6794779fff7575d830451a6"
 }

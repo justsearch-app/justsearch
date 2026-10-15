@@ -22,6 +22,96 @@ activation 9-16 s plus cold-disk margin). The crash path now takes that observat
 successor is identified, before the in-flight jobs finish, so the bound is still open; a first
 observation after the bound is unmeasurable, not a pass.
 
+Phase B (b599d4d7e): `b6d536-no-adoption-ownership.json` was regenerated candidate-only, without a
+before-state. LlamaServerProcessOwnershipTest now uses StopRequest and RecordingChildControl, which
+6f7895a79 lacks, and its entry is not a repair, so no fail-before is required. The check passes on the
+candidate. The former entry 18 (an Adaptation for `scripts/jseval/lane-f/e456-instruments.test.mjs`)
+is removed. The gate leaves the jseval suite out of scope by design (tempdoc 966 D1), so that item is
+never flagged and the entry covered nothing.
+
+Phase B (integration base 181363e86, merge 98fd416d0):
+
+- `b6d536-no-adoption-launch.json` keeps its before-state 6f7895a79 and its helper overlays
+  `RecordingChildControl` and `SurvivingTerminator`. The rest of ManagedLlamaAdoptionTest uses the
+  child-control API that 6f7895a79 lacks, so the file did not compile there. The compat before-patch
+  `gates/test-intent/evidence/b6d536-no-adoption-launch-compat.patch` adds:
+  - in `app-api`: `StopRequest`, `LedgerSink`, `ProcessTerminator` (with `OsProcess`, and a
+    `forCurrentOs` that throws), and a `DefaultChildControl` that cannot be built;
+  - in `ChildControl`: a `ManifestEntry` record and default `start`, `stop` and `stopAll`
+    overloads that take it or a `StopRequest` and throw. The three existing abstract methods
+    (`start(ChildSpec)`, `stop(child, reason, mode)` and `stopAll(children, reason, mode)`) get
+    default bodies that throw, so the overlaid `RecordingChildControl` compiles. 6f7895a79 has no
+    production implementation of `ChildControl`, so nothing there reaches these bodies.
+  - in `LlamaServerOps`: a constructor taking a `ChildControl` that throws, and
+    `stopLlamaServer(StopRequest)` and `stopServerForTerminalShutdown(StopRequest, Duration)`
+    overloads that ignore the request and call the before-state's own stops;
+  - in the test helper `LlamaServerTestAccess`: `TEST_STOP`, and an `installChild` that throws.
+
+  No production code at 6f7895a79 calls the additions. The five repaired checks build
+  `LlamaServerOps` through the before-state's own `ManagedChildRegistry` constructor. They reach the
+  stop overloads only after their assertions. All five fail by assertion, for the behaviour under
+  test:
+  - the healthy server on the configured port is adopted (ADOPTED_EXTERNAL);
+  - the explicit endpoint is not used (LAUNCHED_MANAGED);
+  - a launch binds the configured port;
+  - a lost bind steps the context window down (4096 instead of 8192);
+  - the recovery launch gets no single bind retry.
+- `b6d536-no-adoption-rewrites-external.json` was regenerated candidate-only. It is preservation
+  only. Before-state not reproducible: both checks read `ExternalServerDiagnostics.note()`, which the
+  no-adoption repair f90c16237 itself adds. Both pass on the candidate.
+- `b6d536-no-adoption-rewrites-shutdown.json` keeps 6f7895a79. All four checks pass on the
+  candidate. There they fail by assertion: the Head still has its keep-running directive, and RESTART
+  and HANG do not stop the generative backend.
+- `b6d536-no-adoption-rewrites-inference-b15-refresh.json` has no before-state. It was re-run
+  candidate-only, and all seven checks pass.
+
+Phase B verifier repair (integration base 181363e86):
+
+- **Provenance.** The parent of the no-adoption commit f90c16237 is 68547f75a. 6f7895a79, the
+  before-ref in this changeset's earlier evidence, differs from it only in records under `gates/`
+  (the shared-foundation changeset and its evidence). Production code, configuration and tests are
+  identical, so the runs at 6f7895a79 above show the same before-state. The new runs below use
+  68547f75a.
+- **Entry 3, candidate-only.** Before-state not reproducible: run-evidence cannot record a
+  before-API variant under these ids. The before run copies the candidate's
+  `ManagedChildReconcilerTest.java` over any patched-in version. A variant class is refused because
+  its file does not exist on the candidate (exit 2). The step4/b85 compat-constructor route does not
+  apply: the candidate's `ManagedChildReconciler(registry)` would need a declared llama
+  configuration hash, and that hash alone decides adopt versus terminate (see the control below).
+  Both checks pass on the candidate (`b6d536-no-adoption-reconciler.json`).
+
+  Observation, not recorded by the runner. The before-API variant
+  `gates/test-intent/evidence/b6d536-no-adoption-reconciler-before-api.patch` (the verifier's
+  `ManagedChildReconcilerBeforeApiTest`) holds both checks unchanged. Each calls the 68547f75a
+  public constructor with `TestEngineExecutors` and the fixture record's existing `applied-A`
+  hash; there is no production stub. It was applied at 68547f75a, then run with
+  `gradlew.bat :modules:ui:test --tests io.justsearch.ui.runtime.ManagedChildReconcilerBeforeApiTest --rerun -PskipWebBuild=true`:
+  - `verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot` fails by assertion ("the
+    predecessor's llama-server must have ended", after the 15 s wait). The old reconciler takes its
+    adoption branch (LLAMA_SERVER, matching hash, healthy probe) and leaves the process running.
+  - `llamaRecordWithReusedPidLeavesTheLiveProcessUntouched` passes (preservation).
+  - Control: with the termination check's declared hash changed to `applied-B`, both pass. The
+    failure therefore comes from compatible-predecessor adoption, not from the fixture.
+
+  Logs, outside the repository: `F:/agent-sandbox/design-b6d536/phaseb-2-scripts/no-adoption-before-api-gradle.log`
+  (sha256 d326e4d6...) and `no-adoption-before-api-control.log` (sha256 3f7f6be7...).
+- **Entry 6 now names four checks.** `b6d536-no-adoption-endpoint.json` was re-run on the
+  candidate, and all four pass. Before-state not reproducible: they assert the result of
+  `ExternalInferenceEndpoint.parse` or of `LlamaServerOps.externalServerNote()`. Both arrive with
+  f90c16237 and are absent at 68547f75a, so any compat stub of them would decide those assertions.
+- **Its fifth check, `refusedEndpointFailsTheStartAsInvalidConfiguration`,** moves to new entry 18
+  with a real before-run: `b6d536-no-adoption-endpoint-start.json`, at 68547f75a. The compat
+  before-patch `gates/test-intent/evidence/b6d536-no-adoption-endpoint-compat.patch` adds only
+  declarations the test file needs in order to compile:
+  - an `ExternalInferenceEndpoint` record whose `CONFIG_KEY` is a constant and whose `parse`
+    throws;
+  - an `EXTERNAL_SERVER_IGNORED_NOTE` constant;
+  - an `externalServerNote()` that throws.
+
+  No production code at 68547f75a calls these, and the selected check reaches none of them. The
+  check passes on the candidate. At 68547f75a it fails by assertion (`EXECUTABLE_NOT_FOUND` instead
+  of `INVALID_CONFIG`): the before-state ignores the refused endpoint and goes on to launch.
+
 ```json
 {
   "entries": [
@@ -144,7 +234,7 @@ observation after the bound is unmeasurable, not a pass.
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java"
       ],
       "class": "New",
-      "behaviour": "The explicit endpoint setting: blank means none; a loopback http URL with a port (127.0.0.1 or localhost, optional trailing slash) is accepted with that port; another host, https, no port, port 0, a path or a query is refused with a message naming the setting; a refused value fails startLlamaServer as INVALID_CONFIG; a server answering on the configured port while the setting is unset makes externalServerNote() report external_server_ignored after a start attempt, and the note clears once nothing answers there.",
+      "behaviour": "The explicit endpoint setting: blank means none; a loopback http URL with a port (127.0.0.1 or localhost, optional trailing slash) is accepted with that port; another host, https, no port, port 0, a path or a query is refused with a message naming the setting; a server answering on the configured port while the setting is unset makes externalServerNote() report external_server_ignored after a start attempt, and the note clears once nothing answers there.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -167,7 +257,6 @@ observation after the bound is unmeasurable, not a pass.
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#blankMeansJustSearchRunsItsOwnServer",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#loopbackHttpUrlWithPortIsAccepted",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#unusableValuesAreRefusedWithAReason",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#refusedEndpointFailsTheStartAsInvalidConfiguration",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#serverOnConfiguredPortWithoutEndpointIsReportedAsIgnored"
       ]
     },
@@ -463,13 +552,10 @@ observation after the bound is unmeasurable, not a pass.
     },
     {
       "items": [
-        "scripts/jseval/lane-f/e456-instruments.test.mjs"
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "rename"
-      ],
-      "whatMoved": "'child policy never passes vacuously and any orphan/reload dominates a gap': the all-true fixture row carries llamaEndedAndChatReady instead of healthyLlamaAdopted, the field projectChildPolicies now reads for crash and restart (the E5 instrument measures that the old llama-server ended and the successor's own answers /health, instead of that it was adopted). The three assertions (undefined, false, true) are unchanged.",
+      "class": "New",
+      "behaviour": "A refused explicit endpoint value (here http://example.com:8080, not loopback) fails startLlamaServer as INVALID_CONFIG instead of being ignored.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -477,7 +563,19 @@ observation after the bound is unmeasurable, not a pass.
           "scenario": "S14",
           "quote": "If the Engine crashes, hangs or is restarted, every helper ends with it (including a chat server just started but not yet registered); the supervisor restarts it and chat returns without user action (D2). Unless a game or low GPU memory blocks it, in which case chat shows why.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
+          "choice": "Reconciliation ruling CH4 as the builder implements it: the explicit configuration is justsearch.inference.external_endpoint (env JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT), accepted only as a loopback http URL with a port because every request is built against the loopback host; anything else is refused with a reason, never reinterpreted. Without it, a server on the configured port is ignored with one WARN and the status note external_server_ignored.",
+          "label": "agent choice"
         }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-no-adoption-endpoint-start.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#refusedEndpointFailsTheStartAsInvalidConfiguration"
       ]
     }
   ]

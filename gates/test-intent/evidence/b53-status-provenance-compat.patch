@@ -1,0 +1,23 @@
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java b/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
+index c22eba2b9..cfffad5d0 100644
+--- a/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
+@@ -1480,6 +1480,18 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
+     return LifecycleProjection.project(registry.snapshot(), Instant.now());
+   }
+ 
++  /**
++   * Compat scaffolding for fail-before evidence: the direct (non-cached) mode is this state's only
++   * mode, so {@code cached=false} calls it unchanged; the cached mode does not exist here.
++   */
++  ReadinessEnvelopeView buildReadinessEnvelope(
++      WorkerOperationalView workerView,
++      LifecycleProjection.Projection projection,
++      WorkerContact workerContact, boolean cached) {
++    if (cached) throw new UnsupportedOperationException("compat stub");
++    return buildReadinessEnvelope(workerView, projection, workerContact);
++  }
++
+   // Package-private for StatusLifecycleHandlerTest (tempdoc 600): lets the test drive a
+   // BLOCKED_LEGACY worker view through the real component→composite rollup and assert the
+   // `retrieval` composite resolves to DEGRADED carrying the compat reason code — the chain the

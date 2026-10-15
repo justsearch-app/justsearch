@@ -1,0 +1,122 @@
+diff --git a/modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerBeforeApiTest.java b/modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerBeforeApiTest.java
+new file mode 100644
+--- /dev/null
++++ b/modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerBeforeApiTest.java
+@@ -0,0 +1,117 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ui.runtime;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++import io.justsearch.app.api.runtime.ManagedChild;
++import java.nio.file.Path;
++import java.time.Duration;
++import java.time.Instant;
++import java.util.List;
++final class ManagedChildReconcilerBeforeApiTest {
++  @org.junit.jupiter.api.Test
++  void verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot() throws Exception {
++    Process child = sleepingJava();
++    try (HealthyLlamaStub stub = new HealthyLlamaStub()) {
++      var registry = activeRegistry();
++      registry.register(
++          new ManagedChild(
++              "managed-llama", ManagedChild.Kind.LLAMA_SERVER, child.pid(),
++              child.info().startInstant().orElseThrow().toString(),
++              ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), stub.endpoint(), "model.gguf",
++              "applied-A", "diagnostic-argv"));
++
++      try (var reconciler = new ManagedChildReconciler(
++          new io.justsearch.core.execution.TestEngineExecutors(), registry, "applied-A")) {
++        reconciler.reconcile();
++      }
++
++      assertTrue(child.waitFor(Duration.ofSeconds(15)), "the predecessor's llama-server must have ended");
++      assertTrue(registry.snapshot().isEmpty(), "the ended predecessor's record is released");
++    } finally {
++      child.destroyForcibly();
++      child.waitFor(Duration.ofSeconds(5));
++    }
++  }
++
++  @org.junit.jupiter.api.Test
++  void llamaRecordWithReusedPidLeavesTheLiveProcessUntouched() throws Exception {
++    Process child = sleepingJava();
++    try (HealthyLlamaStub stub = new HealthyLlamaStub()) {
++      var registry = activeRegistry();
++      registry.register(
++          new ManagedChild(
++              "reused-llama", ManagedChild.Kind.LLAMA_SERVER, child.pid(), Instant.EPOCH.toString(),
++              ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), stub.endpoint(), "model.gguf",
++              "applied-A", "diagnostic-argv"));
++
++      try (var reconciler = new ManagedChildReconciler(
++          new io.justsearch.core.execution.TestEngineExecutors(), registry, "applied-A")) {
++        reconciler.reconcile();
++      }
++
++      assertTrue(child.isAlive(), "an unrelated process holding a reused PID is never killed");
++      assertTrue(registry.snapshot().isEmpty(), "proved stale record is removed");
++    } finally {
++      child.destroyForcibly();
++      child.waitFor(Duration.ofSeconds(5));
++    }
++  }
++
++  private static MutableManagedChildRegistry activeRegistry() {
++    var registry = new MutableManagedChildRegistry();
++    registry.seed(List.of());
++    registry.installWriter(ignored -> {});
++    return registry;
++  }
++
++  private static Process sleepingJava() throws Exception {
++    return System.getProperty("os.name", "").startsWith("Windows")
++        ? new ProcessBuilder(sleeperExecutable().toString(), "-NoProfile", "-Command", "Start-Sleep -Seconds 30").start()
++        : new ProcessBuilder(sleeperExecutable().toString(), "30").start();
++  }
++
++  private static Path sleeperExecutable() {
++    return System.getProperty("os.name", "").startsWith("Windows")
++        ? Path.of(System.getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
++        : Path.of("/bin/sleep");
++  }
++
++  private static final class HealthyLlamaStub implements AutoCloseable {
++    private final java.net.ServerSocket server;
++    private final Thread thread;
++
++    HealthyLlamaStub() throws java.io.IOException {
++      server = new java.net.ServerSocket(0, 10, java.net.InetAddress.getLoopbackAddress());
++      thread = Thread.ofVirtual().start(this::serve);
++    }
++
++    String endpoint() {
++      return "http://127.0.0.1:" + server.getLocalPort();
++    }
++
++    private void serve() {
++      while (!server.isClosed()) {
++        try (java.net.Socket socket = server.accept()) {
++          var reader = new java.io.BufferedReader(
++              new java.io.InputStreamReader(
++                  socket.getInputStream(), java.nio.charset.StandardCharsets.US_ASCII));
++          while (true) {
++            String line = reader.readLine();
++            if (line == null || line.isEmpty()) break;
++          }
++          byte[] body = "{\"model_alias\":\"managed-test\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
++          String headers = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
++              + body.length + "\r\nConnection: close\r\n\r\n";
++          socket.getOutputStream().write(headers.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
++          socket.getOutputStream().write(body);
++        } catch (java.io.IOException closed) {
++          if (!server.isClosed()) throw new java.io.UncheckedIOException(closed);
++        }
++      }
++    }
++
++    @Override public void close() throws Exception {
++      server.close();
++      thread.join(Duration.ofSeconds(2));
++    }
++  }
++}

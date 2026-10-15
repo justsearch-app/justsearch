@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-08T16:51:00.810Z",
-  "revision": "11ea890e9c07a44f2d5b7025a7e3c5e65d11d8b1",
-  "tree": "150a2c69fc8ce0cc989c90483b14b60c51fbb86c",
+  "createdAt": "2026-10-14T16:12:23.222Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c7e5e726efa7617eb5cfde00d030f1c30e7787fb",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.reranker.SplitRerankUnderOneLeaseTest.aDeadlineMissOnTheSecondCallReturnsEveryDocumentInItsOriginalOrder\" --tests \"io.justsearch.reranker.SplitRerankUnderOneLeaseTest.aSplitRerankHoldsOneSeatSoAnAgedBulkWaiterIsNotSeatedBetweenItsCalls\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 31057
+      "durationMs": 16750
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaPlanTest\" --tests \"io.justsearch.ort.GpuCallPackerTest\" --tests \"io.justsearch.ort.NativeSessionHandleRetiredSessionTest.noGpuSessionForTheRoleUntilItsRetiredSessionCloses\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 20944
+      "durationMs": 4528
     }
   ],
   "checks": [
@@ -65,7 +65,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b4c785944a2c4e6a813d0adf7b9f6500289a4b52a940d3790e622d9686c3dce1",
+      "contentDigest": "sha256:c14f69fa75f3ef65972107cef115026c553608ba868d6987f11422333058bb56",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -136,7 +136,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:565e5b3ceaf91239cd47d34761372d82d59fbd5feece5b770ff15fa4f62130ee",
+      "contentDigest": "sha256:f87f5860cad996ded7693ea7766cd1a40c8aa16a69fe7421e225860c8350554b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -162,7 +162,7 @@
           "status": "passed"
         },
         {
-          "name": "aSingleItemAlwaysRunsAndUnmeasuredRolesAreNotPacked()",
+          "name": "anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked()",
           "status": "passed"
         }
       ]
@@ -184,5 +184,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9e7f8b2c2d90b1a427d0509524e7efa1e0fd7073fe6f7eca76ee4b192994ad86"
+  "digest": "sha256:d624a673fe340f533efd331ee29a8f260d9a092be27c59356450919a5f96296e"
 }

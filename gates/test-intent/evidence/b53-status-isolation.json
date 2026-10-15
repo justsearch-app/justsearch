@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:d6365732a21827c41b0aed4b763fad01ff0383a5f7bddf14e2973868ad16dff8"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T22:37:25.048Z",
-  "revision": "ce7685a1c7be8d40170f185f3b0e96b5fcadea72",
-  "tree": "090ee9f243559d43c47a9f69d319e4d927e1d5db",
+  "createdAt": "2026-10-15T09:43:06.964Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "d0bc7a63bd896aef2fa3a967618942f63aea997c",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusIsolationHttpTest\" --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 182336
+      "durationMs": 174754
     },
     {
-      "command": "npx vitest run \"src/shell-v0/utils/pollingLifecycle.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b82g-status-records\\\\fe\\\\t\\\\test-intent-vitest-38700-1791930565993.json\"",
+      "command": "npx vitest run \"src/shell-v0/utils/pollingLifecycle.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-39256-1792057025183.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2260
+      "durationMs": 1352
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:bd17a8e225f056161582481dad48ce643df6ef0188839adb05c9dc5f90859a5a",
+      "contentDigest": "sha256:358da8fcc3b133aeaf7a1714427eed1b7327844a0482a671175470c2268813a4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -380,6 +380,10 @@
       {
         "path": "gates/test-intent/evidence/b53-status-isolation-compat.patch",
         "contentDigest": "sha256:0b5b6727929dadb65959515d9b67ceae70e7afb2a458c4f825b517ff524e2c27"
+      },
+      {
+        "path": "gates/test-intent/evidence/b53-status-isolation-admission-compat.patch",
+        "contentDigest": "sha256:00cc93f177bea6d1b147bdcacde12af676c527786b6802983720bb19b6d9e07b"
       }
     ],
     "runs": [
@@ -387,13 +391,13 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusIsolationHttpTest\" --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 463384
+        "durationMs": 355310
       },
       {
-        "command": "npx vitest run \"src/shell-v0/utils/pollingLifecycle.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b82g-status-records\\\\fe\\\\t\\\\test-intent-vitest-38700-1791931037251.json\"",
+        "command": "npx vitest run \"src/shell-v0/utils/pollingLifecycle.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-39256-1792057384337.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3161
+        "durationMs": 1359
       }
     ],
     "checks": [
@@ -410,9 +414,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts",
         "classification": "assertion",
-        "detail": "queues one post-action status read and resolves refreshes only after it publishes:  AssertionError: expected '/api/status' to be '/api/status?fresh=true' // Object.is equality\n    at C:/agent-sandbox-tmp/b82g-status-records/fe/t/test-intent-before-OWzJRc/modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts:144:40\n    at file:///C:/agent-sandbox-tmp/b82g-status-records/fe/node"
+        "detail": "queues one post-action status read and resolves refreshes only after it publishes:  AssertionError: expected '/api/status' to be '/api/status?fresh=true' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-UUHlwO/modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts:144:40\n    at file:///F:/agent-sandbox/design-b6d536/phaseb-tmp-2/node_m"
       }
     ]
   },
-  "digest": "sha256:b533030eae2fbcd28bcf747b7ad5725c03e563e9de120b540bc34c8e49f91c82"
+  "digest": "sha256:5edcaeac1e0e3507d7ced76790bd7fe7e5a2bf8b3d05a02f66dc1fb0e4131b9f"
 }

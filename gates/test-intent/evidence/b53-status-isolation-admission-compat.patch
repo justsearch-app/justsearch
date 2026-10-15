@@ -1,0 +1,21 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionService.java b/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionService.java
+index 30819a254..47ea990c6 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionService.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/EngineAdmissionService.java
+@@ -8,6 +8,16 @@ public interface EngineAdmissionService {
+   /** Admit new work. Only upgrade control routing may bypass a frozen boundary. */
+   EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen);
+ 
++  /** Compat scaffolding for fail-before evidence: no before-state code calls it. */
++  default StatusReservation reserveStatusAdmission(EngineContext context) {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
++  /** Compat scaffolding for fail-before evidence. */
++  interface StatusReservation extends AutoCloseable {
++    @Override void close();
++  }
++
+   /**
+    * Check a status read against the last published admission state without reserving work or
+    * waiting for the work owner. Providers must publish a lock-free view; absent support refuses.

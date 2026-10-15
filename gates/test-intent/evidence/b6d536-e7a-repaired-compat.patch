@@ -1,0 +1,116 @@
+Compat before-patch for b6d536-e7a-repaired-b15-refresh, applied to f648453b5 (the parent of the
+E7a lane commit 481434f82; coordinator decision 4, lane-parent route with add-only patches).
+
+NativeSessionHandlePlannedFp32Test now also holds checks that name the device-memory plan API
+(added with 481434f82 and extended in 7de3976a1), so the file did not compile on f648453b5. This
+patch adds only declarations with immediate no-op returns: GpuArenaPlan (Facts, Settings,
+Settings.none, resolve), DeviceArenaPlans (publish, withdraw), GpuCallPacker.itemsPerCall,
+NativeSessionHandle.arenaPlan() (empty), and a test-side GpuArenaPlanTest holding only the two
+helpers the file names (facts, STANDARD_ONLY). No production code in this state reads any of them,
+and the named check aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu calls none
+of them: its planned() helper already falls back by reflection to the before-state policy.
+
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/DeviceArenaPlans.java b/modules/ort-common/src/main/java/io/justsearch/ort/DeviceArenaPlans.java
+new file mode 100644
+index 000000000..fe4eb899c
+--- /dev/null
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/DeviceArenaPlans.java
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ort;
++
++/** Compatibility only (compat before-patch): immediate no-op returns; nothing in this state calls them. */
++public final class DeviceArenaPlans {
++  private DeviceArenaPlans() {}
++
++  public static void publish(int device, GpuArenaPlan plan) {}
++
++  public static void withdraw(int device) {}
++}
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/GpuArenaPlan.java b/modules/ort-common/src/main/java/io/justsearch/ort/GpuArenaPlan.java
+new file mode 100644
+index 000000000..d7e90968c
+--- /dev/null
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/GpuArenaPlan.java
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ort;
++
++/**
++ * Compatibility only (compat before-patch): declarations that let later checks compile on this
++ * state. No production code in this state reads them; every method is an immediate no-op return.
++ */
++public final class GpuArenaPlan {
++  private GpuArenaPlan() {}
++
++  /** Compatibility only: no fields. */
++  public record Facts() {}
++
++  /** Compatibility only: carries its arguments; nothing reads them. */
++  public record Settings(
++      java.util.Optional<?> chatProfile,
++      java.util.OptionalInt contextTokens,
++      java.util.OptionalInt reserveMiB,
++      java.util.Map<EncoderRole, Double> roleCapsMiB,
++      boolean flag) {
++    public static Settings none() {
++      return null;
++    }
++  }
++
++  public static GpuArenaPlan resolve(Facts facts, Settings settings) {
++    return null;
++  }
++}
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java b/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
+new file mode 100644
+index 000000000..61c9cb490
+--- /dev/null
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
+@@ -0,0 +1,12 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ort;
++
++/** Compatibility only (compat before-patch): an immediate no-op return; nothing in this state calls it. */
++public final class GpuCallPacker {
++  private GpuCallPacker() {}
++
++  public static int itemsPerCall(java.util.Optional<GpuArenaPlan> plan, EncoderRole role, int items,
++      int maxItems, java.util.function.IntUnaryOperator tokensOf) {
++    return items;
++  }
++}
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/NativeSessionHandle.java b/modules/ort-common/src/main/java/io/justsearch/ort/NativeSessionHandle.java
+index deac5d00d..cf106ebb0 100644
+--- a/modules/ort-common/src/main/java/io/justsearch/ort/NativeSessionHandle.java
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/NativeSessionHandle.java
+@@ -1646,4 +1646,9 @@ public final class NativeSessionHandle implements SessionHandle {
+       return new NativeSessionHandle(this);
+     }
+   }
++
++  /** Compatibility only (compat before-patch): an immediate no-op return; nothing in this state calls it. */
++  public java.util.Optional<GpuArenaPlan> arenaPlan() {
++    return java.util.Optional.empty();
++  }
+ }
+diff --git a/modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java b/modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java
+new file mode 100644
+index 000000000..b05a6ad66
+--- /dev/null
++++ b/modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ort;
++
++/**
++ * Compatibility only (compat before-patch): the two helpers NativeSessionHandlePlannedFp32Test
++ * names, as immediate no-op returns. Not the candidate's GpuArenaPlanTest; it holds no tests.
++ */
++final class GpuArenaPlanTest {
++  static final java.util.Set<Object> STANDARD_ONLY = java.util.Set.of();
++
++  static GpuArenaPlan.Facts facts(double deviceMiB, java.util.Set<?> installed) {
++    return null;
++  }
++}

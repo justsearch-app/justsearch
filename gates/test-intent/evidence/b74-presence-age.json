@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-12T09:39:49.241Z",
-  "revision": "80f03cb5459825e0e32660b386a87b624da9a450",
-  "tree": "b180fed91279adeab3523ed420dfb4103e9311a5",
+  "createdAt": "2026-10-14T16:34:34.361Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 69689
+      "durationMs": 28503
     },
     {
-      "command": "npx vitest run \"src/shell-v0/utils/userActivity.test.ts\" \"src/activity/presenceSignal.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b74-evtmp\\\\test-intent-vitest-508-1791797927818.json\"",
+      "command": "npx vitest run \"src/shell-v0/utils/userActivity.test.ts\" \"src/activity/presenceSignal.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-27388-1791995641099.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 21936
+      "durationMs": 8382
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ff6ad7a75cb1797f2e0c7bdc8d6bc0bcd590285fb6415e9fa8476ddfc7338883",
+      "contentDigest": "sha256:4366dceb0455b37763aefd2eb321de38a4726ca7ecc47ef8601ae13ec09a4df6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -193,37 +193,38 @@
     "ref": "80f03cb54",
     "revision": "80f03cb5459825e0e32660b386a87b624da9a450",
     "overlays": [],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 28301
+        "durationMs": 12906
       },
       {
-        "command": "npx vitest run \"src/shell-v0/utils/userActivity.test.ts\" \"src/activity/presenceSignal.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b74-evtmp\\\\test-intent-vitest-508-1791797981434.json\"",
+        "command": "npx vitest run \"src/shell-v0/utils/userActivity.test.ts\" \"src/activity/presenceSignal.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-27388-1791995664765.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6339
+        "durationMs": 5823
       }
     ],
     "checks": [
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
         "classification": "assertion",
-        "detail": "reportedInputAgeIsBoundedSoNoClientPlacesInputInTheFutureOrFarInThePast(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a far-past claim is placed five seconds back: 1 ==> expected: <true> but was: <false> | endOfIntervalReportOfInputBeforeAcceptanceDoesNotInterruptThePass(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: input made before the pass was accepted must not interrupt it ==> expected: <false> but was: <true>"
+        "detail": "earlierRequestDoesNotInterruptAndObserversDoNotResetIdle(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: MCP observation must not interrupt: {\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/read\",\"params\":{\"uri\":\"justsearch://index/summary\"}} ==> expected: <false> but was: <true> | reportedInputAgeIsBoundedSoNoClientPlacesInputInTheFutureOrFarInThePast(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a far-past claim is placed five seconds back: "
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/userActivity.test.ts",
         "classification": "assertion",
-        "detail": "each report says how long ago the input it reports happened, keeping the first report at once:  AssertionError: expected last \"vi.fn()\" call to have been called with [ +0 ]\n    at F:/justsearch-public/.claude/worktrees/b74-evtmp/test-intent-before-bAYWHT/modules/ui-web/src/shell-v0/utils/userActivity.test.ts:129:18\n    at file:///C:/agent-sandbox-tmp/b74/deps-ui/node_modules/@vitest/runner/dis"
+        "detail": "each report says how long ago the input it reports happened, keeping the first report at once:  AssertionError: expected last \"vi.fn()\" call to have been called with [ +0 ]\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-F0NCQO/modules/ui-web/src/shell-v0/utils/userActivity.test.ts:129:18\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb-2-ui/modules/ui-"
       },
       {
         "id": "modules/ui-web/src/activity/presenceSignal.test.ts",
         "classification": "assertion",
-        "detail": "the presence signal says how long ago the input it reports happened:  AssertionError: the first input is reported at once, as happening now: expected [ undefined ] to deeply equal [ { inputAgeMs: +0 } ]\n    at F:/justsearch-public/.claude/worktrees/b74-evtmp/test-intent-before-bAYWHT/modules/ui-web/src/activity/presenceSignal.test.ts:158:77\n    at file:///C:/agent-san"
+        "detail": "the presence signal says how long ago the input it reports happened:  AssertionError: the first input is reported at once, as happening now: expected [ undefined ] to deeply equal [ { inputAgeMs: +0 } ]\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-F0NCQO/modules/ui-web/src/activity/presenceSignal.test.ts:158:77\n    at file:///F:/justsearch-pub"
       }
     ]
   },
-  "digest": "sha256:61b568996e2f43d2795328aa534f40ecadf4fd000f96d979a926084022481541"
+  "digest": "sha256:ad869d071b544382d5e1528baa9dc78536161f432b49ba4b44e0052d85839843"
 }

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T11:18:32.339Z",
-  "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
-  "tree": "85be445d18fafb91bd8dca09f6fa585c6290a478",
+  "createdAt": "2026-10-14T17:09:08.729Z",
+  "revision": "99b515eeae0a6caa0b9e93a6ee1c372718c66aa7",
+  "tree": "00aa2c0e71c0c88e41224c1d5425deebf58c0c1d",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.foreignUnloadWithChatEnabled_neverReloads\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 28408
+      "durationMs": 59822
     }
   ],
   "checks": [
@@ -59,7 +59,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#foreignUnloadWithChatEnabled_neverReloads",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6995d2ca1b50d083533adfeb82af0b5685ac566b144f88f114bb71a6c6e30abd",
+      "contentDigest": "sha256:1cef1a7d75cbac83200480bf8d8daa5f2b70d2f37e753a2fd1b7d194ce758243",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -75,15 +75,20 @@
     "ref": "f75486245",
     "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
     "overlays": [
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java",
-      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java"
+      "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/TestActivationForwarders.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-repaired-compat.patch",
+        "contentDigest": "sha256:c789f5931949a86d92a7c74cf63d5ed799fa4e6f3bb33d50b81664e0862dc4e9"
+      }
     ],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.foreignUnloadWithChatEnabled_neverReloads\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 85923
+        "durationMs": 23808
       }
     ],
     "checks": [
@@ -104,5 +109,5 @@
       }
     ]
   },
-  "digest": "sha256:ec1e28b9fb3133a6bdcef1b817fc4687dafce4be4d0126ee2d4b27dc6591d43a"
+  "digest": "sha256:4ddbb334891c943b75dc2ea7bd17c7176869ab592fab54d0f3e69170a0727c0d"
 }

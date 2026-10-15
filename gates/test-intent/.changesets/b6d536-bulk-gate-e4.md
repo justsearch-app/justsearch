@@ -37,6 +37,9 @@ Evidence files (all written by run-evidence.mjs):
   files are unchanged, so no entry below names them.
 - `b6d536-bulk-gate-e4-new.json`: checks of classes and signatures added in this change (no seam
   for them exists on fbc036129).
+- `b6d536-e4-merged-scope.json`: regenerated on b599d4d7e (phase B). Later merges added keys, so the
+  packaged-register check now expects 289. It passes on the candidate and fails by assertion on
+  fbc036129 (289 expected, 281 actual).
 
 ```json
 {
