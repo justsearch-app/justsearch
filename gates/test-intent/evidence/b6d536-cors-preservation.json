@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T18:53:38.410Z",
+  "revision": "52e01bef49ad838972b61fb1ef03d8a44d8c483c",
+  "tree": "f587475f5ed7700bb83998b1cab9100368edc8cf",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.LocalApiCorsPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 28871
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3c020fc91ca736a10a86feadd0490016c589840c2f93543c6ff34e0b28b8b5b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Dev mode: preflight denies non-loopback origins with 403",
+          "status": "passed"
+        },
+        {
+          "name": "Prod mode: only desktop origins are allowed (tauri://localhost and http(s)://tauri.localhost)",
+          "status": "passed"
+        },
+        {
+          "name": "Dev mode: preflight allows loopback http origin and echoes allow-origin",
+          "status": "passed"
+        },
+        {
+          "name": "Prod mode: the webview's JSON-write preflight may declare X-JustSearch-Client-Kind",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cf174c51b168e2567109da2316c920ff86c8397ad03c0db7ae08a467652c5def"
+}
