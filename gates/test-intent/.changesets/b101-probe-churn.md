@@ -868,3 +868,16 @@ author-session: b101-probe-churn
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VX-probechurn-r6-20261015",
+  "verdict": "accept",
+  "digest": "sha256:4cc47b1fbf90a0f55274e908dc5565f71bfeae7497c100314cdf44f380f40b1d",
+  "note": "Codex VX-probechurn rounds 1-6; ACCEPT on 513b137c0; evidence C:/Users/Elias/Documents/VX-probechurn-513b137c0.zip and r5 zip; census fixture items deferred to merged integration"
+}
+```
