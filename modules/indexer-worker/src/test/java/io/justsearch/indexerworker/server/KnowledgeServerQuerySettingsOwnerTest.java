@@ -506,16 +506,16 @@ final class KnowledgeServerQuerySettingsOwnerTest {
   }
 
   @Test
-  void automaticMemoryCapsCanChangeWithoutReplacingTheIndexOwner(@TempDir Path dir)
+  void automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(@TempDir Path dir)
       throws Exception {
     try (var f = new QueryFixture(dir, 4096L); var ignored = f.composition()) {
       var builder = new ResolvedConfigBuilder().putDefault("justsearch.data.dir", dir.toString());
       builder.contributeAutoDetected(java.util.Map.of("justsearch.embed.gpu_mem_mb", "2466",
           "justsearch.splade.gpu_mem_mb", "2342", "justsearch.ner.gpu_mem_mb", "2125"));
-      var prepared = org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
+      var prepared = assertDoesNotThrow(() ->
           f.server.prepareQueryRoleSettings(new UiSettings(), builder.build(),
               Set.of("justsearch.rerank.gpu_mem_mb"), f.selection),
-          "a memory-plan cap is not index model ownership");
+          "a cap change has no bulk session to replace when the physical bulk surface is empty");
       prepared.abort();
       f.assertA();
       assertFalse(f.index.isClosed());

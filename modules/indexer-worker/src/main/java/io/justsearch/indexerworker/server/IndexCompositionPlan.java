@@ -6,12 +6,14 @@ import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.VariantSelection;
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.ModelSessionPolicy;
+import io.justsearch.ort.ModelSessionPolicyResolver;
 import io.justsearch.ort.RuntimePolicy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -49,6 +51,16 @@ record IndexCompositionPlan(
 
   boolean complete() {
     return roles.values().stream().noneMatch(RolePlan::captureFailed);
+  }
+
+  /** Changes session limits without rediscovering this generation's model files or variants. */
+  IndexCompositionPlan withProjection(EncoderConfigurationProjection desired) {
+    Map<EncoderRole, RolePlan> refreshed = new EnumMap<>(EncoderRole.class);
+    roles.forEach((role, captured) -> refreshed.put(role, captured.variant() == null ? captured
+        : new RolePlan(captured.requested(), captured.variant(),
+            ModelSessionPolicyResolver.resolve(role, desired.config(), hardware, captured.variant()),
+            captured.metadataDirectory(), captured.inputs(), captured.captureFailure())));
+    return new IndexCompositionPlan(desired, hardware, runtimePolicy, refreshed, bgeM3Selected);
   }
 
   record RolePlan(
