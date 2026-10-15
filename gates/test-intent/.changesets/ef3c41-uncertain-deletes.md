@@ -7,6 +7,14 @@ author-session: aae08035fcc266bae
 
 # Test-intent entries
 
+Merge integration with b6d536 preserves the lost-brake recovery assertions.
+`WorkerSnapshotTapLostBrakeTest` now supplies and closes its delivery executor on the
+merged API, uses the original no-argument registry only on the declared before-state,
+and closes the channel when that API supports AutoCloseable. No recovery assertion changes.
+The round-2 and round-3 evidence files are refreshed against their original declared
+before-states. This note brings the existing entries into the merge diff for review;
+the builder does not renew their acceptance.
+
 Task t-20261013-ef3c41: JustSearch never deletes indexed content, and never approves an index as compatible,
 when it cannot tell. Repaired checks fail on cf3f14655 by assertion (evidence
 `gates/test-intent/evidence/ef3c41-uncertain-deletes-repaired.json`). Must-not-break checks pass before and after (`gates/test-intent/evidence/ef3c41-uncertain-deletes-preserved.json`, run with

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:79980b9d786249111daa45082da1dbf41f82b0e58ebec63b4028b6442edb9960"
   },
-  "createdAt": "2026-10-14T16:24:52.276Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "3a7ead788195532ab7b60d83263ca07c67b3b71b",
+  "createdAt": "2026-10-15T21:21:47.644Z",
+  "revision": "087fb01ccca5e4594ef738aaebde0d417b6f01e4",
+  "tree": "40886f2f6aaf3e6ab82d4274fa914478be747ce0",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryReadinessTest.aPrewarmThatAlwaysFailsReachesReadyWithinTheBoundWithTheReason\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryReadinessTest.aGpuReleaseAfterReadyChangesOnlyTheComponentStateNotTheReadiness\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 26703
+      "durationMs": 30424
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleHandlerTest.coldQueryEncodersAfterReadinessDegradeOnlyTheEmbeddingComponent\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6977
+      "durationMs": 15780
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.WorkerStatusMapperTest.toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3695
+      "durationMs": 14070
     }
   ],
   "checks": [
@@ -71,7 +71,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#coldQueryEncodersAfterReadinessDegradeOnlyTheEmbeddingComponent",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:24b8a30a99174cd5ae47a4ce306204a98d697a16032d756ee95ec2b070882ff2",
+      "contentDigest": "sha256:9a92a96e94e2929c641f35014990c5b3f9aaec0d16bb948664f08b09d40a866a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -86,7 +86,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperTest.java#toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4b32441aa0a176d7affc5ea8022ada37f5d95d4aaa5a998b5fc42e67f17368e0",
+      "contentDigest": "sha256:5d35930d3e1eb48a48bf4c1599dbe32f9ec81bb74bc58b714317bb1de53b68d5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -99,5 +99,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:e544010aac11d6055dec4000b35e8dd9b5c7712a6be0087884ece585310e4fc9"
+  "digest": "sha256:77267cd9cd38578eb1880e7dea9656e046c3ced21df2cba85282b4923aae9157"
 }
