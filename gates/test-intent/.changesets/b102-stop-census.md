@@ -1639,3 +1639,14 @@ Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's i
   "note": "The added prerequisites preserve the census inputs, fault injection and all existing assertions. Both current real-process integration classes pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS7-20261016",
+  "verdict": "accept",
+  "digest": "sha256:756d618272c26738492034ccd5522327ef42862edcdfe95545466239c0ffaff7",
+  "note": "Re-bound to origin/main 298354254 after reviewing stronger child-control prerequisites, native guards and the System PID 4 fixture. Both integration classes and all 103 census cases pass without skips; the read-only probe and fabricated host retain the ledger, ownership and precision oracles."
+}
+```

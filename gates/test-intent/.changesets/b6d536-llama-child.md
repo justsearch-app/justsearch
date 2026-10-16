@@ -501,3 +501,14 @@ This replaces the earlier note that `b6d536-no-adoption-launch.json` was not re-
   "note": "Reviewed the changed checks, preserved stop/ownership oracles and explicit new-API candidate-only context; both compatibility patches are additive forwarding scaffolding. Current named and adapted checks passed; declared stop-code, registration and survivor before assertions reproduced."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS7-20261016",
+  "verdict": "accept",
+  "digest": "sha256:e775aba292f3fa92c7b1affb985becd143f515378f72eac6f3be36dcb8eddf90",
+  "note": "The class OS guard prevents premature kernel32 initialization, and the required Windows route executes all three exit-code cases without skips. All 34 evidence selectors pass, and all three before recipes reproduce the stop-code, registration and rollback assertions with the declared add-only scaffolding."
+}
+```
