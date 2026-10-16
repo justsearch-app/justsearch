@@ -338,3 +338,14 @@ overlaid on top of them.
   "note": "Re-bound to origin/main 298354254; the fixture qualification cleanup preserves its behavior and all 22 listed candidate selectors passed. The refreshed coalescing check reproduces the declared launch-order assertion on f75486245 with the declared patch and overlay, and retained before check/patch proof matches d393938e8."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:ae92ab5b2fdfd32b7415d6b130f07d87787b54534e2f2775f854b4fe9cbde8db",
+  "note": "Reviewed shared fixture cleanup and regenerated evidence without an oracle change; all 22 candidate selectors pass. The refreshed f75486245 replay matches, and unchanged repaired-seam proof was content-checked against the retained independent logs."
+}
+```

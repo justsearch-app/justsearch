@@ -577,3 +577,14 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
   "note": "REJECT under the mandatory before-patch rule: b87-dispatch-fixture.patch rewrites executed DetachableRun.runWithin statements at 61ff9b955, replacing the original run body with delegation and the RUN_THREADS factory with an injected factory. NativeSessionHandleDetachedRunTest.abandonedPendingDispatchDoesNotStartNativeWork reaches the patched overload; this is beyond add-only declarations, a stated abstract-to-default change, or an unreached neutral stub."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:ee388ead861ffdcf0ecc2b5ac22b19a9f47593c1b902ada5c64b65ad770a3dfd",
+  "note": "The current dispatch fixture is add-only and reproduces the native-entry assertion failures on 61ff9b955; changed semantic/RAG checks and the explicit-vector control also match. All current listed candidate checks and remaining declared before groups reproduce their outcomes."
+}
+```

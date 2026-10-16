@@ -701,3 +701,14 @@ bc5978095 on (first failing first-parent commit; they pass on a000e15c7 and on 8
   "note": "Reject: the declared r4-r1 and r4-r2 before patches replace existing SlowStartFakeLlamaServer fixture behavior, including launcher checks and removing server.stop(0). They exceed the permitted add-only, stated abstract-to-default or unreached neutral-stub patch forms."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "reject",
+  "digest": "sha256:fcba94beacaa49f30c37944b60c66805b98f504f7467098ade00bf41f52a93f6",
+  "note": "The repaired add-only r4-r1/r4-r2 setups reproduce their declared outcomes. Reject: retained r2 (13524ddf0) and r4 (83f07cc4c) setups compile zero cases for 16 selectors because of the IdleSampler constructor and missing QuitBudget/shutdown APIs, instead of the recorded passes/assertion failures."
+}
+```

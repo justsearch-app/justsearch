@@ -253,3 +253,14 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
   "note": "Reran all 46 changed-entry checks successfully; the actual a3e96417e replay and API audit confirm the stated missing APIs, so the candidate-only reasons are true and withdrawn outcome-stub failures are not proof. Declarations match assertions; other entries and evidence are unchanged since 9f1f6257b; bound to main."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:b6ec26aba37397a540d75cb2a763385be4144edbd495b2eecb531d593bc0ccfc",
+  "note": "The shared Healthy fixture retains PID-plus-birth cleanup and serving behavior. All 46 candidate selectors pass and the 17 declared preservation selectors reproduce on a3e96417e."
+}
+```

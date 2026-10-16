@@ -433,3 +433,14 @@ before assertion failures and candidate results; acceptance remains the verifier
   "note": "Re-bound to origin/main 298354254; the declared a164833f5 self-test enumeration before replay with its three overlays and no patch fails compilation at SlowStartFakeLlamaServer.java:71 (ProcessHandle cannot be converted to Process), so unreadableDescendantsAreNotAnEmptySuccessfulSnapshot executes zero cases instead of the declared assertion failure. The candidate checks pass and both synchronous GPU before failures match, but this rerun mismatch requires reject."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:62d2c3dce453badc09a300bac97e036389f3f897c1f3f6a9f44749af70857ae7",
+  "note": "All listed candidate checks and declared before groups match after the fixture repair. Both previously compile-blocked setups now reach their intended assertions; launch preservation passes and the job-assignment candidate-only reason is concrete."
+}
+```

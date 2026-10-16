@@ -305,3 +305,14 @@ calls the overload. All nine checks fail there by assertion.
   "note": "Re-reviewed crash policy, start failures and restored before-compatible fixture; candidate and declared before outcomes match with creation-time-only fixture safety instrumentation, without changing production repair logic or test oracles."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "reject",
+  "digest": "sha256:e8a8a9b36b0fc77e03dda4fe0ad03fc469ad1683526038b5a5e7265018cb51e3",
+  "note": "Reject: active before evidence applies b6d536-chat-controller-step4-repaired-compat.patch at 7edc726dd, replacing existing executable HealthyFakeLlamaServer endAll/main statements (162 added, 12 removed). The selected checks execute that replaced fixture, outside the permitted add-only, abstract-to-default or unreached-neutral-stub patch forms."
+}
+```

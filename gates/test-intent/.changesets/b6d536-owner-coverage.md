@@ -114,3 +114,14 @@ Pending independent verifier acceptance. No builder acceptance is recorded.
   "note": "Reviewed corrected sources, canonical before proof, the crash-receipt extension and held-identity fixture cleanup. Four selected candidate checks pass; f5877635f with the declared patches reproduces three assertion-failing checks and the architecture preservation pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:4e498997e7d1934982512b817fe71a01aa95991e60f35b613cf0614e44c2697d",
+  "note": "Reviewed PID scopes, prerequisites and shared cleanup adaptations with preserved inputs and assertions. Candidate consumers pass; f5877635f reproduces the missing Vram/Tika/crash receipts and the flat preservation control, before census stubs can affect the result."
+}
+```

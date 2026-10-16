@@ -210,3 +210,14 @@ Independent verifier acceptance is pending. The builder does not accept its own 
   "note": "Reviewed the owner, crash, retention and native witness expectations and the compile-only helper stub; selected runtime checks never reach that stub. All ten current checks passed and the declared assertion failures reproduced on cd406ca13."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:792586856267290ff3e62a9148ac0d3d3f3b99f0f23209059412ad4551b07f02",
+  "note": "The resource declaration and native-acquisition prerequisite preserve the existing observation and assertions. Current Tika and Engine job classes pass; cd406ca13 reproduces the intended missing closed-owner-window assertion."
+}
+```

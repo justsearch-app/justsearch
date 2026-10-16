@@ -682,3 +682,14 @@ the gate, described near the top):
   "note": "Reviewed the scoped lifecycle assertions, refreshed evidence and opt-in fake-server instrumentation; all 15 selected current candidate cases pass. The retained before claims, source scopes and independent prior results still match; the unrelated failed status row in a shared evidence file is not cited by these entries."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:72aeaf689f17c658bf34f6485e6415923a1560451da09fe89369a026c0122593",
+  "note": "The shared Healthy fixture changes cleanup while retaining PID-plus-birth checks, serving behavior and test oracles. All listed candidate selectors pass and the fixture-dependent resume replay reproduces the recorded PASSED-versus-RELAUNCHED failure on 32d00dda8."
+}
+```
