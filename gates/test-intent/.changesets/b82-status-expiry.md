@@ -177,7 +177,7 @@ Decision records were searched for a conflict with these behaviours (status poll
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java"
       ],
       "class": "New",
-      "behaviour": "An independent witness list of user-visible state fields (at-rest protection, GPU availability, conversation protection, worker RPC staleness, core index health and state, inference engine state, readiness components, lifecycle components, operating chat, indexing, GPU staleness and freshness sources) must each be treated as a state that signals a canonical change; the expectation no longer derives only from the production exclusion predicate, so a misclassified state fails. The two existing cases are unchanged.",
+      "behaviour": "Preservation check of existing canonical status publication, not repaired behavior. An independent witness list of user-visible state fields (at-rest protection, GPU availability, conversation protection, worker RPC staleness, core index health and state, inference engine state, readiness components, lifecycle components, operating chat, indexing, GPU staleness and freshness sources) must each be treated as a state that signals a canonical change; the expectation no longer derives only from the production exclusion predicate, so a misclassified state fails. The two existing cases are unchanged. The new independent witness knownUserVisibleStatesAlwaysSignal passes on 98cad099f, where StatusPublicationBackstop.content/observation already exist, and on the candidate; the unchanged two cases remain covered by the kept-Java evidence.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -196,9 +196,9 @@ Decision records were searched for a conflict with these behaviours (status poll
           "provenance": "delegationQuote was 'Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine.' at 'task t-20261005-b6d536 request (task item 5)', which is item wording, not a delegation"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b82-status-expiry-kept-java.json",
+      "evidence": "gates/test-intent/evidence/b82-status-expiry-publication-preservation.json",
       "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java"
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#knownUserVisibleStatesAlwaysSignal"
       ]
     },
     {

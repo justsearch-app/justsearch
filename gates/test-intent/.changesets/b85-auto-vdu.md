@@ -40,9 +40,21 @@ The patches add three kinds of code:
   - InferenceLifecycleManager.beginTerminalShutdown.
   - OfflineCoordinator.cancelForShutdown.
 
-SlowStartFakeLlamaServer and the app-services test dependency on app-engine come from the commit
-that added the checks, instead of overlaying today's fixture and build file. Nothing at those
-before-states calls the added code. Every repaired check fails by assertion.
+The r4-r1 and r4-r2 patches are add-only: no existing line is deleted or replaced. A new
+B85CompatibilityFakeLlamaServer supplies controlled completion, refusal and launch-journal
+endpoints. Additions in the historical SlowStartFakeLlamaServer installer select that standalone
+fixture, and additions in its cleanup/observation methods delegate only for the marked fixture.
+The historical main, launch parser and cleanup bodies remain untouched. The separate fixture
+records and checks PID plus creation time, including the launcher's lifetime; it does not alter
+product controller, idle, restoration or shutdown behavior. The app-services test dependency on
+app-engine is also add-only. Delegating overloads preserve the historical implementation;
+the terminal-fence and cancel stubs use compile-only varargs, so the copied tests' optional
+zero-argument reflection still observes their absence. Other neutral API stubs remain unreached.
+Regenerated r4-r1 evidence records nine candidate passes; on 0a79303bb the six repaired checks
+fail by assertion and the three preservation checks pass. Regenerated r4-r2 evidence records
+eleven candidate passes and eleven assertion failures on 13524ddf0, including the UI shutdown
+ordering check. No candidate-only fallback was needed. The producer exits 1 for r4-r1 because
+its general fail-before exit policy also flags preservation passes; every declared outcome matches.
 
 ```json
 {
