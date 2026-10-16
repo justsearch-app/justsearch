@@ -90,3 +90,14 @@ automatic title no longer makes the window write its own rename again.
   "note": "Reviewed deferred retry, neutral MCP observations and automatic-title preservation against their intent sources. Own candidate checks passed; own 0a79303bb Java/frontend reruns reproduced the declared PENDING/retry, observer-interruption and title assertions."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:99c40956a902fd8cee7859b85347088d65585c2e15aed3ea67b6afb46f2c3c2a",
+  "note": "Re-bound to origin/main 298354254 after confirming the shared activity-fixture cleanup retains retry, interruption and title oracles. All listed candidate checks pass and 0a79303bb reproduces the declared assertion failures; the MCP declaration API-only reason remains factual."
+}
+```

@@ -409,3 +409,14 @@ changeset.
   "note": "re-bound to main; no change since 7155c7882"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:725de135810d1c7e4be5dce0616f75acab9e9de9bfe7a3738cce7ae3d393ed04",
+  "note": "Re-bound to origin/main 298354254 after checking the refreshed breaker evidence and shared readiness helper. All 30 listed candidate checks pass; the declared bc5978095, d72a8a90c and 184dc8963 before outcomes reproduce the recorded assertion reasons."
+}
+```

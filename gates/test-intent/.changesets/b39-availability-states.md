@@ -242,3 +242,14 @@ Pending independent verifier acceptance.
   "note": "Reviewed retained availability expectations and scoped the shared-file timing changes to deadline-load; its two candidate checks pass. The unchanged availability entries and evidence still truthfully describe the current API and fixtures."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:05e29e671b6d5f24f1795edde03e26fec1ac38701bcf14f3a011bc91bce4f171",
+  "note": "Re-bound to origin/main 298354254 after reviewing the resource-name and Mockito qualification cleanup; the existing oracles remain intact. The 13 availability checks and changed test classes pass, and the declared a600f71b6 before outcomes match; the API-only candidate reason remains factual."
+}
+```

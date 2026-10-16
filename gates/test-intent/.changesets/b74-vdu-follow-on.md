@@ -132,3 +132,14 @@ Pending independent verifier review. The builder does not provide its own accept
   "note": "Re-reviewed idle demand, dispatch, presence age and explicit new-API explanations; candidate and declared before checks reproduce the recorded outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:3843dfc65a600cc586d34a2f1f84c9ea3630dd851ec5fa1f53c4abd1a64e062c",
+  "note": "Re-bound to origin/main 298354254 after confirming the added activity-fixture prerequisites preserve the existing oracles. All listed Java/frontend candidate checks pass and 80f03cb54 reproduces the declared follow-on, title-race and presence-age assertions; the new Java API reason remains factual."
+}
+```

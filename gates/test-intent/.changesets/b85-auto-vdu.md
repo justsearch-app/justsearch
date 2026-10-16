@@ -678,3 +678,14 @@ bc5978095 on (first failing first-parent commit; they pass on a000e15c7 and on 8
   "note": "Reviewed current tests, fixture adaptations, refreshed evidence and patches; selected current candidate checks pass. Every changed before record/patch matches today's b1 independent review exactly, including the separately executed entry-25 preservation before-pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "reject",
+  "digest": "sha256:96aa90ae1aab72278d8127863b5802074b0a916788fd3900afccc8f0887a36c1",
+  "note": "Reject: the declared r4-r1 and r4-r2 before patches replace existing SlowStartFakeLlamaServer fixture behavior, including launcher checks and removing server.stop(0). They exceed the permitted add-only, stated abstract-to-default or unreached neutral-stub patch forms."
+}
+```

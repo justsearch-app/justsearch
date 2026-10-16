@@ -64,3 +64,14 @@ Evidence regenerated on b599d4d7e (phase B). VduRequestActivityTest now register
   "note": "Current entries, evidence, patch and test source match the independent 75917a073 review, including the 164a24b1a assertion rerun and add-only scaffolding. Own candidate HTTP activity checks also passed."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:8138c3b3f65c68ce971c7e4c0046062dc965fd02d791ced851d3d8a3357ce56a",
+  "note": "Re-bound to origin/main 298354254 after confirming the added fixture prerequisites retain the activity, pending and resume oracles. Candidate checks pass and 164a24b1a with the declared additive enum patch reproduces the recorded activity assertion failures."
+}
+```

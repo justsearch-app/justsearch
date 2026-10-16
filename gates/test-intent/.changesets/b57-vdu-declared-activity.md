@@ -144,3 +144,14 @@ Pending independent verifier review.
   "note": "Re-reviewed declared request activity and the corrected delegation labels; candidate and declared before checks reproduce the recorded activity outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:e9d61e40a93484d175dca4a270fc831b65144427f2eb4c7cb9acd2b6abf6116a",
+  "note": "Re-bound to origin/main 298354254 after confirming prerequisite assertions strengthen the existing fixtures without removing an oracle. All three listed candidate classes pass and be59f4664 reproduces the declared route, observer and feed activity failures."
+}
+```
