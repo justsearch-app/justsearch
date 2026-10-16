@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import census from './lib/stop-exit-census.cjs';
+
+// Keep synthetic executable identities absolute on the host while preserving image and directory distinctions.
+const fixtureExecutable = windowsPath => path.resolve('tmp', 'census-fixtures', ...windowsPath.slice(2).split(/\\+/).filter(Boolean));
 
 const instant = n => new Date(Date.UTC(2026, 9, 8, 10, 0, n)).toISOString();
 const birth = n => census.fileTimeFromInstant(instant(n));
@@ -11,11 +15,11 @@ const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100, s
 const run = { runId: 'classify', pids: { backendRootPid: 100 } };
 function history(code, extra = [], image = 'tesseract.exe') {
   return { engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100,
-    creationFileTime: birth(0), executable: 'C:\\test\\java.exe' }),
+    creationFileTime: birth(0), executable: fixtureExecutable('C:\\test\\java.exe') }),
   rec('engine-exit', { incarnation, code: 0, exitClass: 'REQUESTED', reason: 'QUIT',
     exitedAt: instant(20), observedAt: instant(20) })] }, children: { present: true, records: [
     rec('job-process-start', { witnessId: 'j-1', owner, incarnation, pid: 102,
-      creationFileTime: birth(2), executable: `C:\\test\\${image}`, contained: true,
+      creationFileTime: birth(2), executable: fixtureExecutable(`C:\\test\\${image}`), contained: true,
       awaited: false, parentPid: 100, parentCreationFileTime: birth(0) }),
     rec('job-process-exit', { witnessId: 'j-1', owner, incarnation, pid: 102,
       creationFileTime: birth(2), code, exitClass: 'UNEXPECTED', reason: null,
@@ -45,7 +49,7 @@ test('W4: owner interruption receipt wins over the witness', () => {
 });
 test('managed child owner record takes precedence for identical birth and code', () => {
   const extra = [rec('child-spawn', { childId: 'c-1', owner, kind: 'EXTRACTION' }),
-    rec('child-start', { childId: 'c-1', pid: 102, creationFileTime: birth(2), executable: 'C:\\test\\java.exe' }),
+    rec('child-start', { childId: 'c-1', pid: 102, creationFileTime: birth(2), executable: fixtureExecutable('C:\\test\\java.exe') }),
     rec('child-exit', { childId: 'c-1', code: 1246953473, exitClass: 'REQUESTED', reason: 'QUIT', forced: true })];
   assert.equal(cls(history(1246953473, extra)).exitClass, 'REQUESTED');
   extra[1].line.creationFileTime = birth(1);
@@ -62,7 +66,7 @@ test('a crash during intended completion or termination stays unexpected; an uno
 });
 test('a managed parser records its own helpers; a foreign writer cannot impersonate that parser', () => {
   const parser = [rec('child-spawn', { childId: 'parser', owner, kind: 'EXTRACTION' }),
-    rec('child-start', { childId: 'parser', pid: 101, creationFileTime: birth(1), executable: 'C:\\test\\java.exe' })];
+    rec('child-start', { childId: 'parser', pid: 101, creationFileTime: birth(1), executable: fixtureExecutable('C:\\test\\java.exe') })];
   const extra = receipt(1, 'parser Tesseract probe: awaited completion').map(r => ({ ...r,
     writer: { role: 'engine', pid: 101, startedAt: Date.parse(instant(1)) },
     line: { ...r.line, owner: { pid: 101, creationFileTime: birth(1), instanceId: 'parser' } } }));
@@ -75,7 +79,7 @@ test('a managed parser records its own helpers; a foreign writer cannot imperson
 test('native console client binding accounts an unsampled host only inside the client lifetime', () => {
   const ledger = history(1, receipt(1, 'disk encryption probe: awaited completion'), 'powershell.exe');
   ledger.children.records.push(rec('job-process-start', { witnessId: 'host', owner, incarnation, pid: 103,
-    creationFileTime: birth(2), executable: 'C:\\test\\conhost.exe', contained: true,
+    creationFileTime: birth(2), executable: fixtureExecutable('C:\\test\\conhost.exe'), contained: true,
     parentPid: 102, parentCreationFileTime: birth(2), awaited: false }),
   rec('job-process-exit', { witnessId: 'host', owner, incarnation, pid: 103,
     creationFileTime: birth(2), code: 0, exitClass: 'UNEXPECTED', forced: false,

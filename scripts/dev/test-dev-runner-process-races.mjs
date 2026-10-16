@@ -16,8 +16,18 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-process-races-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = root;
 const require = createRequire(import.meta.url);
 const actuator = require('./lib/engine-actuator.cjs');
-const { stopRun } = require('./dev-runner.cjs').__test;
 const source = fs.readFileSync(path.join(here, 'dev-runner.cjs'), 'utf8');
+// These races inject the Windows stop's lookup and termination boundaries, with no OS calls.
+// Its platform is fixture input, independent of the host that executes the portable assertions.
+const runnerFile = path.join(here, 'dev-runner.cjs');
+const runnerModule = { exports: {} };
+vm.runInNewContext(source, {
+  require: createRequire(runnerFile), module: runnerModule, exports: runnerModule.exports,
+  __dirname: here, __filename: runnerFile,
+  process: { ...process, platform: 'win32' }, console, Buffer, URL, performance,
+  setTimeout, clearTimeout, setInterval, clearInterval,
+}, { filename: runnerFile });
+const { stopRun } = runnerModule.exports.__test;
 const pid = 900101, birth = '134000000000000000';
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const child = () => Object.assign(new EventEmitter(), { pid, exitCode: null, signalCode: null });

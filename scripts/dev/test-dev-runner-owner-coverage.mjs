@@ -4,6 +4,9 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+// Keep synthetic executable identities absolute on the host while preserving image and directory distinctions.
+const fixtureExecutable = windowsPath => path.resolve('tmp', 'census-fixtures', ...windowsPath.slice(2).split(/\\+/).filter(Boolean));
+
 const require = createRequire(import.meta.url);
 const census = process.env.CENSUS_TEST_TREE
   ? require(path.join(process.env.CENSUS_TEST_TREE, 'scripts/dev/lib/stop-exit-census.cjs'))
@@ -16,10 +19,10 @@ const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'engine' };
 const rec = (type, line, pid = 100) => ({ type, line, writer: { role: 'engine', pid, startedAt: at(pid === 100 ? 0 : 1) } });
 function fixture() {
   return { engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100,
-    creationFileTime: birth(0), executable: 'C:\\test\\java.exe' }), rec('engine-exit', {
+    creationFileTime: birth(0), executable: fixtureExecutable('C:\\test\\java.exe') }), rec('engine-exit', {
     incarnation, code: 0, exitClass: 'REQUESTED', reason: 'QUIT', observedAt: at(10), exitedAt: at(10) })] },
   children: { present: true, records: [rec('job-process-start', { witnessId: 'helper', owner, incarnation,
-    pid: 102, creationFileTime: birth(2), executable: 'C:\\test\\tesseract.exe', contained: true,
+    pid: 102, creationFileTime: birth(2), executable: fixtureExecutable('C:\\test\\tesseract.exe'), contained: true,
     parentPid: 104, parentCreationFileTime: birth(1) }), rec('job-process-exit', { witnessId: 'helper',
     owner, incarnation, pid: 102, creationFileTime: birth(2), code: 1, exitClass: 'UNEXPECTED',
     forced: false, exitedAt: at(3), observedAt: at(3) })] } };
@@ -28,7 +31,7 @@ test('O9: sibling parser windows and receipts require the exact witnessed creato
   const data = fixture();
   for (const pid of [101, 104]) data.children.records.push(rec('child-spawn', {
     childId: `p${pid}`, owner, kind: 'EXTRACTION' }), rec('child-start', {
-    childId: `p${pid}`, pid, creationFileTime: birth(1), executable: 'C:\\test\\java.exe' }));
+    childId: `p${pid}`, pid, creationFileTime: birth(1), executable: fixtureExecutable('C:\\test\\java.exe') }));
   const parser = { pid: 101, creationFileTime: birth(1), instanceId: 'parser-a' };
   for (const type of ['helper-window-start', 'helper-window-end']) data.children.records.push(rec(type, {
     intentId: 'call', owner: parser, incarnation, image: 'tesseract.exe', reason: 'parser A call',
@@ -83,12 +86,12 @@ test('an unsampled helper console host inherits its client receipt and every sam
     helperId: 'owner-helper', owner, incarnation, pid: 102, creationFileTime: birth(2),
     code: 1, exitClass: 'REQUESTED', reason: 'probe completed', exitedAt: at(3), observedAt: at(3), forced: false }));
   data.children.records.push(rec('job-process-start', { witnessId: 'helper-host', owner, incarnation,
-    pid: 103, creationFileTime: birth(2), executable: 'C:\\test\\conhost.exe', contained: true,
+    pid: 103, creationFileTime: birth(2), executable: fixtureExecutable('C:\\test\\conhost.exe'), contained: true,
     parentPid: 102, parentCreationFileTime: birth(2) }), rec('job-process-exit', {
     witnessId: 'helper-host', owner, incarnation, pid: 103, creationFileTime: birth(2),
     code: 0, exitClass: 'UNEXPECTED', exitedAt: at(4), observedAt: at(4), forced: false }));
   const input = census.exitTargets(run, null, [{ pid: 105, creationFileTimeUtc: birth(1),
-    name: 'nvidia-smi.exe', executable: 'C:\\test\\nvidia-smi.exe', parentPid: 100 }], data);
+    name: 'nvidia-smi.exe', executable: fixtureExecutable('C:\\test\\nvidia-smi.exe'), parentPid: 100 }], data);
   data.engine.records.push(rec('engine-exit', { incarnation, code: 0, exitClass: 'REQUESTED',
     reason: 'QUIT', exitedAt: at(10), observedAt: at(10) }));
   const out = census.exitResult(input, { processExits: input.targets.map(t => ({ pid: t.pid,

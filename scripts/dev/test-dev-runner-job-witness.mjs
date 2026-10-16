@@ -8,6 +8,9 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { crashEvidence } from '../jseval/lane-f/e-crash-evidence.mjs';
 
+// Keep synthetic executable identities absolute on the host while preserving image and directory distinctions.
+const fixtureExecutable = windowsPath => path.resolve('tmp', 'census-fixtures', ...windowsPath.slice(2).split(/\\+/).filter(Boolean));
+
 const at = n => `2026-10-08T10:00:${String(n).padStart(2, '0')}Z`;
 const birth = n => census.fileTimeFromInstant(at(n));
 const incarnation = { session: 'job-witness-test', n: 1 };
@@ -19,7 +22,7 @@ const run = { runId: incarnation.session, pids: { backendRootPid: 100 } };
 const DEV_RUNNER = { role: 'dev-runner', pid: 4000, startedAt: '2026-10-08T09:59:00.000Z' };
 const rec = (type, line) => ({ type, line, writer: type.startsWith('engine-') ? DEV_RUNNER : { role: 'engine', pid: 100 } });
 const row = (pid, parent, n, name, seen = n) => ({ pid, parentPid: parent, creationFileTimeUtc: birth(n),
-  name, executable: `C:\\test\\${name}`, lastSeenAtMs: Date.parse(at(seen)) });
+  name, executable: fixtureExecutable(`C:\\test\\${name}`), lastSeenAtMs: Date.parse(at(seen)) });
 const helper = row(102, 100, 2, 'powershell.exe', 10);
 const host = row(103, 102, 3, 'conhost.exe', 11);
 const witness = (p, end = 10) => [rec('job-process-start', { witnessId: `j-${p.pid}`, owner, incarnation,
@@ -30,7 +33,7 @@ rec('job-process-exit', { witnessId: `j-${p.pid}`, owner, incarnation, pid: p.pi
   creationFileTime: p.creationFileTimeUtc, code: 0, exitClass: 'REQUESTED', reason: 'HELPER_COMPLETION',
   exitedAt: at(end), observedAt: at(end), forced: false })];
 const ledger = (records) => ({ engine: { present: true, records: [rec('engine-start', {
-  incarnation, pid: 100, creationFileTime: birth(0), executable: 'C:\\test\\java.exe' }),
+  incarnation, pid: 100, creationFileTime: birth(0), executable: fixtureExecutable('C:\\test\\java.exe') }),
 rec('engine-exit', { incarnation, exitClass: 'REQUESTED', reason: 'QUIT', code: 0, exitedAt: at(20) })] },
 children: { present: true, records: [...records, ...records.filter(r => r.type === 'job-process-exit'
   && r.line.pid === helper.pid).flatMap(r => [rec('helper-start', { helperId: 'h-' + r.line.pid,
