@@ -30,6 +30,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /** S15: the boot fallback owns its stop intent and final exit observation. */
@@ -37,6 +40,8 @@ final class ManagedChildBootFallbackTest {
   @TempDir Path dataDir;
 
   @Test
+  @Tag("windows")
+  @EnabledOnOs(OS.WINDOWS)
   void bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing() throws Exception {
     Process child = sleepingJava();
     try {
@@ -79,6 +84,81 @@ final class ManagedChildBootFallbackTest {
       child.destroyForcibly();
       child.waitFor(Duration.ofSeconds(5));
     }
+  }
+
+  @Test
+  void bootFallbackWithoutExitFactsRecordsUnknownAndNextBootAddsNothing() throws Exception {
+    Process child = sleepingJava();
+    var identityChecks = new java.util.concurrent.atomic.AtomicInteger();
+    try {
+      var registry = activeRegistry();
+      registry.register(record(child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())),
+          child.info().startInstant().orElseThrow()));
+      seedUncontainedPredecessor(child, false);
+      ProcessTerminator real = ProcessTerminator.forCurrentOs();
+      var writer = ExitLedgerWriter.rotating(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN,
+          LedgerWriterId.currentProcess(LedgerWriterId.Role.ENGINE, Instant.now()), Clock.systemUTC());
+      new LedgerReconciler(LedgerFamily.directory(dataDir), LedgerSink.of(writer),
+          LedgerReconciler.osIdentity(real)).reconcile();
+      ProcessTerminator unavailableFacts = new ProcessTerminator() {
+        @Override public OsProcess open(Process process) throws java.io.IOException { return real.open(process); }
+        public OsProcess open(ProcessHandle process) throws java.io.IOException {
+          assertEquals(child.toHandle(), process);
+          OsProcess held = real.open(child);
+          return new OsProcess() {
+            @Override public Optional<String> creationFileTime() { return Optional.empty(); }
+            public Optional<String> executable() { return process.info().command(); }
+            public boolean matchesJdkIdentity(ManagedChild expected) {
+              identityChecks.incrementAndGet();
+              return expected.identityOf(process) == ManagedChild.IdentityMatch.MATCH;
+            }
+            @Override public TerminateResult terminate(int code) {
+              assertEquals(1, childRecordsUnchecked(LedgerRecordType.STOP_INTENT).size(), "intent precedes the kill");
+              return held.terminate(code);
+            }
+            @Override public boolean awaitExit(Duration max) throws InterruptedException { return held.awaitExit(max); }
+            @Override public OptionalInt exitCode() { return OptionalInt.empty(); }
+            @Override public Optional<Instant> exitedAt() { return Optional.empty(); }
+            @Override public void close() { held.close(); }
+          };
+        }
+        @Override public int ourCode() { return real.ourCode(); }
+        @Override public boolean codeDistinctive() { return real.codeDistinctive(); }
+        @Override public Optional<String> creationFileTime(long pid) { return real.creationFileTime(pid); }
+      };
+      try (var control = DefaultChildControl.of(LedgerSink.of(writer), unavailableFacts, registry)) {
+        recordedBootReconciler(registry, control).reconcile();
+        assertTrue(child.waitFor(Duration.ofSeconds(15)));
+        var intents = childRecords(LedgerRecordType.STOP_INTENT);
+        var exits = childRecords(LedgerRecordType.CHILD_EXIT);
+        assertEquals(1, intents.size());
+        assertEquals(1, exits.size());
+        assertEquals(Optional.of("CRASH_RECOVERY"), intents.getFirst().text("reason"));
+        assertEquals(intents.getFirst().text("intentId"), exits.getFirst().text("intentId"));
+        assertEquals(Optional.of("CRASH_RECOVERY"), exits.getFirst().text("reason"));
+        assertEquals(Optional.of("UNKNOWN"), exits.getFirst().text("exitClass"));
+        assertTrue(exits.getFirst().field("code").isNull());
+        assertTrue(exits.getFirst().field("exitedAt").isNull());
+        assertFalse(exits.getFirst().field("forced").asBoolean());
+        assertEquals(Optional.of("OK"), exits.getFirst().text("terminateResult"));
+        assertTrue(registry.snapshot().isEmpty());
+        assertEquals(1, identityChecks.get(), "the held JDK identity authorizes the stop without FILETIME");
+      }
+      int count = ExitLedgerReader.read(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records().size();
+      try (var next = DefaultChildControl.openForEngine(dataDir, "next-boot", registry,
+          VramProbe.none(), EngineContainment.current())) {
+        recordedBootReconciler(registry, next).reconcile();
+      }
+      assertEquals(count, ExitLedgerReader.read(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records().size());
+    } finally {
+      child.destroyForcibly();
+      child.waitFor(Duration.ofSeconds(5));
+    }
+  }
+
+  private List<io.justsearch.app.api.runtime.ledger.LedgerRecord> childRecordsUnchecked(LedgerRecordType type) {
+    try { return childRecords(type); }
+    catch (java.io.IOException failure) { throw new AssertionError(failure); }
   }
 
   @Test
@@ -140,9 +220,14 @@ final class ManagedChildBootFallbackTest {
         @Override public OsProcess open(Process process) throws java.io.IOException { return real.open(process); }
         // Extra overload compiles on the baseline, where the boot path does not use it.
         public OsProcess open(ProcessHandle process) throws java.io.IOException {
+          assertEquals(child.toHandle(), process);
           OsProcess held = real.open(child);
           return new OsProcess() {
             @Override public Optional<String> creationFileTime() { return held.creationFileTime(); }
+            public Optional<String> executable() { return process.info().command(); }
+            public boolean matchesJdkIdentity(ManagedChild expected) {
+              return expected.identityOf(process) == ManagedChild.IdentityMatch.MATCH;
+            }
             @Override public TerminateResult terminate(int code) {
               try {
                 assertEquals(1, childRecords(LedgerRecordType.STOP_INTENT).size(), "intent precedes the kill");
@@ -190,6 +275,10 @@ final class ManagedChildBootFallbackTest {
   }
 
   private void seedUncontainedPredecessor(Process child) {
+    seedUncontainedPredecessor(child, true);
+  }
+
+  private void seedUncontainedPredecessor(Process child, boolean nativeBirth) {
     var writer = ExitLedgerWriter.rotating(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN,
         new LedgerWriterId(LedgerWriterId.Role.ENGINE, 4242L, Instant.parse("2026-10-06T09:00:00Z")), Clock.systemUTC());
     assertTrue(writer.append(LedgerRecordType.CHILD_SPAWN, Map.of("childId", "c-orphan", "kind", "EXTRACTION",
@@ -199,7 +288,7 @@ final class ManagedChildBootFallbackTest {
     fields.put("childId", "c-orphan");
     fields.put("pid", child.pid());
     fields.put("processStartedAt", child.info().startInstant().orElseThrow());
-    fields.put("creationFileTime", ProcessTerminator.forCurrentOs().creationFileTime(child.pid()));
+    fields.put("creationFileTime", nativeBirth ? ProcessTerminator.forCurrentOs().creationFileTime(child.pid()) : Optional.empty());
     fields.put("executable", child.info().command().orElseThrow());
     fields.put("argvHash", "a".repeat(64));
     fields.put("contained", false);
