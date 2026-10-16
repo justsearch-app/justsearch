@@ -28,7 +28,7 @@ class PredecessorChildStopTest {
 
   private ProcessTerminator terminator(String heldBirth) {
     return new ProcessTerminator() {
-      public OsProcess open(Process p) { throw new AssertionError("no spawn expected"); }
+      @Override public OsProcess open(Process p) { throw new AssertionError("no spawn expected"); }
       public OsProcess open(ProcessHandle p) {
         assertEquals(process.pid(), p.pid());
         return new OsProcess() {

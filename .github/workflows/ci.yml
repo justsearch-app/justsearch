@@ -1131,12 +1131,16 @@ jobs:
 
   # Tempdoc 668 option B — runs ONLY the @Tag("windows") tests (single-instance lock,
   # job objects, power status) on Windows, preserving coverage of genuinely Windows-
-  # specific product behaviour that the Linux-migrated lanes (app-ui) skip. Small + fast
-  # (a handful of classes via -PwindowsOnly). Covers the modules moved to Linux so far.
+  # specific product behaviour that the Linux-migrated lanes skip. JVM selection uses
+  # -PwindowsOnly; the lane also runs the full dev-runner and release suites.
   windows-native-tests:
     name: Windows-native tests
     runs-on: windows-latest
-    timeout-minutes: 15
+    # This lane now auto-discovers 45 dev-runner files, including real identity-bound stop,
+    # census and recovery rounds, before compiling/running the native JVM tests. The old
+    # 15-minute budget cancelled run 38847760494 inside that suite, before Gradle started.
+    # stop-census alone measured 10m04s locally (81 cases, 5,250 generated ledgers/histories).
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1171,7 +1175,7 @@ jobs:
             ${{ env.JAVA_VERSION }}
 
       - name: Dev-runner suite (auto-discovered)
-        run: npm ci --audit=false && npm run test:dev-runner
+        run: npm ci --audit=false && npm run test:dev-runner -- --verbose
 
       # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
       # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
@@ -1186,7 +1190,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Windows-only tests (@Tag windows) for the Linux-migrated modules
-        run: ./gradlew.bat :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test -PwindowsOnly=true --console=plain
+        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test -PwindowsOnly=true -PskipWebBuild=true --console=plain
 
       - name: Preserve Windows-native test results
         if: always()

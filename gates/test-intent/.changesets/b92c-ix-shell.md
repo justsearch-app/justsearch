@@ -177,7 +177,7 @@ outside this gate's scope; their before and after logs are in the run folder.
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java"
       ],
       "class": "New",
-      "behaviour": "The boot stop of a manifest-only predecessor refuses a held process whose native birth differs, whose birth is unreadable, or whose executable differs, before any stop (R09-security 1). An UNKNOWN owner-death record does not block a later identity-proven cleanup (R12-design 3).",
+      "behaviour": "The boot stop of a manifest-only predecessor refuses a held process whose native birth differs, whose birth is unreadable, or whose executable differs, before any stop (R09-security 1). An UNKNOWN owner-death record does not block a later identity-proven cleanup (R12-design 3). CI compile-warning repair: add the missing Override annotation to the existing Process overload; all fixtures and assertions are retained.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -202,7 +202,7 @@ outside this gate's scope; their before and after logs are in the run folder.
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java"
       ],
       "class": "New",
-      "behaviour": "Preservation: a held process whose native birth and executable match is still stopped (on Windows through the real native query with a recording-only terminator), and the JDK birth-checked fallback stays eligible.",
+      "behaviour": "Preservation: a held process whose native birth and executable match is still stopped (on Windows through the real native query with a recording-only terminator), and the JDK birth-checked fallback stays eligible. CI compile-warning repair: add the missing Override annotation to the existing Process overload; all fixtures and assertions are retained.",
       "sources": [
         {
           "kind": "delegated-choice",

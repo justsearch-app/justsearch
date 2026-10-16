@@ -302,7 +302,7 @@ This is unchanged behavior, not a new health guarantee.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Both ownership rollback and boot-buffer overflow gap records conform to the existing ledger schema, including the since field.",
+      "behaviour": "Both ownership rollback and boot-buffer overflow gap records conform to the existing ledger schema, including the since field. CI portability repair: make the fake process fail its command observation with a fixture SecurityException, exercising the same ownership rollback and schema assertions on POSIX as on Windows; POSIX does not perform the Windows OpenProcess lookup of its nonexistent PID. The overflow scenario is retained.",
       "sources": [
         {
           "kind": "delegated-choice",

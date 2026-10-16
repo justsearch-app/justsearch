@@ -10,6 +10,9 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -19,6 +22,8 @@ import org.junit.jupiter.api.io.TempDir;
  * the owner's exit receipt is delayed 4.5 s in publication. From the round-4 verifier's
  * crash-console preservation check; it passes on b599d4d7e.
  */
+@Tag("windows")
+@EnabledOnOs(value = OS.WINDOWS, disabledReason = "Requires a Windows job witness and real console host")
 final class CrashConsoleFollowsClientTest {
   @TempDir Path dir;
 

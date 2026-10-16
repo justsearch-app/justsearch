@@ -48,7 +48,14 @@ if (process.platform === 'win32') {
     return r.status === 0;
   };
 }
-const roots = [os.tmpdir(), path.resolve(__dirname, '../../../tmp')].map(p => path.resolve(p).toLowerCase());
+// Hosted Windows TEMP may use an 8.3 alias while fixtures canonicalize their paths.
+// Accept both spellings of each declared root, without admitting any other directory.
+const roots = [os.tmpdir(), path.resolve(__dirname, '../../../tmp')].flatMap(p => {
+  const resolved = path.resolve(p);
+  let physical = resolved;
+  try { physical = fs.realpathSync.native(resolved); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+  return [resolved.toLowerCase(), physical.toLowerCase()];
+});
 function unlinkBeforeRemoval(target) {
   let abs = path.resolve(String(target));
   const inside = p => roots.some(root => p.startsWith(root + path.sep));

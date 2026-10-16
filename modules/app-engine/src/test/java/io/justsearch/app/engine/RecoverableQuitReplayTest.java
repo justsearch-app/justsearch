@@ -111,7 +111,7 @@ final class RecoverableQuitReplayTest {
     Files.writeString(args, "--enable-native-access=ALL-UNNAMED\n-cp\n\"" + classpath
         + "\"\n" + Probe.class.getName() + "\n\"" + data.toString().replace("\\", "/")
         + "\"\n" + phase + "\n", StandardCharsets.UTF_8);
-    Process process = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
+    Process process = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),
         "@" + args).redirectErrorStream(true).redirectOutput(data.resolve(phase + ".log").toFile()).start();
     // Capture ownership at spawn; this test never terminates by name, ancestry, or bare PID.
     Files.writeString(data.resolve(phase + ".identity"), process.pid() + " "

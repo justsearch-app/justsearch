@@ -9,6 +9,9 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -19,6 +22,8 @@ import io.justsearch.app.api.runtime.ledger.LedgerFamily;
 import io.justsearch.app.api.runtime.ledger.LedgerWriterId;
 
 /** Task b6d536 b101, verifier round 2: records remain pending when the disk force fails and need another group force. */
+@Tag("windows")
+@EnabledOnOs(value = OS.WINDOWS, disabledReason = "DOS read-only must make the real ledger force fail")
 final class HelperFlushRetryTest {
   @Test void failedGroupForceRetainsPendingRecordsForTheNextFlush(@TempDir Path dir) throws Exception {
     var recorder = OwnedHelper.class.getDeclaredField("recorder");

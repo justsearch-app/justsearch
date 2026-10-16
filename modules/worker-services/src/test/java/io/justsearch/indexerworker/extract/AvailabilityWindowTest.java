@@ -13,7 +13,8 @@ final class AvailabilityWindowTest {
     exercise(invalid, false);
   }
   @Test void realAvailabilityForcesOnlyItsWindowStart() throws Exception {
-    exercise(Path.of("F:/scoop/apps/tesseract/current/tesseract.exe"), true);
+    // Availability only requires a real executable accepting --version, on every CI OS.
+    exercise(Path.of(ProcessHandle.current().info().command().orElseThrow()), true);
   }
   private static void exercise(Path exe, boolean launches) throws Exception {
     var field = OwnedHelper.class.getDeclaredField("recorder"); field.setAccessible(true);
