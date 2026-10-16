@@ -758,8 +758,13 @@ impl EngineHost {
             return Ok(None);
         }
         self.post_stop("upgrade", None, timeout)?;
-        let deadline =
-            self.now_ms() + timeout.as_millis() as u64 + containment::JOB_TERMINATE_CONFIRM_MS;
+        // The stop deadline still bounds the cooperative/forced stop. The actor then
+        // reaps the child, waits for the incarnation job in end_owned, and persists its
+        // exit before publishing terminal. Give that work its own declared allowance.
+        let deadline = self.now_ms()
+            + timeout.as_millis() as u64
+            + containment::RESTART_FLOOR_WAIT_MS
+            + containment::JOB_TERMINATE_CONFIRM_MS;
         match self.wait_terminal(deadline) {
             Some(supervisor::Outcome::Stopped { reason, .. }) if reason == "upgrade" => Ok(pid),
             Some(supervisor::Outcome::NoEngine)
@@ -1971,6 +1976,54 @@ mod tests {
         );
         host.acknowledge_exit(code);
         assert!(host.wait_for_exit(Duration::ZERO));
+    }
+
+    #[test]
+    fn upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor() {
+        let dir = tempfile::tempdir().unwrap();
+        let host = Arc::new(EngineHost::default());
+        let pid = host.admit(sleeper()).unwrap().pid;
+        host.acquire_replacement_hold(Duration::ZERO).unwrap();
+        let (accounted_tx, accounted_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let mut actuator = crate::shell_actuator::ShellActuator::new(
+            host.clone(),
+            dir.path().to_path_buf(),
+            move || Ok(pid),
+            move |record| {
+                if record.state == "stopped" {
+                    // The actor has reaped the real child and persisted its exit, but its
+                    // terminal publication is still pending, as after slow job cleanup/I/O.
+                    accounted_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                }
+            },
+        );
+        host.start_supervisor(move || {
+            let mut sup = supervisor::Supervisor::new(supervisor::load_policy());
+            supervisor::run_supervision(&mut sup, &mut actuator);
+        })
+        .unwrap();
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let stop_host = host.clone();
+        let waiter = thread::spawn(move || {
+            result_tx.send(stop_host.stop_owned_engine(Duration::ZERO)).unwrap();
+        });
+        accounted_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(host.wait_for_exit(Duration::ZERO));
+        // Hold the actor beyond the old two-second allowance, but within the job's
+        // declared five-second cleanup floor. A timeout must not stand in for its result.
+        let early = result_rx.recv_timeout(Duration::from_millis(
+            containment::JOB_TERMINATE_CONFIRM_MS + 250,
+        ));
+        release_tx.send(()).unwrap();
+        let result = early.unwrap_or_else(|_| result_rx.recv_timeout(Duration::from_secs(10)).unwrap());
+        waiter.join().unwrap();
+        host.supervisor.lock().unwrap().take().unwrap().join().unwrap();
+        assert_eq!(result, Ok(Some(pid)), "the accounted upgrade must permit handoff");
+        assert!(host.child_pid().is_none());
+        assert!(host.predecessor_job_empty());
+        assert_eq!(actor_records(dir.path()).iter().filter(|r| r["type"] == "engine-exit").count(), 1);
     }
 
     #[test]

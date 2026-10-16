@@ -63,7 +63,7 @@ outside this gate's scope; their before and after logs are in the run folder.
         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "An updater handoff waits for the actor's persisted exit acknowledgement after the Engine is reaped (R04-lifecycle 4). A crash before the upgrade command is consumed, under an active upgrade with the replacement held, completes the handoff instead of stranding it, and is still recorded as one unexpected exit (R04-lifecycle 3).",
+      "behaviour": "An updater handoff waits for the actor's persisted exit acknowledgement after the Engine is reaped (R04-lifecycle 4). A crash before the upgrade command is consumed, under an active upgrade with the replacement held, completes the handoff instead of stranding it, and is still recorded as one unexpected exit (R04-lifecycle 3). CI759: preservation rerun retains both actor-accounting assertions; a separate new check below covers the observation budget after forced stop.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -80,6 +80,25 @@ outside this gate's scope; their before and after logs are in the run folder.
         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "An upgrade stop waits for actor terminal publication within the declared incarnation-job cleanup allowance after the real child is reaped and its one exit is accounted. The posted cooperative/force deadline is unchanged. Holding terminal publication past the old two-second allowance makes 31bbdf349 refuse the handoff; the candidate returns the original PID, with the child gone, the predecessor job empty and exactly one engine-exit record. The four CI handoff panics did not reproduce in the quiet local baseline; this deterministic boundary check proves the discovered deadline defect, not the exact CI stall.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "process ownership and exit accounting",
+          "location": "task t-20261005-b6d536 request (CI759 part 2 builder brief, Owner's words item 6; Method: never weaken an assertion and fix the race or timing assumption)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-ci759-stop-accounting.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor"
+      ]
     },
     {
       "items": [
@@ -314,6 +333,8 @@ outside this gate's scope; their before and after logs are in the run folder.
   ]
 }
 ```
+
+CI759: existing b92c-ix-shell-rust.json is regenerated with its declared before-state 61ff9b955 (plus the resource-glob placeholder). The new accounting-budget check uses separate run-evidence --before 31bbdf349 and reaches its intended handoff assertion there. The Node fixture preload prerequisite is recorded in b6d536-b98-proc-devtools. No acceptance is recorded by this builder.
 
 ## Acceptance records
 

@@ -58,7 +58,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Steps 2 and 4: observed Engine exit ends helpers within one second; a real fallback spawn publishes shell_unavailable; a forced shell stop yields SUPERVISOR_FORCED from the actual held process and the contract decoder. A timed-out predecessor job closes its handle at once; its negative witness prevents a missing handle being reported empty to the updater. Spec F Ã‚Â§8.1 fail-before proof is the conformance negative control: engine-exit-ends-its-helpers and supervisor-killed-ends-engine-and-helpers fail on f7cd27765 by assertion; per-test fail-before run-evidence is not the proof for this New entry.",
+      "behaviour": "Steps 2 and 4: observed Engine exit ends helpers within one second; a real fallback spawn publishes shell_unavailable; a forced shell stop yields SUPERVISOR_FORCED from the actual held process and the contract decoder. A timed-out predecessor job closes its handle at once; its negative witness prevents a missing handle being reported empty to the updater. Spec F Ã‚Â§8.1 fail-before proof is the conformance negative control: engine-exit-ends-its-helpers and supervisor-killed-ends-engine-and-helpers fail on f7cd27765 by assertion; per-test fail-before run-evidence is not the proof for this New entry. CI759: unchanged preservation oracles rerun after the terminal-accounting wait repair; the only new host check is recorded in b92c-ix-shell, with a separate before-state at 31bbdf349.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -641,6 +641,8 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
 >   ]
 > }
 > ```
+
+CI759: b6d536-shell-r1-host-b17.json is regenerated candidate-only, as originally declared. No test oracle or item is removed; engine_host.rs now also contains the separate accounting-budget regression declared in b92c-ix-shell. Prior acceptances are history, not acceptance of these bytes.
 
 ## Acceptance records
 

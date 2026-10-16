@@ -2,18 +2,18 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
   },
-  "createdAt": "2026-10-14T17:03:36.595Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "decb5d7dfe60db8cabef203a8a47f79e1593e94f",
+  "createdAt": "2026-10-16T04:32:51.199Z",
+  "revision": "31bbdf349527234907d0378966df178e66ef3e0e",
+  "tree": "bbd1244c97b87b262e1a1f90f1647649d943fdc0",
   "environment": {
     "platform": "win32",
     "arch": "x64",
     "osRelease": "10.0.26200",
     "node": "v24.12.0",
     "java": null,
-    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
     "ci": false
   },
   "runs": [
@@ -21,25 +21,25 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 105114
+      "durationMs": 10971
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::forced_shell_stop_observes_supervisor_forced\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3739
+      "durationMs": 508
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 901
+      "durationMs": 537
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 759
+      "durationMs": 548
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "contentDigest": "sha256:63db5e00119af43e58f6174cb8928d1758ce564c31274c25da1e81171897e428",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -62,7 +62,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::forced_shell_stop_observes_supervisor_forced",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "contentDigest": "sha256:63db5e00119af43e58f6174cb8928d1758ce564c31274c25da1e81171897e428",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -77,7 +77,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "contentDigest": "sha256:63db5e00119af43e58f6174cb8928d1758ce564c31274c25da1e81171897e428",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,7 +92,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "contentDigest": "sha256:63db5e00119af43e58f6174cb8928d1758ce564c31274c25da1e81171897e428",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -105,5 +105,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:8e7add1e7268cbe94c42f87db82046af37576490dc8792b24cd5179d0c2c1b75"
+  "digest": "sha256:a7ee4c61eecf762fac8bbd04b9399874b7fb275650afa9536a2e1343e52e0c8b"
 }

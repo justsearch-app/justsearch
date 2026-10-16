@@ -27,6 +27,25 @@ class TestApiPathPredicate:
 
 
 class TestFixtureBodies:
+    def test_chat_capture_variants_report_ready_operating_chat(self):
+        for variant in ("degraded", "degraded-detailed", "degraded-thread", "agent-run"):
+            status = json.loads(ui_fixtures._status_body(variant))
+            inference = json.loads(ui_fixtures._inference_body(variant))
+            chat = status["operating"]["chat"]
+            assert inference["available"] is True, variant
+            assert chat["state"] == "READY", variant
+            for field in ("reason", "detail", "reasonCode", "load"):
+                assert chat[field] is None, (variant, field)
+            assert chat["queued"] == 0, variant
+
+    def test_chat_capture_transform_preserves_the_canonical_loading_state(self):
+        before = json.loads(ui_fixtures._status_body("default"))
+        ui_fixtures._status_body("degraded")
+        after = json.loads(ui_fixtures._status_body("default"))
+        assert before == after
+        assert after["operating"]["chat"]["state"] == "LOADING"
+        assert after["operating"]["chat"]["load"] is not None
+
     def test_boot_critical_bodies_are_valid_json_objects(self):
         for needle in ("/api/status", "/api/knowledge/search", "/api/settings"):
             body = json.loads(ui_fixtures.fixture_body(f"http://x{needle}"))
