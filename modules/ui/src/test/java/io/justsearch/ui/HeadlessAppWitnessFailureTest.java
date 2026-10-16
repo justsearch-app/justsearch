@@ -19,7 +19,10 @@ final class HeadlessAppWitnessFailureTest {
     Process child = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),
         "@" + args).redirectErrorStream(true).redirectOutput(log.toFile()).start();
     var os = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs();
-    var held = os.open(child); String birth = held.creationFileTime().orElseThrow();
+    var held = os.open(child);
+    // POSIX has no Windows FILETIME. The original JDK child handle carries its start identity.
+    String birth = held.creationFileTime().orElseGet(() -> "instant:"
+        + child.info().startInstant().orElseThrow());
     System.out.println("fixture-start=" + child.pid() + "/" + birth);
     try {
       assertTrue(child.waitFor(30, TimeUnit.SECONDS), "the fatal path is bounded");
@@ -29,7 +32,9 @@ final class HeadlessAppWitnessFailureTest {
       assertTrue(Files.readString(log).contains("fixture witness storage still active"), "the unclean reason remains visible");
     } finally {
       if (child.isAlive()) {
-        assertEquals(birth, held.creationFileTime().orElseThrow()); held.terminate(os.ourCode());
+        String currentBirth = held.creationFileTime().orElseGet(() -> "instant:"
+            + child.info().startInstant().orElseThrow());
+        assertEquals(birth, currentBirth); held.terminate(os.ourCode());
       }
       assertTrue(held.awaitExit(Duration.ofSeconds(5))); held.close();
     }

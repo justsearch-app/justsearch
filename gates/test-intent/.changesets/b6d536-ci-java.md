@@ -50,7 +50,7 @@ No builder acceptance is recorded.
       "items": [".github/workflows/ci.yml"],
       "class": "Structural rule kept",
       "rule": "Every portable unit check remains selected on Ubuntu; Windows-native helper checks remain selected on Windows with all original assertions and prerequisite-specific execution.",
-      "whySurvives": "Add app-api to the existing Windows-tagged task list and declare skipWebBuild explicitly. The 45-file dev-runner suite is unchanged in selection; verbose diagnostics expose progress, and a 35-minute enclosing job budget allows its real stop/recovery rounds plus native JVM compilation. No assertion, test, retry or unit-shard selection is removed."
+      "whySurvives": "Add app-api to the existing Windows-tagged task list and declare skipWebBuild explicitly. The 45-file dev-runner suite is unchanged in selection; verbose diagnostics expose progress, and a 35-minute enclosing Windows job budget allows its real stop/recovery rounds plus native JVM compilation. Round 4 also installs the root esbuild and UI zod locked dependency sets for the existing real frontend HTTP probes on app-ui. That shard alone receives a 35-minute whole-job cap after hosted run 38867896142 exhausted 25 minutes during its final UI task; the other unit shards retain 25 minutes and every per-test budget stays intact. No assertion, test, retry or unit-shard selection is removed."
     }
   ]
 }
