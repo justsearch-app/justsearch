@@ -294,3 +294,14 @@ Pending the orchestrator's independent verifier and the owner's behavior verdict
   "note": "The Windows guards, mocked platform, private fixture quit channel and POSIX stub preserve the refusal and ownership oracles. Changed Node and conformance fixture checks plus all eight owned-stop Python cases pass on Windows; the wider jseval suite passes 3710 with 16 unrelated prerequisite skips."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:a7e4fd4edf9b9a8e7f3098650186ac910a0f443d742c0d2625888f8e405bc59c",
+  "note": "The Windows prerequisites, explicit VM platform and absent-PID lookup preserve captured identity, refusal and ordering assertions. Changed Node fixtures, fixture cleanup and all 65 Python ownership cases pass on Windows, including all seven job-stop cases in isolation."
+}
+```

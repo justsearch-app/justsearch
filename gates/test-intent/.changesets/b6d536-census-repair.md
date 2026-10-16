@@ -118,3 +118,14 @@ Independent verifier acceptance is pending; the builder has not judged its own t
   "note": "Reviewed the source-only correction against item 6 and the exit-ledger classification/timestamp oracles. Candidate checks passed; test items and execution evidence are unchanged since cd406ca13."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8a-20261016",
+  "verdict": "reject",
+  "digest": "sha256:76f89eb2fbdea07aee2a8cd1b996dbae37f6812585431ecfb43a2a7cf72a758b",
+  "note": "The new bootFallbackWithoutExitFactsRecordsUnknownAndNextBootAddsNothing check fails on unchanged candidate source at line 152: expected five ledger records, observed seven, both in the broad UI run and with VerifierStatus4Test paired alone. Although its isolated five-case selection passes and all five declared before failures match, this repeatable candidate rerun mismatch contradicts the recorded pass."
+}
+```

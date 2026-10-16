@@ -1650,3 +1650,14 @@ Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's i
   "note": "Re-bound to origin/main 298354254 after reviewing stronger child-control prerequisites, native guards and the System PID 4 fixture. Both integration classes and all 103 census cases pass without skips; the read-only probe and fabricated host retain the ledger, ownership and precision oracles."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:56190cd485783c4fd34eb806b4d8bb38652e031183b5a666c7e77a07f8209158",
+  "note": "Reviewed the unreadable-birth native wrapper and stronger control prerequisites; both integration classes and all 103 census cases execute on Windows. The 102 non-budget cases pass in the full run, and the unchanged large-ledger budget check passes in isolation at 12278 ms, retaining every ownership and precision assertion."
+}
+```
