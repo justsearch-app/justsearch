@@ -8,6 +8,7 @@ import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import java.nio.file.Path;
 import java.util.Map;
+import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -47,6 +48,10 @@ final class ChunkAdmissionRefreshRetentionTest extends LuceneExecutorTestBase {
       for (int cycle = 0; cycle < 12; cycle++) {
         parent(runtime, cycle);
         runtime.commitOps().commitAndTrack();
+        // A durable commit does not join Lucene's background merges. Their codec buffers are
+        // temporary working memory, not retained admission membership; join them before sampling.
+        ((ConcurrentMergeScheduler) runtime.session().snapshot.writer().getConfig().getMergeScheduler())
+            .sync();
         runtime.commitOps().maybeRefreshBlocking();
         scan(runtime);
         peak = Math.max(peak, heap());

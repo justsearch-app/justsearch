@@ -100,6 +100,11 @@ final class AutomaticVduRecoveryTest {
     index = mock(KnowledgeClient.class, call -> {
       if ("recoverVduProcessingForOwner".equals(call.getMethod().getName()))
         return index.recoverVduProcessing(call.getArgument(0));
+      if ("recoverVduProcessingForRetainedOwner".equals(call.getMethod().getName())) {
+        try (var retained = call.getArgument(0, io.justsearch.app.api.EngineWorkHandle.class).retain()) {
+          return index.recoverVduProcessing(retained.context());
+        }
+      }
       return RETURNS_DEFAULTS.answer(call);
     });
     for (int i = 0; i < 3; i++) documents.add(image("document-" + i + ".png").toString());
@@ -428,8 +433,9 @@ final class AutomaticVduRecoveryTest {
     // Owner-scoped recovery (orderly cancel) returns the pre-claim count; general startup recovery
     // keeps the spent one. Only the first may run here.
     doAnswer(call -> {
-      try (var retained = admission.attach(call.getArgument(0,
-          io.justsearch.core.context.EngineContext.class))) {
+      // Force the hosted-runner ordering: recovery starts only after the admission fence.
+      assertTrue(awaitFor(admission::isClosing, 1), "quit closes admission before cleanup proceeds");
+      try (var retained = call.getArgument(0, io.justsearch.app.api.EngineWorkHandle.class).retain()) {
         assertTrue(retained.cancellationReason().isEmpty(), "cleanup must retain its live authority");
         int recovered = 0;
         for (var entry : documentStates.entrySet()) {
@@ -440,7 +446,7 @@ final class AutomaticVduRecoveryTest {
         }
         return recovered;
       }
-    }).when(index).recoverVduProcessingForOwner(any());
+    }).when(index).recoverVduProcessingForRetainedOwner(any());
     var generalRecoveries = new AtomicInteger();
     doAnswer(call -> {
       generalRecoveries.incrementAndGet();

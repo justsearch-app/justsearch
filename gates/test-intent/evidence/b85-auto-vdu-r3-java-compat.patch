@@ -240,12 +240,18 @@ diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worke
 index c4fcd27ed..e67480d67 100644
 --- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
 +++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
-@@ -1781,6 +1781,11 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
+@@ -1781,6 +1781,17 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
          return vduOps.markVduProcessing(docId, maxRetries, engineContext);
      }
  
 +    /** Compat (fail-before only): the later owner-scoped recovery; nothing here calls it. */
 +    public int recoverVduProcessingForOwner(EngineContext engineContext) {
++        return 0;
++    }
++
++    /** Compat (fail-before only): retained-owner cleanup is outside the selected old paths. */
++    public int recoverVduProcessingForRetainedOwner(
++            io.justsearch.app.api.EngineWorkHandle owner) {
 +        return 0;
 +    }
 +

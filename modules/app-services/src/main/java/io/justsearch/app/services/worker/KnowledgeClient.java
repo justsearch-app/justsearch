@@ -1844,6 +1844,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return vduOps.recoverVduProcessingForOwner(engineContext);
     }
 
+    /**
+     * Return this procedure's claims while its admitted work is still owned, including after new
+     * admission closes. The transport retains the supplied handle through the recovery's actual
+     * exit; a context alone is not authority to cross the process-closing fence.
+     */
+    public abstract int recoverVduProcessingForRetainedOwner(
+            io.justsearch.app.api.EngineWorkHandle owner);
+
 
     /**
      * Stops the background root-walk and WAITS for it, rather than only asking it to stop.

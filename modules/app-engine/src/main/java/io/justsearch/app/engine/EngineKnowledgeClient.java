@@ -802,6 +802,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
       boolean inference, Function<Budget, T> body) {
     var work = inference ? admission.attachInference(engineContext) : admission.attach(engineContext);
+    return withOwnedBudget(operation, budgetMs, work, inference, body);
+  }
+
+  /** Own an already-retained reference, so orderly cleanup need not reopen admission. */
+  private <T> T withOwnedBudget(String operation, long budgetMs,
+      io.justsearch.app.api.EngineWorkHandle work, boolean inference, Function<Budget, T> body) {
     CallView view;
     try {
       view = captureCallView();
@@ -994,6 +1000,16 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         deadline(category),
         engineContext,
         budget -> rpc.apply(new WorkerIngestCalls(requireService(WorkerAppServices::ingestService), budget.context())));
+  }
+
+  @Override
+  public int recoverVduProcessingForRetainedOwner(io.justsearch.app.api.EngineWorkHandle owner) {
+    var request = io.justsearch.ipc.RecoverVduProcessingRequest.newBuilder()
+        .setProcedureOwner(owner.context().workId().orElseThrow().toString()).build();
+    return withOwnedBudget("recoverVduProcessing", deadline(RpcDeadlineCategory.VDU_OPERATION),
+        owner.retain(), false,
+        budget -> new WorkerIngestCalls(requireService(WorkerAppServices::ingestService),
+            budget.context()).recoverVduProcessing(request).getRecoveredCount());
   }
 
   @Override

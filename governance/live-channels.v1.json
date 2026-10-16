@@ -132,12 +132,6 @@
       "note": "Two doFetch-based response-body readers (/api/health/events/stream, /api/condition-recovery-index/stream) — open only while the Health surface is mounted."
     },
     {
-      "file": "modules/ui-web/src/shell-v0/state/conversationListStore.ts",
-      "openerId": "fetch-stream-body-reader",
-      "class": "transient",
-      "note": "One-shot conversation-title generation request — a transient streaming fetch, not a persistent connection."
-    },
-    {
       "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts",
       "openerId": "fetch-stream-shape",
       "class": "lazy",
