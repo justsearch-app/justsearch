@@ -141,3 +141,14 @@ Independent verifier acceptance is pending; the builder has not judged its own t
   "note": "The new bootFallbackWithoutExitFactsRecordsUnknownAndNextBootAddsNothing check fails on unchanged candidate source at line 152: expected five ledger records, observed seven, both in the broad UI run and with VerifierStatus4Test paired alone. Although its isolated five-case selection passes and all five declared before failures match, this repeatable candidate rerun mismatch contradicts the recorded pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS9-20261016",
+  "verdict": "accept",
+  "digest": "sha256:4dc638e31dcfc381bedb5f7da5bfbe44edc3bc35beadb4827a7161cd9284484d",
+  "note": "Verified native Windows paired run (19 passed), class alone (5 passed), full UI (2013 passed, 1 unrelated fixture skip after npm ci), and all five matching assertion failures on 46c74f725 with only the candidate test transplanted. The isolation retains exactly five predecessor records before and after next boot and every outcome assertion; 2f3b5e60f changes no product code, and the entry and evidence remain truthful against origin/main 298354254."
+}
+```
