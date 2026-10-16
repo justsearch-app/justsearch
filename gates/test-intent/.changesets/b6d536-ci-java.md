@@ -68,3 +68,14 @@ No builder acceptance is recorded.
   "note": "Reviewed the CI repairs, preserved assertions, honest prerequisites and required Windows task selection; the exact Windows-native task list and all changed Java classes execute successfully on Windows. The Rust library passes 149 tests, including the finite terminal-accounting allowance regression; the unchanged default Cargo binary compilation failure is an observation, not a library-test pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:916df9ff53758fce0c70cdd15a39b506f393fdd5cf634a9078140c6ccd7ec10f",
+  "note": "Reviewed every workflow test-selection change: original Ubuntu task lists remain and Windows adds app-api/ui. The exact current Windows-only Gradle selection and policy/public-claim guards pass; dependency setup and finite job budgets preserve per-test selection and oracles."
+}
+```

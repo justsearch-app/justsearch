@@ -154,3 +154,14 @@ Evidence for b6d536-b65-observer-owner.json was regenerated on b599d4d7e (phase 
   "note": "Re-reviewed observer retention and transport shutdown ownership, including the delegating constructor patch; candidate and declared before checks match their recorded outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:53e921e5f008e8c797559aca217ddcfa0c118eae8aea88d31128d23015ff40f9",
+  "note": "All nine candidate selectors (28 cases) pass; the original owner and unpatched retention recipes on 8eb24a870 reproduce their declared assertions. Joining background merges preserves the 100000-chunk corpus, twelve cycles, completeness checks and 5 MB bound."
+}
+```

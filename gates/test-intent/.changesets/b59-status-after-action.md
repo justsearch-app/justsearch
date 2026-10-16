@@ -138,3 +138,14 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
   "note": "Reviewed the real transport and polling paths and the add-only compatibility declaration that preserves the old transport behavior. Both current frontend files pass and the declared 1939ad02c before runs reproduce the missing canonical-status publication assertions."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:a96772f0885bea5bf9207ff678a42c410c6d1234114b084a14c7a1f40281846f",
+  "note": "Reran both candidate files (36 cases) and their declared 1939ad02c recipes, reproducing the canonical-refresh assertions and failed/read-only preservation. Curried registration edits retain every row, callback and assertion."
+}
+```

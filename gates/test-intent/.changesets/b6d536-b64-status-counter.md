@@ -209,3 +209,14 @@ Pending independent verifier judgment; the builder does not accept its own chang
   "note": "Re-bound to origin/main 298354254 after reviewing the shared HTTP qualification cleanup and retained counter oracles. All listed candidate checks pass and the 13 declared 23b8679ee before outcomes reproduce with its additive constructor patch and fixture overlay."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:fa5d4991b5b32b9f8ca758bdabe9b1938d0347bb0e4f08fe1d5ebbb076803622",
+  "note": "Reran all 15 listed candidate selectors (29 cases), the changed StatusIsolation HTTP class (16 cases), and the original 13-selector 23b8679ee before recipe with its declared compatibility scaffolding. Formatting and qualification edits preserve the counter, observation and no-refresh assertions."
+}
+```
