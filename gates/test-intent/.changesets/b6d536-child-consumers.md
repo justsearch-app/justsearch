@@ -248,3 +248,14 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
   "note": "Reviewed the containment, self-intent and reconciler expectations against item 6 and the current tests. Candidate checks passed and declared before assertions reproduced; the JobMembership and composition-root API absence reasons are truthful."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:460e48dfcac0057ec0241ae205b913aeb1129e63ece51725ce79ff8b3878a540",
+  "note": "Re-bound to origin/main 298354254; prerequisite assertions strengthen the existing checks without changing their oracles. All nine candidate cases pass and all seven declared 1c6f8da2c assertion failures reproduce, including absent membership, missing ledger containment and self-intent receipts."
+}
+```

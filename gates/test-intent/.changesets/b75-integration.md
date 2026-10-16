@@ -137,3 +137,14 @@ Records phase B (batch 3) re-ran `b75-integration.json` on b599d4d7e because its
   "note": "Reviewed independent observation capacity/refusal and slot retention against the delegated integration choice. Own candidate checks passed all seven listed overlap methods; the explicit manual-before explanation is retained as a nonblocking proof limit."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:e4b8c42068d111867e6f8c8bc5cd86fd9263d5d1da0e37b1c0064fc9720a116b",
+  "note": "Re-bound to origin/main 298354254 after reviewing qualification and whitespace cleanup without oracle changes. The seven listed observation-admission checks, edited recovery fixture and both full status-isolation classes pass; the entry retains its explicit historical manual-before explanation and makes no automated fail-before claim."
+}
+```

@@ -2357,3 +2357,14 @@ Round 9 (on top of 925610f44, decisions under the owner's delegation): on a plat
   "note": "Independent verifier accepted round 9 (fdefda2f6): no platform volume identity defers nothing (seam run 2,710 tests, 0 failed); deleted, corrupt, malformed and denied volume ledger deletes nothing live; store-recoverability gate passes; full suite 9,816/0. a1d143cee only removes two unused exports (dead-code gate), with no behaviour change."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:591f702d37f91194fc790f952f6c50f47ab82807d34cbf31ccb1fbcd4bd973f9",
+  "note": "Reviewed the merge compatibility against origin/main 298354254: the helpers call the real old/new APIs and retain the original assertions. All 25 refreshed-evidence candidate selectors pass, both declared unpatched before states reproduce 21 named assertion failures plus four preservation passes, and the changed status-fixture consumers pass."
+}
+```

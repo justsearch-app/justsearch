@@ -412,3 +412,14 @@ F:/phaseb-fix3-b6d536-20261015.
   "note": "All three corrected checks pass; both preservation checks also pass at a164833f5 with the declared add-only createChat stub, which their paths cannot reach. The job-assignment candidate-only reason is true, declarations match assertions, and remaining entries/items/evidence are unchanged since 9f1f6257b; bound to main."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "reject",
+  "digest": "sha256:c1150c75251662777b20800c412e659bea4b0bffe306994bc9fcef42f62ebba6",
+  "note": "Re-bound to origin/main 298354254; the declared a164833f5 self-test enumeration before replay with its three overlays and no patch fails compilation at SlowStartFakeLlamaServer.java:71 (ProcessHandle cannot be converted to Process), so unreadableDescendantsAreNotAnEmptySuccessfulSnapshot executes zero cases instead of the declared assertion failure. The candidate checks pass and both synchronous GPU before failures match, but this rerun mismatch requires reject."
+}
+```

@@ -129,3 +129,14 @@ Known side effect: several of the adapted files are new checks of earlier change
   "note": "Re-reviewed owned SSE delivery and historical sampler adaptation; candidate checks and the cited real before-state replay retain the expected repair and preservation outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:f8ec73344be7ad5b0b8975f0c7b5d91c04e3da42e78657e1ec583b47975b2645",
+  "note": "Re-bound to origin/main 298354254 after reviewing the shared constructor compatibility and unreadable-brake test. All three SSE ownership checks and the 40-case WorkerSnapshotTap class pass; 2e1196050 reproduces two missing-refusal assertions and the owner-thread preservation pass."
+}
+```

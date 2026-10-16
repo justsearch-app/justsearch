@@ -73,3 +73,14 @@ Independent acceptance is pending; the builder does not accept its own checks.
   "note": "Reviewed all four checks and the supervisor/lookup adaptation; the old census ignores lookup context, so the additive no-op exports do not determine the asserted outcomes. All four current checks passed and all four declared before assertions reproduced on e882e30f7."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:7c807f8dbd45e2df303fcfb4989e492e4d8fd275438f9a4f0be280bd55598cc5",
+  "note": "Re-bound to origin/main 298354254; added prerequisite assertions preserve the four existing receipt oracles. All four candidate checks pass and e882e30f7 with the declared add-only patch reproduces all four named assertion reasons; the neutral lookup stub does not create them."
+}
+```

@@ -169,3 +169,14 @@ fail-before is claimed for it.
   "note": "Reviewed source corrections and the current sandbox fixture adaptation against the unchanged ownership and exit-accounting checks. Selected current candidate checks pass; the declared before evidence is unchanged and the missing old ownership API is explained."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:885bbd094d02aa9e40d42e5380595206acbfed5fba74bd4a217965beb92670c2",
+  "note": "Re-bound to origin/main 298354254; the three PID declarations move into their existing try scopes without changing inputs, lifetime or assertions. Both new classes and all 32 sandbox cases pass, while the four stop-code checks on the exact declared 27f19c3ac ref assert 1246953473 versus actual 1."
+}
+```

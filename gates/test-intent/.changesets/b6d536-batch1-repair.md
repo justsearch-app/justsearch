@@ -188,3 +188,14 @@ Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before 
   "note": "The timing adaptation retains the durable chunk-completeness assertions; both candidate test files pass. The declared 1e333857b before rerun with its compatibility patch reproduces the incomplete-chunk assertion failures without a patch-created failure."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:72e3f71c9f1eea3357f04a3d5f92b022f603159e0090e9737797188a3a1c5595",
+  "note": "Re-bound to origin/main 298354254 after reviewing the PID-local cleanup and declared add-only compatibility patches. Candidate checks and shared sandbox cases pass; 1e333857b reproduces the 997-chunk/admission, stale-health and premature-CPU-service failures, while two backfill passes rely on scaffolding and do not prove implemented preservation."
+}
+```
