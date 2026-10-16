@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261005-b6d536
 author-role: builder
-author-session: b85-auto-vdu-round4
+author-session: b6d536-last-two-20261016
 ---
 
 # b85-auto-vdu — complete intent and round 4 repairs
@@ -50,11 +50,29 @@ product controller, idle, restoration or shutdown behavior. The app-services tes
 app-engine is also add-only. Delegating overloads preserve the historical implementation;
 the terminal-fence and cancel stubs use compile-only varargs, so the copied tests' optional
 zero-argument reflection still observes their absence. Other neutral API stubs remain unreached.
-Regenerated r4-r1 evidence records nine candidate passes; on 0a79303bb the six repaired checks
-fail by assertion and the three preservation checks pass. Regenerated r4-r2 evidence records
-eleven candidate passes and eleven assertion failures on 13524ddf0, including the UI shutdown
-ordering check. No candidate-only fallback was needed. The producer exits 1 for r4-r1 because
-its general fail-before exit policy also flags preservation passes; every declared outcome matches.
+Fresh replay repair on 31bbdf349 also covers the retained r2 and r4 records:
+
+- r2-java selects only its nine retained preservation checks on 13524ddf0. The add-only
+  b85-auto-vdu-r2-preservation-compat.patch adds the lease-less RuntimeReconciler constructor,
+  delegating to the historical constructor with a fresh lease. The current test fixture is the
+  sole overlay. The historical build file is retained, avoiding a mismatched dependency lock.
+- r4-java runs all eleven declared checks on 83f07cc4c with the add-only
+  b85-auto-vdu-r4-replay-compat.patch. It adds the same delegating constructor and the later
+  QuitBudget type/constants, budget-delegating EngineShutdownSequence overload, and neutral
+  HeadAssembly quit-cancel APIs used only by unselected fixture methods. None of the seven
+  selected retry-budget checks reaches these shutdown stubs. Overlays are the two declared
+  test fixtures; the existing build file already includes app-engine and is retained.
+- r4-r1 and r4-r2 keep their existing add-only patches. The UI shutdown entry now cites the
+  same r4-r2 evidence as its ten app-services checks. The round-3 UI entries likewise cite
+  r3-java, eliminating duplicate evidence with older patch digests.
+- Integration recovery preservation now has a before-pass on 1d23c9d95 alongside the repair's
+  assertion fail-before.
+
+Every declared setup is replayed from scratch with the current check files, exactly its named
+patch and overlays, and exact method selectors. No test method is projected out, no product
+behavior is overlaid, and no candidate-only fallback is introduced. The builder report records
+commands, non-zero executed case counts, outcomes and retained logs. Evidence is regenerated
+with run-evidence; its general fail-before exit policy returns 1 for preservation passes too.
 
 ```json
 {
@@ -199,7 +217,7 @@ its general fail-before exit policy also flags preservation passes; every declar
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-build-green-13524ddf0-14b7ac2ee6.json",
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r4-r2-refresh.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#terminalEnrichmentQuiescesBeforeTheLiveWorkDrain"
       ]
@@ -212,7 +230,7 @@ its general fail-before exit policy also flags preservation passes; every declar
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Inject an already-expired process startup clock for existing non-startup scenarios. All nine original behavioural oracles remain, and pass on 13524ddf0 and the repaired candidate.",
+      "whatMoved": "Inject an already-expired process startup clock for existing non-startup scenarios. All nine original behavioural oracles remain. Before replay on 13524ddf0 uses b85-auto-vdu-r2-preservation-compat.patch and the current SlowStartFakeLlamaServer test fixture overlay; the constructor delegates to the historical reconciler and all nine selected cases execute and pass. The historical build file and dependency locks remain in use.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -394,7 +412,7 @@ its general fail-before exit policy also flags preservation passes; every declar
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-build-green-14a7eb8a2-fdc94f763f.json",
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r3-java.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#noPassPreservesOriginalCancellationAndStopOrder",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#activePassAllowsThreeSecondStopAndRunsLaterSteps"
@@ -455,7 +473,7 @@ its general fail-before exit policy also flags preservation passes; every declar
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Retain all ten round-2 behaviour oracles. The mock index endpoint forwards the additive shutdown-scoped recovery operation to its existing live-admission recovery fixture. A controlled controller clock advances restoration pressure time without forty seconds of sleeping. The refreshed round-2 before135 run projects out only three unselected round-3 test methods referencing Head or terminal APIs absent on that revision; all selected round-2 method bodies and helpers remain byte-identical. The external execution guard records the projection hashes.",
+      "whatMoved": "Retain all ten round-2 behaviour oracles. The mock index endpoint forwards the additive shutdown-scoped recovery operation to its existing live-admission recovery fixture. A controlled controller clock advances restoration pressure time without forty seconds of sleeping. All current methods compile unchanged under the declared add-only compatibility scaffolding; no test method is removed or projected out for replay.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -513,7 +531,7 @@ its general fail-before exit policy also flags preservation passes; every declar
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Automatic restoration stops after five consecutive failures including the failed return; status remains config_apply_failed and says retries stopped. Human chat, recorded settings, committed prepared settings and off/on permit a fresh bounded attempt series. A record-only prepared refresh retains the newest restore target so its next demand actually starts chat. Explicit entry while recovery is pending performs normal restoration then vision entry without timer ticks, new activity or a manual activation; two healthy fake starts delayed by two seconds reach the first document within twelve seconds.",
+      "behaviour": "Automatic restoration stops after five consecutive failures including the failed return; status remains config_apply_failed and says retries stopped. Human chat, recorded settings, committed prepared settings and off/on permit a fresh bounded attempt series. A record-only prepared refresh retains the newest restore target so its next demand actually starts chat. Explicit entry while recovery is pending performs normal restoration then vision entry without timer ticks, new activity or a manual activation; two healthy fake starts delayed by two seconds reach the first document within twelve seconds. Fail-before: 83f07cc4c with b85-auto-vdu-r4-replay-compat.patch and the two named test-fixture overlays. The selected cases do not call the added quit/shutdown APIs; the historical retry controller remains under test.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -541,7 +559,7 @@ its general fail-before exit policy also flags preservation passes; every declar
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Orderly owner-scoped cancellation atomically returns PROCESSING to PENDING and restores the pre-claim retry count, including a final permitted attempt. A later pass can claim the document again without cancellation spending its retry.",
+      "behaviour": "Orderly owner-scoped cancellation atomically returns PROCESSING to PENDING and restores the pre-claim retry count, including a final permitted attempt. A later pass can claim the document again without cancellation spending its retry. Fail-before: 83f07cc4c under the r4-java setup; both selected cases execute and fail by assertion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -564,7 +582,7 @@ its general fail-before exit policy also flags preservation passes; every declar
       ],
       "class": "New",
       "repaired": false,
-      "behaviour": "Preservation: a completed attempt winning the reset retains its success text and claimed retry count. Unscoped startup recovery after lost worker ownership retains the claimed retry count.",
+      "behaviour": "Preservation: a completed attempt winning the reset retains its success text and claimed retry count. Unscoped startup recovery after lost worker ownership retains the claimed retry count. Preservation replay: 83f07cc4c under the same r4-java setup; both selected cases execute and pass.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -631,7 +649,7 @@ its general fail-before exit policy also flags preservation passes; every declar
       ],
       "class": "New",
       "repaired": false,
-      "behaviour": "Preservation: on a real index, a selected PROCESSING document that completes after recovery selects it and before its conditional reset is not reset to PENDING, does not count as a miss and does not keep the recovery row.",
+      "behaviour": "Preservation: on a real index, a selected PROCESSING document that completes after recovery selects it and before its conditional reset is not reset to PENDING, does not count as a miss and does not keep the recovery row. Preservation replay: 1d23c9d95, with the current check file and no patch or overlay; one selected case executes and passes.",
       "sources": [
         {
           "kind": "delegated-choice",

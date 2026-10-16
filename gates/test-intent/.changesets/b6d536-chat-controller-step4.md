@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261005-b6d536
 author-role: builder
-author-session: 886833dd-a08f-492f-a40a-cc0976b5ce5e
+author-session: b6d536-last-two-20261016
 ---
 
 # Test-intent entries
@@ -18,15 +18,21 @@ generative action is operator-only), so the harness barrier that held its first 
 the installed exhaustion fixture and their store-register row are removed. The supervision contract's brain row declares this policy,
 with a gate in SupervisionContractTest. This changeset covers only this slice's files.
 
-Evidence regenerated on b599d4d7e. The fail-before of b6d536-chat-controller-step4-repaired.json
-runs on 7edc726dd, the parent of d3fe74ef2, which added these checks. It applies
-`gates/test-intent/evidence/b6d536-chat-controller-step4-repaired-compat.patch`. The patch makes two
-changes. It sets the HealthyFakeLlamaServer test fixture to its d3fe74ef2 version, which does not
-use the later ProcessTerminator. It also gives the later
-`stopLlamaServer(LlamaServerTestAccess.TEST_STOP)` call a form that works before: TEST_STOP is an
-opaque token, and a new `LlamaServerOps.stopLlamaServer(Object)` overload calls the existing
-`stopLlamaServer()`. That is what the check called at d3fe74ef2. No production code at 7edc726dd
-calls the overload. All nine checks fail there by assertion.
+Replay repair on 31bbdf349: the 7edc726dd setup uses an add-only patch (zero deletions).
+It adds Step4CompatibilityFakeLlamaServer beside the historical fixture. A new varargs installer
+selects it; new observation methods and a marked cleanup branch delegate to it. The existing
+HealthyFakeLlamaServer main, single-argument installer and cleanup statements remain intact.
+The standalone fixture records and validates PID plus creation time. The only product addition
+in the before patch is a stop overload delegating to the original stop. No repaired controller
+behavior is transplanted. All nine repaired checks execute and fail by assertion; the one-rung
+preservation check executes and passes using the same setup.
+
+The separate fixture-cleanup check uses b6d536-chat-controller-step4-fixture-identity.patch on
+7edc726dd. Its only additions record and check process creation time before the historical stop;
+they leave the cleanup behavior under test intact. That check executes and fails by assertion.
+Unit checks of the newly introduced classifier and crash-policy classes remain candidate-only:
+those classes do not exist before this slice. All selected candidate checks pass. Fresh replay
+commands, counts, assertion details and logs are recorded in the builder report.
 
 ```json
 {
@@ -61,7 +67,7 @@ calls the overload. All nine checks fail there by assertion.
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java"
       ],
       "class": "New",
-      "behaviour": "I4 (preservation, reconciliation F15), aWindowThatDoesNotFitStepsDownOneRungAndServes: the fake refuses any -c above 16384 with the real llama-server allocation failure ('alloc_buffer: allocating 16604.75 MiB on device 0: cudaMalloc failed: out of memory') and exit 1. The start launches 32768, then exactly one step-down to 16384; the window is rung 16384 with reason stepped-from:32768, and the server there is alive. It passed on 7edc726dd as well in the original record. The evidence regenerated on b599d4d7e has no fail-before run: the current HealthyFakeLlamaServer uses ProcessTerminator, which 7edc726dd lacks, so the check no longer compiles there. It pins that a real fit failure still costs one rung, not inference, now that only RESOURCE steps down.",
+      "behaviour": "I4 (preservation, reconciliation F15), aWindowThatDoesNotFitStepsDownOneRungAndServes: the fake refuses any -c above 16384 with the real llama-server allocation failure ('alloc_buffer: allocating 16604.75 MiB on device 0: cudaMalloc failed: out of memory') and exit 1. The start launches 32768, then exactly one step-down to 16384; the window is rung 16384 with reason stepped-from:32768, and the server there is alive. Preservation replay: 7edc726dd with b6d536-chat-controller-step4-repaired-compat.patch; one selected case executes and passes. It pins that a real fit failure still costs one rung, now that only RESOURCE steps down.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -199,7 +205,9 @@ calls the overload. All nine checks fail there by assertion.
         "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java"
       ],
       "class": "Adaptation",
-      "moved": ["instrumentation"],
+      "moved": [
+        "instrumentation"
+      ],
       "whatMoved": "The shared llama-server stand-in gains opt-in failure behaviour and observation; install(dir) and every existing caller behave as before. install(dir, behaviour...) writes behaviour.txt: --max-ctx N exits 1 with the real alloc_buffer/cudaMalloc out-of-memory line when -c exceeds N; --log-line L with --exit-code C prints the lines and exits; --oom-on-signal makes a serving fake print a CUDA out-of-memory and exit 1 when signalOutOfMemory(dir) is called. Every launch appends its argv to launches.txt (launches(dir)); crashLatest(dir) kills the newest recorded pid only if it is a descendant of this JVM. endAll(dir) still ends and awaits every recorded server, and then also waits (at most five seconds, failing with the file named) until no file in the test directory that holds dir is still held: on Windows the launcher shell and the fake's handles on the redirected llama-server.log outlived their reported exit by 9 to 19 ms, so the @TempDir could not be deleted (pinned by HealthyFakeLlamaServerTest). No assertion in an existing test changes."
     },
     {
@@ -208,7 +216,7 @@ calls the overload. All nine checks fail there by assertion.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The fixture's teardown contract, afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted: three times, the fake is launched as LlamaServerOps launches it (stdout and stderr appended to logs/llama-server.log in the test directory) and stopped as stopLlamaServer stops it (end the launched process and wait for it); after HealthyFakeLlamaServer.endAll the recorded server is not alive and the log can be moved at once (the access @TempDir deletion needs). On 7edc726dd's fixture the second round's log was still held after endAll (the same 'being used by another process' that failed @TempDir cleanup in LlamaServerStartFailureTest and ChatCrashRestartTest).",
+      "behaviour": "The fixture's teardown contract, afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted: three times, the fake is launched as LlamaServerOps launches it (stdout and stderr appended to logs/llama-server.log in the test directory) and stopped as stopLlamaServer stops it (end the launched process and wait for it); after HealthyFakeLlamaServer.endAll the recorded server is not alive and the log can be moved at once (the access @TempDir deletion needs). On 7edc726dd's fixture the second round's log was still held after endAll (the same 'being used by another process' that failed @TempDir cleanup in LlamaServerStartFailureTest and ChatCrashRestartTest). Before replay now declares the add-only b6d536-chat-controller-step4-fixture-identity.patch solely to record and validate PID plus creation time; the original cleanup implementation is retained.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -254,7 +262,9 @@ calls the overload. All nine checks fail there by assertion.
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/ComponentRecoveryMonitorTest.java"
       ],
       "class": "Adaptation",
-      "moved": ["signature"],
+      "moved": [
+        "signature"
+      ],
       "whatMoved": "KnowledgeServerHealthMonitor lost its environment parameter (it fed only the removed barrier): the package-private constructors are now (..., recoveryPolicy) and (..., recoveryPolicy, ownerClockNanos). The helper monitor(components, bootstrap, ownerClockNanos) drops SystemAccess::rawEnvVar; monitor(components, bootstrap, policy, now) now calls the public five-argument constructor directly, and the five-argument helper that took an environment function (used only by the removed barrier tests) is gone. Every remaining test builds the same monitor with the same policy, clocks and bindings as before; no assertion changes."
     },
     {
@@ -262,7 +272,9 @@ calls the overload. All nine checks fail there by assertion.
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexReadinessPublicationTest.java"
       ],
       "class": "Adaptation",
-      "moved": ["instrumentation"],
+      "moved": [
+        "instrumentation"
+      ],
       "whatMoved": "Only the recoveryMonitor helper changes: it looked up the package-private KnowledgeServerHealthMonitor constructor reflectively with the environment Function parameter this step removed (so both tests using it failed with NoSuchMethodException, not an assertion). It now looks up (EngineExecutorRegistry, KnowledgeServerBootstrap, long, LongSupplier, BootRecoveryPolicy, LongSupplier) and passes the same executors, server, 10_000 ms poll interval, wall clock, BootRecoveryPolicy.defaults() and deterministic owner clock as before; the always-null environment function it passed (read only by the removed barrier) and the unused Function import are dropped. Inputs, preconditions, ticks, observations, fault injection and every assertion are unchanged."
     },
     {

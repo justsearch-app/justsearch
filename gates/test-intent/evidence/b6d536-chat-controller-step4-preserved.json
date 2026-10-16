@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
   },
-  "createdAt": "2026-10-14T16:14:51.487Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "b4614dcdfea949c35e618b06f4b7afc37fe0595b",
+  "createdAt": "2026-10-16T04:03:05.996Z",
+  "revision": "31bbdf349527234907d0378966df178e66ef3e0e",
+  "tree": "16e9bdf2b3ef104f56630fea70b59dfa3da415c8",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.aWindowThatDoesNotFitStepsDownOneRungAndServes\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12896
+      "durationMs": 15522
     }
   ],
   "checks": [
@@ -41,6 +41,31 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:ae6a09ba31b67c82bb3fc05db7d72570f029d27c17ab532ddbbd4911aa126ac5"
+  "failBefore": {
+    "ref": "7edc726dd",
+    "revision": "7edc726ddb8eb169e511c5cb8754bc9b07d4d059",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-step4-repaired-compat.patch",
+        "contentDigest": "sha256:34c7fa43d26296305c88940f37e1c3e978456c872ca72225e7ef048d62bda100"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.aWindowThatDoesNotFitStepsDownOneRungAndServes\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 17743
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#aWindowThatDoesNotFitStepsDownOneRungAndServes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:56b495d856aa28175fb178fef21a0187e340fa51a8a08275380407dd0dced1c4"
 }
