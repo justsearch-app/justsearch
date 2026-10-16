@@ -370,7 +370,7 @@ This is unchanged behavior, not a new health guarantee.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Failure to fence witness recording inside main finally remains an unclean exit with its reason and retained instance lock, and reaches the normal fatal startup exit.",
+      "behaviour": "Failure to fence witness recording inside main finally remains an unclean exit with its reason and retained instance lock, and reaches the normal fatal startup exit. The disposable probe launches the current JVM executable on every OS; PID/birth ownership, bounded exit, the normal-exit shutdown-hook marker and visible failure-reason assertions are unchanged.",
       "sources": [
         {
           "kind": "delegated-choice",

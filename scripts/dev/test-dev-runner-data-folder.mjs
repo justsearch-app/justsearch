@@ -61,6 +61,8 @@ function fakeRepository(name) {
   }
   fs.writeFileSync(path.join(fake, 'modules/ui-web/package.json'), JSON.stringify({ name: 'fixture-ui', private: true }));
   fs.writeFileSync(path.join(fake, 'gradlew.bat'), '@echo off\r\necho started>"%~dp0gradle-started.txt"\r\nexit /b 3\r\n');
+  fs.writeFileSync(path.join(fake, 'gradlew'), '#!/bin/sh\nprintf \'started\\n\' > "$(dirname "$0")/gradle-started.txt"\nexit 3\n',
+    { mode: 0o755 });
   return fake;
 }
 

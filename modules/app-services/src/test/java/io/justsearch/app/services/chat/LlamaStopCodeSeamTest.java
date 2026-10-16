@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import io.justsearch.app.api.runtime.child.TerminateCodes;
 import io.justsearch.app.inference.InferenceLifecycleManager;
@@ -26,6 +25,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -35,6 +37,8 @@ import org.junit.jupiter.api.io.TempDir;
  * destroy ends it with 1, which nothing can tell from a crash. Covered: the main server on
  * deactivate and on quit, and the activation self-test's candidate.
  */
+@Tag("windows")
+@EnabledOnOs(OS.WINDOWS)
 final class LlamaStopCodeSeamTest {
 
   private static final Duration EXIT_BOUND = Duration.ofSeconds(15);
@@ -46,7 +50,6 @@ final class LlamaStopCodeSeamTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    assumeTrue(ExitCodeWatch.supported(), "the launched process's exit code is read on Windows");
     seam = new ManagedChatSeam(directory, 200);
     manager = seam.manager();
   }

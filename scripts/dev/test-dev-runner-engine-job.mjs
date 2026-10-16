@@ -26,7 +26,8 @@ const jobRun = require('./lib/job-run.cjs');
 const api = require('./dev-runner.cjs').__test;
 const { identityExecutable } = require('./lib/test-fixture-processes.cjs');
 const tests = [], owned = [], decoys = [];
-const test = (name, fn) => tests.push([name, fn]);
+const test = (name, fn, prerequisite = null) => tests.push([name, fn, prerequisite]);
+const testWindows = (name, fn) => test(name, fn, 'Windows job objects and process creation identities');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const read = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const birthOf = pid => spawnSync(identityExecutable(), [String(pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim();
@@ -67,7 +68,7 @@ function startDecoy() {
   return decoy;
 }
 
-test('dev-runner stop: a detached process the Engine started is ended by the Engine\'s job and listed by identity; a stranger is untouched', async () => {
+testWindows('dev-runner stop: a detached process the Engine started is ended by the Engine\'s job and listed by identity; a stranger is untouched', async () => {
   const state = path.join(root, 'cli'); fs.mkdirSync(state, { recursive: true });
   const plan = path.join(state, 'plan.json');
   fs.writeFileSync(plan, JSON.stringify({ incarnations: [{ mode: 'honour', spawnGrandchild: true }] }));
@@ -130,7 +131,7 @@ const exit=process.exit.bind(process);
 process.exit=code=>{if(last)try{write({...last,children:[child]})}catch{};exit(code)};
 import(${JSON.stringify('file:///' + fakeEngine.replaceAll('\\', '/'))});`;
 
-test('dev-runner stop: a helper registered with the Engine is ended by the registered-helper step, before the job, and reported as such', async () => {
+testWindows('dev-runner stop: a helper registered with the Engine is ended by the registered-helper step, before the job, and reported as such', async () => {
   const state = path.join(root, 'registered'); fs.mkdirSync(state, { recursive: true });
   const plan = path.join(state, 'plan.json');
   fs.writeFileSync(plan, JSON.stringify({ incarnations: [{ mode: 'honour' }] }));
@@ -224,7 +225,7 @@ async function startNestedEngine(name, code) {
   return { run, quit, rootId, helper };
 }
 
-test('the Engine\'s own nested job changes neither containment nor the exit code it leaves', async () => {
+testWindows('the Engine\'s own nested job changes neither containment nor the exit code it leaves', async () => {
   // An ordered exit: the Engine's code passes through the runner's job host unchanged.
   const quitting = await startNestedEngine('nested-quit', 7);
   const exited = new Promise(resolve => quitting.run.child.once('exit', code => resolve(code)));
@@ -286,9 +287,10 @@ test('a fallback stop ends the Engine\'s job last, after the ordered quit and th
     ?.unresolvedProcesses?.some(p => p.pid === left), 'and names it');
 });
 
-let failed = 0;
+let failed = 0, skipped = 0;
 try {
-  for (const [name, fn] of tests) {
+  for (const [name, fn, prerequisite] of tests) {
+    if (prerequisite && process.platform !== 'win32') { skipped++; console.log(`SKIP ${name}: ${prerequisite}`); continue; }
     try { await fn(); console.log(`PASS ${name}`); }
     catch (error) { failed++; console.error(`FAIL ${name}: ${error.stack}`); }
   }
@@ -301,5 +303,5 @@ try {
   fs.rmSync(root, { recursive: true, force: true });
   fs.rmSync(dataRoot, { recursive: true, force: true });
 }
-console.log(`engine-job: ${tests.length - failed}/${tests.length} passed`);
+console.log(`engine-job: ${tests.length - failed - skipped}/${tests.length - skipped} passed${skipped ? `, ${skipped} skipped (Windows native job prerequisites)` : ''}`);
 process.exitCode = failed ? 1 : 0;

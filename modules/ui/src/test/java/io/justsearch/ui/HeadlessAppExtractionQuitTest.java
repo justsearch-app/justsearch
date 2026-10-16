@@ -42,7 +42,7 @@ final class HeadlessAppExtractionQuitTest {
       Files.writeString(args, "-cp\n\"" + System.getProperty("java.class.path").replace("\\", "/")
           + "\"\n" + Probe.class.getName() + "\n" + ignoresEof + "\n", StandardCharsets.UTF_8);
       var spec = new ChildSpec(ChildKind.EXTRACTION,
-          List.of(Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
+          List.of(ProcessHandle.current().info().command().orElseThrow(),
               "@" + args),
           null, Map.of(), new ChildSpec.Stdio.Pipes(), false, OptionalLong.empty(), Optional.empty(),
           new ChildSpec.CooperativeStop(ChildSpec.CooperativeStop.Action.CLOSE_STDIN,

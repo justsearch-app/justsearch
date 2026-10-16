@@ -69,6 +69,13 @@
       "cadence": "local targeted runs when changing the measured or proven behavior"
     },
     {
+      "tag": "heap-measurement",
+      "tier": "unit-heap-measurement",
+      "owner": "adapters-lucene / chunk admission retention",
+      "reason": "ChunkAdmissionRefreshRetentionTest measures retained heap across reader refreshes with a settled 100,000-chunk corpus. The tag describes this measurement and does not exclude it from the default unit-test task.",
+      "cadence": "runs every CI in the adapters-lucene unit-test lane; run locally before changing chunk admission or reader refresh retention"
+    },
+    {
       "tag": "vdu",
       "tier": "vdu-integration-evidence",
       "owner": "VDU processing",

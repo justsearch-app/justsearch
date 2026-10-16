@@ -13,6 +13,13 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
+// Every case exercises a real Windows job, native creation identity or console Ctrl+C.
+// Keep the full suite on Windows; these prerequisites do not exist on the Ubuntu runner.
+if (process.platform !== 'win32') {
+  console.log('job-stops: SKIP (Windows job objects, process creation identities and console events)');
+  process.exit(0);
+}
+
 const require = createRequire(import.meta.url);
 const repo = path.resolve(import.meta.dirname, '../..');
 const actuator = require('./lib/engine-actuator.cjs');

@@ -16,7 +16,7 @@ final class HeadlessAppWitnessFailureTest {
     Files.writeString(args, "--enable-native-access=ALL-UNNAMED\n-javaagent:\"" + agent
         + "\"\n-cp \"" + classpath + "\"\n" + HeadlessAppWitnessFailureProbe.class.getName()
         + "\n\"" + dir.toString().replace('\\', '/') + "\"\n");
-    Process child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
+    Process child = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),
         "@" + args).redirectErrorStream(true).redirectOutput(log.toFile()).start();
     var os = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs();
     var held = os.open(child); String birth = held.creationFileTime().orElseThrow();

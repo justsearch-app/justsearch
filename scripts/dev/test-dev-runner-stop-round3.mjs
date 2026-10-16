@@ -15,7 +15,9 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stop-round3-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = root;
 const api = require('./dev-runner.cjs').__test;
 const tests = [];
-const test = (name, fn) => tests.push([name, fn]);
+const test = (name, fn) => tests.push([name, fn, false]);
+const windowsTest = (name, fn) => tests.push([name, fn, true]);
+const windows = process.platform === 'win32';
 const pid = 987654, birth = '134000000000000000';
 const owner = api.holderBlockFor(api.resolveCallerIdentity('owner'));
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -115,7 +117,7 @@ test('start refuses living forgotten runner and Engine before publishing or clea
   assert.equal(publishes, 0); assert.equal(stops, 0);
 });
 
-test('real default CLI start refuses forgotten live processes without cleaning, even with takeover force', async () => {
+windowsTest('real default CLI start refuses forgotten live processes without cleaning, even with takeover force', async () => {
   const children = [];
   fs.mkdirSync(path.join(repo, 'tmp'), { recursive: true });
   const data = fs.mkdtempSync(path.join(repo, 'tmp', 'round3-forgotten-data-'));
@@ -169,7 +171,7 @@ test('real cleanup of a forgotten run refuses clearly and preserves its data', (
   const sentinel = path.join(data, 'derived-still-in-use'); fs.writeFileSync(sentinel, 'preserve');
   const target = fixture('forgotten-cleanup', { pids: {}, identities: {}, dataDir: data });
   const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},60000)'], { stdio: 'ignore', windowsHide: true });
-  fs.writeFileSync(path.join(target.dir, 'forgotten-unresolved.json'), JSON.stringify({ leftBehind: [{ ...child.recordedIdentity, name: 'Engine.exe' }] }));
+  fs.writeFileSync(path.join(target.dir, 'forgotten-unresolved.json'), JSON.stringify({ leftBehind: [{ pid: child.pid, ...child.recordedIdentity, name: 'Engine.exe' }] }));
   try {
     const result = spawnSync(process.execPath, [path.join(repo, 'scripts/dev/dev-runner.cjs'), 'cleanup', '--json',
       '--run', target.run.runId, '--session-id', 'owner', '--clean', 'hard'], { cwd: repo, env: process.env, encoding: 'utf8', windowsHide: true });
@@ -220,7 +222,7 @@ test('birthless descendant gets a stable first-observed bound and resolves later
   assert.equal((await api.stopRun({}, { ...io(target), resolveTarget: async () => ({ ...target, run: read(target.runPath) }), lookupIdentities: lookup })).outcome,
     'STOPPED', 'a PID born after the descendant was observed is foreign');
 });
-test('real Windows identity lookup reads two spawn-recorded roots in one invocation', async () => {
+windowsTest('real Windows identity lookup reads two spawn-recorded roots in one invocation', async () => {
   const actuator = require('./lib/engine-actuator.cjs');
   const children = [], roots = [];
   try {
@@ -246,9 +248,13 @@ test('real Windows identity lookup reads two spawn-recorded roots in one invocat
     for (const child of children) child.kill();
   }
 });
-let failed = 0;
-try { for (const [name, fn] of tests) { try { await fn(); console.log('PASS ' + name); }
+let failed = 0, skipped = 0;
+try { for (const [name, fn, requiresWindows] of tests) {
+  if (requiresWindows && !windows) {
+    skipped++; console.log('SKIP ' + name + ': requires native Windows process creation identities'); continue;
+  }
+  try { await fn(); console.log('PASS ' + name); }
   catch (e) { failed++; console.error('FAIL ' + name + ': ' + e.stack); } } }
 finally { fs.rmSync(root, { recursive: true, force: true }); }
-console.log(`stop-round3: ${tests.length - failed}/${tests.length} passed`);
+console.log(`stop-round3: ${tests.length - failed - skipped}/${tests.length - skipped} passed; ${skipped} skipped`);
 process.exitCode = failed ? 1 : 0;

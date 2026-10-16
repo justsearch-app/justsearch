@@ -21,7 +21,8 @@ const actuator = require('./lib/engine-actuator.cjs');
 const { stopRun, acquireAdmission, holderBlockFor, resolveCallerIdentity } = require('./dev-runner.cjs').__test;
 const tests = [], children = [];
 const extraOwned = [];
-const test = (name, fn) => tests.push([name, fn]);
+const test = (name, fn, windowsOnly = false) => tests.push([name, fn, windowsOnly]);
+const windowsNative = (name, fn) => test(name, fn, true);
 const pid = 987654, birth = '134000000000000000';
 function fixture(name, extra = {}) {
   const run = { runId: name, holder: holderBlockFor(resolveCallerIdentity('recovery-owner')), pids: { frontendRootPid: pid },
@@ -150,7 +151,7 @@ test('dev-all birth capture finishes in the spawn turn before stop', () => {
   const jobRun = require('./lib/job-run.cjs');
   const context = { require: id => id === 'process' ? { platform: 'win32', env: {} }
     : id.includes('job-run') ? { ...jobRun,
-      startInJob: options => jobRun.startInJob({ ...options, env: { JUSTSEARCH_JOB_RECORD_DIR: path.join(root, 'dev-all-runs') },
+      startInJob: options => jobRun.startInJob({ ...options, platform: 'win32', env: { JUSTSEARCH_JOB_RECORD_DIR: path.join(root, 'dev-all-runs') },
         spawnImpl: () => child, capture: () => ({ pid, creationFileTimeUtc: birth }) }),
       stopJobRunSync: (...args) => { calls.push(args); return { ok: true }; } }
       : createRequire(file)(id), __dirname: path.dirname(file), console, setTimeout };
@@ -159,7 +160,7 @@ test('dev-all birth capture finishes in the spawn turn before stop', () => {
   assert.equal(calls[0]?.[0]?.host?.creationFileTimeUtc, birth, 'stop immediately after spawn must carry the birth');
 });
 let exitedWrapper;
-test('spawn capture retains the exited wrapper identity, and its identity stop ends nothing else', () => {
+windowsNative('spawn capture retains the exited wrapper identity, and its identity stop ends nothing else', () => {
   const proof = path.join(root, 'exited-wrapper.json');
   const identityExe = process.platform === 'win32' ? require('./lib/test-fixture-processes.cjs').identityExecutable() : null;
   const code = `const cp=require('child_process'),fs=require('fs'); const child=cp.spawn(process.execPath,['-e','setTimeout(()=>{},120000)'],{stdio:'ignore',detached:true,windowsHide:true}); const r=cp.spawnSync(${JSON.stringify(identityExe)},[String(child.pid)],{encoding:'utf8',windowsHide:true}); fs.writeFileSync(${JSON.stringify(proof)},JSON.stringify({pid:child.pid,creationFileTimeUtc:r.stdout.trim()})); process.exit(0);`;
@@ -179,7 +180,7 @@ test('spawn capture retains the exited wrapper identity, and its identity stop e
   assert.equal(stopped.outcome, 'gone', JSON.stringify(stopped));
   exitedWrapper = { wrapper, captured, leaf };
 });
-test('a detached leaf of an exited wrapper does not survive its run\'s stop', async () => {
+windowsNative('a detached leaf of an exited wrapper does not survive its run\'s stop', async () => {
   // A dev tool's run: started through the tools' job starter when the tree has one, so the kernel adds
   // the leaf to the run's job at its creation and the run's stop ends it, without parent links. A
   // tree without it starts and stops the run as the check above does, by the wrapper's identity alone.
@@ -222,7 +223,7 @@ function cli(args, env) {
 }
 function readJsonOutput(output) { try { return JSON.parse(String(output).trim().split(/\r?\n/).at(-1)); } catch { return { output }; } }
 let cliRecovery;
-test('real CLI first stop resolves a frontend exiting during the stop request', async () => {
+windowsNative('real CLI first stop resolves a frontend exiting during the stop request', async () => {
   const state = path.join(root, 'cli'); fs.mkdirSync(state);
   const plan = path.join(state, 'plan.json'); fs.writeFileSync(plan, JSON.stringify({ incarnations: [{ mode: 'honour' }] }));
   const delayExit = path.join(state, 'delay-exit.cjs');
@@ -260,22 +261,28 @@ test('real CLI first stop resolves a frontend exiting during the stop request', 
   cliRecovery = { stopped, second, takeover, takeoverStopped, next };
   assert.equal(stopped.outcome, 'STOPPED', JSON.stringify(stopped));
 });
-test('real CLI second stop finds no active run after frontend self-exit', () => {
+windowsNative('real CLI second stop finds no active run after frontend self-exit', () => {
   assert.equal(cliRecovery?.second.note, 'no_active_run', JSON.stringify(cliRecovery?.second));
 });
-test('real CLI another-session takeover proceeds after frontend self-exit', () => {
+windowsNative('real CLI another-session takeover proceeds after frontend self-exit', () => {
   assert.ok(cliRecovery && !cliRecovery.takeover.failed, cliRecovery?.takeover.output);
   assert.equal(cliRecovery.takeoverStopped.outcome, 'STOPPED');
 });
-test('real CLI next start proceeds after frontend self-exit', () => {
+windowsNative('real CLI next start proceeds after frontend self-exit', () => {
   assert.ok(cliRecovery && !cliRecovery.next.failed, cliRecovery?.next.output);
 });
 test('real CLI forget prints the unknown Engine and leaves it alive', async () => {
   const state = path.join(root, 'forget-cli');
   const runId = 'legacy-live'; const dir = path.join(state, 'runs', runId); fs.mkdirSync(dir, { recursive: true });
-  const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},60000)'], { stdio: 'ignore' });
-  const capture = spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-Process -Id ${child.pid}).StartTime.ToFileTimeUtc().ToString()`], { encoding: 'utf8', windowsHide: true });
-  children.push({ child, identity: { pid: child.pid, creationFileTimeUtc: capture.stdout.trim() } });
+  // The deliberately unowned fixture exits only on this private channel after every assertion.
+  // Forget is portable: it must retain an unknown process without needing a native stop primitive.
+  const exitFile = path.join(state, 'fixture-quit');
+  const child = spawn(process.execPath, ['-e', `const fs=require('fs');setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitFile)}))process.exit(0)},20)`], { stdio: 'ignore' });
+  const exited = new Promise(resolve => child.once('exit', resolve));
+  const capture = process.platform === 'win32'
+    ? spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-Process -Id ${child.pid}).StartTime.ToFileTimeUtc().ToString()`], { encoding: 'utf8', windowsHide: true })
+    : null;
+  children.push({ child, identity: capture ? { pid: child.pid, creationFileTimeUtc: capture.stdout.trim() } : null, exitFile, exited });
   const holder = holderBlockFor(resolveCallerIdentity('forget-owner'));
   fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ runId, holder, pids: { backendRootPid: child.pid } }));
   fs.writeFileSync(path.join(state, 'active.json'), JSON.stringify({ runId, holder, runPath: path.join(dir, 'run.json') }));
@@ -288,18 +295,32 @@ test('real CLI forget prints the unknown Engine and leaves it alive', async () =
   assert.equal(child.exitCode, null, 'forget never terminates the unknown Engine');
   assert.equal(fs.existsSync(path.join(state, 'active.json')), false);
 });
-let failed = 0;
+let failed = 0, skipped = 0;
 try {
-  for (const [name, fn] of tests) { try { await fn(); console.log(`PASS ${name}`); } catch (e) { failed++; console.error(`FAIL ${name}: ${e.stack}`); } }
+  for (const [name, fn, windowsOnly] of tests) {
+    if (windowsOnly && process.platform !== 'win32') {
+      console.log(`SKIP ${name}: Windows native process identities and job-object stops`);
+      skipped++;
+      continue;
+    }
+    try { await fn(); console.log(`PASS ${name}`); } catch (e) { failed++; console.error(`FAIL ${name}: ${e.stack}`); }
+  }
 }
 finally {
-  // Only our spawn-recorded identities, each by its own recorded birth; a runner's children end
-  // with its job, never through a sweep of parent links.
-  for (const { child, identity } of children) if (identity && child.exitCode === null) actuator.terminateWithCodeSync(child.pid, identity.creationFileTimeUtc, 1);
+  // A portable fixture uses its private self-exit channel. Terminations target only our
+  // spawn-recorded identities, each by its own recorded birth; a runner's children end with its
+  // job, never through a sweep of parent links.
+  for (const { child, identity, exitFile, exited } of children) {
+    if (exitFile) {
+      fs.writeFileSync(exitFile, 'quit');
+      await until(() => child.exitCode !== null, 5000);
+      await exited;
+    } else if (identity && child.exitCode === null) actuator.terminateWithCodeSync(child.pid, identity.creationFileTimeUtc, 1);
+  }
   for (const p of extraOwned) actuator.terminateWithCodeSync(p.pid, p.creationFileTimeUtc, 1);
   // JSON/log-only fixture; no symlinks or junctions are created here.
   fs.rmSync(root, { recursive: true, force: true });
   fs.rmSync(dataRoot, { recursive: true, force: true });
 }
-console.log(`stop-recovery: ${tests.length - failed}/${tests.length} passed`);
+console.log(`stop-recovery: ${tests.length - failed - skipped}/${tests.length - skipped} passed, ${skipped} skipped`);
 process.exitCode = failed ? 1 : 0;
