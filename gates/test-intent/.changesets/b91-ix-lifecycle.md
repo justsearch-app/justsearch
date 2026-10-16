@@ -715,3 +715,14 @@ the gate, described near the top):
   "note": "Reviewed fixture cleanup, the explicit fake-process admission fault and portable JVM launcher; all 36 scoped evidence selectors pass. All six declared before setups match their assertion and preservation outcomes, including the four actual round-4 selectors without an unrelated shared status-test overlay."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:2b4c5348e524570fc6d2d460ed46556599c032f17af9e234570f2029f5322d0a",
+  "note": "Re-bound to origin/main 298354254 after reviewing the admission-fault and portable witness fixtures. All 36 scoped and preservation selectors pass, and six declared before setups reproduce their assertion and preservation outcomes without changed expectations."
+}
+```

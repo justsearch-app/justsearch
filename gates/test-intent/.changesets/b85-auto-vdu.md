@@ -741,3 +741,14 @@ bc5978095 on (first failing first-parent commit; they pass on a000e15c7 and on 8
   "note": "Replayed every declared setup with nonzero cases and matching reasons, including nine r2 preservation passes and r4 nine assertion failures plus two preservation passes; candidate checks pass. Reviewed add-only compatibility patches and confirmed the added shutdown stubs are outside selected paths."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:972a4781370f13923d460d16194fd922630dad147d28bfc3e683e17acca6f67f",
+  "note": "Reviewed add-only historical compatibility, shared process fixtures and the closing-order repair; all 55 declared checks pass in scoped Windows reruns. All seven before recipes match, and the unchanged active-pass quit-budget regression passes."
+}
+```
