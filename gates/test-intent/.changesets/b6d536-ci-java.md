@@ -55,3 +55,16 @@ No builder acceptance is recorded.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:6a887fd7835604ee1f9a877bdd9b8b01cfd1ebbac44d9c16853dadd5cbff58a7",
+  "note": "Reviewed the CI repairs, preserved assertions, honest prerequisites and required Windows task selection; the exact Windows-native task list and all changed Java classes execute successfully on Windows. The Rust library passes 149 tests, including the finite terminal-accounting allowance regression; the unchanged default Cargo binary compilation failure is an observation, not a library-test pass."
+}
+```

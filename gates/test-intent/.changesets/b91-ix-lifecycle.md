@@ -693,3 +693,14 @@ the gate, described near the top):
   "note": "The shared Healthy fixture changes cleanup while retaining PID-plus-birth checks, serving behavior and test oracles. All listed candidate selectors pass and the fixture-dependent resume replay reproduces the recorded PASSED-versus-RELAUNCHED failure on 32d00dda8."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:560e871a8308a40a7abc663bd1cdf38fbc84070d77b01492ac01f6479ac425eb",
+  "note": "Reviewed the portable admission fault, shared fake-server cleanup, unchanged lifecycle oracles and refreshed evidence. All cited candidate selectors pass, and every declared before setup reproduces its intended assertion or preservation outcome, including the fixture-overlay resume replay."
+}
+```

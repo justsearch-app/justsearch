@@ -93,3 +93,14 @@ Pending independent verifier acceptance.
   "note": "Reviewed the current replay fixture/evidence changes and selected candidate passes. The exact declared b1cfcac8e before run matches all five recorded check outcomes: three assertion classifications and two preservation passes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:6fbbaa3a654cd4f6823e10ee674645876402803c93468679b7d97a53ac922dc3",
+  "note": "Reviewed the portable JVM launcher without any weakened quit, extraction or replay assertion. All candidate checks pass, and the declared b1cfcac8e replay reproduces three assertion classifications and two preservation passes with nonzero cases."
+}
+```

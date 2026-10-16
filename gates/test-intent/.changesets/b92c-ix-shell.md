@@ -359,3 +359,14 @@ CI759: existing b92c-ix-shell-rust.json is regenerated with its declared before-
   "note": "re-bound to main; no change since 48b978bd925da79121a083fd687b76469592e130. Reading review confirms the entries still truthfully describe the current indexing-shell items."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:1a5b5d29d89fe47ab94a1c3d00e8da9945a7df103fda124291936fefe8bee66f",
+  "note": "Reviewed the bounded updater wait, new real-child accounting regression, Java override adaptation and refreshed evidence. Every cited candidate check passes on Windows, and serialized before replays reproduce the original assertion and preservation outcomes, including the 31bbdf349 accounting-budget assertion."
+}
+```
