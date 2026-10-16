@@ -104,3 +104,14 @@ Pending independent verifier acceptance.
   "note": "Reviewed the portable JVM launcher without any weakened quit, extraction or replay assertion. All candidate checks pass, and the declared b1cfcac8e replay reproduces three assertion classifications and two preservation passes with nonzero cases."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS7-20261016",
+  "verdict": "accept",
+  "digest": "sha256:bf2c3f7f4eae50e8e4c1c9be6c0f1cb4072aae518f28d439e337d39234ccc05a",
+  "note": "Both running-JVM launch changes retain every replay and quit assertion, and all five evidence selectors pass. The declared b1cfcac8e recipe reproduces its three assertion classifications and both preservation passes."
+}
+```
