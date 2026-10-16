@@ -144,7 +144,8 @@ test('an owned fixture that exits within its grace is never stopped', async () =
   } finally { removeFixtureDirectory(dir); }
 });
 
-test('the fixture identity preload starts no process before the fixture runs', () => {
+test('the fixture identity preload starts no process before the fixture runs',
+  { skip: process.platform !== 'win32' && 'Windows fixture identity boundary' }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conformance-preload-'));
   const require = createRequire(import.meta.url);
   const cp = require('node:child_process');

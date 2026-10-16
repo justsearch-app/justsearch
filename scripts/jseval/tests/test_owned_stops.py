@@ -39,6 +39,7 @@ class OwnedStopTest(unittest.TestCase):
             stop.assert_not_called()
             retire.assert_called_once_with(child.pid)
 
+    @unittest.skipUnless(os.name == "nt", "exercises the Windows PowerShell run-stop boundary")
     def test_sweep_accepts_a_recorded_process_already_gone(self):
         source = (ROOT / "scripts/search/sweep-cc-weights.sh").read_text(encoding="utf-8")
         body = source.split("kill_backend() {", 1)[1].split("\n}", 1)[0]
@@ -106,6 +107,7 @@ class OwnedStopTest(unittest.TestCase):
         self.assertLess(text.index('actual == int(start["creationFileTime"])'), text.index("kernel.TerminateProcess(helper"))
         self.assertLess(text.index('spawn["owner"]["creationFileTime"]'), text.index("kernel.TerminateProcess(helper"))
 
+    @unittest.skipUnless(os.name == "nt", "exercises the Windows PowerShell run-stop boundary")
     def test_sweep_leaves_a_foreign_port_owner_alone(self):
         source = (ROOT / "scripts/search/sweep-cc-weights.sh").read_text(encoding="utf-8")
         body = source.split("kill_backend() {", 1)[1].split("\n}", 1)[0]
@@ -124,6 +126,7 @@ class OwnedStopTest(unittest.TestCase):
             result = subprocess.run(["powershell.exe", "-NoProfile", "-Command", script], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, "a foreign listener must not be killed: " + result.stderr)
 
+    @unittest.skipUnless(os.name == "nt", "exercises the Windows installer process-handle boundary")
     def test_local_installer_cleanup_rechecks_its_spawn_identity(self):
         # Identity-only stops, as on the integration side since 58a51a608: the installer's
         # cleanup ends only the registered process handle after rechecking its start time.

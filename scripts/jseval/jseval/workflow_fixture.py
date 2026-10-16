@@ -2425,7 +2425,7 @@ def _applied_sampling_problems(baseline: dict, candidate: dict) -> list[str]:
 #: `CrossEncoderSkipReason.isDrop()` (app-api) — a by-design skip is not in this set.
 CROSS_ENCODER_DROP_REASONS = frozenset({
     "DEADLINE_EXCEEDED", "SEARCH_DEADLINE_EXCEEDED", "RPC_FAILED", "MODEL_NOT_LOADED",
-    "INFERENCE_FAILED", "UNKNOWN",
+    "MODEL_LOADING", "INFERENCE_FAILED", "UNKNOWN",
 })
 
 

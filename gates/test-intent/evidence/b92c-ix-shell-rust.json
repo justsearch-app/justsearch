@@ -2,18 +2,18 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
   },
-  "createdAt": "2026-10-13T18:26:00.199Z",
-  "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
-  "tree": "9150f99179b003efde97bd0cf2df9dab08ff76e8",
+  "createdAt": "2026-10-16T04:34:06.888Z",
+  "revision": "31bbdf349527234907d0378966df178e66ef3e0e",
+  "tree": "f14617d717240c007f3b016a485b74f0f158b63c",
   "environment": {
     "platform": "win32",
     "arch": "x64",
     "osRelease": "10.0.26200",
     "node": "v24.12.0",
     "java": null,
-    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
     "ci": false
   },
   "runs": [
@@ -21,31 +21,31 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10153
+      "durationMs": 3423
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 524
+      "durationMs": 571
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::all_five_incarnations_survive_per_file_rotation\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 623
+      "durationMs": 827
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::failed_rotation_preserves_previous_archive\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 560
+      "durationMs": 521
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 969
+      "durationMs": 1032
     }
   ],
   "checks": [
@@ -53,7 +53,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "contentDigest": "sha256:63db5e00119af43e58f6174cb8928d1758ce564c31274c25da1e81171897e428",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -68,7 +68,7 @@
       "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption",
       "file": "modules/shell/src-tauri/src/engine_host.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "contentDigest": "sha256:63db5e00119af43e58f6174cb8928d1758ce564c31274c25da1e81171897e428",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -128,67 +128,74 @@
   "failBefore": {
     "ref": "61ff9b955",
     "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
-    "overlays": [],
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
     "patches": [],
     "runs": [
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 11364
+        "durationMs": 9987,
+        "output": "\nrunning 1 test\ntest engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting ... FAILED\n\nfailures:\n\n---- engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting stdout ----\n\nthread 'engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting' (22852) panicked at src\\engine_host.rs:1956:9:\nassertion `left == right` failed: reaped is not the actor's persisted exit acknowledgement\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 148 filtered out; finished in 0.04s\n\n\n   Compiling shell v0.3.0 (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\ci759\\before\\test-intent-before-pacxbH\\modules\\shell\\src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src\\lib.rs:203:4\n    |\n203 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src\\lib.rs:944:15\n    |\n944 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variant `Unsupported` is never constructed\n  --> src\\containment.rs:39:5\n   |\n37 | pub(crate) enum ContainmentError {\n   |                 ---------------- variant in this enum\n38 |     /// Not Windows: there is no job to create.\n39 |     Unsupported,\n   |     ^^^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: function `resolve_manifest_path` is never used\n  --> src\\platform_paths.rs:92:8\n   |\n92 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src\\quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src\\quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src\\supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src\\updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src\\updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 9 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.86s\n     Running unittests src\\lib.rs (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\cargo-target\\debug\\deps\\shell_lib-ab4a4d612243eb27.exe)\nerror: test failed, to rerun pass `--lib`\n"
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 685
+        "durationMs": 512,
+        "output": "\nrunning 1 test\ntest engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption ... FAILED\n\nfailures:\n\n---- engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption stdout ----\n\nthread 'engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption' (30276) panicked at src\\engine_host.rs:2053:9:\nassertion `left == right` failed: accounted crash under replacement hold must permit handoff: Err(\"Engine stop did not finish as upgrade; installer refused\")\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 148 filtered out; finished in 0.05s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src\\lib.rs:203:4\n    |\n203 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src\\lib.rs:944:15\n    |\n944 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variant `Unsupported` is never constructed\n  --> src\\containment.rs:39:5\n   |\n37 | pub(crate) enum ContainmentError {\n   |                 ---------------- variant in this enum\n38 |     /// Not Windows: there is no job to create.\n39 |     Unsupported,\n   |     ^^^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: function `resolve_manifest_path` is never used\n  --> src\\platform_paths.rs:92:8\n   |\n92 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src\\quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src\\quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src\\supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src\\updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src\\updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 9 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.39s\n     Running unittests src\\lib.rs (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\cargo-target\\debug\\deps\\shell_lib-ab4a4d612243eb27.exe)\nerror: test failed, to rerun pass `--lib`\n"
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::all_five_incarnations_survive_per_file_rotation\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 716
+        "durationMs": 773,
+        "output": "\nrunning 1 test\ntest exit_ledger::tests::all_five_incarnations_survive_per_file_rotation ... FAILED\n\nfailures:\n\n---- exit_ledger::tests::all_five_incarnations_survive_per_file_rotation stdout ----\n\nthread 'exit_ledger::tests::all_five_incarnations_survive_per_file_rotation' (42224) panicked at src\\exit_ledger.rs:619:9:\nassertion `left == right` failed: per-file rotation must retain prior generations below the retention bound\n  left: 4\n right: 40\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    exit_ledger::tests::all_five_incarnations_survive_per_file_rotation\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 148 filtered out; finished in 0.31s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src\\lib.rs:203:4\n    |\n203 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src\\lib.rs:944:15\n    |\n944 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variant `Unsupported` is never constructed\n  --> src\\containment.rs:39:5\n   |\n37 | pub(crate) enum ContainmentError {\n   |                 ---------------- variant in this enum\n38 |     /// Not Windows: there is no job to create.\n39 |     Unsupported,\n   |     ^^^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: function `resolve_manifest_path` is never used\n  --> src\\platform_paths.rs:92:8\n   |\n92 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src\\quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src\\quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src\\supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src\\updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src\\updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 9 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.39s\n     Running unittests src\\lib.rs (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\cargo-target\\debug\\deps\\shell_lib-ab4a4d612243eb27.exe)\nerror: test failed, to rerun pass `--lib`\n"
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::failed_rotation_preserves_previous_archive\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 588
+        "durationMs": 473,
+        "output": "\nrunning 1 test\ntest exit_ledger::tests::failed_rotation_preserves_previous_archive ... FAILED\n\nfailures:\n\n---- exit_ledger::tests::failed_rotation_preserves_previous_archive stdout ----\n\nthread 'exit_ledger::tests::failed_rotation_preserves_previous_archive' (22000) panicked at src\\exit_ledger.rs:851:9:\nassertion `left == right` failed: failed rotation cannot destroy the retained previous archive\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    exit_ledger::tests::failed_rotation_preserves_previous_archive\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 148 filtered out; finished in 0.01s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src\\lib.rs:203:4\n    |\n203 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src\\lib.rs:944:15\n    |\n944 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variant `Unsupported` is never constructed\n  --> src\\containment.rs:39:5\n   |\n37 | pub(crate) enum ContainmentError {\n   |                 ---------------- variant in this enum\n38 |     /// Not Windows: there is no job to create.\n39 |     Unsupported,\n   |     ^^^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: function `resolve_manifest_path` is never used\n  --> src\\platform_paths.rs:92:8\n   |\n92 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src\\quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src\\quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src\\supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src\\updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src\\updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 9 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.39s\n     Running unittests src\\lib.rs (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\cargo-target\\debug\\deps\\shell_lib-ab4a4d612243eb27.exe)\nerror: test failed, to rerun pass `--lib`\n"
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 607
+        "durationMs": 474,
+        "output": "\nrunning 1 test\ntest exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first ... FAILED\n\nfailures:\n\n---- exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first stdout ----\n\nthread 'exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first' (11232) panicked at src\\exit_ledger.rs:654:9:\nassertion `left == right` failed: the evicted identity has a loss receipt: []\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 148 filtered out; finished in 0.01s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src\\lib.rs:203:4\n    |\n203 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src\\lib.rs:944:15\n    |\n944 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variant `Unsupported` is never constructed\n  --> src\\containment.rs:39:5\n   |\n37 | pub(crate) enum ContainmentError {\n   |                 ---------------- variant in this enum\n38 |     /// Not Windows: there is no job to create.\n39 |     Unsupported,\n   |     ^^^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: function `resolve_manifest_path` is never used\n  --> src\\platform_paths.rs:92:8\n   |\n92 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src\\quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src\\quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src\\supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src\\updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src\\updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 9 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s\n     Running unittests src\\lib.rs (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\cargo-target\\debug\\deps\\shell_lib-ab4a4d612243eb27.exe)\nerror: test failed, to rerun pass `--lib`\n"
       }
     ],
     "checks": [
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting",
         "classification": "assertion",
-        "detail": "engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting:  ---- engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting stdout ----\n\nthread 'engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting' (36696) panicked at src\\engine_host.rs:1956:9:\nassertion `left == right` failed: reaped is not the actor's persisted exit acknowledgement\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engin"
+        "detail": "engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting:  ---- engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting stdout ----\n\nthread 'engine_host::tests::prepared_upgrade_waits_for_actor_exit_accounting' (22852) panicked at src\\engine_host.rs:1956:9:\nassertion `left == right` failed: reaped is not the actor's persisted exit acknowledgement\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engin"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption",
         "classification": "assertion",
-        "detail": "engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption:  ---- engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption stdout ----\n\nthread 'engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption' (35368) panicked at src\\engine_host.rs:2005:9:\nassertion `left == right` failed: accounted crash under replacement hold must permit handoff: Err(\"Engine stop did not finish as upgrade; installer refused\")\n  left: false\n right: true\nnote: run with `R"
+        "detail": "engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption:  ---- engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption stdout ----\n\nthread 'engine_host::tests::upgrade_stop_accepts_crash_before_command_consumption' (30276) panicked at src\\engine_host.rs:2053:9:\nassertion `left == right` failed: accounted crash under replacement hold must permit handoff: Err(\"Engine stop did not finish as upgrade; installer refused\")\n  left: false\n right: true\nnote: run with `R"
       },
       {
         "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::all_five_incarnations_survive_per_file_rotation",
         "classification": "assertion",
-        "detail": "exit_ledger::tests::all_five_incarnations_survive_per_file_rotation:  ---- exit_ledger::tests::all_five_incarnations_survive_per_file_rotation stdout ----\n\nthread 'exit_ledger::tests::all_five_incarnations_survive_per_file_rotation' (37932) panicked at src\\exit_ledger.rs:619:9:\nassertion `left == right` failed: per-file rotation must retain prior generations below the retention bound\n  left: 4\n right: 40\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n  "
+        "detail": "exit_ledger::tests::all_five_incarnations_survive_per_file_rotation:  ---- exit_ledger::tests::all_five_incarnations_survive_per_file_rotation stdout ----\n\nthread 'exit_ledger::tests::all_five_incarnations_survive_per_file_rotation' (42224) panicked at src\\exit_ledger.rs:619:9:\nassertion `left == right` failed: per-file rotation must retain prior generations below the retention bound\n  left: 4\n right: 40\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n  "
       },
       {
         "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::failed_rotation_preserves_previous_archive",
         "classification": "assertion",
-        "detail": "exit_ledger::tests::failed_rotation_preserves_previous_archive:  ---- exit_ledger::tests::failed_rotation_preserves_previous_archive stdout ----\n\nthread 'exit_ledger::tests::failed_rotation_preserves_previous_archive' (8044) panicked at src\\exit_ledger.rs:851:9:\nassertion `left == right` failed: failed rotation cannot destroy the retained previous archive\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    exit_ledger::tests::failed_r"
+        "detail": "exit_ledger::tests::failed_rotation_preserves_previous_archive:  ---- exit_ledger::tests::failed_rotation_preserves_previous_archive stdout ----\n\nthread 'exit_ledger::tests::failed_rotation_preserves_previous_archive' (22000) panicked at src\\exit_ledger.rs:851:9:\nassertion `left == right` failed: failed rotation cannot destroy the retained previous archive\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    exit_ledger::tests::failed_"
       },
       {
         "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first",
         "classification": "assertion",
-        "detail": "exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first:  ---- exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first stdout ----\n\nthread 'exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first' (25260) panicked at src\\exit_ledger.rs:654:9:\nassertion `left == right` failed: the evicted identity has a loss receipt: []\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n   "
+        "detail": "exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first:  ---- exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first stdout ----\n\nthread 'exit_ledger::tests::eviction_at_the_retention_bound_records_scoped_loss_first' (11232) panicked at src\\exit_ledger.rs:654:9:\nassertion `left == right` failed: the evicted identity has a loss receipt: []\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n   "
       }
     ]
   },
-  "digest": "sha256:249a730a19bf774c610f3616f53636cc629d40d1da96775540253721d2f5afb2"
+  "digest": "sha256:fa4dc3c1ee4a4608096c61fc109fcdf77d41084bf25a72d6cd88d11cb6e9518e"
 }

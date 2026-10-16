@@ -101,13 +101,14 @@ Java ownership belongs to b6d536/proc-java. Modules Java remains byte-for-byte a
       "items": [
         "scripts/dev/test-dev-runner-process-races.mjs",
         "scripts/dev/test-dev-runner-stop-recovery.mjs",
-        "scripts/jseval/tests/test_owned_stops.py"
+        "scripts/jseval/tests/test_owned_stops.py",
+        "scripts/supervisor-conformance/fixture-cleanup.test.mjs"
       ],
       "moved": [
         "signature",
         "instrumentation"
       ],
-      "whatMoved": "Job-object stops for dev tools (scripts/dev/lib/job-run.cjs, job-host.ps1, job-run.cs, stop-job-run.ps1). process-races 'dev-all refuses a replacement at the termination boundary' and stop-recovery 'dev-all birth capture finishes in the spawn turn before stop' evaluate dev-all's declarations with the job starter injected instead of engine-actuator: the stop carries the host's recorded birth and dev-all never hands a bare PID to taskkill /T; inputs and expected outcomes are kept. test_owned_stops' two sweep checks drive kill_backend with a fake run stop taking the run record (-RecordPath, -Code) instead of a PID-addressed terminator; already-gone is still success and a foreign port owner is still never stopped.",
+      "whatMoved": "Job-object stops for dev tools (scripts/dev/lib/job-run.cjs, job-host.ps1, job-run.cs, stop-job-run.ps1). process-races 'dev-all refuses a replacement at the termination boundary' and stop-recovery 'dev-all birth capture finishes in the spawn turn before stop' evaluate dev-all's declarations with the job starter injected instead of engine-actuator: the stop carries the host's recorded birth and dev-all never hands a bare PID to taskkill /T; inputs and expected outcomes are kept. test_owned_stops' two sweep checks drive kill_backend with a fake run stop taking the run record (-RecordPath, -Code) instead of a PID-addressed terminator; already-gone is still success and a foreign port owner is still never stopped. CI759: the two sweep checks and installer cleanup check now explicitly require Windows; all three still execute there, while the portable ownership checks remain enabled on every OS. The fixture preload check uses the existing Windows identity-boundary prerequisite for the same reason. No input or outcome assertion changes.",
       "sources": [
         {
           "delegationQuote": "do whatever you think is best. your working autonomously",
@@ -240,6 +241,8 @@ dev-all's clean) and a registered-helper case in test-dev-runner-engine-job.mjs 
 recorded there, not as DEV_RUNNER_JOB). The two refusal checks and the registered-helper check fail by assertion on 280d21c19
 (detached worktree, new check files copied in: the folder was cleaned; the helper was already dead when its step came) and
 pass after; the marking and adoption checks fail there because the module does not exist.
+
+CI759 non-Gradle repair: only the three PowerShell/Windows-handle cases in test_owned_stops.py and the fixture-identity preload case have an OS prerequisite. Windows before and after runs execute all cases without skipping. Python and Node script checks are outside the product-test evidence runner; run-evidence has no Python or Node runner. The original assertions are retained. No acceptance is recorded by this builder.
 
 ## Acceptance records
 
