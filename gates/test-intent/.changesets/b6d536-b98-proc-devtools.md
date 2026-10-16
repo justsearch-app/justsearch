@@ -283,3 +283,14 @@ Pending the orchestrator's independent verifier and the owner's behavior verdict
   "note": "Reviewed the Windows prerequisites and unchanged process-identity oracles against d393938e8 and the owner delegation. On Windows, 219 Python checks, 10 supervisor fixture checks and the TEMP-alias regression pass; the new fixture and alias checks reproduce their intended before assertions."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS7-20261016",
+  "verdict": "accept",
+  "digest": "sha256:0fcb6a0682255a2db078b5ac765e173ec1a07e126991a6ef41c13c259a86a3f7",
+  "note": "The Windows guards, mocked platform, private fixture quit channel and POSIX stub preserve the refusal and ownership oracles. Changed Node and conformance fixture checks plus all eight owned-stop Python cases pass on Windows; the wider jseval suite passes 3710 with 16 unrelated prerequisite skips."
+}
+```

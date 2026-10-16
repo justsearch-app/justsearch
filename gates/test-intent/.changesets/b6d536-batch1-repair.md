@@ -221,3 +221,14 @@ Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before 
   "note": "Reviewed JVM portability, fixture cleanup and PID-scope adaptations; candidate checks pass and all three declared patched before setups reproduce the recorded failures. The two compatibility-stub-dependent backfill passes are excluded from preservation proof."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS7-20261016",
+  "verdict": "accept",
+  "digest": "sha256:f95d2c0fd36a8dff4ab40dd3928713f024e84e4f13d0ea2b0f98f5e3c49e1003",
+  "note": "Reviewed current-JVM launchers, PID scope cleanup and producer-identity fixture changes; all seven evidence selectors pass. All three declared patched 1e333857b recipes reproduce their intended assertion failures; two stub-dependent backfill passes are excluded from preservation proof."
+}
+```
