@@ -150,3 +150,14 @@ ManagedChatSeam overlay alone.
   "note": "Entries and evidence are unchanged since 9f1f6257b; the shared controller file only gained the independently covered planner check, and its current whole class passes. Read review and source/patch comparisons confirm the retained seam assertions still match the independent d3fe74ef2 replay."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:2892ff846ccc96f05a9ac7279978b1bfcdcf7c543b0b5ba1767e62c70ff008a5",
+  "note": "Re-bound to origin/main 298354254 after reviewing the qualification-only shared helper edit and descriptive update; all three listed candidate selectors passed. Both retained d3fe74ef2 seam failures have matching current checks, compatibility patch and independent rerun proof, with no assertion or tested transition changed."
+}
+```

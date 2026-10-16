@@ -477,3 +477,14 @@ Evidence files (all written by run-evidence.mjs):
   "note": "Reviewed current admission/breaker fixtures, evidence and selected candidate passes. Exact declared before reruns at 68547f75a and 342da6779 reproduce all four recorded assertion classifications; the other before evidence is unchanged."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:64a94a692fb0ef7ada83b1b4a19d3600879d79cd1199763a47d87975d821f0e5",
+  "note": "Re-bound to origin/main 298354254; the lifetime-only resource edits preserve preconditions, observation and every assertion, and all 16 candidate selectors passed. Retained repaired-before checks and patches match d393938e8 and the independent rerun proof, while new-API candidate-only reasons and the explicitly labeled aging mutation remain truthful."
+}
+```

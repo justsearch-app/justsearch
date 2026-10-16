@@ -457,3 +457,14 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
   "note": "Re-reviewed deadlines, lexical fallback, priority and cause propagation; the declared abstract-to-default compatibility change is explicit, and candidate and declared before checks reproduce the recorded outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:ede7ced3a8b8a4ce1fa7e9b591fe93235ba0aa5b62f9d783026d80aa27182eb4",
+  "note": "Re-bound to origin/main 298354254; the unnamed lifetime-only resource edits preserve every assertion, and all 34 candidate selectors passed. All six regenerated budget/reason selectors reproduce the declared assertion failures on 68547f75a with its stated abstract-to-default compatibility patch; unchanged before check/patch proof was matched before reuse."
+}
+```

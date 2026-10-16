@@ -370,3 +370,14 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
   "note": "Reviewed all entries against ba4607de0 and unchanged listed tests/evidence; reran entry 8: all 8 frontend checks and 4 candidate CORS checks pass. All 4 CORS checks also pass on main 52e01bef4 with only the declared add-only preservation method patch; remaining foundation checks concern branch-added APIs absent on main."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:9b0b8f608c0c4b4fef5c8c86085ed5832f532557ee670eac4735785f116d2bf2",
+  "note": "Re-bound to origin/main 298354254; the sole fixture addition indexedDocumentsUnknown=false comes from main, preserves the operating block, and all 19 listed candidate selectors passed including nested Java serialization and both frontend fixture consumers. Retained CORS preservation proof matches its declared before source and patch, with four executed passes and no skipped checks."
+}
+```

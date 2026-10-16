@@ -147,3 +147,14 @@ F:/agent-sandbox/design-b6d536/codex/b56-nogpu-encoders/report.md.
   "note": "Reviewed current tests, fixtures and evidence; candidate selectors pass, including NoDeviceTokenizerCacheTest in its required CUDA_VISIBLE_DEVICES=-1 JVM. Today's independent report exactly matches the current files/patch and all eight declared before outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:4df83dc676986a9915a2efa3d3694bf74d853ac12caaf8b248b4bf97126c89dc",
+  "note": "Re-bound to origin/main 298354254 after reviewing the qualification-only cleanup and regenerated evidence; all eight candidate selectors passed, including the native tokenizer with CUDA_VISIBLE_DEVICES=-1 and configuration cache disabled. The five regenerated before selectors reproduce the declared assertion failures on 6b317848e with the declared compatibility patch; retained check and patch proof matches d393938e8."
+}
+```

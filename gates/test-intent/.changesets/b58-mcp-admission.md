@@ -93,3 +93,14 @@ five checks fail before by assertion.
   "note": "Reviewed the independent observation admission and deferred publication obligations; current evidence/patch/test source match the independent 75917a073 reruns. All five listed checks passed on the candidate and have matching genuine before assertions at 7655b8a20."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:b3115bf7d968155e09f5a4aa1760e97e2ea09962102c6e1fc0797d446d7ba97f",
+  "note": "Re-bound to origin/main 298354254 after reviewing imports, lifetime-only resources, stronger MCP preconditions and the merged watcher registration setup; all five listed candidate selectors and the supplemental watcher ownership check passed. All five before selectors reproduce the declared assertion failures on 7655b8a20 with its unchanged, unreached-reason compatibility patch."
+}
+```
