@@ -390,3 +390,14 @@ Decision records were searched for a conflict with these behaviours (status poll
   "note": "Reject: entry 4 attaches b82-status-expiry-kept-java.json with failBefore null and gives no reason for candidate-only execution. Its StatusPublicationBackstop content/observation seam already exists on 98cad099f, so the strengthening description does not explain omitting before execution."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:e81331432771bc1f356beb6723b04ba70ef80a910613a279dc790dca5e3313bc",
+  "note": "The corrected publication entry is preservation: its named check passes on both the candidate and 98cad099f. The changed status classes pass, their assertions are unchanged, and unchanged repair proof was content-checked against retained independent runs."
+}
+```

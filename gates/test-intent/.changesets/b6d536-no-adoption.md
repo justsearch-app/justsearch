@@ -648,3 +648,14 @@ Phase B verifier repair (integration base 181363e86):
   "note": "Re-reviewed the corrected distinction between the evidence runner limitation and the genuine before-API reproducer, plus endpoint and ownership checks; candidate and declared before checks match the evidence without a behavior-defining production stub."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:5f2a562b39e35897026ebfe3f4723dcea5276a52a6d9716dd7cd0eb11a0df917",
+  "note": "Reviewed shared fixture cleanup and unchanged ownership assertions against the owner intent. Candidate checks and the declared launch, manifest, shutdown, endpoint and executor before setups reproduce their recorded outcomes."
+}
+```

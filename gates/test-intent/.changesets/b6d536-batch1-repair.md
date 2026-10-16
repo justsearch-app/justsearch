@@ -199,3 +199,14 @@ Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before 
   "note": "Re-bound to origin/main 298354254 after reviewing the PID-local cleanup and declared add-only compatibility patches. Candidate checks and shared sandbox cases pass; 1e333857b reproduces the 997-chunk/admission, stale-health and premature-CPU-service failures, while two backfill passes rely on scaffolding and do not prove implemented preservation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:5cd7d82710ff6b41f12034b18c30e915c9cecc686d056b4b5c5ada8d4489100e",
+  "note": "PID declaration scopes and shared fixture cleanup preserve the guarded outcomes; all listed candidate checks and the patched 1e333857b outcomes match. The declared stub-dependent backfill preservation limit remains an observation."
+}
+```

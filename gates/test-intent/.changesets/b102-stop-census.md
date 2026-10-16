@@ -1618,3 +1618,14 @@ Execution logs: F:/agent-sandbox/design-b6d536/b102-stop-census/ (this round's i
   "note": "Reviewed both supervisor-record and lookup-context adaptations against their before tests and production writer shape; every assertion and fault injection is preserved. Both current integration classes passed, with their declared repaired receipt checks independently rerun under the owning changesets."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5d-20261016",
+  "verdict": "accept",
+  "digest": "sha256:951b539dbf70d7b5f5cf90aa741014d239d9ea484a5c2b0499b4e27d58a90e12",
+  "note": "The added prerequisites preserve the census inputs, fault injection and all existing assertions. Both current real-process integration classes pass."
+}
+```
