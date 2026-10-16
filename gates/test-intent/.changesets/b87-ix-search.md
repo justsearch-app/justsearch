@@ -19,7 +19,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java"
       ],
       "class": "New",
-      "behaviour": "Expired or abandoned, undispatched queries must not enter native inference; copied inputs and the native lease/seat are released once. Already executing native calls retain ownership until they finish.",
+      "behaviour": "Expired or abandoned, undispatched queries must not enter native inference; copied inputs and the native lease/seat are released once. Already executing native calls retain ownership until they finish. Fail-before uses 61ff9b955 with the add-only b87-dispatch-fixture.patch: its new four-argument runWithin overload mirrors the entire old three-argument body, substituting only the injected ThreadFactory for RUN_THREADS at dispatch. Every existing statement stays untouched. The pending-dispatch check calls that overload; the expired-deadline check retains the original lease.runWithin path.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -31,7 +31,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-java.json",
+      "evidence": "gates/test-intent/evidence/b87-dispatch-add-only-java.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java#expiredRunDeadlineDoesNotStartNativeWork",
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java#abandonedPendingDispatchDoesNotStartNativeWork"
