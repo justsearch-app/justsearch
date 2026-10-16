@@ -328,3 +328,14 @@ commands, counts, assertion details and logs are recorded in the builder report.
   "note": "Reject: active before evidence applies b6d536-chat-controller-step4-repaired-compat.patch at 7edc726dd, replacing existing executable HealthyFakeLlamaServer endAll/main statements (162 added, 12 removed). The selected checks execute that replaced fixture, outside the permitted add-only, abstract-to-default or unreached-neutral-stub patch forms."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:45261113f0a3603bc50b8983b9385c50dff29ed0362615b199ef3f3832ad300a",
+  "note": "Replayed both before setups with the current add-only patches: nine behavior assertion failures, one preservation pass and the original round-two held-log assertion; candidate checks pass. Entries 6-7 correctly explain candidate-only checks against classes absent from the baseline."
+}
+```

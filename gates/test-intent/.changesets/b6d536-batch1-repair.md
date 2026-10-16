@@ -210,3 +210,14 @@ Records phase B (batch 3) re-ran entries 1-3 on b599d4d7e, with the fail-before 
   "note": "PID declaration scopes and shared fixture cleanup preserve the guarded outcomes; all listed candidate checks and the patched 1e333857b outcomes match. The declared stub-dependent backfill preservation limit remains an observation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:62cdd590276b4f4fc1e42bdfb22add4abfd2a706ac8827488b18f6b0f918a4a5",
+  "note": "Reviewed JVM portability, fixture cleanup and PID-scope adaptations; candidate checks pass and all three declared patched before setups reproduce the recorded failures. The two compatibility-stub-dependent backfill passes are excluded from preservation proof."
+}
+```

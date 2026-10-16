@@ -931,3 +931,14 @@ author-session: b101-probe-churn
   "note": "Reviewed the console regression and probe edits against the owner intent and unchanged prior proof. Five console repairs fail by the intended assertions on 8043f327f, four preservation checks pass both ways, and changed Tika/sharing checks reproduce their declared outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:b472f2de9a84d2d84565766424ffc56d0102618ec82ab53ce4fc7aee3dc375d2",
+  "note": "Re-reviewed changed entries, process identities, probe instrumentation and refreshed evidence; candidate checks pass and all six changed before setups reproduce their 21 declared comparisons and failure reasons. The 29 untouched entries and their check/evidence files are byte-identical to d393938e8."
+}
+```

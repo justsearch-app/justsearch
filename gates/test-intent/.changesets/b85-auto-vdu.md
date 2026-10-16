@@ -730,3 +730,14 @@ bc5978095 on (first failing first-parent commit; they pass on a000e15c7 and on 8
   "note": "The repaired add-only r4-r1/r4-r2 setups reproduce their declared outcomes. Reject: retained r2 (13524ddf0) and r4 (83f07cc4c) setups compile zero cases for 16 selectors because of the IdleSampler constructor and missing QuitBudget/shutdown APIs, instead of the recorded passes/assertion failures."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:e1b4cffdcf7a1560ca50e585154715ad93dd7699664c42ca725fee27d4a586ba",
+  "note": "Replayed every declared setup with nonzero cases and matching reasons, including nine r2 preservation passes and r4 nine assertion failures plus two preservation passes; candidate checks pass. Reviewed add-only compatibility patches and confirmed the added shutdown stubs are outside selected paths."
+}
+```
