@@ -192,8 +192,9 @@ public final class ProcessIntents {
    * creatorPid}/{@code creatorBirth}, the exiting process's parent as read natively, is the window's
    * owner. Without a window, empty while the owner of an owned identity has not recorded its exit
    * and {@code ownerWaitOver} is false: the witness asks again later. A crash {@code exitCode} makes
-   * any REQUESTED class UNEXPECTED, even inside a window, before the class is kept for the exit's
-   * console host: what is kept and returned is always the final class.
+   * any REQUESTED class UNEXPECTED, even inside a window. The witness must still apply its
+   * registration wait before publishing the accepted class with {@link #witnessed} for the exit's
+   * console host; resolving alone never publishes a class that may still be deferred.
    */
   public static synchronized Optional<Resolution> resolve(long pid, String birth, String executable,
       Instant born, Instant exited, boolean ownerWaitOver, Long creatorPid, String creatorBirth,
@@ -223,9 +224,15 @@ public final class ProcessIntents {
             : new Resolution("UNEXPECTED", NO_INTENT, "none");
       }
     }
-    resolution = afterExitCode(resolution, exitCode);
+    return Optional.of(afterExitCode(resolution, exitCode));
+  }
+
+  /**
+   * Publishes only the witness's accepted final class, after registration/owner waits and native
+   * exit-code classification. A console must not inherit a no-intent result still being deferred.
+   */
+  public static synchronized void witnessed(long pid, String birth, Resolution resolution) {
     if (birth != null) WITNESSED.put(new Key(pid, birth), resolution);
-    return Optional.of(resolution);
   }
 
   /** A crash exit code is UNEXPECTED whatever intent or window would have made it REQUESTED. */
@@ -278,9 +285,11 @@ public final class ProcessIntents {
       boolean ownerWaitOver) {
     Owned owned = clientBirth == null ? null : OWNED.get(new Key(clientPid, clientBirth));
     Resolution witnessed = clientBirth == null ? null : WITNESSED.get(new Key(clientPid, clientBirth));
-    // The client's own record first, then its witnessed class (a window covers it at once).
-    Optional<Resolution> owner = owned != null && owned.outcome != null ? Optional.of(owned.outcome)
-        : witnessed != null ? Optional.of(witnessed) : ownerOf(clientPid, clientBirth, ownerWaitOver);
+    // An accepted witness class includes native crash/unknown-code facts and is final. A late
+    // owner receipt must not erase them. Before acceptance, an owner outcome can resolve the exit.
+    Optional<Resolution> owner = witnessed != null ? Optional.of(witnessed)
+        : owned != null && owned.outcome != null ? Optional.of(owned.outcome)
+        : ownerOf(clientPid, clientBirth, ownerWaitOver);
     if (owner == null) return Optional.empty();
     Resolution client = owner.orElse(null);
     if (client == null) {

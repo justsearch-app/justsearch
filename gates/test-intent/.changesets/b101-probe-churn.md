@@ -864,6 +864,34 @@ author-session: b101-probe-churn
         "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiSlowProbeSharingTest.java#everyWaiterReceivesTheOutcomeOfTheProbeItJoined"
       ],
       "repaired": true
+    },
+    {
+      "items": ["modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The witness's elapsed-time seam deterministically orders a native client exit before ownership registration, then its console exit, then the awaited owner receipt. Accepted resolutions are written once through the real ledger writer and read back raw: the console follows the client's final REQUESTED class and reason. Registration partway through the wait keeps the console deferred until the owner resolves. A shared-ledger receipt already durable before the console retry also reaches it through the final client class. A late owner receipt cannot erase an accepted native crash class. A console visited first at the owner deadline cannot hide its client's known native crash: that crash needs no owner receipt to decide its class. All five checks fail by assertion on 8043f327f; no production compatibility overlay or sleeps are used.",
+      "sources": [{"kind": "owner-adopted-scenario", "task": "t-20261005-b6d536", "scenario": "S15", "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.", "label": "agent-drafted, owner-adopted"}],
+      "evidence": "gates/test-intent/evidence/b101-console-registration-race.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#consoleWaitsForClientRegistrationBeforeWritingItsFinalClass",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#consoleCannotPublishWhileRegisteredClientStillAwaitsItsOwner",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#lateOwnerReceiptCannotEraseTheClientsFinalNativeCrashClass",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#sharedOwnerReceiptBeforeConsoleRetryStillSuppliesItsFinalClass",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#consoleVisitedFirstAtTheOwnerDeadlineCannotHideItsClientsCrash"
+      ]
+    },
+    {
+      "items": ["modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java"],
+      "class": "New",
+      "behaviour": "Preservation on 8043f327f and the candidate: an unowned clean exit and its console stay UNEXPECTED at the existing 250 ms registration bound; a native crash during an intended stop keeps both UNEXPECTED; a console's own crash stays UNEXPECTED after a normal client completion; an unavailable native exit time is written null and reads unknown. The canonical producer records four passed before-state cases, so its all-fail-before exit status is 1 by design for these preservation cases; none is claimed as a repaired fail-before.",
+      "sources": [{"kind": "owner-adopted-scenario", "task": "t-20261005-b6d536", "scenario": "S15", "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.", "label": "agent-drafted, owner-adopted"}],
+      "evidence": "gates/test-intent/evidence/b101-console-registration-preservation.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#noIntentClientAndConsoleRemainUnexpectedAtTheExistingRegistrationBound",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#realCrashDuringAnIntendedStopStillMakesTheConsoleUnexpected",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#consoleCrashIsUnexpectedEvenWhenItsClientCompletedNormally",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#unknownNativeExitTimeRemainsUnknownInTheLedger"
+      ]
     }
   ]
 }
