@@ -59,6 +59,16 @@ no acceptance record.
           "choice": "After merging b102 onto b101, fixtures write the ledger as production writers do: the supervisor that records an Engine's exit records its start, and a census check runs with the stop's own lookup."
         }
       ]
+    },
+    {
+          "items": [
+                "scripts/dev/test-dev-runner-stop-census.mjs"
+          ],
+          "class": "Adaptation",
+          "moved": [
+                "input re-encoding"
+          ],
+          "whatMoved": "CI run 38855194177 showed that the Windows Server runner can read all enumerated ordinary process births, so the shared unreadablePid fixture failed before four ownership/precision scenarios ran. The fixture now probes the System process (PID 4), for which Windows documents OpenProcess access denial, using the same native Survivors call and rights. It asserts that the returned unreadable identity is PID 4. No process is started, terminated or modified for that observation. Every stop, ledger, one-tick and coarser-precision assertion remains unchanged. Native census cases that start live children now state their Windows creation-identity prerequisite. Portable one-tick, pairwise precision, ledger and injected lookup assertions still run off Windows. Synthetic and ledger-performance cases retain the original real observer on Windows and use an observer stand-in only where that observer is unavailable off Windows. Full Ubuntu and Windows test discovery remains selected. These Node checks use the real native census; run-evidence supports only Gradle, vitest and cargo, so their before/after execution is reported separately and no Java evidence is attributed to them."
     }
   ]
 }

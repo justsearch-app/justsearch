@@ -85,6 +85,8 @@ function spawnAliveProc() {
  * no process.
  */
 function recordedIdentity(pid) {
+  // Portable ownership refusals need the live PID, but never a Windows termination identity.
+  if (process.platform !== 'win32') return null;
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
     `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { $p.CreationDate.ToFileTimeUtc().ToString() + '|' + $p.ExecutablePath }`],
@@ -225,7 +227,7 @@ const tests = [
     assert.equal(r.action, 'proceed');
     assert.equal(r.disposition, 'owner_restart', JSON.stringify(r));
     assert.equal(stopDisposition(), 'owner_restart', 'the stop report records owner_restart');
-  }],
+  }, 'Windows identity-checked stop'],
 
   ['stop reports over worktree-started stacks record idle_takeover / abandoned_reclaim, never stale_reclaim', async () => {
     craftWorktreeStack({ runnerPid: spawnAliveProc(), touchAgoMs: 10_000 });
@@ -237,7 +239,7 @@ const tests = [
     const abandoned = await acquireAdmission({ takeover: 'warn', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
     assert.equal(abandoned.disposition, 'abandoned_reclaim', JSON.stringify(abandoned));
     assert.equal(stopDisposition(), 'abandoned_reclaim');
-  }],
+  }, 'Windows identity-checked stop'],
 
   ['the MCP ownership projection reads a worktree-started run record and fails safe on an unreadable one', async () => {
     const { buildOwnershipProjection } = await import(pathToFileURL(path.join(__dirname, 'justsearch-dev-mcp', 'server.mjs')).href);
@@ -261,12 +263,13 @@ const tests = [
   }],
 ];
 
-let pass = 0, fail = 0;
-for (const [name, fn] of tests) {
+let pass = 0, fail = 0, skipped = 0;
+for (const [name, fn, prerequisite] of tests) {
+  if (prerequisite && process.platform !== 'win32') { skipped++; console.log(`  SKIP  ${name}: ${prerequisite}`); continue; }
   try { await fn(); console.log(`  PASS  ${name}`); pass++; }
   catch (e) { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
 }
 for (const p of sleepers) { try { p.kill(); } catch {} }
 try { fs.rmSync(STATE, { recursive: true, force: true }); } catch {}
-console.log(`test-dev-runner-worktree-run-record: ${pass} passed, ${fail} failed`);
+console.log(`test-dev-runner-worktree-run-record: ${pass} passed, ${fail} failed${skipped ? `, ${skipped} skipped (Windows identity-checked stop)` : ''}`);
 process.exit(fail === 0 ? 0 : 1);

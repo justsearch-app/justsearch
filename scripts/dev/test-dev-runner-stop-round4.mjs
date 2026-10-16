@@ -13,7 +13,8 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stop-round4-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = root;
 const api = require('./dev-runner.cjs').__test;
 const owner = api.holderBlockFor(api.resolveCallerIdentity('round4-owner'));
-const tests = [], children = [], test = (name, fn) => tests.push([name, fn]);
+const tests = [], children = [], test = (name, fn, prerequisite = null) => tests.push([name, fn, prerequisite]);
+const testWindows = (name, fn) => test(name, fn, 'Windows process creation identities and native lookup');
 const read = p => JSON.parse(fs.readFileSync(p, 'utf8'));
 function forgotten(id, leftBehind) {
   fs.mkdirSync(path.join(repo, 'tmp'), { recursive: true });
@@ -34,7 +35,7 @@ function cli(args) {
 }
 test('forgotten cleanup names each living or unknown process and keeps data', () => {
   const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},60000)'], { stdio: 'ignore', windowsHide: true }); children.push(child);
-  const t = forgotten('live', [{ ...child.recordedIdentity, role: 'backend', name: 'fixture-Engine' }]);
+  const t = forgotten('live', [{ pid: child.pid, ...child.recordedIdentity, role: 'backend', name: 'fixture-Engine' }]);
   try {
     const out = cli(['cleanup', '--run', 'live', '--clean', 'hard']);
     assert.equal(out.cleaned, false); assert.equal(out.status, 1);
@@ -43,7 +44,7 @@ test('forgotten cleanup names each living or unknown process and keeps data', ()
     assert.equal(fs.readFileSync(t.sentinel, 'utf8'), 'preserve');
   } finally { fs.rmSync(t.data, { recursive: true, force: true }); }
 });
-test('forgotten cleanup succeeds after every recorded identity ends', async () => {
+testWindows('forgotten cleanup succeeds after every recorded identity ends', async () => {
   const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},60000)'], { stdio: 'ignore', windowsHide: true }); children.push(child);
   const t = forgotten('ended', [{ ...child.recordedIdentity, role: 'backend', name: 'fixture-Engine' }]);
   child.kill(); await new Promise(resolve => child.once('exit', resolve));
@@ -97,7 +98,7 @@ test('recovery check passes without NODE_OPTIONS or an external binary', () => {
     { cwd: repo, env, encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 0, 'plain recovery: ' + r.stdout + r.stderr);
 });
-test('the batched identity lookup supplies fresh identities across stop phases', async () => {
+testWindows('the batched identity lookup supplies fresh identities across stop phases', async () => {
   const actor = require('./lib/engine-actuator.cjs');
   assert.equal(actor.createTreeInspectionSession, undefined, 'no tree inspection host');
   const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},60000)'], { stdio: 'ignore', windowsHide: true }); children.push(child);
@@ -107,8 +108,10 @@ test('the batched identity lookup supplies fresh identities across stop phases',
   const second = await actor.lookupProcessIdentities([child.recordedIdentity.pid]);
   assert.equal(second.get(child.pid)?.present ?? false, false);
 });
-let failed = 0;
-try { for (const [name, fn] of tests) { try { await fn(); console.log('PASS ' + name); }
+let failed = 0, skipped = 0;
+try { for (const [name, fn, prerequisite] of tests) {
+  if (prerequisite && process.platform !== 'win32') { skipped++; console.log('SKIP ' + name + ': ' + prerequisite); continue; }
+  try { await fn(); console.log('PASS ' + name); }
   catch (e) { failed++; console.error('FAIL ' + name + ': ' + e.stack); } } }
 finally { for (const child of children) child.kill(); fs.rmSync(root, { recursive: true, force: true }); }
-console.log(`stop-round4: ${tests.length - failed}/${tests.length} passed`); process.exitCode = failed ? 1 : 0;
+console.log(`stop-round4: ${tests.length - failed - skipped}/${tests.length - skipped} passed${skipped ? `, ${skipped} skipped (Windows native identity prerequisites)` : ''}`); process.exitCode = failed ? 1 : 0;

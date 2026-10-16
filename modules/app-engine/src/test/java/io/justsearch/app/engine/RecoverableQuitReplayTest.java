@@ -162,7 +162,7 @@ final class RecoverableQuitReplayTest {
           "justsearch.models.dir", Files.createDirectories(data.resolve("empty-models")).toString(),
           "justsearch.gpu.enabled", "false", "justsearch.embed.gpu.enabled", "false",
           "justsearch.splade.gpu_enabled", "false", "justsearch.extraction.sandbox.mode", "process",
-          "justsearch.extraction.sandbox.command", "\"" + Path.of(System.getProperty("java.home"), "bin", "java.exe")
+          "justsearch.extraction.sandbox.command", "\"" + ProcessHandle.current().info().command().orElseThrow()
               + "\" @\"" + parserArgs + "\""));
       var operations = new SqliteOperationStore(data.resolve("operations.db"));
       var attempts = new OperationAttemptRunnerImpl(operations, Clock.systemUTC(),

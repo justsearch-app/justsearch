@@ -2549,9 +2549,6 @@ async function cmdStart(opts) {
           ?? `Backend has ${admission.criticalOps?.length ?? 0} critical op-lease(s) active`;
     } else if (admission.reason === 'requires_confirmation') {
       message = admission.message ?? 'force-interrupt requires --confirm-interrupt=<opId>';
-    } else if (admission.reason === 'takeover_stop_failed') {
-      message = `Takeover refused: the stop of run ${admission.runId} did not end it `
-        + `(${admission.stop?.outcome ?? 'no result'}); nothing was started.`;
     } else {
       message = `Backend owned by ${describeHolder(admission.holder)}` +
           (admission.reason === 'lock_held'

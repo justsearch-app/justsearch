@@ -49,21 +49,23 @@ const noProcess = (pid, creationFileTimeUtc) => {
 };
 
 /**
- * A running process whose birth this user cannot read (OpenProcess is refused), found the way the
- * stop's own probe meets it: job-run.cs Survivors reports exactly those for a birth no process has.
- * Only query rights are asked for; nothing is ended.
+ * The System process is the stable access-denied case in OpenProcess's contract. Ordinary process
+ * births may all be readable to an elevated Windows CI runner, so discovering an unreadable PID
+ * among them would make these checks depend on the runner's access rights and background services.
+ * Use the stop's own read-only probe with a birth no process has: Survivors must retain PID 4
+ * because its birth cannot be read. No termination targets this process; only the nonexistent
+ * recorded job host is passed to EndHost.
+ * https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess
  */
 function unreadablePid() {
   const script = [
     `Add-Type -Path '${path.join(root, 'scripts/dev/lib/job-run.cs').replaceAll("'", "''")}'`,
-    '$p = @(Get-Process | ForEach-Object { $_.Id } | Where-Object { $_ -gt 4 })',
-    '$b = [long[]]@($p | ForEach-Object { 1 })',
-    '[JustSearchJobRun]::Survivors([int[]]$p, $b, 10, 0) | Select-Object -First 1',
+    '[JustSearchJobRun]::Survivors([int[]]@(4), [long[]]@(1), 10, 0) | Select-Object -First 1',
   ].join('\n');
   const out = cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
     { encoding: 'utf8', windowsHide: true, timeout: 60000 });
   const pid = Number(JSON.parse(String(out.stdout).trim() || 'null')?.pid);
-  assert.ok(Number.isInteger(pid) && pid > 4, `a running process whose birth cannot be read: ${out.stdout} ${out.stderr}`);
+  assert.equal(pid, 4, `the System process's birth cannot be read: ${out.stdout} ${out.stderr}`);
   return pid;
 }
 
@@ -1729,7 +1731,8 @@ async function measuredStop(runId, dataDir, engine) {
   const started = Date.now();
   let out;
   try {
-    out = await api.stopRun({}, { ...fixture.io, ...(windows ? {} : { lookupIdentities: async (ids) => new Map(ids.map((p) => [p, { present: false }])) }) });
+    out = await api.stopRun({}, { ...fixture.io, ...(windows ? {} : { census: standInCensus,
+      lookupIdentities: async (ids) => new Map(ids.map((p) => [p, { present: false }])) }) });
   } finally {
     Object.assign(fs, original);
   }
@@ -1893,6 +1896,13 @@ async function trackedStop(r, tracked, { census: censusOf, lookup } = {}) {
   return { out, lookups, fixture };
 }
 
+/** Keep Windows' native observations; ledger-only identities use an empty observer and lookup elsewhere. */
+function syntheticTrackedStop(r, tracked) {
+  if (windows) return trackedStop(r, tracked);
+  return trackedStop(r, tracked, { census: standInCensus,
+    lookup: async (ids) => new Map(ids.map((pid) => [pid, { present: false }])) });
+}
+
 /** The live child stays running: looked up, found, the stop incomplete and its accounting too. */
 function assertLiveChildFound({ out, lookups }, p, why) {
   assert.ok(lookups.includes(p.pid), `${why}: the live child is looked up, not taken as ended (${JSON.stringify(out.resolvedByLedger ?? [])})`);
@@ -1974,7 +1984,7 @@ const IDENTITY_EDGES = {
   },
 };
 for (const [name, setup] of Object.entries(IDENTITY_EDGES)) {
-  test(`round 8 identity edge ${name}: the stop looks the live child up, finds it running, and is incomplete`, async () => {
+  test(`round 8 identity edge ${name}: the stop looks the live child up, finds it running, and is incomplete`, { skip: !windows && 'Windows process identities' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(name);
@@ -1986,7 +1996,7 @@ for (const [name, setup] of Object.entries(IDENTITY_EDGES)) {
   });
 }
 
-test('round 8 identity edge tracked-other-owner: a ledger exit of the child under one owner instance does not end a tracked record naming another', async () => {
+test('round 8 identity edge tracked-other-owner: a ledger exit of the child under one owner instance does not end a tracked record naming another', { skip: !windows && 'Windows process identities' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('tracked-other-owner');
@@ -2003,7 +2013,7 @@ test('round 8 identity edge tracked-other-owner: a ledger exit of the child unde
   }
 });
 
-test('round 8 runner matching: a tracked identity recorded to the tick is compared with its CIM row at the microsecond, so a live process is found running, never taken as reused', async () => {
+test('round 8 runner matching: a tracked identity recorded to the tick is compared with its CIM row at the microsecond, so a live process is found running, never taken as reused', { skip: !windows && 'the CIM lookup' }, async () => {
   // The OS lookup reads the process table (CIM): a birth to the microsecond. Compared at the tracked
   // record's own tick, an exact birth that is not a whole microsecond reads as another process.
   let p = await liveChild();
@@ -2025,7 +2035,7 @@ test('round 8 edge 1, corrected on evidence: the owning Engine\'s exit naming on
   r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner, incarnation: r.incarnation });
   r.startOf(ended);
   r.exitOf();
-  const { out, lookups, fixture } = await trackedStop(r, ended);
+  const { out, lookups, fixture } = await syntheticTrackedStop(r, ended);
   assert.ok(!lookups.includes(ended.pid), 'proven ended: never looked up');
   const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
   assert.ok((report.resolvedByLedger ?? []).some((x) => x.pid === ended.pid), JSON.stringify(report.resolvedByLedger));
@@ -2033,7 +2043,7 @@ test('round 8 edge 1, corrected on evidence: the owning Engine\'s exit naming on
   assert.equal(out.exitAccountingComplete, true, JSON.stringify(out.exitAccountingGaps));
 });
 
-test('round 8 sticky: a containment contradiction one stop observed is carried by every later stop, which stays incomplete', async () => {
+test('round 8 sticky: a containment contradiction one stop observed is carried by every later stop, which stays incomplete', { skip: !windows && 'Windows process identities' }, async () => {
   const p = await liveChild();
   let ended = false;
   try {
@@ -2264,7 +2274,7 @@ const appendAfterArming = (records, scopeFile = null) => async (run, dataDir, ru
 const namesProcess = (gaps, p) => (gaps ?? []).some((g) => g.pid === p.pid
   && (g.creationFileTimeUtc == null || g.creationFileTimeUtc === p.creationFileTimeUtc));
 
-test('round 9 late childId: a start appended after arming under another childId, with an ended start\'s PID and birth, has no exit of its own, so the whole stop is incomplete', async () => {
+test('round 9 late childId: a start appended after arming under another childId, with an ended start\'s PID and birth, has no exit of its own, so the whole stop is incomplete', { skip: !windows && 'Windows process identities' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-late-childid');
@@ -2284,7 +2294,7 @@ test('round 9 late childId: a start appended after arming under another childId,
   }
 });
 
-test('round 9 late incarnation: an Engine start appended after arming under another incarnation, with an ended start\'s PID and birth, keeps the census incomplete', async () => {
+test('round 9 late incarnation: an Engine start appended after arming under another incarnation, with an ended start\'s PID and birth, keeps the census incomplete', { skip: !windows && 'Windows process identities' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-late-incarnation');
@@ -2306,7 +2316,7 @@ test('round 9 late incarnation: an Engine start appended after arming under anot
 });
 
 for (const order of [['second-child', 'c'], ['c', 'second-child']]) {
-  test(`round 9 tracked list: two tracked records of one process under childIds ${order.join(' then ')}, one proven ended, are both kept: the unproven one is looked up and the stop is incomplete`, async () => {
+  test(`round 9 tracked list: two tracked records of one process under childIds ${order.join(' then ')}, one proven ended, are both kept: the unproven one is looked up and the stop is incomplete`, { skip: !windows && 'Windows process identities' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(`r9-two-tracked-${order[0]}`);
@@ -2340,7 +2350,7 @@ test('round 9 tracked list: records repeated whole are one; records of one PID a
   });
 });
 
-test('round 9 native precision: a tracked birth read natively is compared to the tick whatever tick it declares, so an exit of a birth one tick away never ends it', async () => {
+test('round 9 native precision: a tracked birth read natively is compared to the tick whatever tick it declares, so an exit of a birth one tick away never ends it', { skip: !windows && 'Windows process identities' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-native-declared-coarse');
@@ -2357,7 +2367,7 @@ test('round 9 native precision: a tracked birth read natively is compared to the
   }
 });
 
-test('round 9 Engine writer: an incarnation-only exit another Engine wrote proves nothing of a live Engine start, which is looked up and keeps the stop incomplete', async () => {
+test('round 9 Engine writer: an incarnation-only exit another Engine wrote proves nothing of a live Engine start, which is looked up and keeps the stop incomplete', { skip: !windows && 'Windows process identities' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-engine-other-writer');
@@ -2413,7 +2423,7 @@ test('round 10 Engine writer table: an incarnation-only Engine exit proves its o
   assert.deepEqual(wrong, []);
 });
 
-test('round 9 related shapes: a later note naming another owner, a second childId with a relative executable, and a job witness of an ended child\'s process each keep the census incomplete', async () => {
+test('round 9 related shapes: a later note naming another owner, a second childId with a relative executable, and a job witness of an ended child\'s process each keep the census incomplete', { skip: !windows && 'Windows process identities' }, async () => {
   const shapes = {
     'later-note-conflict': (r, p) => {
       r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
@@ -2470,7 +2480,7 @@ const R10_UNBOUND = {
     after: [['engine-exit', { role: 'dev-runner', pid: 4001 }, 10000000n]] },
 };
 for (const [name, { start, after }] of Object.entries(R10_UNBOUND)) {
-  test(`round 10 unbound supervisor (${name}): an incarnation-only exit from a writer no record binds to a live Engine start proves nothing; the Engine is looked up and the stop is incomplete`, async () => {
+  test(`round 10 unbound supervisor (${name}): an incarnation-only exit from a writer no record binds to a live Engine start proves nothing; the Engine is looked up and the stop is incomplete`, { skip: !windows && 'Windows process identities' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(`r10-unbound-${name.replace(/\W+/g, '-')}`);
@@ -2494,7 +2504,7 @@ test('round 10 bound writer: the dev runner that recorded an Engine start (its r
   r.records.push(rec('engine', runner, 'engine-start', { incarnation: n2, pid: q.pid, creationFileTime: q.creationFileTimeUtc,
     executable: process.execPath, processStartedAt: isoMs(q.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }),
   rec('engine', runner, 'engine-intent', r10Intent(n2)), rec('engine', runner, 'engine-exit', r10Exit(n2)));
-  const { out, lookups } = await trackedStop(r, { ...q, incarnation: n2 });
+  const { out, lookups } = await syntheticTrackedStop(r, { ...q, incarnation: n2 });
   assert.ok(!lookups.includes(q.pid), `the start's own writer proves its exit: ${JSON.stringify(out.exitAccountingGaps)}`);
   assert.ok(!namesProcess(out.exitAccountingGaps, q), JSON.stringify(out.exitAccountingGaps));
   assert.deepEqual(out.unresolvedProcesses ?? [], []);
@@ -2506,7 +2516,7 @@ test('round 10 dev CLI fallback: an Engine that has gone, whose only exit record
   r.records.push(rec('engine', { role: 'dev-runner', pid: 4021, startedAt: isoMs(q.creationFileTimeUtc) }, 'engine-start', { incarnation: n2,
     pid: q.pid, creationFileTime: q.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(q.creationFileTimeUtc),
     cause: 'RESTART', supervisorKind: 'dev-runner' }), rec('engine', cli, 'engine-intent', r10Intent(n2)), rec('engine', cli, 'engine-exit', r10Exit(n2)));
-  const { out, lookups } = await trackedStop(r, { ...q, incarnation: n2 });
+  const { out, lookups } = await syntheticTrackedStop(r, { ...q, incarnation: n2 });
   assert.ok(lookups.includes(q.pid), `the dev CLI's exit does not prove the start; the lookup decides: ${JSON.stringify(out.resolvedByLedger ?? [])}`);
   assert.equal(out.outcome, 'STOPPED', JSON.stringify(out.errors));
   assert.deepEqual(out.unresolvedProcesses ?? [], []);
@@ -2514,7 +2524,7 @@ test('round 10 dev CLI fallback: an Engine that has gone, whose only exit record
 
 for (const [mode, secondOf] of [['two incarnations', (r) => ({ owner: r.owner, incarnation: { ...r.incarnation, n: 2 } })],
   ['two owners', (r) => ({ owner: { ...r.owner, instanceId: 'inst-2' }, incarnation: r.incarnation })]]) {
-  test(`round 10 whole starts (${mode}): two child-starts of one childId, PID and birth that differ in owner or incarnation are two starts, each reported with the conflict as a finding, and neither is proven`, async () => {
+  test(`round 10 whole starts (${mode}): two child-starts of one childId, PID and birth that differ in owner or incarnation are two starts, each reported with the conflict as a finding, and neither is proven`, { skip: !windows && 'Windows process identities' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(`r10-whole-${mode.replace(/\W+/g, '-')}`);
@@ -2574,7 +2584,7 @@ test('round 10 stop binding table: a stop\'s own dev CLI writer proves an incarn
   assert.deepEqual(wrong, []);
 });
 
-test('round 10 unchecked stop: a stop whose Engine identity could not be read writes nothing for it and gets no binding, so a dev CLI exit from its own PID already in the ledger proves nothing and the Engine stays unresolved', async () => {
+test('round 10 unchecked stop: a stop whose Engine identity could not be read writes nothing for it and gets no binding, so a dev CLI exit from its own PID already in the ledger proves nothing and the Engine stays unresolved', { skip: !windows && 'Windows process identities' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r10-unchecked');

@@ -157,7 +157,7 @@ This replaces the earlier note that `b6d536-no-adoption-launch.json` was not re-
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Spec B B1 at the Engine's real seam (ManagedChatSeam: the composition root's lifecycle manager launching a stand-in server). A planned stop (deactivating chat) and quit each end the main llama-server with the child control's terminate code, JS_CHILD_STOP (0x4A530001), observed as the real OS exit code of the launched process (ExitCodeWatch holds a Windows process handle across the stop). Windows only: the code is the Windows terminator's.",
+      "behaviour": "Spec B B1 at the Engine's real seam (ManagedChatSeam: the composition root's lifecycle manager launching a stand-in server). A planned stop (deactivating chat) and quit each end the main llama-server with the child control's terminate code, JS_CHILD_STOP (0x4A530001), observed as the real OS exit code of the launched process (ExitCodeWatch holds a Windows process handle across the stop). Windows only: the code is the Windows terminator's. The class declares EnabledOnOs(WINDOWS) before setup can initialise ExitCodeWatch/kernel32, and Tag(windows) selects all three unchanged real exit-code checks in the dedicated Windows-native CI lane. The activation self-test candidate must also exit with JS_CHILD_STOP before its run returns.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -248,7 +248,7 @@ This replaces the earlier note that `b6d536-no-adoption-launch.json` was not re-
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTerminalStopTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec B §2.8, SHUTDOWN to the Engine reason: the llama-server stop each Engine shutdown reason records, asked for by engine-shutdown with mode NOW. QUIT is QUIT; RESTART is ENGINE_RESTART; UPGRADE is UPGRADE; HANG is ENGINE_RESTART with detail HANG. Every ShutdownRequest.Reason has an expected stop.",
+      "behaviour": "Spec B Â§2.8, SHUTDOWN to the Engine reason: the llama-server stop each Engine shutdown reason records, asked for by engine-shutdown with mode NOW. QUIT is QUIT; RESTART is ENGINE_RESTART; UPGRADE is UPGRADE; HANG is ENGINE_RESTART with detail HANG. Every ShutdownRequest.Reason has an expected stop.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
