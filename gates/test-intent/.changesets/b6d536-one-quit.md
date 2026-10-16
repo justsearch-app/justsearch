@@ -277,3 +277,14 @@ the coordinator's review.
   "note": "Reran all three corrected power checks on the candidate and d20c300d1^, reproducing the declared passes and wrapped ClassNotFoundException assertions without a patch or stub. The before failures establish absence of the new producer/API only, not native registration or delivery failure; this limit is truthfully declared, so it is nonblocking under the stopping rule."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:298b8123a15183f0f55d876a0963cba490b168c622bf18590f3b1c031fa6905c",
+  "note": "Re-bound to origin/main 298354254 after reviewing the three-producer binding and running the listed checks plus the full coordinator class. The bca7dd0dd quit/deadline/ownership and d20c300d1^ power assertions reproduce as declared without patches; D1 proves bounded abandonment and durable store reopen within one JVM, with its stated existing-drain candidate-only reason."
+}
+```

@@ -86,3 +86,14 @@ Independent verifier acceptance is pending.
   "note": "Re-reviewed the source/provenance corrections, unchanged checks/evidence and current candidate reruns. The earlier verifier note supplies the true missing-API reason for candidate-only backpressure execution; selected current checks pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:b240959db594576ffb4457d6e263f646dad41698b58cfde8539e99de2b3da567",
+  "note": "Re-bound to origin/main 298354254 after reviewing the deliberate-root setup and resource-name cleanup without assertion weakening. All listed candidate checks pass, and the five declared failures on 11ea890e9 reproduce for the recorded reasons without patches."
+}
+```

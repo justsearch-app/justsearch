@@ -68,3 +68,14 @@ Pending independent verification. The builder does not accept its own check chan
   "note": "Reviewed supervisor re-encoding and the add-only census lookup compatibility exports; the historical census ignores the added context, so the stubs cannot create this failure. Current check passed and the declared delayed-receipt assertion failure reproduced on 738c61aa4."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:0da197f3408fffe79798965e6917d8ee24be0111aa174f27be5e2fb3bc63a3e7",
+  "note": "Re-bound to origin/main 298354254 after reviewing the added control prerequisites and running the full current receipt class. The declared 738c61aa4 replay with its unchanged add-only compatibility patch reproduces UNKNOWN instead of OWNER_DIED; the delayed candidate check passes and no patch-created failure was found."
+}
+```
