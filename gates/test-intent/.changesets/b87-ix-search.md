@@ -566,3 +566,14 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
   "note": "re-bound to main; no change since 8063e3bbc"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "reject",
+  "digest": "sha256:95dd5f3f21dd802ec759e23f4a399bf57977f6b3b32cc6f30d1f484ae72ff165",
+  "note": "REJECT under the mandatory before-patch rule: b87-dispatch-fixture.patch rewrites executed DetachableRun.runWithin statements at 61ff9b955, replacing the original run body with delegation and the RUN_THREADS factory with an injected factory. NativeSessionHandleDetachedRunTest.abandonedPendingDispatchDoesNotStartNativeWork reaches the patched overload; this is beyond add-only declarations, a stated abstract-to-default change, or an unreached neutral stub."
+}
+```

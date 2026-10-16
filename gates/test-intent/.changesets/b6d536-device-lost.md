@@ -510,3 +510,14 @@ after the first runs:
   "note": "Reviewed changed CPU-recourse fixtures/evidence and current selected candidate reruns, which pass. Today's exact-file reruns cover the changed repaired evidence; stale timestamp prose is an observation rather than a false execution record."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:d19b102daf608029b89a2916ad115a9431724643104f2395676275e614529bf0",
+  "note": "Re-bound to origin/main 298354254; the unnamed lifetime-only resources retain the original inputs, lifetimes and assertions, and all 20 candidate selectors passed. All five regenerated before selectors on 8ba4bff64 match the evidence (one preservation selector and four assertion failures), while retained before checks and patches match d393938e8."
+}
+```

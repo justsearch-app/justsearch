@@ -460,3 +460,14 @@ fail once with an untyped deadline in a broader run, and that failure was not re
   "note": "Reviewed all entries against 628bb419f and unchanged listed tests/evidence; reran entry 1 (31 candidate cases pass, before classifications and assertion details match f648453b5 with the declared compat patch). VECTOR now truthfully discloses mocked semantic expiry under a 60-second request budget and the before queue-precondition failure, which does not establish the unreached semantic outcome."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:ac80db928a7db7d939bea80f4287b66ca15096e0fc322870d2560737e6fff46b",
+  "note": "Re-bound to origin/main 298354254 after reviewing the stronger MCP preconditions; all 34 listed candidate selectors passed without weakened assertions. The three refreshed f648453b5 selections reproduce their explicitly declared compile-only outcome, and retained repaired/preservation proof and compatibility-patch digests match the current selected checks."
+}
+```

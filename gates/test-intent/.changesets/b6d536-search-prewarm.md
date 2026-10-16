@@ -209,3 +209,14 @@ Evidence files (all written by run-evidence.mjs):
   "note": "Re-reviewed query-leg acquisition, readiness and the concrete candidate-only reasons; candidate and declared before checks reproduce the recorded repair and preservation outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:d91fe6c3028f25a05eff79aba964ae22f2034ab5efb9f998c001a04c3fc5d760",
+  "note": "Re-bound to origin/main 298354254 after reviewing the readiness descriptor/reflection adaptations and regenerated evidence; their inputs and expected readiness outcomes are preserved and all 16 candidate selectors passed. The seven repaired and four preservation before checks retain matching current test content and independently corroborated proof."
+}
+```

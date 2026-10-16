@@ -404,3 +404,14 @@ first runs:
   "note": "Reran both corrected detached-thread lifetime cases on the candidate and 3d181a70c; both execute and pass on both revisions, matching the new preservation evidence. The acquisition/lease APIs and daemon construction exist before, and the corrected declaration now says so; retained content is unchanged since 6f85a257a."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:9b95cb4956fbd5a5b5f9f5c355291d55c5114680909187357b9f5a5f9fd79299",
+  "note": "Re-bound to origin/main 298354254; the unnamed lifetime-only resource edits preserve every assertion, and all 21 candidate selectors passed. The five refreshed repaired selectors fail by the declared assertions on 68547f75a and 900bdf4a0 with their declared patches, both refreshed 3d181a70c preservation selectors pass, and retained proof matches current checks and patches."
+}
+```

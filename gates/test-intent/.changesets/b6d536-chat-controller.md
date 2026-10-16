@@ -327,3 +327,14 @@ overlaid on top of them.
   "note": "All 19 current selected candidate cases pass; the shared controller addition is separately covered by fix-replan. Regenerated evidence retains the exact repaired seam source, compatibility patch and before outcomes independently reproduced in VS3b on f75486245; those bytes and the archived assertion results were checked."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:49b26e69aa923acb32336daa5927575d6e54a84cabc28daae93a471303d51979",
+  "note": "Re-bound to origin/main 298354254; the fixture qualification cleanup preserves its behavior and all 22 listed candidate selectors passed. The refreshed coalescing check reproduces the declared launch-order assertion on f75486245 with the declared patch and overlay, and retained before check/patch proof matches d393938e8."
+}
+```

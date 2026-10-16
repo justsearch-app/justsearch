@@ -207,3 +207,14 @@ wait remain; the selected check, assertions, streaming behavior and production f
   "note": "Reviewed current tracker/lease adaptations, source corrections and evidence; selected current candidate checks pass. The independent verify-a23 report explicitly records the unchanged noOtherMainClassNamesALlamaServerExchange preservation check passing before, resolving the candidate-only concern."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:3ede508baa33ac1347369e73368362e935810225d0a84fb679df87b54e87caf6",
+  "note": "Re-bound to origin/main 298354254; the streaming fixture qualification cleanup preserves its behavior and all 19 listed candidate selectors passed. The refreshed proxy check reproduces the declared no-relaunch-during-stream assertion on 981aeb298 with the fixture-only compatibility patch; unchanged scan proof matches the current check content."
+}
+```
