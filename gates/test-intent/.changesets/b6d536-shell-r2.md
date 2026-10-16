@@ -1622,3 +1622,14 @@ Prior active entries amended only to name their superseding before witnesses; or
   "note": "Reviewed the corrected before declarations, patches and exact current snapshots against today's independent original/correction reports. All 15 changed-entry Rust selectors pass on a fresh current-candidate build; corrected before assertions, candidate-only API reasons and allowed actor scaffolding match those reports."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:a1905ba5a934fd3de2fdca5b947aab5fe552decd490fbca255ce4aa078961752",
+  "note": "Replayed every declared library before setup and checked the actual assertion reasons against the records; candidate library tests pass 149/149. Neutral scaffolding preserves existing behavior, while the five disclosed fixture-deadline failures remain UNVERIFIED and are not promoted to behavioral proof."
+}
+```

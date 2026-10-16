@@ -689,3 +689,14 @@ CI759: b6d536-shell-r1-host-b17.json is regenerated candidate-only, as originall
   "note": "Current entries, evidence and test source match the independent 150a989ca review of allowed overlays and the original P5 launch-count assertion. Own current engine_host run passed all 31 cases, including the four listed host checks; the recorded compile-only and UNVERIFIED boundaries are not behavior passes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS6a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:5d992e22bb02b17fdfc5a5e3b5757986445488eb021a233160cafc3f2193bbd7",
+  "note": "Reviewed the host/evidence refresh and preserved assertions; all cited selectors execute among 149 passing Windows Rust library tests. The original P5 launch-count assertion reproduces on f7cd27765, and historical compile-only records remain explicitly outside behavioral proof."
+}
+```
