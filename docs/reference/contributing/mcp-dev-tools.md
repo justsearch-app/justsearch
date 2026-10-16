@@ -422,6 +422,8 @@ and writes no signal — distinct from a push that failed.
 
 Before tempdoc 844, the missing-dist case returned `UNHANDLED` — a fully-understood, recoverable condition classified as an unhandled exception on 16 of 20 measured `start` errors. It is now classified at the layer that detects it (`scripts/dev/dev-runner.cjs`), so severity and code match reality.
 
+On Windows, creating the Engine's job and reading its root identity consume the configured backend port startup budget. A host that never publishes that identity fails startup; the current run's `engineJob.startupFailure` records `ENGINE_ROOT_UNPUBLISHED`, and the runner's stderr describes the ownership and cleanup outcome. Cleanup verifies the host's PID and birth before ending its job and keeps its existing separate stop allowance. If that identity or its exit cannot be verified, the job stays in the run record and a later stop remains incomplete, including when the native job record was never published.
+
 `quick_health.ownership.opLeases[]` (added tempdoc 542) surfaces the active critical op-leases on the holder so an agent can see what would be interrupted before requesting takeover.
 
 The ownership/contention model those codes belong to — verdicts, leases, takeover policy, `distFrom`, campaign-length holds — lives in the `/dev-stack` skill, which is also where troubleshooting and worktree-FE serving live.

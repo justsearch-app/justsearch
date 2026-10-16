@@ -2045,18 +2045,50 @@ function spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter) 
  * step before it would stop in order is ended first by the job. Off Windows, or for a shell
  * command, the plain spawn.
  */
-function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, splitter, { recordDir, label }) {
+function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, splitter,
+  { recordDir, label, startupTimeoutMs = 20000, onStartupFailure = () => {} }) {
   if (process.platform !== 'win32' || opts?.shell) return spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter);
+  if (!Number.isFinite(startupTimeoutMs) || startupTimeoutMs <= 0) throw new RangeError('the Engine startup budget must be positive and finite');
+  const startedAt = performance.now();
+  const remainingMs = () => Math.max(0, startupTimeoutMs - (performance.now() - startedAt));
   const run = jobRun.startInJob({ command, args, cwd: opts.cwd, env: opts.env, stdio: opts.stdio, label, recordDir,
-    holdAfterRoot: true, capture: () => null });
-  const record = jobRun.waitForRootSync(run);
+    holdAfterRoot: true, capture: child => engineActuator.captureSpawnedIdentity(child,
+      { timeoutMs: Math.floor(Math.min(5000, remainingMs())) }) });
+  const record = jobRun.waitForRootSync(run, { timeoutMs: remainingMs() });
   // The host's identity as it recorded it on its own handle: what a stop's job step checks first.
-  if (record) run.host = { pid: Number(record.pid), creationFileTimeUtc: String(record.creationFileTimeUtc) };
-  else process.stderr.write(`[dev-runner] the Engine job host (pid ${run.child.pid}) recorded no root\n`);
+  const latest = record ?? jobRun.readRunRecord(run);
+  const sameHost = Number(latest?.pid) === run.child.pid && /^[1-9]\d{0,19}$/.test(String(latest.creationFileTimeUtc ?? ''))
+    && (!run.host || (run.host.pid === Number(latest.pid) && run.host.creationFileTimeUtc === String(latest.creationFileTimeUtc)));
+  if (sameHost) {
+    run.host = { pid: Number(latest.pid), creationFileTimeUtc: String(latest.creationFileTimeUtc) };
+  }
+  if (!record || !sameHost || remainingMs() <= 0 || !Number.isSafeInteger(record.root?.pid) || record.root.pid <= 0
+      || !/^[1-9]\d{0,19}$/.test(String(record.root.creationFileTimeUtc ?? ''))) {
+    // No facade with an unknown PID: discovery and the exit ledger require this incarnation's
+    // root. Only the host's captured/recorded birth grants cleanup authority. If it cannot be
+    // verified, retain the job in the current run for an explicit later stop to account for.
+    const cleanup = jobRun.stopJobRunSync(run);
+    const err = new Error(`the Engine job host (pid ${run.child.pid}) did not publish its root within the ${startupTimeoutMs}ms startup budget`);
+    err.code = 'ENGINE_ROOT_UNPUBLISHED';
+    err.details = { recordPath: run.recordPath, hostPid: run.child.pid, host: run.host, startupTimeoutMs, cleanup };
+    try { onStartupFailure(err.details); }
+    catch (writeError) { err.details.failureRecordError = writeError?.message ?? String(writeError); }
+    throw err;
+  }
   const child = jobRun.rootAsChild(run, record, { spawnfile: command });
   child.stdout?.on('data', (buf) => splitter('stdout', buf));
   child.stderr?.on('data', (buf) => splitter('stderr', buf));
   return child;
+}
+
+/** A failed spawn still belongs to this run, including a host whose birth was not readable. */
+function persistEngineStartupFailure(runPath, run, incarnation, details) {
+  run.engineJob = { incarnation, recordPath: details.recordPath,
+    host: details.host ?? { pid: details.hostPid, creationFileTimeUtc: null },
+    startupFailure: { code: 'ENGINE_ROOT_UNPUBLISHED', startupTimeoutMs: details.startupTimeoutMs, cleanup: details.cleanup } };
+  const pending = `${runPath}.engine-start-${process.pid}.tmp`;
+  fs.writeFileSync(pending, JSON.stringify(run, null, 2) + '\n');
+  fs.renameSync(pending, runPath);
 }
 
 const EARLIER_REPORT_RE = /^stop-report\.(\d+)\.json$/;
@@ -2804,7 +2836,7 @@ async function runAdmittedStart(opts, ctx) {
   // Lane F stage B item B8: one incarnation of the Engine. A supervised restart calls this again
   // with the SAME log streams, the same run id and the same lease — 7.6's dev-runner sentence — so
   // what survives the child is everything except the child.
-  const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}, n = 1) => spawnEngineInJob(
+  const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}, n = 1, startup = {}) => spawnEngineInJob(
     spawnBackend.command,
     spawnBackend.args,
     {
@@ -2871,7 +2903,8 @@ async function runAdmittedStart(opts, ctx) {
       }
     },
     // The incarnation's job record lives with the run, where a fallback stop reads it.
-    { recordDir: path.join(runDir, 'engine-jobs'), label: `engine-${n}` },
+    { recordDir: path.join(runDir, 'engine-jobs'), label: `engine-${n}`, ...startup,
+      onStartupFailure: details => persistEngineStartupFailure(runPath, runJson ?? startingRun, n, details) },
   );
 
   // Spec F §5.2 (step 9): the Engine is spawned, observed and stopped by the actuator
@@ -3064,8 +3097,8 @@ async function runAdmittedStart(opts, ctx) {
     dataDir,
     runId,
     policy: supervisionPolicy,
-    spawnChild: (n, port, incarnationEnv) => {
-      backend = spawnEngineChild(port, incarnationEnv, n);
+    spawnChild: (n, port, incarnationEnv, startup) => {
+      backend = spawnEngineChild(port, incarnationEnv, n, startup);
       // Held until endEngineJobs: a restart keeps what the dead incarnation left (as it keeps its
       // registered helpers), and a stop ends it only after its ordered steps.
       if (backend.jobRun) engineJobs.set(n, backend);
@@ -3169,6 +3202,7 @@ async function runAdmittedStart(opts, ctx) {
 
   supervision.run().catch((err) => {
     narrate(`supervisor failed: ${err?.stack ?? err}`);
+    if (err?.details) narrate(`supervisor failure details: ${JSON.stringify(err.details)}`);
     try { onExit(); } catch { /* streams not open yet */ }
     process.exit(1);
   });
@@ -4432,7 +4466,8 @@ async function stopRun(opts, {
     engineJob = { source: 'runner', incarnation: answeredJob.incarnation ?? null, outcome: 'ended',
       endedByJob: jobIdentities(answeredJob.endedByJob), survivors: [] };
   } else if (recordedJob && process.platform === 'win32') {
-    if (!fs.existsSync(recordedJob.recordPath)) {
+    if (!fs.existsSync(recordedJob.recordPath)
+        && (!recordedJob.startupFailure || recordedJob.startupFailure.cleanup?.ok === true)) {
       // Retired by the runner once its host closed the job as `ended`.
       engineJob = { source: 'record', incarnation: recordedJob.incarnation ?? null, outcome: 'gone',
         endedByJob: jobIdentities(answeredJob?.endedByJob), survivors: [] };
@@ -4894,6 +4929,7 @@ if (require.main === module) {
   module.exports = {
     __test: {
       trackedIdentities,
+      persistEngineStartupFailure,
       pruneHistoricRuns,
       resolveDataDir,
       cleanDataDir,

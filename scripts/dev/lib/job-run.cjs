@@ -152,17 +152,21 @@ function settleRunRecord(run, options) {
  * run no code yet), the host has exited, or `timeoutMs` passes. The host's PID cannot name another
  * process meanwhile: libuv holds its handle until its exit is reaped.
  */
-function waitForRootSync(run, { timeoutMs = 20000, intervalMs = 10 } = {}) {
+function waitForRootSync(run, { timeoutMs = 20000, intervalMs = 10,
+  monotonic = () => performance.now(), wait = null } = {}) {
   if (!run?.recordPath) return null;
   const pause = new Int32Array(new SharedArrayBuffer(4));
-  const end = Date.now() + timeoutMs;
+  const end = monotonic() + timeoutMs;
   for (;;) {
     const record = readRunRecord(run);
     if (record?.root?.pid && Number(record.pid) === run.child.pid) return record;
     let alive = true;
     try { process.kill(run.child.pid, 0); } catch { alive = false; }
-    if (!alive || Date.now() >= end) return null;
-    Atomics.wait(pause, 0, 0, intervalMs);
+    const remainingMs = end - monotonic();
+    if (!alive || remainingMs <= 0) return null;
+    const pauseMs = Math.min(intervalMs, remainingMs);
+    if (wait) wait(pauseMs);
+    else Atomics.wait(pause, 0, 0, pauseMs);
   }
 }
 

@@ -507,9 +507,12 @@ function createSupervisionLoop({
     s.harnessRequestFired = s.incarnation !== 1;
     io.clearStaleDiscoveryFiles();
     const port = s.firstReadyDone ? s.apiPort : requestedApiPort;
-    const spawned = actuator.spawnEngine({ n: s.incarnation, cause, apiPort: port });
-    s.pid = spawned.pid ?? null;
+    // Creating the Windows job and publishing its root are part of this same startup budget.
+    // Arm before the synchronous spawn so that a slow host cannot reset the discovery deadline.
     startDeadlines();
+    const spawned = actuator.spawnEngine({ n: s.incarnation, cause, apiPort: port,
+      startupTimeoutMs: Math.max(0, s.portDeadlineAt - clockNow()) });
+    s.pid = spawned.pid ?? null;
     await emit(STATES.STARTING);
     await callHook('onSpawned', { n: s.incarnation, pid: s.pid, cause });
   };
