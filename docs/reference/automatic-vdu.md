@@ -1,3 +1,10 @@
+---
+title: Automatic picture reading while chat is loaded
+type: reference
+status: stable
+description: "Automatic picture-reading eligibility, restoration, retries, and shutdown behavior."
+---
+
 # Automatic picture reading while chat is loaded
 
 The existing 30-second VDU sampler can lend an idle, managed chat server to one bounded
