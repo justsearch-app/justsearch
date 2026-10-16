@@ -379,3 +379,14 @@ Decision records were searched for a conflict with these behaviours (status poll
   "note": "Re-reviewed producer staleness, status publication and the preserved hang controls; candidate and declared before checks reproduce the recorded outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "reject",
+  "digest": "sha256:7840a1a483a9379ee78b4cf080cf7d1ae07ee589e9bc3942eca4ed9420a6f2ad",
+  "note": "Reject: entry 4 attaches b82-status-expiry-kept-java.json with failBefore null and gives no reason for candidate-only execution. Its StatusPublicationBackstop content/observation seam already exists on 98cad099f, so the strengthening description does not explain omitting before execution."
+}
+```

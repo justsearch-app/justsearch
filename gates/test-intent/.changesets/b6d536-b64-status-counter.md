@@ -198,3 +198,14 @@ Pending independent verifier judgment; the builder does not accept its own chang
   "note": "Reviewed refreshed repaired evidence and the unrelated settings method change; all 13 selected candidate checks pass and the declared 23b8679ee before rerun reproduces its recorded classifications. The unchanged metadata-only entry retains its explicit absent-before-API reason."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:96df05581b25a02153fed16d8262b102c6414c2134059f5a8a56a4808b4a6593",
+  "note": "Re-bound to origin/main 298354254 after reviewing the shared HTTP qualification cleanup and retained counter oracles. All listed candidate checks pass and the 13 declared 23b8679ee before outcomes reproduce with its additive constructor patch and fixture overlay."
+}
+```

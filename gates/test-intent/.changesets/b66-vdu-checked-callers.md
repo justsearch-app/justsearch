@@ -119,3 +119,14 @@ Pending independent verifier review. The builder does not provide its own accept
   "note": "Reviewed source corrections and unchanged check/evidence content; all selected current Java/web checks pass. Earlier independent notes document the preservation comparisons and absent new Java APIs, so the candidate-only records are not unexplained."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:b569bcc69777d9f217f9c8790e7bfb7ad4549d1845ee4eac8ce2a629da24e38d",
+  "note": "Re-bound to origin/main 298354254 after reviewing the additional fixture prerequisite and confirming the documented candidate-only APIs are absent on 63c28232f. All listed candidate checks pass, and the declared frontend and HTTP before assertions reproduce with the current verifier overlay."
+}
+```

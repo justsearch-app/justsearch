@@ -71,3 +71,14 @@ The verifier's mixed PDF, search, 45-second cooldown and explicit enrichment pas
   "note": "Reviewed the delegated-choice relabel and both production checkpoint/projector oracles against current code. Candidate checks passed, with unchanged assertion before evidence at f6d579a86."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:10a24e281b86b9f84296c979f7f891302df1a4f772fb147c1e11decbdb0f07a9",
+  "note": "Re-bound to origin/main 298354254 after confirming unnamed resources preserve scope, lifetime and assertions. Both listed candidate checks pass and f6d579a86 reproduces the checkpoint and projector assertion failures."
+}
+```

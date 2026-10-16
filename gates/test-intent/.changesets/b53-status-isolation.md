@@ -201,3 +201,14 @@ Pending independent verifier review; the builder cannot self-accept or delegate.
   "note": "Re-reviewed isolation and provenance against current sources and the corrected compatibility patches; candidate and declared before runs match, including preservation through the forwarding overload."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:46e02f5516fcd2670a76b8dd48e37d0e8cf38ef90c3a7cbee0bf3115c6166da3",
+  "note": "Re-bound to origin/main 298354254 after checking the qualification cleanup, regenerated evidence and add-only compatibility patches. All listed candidate checks pass; ff0c00f5e reproduces the declared assertion failures and provenance preservation, without reaching the neutral admission stub."
+}
+```

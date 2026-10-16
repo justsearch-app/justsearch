@@ -112,3 +112,14 @@ Pending independent verifier review.
   "note": "Reviewed the corrected sources and refreshed observation evidence. Candidate checks pass; the exact 55e4dd392 before run reproduces both recorded assertion classifications."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:1fc35e965f4cd093c5c4bc3c305c858e6f00d7521f5db611ae65bd7736ed38d6",
+  "note": "Re-bound to origin/main 298354254 after reviewing the added capacity-holder prerequisite and retained route oracle. Both listed candidate checks pass; b45615514 and 55e4dd392 reproduce their declared activity assertion failures."
+}
+```

@@ -155,3 +155,14 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
   "note": "Re-reviewed the corrected candidate-only preservation explanation and status backstop checks; candidate and declared before runs match the evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5a-20261016",
+  "verdict": "accept",
+  "digest": "sha256:b7b1b0393f42a25059e1d9a495bfed4874029fdb1ff0e95502488a19d260f00e",
+  "note": "Re-bound to origin/main 298354254 after confirming comment and whitespace cleanup preserves every assertion. All listed candidate checks pass and 93479e944 reproduces the backstop/publication failures; the separate candidate-only preservation reason remains explicit."
+}
+```
