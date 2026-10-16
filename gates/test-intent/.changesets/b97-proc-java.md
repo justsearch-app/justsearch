@@ -22,6 +22,16 @@ The job-assignment check stays candidate-only for the concrete API reason in its
 The initial unpatched parent replay and native PID/creation-time logs are retained in
 F:/phaseb-fix3-b6d536-20261015.
 
+Before-state replay repair: the native ProcessTerminator.open(ProcessHandle) cleanup in the
+rejected overlays was already present at d393938e8, but neither a164833f5 nor d7bbe9600 has that
+overload. The post-acceptance change to SlowStartFakeLlamaServer only shortened enum references;
+HealthyFakeLlamaServer and ProcessTerminator were unchanged. Restore the PID/creation-instant
+checked JDK cleanup from the original evidence trees (7de00fd963 for SlowStart and 8d423e994f
+for Healthy; also present at d7bbe9600 and f40ba7da8 respectively), retaining later fixture
+inputs and serving behavior. This needs no
+before-patch and leaves every test assertion intact. Regenerated evidence records the actual
+before assertion failures and candidate results; acceptance remains the verifier's decision.
+
 ```json
 {
   "entries": [
@@ -81,7 +91,7 @@ F:/phaseb-fix3-b6d536-20261015.
         "instrumentation",
         "signature"
       ],
-      "whatMoved": "Fixture cleanup records creation instants at process startup and checks them before terminating; the seam accepts an injected child control so the session and candidate share the same real ownership boundary. Existing test inputs and oracles are retained. Build cleanup removes redundant qualification in SlowStartFakeLlamaServer, retaining original inputs, resource lifetimes and every existing assertion."
+      "whatMoved": "Fixture cleanup records creation instants at process startup and checks them before terminating; the seam accepts an injected child control so the session and candidate share the same real ownership boundary. Existing test inputs and oracles are retained. Before-state replay restores SlowStartFakeLlamaServer's original PID/creation-instant checked JDK cleanup from d7bbe9600, avoiding the later ProcessTerminator.open(ProcessHandle) API absent at a164833f5. Later serving behavior, inputs and every assertion are retained."
     },
     {
       "items": [
@@ -305,7 +315,7 @@ F:/phaseb-fix3-b6d536-20261015.
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "The stand-in llama-server gains an opt-in --spawn-lingerer behaviour: once serving it starts one more process that records its own PID and creation instant and exits on a signal file or after 90 s, with lookup and release helpers that act only on those recorded identities. No existing behaviour, input or oracle of the fixture changes."
+      "whatMoved": "The stand-in llama-server gains an opt-in --spawn-lingerer behaviour: once serving it starts one more process that records its own PID and creation instant and exits on a signal file or after 90 s, with lookup and release helpers that act only on those recorded identities. Before-state replay restores the original PID/creation-instant checked JDK cleanup and crash injection from f40ba7da8, avoiding the later ProcessTerminator.open(ProcessHandle) API absent at d7bbe9600. Later single-slot streaming behavior and every existing fixture input and test assertion are retained."
     },
     {
       "items": [

@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
   },
-  "createdAt": "2026-10-15T15:44:58.010Z",
-  "revision": "9f1f6257b39280b39df6b7e638d2fce4ef4ae50b",
-  "tree": "4b05a15353c27bd97b417f024dd1c4ccbcecb0f6",
+  "createdAt": "2026-10-16T01:32:27.497Z",
+  "revision": "e0ae2e133135624f7d47caed2c958f42331fdba2",
+  "tree": "84da1fbc52d35a3e89e39642a5a4f78a6ae18d17",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureBeforeResumeLeavesNoProcessBehind\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 205292
+      "durationMs": 21076
     }
   ],
   "checks": [
@@ -71,7 +71,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory\" --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureBeforeResumeLeavesNoProcessBehind\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 366041
+        "durationMs": 17427
       }
     ],
     "checks": [
@@ -87,5 +87,5 @@
       }
     ]
   },
-  "digest": "sha256:d963123d0ccab399d0a6e9f8cd922db1922c79ad665c77acc9e5ef185b34fa29"
+  "digest": "sha256:493eebd69b64bdb8df5a39b5a698191afb979a656a0c0eee3bdcdeb94f74d9f5"
 }

@@ -57,38 +57,17 @@ public final class SlowStartFakeLlamaServer {
   /** Ends every server launched from {@code dir} and waits for it (test cleanup). */
   public static void endAll(Path dir) throws IOException {
     for (Launch launch : launches(dir)) {
-      stopRecorded(dir, launch.pid());
+      ProcessHandle.of(launch.pid())
+          .filter(server -> server.info().startInstant().filter(launch.birth()::equals).isPresent())
+          .ifPresent(server -> {
+        server.destroyForcibly();
+        try {
+          server.onExit().get(5, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+          // best-effort cleanup of a test helper
+        }
+      });
     }
-  }
-
-  private static void stopRecorded(Path dir, long pid) {
-    try {
-      String birth = Files.readAllLines(dir.resolve("identities.txt"), StandardCharsets.US_ASCII)
-          .stream().map(line -> line.split(" ")).filter(fields -> Long.parseLong(fields[0]) == pid)
-          .map(fields -> fields[1]).findFirst().orElseThrow();
-      var process = ProcessHandle.of(pid).filter(ProcessHandle::isAlive);
-      if (process.isEmpty()) return;
-      var held = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(process.get());
-      try {
-        String actual = held.creationFileTime().orElseGet(() -> "instant:"
-            + process.get().info().startInstant().orElseThrow());
-        if (!actual.equals(birth)) return;
-        held.terminate(1);
-        held.awaitExit(java.time.Duration.ofSeconds(10));
-      } finally { held.close(); }
-    } catch (Exception failure) {
-      throw new AssertionError("could not stop recorded fixture identity " + pid, failure);
-    }
-  }
-
-  private static void recordIdentity(Path dir) throws IOException {
-    long pid = ProcessHandle.current().pid();
-    String birth = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
-        .creationFileTime(pid).orElseGet(() -> "instant:"
-            + ProcessHandle.current().info().startInstant().orElseThrow());
-    Files.writeString(dir.resolve("identities.txt"), pid + " " + birth + "\n",
-        StandardCharsets.US_ASCII, StandardOpenOption.CREATE,
-        StandardOpenOption.APPEND);
   }
 
   public static void main(String[] args) throws Exception {
@@ -97,7 +76,6 @@ public final class SlowStartFakeLlamaServer {
     String window = value(args, "-c", "4096");
     String home = System.getProperty(HOME_PROPERTY);
     if (home != null) {
-      recordIdentity(Path.of(home));
       String modelName = model.substring(model.lastIndexOf('/') + 1);
       Files.writeString(Path.of(home, LAUNCHES),
           modelName + " " + ProcessHandle.current().pid() + " "

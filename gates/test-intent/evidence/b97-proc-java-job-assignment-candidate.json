@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
   },
-  "createdAt": "2026-10-15T15:46:11.777Z",
-  "revision": "9f1f6257b39280b39df6b7e638d2fce4ef4ae50b",
-  "tree": "32cfc40671d5d1621601c8a8ae596af4ae2d05e7",
+  "createdAt": "2026-10-16T01:32:54.819Z",
+  "revision": "e0ae2e133135624f7d47caed2c958f42331fdba2",
+  "tree": "aa29ba15b551935b5abae79dcff9d358e7b57232",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest.aFailureJoiningTheJobLeavesNoProcessBehind\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 66231
+      "durationMs": 24251
     }
   ],
   "checks": [
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:2e966cab389eca3f2fbe3d0ba26d6213a3a5243182936fc3f2d8360f7e8d2389"
+  "digest": "sha256:c11e18081b473cc31c9ad6dd883996d437fe919ee9c82998440f34aa7e6248ba"
 }
