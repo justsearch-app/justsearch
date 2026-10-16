@@ -304,7 +304,11 @@ final class WindowsJobWitness implements AutoCloseable {
   /** Null while the owner may still record this exit. */
   private static io.justsearch.app.api.runtime.child.ProcessIntents.Resolution resolve(
       long pid, Held held, Integer code, Instant exitedAt, long waitedNanos) {
-    boolean ownerWaitOver = waitedNanos >= OWNER_WAIT_NANOS;
+    // A known native crash cannot become an intended exit when an owner receipt arrives.
+    // Accept it without the owner wait so a console visited first at the deadline cannot
+    // inherit a stop intent while its client's native crash is still deferred.
+    boolean ownerWaitOver = waitedNanos >= OWNER_WAIT_NANOS
+        || (code != null && io.justsearch.app.api.runtime.child.OwnedHelper.crashCode(code));
     java.util.Optional<io.justsearch.app.api.runtime.child.ProcessIntents.Resolution> found;
     boolean console = held.executable != null
         && held.executable.toLowerCase(java.util.Locale.ROOT).endsWith("\\conhost.exe") && held.parentPid != null;
@@ -314,13 +318,19 @@ final class WindowsJobWitness implements AutoCloseable {
     } else {
       found = io.justsearch.app.api.runtime.child.ProcessIntents.resolve(pid, held.birth,
           held.executable, instantOf(held.birth == null ? 0 : Long.parseLong(held.birth)), exitedAt, ownerWaitOver,
-          held.parentPid, held.parentBirth, code); // the crash class is applied before it is kept
+          held.parentPid, held.parentBirth, code);
     }
     if (found.isEmpty()) return null;
     var resolution = found.get();
     if ("none".equals(resolution.basis()) && waitedNanos < REGISTRATION_WAIT_NANOS) return null;
     // A console host follows its client's final class; its own crash code still counts.
-    return io.justsearch.app.api.runtime.child.ProcessIntents.afterExitCode(resolution, code);
+    resolution = io.justsearch.app.api.runtime.child.ProcessIntents.afterExitCode(resolution, code);
+    if (code == null) resolution = new io.justsearch.app.api.runtime.child.ProcessIntents.Resolution(
+        "UNKNOWN", "native exit code unavailable", resolution.basis());
+    // Only now is this class final. Publishing before the registration gate lets a console
+    // relabel a deferred no-intent result as "console client" and bypass that same gate.
+    io.justsearch.app.api.runtime.child.ProcessIntents.witnessed(pid, held.birth, resolution);
+    return resolution;
   }
 
   private long[] times(MemorySegment process) throws Throwable {
