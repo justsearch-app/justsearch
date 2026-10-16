@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.TermQuery;
@@ -53,6 +55,9 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
     int[] children;
     Map<String, String> vectors;
     try (var runtime = open(index)) {
+      // This check uses internal Lucene doc numbers to detect a child rewrite. Segment merges
+      // may renumber untouched children, so keep the fixture's segments fixed before seeding.
+      writer(runtime).getConfig().setMergePolicy(NoMergePolicy.INSTANCE);
       total = seed(runtime, id, content, modified);
       children = childIds(index, id);
       vectors = vectors(index);
@@ -162,6 +167,18 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
       var query = new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, id));
       return java.util.Arrays.stream(searcher.search(query, 10000).scoreDocs).mapToInt(hit -> hit.doc).sorted().toArray();
     }
+  }
+
+  private static IndexWriter writer(RunningRuntime runtime) throws ReflectiveOperationException {
+    var sessionField = RunningRuntime.class.getDeclaredField("session");
+    sessionField.setAccessible(true);
+    Object session = sessionField.get(runtime);
+    var snapshotField = session.getClass().getDeclaredField("snapshot");
+    snapshotField.setAccessible(true);
+    Object snapshot = snapshotField.get(session);
+    var writerMethod = snapshot.getClass().getDeclaredMethod("writer");
+    writerMethod.setAccessible(true);
+    return (IndexWriter) writerMethod.invoke(snapshot);
   }
 
   private static Map<String, String> vectors(Path index) throws Exception {
