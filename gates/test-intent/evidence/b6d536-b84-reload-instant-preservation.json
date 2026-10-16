@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T20:59:01.311Z",
+  "revision": "b48ef2fcc8e74753777e6b4c8ff6402eb2977c2f",
+  "tree": "72e968f74b257637d8cc304132c8267d90405ea0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.clearedPressureEndsThePublishedReloadWaitAndRaisesSeq\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 29279
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#clearedPressureEndsThePublishedReloadWaitAndRaisesSeq",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "clearedPressureEndsThePublishedReloadWaitAndRaisesSeq()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d1fc044786544d716c902b0748bc2e76706083368bf6df78d6e7abcf8d2b1d4f"
+}

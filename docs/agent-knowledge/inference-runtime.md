@@ -579,7 +579,8 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   successful activation), Condition-shaped `RuntimeStatus`
   (ENGINE/ADOPTION/LEASE/PROCEDURE axes with reason codes),
   `RuntimeGpuLease` (binary grants; size-admitting interface for future
-  co-residency), and a single-thread level-triggered `RuntimeReconciler` —
+  co-residency; deleted in Spec A step 12, the LEASE axis is now derived
+  from the observed mode), and a single-thread level-triggered `RuntimeReconciler` —
   the ONLY sanctioned caller of `switchToOnlineMode/switchToIndexingMode`
   (ArchUnit-forced, `RuntimeReconcilerGuardrailsTest`). Machine actors hold
   non-spec engine states only inside declared procedures (VDU_BATCH);
@@ -599,8 +600,13 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   `governance/runtime-state.v1.json` (fork gate fails the build otherwise).
 - **Re-entrancy contract:** listeners fire under the transition lock;
   reconciliation never runs on a listener thread (level-triggered dirty
-  flag). Anti-flap: repeated foreign flips (>3 in 5 min) hold convergence
-  with reason `convergence-held-flap-suspected`.
+  flag). Since Spec A step 2 an observed foreign flip only republishes
+  status: foreign-flip convergence and its anti-flap hold (reason
+  `convergence-held-flap-suspected`) were removed, and the chat controller
+  (`ChatServerControllerImpl`) runs every start, stop and relaunch; the
+  reconciler forwards boot, spec and procedure intent to it as
+  `setActivation`, and no lifecycle lock is held during a health wait or
+  a drain.
 - **Evidence:** tempdoc 737 (§8 diagnosis, §12 design, §14 derisk, §15
   implementation log; live Checkpoint 1 record).
 - **Revisit when:** sized GPU grants (12 GB+ co-residency) are implemented —

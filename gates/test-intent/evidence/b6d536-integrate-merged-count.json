@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:16:25.186Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "2a286abaf71aa74317c5028d0f1c9c49b12fb830",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23194
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5030008593c02579f70060d04533ac4510b467b8bd94cd7eafd7e195ff4497b4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "packagedRegisterIsTheRepositoryRegister()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "75e70d488",
+    "revision": "75e70d488483e8f6bcb67ffa2d8136695c130fc2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 12125
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
+        "classification": "assertion",
+        "detail": "packagedRegisterIsTheRepositoryRegister(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the additive encoder-device scope is registered ==> expected: <289> but was: <282>"
+      }
+    ]
+  },
+  "digest": "sha256:45fa39b11dcf2dd78cbfa57b05e2ed18dd92e37a18359c5bfbb6677fa7866125"
+}

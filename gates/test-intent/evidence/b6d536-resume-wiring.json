@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T01:18:45.169Z",
+  "revision": "48326a1cea23f3f8996a1a6aa3b9915837e200b3",
+  "tree": "44517503f0f99b970fb470ec929ad7113d3b2b6f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineResumeWiringTest.aResumeReachesTheControllerBoundBeforeThePowerEvents\" --tests \"io.justsearch.app.engine.EngineResumeWiringTest.aResumeReachesTheControllerBoundAfterThePowerEvents\" --tests \"io.justsearch.app.engine.EngineResumeWiringTest.aReboundControllerGetsTheResumesThroughOneSubscription\" --tests \"io.justsearch.app.engine.EngineResumeWiringTest.theSubscriptionClosesWithTheProcessResources\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4674
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java#aResumeReachesTheControllerBoundBeforeThePowerEvents",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b7d9a2d1fa94d604c6829bd0b9baf21d6b8a183b4cca904f1b04acc6409e829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aResumeReachesTheControllerBoundBeforeThePowerEvents()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java#aResumeReachesTheControllerBoundAfterThePowerEvents",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b7d9a2d1fa94d604c6829bd0b9baf21d6b8a183b4cca904f1b04acc6409e829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aResumeReachesTheControllerBoundAfterThePowerEvents()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java#aReboundControllerGetsTheResumesThroughOneSubscription",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b7d9a2d1fa94d604c6829bd0b9baf21d6b8a183b4cca904f1b04acc6409e829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReboundControllerGetsTheResumesThroughOneSubscription()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java#theSubscriptionClosesWithTheProcessResources",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineResumeWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b7d9a2d1fa94d604c6829bd0b9baf21d6b8a183b4cca904f1b04acc6409e829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theSubscriptionClosesWithTheProcessResources()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d051b8f6139a4be178e123399e3404edaaf6824f9ebc2c8ae32592b7f81d9b61"
+}

@@ -1,0 +1,159 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:40:43.296Z",
+  "revision": "981aeb2983b77dc775ab8a02f76c62f810df690c",
+  "tree": "b402bda88c8cd5fa53384f16c0eb0d9ab57dd200",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ProxyStreamAcrossReconfigureTest.aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13408
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.theExchangeRequestBuilderRequiresALease\" --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.everyInferenceExchangePassesItsLeaseAndOnlyProbesGoWithout\" --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.theProxyAdmitsEachExchangeBeforeItReachesLlamaServer\" --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.evalScriptsReachTheChatModelThroughTheProxy\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4048
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyStreamAcrossReconfigureTest.java#aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyStreamAcrossReconfigureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e7760da2ffe2907bd4111f186623081fa11a55b8f7dd39f7ed222c7505e9bed7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#theExchangeRequestBuilderRequiresALease",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d2d640f99e04029b6228a43ac1c902cb19691a7d7a3c9ab236f1a3cf184b6863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theExchangeRequestBuilderRequiresALease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#everyInferenceExchangePassesItsLeaseAndOnlyProbesGoWithout",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d2d640f99e04029b6228a43ac1c902cb19691a7d7a3c9ab236f1a3cf184b6863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyInferenceExchangePassesItsLeaseAndOnlyProbesGoWithout()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#theProxyAdmitsEachExchangeBeforeItReachesLlamaServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d2d640f99e04029b6228a43ac1c902cb19691a7d7a3c9ab236f1a3cf184b6863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theProxyAdmitsEachExchangeBeforeItReachesLlamaServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#evalScriptsReachTheChatModelThroughTheProxy",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d2d640f99e04029b6228a43ac1c902cb19691a7d7a3c9ab236f1a3cf184b6863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "evalScriptsReachTheChatModelThroughTheProxy()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "981aeb298",
+    "revision": "981aeb2983b77dc775ab8a02f76c62f810df690c",
+    "overlays": [
+      "modules/ui/src/test/java/io/justsearch/ui/api/StreamingFakeLlamaServer.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ProxyStreamAcrossReconfigureTest.aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 46074
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.theExchangeRequestBuilderRequiresALease\" --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.everyInferenceExchangePassesItsLeaseAndOnlyProbesGoWithout\" --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.theProxyAdmitsEachExchangeBeforeItReachesLlamaServer\" --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.evalScriptsReachTheChatModelThroughTheProxy\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7679
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyStreamAcrossReconfigureTest.java#aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches",
+        "classification": "assertion",
+        "detail": "aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no relaunch while the proxied reply is open ==> expected: <[model.gguf]> but was: <[model.gguf, b.gguf]>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#theExchangeRequestBuilderRequiresALease",
+        "classification": "assertion",
+        "detail": "theExchangeRequestBuilderRequiresALease(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: buildJsonPostRequest takes the exchange's GenerationLease first ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#everyInferenceExchangePassesItsLeaseAndOnlyProbesGoWithout",
+        "classification": "assertion",
+        "detail": "everyInferenceExchangePassesItsLeaseAndOnlyProbesGoWithout(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[]> but was: <[OnlineModeOps.java sends an exchange with serverPort.get( instead of its lease, OnlineModeOps.java sends an exchange with serverPort.get( instead of its lease, OnlineModeOps.java sends an exchange with serverPort.get( instead of its leas"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#theProxyAdmitsEachExchangeBeforeItReachesLlamaServer",
+        "classification": "assertion",
+        "detail": "theProxyAdmitsEachExchangeBeforeItReachesLlamaServer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the proxy admits and sends ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#evalScriptsReachTheChatModelThroughTheProxy",
+        "classification": "assertion",
+        "detail": "evalScriptsReachTheChatModelThroughTheProxy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: eval LLM calls default to the Engine's /v1 proxy, not llama-server's own port ==> expected: <[]> but was: <[scripts/jseval/jseval/agent_retrieval_eval.py:964: llm_url: str = \"http://127.0.0.1:8080\",, scripts/jseval/jseval/commands/eval_cmds.py:158: @click.option("
+      }
+    ]
+  },
+  "digest": "sha256:523db9e426a4364e749da314337bfe6e55793903e58a15d110061e3b584f2467"
+}

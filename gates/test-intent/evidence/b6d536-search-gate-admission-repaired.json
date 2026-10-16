@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T05:50:49.915Z",
+  "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
+  "tree": "7b7e50e5bfe01d14f7a06a8aedf114a62d2d3cfe",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineSearchAdmissionUnderStallTest.slotsInUseNeverExceedLiveCallersAndAllReturnWhileRunsStillStall\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18812
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java#slotsInUseNeverExceedLiveCallersAndAllReturnWhileRunsStillStall",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8344513c055b708afb230ebb6dc928fd07ab130cce6667393506915fdcda12d6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "slotsInUseNeverExceedLiveCallersAndAllReturnWhileRunsStillStall()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "68547f75a",
+    "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineSearchAdmissionUnderStallTest.slotsInUseNeverExceedLiveCallersAndAllReturnWhileRunsStillStall\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 51121
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java#slotsInUseNeverExceedLiveCallersAndAllReturnWhileRunsStillStall",
+        "classification": "assertion",
+        "detail": "slotsInUseNeverExceedLiveCallersAndAllReturnWhileRunsStillStall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: slots held beyond the live callers ==> expected: <0> but was: <3>"
+      }
+    ]
+  },
+  "digest": "sha256:d47b787c55743142ca591f18c143979e645b3c42b1fc67917b09ff764294ced7"
+}

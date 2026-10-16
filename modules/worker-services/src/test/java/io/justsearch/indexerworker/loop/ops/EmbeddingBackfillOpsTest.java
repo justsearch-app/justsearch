@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -73,15 +74,15 @@ class EmbeddingBackfillOpsTest {
       stubTwoPendingChunks();
       when(embeddingProvider.embedDocumentBatch(List.of("content one", "content two")))
           .thenReturn(List.of());
-      when(embeddingProvider.embedDocument("content one")).thenReturn(new float[] {1f, 2f});
-      when(embeddingProvider.embedDocument("content two")).thenReturn(new float[] {3f, 4f});
+      when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
+      when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       StageOutcome result =
           assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
 
       assertTrue(result.success(), "should report work was done via the per-chunk fallback");
-      verify(embeddingProvider).embedDocument("content one");
-      verify(embeddingProvider).embedDocument("content two");
+      verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
+      verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
       verify(indexingCoordinator)
           .updateDocument(
               eq("chunk1"),
@@ -107,15 +108,15 @@ class EmbeddingBackfillOpsTest {
       // null-only guard.
       when(embeddingProvider.embedDocumentBatch(List.of("content one", "content two")))
           .thenReturn(List.of(new float[] {9f}));
-      when(embeddingProvider.embedDocument("content one")).thenReturn(new float[] {1f, 2f});
-      when(embeddingProvider.embedDocument("content two")).thenReturn(new float[] {3f, 4f});
+      when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
+      when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       StageOutcome result =
           assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
 
       assertTrue(result.success());
-      verify(embeddingProvider).embedDocument("content one");
-      verify(embeddingProvider).embedDocument("content two");
+      verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
+      verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
     }
 
     @Test
@@ -124,15 +125,15 @@ class EmbeddingBackfillOpsTest {
       stubTwoPendingChunks();
       when(embeddingProvider.embedDocumentBatch(List.of("content one", "content two")))
           .thenReturn(null);
-      when(embeddingProvider.embedDocument("content one")).thenReturn(new float[] {1f, 2f});
-      when(embeddingProvider.embedDocument("content two")).thenReturn(new float[] {3f, 4f});
+      when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
+      when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       StageOutcome result =
           assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
 
       assertTrue(result.success());
-      verify(embeddingProvider).embedDocument("content one");
-      verify(embeddingProvider).embedDocument("content two");
+      verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
+      verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
     }
 
     @Test
@@ -142,8 +143,8 @@ class EmbeddingBackfillOpsTest {
       stubTwoPendingChunks();
       when(embeddingProvider.embedDocumentBatch(List.of("content one", "content two")))
           .thenReturn(List.of());
-      when(embeddingProvider.embedDocument("content one")).thenReturn(new float[] {1f, 2f});
-      when(embeddingProvider.embedDocument("content two")).thenReturn(new float[0]);
+      when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
+      when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[0]);
       when(documentFieldOps.getDocumentField("chunk2", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
           .thenReturn(null);
 
@@ -182,7 +183,7 @@ class EmbeddingBackfillOpsTest {
           .thenReturn(List.of("large", "later"));
       when(documentFieldOps.getDocumentContent("large")).thenReturn(large);
       when(embeddingProvider.embedDocumentBatch(List.of(large))).thenReturn(List.of());
-      when(embeddingProvider.embedDocument(large)).thenReturn(new float[] {1f});
+      when(embeddingProvider.embedDocument(eq(large), any(InferenceRequest.class))).thenReturn(new float[] {1f});
 
       EmbeddingBackfillOps.processEmbeddingBackfill(context());
 
@@ -201,12 +202,12 @@ class EmbeddingBackfillOpsTest {
       when(documentFieldOps.getDocumentContent("first")).thenReturn(first);
       when(documentFieldOps.getDocumentContent("large")).thenReturn(large);
       when(embeddingProvider.embedDocumentBatch(List.of(first))).thenReturn(List.of());
-      when(embeddingProvider.embedDocument(first)).thenReturn(new float[] {1f});
+      when(embeddingProvider.embedDocument(eq(first), any(InferenceRequest.class))).thenReturn(new float[] {1f});
 
       EmbeddingBackfillOps.processEmbeddingBackfill(context());
 
       verify(embeddingProvider).embedDocumentBatch(List.of(first));
-      verify(embeddingProvider, never()).embedDocument(large);
+      verify(embeddingProvider, never()).embedDocument(eq(large), any(InferenceRequest.class));
       verify(indexingCoordinator, never()).updateDocument(eq("large"), anyMap());
       verify(documentFieldOps, never()).getDocumentContent("later");
     }
@@ -220,7 +221,7 @@ class EmbeddingBackfillOpsTest {
       when(documentFieldOps.getDocumentContent("first")).thenReturn(half);
       when(documentFieldOps.getDocumentContent("second")).thenReturn(half);
       when(embeddingProvider.embedDocumentBatch(List.of(half, half))).thenReturn(List.of());
-      when(embeddingProvider.embedDocument(half)).thenReturn(new float[] {1f});
+      when(embeddingProvider.embedDocument(eq(half), any(InferenceRequest.class))).thenReturn(new float[] {1f});
 
       EmbeddingBackfillOps.processEmbeddingBackfill(context());
 
@@ -233,13 +234,13 @@ class EmbeddingBackfillOpsTest {
     void fallsBackPerDoc_whenBatchReturnsEmptyList() {
       stubTwoPendingDocs();
       when(embeddingProvider.embedDocumentBatch(anyList())).thenReturn(List.of());
-      when(embeddingProvider.embedDocument("content one")).thenReturn(new float[] {1f, 2f});
-      when(embeddingProvider.embedDocument("content two")).thenReturn(new float[] {3f, 4f});
+      when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
+      when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       assertDoesNotThrow(() -> EmbeddingBackfillOps.processEmbeddingBackfill(context()));
 
-      verify(embeddingProvider).embedDocument("content one");
-      verify(embeddingProvider).embedDocument("content two");
+      verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
+      verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
     }
 
     @Test
@@ -248,13 +249,13 @@ class EmbeddingBackfillOpsTest {
       stubTwoPendingDocs();
       when(embeddingProvider.embedDocumentBatch(anyList()))
           .thenReturn(List.of(new float[] {9f}));
-      when(embeddingProvider.embedDocument("content one")).thenReturn(new float[] {1f, 2f});
-      when(embeddingProvider.embedDocument("content two")).thenReturn(new float[] {3f, 4f});
+      when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
+      when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       assertDoesNotThrow(() -> EmbeddingBackfillOps.processEmbeddingBackfill(context()));
 
-      verify(embeddingProvider).embedDocument("content one");
-      verify(embeddingProvider).embedDocument("content two");
+      verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
+      verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
     }
 
     @Test
@@ -262,13 +263,13 @@ class EmbeddingBackfillOpsTest {
     void fallsBackPerDoc_whenBatchReturnsNull() {
       stubTwoPendingDocs();
       when(embeddingProvider.embedDocumentBatch(anyList())).thenReturn(null);
-      when(embeddingProvider.embedDocument("content one")).thenReturn(new float[] {1f, 2f});
-      when(embeddingProvider.embedDocument("content two")).thenReturn(new float[] {3f, 4f});
+      when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
+      when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       assertDoesNotThrow(() -> EmbeddingBackfillOps.processEmbeddingBackfill(context()));
 
-      verify(embeddingProvider).embedDocument("content one");
-      verify(embeddingProvider).embedDocument("content two");
+      verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
+      verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
     }
   }
 }

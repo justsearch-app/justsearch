@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T02:45:23.373Z",
+  "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
+  "tree": "26d3d2b3fc4fa9a93f2f131aca75ac938889afca",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestPublisherTest.restartWithChildrenRemainingIsIncompleteAndCloseCannotEraseIt\" --tests \"io.justsearch.ui.runtime.RuntimeManifestPublisherTest.childPersistenceAndShutdownCompletionCannotDeadlockUnderForcedContention\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11301
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java#restartWithChildrenRemainingIsIncompleteAndCloseCannotEraseIt",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f0b2e79e1462267695f94b6f2c274f0036c50ef4d51a211e568207fb20db8688",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "restartWithChildrenRemainingIsIncompleteAndCloseCannotEraseIt(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java#childPersistenceAndShutdownCompletionCannotDeadlockUnderForcedContention",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f0b2e79e1462267695f94b6f2c274f0036c50ef4d51a211e568207fb20db8688",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "childPersistenceAndShutdownCompletionCannotDeadlockUnderForcedContention(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6f7895a79",
+    "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestPublisherTest.restartWithChildrenRemainingIsIncompleteAndCloseCannotEraseIt\" --tests \"io.justsearch.ui.runtime.RuntimeManifestPublisherTest.childPersistenceAndShutdownCompletionCannotDeadlockUnderForcedContention\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 42244
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java#restartWithChildrenRemainingIsIncompleteAndCloseCannotEraseIt",
+        "classification": "assertion",
+        "detail": "restartWithChildrenRemainingIsIncompleteAndCloseCannotEraseIt(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: restart with a registered child left must not hand off as ready ==> expected: <incomplete> but was: <ready>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java#childPersistenceAndShutdownCompletionCannotDeadlockUnderForcedContention",
+        "classification": "assertion",
+        "detail": "childPersistenceAndShutdownCompletionCannotDeadlockUnderForcedContention(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <incomplete> but was: <ready>"
+      }
+    ]
+  },
+  "digest": "sha256:ab5a7826ae7d76a734a6b7123ba54891df39429b153aea7c107810f50bb15b6b"
+}

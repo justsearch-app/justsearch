@@ -1,0 +1,71 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:00:12.268Z",
+  "revision": "41d9f3bf6c14c3bb60dcd41f81880102ec725610",
+  "tree": "16d3a9e844339113f80049cfa384837ab5c019a0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.combinedPressureIsAcceptedRoundTrippedAndListedInValidation\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13419
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#combinedPressureIsAcceptedRoundTrippedAndListedInValidation",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "combinedPressureIsAcceptedRoundTrippedAndListedInValidation()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "83b5d54cf",
+    "revision": "83b5d54cf4ef3bb6203a004e7546c980fb34ecce",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b84-route-compat.patch",
+        "contentDigest": "sha256:878a084555cd72a88394f8667e9f8cd06574b3e44f58685f0d6a834788a6cc93"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.combinedPressureIsAcceptedRoundTrippedAndListedInValidation\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 37856
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#combinedPressureIsAcceptedRoundTrippedAndListedInValidation",
+        "classification": "assertion",
+        "detail": "combinedPressureIsAcceptedRoundTrippedAndListedInValidation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: validation lists every accepted signal ==> expected: <signal must be NONE | EXTERNAL_MEMORY | GAME | GAME_AND_EXTERNAL_MEMORY> but was: <signal must be NONE | EXTERNAL_MEMORY | GAME>"
+      }
+    ]
+  },
+  "digest": "sha256:c1fd13c1f1fd540e3f5f1094825c18bb07033ab72f24701e5d95950e7365e447"
+}

@@ -1,0 +1,175 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:09:25.476Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "0091997415706e6dc7b4ac4c2eb0efe7fd810f13",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.enabledEmbeddingBacklogIsNotIdle\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8548
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingIdleTest.java#enabledEmbeddingBacklogIsNotIdle",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingIdleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:247499c903b6328714a738151b7bda88c847c8f80026d6f6767ef3bb423bea81",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "enabledEmbeddingBacklogIsNotIdle()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ecf8c1c6dc2cf7618ccc810d377916539d09e4e63192732d1624f4832552fadf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the assembled view always validates (every projected chat reason is in vocabulary)",
+          "status": "passed"
+        },
+        {
+          "name": "gpu is unknown and degradations empty: no producer feeds them yet",
+          "status": "passed"
+        },
+        {
+          "name": "seq starts at 1 and grows only when content other than sample times changes",
+          "status": "passed"
+        },
+        {
+          "name": "engine Healthy + generative READY -> READY",
+          "status": "passed"
+        },
+        {
+          "name": "engine Starting + generative STARTING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine Recovering + generative RELOADING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine Down + generative FAILED -> FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "engine Down + generative ABSENT -> OFF",
+          "status": "passed"
+        },
+        {
+          "name": "engine Down + generative UNAVAILABLE -> OFF",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative READY -> READY",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative STARTING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative RELOADING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative FAILED -> FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative ABSENT -> OFF",
+          "status": "passed"
+        },
+        {
+          "name": "indexing since moves only when the state or reasons change",
+          "status": "passed"
+        },
+        {
+          "name": "indexing: IDLE with nothing pending, RUNNING with work, PAUSED for energy saver",
+          "status": "passed"
+        },
+        {
+          "name": "ledgerWriteFailureIsVisibleUntilDurableRecovery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "indexing is absent without a Worker view, and listed stale when the sample is",
+          "status": "passed"
+        },
+        {
+          "name": "gpu: the projected reading passes through; byte figures do not move seq, a stale one is listed",
+          "status": "passed"
+        },
+        {
+          "name": "chat reasonCode and since are the generative component's own (same pass)",
+          "status": "passed"
+        },
+        {
+          "name": "lifecycle LIFECYCLE_STATE_STOPPING omits chat",
+          "status": "passed"
+        },
+        {
+          "name": "lifecycle LIFECYCLE_STATE_STOPPED omits chat",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5f91835f3",
+    "revision": "5f91835f366032a75d856d796967c35ec1c769ea",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-bulk-gate-repaired-compat.patch",
+        "contentDigest": "sha256:0f14b93260e2821771c3d4550017c45d1f09a066ae1c6bc7215ae51781febf30"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.enabledEmbeddingBacklogIsNotIdle\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13515
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingIdleTest.java#enabledEmbeddingBacklogIsNotIdle",
+        "classification": "assertion",
+        "detail": "enabledEmbeddingBacklogIsNotIdle(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: 3,000 documents still to embed: reading IDLE here is the base defect ==> expected: not equal but was: <IDLE>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
+        "classification": "assertion",
+        "detail": "indexing: IDLE with nothing pending, RUNNING with work, PAUSED for energy saver: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Spec E step E1 lands the energy-saver code with its producer ==> expected: <indexing.paused_energy_saver> but was: <null> | ledgerWriteFailureIsVisibleUntilDurableRecovery(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: failed owner receipts must be visible through the production status projection ==> expected: <"
+      }
+    ]
+  },
+  "digest": "sha256:392a81c20d951e8ce8a13da5d8eb7307fddcd731cf2af4eff7ce1160d5231436"
+}

@@ -1,0 +1,254 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:11:21.754Z",
+  "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+  "tree": "97317bec1c73cdb966adaf00b788f0cf1476c8d2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.sourceEstimateUsesRealizedGpuHandleAndPolicy\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.unknownFreeMemoryNeverAdmitsBesideAResidentGpuSource\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.plannedP12ReplacementFromCpuSourceFitsFiveGiBFree\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.retirementDoesNotCreditAnUnusedArenaCeiling\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.plannedFp32QueryPreparesAndValidatesItsIntentionalCpuSession\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.capturedNonFp16ModelRemainsComposableOnCpu\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.cudaWarmupRemainsStrictForUnknownOrPositivePolicy\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.cudaPublicationRemainsStrictForUnknownOrPositivePolicy\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24374
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceEstimateUsesRealizedGpuHandleAndPolicy",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b8ca0f4f1437740f684cfe65f0640f70dfbd1c7e0b19f7a79e3d1c170d310ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourceEstimateUsesRealizedGpuHandleAndPolicy(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#unknownFreeMemoryNeverAdmitsBesideAResidentGpuSource",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b8ca0f4f1437740f684cfe65f0640f70dfbd1c7e0b19f7a79e3d1c170d310ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownFreeMemoryNeverAdmitsBesideAResidentGpuSource(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b8ca0f4f1437740f684cfe65f0640f70dfbd1c7e0b19f7a79e3d1c170d310ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b8ca0f4f1437740f684cfe65f0640f70dfbd1c7e0b19f7a79e3d1c170d310ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#plannedP12ReplacementFromCpuSourceFitsFiveGiBFree",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b8ca0f4f1437740f684cfe65f0640f70dfbd1c7e0b19f7a79e3d1c170d310ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plannedP12ReplacementFromCpuSourceFitsFiveGiBFree(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#retirementDoesNotCreditAnUnusedArenaCeiling",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b8ca0f4f1437740f684cfe65f0640f70dfbd1c7e0b19f7a79e3d1c170d310ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retirementDoesNotCreditAnUnusedArenaCeiling(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#plannedFp32QueryPreparesAndValidatesItsIntentionalCpuSession",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plannedFp32QueryPreparesAndValidatesItsIntentionalCpuSession(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#capturedNonFp16ModelRemainsComposableOnCpu",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capturedNonFp16ModelRemainsComposableOnCpu(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#cudaWarmupRemainsStrictForUnknownOrPositivePolicy",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cudaWarmupRemainsStrictForUnknownOrPositivePolicy(false)",
+          "status": "passed"
+        },
+        {
+          "name": "cudaWarmupRemainsStrictForUnknownOrPositivePolicy(true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#cudaPublicationRemainsStrictForUnknownOrPositivePolicy",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cudaPublicationRemainsStrictForUnknownOrPositivePolicy(false)",
+          "status": "passed"
+        },
+        {
+          "name": "cudaPublicationRemainsStrictForUnknownOrPositivePolicy(true)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7de3976a1",
+    "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.sourceEstimateUsesRealizedGpuHandleAndPolicy\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.unknownFreeMemoryNeverAdmitsBesideAResidentGpuSource\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.plannedP12ReplacementFromCpuSourceFitsFiveGiBFree\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.retirementDoesNotCreditAnUnusedArenaCeiling\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.plannedFp32QueryPreparesAndValidatesItsIntentionalCpuSession\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.capturedNonFp16ModelRemainsComposableOnCpu\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.cudaWarmupRemainsStrictForUnknownOrPositivePolicy\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest.cudaPublicationRemainsStrictForUnknownOrPositivePolicy\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 33859
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceEstimateUsesRealizedGpuHandleAndPolicy",
+        "classification": "assertion",
+        "detail": "sourceEstimateUsesRealizedGpuHandleAndPolicy(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: credit the retained weights, not zero or the unused arena ceiling ==> expected: <3145728> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#unknownFreeMemoryNeverAdmitsBesideAResidentGpuSource",
+        "classification": "assertion",
+        "detail": "unknownFreeMemoryNeverAdmitsBesideAResidentGpuSource(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <REFUSED> but was: <BESIDE>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies",
+        "classification": "assertion",
+        "detail": "indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <4096> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle",
+        "classification": "assertion",
+        "detail": "sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: credit the realized FP32 weights, not the nominal FP16 file or the arena ceiling ==> expected: <4096> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#plannedP12ReplacementFromCpuSourceFitsFiveGiBFree",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#retirementDoesNotCreditAnUnusedArenaCeiling",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#plannedFp32QueryPreparesAndValidatesItsIntentionalCpuSession",
+        "classification": "assertion",
+        "detail": "plannedFp32QueryPreparesAndValidatesItsIntentionalCpuSession(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an intentional planned CPU placement must satisfy the real query-owner factory ==> Unexpected exception thrown: io.justsearch.app.api.settings.SettingsCommitOwner$Refused: Query model preparation refused: Prepared CUDA query session did not realize CUDA"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#capturedNonFp16ModelRemainsComposableOnCpu",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#cudaWarmupRemainsStrictForUnknownOrPositivePolicy",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java#cudaPublicationRemainsStrictForUnknownOrPositivePolicy",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:0ad84440a7403ff7530d9b80f25fc12365a51aa8d99b8502c815fb8d1d28ee0e"
+}

@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T12:27:42.916Z",
+  "revision": "184dc89633f4214dfc2432db9eaeb82a8055bb16",
+  "tree": "f6aee19f97e431cd029862d3cdde2afd9e007832",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerNextTryTextTest.aPauseReadAfterItsDeadlineWithNoProbeNamesNoPastTime\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerNextTryTextTest.aDeadlineBetweenMinutesIsShownRoundedUpSoItIsNeverEarly\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5957
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java#aPauseReadAfterItsDeadlineWithNoProbeNamesNoPastTime",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5842256451d85f04a18eb6947cb3386c987bd3d406b4e7387fc34f9585879704",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPauseReadAfterItsDeadlineWithNoProbeNamesNoPastTime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java#aDeadlineBetweenMinutesIsShownRoundedUpSoItIsNeverEarly",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5842256451d85f04a18eb6947cb3386c987bd3d406b4e7387fc34f9585879704",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDeadlineBetweenMinutesIsShownRoundedUpSoItIsNeverEarly()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "184dc8963",
+    "revision": "184dc89633f4214dfc2432db9eaeb82a8055bb16",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerNextTryTextTest.aPauseReadAfterItsDeadlineWithNoProbeNamesNoPastTime\" --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerNextTryTextTest.aDeadlineBetweenMinutesIsShownRoundedUpSoItIsNeverEarly\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 73935
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java#aPauseReadAfterItsDeadlineWithNoProbeNamesNoPastTime",
+        "classification": "assertion",
+        "detail": "aPauseReadAfterItsDeadlineWithNoProbeNamesNoPastTime(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no past time is named: Automatic picture reading is paused after 3 automatic passes in a row made no progress: the Engine held generation closed (a settings change in progress or settings recovery), so every document was turned away (generation refused: settings"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerNextTryTextTest.java#aDeadlineBetweenMinutesIsShownRoundedUpSoItIsNeverEarly",
+        "classification": "assertion",
+        "detail": "aDeadlineBetweenMinutesIsShownRoundedUpSoItIsNeverEarly(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: 14:05:40 is shown as 14:06: Automatic picture reading is paused after 3 automatic passes in a row made no progress: the Engine held generation closed (a settings change in progress or settings recovery), so every document was turned away (generation refused: sett"
+      }
+    ]
+  },
+  "digest": "sha256:5c5b3ade68a5f32d44e904a27735fc0f9da6858dd663b903cc2d64133ea7f931"
+}

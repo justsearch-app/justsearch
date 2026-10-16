@@ -1,0 +1,103 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:17:58.352Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "72d930723894aa4fd7163a9c5152f43325e5c9bf",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15679
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-23936-1791998259566.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1241
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7188a658c79af0f3abb7ef78163dbb9be0daa9794972c1f6e6cdec9e51f1dad6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts#words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fd5a31f3ebcc23d99a314d47b3f0572160db2b84f57c927697afdfc2cdf803",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readinessNotice — searches answered on the CPU (b6d536 X2) words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "93a8b2038",
+    "revision": "93a8b20388d4f5bdb8f7cff4f242244074991154",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-visible-compat.patch",
+        "contentDigest": "sha256:670aab26a1f4d24d032499bb9462b21eb060ec9053f9bcb4bdfd1dbf03054b8a"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 10711
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-23936-1791998274389.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 941
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt",
+        "classification": "assertion",
+        "detail": "theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the idle leg ran on the GPU ==> expected: <device=gpu> but was: <>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts#words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim",
+        "classification": "assertion",
+        "detail": "readinessNotice — searches answered on the CPU (b6d536 X2) words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim:  AssertionError: expected 'Degraded: encoders.health.query_on_cpu' to be 'Searches are running on the CPU while…' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-3/test-intent-before-wdCMgR/modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts:21:38\n    at file://"
+      }
+    ]
+  },
+  "digest": "sha256:b40e8718a911088c52cda5c115198aa09d716ed20715cde5405b5f7f660592ee"
+}

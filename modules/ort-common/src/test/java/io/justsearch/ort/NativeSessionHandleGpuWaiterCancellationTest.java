@@ -21,7 +21,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
@@ -29,7 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Focused semaphore-ownership tests using a mocked native ORT session boundary. */
+/** Focused GPU-permit (device gate seat) ownership tests using a mocked native ORT session boundary. */
 final class NativeSessionHandleGpuWaiterCancellationTest {
 
   @ParameterizedTest
@@ -48,10 +47,10 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
           else lease.run(java.util.Map.of());
         });
         org.mockito.Mockito.verifyNoInteractions(gpu);
-        assertEquals(0, semaphore(handle).availablePermits(),
+        assertEquals(0, freeSeats(handle),
             "cancellation does not release an issued lease");
       }
-      assertEquals(1, semaphore(handle).availablePermits());
+      assertEquals(1, freeSeats(handle));
     }
   }
 
@@ -82,7 +81,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
               return gpu;
             });
         try (var lease = handle.acquire(request())) {
-          // Release may win the inference semaphore after creation publishes.
+          // Release may take the session after creation publishes.
           assertTrue(lease.session() == gpu || lease.session() == cpu);
         }
       } catch (Throwable thrown) {
@@ -186,8 +185,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
     SessionHandle.Lease active = handle.acquire(request());
     Thread waiter = null;
     try {
-      Semaphore semaphore = semaphore(handle);
-      assertEquals(0, semaphore.availablePermits(), "the first lease owns the GPU permit");
+      assertEquals(0, freeSeats(handle), "the first lease owns the GPU permit");
 
       CountDownLatch entered = new CountDownLatch(1);
       CountDownLatch finished = new CountDownLatch(1);
@@ -208,18 +206,18 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
               "native-gpu-waiter-test");
       waiter.start();
       assertTrue(entered.await(1, TimeUnit.SECONDS));
-      awaitQueued(semaphore);
+      awaitQueued(handle);
 
       waiter.interrupt();
       assertTrue(finished.await(1, TimeUnit.SECONDS), "interrupt must release the blocked waiter");
       assertInstanceOf(CancellationException.class, failure.get());
       assertInstanceOf(InterruptedException.class, failure.get().getCause());
-      assertEquals(0, semaphore.availablePermits(), "waiter cancellation must not release holder permit");
+      assertEquals(0, freeSeats(handle), "waiter cancellation must not release holder permit");
       verify(gpuSession, never()).close();
 
       active.close();
       active = null;
-      assertEquals(1, semaphore.availablePermits(), "active lease still owns release");
+      assertEquals(1, freeSeats(handle), "active lease still owns release");
       try (SessionHandle.Lease next = handle.acquire(request())) {
         assertFalse(next.isCpu(), "the next caller can acquire GPU after the holder releases");
       }
@@ -243,7 +241,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
                   SessionAcquisitionRequest.within(
                       SessionAcquisitionRequest.Urgency.BACKGROUND,
                       Duration.ofMillis(25))));
-      assertEquals(0, semaphore(handle).availablePermits());
+      assertEquals(0, freeSeats(handle));
       verify(gpuSession, never()).close();
     } finally {
       active.close();
@@ -256,7 +254,6 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
     OrtSession gpuSession = mock(OrtSession.class);
     NativeSessionHandle handle = gpuHandle(gpuSession);
     try {
-      Semaphore semaphore = semaphore(handle);
       CountDownLatch finished = new CountDownLatch(1);
       AtomicReference<Throwable> failure = new AtomicReference<>();
       AtomicReference<Boolean> interruptRestored = new AtomicReference<>();
@@ -280,7 +277,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
       assertInstanceOf(CancellationException.class, failure.get());
       assertInstanceOf(InterruptedException.class, failure.get().getCause());
       assertTrue(interruptRestored.get(), "the acquire contract restores the interrupt flag");
-      assertEquals(1, semaphore.availablePermits(), "pre-interrupted acquire never owned a permit");
+      assertEquals(1, freeSeats(handle), "pre-interrupted acquire never owned a permit");
     } finally {
       handle.close();
     }
@@ -298,7 +295,6 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
         };
     NativeSessionHandle handle = gpuHandle(gpuSession, interruptingEvents);
     try {
-      Semaphore semaphore = semaphore(handle);
       CountDownLatch finished = new CountDownLatch(1);
       AtomicReference<Throwable> failure = new AtomicReference<>();
       Thread caller =
@@ -319,7 +315,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
       assertInstanceOf(CancellationException.class, failure.get());
       assertEquals(
           1,
-          semaphore.availablePermits(),
+          freeSeats(handle),
           "the unissued lease must not retain or duplicate the permit");
       verify(gpuSession, never()).close();
     } finally {
@@ -346,7 +342,7 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
       }
     }, "native-gpu-retiring-waiter-test");
     waiter.start();
-    awaitQueued(semaphore(handle));
+    awaitQueued(handle);
     CountDownLatch closeFinished = new CountDownLatch(1);
     Thread closer = new Thread(() -> {
       handle.close();
@@ -397,10 +393,22 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
     return handle;
   }
 
-  private static Semaphore semaphore(NativeSessionHandle handle) throws Exception {
-    Field field = NativeSessionHandle.class.getDeclaredField("gpuInferenceSemaphore");
+  /**
+   * Free seats of the handle's device gate, the GPU permit since Spec D §3.2 (it was the
+   * handle's semaphore's available permits). The tests' handles share device 0's gate and run one
+   * at a time, so its seats are theirs.
+   */
+  private static int freeSeats(NativeSessionHandle handle) throws Exception {
+    DeviceEncoderGate gate = gate(handle);
+    Field seated = DeviceEncoderGate.class.getDeclaredField("seated");
+    seated.setAccessible(true);
+    return gate.policy().seats() - seated.getInt(gate);
+  }
+
+  private static DeviceEncoderGate gate(NativeSessionHandle handle) throws Exception {
+    Field field = NativeSessionHandle.class.getDeclaredField("gpuGate");
     field.setAccessible(true);
-    return (Semaphore) field.get(handle);
+    return (DeviceEncoderGate) field.get(handle);
   }
 
   private static void set(NativeSessionHandle handle, String name, Object value) throws Exception {
@@ -409,12 +417,13 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
     field.set(handle, value);
   }
 
-  private static void awaitQueued(Semaphore semaphore) throws Exception {
+  private static void awaitQueued(NativeSessionHandle handle) throws Exception {
+    DeviceEncoderGate gate = gate(handle);
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
-    while (semaphore.getQueueLength() == 0 && System.nanoTime() < deadline) {
+    while (gate.waiting() == 0 && System.nanoTime() < deadline) {
       Thread.sleep(1);
     }
-    assertTrue(semaphore.getQueueLength() > 0, "waiter did not reach the semaphore queue");
+    assertTrue(gate.waiting() > 0, "waiter did not reach the device gate's queue");
   }
 
   private static void awaitRetired(NativeSessionHandle handle) throws Exception {

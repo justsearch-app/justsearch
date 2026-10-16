@@ -5,6 +5,7 @@ import ai.onnxruntime.OrtException;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.indexerworker.loop.pacing.BulkPacePolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.embed.EmbeddingService;
@@ -278,6 +279,14 @@ public final class CombinedEnrichmentBackfillOps {
    *     loop over this method must terminate on (tempdoc 798).
    */
   public static CombinedOutcome processCombinedBackfill(BackfillContext context) {
+    return processCombinedBackfill(context, BulkPacePolicy.DEFAULTS);
+  }
+
+  /**
+   * As {@link #processCombinedBackfill(BackfillContext)}, with the phase slice sizes that bound the
+   * GPU work between two {@code pace()} calls given explicitly (Spec D §3.3).
+   */
+  static CombinedOutcome processCombinedBackfill(BackfillContext context, BulkPacePolicy bulkPace) {
     // Timing/count accumulators hoisted so they survive exceptions (350).
     int embedProcessed = 0;
     int spladeProcessed = 0;
@@ -690,6 +699,13 @@ public final class CombinedEnrichmentBackfillOps {
               chunkIdsInBatch.size(),
               nerCandidates);
 
+      // Spec D §3.3: the pace() above is the only yield point the batch used to have, so one batch
+      // ran 2-3 s of GPU work before foreground load could slow it (M5). Each GPU phase below now
+      // paces every bulkPhaseDocs documents, and every phase boundary is a pace point, so no stretch
+      // between two pace() calls exceeds bulkPaceTargetMs at M5's per-document costs.
+      BulkPacePolicy.PhasePacer pacer = new BulkPacePolicy.PhasePacer(context.pacing());
+      pacer.startPhase(bulkPace.embeddingPhaseDocs());
+
       // Phase 3a: Batch embedding
       long tEmbed = System.nanoTime();
       int embedFailed = 0;
@@ -729,6 +745,7 @@ public final class CombinedEnrichmentBackfillOps {
           }
           String lcDocId = lateChunkingDocIds.get(i);
           String lcContent = lateChunkingContents.get(i);
+          pacer.beforeUnit(1);
           try {
             EmbeddingService.ChunkedEmbedding result =
                 lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS);
@@ -779,6 +796,7 @@ public final class CombinedEnrichmentBackfillOps {
               stageAdvancedDocIds.add(lcDocId);
             }
           }
+          pacer.afterUnit(1);
           unitsDone++;
         }
       }
@@ -853,8 +871,15 @@ public final class CombinedEnrichmentBackfillOps {
           try {
             int nextWindow = progress.nextWindow(docId, content);
             while (!progress.isComplete(docId)) {
-              EmbeddingProvider.WindowSlice slice =
-                  provider.embedDocumentWindows(content, nextWindow, EMBED_WINDOW_SLICE);
+              // A window is one encoder forward pass of at most a document's length, so the
+              // embedding slice counts windows here; counted whether or not the call succeeds.
+              pacer.beforeUnit(EMBED_WINDOW_SLICE);
+              EmbeddingProvider.WindowSlice slice;
+              try {
+                slice = provider.embedDocumentWindows(content, nextWindow, EMBED_WINDOW_SLICE);
+              } finally {
+                pacer.afterUnit(EMBED_WINDOW_SLICE);
+              }
               if (slice == null || slice.vectors().isEmpty()) {
                 // Either the provider stopped exposing windows mid-batch or it has no window at
                 // this index — neither can produce a vector, so escalate through the same retry
@@ -966,8 +991,10 @@ public final class CombinedEnrichmentBackfillOps {
           }
           int sliceEnd = Math.min(sliceStart + EMBED_ENCODE_SLICE, embedDocIds.size());
           List<String> sliceDocIds = embedDocIds.subList(sliceStart, sliceEnd);
+          pacer.beforeUnit(sliceDocIds.size());
           List<float[]> vectors =
               provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
+          pacer.afterUnit(sliceDocIds.size());
           unitsDone++;
           // Trusting a batch result's length to match the request is what crash-loops the
           // embedding-chunk sibling (EmbeddingBackfillOps#processChunkEmbeddingBackfill) — guard
@@ -1039,26 +1066,40 @@ public final class CombinedEnrichmentBackfillOps {
       if (!spladeDocIds.isEmpty()
           && spladeAvailable
           && stopRequested(context, unitsDone, epochAtSelection)) {
-        // Tempdoc 809 finding 3: checked at the stage boundary, not sliced. SPLADE's own
-        // encodeBatchTokenBudget sorts the WHOLE caller batch by token count to minimise padding
-        // waste (SpladeEncoder:338-349) — slicing it at this call site would degrade a measured
-        // optimisation to buy an interruption point the stage boundary already provides, since the
-        // embed stage above is what consumes the budget.
+        // Tempdoc 809 finding 3: the stop request is checked at the stage boundary only; the
+        // embed stage above is what consumes the cycle budget.
         aborted = true;
         docsSkipped += spladeDocIds.size();
       } else if (!spladeDocIds.isEmpty() && spladeAvailable) {
         SpladeEncoder encoder = context.spladeEncoderSupplier().get();
+        // Spec D §3.3: encoded in spladePhaseDocs slices with a pace point between them. One
+        // 100-document call measured 1.33-1.45 s (M5), past the ~1 s a bulk producer may hold the
+        // GPU between yields (ADR-0050 decision 2). encodeBatchTokenBudget still sorts by token
+        // count to limit padding, now within each slice (SpladeEncoder:338-349). Each slice's
+        // results are applied before the next slice runs, so a failing slice leaves the earlier
+        // slices' documents COMPLETED, exactly as a short result of the old single call did.
+        pacer.startPhase(bulkPace.spladePhaseDocs());
         try {
-          List<Map<String, Float>> sparseVecs = encoder.encodeBatch(spladeContents);
-          for (int i = 0; i < spladeDocIds.size(); i++) {
-            Map<String, Object> updates = updatesByDocId.get(spladeDocIds.get(i));
-            updates.put(SchemaFields.SPLADE, sparseVecs.get(i));
-            updates.put(
-                SchemaFields.SPLADE_STATUS,
-                SpladeBackfillOps.spladeStatusFor(sparseVecs.get(i)));
-            updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
-            spladeProcessed++;
-            stageAdvancedDocIds.add(spladeDocIds.get(i));
+          for (int sliceStart = 0;
+              sliceStart < spladeDocIds.size();
+              sliceStart += bulkPace.spladePhaseDocs()) {
+            int sliceEnd = Math.min(sliceStart + bulkPace.spladePhaseDocs(), spladeDocIds.size());
+            pacer.beforeUnit(sliceEnd - sliceStart);
+            List<Map<String, Float>> sparseVecs;
+            try {
+              sparseVecs = encoder.encodeBatch(spladeContents.subList(sliceStart, sliceEnd));
+            } finally {
+              pacer.afterUnit(sliceEnd - sliceStart);
+            }
+            for (int i = sliceStart; i < sliceEnd; i++) {
+              Map<String, Float> sparseVec = sparseVecs.get(i - sliceStart);
+              Map<String, Object> updates = updatesByDocId.get(spladeDocIds.get(i));
+              updates.put(SchemaFields.SPLADE, sparseVec);
+              updates.put(SchemaFields.SPLADE_STATUS, SpladeBackfillOps.spladeStatusFor(sparseVec));
+              updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
+              spladeProcessed++;
+              stageAdvancedDocIds.add(spladeDocIds.get(i));
+            }
           }
         } catch (Exception e) {
           context.log().warn("Combined backfill: SPLADE batch encode failed: {}", e.getMessage());
@@ -1128,6 +1169,9 @@ public final class CombinedEnrichmentBackfillOps {
           }
           nerDocIds.add(docId);
         }
+        if (!nerDocIds.isEmpty()) {
+          pacer.startPhase(bulkPace.nerPhaseDocs());
+        }
         for (int n = 0; n < nerDocIds.size(); n++) {
           // Per-document GPU inference — already the atomic unit (batching regressed, item 22).
           if (stopRequested(context, unitsDone, epochAtSelection)) {
@@ -1138,6 +1182,7 @@ public final class CombinedEnrichmentBackfillOps {
           String docId = nerDocIds.get(n);
           Map<String, String> docFields = batchedFields.getOrDefault(docId, Map.of());
           String content = contentByDocId.get(docId);
+          pacer.beforeUnit(1);
           try {
             List<NerResult> nerBatch = nerService.extractEntitiesBatch(List.of(content));
             NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
@@ -1167,6 +1212,7 @@ public final class CombinedEnrichmentBackfillOps {
             nerFailed++;
             stageAdvancedDocIds.add(docId);
           }
+          pacer.afterUnit(1);
           unitsDone++;
         }
       }

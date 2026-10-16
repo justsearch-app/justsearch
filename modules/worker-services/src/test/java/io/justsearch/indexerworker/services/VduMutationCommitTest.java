@@ -122,6 +122,82 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     }
   }
 
+  @Test void successWinningShutdownResetKeepsItsTerminalStateAndText() throws Exception {
+    try (var runtime = open()) {
+      seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);
+      var fields = spy(runtime.documentFieldOps());
+      var facade = mock(RunningRuntime.class);
+      when(facade.indexingCoordinator()).thenReturn(runtime.indexingCoordinator());
+      when(facade.documentFieldOps()).thenReturn(fields);
+      when(facade.commitOps()).thenReturn(runtime.commitOps());
+      var service = service(facade);
+      var ctx = procedureContext();
+      assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
+          .setDocId(DOC).setMaxRetries(3).build(), ctx).getSuccess());
+      doAnswer(call -> {
+        Object selected = call.callRealMethod();
+        assertTrue(service.updateVduResult(success(), ctx).getSuccess());
+        return selected;
+      }).when(fields).queryDocIdsByFieldOrThrow(eq(SchemaFields.VDU_STATUS),
+          eq(SchemaFields.VDU_STATUS_PROCESSING), anyInt());
+      service.recoverVduProcessing(ownedRecovery(ctx), ctx);
+      assertEquals(SchemaFields.VDU_STATUS_COMPLETED, committedField(SchemaFields.VDU_STATUS),
+          "a selected PROCESSING document cannot reset a later terminal success");
+      assertEquals("new successful text", committedField(SchemaFields.CONTENT));
+    }
+  }
+
+  @Test void shutdownResetWinningLateSuccessKeepsPendingWithOriginalText() throws Exception {
+    try (var runtime = open()) {
+      seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);
+      var service = service(runtime);
+      var ctx = procedureContext();
+      assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
+          .setDocId(DOC).setMaxRetries(3).build(), ctx).getSuccess());
+      assertEquals(1, service.recoverVduProcessing(ownedRecovery(ctx), ctx).getRecoveredCount());
+      var result = service.updateVduResult(success(), ctx);
+      assertFalse(result.getSuccess(), "a reset retires the abandoned procedure's terminal authority");
+      assertEquals(SchemaFields.VDU_STATUS_PENDING, committedField(SchemaFields.VDU_STATUS));
+      assertEquals("baseline content", committedField(SchemaFields.CONTENT));
+    }
+  }
+
+  @Test void shutdownResetCannotResetAnotherProceduresClaim() throws Exception {
+    try (var runtime = open()) {
+      seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);
+      var service = service(runtime);
+      var abandoned = procedureContext();
+      var current = procedureContext();
+      assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
+          .setDocId(DOC).setMaxRetries(3).build(), current).getSuccess());
+      assertEquals(0, service.recoverVduProcessing(ownedRecovery(abandoned), abandoned).getRecoveredCount());
+      assertEquals(SchemaFields.VDU_STATUS_PROCESSING, committedField(SchemaFields.VDU_STATUS));
+      assertTrue(service.updateVduResult(success(), current).getSuccess());
+      assertEquals(SchemaFields.VDU_STATUS_COMPLETED, committedField(SchemaFields.VDU_STATUS));
+    }
+  }
+
+  private static UpdateVduResultRequest success() {
+    return UpdateVduResultRequest.newBuilder().setDocId(DOC)
+        .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
+        .setExtractedContent("new successful text").build();
+  }
+
+  private static CallContext procedureContext() {
+    var base = CallContext.none();
+    return new CallContext(null, null, null,
+        base.engineContext().withWorkId(java.util.UUID.randomUUID()),
+        base.provenance(), base.childLifetime());
+  }
+
+  private static RecoverVduProcessingRequest ownedRecovery(CallContext ctx) throws Exception {
+    var builder = RecoverVduProcessingRequest.newBuilder();
+    try { builder.getClass().getMethod("setProcedureOwner", String.class)
+        .invoke(builder, ctx.engineContext().workId().orElseThrow().toString()); }
+    catch (NoSuchMethodException beforeScopedRecovery) { /* exercise the previous reset */ }
+    return builder.build();
+  }
+
   @Test
   void exhaustedRetryRejectionCoversItsFailedStatus() throws Exception {
     try (var runtime = open()) {
@@ -145,6 +221,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     when(runtime.documentFieldOps()).thenReturn(fields);
     when(runtime.indexingCoordinator()).thenReturn(indexing);
     when(indexing.updateDocument(eq(DOC), anyMap())).thenReturn(true);
+    stubRecoveryUpdates(indexing, call -> true);
     when(fields.queryDocIdsByFieldOrThrow(anyString(), anyString(), anyInt())).thenReturn(List.of(DOC));
     var failure = new IllegalStateException("controlled commit failure");
     doThrow(failure).when(commits).commitAndTrack(reason);
@@ -223,13 +300,37 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     when(fields.queryDocIdsByFieldOrThrow(anyString(), anyString(), anyInt()))
         .thenReturn(List.of("first", "second"));
     var failure = new IllegalStateException("reset failed");
-    when(indexing.updateDocument(anyString(), anyMap())).thenThrow(failure);
+    stubRecoveryUpdates(indexing, call -> { throw failure; });
     var thrown = assertThrows(WorkerServiceException.class, () -> service(runtime).recoverVduProcessing(
         RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none()));
     assertEquals(WorkerServiceException.Status.INTERNAL, thrown.status());
     assertSame(failure, thrown.getCause().getCause());
-    verify(indexing).updateDocument(eq("first"), anyMap());
-    verify(indexing).updateDocument(eq("second"), anyMap());
+    verifyRecoveryUpdate(indexing, "first");
+    verifyRecoveryUpdate(indexing, "second");
+  }
+
+  // Keep the same commit/failure oracles executable on the starting revision, whose recovery
+  // used unconditional updateDocument. Only the mock's method selection follows the new CAS API.
+  private static void stubRecoveryUpdates(
+      IndexingCoordinator indexing, org.mockito.stubbing.Answer<Boolean> answer) throws Exception {
+    try {
+      var conditional = IndexingCoordinator.class.getMethod(
+          "updateDocumentIf", String.class, Map.class, Map.class);
+      conditional.invoke(doAnswer(answer).when(indexing), anyString(), anyMap(), anyMap());
+    } catch (NoSuchMethodException beforeConditionalRecovery) {
+      doAnswer(answer).when(indexing).updateDocument(anyString(), anyMap());
+    }
+  }
+
+  private static void verifyRecoveryUpdate(IndexingCoordinator indexing, String docId)
+      throws Exception {
+    try {
+      var conditional = IndexingCoordinator.class.getMethod(
+          "updateDocumentIf", String.class, Map.class, Map.class);
+      conditional.invoke(verify(indexing), eq(docId), anyMap(), anyMap());
+    } catch (NoSuchMethodException beforeConditionalRecovery) {
+      verify(indexing).updateDocument(eq(docId), anyMap());
+    }
   }
 
   @Test

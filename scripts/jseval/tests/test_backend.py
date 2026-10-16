@@ -27,26 +27,25 @@ class TestRepoRoot:
 
 
 class TestStopBackend:
-    def test_already_exited(self):
+    @patch("jseval.backend.subprocess.run")
+    def test_already_exited(self, mock_run):
         proc = MagicMock()
         proc.poll.return_value = 0
         proc.returncode = 0
         stop_backend(proc)
-        # Should not call taskkill or terminate
+        mock_run.assert_not_called()  # an exited backend requires no termination
+        proc.terminate.assert_not_called()
 
     @patch("jseval.backend.os.name", "nt")
     @patch("jseval.backend.subprocess.run")
-    def test_windows_taskkill(self, mock_run):
+    def test_windows_uses_held_popen(self, mock_run):
         proc = MagicMock()
         proc.poll.return_value = None
         proc.pid = 12345
         stop_backend(proc)
-        mock_run.assert_called_once()
-        args = mock_run.call_args[0][0]
-        assert "taskkill" in args
-        assert "/T" in args
-        assert "/F" in args
-        assert "12345" in args
+        proc.terminate.assert_called_once()
+        proc.wait.assert_called_once_with(timeout=10)
+        mock_run.assert_not_called()
 
     @patch("jseval.backend.os.name", "posix")
     def test_posix_terminate(self):
@@ -66,9 +65,9 @@ class TestStopBackend:
         proc.pid = 12345
         with patch("psutil.process_iter", side_effect=AssertionError("unexpected scan")):
             stop_backend(proc, data_dir=tmp_path)
-        mock_run.assert_called_once_with(
-            ["taskkill", "/PID", "12345", "/T", "/F"], capture_output=True,
-        )
+        proc.terminate.assert_called_once()
+        proc.wait.assert_called_once_with(timeout=10)
+        mock_run.assert_not_called()
 
 
 class TestWaitForInference:

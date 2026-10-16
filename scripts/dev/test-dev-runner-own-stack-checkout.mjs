@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // The owner's own stack, and the paths a stop names, driven through throwaway CHECKOUTS.
 //
@@ -29,6 +30,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
@@ -38,6 +41,10 @@ const REPO_ROOT = path.resolve(HERE, '..', '..');
  * as SKIPPED and counted apart: never a pass, never a failure.
  */
 class Skip extends Error {}
+const windowsNative = (name, fn) => [name, async () => {
+  if (process.platform !== 'win32') throw new Skip('Windows native identity-bound process stop');
+  await fn();
+}];
 // Test seam: JUSTSEARCH_TEST_SIMULATE_PLATFORM stands in for process.platform in the drive-letter
 // check only, so the non-Windows skip can be exercised on Windows.
 const PLATFORM = process.env.JUSTSEARCH_TEST_SIMULATE_PLATFORM || process.platform;
@@ -100,8 +107,25 @@ function childEnv(stateRoot = STATE, label = OWNER_LABEL) {
 const sleepers = [];
 function spawnSleeper() {
   const p = spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' });
+  p.recordedIdentity = recordedIdentity(p.pid);
   sleepers.push(p);
   return p.pid;
+}
+
+/**
+ * The runner identity a current dev-runner records at spawn (pid + creation FILETIME + executable):
+ * a stop kills a recorded process only on that identity (Spec F §5.3, S17). Null when the pid names
+ * no process.
+ */
+function recordedIdentity(pid) {
+  // Refusal and path checks need no native identity unless they actually stop the fixture.
+  if (process.platform !== 'win32') return null;
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { $p.CreationDate.ToFileTimeUtc().ToString() + '|' + $p.ExecutablePath }`],
+  { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+  const [creation, executable] = String(res.stdout || '').trim().split('|');
+  return /^[1-9]\d*$/.test(creation ?? '') ? { pid, creationFileTimeUtc: creation, executable: executable || null } : null;
 }
 function alive(pid) { try { process.kill(pid, 0); return true; } catch { return false; } }
 const posix = (p) => String(p).split(path.sep).join('/');
@@ -116,7 +140,8 @@ function craftOwnStack({ stateRoot = STATE, runId = 'run-OWN', ops = null } = {}
   fs.rmSync(runDir, { recursive: true, force: true });
   fs.mkdirSync(runDir, { recursive: true });
   const runFile = path.join(runDir, 'run.json');
-  fs.writeFileSync(runFile, JSON.stringify({ schemaVersion: 1, runId, dataDir: posix(DATA), pids: { runnerPid } }));
+  fs.writeFileSync(runFile, JSON.stringify({ schemaVersion: 1, runId, dataDir: posix(DATA), pids: { runnerPid },
+    identities: { runner: recordedIdentity(runnerPid) } }));
   const rel = path.relative(MAIN, runFile);
   fs.writeFileSync(path.join(stateRoot, 'active.json'), JSON.stringify({
     kind: 'backend-shared-lease.v1', schemaVersion: 1, runId,
@@ -329,7 +354,21 @@ const tests = [
     }],
   ]),
 
-  ['S6 shell: a stop from a worktree names the stop report on the run record\'s base (main-relative); the owner\'s stop with an op in flight proceeds', async () => {
+  ['S6 portable: main and worktree report references and engine-log copies use the main checkout as their base', async () => {
+    const runPath = path.join(STATE, 'runs', 'run-PATH', 'run.json');
+    const reportPath = path.join(path.dirname(runPath), 'stop-report.json');
+    for (const checkout of [MAIN, WT]) {
+      const api = require(path.join(checkout, 'scripts/dev/dev-runner.cjs')).__test;
+      const reference = api.mainRelativePath(reportPath);
+      assert.equal(reference, 'tmp/dev-runner/runs/run-PATH/stop-report.json');
+      assert.equal(path.resolve(MAIN, reference), reportPath);
+      const engineLog = await api.preserveEngineLog({ dataDir: DATA }, runPath);
+      assert.equal(engineLog.preserved, true, JSON.stringify(engineLog));
+      assert.equal(engineLog.path, 'tmp/dev-runner/runs/run-PATH/logs/engine.log');
+      assert.equal(fs.readFileSync(path.resolve(MAIN, engineLog.path), 'utf8'), 'engine log line\n');
+    }
+  }],
+  windowsNative('S6 shell: a stop from a worktree names the stop report on the run record\'s base (main-relative); the owner\'s stop with an op in flight proceeds', async () => {
     const { runDir } = craftOwnStack({ ops: MUST });
     const storedRunPath = JSON.parse(fs.readFileSync(path.join(STATE, 'active.json'), 'utf8')).runPath;
     const r = runCli(WT, ['stop']);
@@ -339,16 +378,16 @@ const tests = [
     assert.equal(r.json.stopReportPath, 'tmp/dev-runner/runs/run-OWN/stop-report.json');
     assert.equal(path.resolve(MAIN, r.json.stopReportPath), worktreeStopReport);
     assert.equal(path.dirname(path.resolve(MAIN, r.json.stopReportPath)), path.dirname(path.resolve(MAIN, storedRunPath)), 'same base as active.runPath');
-  }],
-  ['S6 shell: that stop report names its engine-log copy on the same base', async () => {
+  }),
+  windowsNative('S6 shell: that stop report names its engine-log copy on the same base', async () => {
     assert.ok(worktreeStopReport, 'the worktree stop above wrote a report');
     const report = JSON.parse(fs.readFileSync(worktreeStopReport, 'utf8'));
     assert.equal(report.disposition, 'normal_stop');
     assert.equal(report.engineLog?.preserved, true, JSON.stringify(report.engineLog));
     assert.equal(report.engineLog.path, 'tmp/dev-runner/runs/run-OWN/logs/engine.log');
     assert.ok(fs.existsSync(path.resolve(MAIN, report.engineLog.path)), 'the engine-log path resolves against the main checkout');
-  }],
-  ['S6 dev tools: the MCP stop from a worktree returns the main-relative stop-report path', async () => {
+  }),
+  windowsNative('S6 dev tools: the MCP stop from a worktree returns the main-relative stop-report path', async () => {
     const { runDir } = craftOwnStack();
     const mcp = startMcp(WT);
     try {
@@ -359,15 +398,15 @@ const tests = [
       assert.ok(fs.existsSync(path.resolve(MAIN, out.stopReportPath)));
       assert.equal(path.resolve(MAIN, out.stopReportPath), path.join(runDir, 'stop-report.json'));
     } finally { mcp.close(); }
-  }],
-  ['S6 preserved: a stop from the main checkout names the same main-relative path', async () => {
+  }),
+  windowsNative('S6 preserved: a stop from the main checkout names the same main-relative path', async () => {
     const { runDir } = craftOwnStack();
     const r = runCli(MAIN, ['stop']);
     assert.equal(r.json?.ok, true, JSON.stringify(r.json));
     assert.equal(r.json.stopReportPath, 'tmp/dev-runner/runs/run-OWN/stop-report.json');
     const report = JSON.parse(fs.readFileSync(path.join(runDir, 'stop-report.json'), 'utf8'));
     assert.equal(report.engineLog?.path, 'tmp/dev-runner/runs/run-OWN/logs/engine.log');
-  }],
+  }),
   ['S6 preserved: a stop with no run returns a null stop-report path', async () => {
     fs.rmSync(path.join(STATE, 'active.json'), { force: true });
     const r = runCli(WT, ['stop']);
@@ -421,7 +460,7 @@ for (const [name, fn] of tests) {
   }
 }
 if (mainMcp) { mainMcp.close(); await new Promise((r) => setTimeout(r, 500)); }
-for (const p of sleepers) { try { process.kill(p.pid); } catch { /* gone */ } }
+for (const p of sleepers) { try { p.kill(); } catch { /* gone */ } }
 try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch { /* best effort */ }
 console.log(`test-dev-runner-own-stack-checkout: ${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail === 0 ? 0 : 1);

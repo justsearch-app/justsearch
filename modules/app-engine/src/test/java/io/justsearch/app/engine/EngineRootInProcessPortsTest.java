@@ -94,11 +94,22 @@ final class EngineRootInProcessPortsTest {
     assertGenerationPacing(tempDir, false, 0, 3);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "generationStartedBeforeIndexCompositionIsPacedUntilProducerExit({0})")
   @ValueSource(ints = {0, 1, 2, 3})
   void generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(
       int scenario, @TempDir Path tempDir) throws Exception {
     assertGenerationPacing(tempDir, true, scenario, scenario + 1);
+  }
+
+  /** Generation edges reach the gate off the lease holder's thread; wait up to 5 s. */
+  private static boolean eventually(java.util.function.BooleanSupplier condition)
+      throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (!condition.getAsBoolean()) {
+      if (System.nanoTime() > deadline) return false;
+      Thread.sleep(10);
+    }
+    return true;
   }
 
   private void assertGenerationPacing(Path tempDir, boolean deferIndexStart,
@@ -151,7 +162,9 @@ final class EngineRootInProcessPortsTest {
       config.putDefault("justsearch.server.exe", Files.writeString(tempDir.resolve("llama-server.exe"), "fixture").toString());
       config.put("justsearch.llm.model_path", 400, "env_var", "test",
           Files.writeString(tempDir.resolve("model.gguf"), "fixture").toString());
-      config.putDefault("justsearch.server.port", Integer.toString(server.getAddress().getPort()));
+      // The stand-in llama-server is the user's own server, named explicitly (ADR-0051 CH4).
+      config.putDefault("justsearch.inference.external_endpoint",
+          "http://127.0.0.1:" + server.getAddress().getPort());
       config.putDefault("justsearch.context.size", "4096");
       config.putDefault("justsearch.gpu.layers", "0");
       config.putDefault("justsearch.ai.disabled", "false");
@@ -209,12 +222,17 @@ final class EngineRootInProcessPortsTest {
               assertSame(load, pacing.foregroundLoad());
               assertEquals(1, finish.getCount(), "upstream generation outlives index startup");
             }
-            assertEquals(foreground ? 1 : 0, load.inFlight());
-            assertEquals(beforeGeneration + (foreground ? 1 : 0), load.startedTotal());
-            // Ignore retrieval cooldown: pacing must still see active foreground generation.
-            var afterCooldown = new io.justsearch.indexerworker.loop.pacing.IndexingPacing(load, 20, 0);
-            assertEquals(foreground, afterCooldown.foregroundBusy());
-            if (foreground) assertTrue(pacing.foregroundBusy());
+            // Spec E step E2 (changed intent, S7 + ruling F1): chat generation paces indexing
+            // through Switch A's duty floor, whatever its urgency, and no longer enters the search
+            // gauge. The pacing the index half was composed with reads the Engine's one gate, so a
+            // generation that began before composition paces as soon as the pacing exists.
+            assertEquals(0, load.inFlight(), "generation does not count as search load");
+            assertEquals(beforeGeneration, load.startedTotal());
+            // Outlast the retrieval's cooldown: only the generation can keep pacing busy now.
+            Thread.sleep(pacing.cooldownMs() + 50);
+            final var composedPacing = pacing;
+            assertTrue(eventually(composedPacing::foregroundBusy),
+                "the composed indexing pacing sees the generation through the duty floor");
             front.close();
             if (cancel) front.cancel("test-cancelled");
             else finish.countDown();
@@ -223,7 +241,8 @@ final class EngineRootInProcessPortsTest {
             else assertEquals(null, outcome);
             assertTrue(drained.await(5, TimeUnit.SECONDS));
             assertEquals(0, load.inFlight());
-            assertFalse(afterCooldown.foregroundBusy());
+            assertTrue(eventually(() -> !composedPacing.foregroundBusy()),
+                "the duty floor releases at the generation's end");
             if (cancel) assertEquals(1, finish.getCount(), "upstream has not finished its response");
             finish.countDown();
           } finally {

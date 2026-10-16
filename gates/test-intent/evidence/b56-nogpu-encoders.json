@@ -1,0 +1,307 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:52:07.395Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "148d5c53f654930b688ff0a4c0385cd6d811aa6b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.NoDeviceEncoderPlanTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12161
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialNativeFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialCpuFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerStartupConfigurationTest.enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17780
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9834
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.tokenizer.NoDeviceTokenizerCacheTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11323
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatorRerankerPlacementStatusTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4010
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DevModeVariantProbeTest.witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8194
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/NoDeviceEncoderPlanTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/NoDeviceEncoderPlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:56553ac3f23524c55beea93b327cbf41e2a0ecd3c9b697aee92e9b8fbd9a61bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 35",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 100",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 803",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialNativeFailureRetainsTheCapturedDesiredPlan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8b0527e65b29dba9644693da1d858c1b376d84c93f4df7aee71064a65a7842de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(0)",
+          "status": "passed"
+        },
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(35)",
+          "status": "passed"
+        },
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(100)",
+          "status": "passed"
+        },
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(803)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialCpuFailureRetainsTheCapturedDesiredPlan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8b0527e65b29dba9644693da1d858c1b376d84c93f4df7aee71064a65a7842de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "initialCpuFailureRetainsTheCapturedDesiredPlan(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerStartupConfigurationTest.java#enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerStartupConfigurationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2ff1e2e7029a07e35bce236c655ef71c450b04daf21eea40e3229cecd8fe61ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/tokenizer/NoDeviceTokenizerCacheTest.java",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/tokenizer/NoDeviceTokenizerCacheTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aec29d77aed847543e9bf37ce82fe37b82cfb237008db38706214b470a492e9b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuTokenizerStartsAfterAGpuArchitectureCacheWasCreated(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatorRerankerPlacementStatusTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatorRerankerPlacementStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8fb4636dc7170e336964b09a75a897436bd2222563b458745ffaaa2b91cd31e6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 4096, P8",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 8192, P8",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 12282, P12",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 16384, P16_PLUS",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DevModeVariantProbeTest.java#witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DevModeVariantProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c9a4d54facc8270829576db2b60489fc3e25ec326f6f589b372656d26c121a89",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6b317848e",
+    "revision": "6b317848e4c00b326c9ae3c65b3e58477b4ea23a",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b56-nogpu-encoders-compat.patch",
+        "contentDigest": "sha256:a73c075c5d94d1efb8bb412fc5bb9faf0541a3d79f1f2b9c0f3fad3f5c390ac2"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.NoDeviceEncoderPlanTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 28173
+      },
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialNativeFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest.initialCpuFailureRetainsTheCapturedDesiredPlan\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerStartupConfigurationTest.enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14450
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5045
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.tokenizer.NoDeviceTokenizerCacheTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 11362
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatorRerankerPlacementStatusTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 9061
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DevModeVariantProbeTest.witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3497
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/NoDeviceEncoderPlanTest.java",
+        "classification": "assertion",
+        "detail": "[1] 0: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: embedding must honour actual no-device facts ==> expected: <false> but was: <true> | [2] 35: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: embedding must honour actual no-device facts ==> expected: <false> but was: <true> | [3] 100: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: embedding must honour actual no-device facts ==> expected: <false> but was: <true> | [4"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialNativeFailureRetainsTheCapturedDesiredPlan",
+        "classification": "assertion",
+        "detail": "initialNativeFailureRetainsTheCapturedDesiredPlan(0): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: startup hardware must come from the no-device decision ==> expected: <HardwareProfile[gpuDetected=false, cudaFunctional=false, vramBytes=-1]> but was: <HardwareProfile[gpuDetected=true, cudaFunctional=true, vramBytes=0]> | initialNativeFailureRetainsTheCapturedDesiredPlan(35): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: startup hardware must "
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialCpuFailureRetainsTheCapturedDesiredPlan",
+        "classification": "assertion",
+        "detail": "initialCpuFailureRetainsTheCapturedDesiredPlan(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: ownerless recovery must compare with the captured start plan, not earlier discovery ==> expected: <3949380d572ceab950bcda994842b3bfa018bb6fa0d81e9500705e161690249c> but was: <earlier-discovery-digest>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerStartupConfigurationTest.java#enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration",
+        "classification": "assertion",
+        "detail": "enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the captured start decision must be published before native assembly ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
+        "classification": "assertion",
+        "detail": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <{justsearch.gpu.layers=0, justsearch.gpu.device_available=false, justsearch.context.size=8192, justsearch.gpu.memory_plan=no_gpu, justsearch.mmproj.offload=false, justsearch.gpu.enabled=false}> but was: <{justsearch.gpu.memory_plan=no_gpu, justsearch.g"
+      },
+      {
+        "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/tokenizer/NoDeviceTokenizerCacheTest.java",
+        "classification": "assertion",
+        "detail": "cpuTokenizerStartsAfterAGpuArchitectureCacheWasCreated(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU native execution must survive a cache left by GPU use ==> Unexpected exception thrown: java.lang.UnsatisfiedLinkError: Can't load library: F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-3\\junit-7149452639698876824\\tokenizers\\0.21.0-0.36.0-cpu-win-x86_64\\libwinpthr"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatorRerankerPlacementStatusTest.java",
+        "classification": "assertion",
+        "detail": "[1] 4096, P8: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU reranker must not be labelled all-CPU ==> expected: <P8> but was: <NO_GPU> | [2] 8192, P8: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU reranker must not be labelled all-CPU ==> expected: <P8> but was: <NO_GPU> | [3] 12282, P12: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU reranker must not be labelled all-CPU ==> expected: <P12> but was: <NO_"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/DevModeVariantProbeTest.java#witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile",
+        "classification": "assertion",
+        "detail": "witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a witnessed FP16 artifact can execute on CPU without changing identity ==> expected: not <null>"
+      }
+    ]
+  },
+  "digest": "sha256:64a2df523686ffba7039a46c227e35c7119957ca6efaaf931e1d7077d3f9c699"
+}

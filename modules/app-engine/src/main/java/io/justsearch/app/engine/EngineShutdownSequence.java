@@ -2,6 +2,8 @@
 package io.justsearch.app.engine;
 
 import io.justsearch.app.api.NativeQuiescence;
+import io.justsearch.app.api.runtime.child.StopDetail;
+import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import java.nio.file.Path;
@@ -12,6 +14,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
 import java.util.function.Supplier;
@@ -47,6 +51,12 @@ import tools.jackson.databind.ObjectMapper;
  * continues, because the steps release different resources — an exception closing telemetry must
  * not leave the index lock held. {@code clean} is false when anything failed, and the exit code
  * follows it.
+ *
+ * <p><b>The Engine says when it ends itself</b> (Spec B §6.1). The cooperative exits ({@link
+ * #runAndExit}, {@link #runAndExitEscalated}, {@link #runAndExitWithReceipt}) and a close the JVM
+ * hook starts record one {@code engine-self-intent} first, before the ordered close: the reason
+ * and the exit code the Engine expects to leave ({@link #selfIntentOf}). A fatal exit records
+ * none, so it stays UNEXPECTED; a hook that joins an exit already claimed records none either.
  */
 public final class EngineShutdownSequence {
 
@@ -70,16 +80,55 @@ public final class EngineShutdownSequence {
     String run(Reason reason) throws Exception;
   }
 
+  /**
+   * A step whose waits take their share of a quit's {@link QuitBudget} (Spec F §4.3). Run without
+   * one — every non-quit close, and {@link #run(Reason)} — it gets {@link QuitBudget#unbounded()},
+   * whose {@link QuitBudget#waitFor} hands back today's wait unchanged.
+   */
+  @FunctionalInterface
+  public interface BudgetedStepAction extends StepAction {
+    String run(Reason reason, QuitBudget budget) throws Exception;
+
+    @Override
+    default String run(Reason reason) throws Exception {
+      return run(reason, QuitBudget.unbounded());
+    }
+  }
+
   @FunctionalInterface
   public interface CompletionAction {
     void complete(Result preliminary) throws Exception;
   }
 
   /**
+   * Records the Engine's intent to end itself ({@code EngineSelfIntentWriter.record}). Called at
+   * most once per process, before the ordered close; a failure must not stop the exit.
+   */
+  @FunctionalInterface
+  public interface SelfIntent {
+    SelfIntent NONE = (reason, detail, expectedCode) -> {};
+
+    void record(StopReason reason, Optional<StopDetail> detail, int expectedCode) throws Exception;
+  }
+
+  /** What the Engine records before ending itself: the reason and the code it expects to leave. */
+  public record SelfIntentRecord(StopReason reason, Optional<StopDetail> detail, int expectedCode) {
+    public SelfIntentRecord {
+      Objects.requireNonNull(reason, "reason");
+      Objects.requireNonNull(detail, "detail");
+    }
+  }
+
+  /**
    * A named step. The name is what appears in {@code errors}, so it is a diagnostic surface: it
    * should say which resource did not close, not which method threw.
    */
-  public record Step(String name, StepAction action) {}
+  public record Step(String name, StepAction action) {
+    /** A step that budgets its waits; the lambda's arity picks this constructor. */
+    public Step(String name, BudgetedStepAction action) {
+      this(name, (StepAction) action);
+    }
+  }
 
   /** The outcome of one ordered close. */
   public record Result(
@@ -100,8 +149,11 @@ public final class EngineShutdownSequence {
   private final IntConsumer hardStop;
   private final Supplier<NativeQuiescence> nativeQuiescence;
   private final CompletionAction completion;
+  private final SelfIntent selfIntent;
+  private final AtomicBoolean selfIntentRecorded = new AtomicBoolean();
   private final AtomicReference<Result> result = new AtomicReference<>();
   private final Object exitAuthority = new Object();
+  private boolean selfIntentDurable;
   private boolean exitRequested;
   private boolean fatalExitRequested;
   private boolean exitSelected;
@@ -124,12 +176,66 @@ public final class EngineShutdownSequence {
   public EngineShutdownSequence(Path dataDir, List<Step> steps, IntConsumer exit,
       IntConsumer hardStop, Supplier<NativeQuiescence> nativeQuiescence,
       CompletionAction completion) {
+    this(dataDir, steps, exit, hardStop, nativeQuiescence, completion, SelfIntent.NONE);
+  }
+
+  /** The Engine's composition: {@code selfIntent} records each exit the Engine starts itself. */
+  public EngineShutdownSequence(Path dataDir, List<Step> steps, IntConsumer exit,
+      IntConsumer hardStop, Supplier<NativeQuiescence> nativeQuiescence,
+      CompletionAction completion, SelfIntent selfIntent) {
     this.receiptPath = dataDir.resolve("upgrade").resolve(RECEIPT_FILE);
     this.steps = List.copyOf(steps);
     this.exit = Objects.requireNonNull(exit, "exit");
     this.hardStop = Objects.requireNonNull(hardStop, "hardStop");
     this.nativeQuiescence = Objects.requireNonNull(nativeQuiescence, "nativeQuiescence");
     this.completion = Objects.requireNonNull(completion, "completion");
+    this.selfIntent = Objects.requireNonNull(selfIntent, "selfIntent");
+  }
+
+  /**
+   * The self-intent of a cooperative exit for {@code reason} (Spec B §6.1, §6.2): QUIT and UPGRADE
+   * expect 0, RESTART expects {@link EngineExit#REQUESTED_RESTART}; a HANG close is an Engine
+   * restart (detail {@code hang}) that exits 0. The escalated restart is {@link
+   * #escalatedSelfIntent}.
+   */
+  public static SelfIntentRecord selfIntentOf(Reason reason) {
+    return switch (Objects.requireNonNull(reason, "reason")) {
+      case QUIT -> new SelfIntentRecord(StopReason.QUIT, Optional.empty(), EngineExit.OK);
+      case UPGRADE -> new SelfIntentRecord(StopReason.UPGRADE, Optional.empty(), EngineExit.OK);
+      case RESTART -> new SelfIntentRecord(
+          StopReason.ENGINE_RESTART, Optional.empty(), EngineExit.REQUESTED_RESTART);
+      case HANG -> new SelfIntentRecord(
+          StopReason.ENGINE_RESTART, Optional.of(StopDetail.HANG), EngineExit.OK);
+    };
+  }
+
+  /**
+   * The device-lost restart's self-intent (Spec A §7.3, reconciliation F10): reason {@code
+   * DEVICE_LOST}, expecting the requested-restart code. The Engine counts these records to limit
+   * device-lost restarts.
+   */
+  public static SelfIntentRecord deviceLostSelfIntent() {
+    return new SelfIntentRecord(StopReason.DEVICE_LOST, Optional.empty(),
+        EngineExit.REQUESTED_RESTART);
+  }
+
+  /** The escalated restart's self-intent: an Engine restart, detail {@code escalated}, code 5. */
+  public static SelfIntentRecord escalatedSelfIntent() {
+    return new SelfIntentRecord(StopReason.ENGINE_RESTART, Optional.of(StopDetail.ESCALATED),
+        EngineExit.ESCALATED_RESTART);
+  }
+
+  private synchronized boolean recordSelfIntent(SelfIntentRecord intent) {
+    if (!selfIntentRecorded.compareAndSet(false, true)) return selfIntentDurable;
+    try {
+      selfIntent.record(intent.reason(), intent.detail(), intent.expectedCode());
+      selfIntentDurable = true;
+    } catch (Exception e) {
+      // Ordinary quit still proceeds. Device-loss restart requires durable budget accounting.
+      selfIntentRecorded.set(false);
+      log.warn("Could not record the Engine's self-intent: {}", e.toString());
+    }
+    return selfIntentDurable;
   }
 
   /**
@@ -141,6 +247,16 @@ public final class EngineShutdownSequence {
    * adoption.
    */
   public Result run(Reason reason) {
+    return run(reason, QuitBudget.unbounded());
+  }
+
+  /**
+   * {@link #run(Reason)} under a quit's budget (Spec F §4.3): each budgeted step caps its waits at
+   * its sub-budget and at what is left before the supervisor's force. Only a QUIT is budgeted;
+   * restart, upgrade and hang closes keep today's waits whatever budget is passed.
+   */
+  public Result run(Reason reason, QuitBudget budget) {
+    Objects.requireNonNull(budget, "budget");
     Result existing = result.get();
     if (existing != null) {
       return existing;
@@ -148,7 +264,7 @@ public final class EngineShutdownSequence {
     synchronized (result) {
       existing = result.get();
       if (existing == null) {
-        existing = execute(reason);
+        existing = execute(reason, reason == Reason.QUIT ? budget : QuitBudget.unbounded());
         result.set(existing);
       }
       return existing;
@@ -157,6 +273,13 @@ public final class EngineShutdownSequence {
 
   /** A JVM-initiated exit is already in progress; never request System.exit again from its hook. */
   public void runFromJvmShutdownHook(Reason reason) {
+    boolean claimed;
+    synchronized (exitAuthority) {
+      claimed = exitRequested;
+    }
+    // A hook joining an exit this sequence already claimed adds no intent: a cooperative exit has
+    // recorded its own and a fatal one records none.
+    if (!claimed) recordSelfIntent(selfIntentOf(reason));
     Result shutdown = run(reason);
     if (shutdown.nativeQuiescence() != NativeQuiescence.QUIESCED) {
       // Other JVM hooks (including ORT's) may already be running concurrently. A late halt
@@ -165,13 +288,15 @@ public final class EngineShutdownSequence {
     }
   }
 
-  private Result execute(Reason reason) {
-    log.info("Ordered shutdown starting (reason={})", reason.wire());
+  private Result execute(Reason reason, QuitBudget budget) {
+    log.info("Ordered shutdown starting (reason={}, budget={})", reason.wire(), budget);
     List<String> errors = new ArrayList<>();
     Map<String, String> outcomes = new LinkedHashMap<>();
     for (Step step : steps) {
       try {
-        String outcome = step.action().run(reason);
+        String outcome = step.action() instanceof BudgetedStepAction budgeted
+            ? budgeted.run(reason, budget)
+            : step.action().run(reason);
         if (outcome != null) {
           outcomes.put(step.name(), outcome);
         }
@@ -207,8 +332,8 @@ public final class EngineShutdownSequence {
       errors.add("shutdown-completion");
       clean = false;
     }
-    log.info(
-        "Ordered shutdown complete (reason={}, clean={}, errors={})", reason.wire(), clean, errors);
+    log.info("Ordered shutdown complete (reason={}, clean={}, errors={}, elapsedMs={})",
+        reason.wire(), clean, errors, budget.bounded() ? budget.elapsedMs() : "-");
     return new Result(clean, workerOutcome, errors, reason, outcomes, nativeStatus);
   }
 
@@ -219,10 +344,17 @@ public final class EngineShutdownSequence {
    * endpoint requested, and a second {@code exit.accept} would re-enter shutdown.
    */
   public void runAndExit(Reason reason) {
+    runAndExit(reason, QuitBudget.unbounded());
+  }
+
+  /** {@link #runAndExit(Reason)} under a quit's budget; see {@link #run(Reason, QuitBudget)}. */
+  public void runAndExit(Reason reason, QuitBudget budget) {
+    Objects.requireNonNull(budget, "budget");
     if (!claimExit(false)) {
       return;
     }
-    Result shutdown = run(reason);
+    recordSelfIntent(selfIntentOf(reason));
+    Result shutdown = run(reason, budget);
     int completedCode =
         shutdown.reason() == Reason.RESTART ? EngineExit.REQUESTED_RESTART : EngineExit.OK;
     terminate(shutdown, selectExitCode(shutdown.clean() ? completedCode : EngineExit.FATAL_OR_UNCAUGHT));
@@ -236,10 +368,39 @@ public final class EngineShutdownSequence {
     if (!claimExit(false)) {
       return;
     }
+    recordSelfIntent(escalatedSelfIntent());
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.ESCALATED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
     terminate(shutdown, selectExitCode(completedCode));
+  }
+
+  /**
+   * Closes in restart order after the chat controller found the GPU lost within the device-lost
+   * limit (Spec A §7.3): the self-intent names {@code DEVICE_LOST}, and a clean close exits with
+   * the requested-restart code, so the supervisor starts a new Engine that probes the device again.
+   */
+  public void runAndExitDeviceLost() {
+    runAndExitDeviceLost(() -> {});
+  }
+
+  /** Commits before the hand-off/chat terminal callback; a failed write leaves exit authority free. */
+  public boolean runAndExitDeviceLost(Runnable beforeClose) {
+    Objects.requireNonNull(beforeClose, "beforeClose");
+    synchronized (exitAuthority) {
+      if (exitRequested) return false;
+      if (!recordSelfIntent(deviceLostSelfIntent())) {
+        log.warn("Device-loss restart refused: device_lost_restart_commit_failed");
+        return false;
+      }
+      if (!claimExit(false)) return false;
+    }
+    beforeClose.run();
+    Result shutdown = run(Reason.RESTART);
+    int completedCode = shutdown.clean()
+        ? EngineExit.REQUESTED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
+    terminate(shutdown, selectExitCode(completedCode));
+    return true;
   }
 
   /**
@@ -269,6 +430,7 @@ public final class EngineShutdownSequence {
     if (!claimExit(false)) {
       return;
     }
+    recordSelfIntent(selfIntentOf(Reason.UPGRADE));
     Result shutdown = run(Reason.UPGRADE);
     int selectedExitCode = selectExitCode(shutdown.clean() ? 0 : 1);
     boolean cleanReceipt = shutdown.clean() && selectedExitCode == 0;

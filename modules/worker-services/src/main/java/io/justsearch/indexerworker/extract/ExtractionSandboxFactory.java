@@ -138,6 +138,25 @@ public final class ExtractionSandboxFactory {
       List<String> processCommand,
       PoolSettings poolSettings,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    return create(ocrRegistration, timeboxRegistration, readerRegistration, mode, policy, ocrConfig,
+        timeout, catalog, ocrMetricCatalog, processCommand, poolSettings,
+        io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(childRegistry));
+  }
+
+  /** The Engine's composition: process-routed children start and stop through its control. */
+  public static TimeboxedContentExtractor create(
+      EngineExecutorRegistry.Registration ocrRegistration,
+      EngineExecutorRegistry.Registration timeboxRegistration,
+      EngineExecutorRegistry.Registration readerRegistration,
+      Mode mode,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      ExtractionMetricCatalog catalog,
+      OcrMetricCatalog ocrMetricCatalog,
+      List<String> processCommand,
+      PoolSettings poolSettings,
+      io.justsearch.app.api.runtime.child.ChildControl childControl) {
     TikaExtractionPolicy effectivePolicy = policy == null ? TikaExtractionPolicy.defaults() : policy;
     OcrRoutingConfig effectiveOcrConfig =
         (ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig)
@@ -163,7 +182,7 @@ public final class ExtractionSandboxFactory {
             effectivePool.poolSize(),
             effectivePool.maxRequestsPerChild(),
             catalog,
-            childRegistry);
+            childControl);
     // The sandbox owns the deadline; the timebox is only a backstop for a sandbox that itself
     // wedges. See PROCESS_TIMEBOX_GRACE.
     Duration backstop = effectiveTimeout.plus(PROCESS_TIMEBOX_GRACE);
@@ -192,8 +211,8 @@ public final class ExtractionSandboxFactory {
    * Deadline for the startup probe's single extraction, because a broken command must not stall
    * Worker boot.
    *
-   * <p>This is NOT the whole worst case: a child that hangs is then killed, and that path waits up
-   * to 5 s on {@code Process.waitFor}. Boot therefore blocks for at most ~25 s, and only against a
+   * <p>This is NOT the whole worst case: a child that hangs is then stopped, and that path waits
+   * up to 5 s per terminate attempt. Boot therefore blocks for at most ~30 s, and only against a
    * child that launches and then hangs; the far commoner failure — a command that cannot launch at
    * all — is rejected by {@code ProcessBuilder.start} at once.
    */
@@ -229,6 +248,18 @@ public final class ExtractionSandboxFactory {
       OcrRoutingConfig ocrConfig,
       Duration timeout,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    return probeChildCommand(readerRegistration, command, policy, ocrConfig, timeout,
+        io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(childRegistry));
+  }
+
+  /** {@link #probeChildCommand} with the probe child started and stopped through {@code control}. */
+  public static Optional<String> probeChildCommand(
+      EngineExecutorRegistry.Registration readerRegistration,
+      List<String> command,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      io.justsearch.app.api.runtime.child.ChildControl childControl) {
     Path probeFile = null;
     try {
       // Scratch, not state: a JVM temp file written and deleted inside this method, outside the
@@ -241,7 +272,7 @@ public final class ExtractionSandboxFactory {
       try (PersistentExtractionSandbox sandbox =
           new PersistentExtractionSandbox(readerRegistration, command, policy, ocrConfig, timeout,
               1, 1, null,
-              childRegistry)) {
+              childControl)) {
         String content = sandbox.extract(probeFile).result().content();
         if (content == null || !content.contains(PROBE_MARKER)) {
           return Optional.of("child answered without the probe content");

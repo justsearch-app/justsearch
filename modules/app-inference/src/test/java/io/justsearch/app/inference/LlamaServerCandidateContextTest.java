@@ -16,6 +16,7 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.containment.WindowsEngineJob;
 import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -39,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import tools.jackson.databind.ObjectMapper;
 
@@ -54,40 +56,20 @@ final class LlamaServerCandidateContextTest {
     ConfigStore installed = new ConfigStore(globalA);
     ConfigStore.setGlobal(installed);
 
-    HttpServer server = healthyServer();
     Path model = Files.createFile(tmp.resolve("candidate-b.gguf"));
-    Process child =
-        new ProcessBuilder(
-                Path.of(
-                        System.getProperty("java.home"),
-                        "bin",
-                        System.getProperty("os.name").startsWith("Windows")
-                            ? "java.exe"
-                            : "java")
-                    .toString(),
-                "-cp",
-                System.getProperty("java.class.path"),
-                ManagedLlamaAdoptionTest.SleepingChild.class.getName())
-            .start();
-    Path executable = Path.of(child.info().command().orElseThrow());
+    // ADR-0051 decision 2: the candidate is launched fresh. The stand-in llama-server serves on
+    // the fresh port it is given; the GPU service is a fake that has no reading to offer.
+    Path fakeHome = tmp.resolve("fake-llama");
+    Path executable = HealthyFakeLlamaServer.install(fakeHome);
     InferenceConfig inference =
-        new InferenceConfig(executable, model, null, server.getAddress().getPort(), 4096, 77, false);
+        new InferenceConfig(executable, model, null, freePort(), 4096, 77, false);
     LlamaServerConfigContext context = new LlamaServerConfigContext(inference, candidateB);
     LlamaServerOps.StartRequest request =
         new LlamaServerOps.StartRequest(
             context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
     String candidateHash = ManagedLlamaConfigIdentity.declaredHash(inference, candidateB, 77);
-    ManagedChild registeredChild =
-        new ManagedChild(
-            "candidate-b",
-            ManagedChild.Kind.LLAMA_SERVER,
-            child.pid(),
-            child.info().startInstant().orElseThrow().toString(),
-            ManagedChild.normalizePath(executable),
-            "http://127.0.0.1:" + inference.serverPort(),
-            model.toString(),
-            candidateHash,
-            "diagnostic-argv");
+    io.justsearch.gpu.GpuCapabilitiesService gpu =
+        Mockito.mock(io.justsearch.gpu.GpuCapabilitiesService.class);
     AtomicReference<LlamaServerOps.StartResult> recoveryOwner = new AtomicReference<>();
     AtomicReference<java.util.function.BooleanSupplier> recoveryGuard = new AtomicReference<>();
     AtomicReference<LlamaServerOps> opsReference = new AtomicReference<>();
@@ -99,8 +81,8 @@ final class LlamaServerCandidateContextTest {
               recoveryGuard.set(guard);
               recoveryOwner.set(opsReference.get().activeStartResult().orElseThrow());
             },
-            new FixedRegistry(registeredChild),
-            ignored -> false);
+            ManagedChildRegistry.noop(),
+            gpu);
     opsReference.set(ops);
     try {
       installed.update(globalC);
@@ -120,7 +102,7 @@ final class LlamaServerCandidateContextTest {
 
       LlamaServerOps.StartResult started = ops.startLlamaServer(request);
       ops.waitForServerHealth(started);
-      assertEquals(LlamaServerOps.StartDisposition.ADOPTED_MANAGED, started.disposition());
+      assertEquals(LlamaServerOps.StartDisposition.LAUNCHED_MANAGED, started.disposition());
       assertEquals(candidateHash, started.declaredConfigHash());
       assertSame(context, started.context());
 
@@ -137,9 +119,12 @@ final class LlamaServerCandidateContextTest {
           LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
           recoveryOwner.get().adoptionPolicy());
     } finally {
-      ops.shutdown();
-      child.destroyForcibly();
-      server.stop(0);
+      try {
+        ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+      } finally {
+        ops.shutdown();
+        HealthyFakeLlamaServer.endAll(fakeHome);
+      }
       ConfigStore.restoreGlobal(installed, previous);
     }
   }
@@ -181,15 +166,18 @@ final class LlamaServerCandidateContextTest {
     Path expectedLog = expectedLogPath(data);
     var registry = new KillingRegistry(List.of(child), expectedLog);
     LlamaServerOps ops = newOps(
-        Mode.ONLINE, new RecordingObserver(), ignored -> {}, registry, ignored -> false);
+        Mode.ONLINE, new RecordingObserver(), ignored -> {}, registry, null);
     try {
       try (MockedConstruction<ProcessBuilder> construction =
-          Mockito.mockConstruction(
-              ProcessBuilder.class,
-              (builder, ignored) -> {
-                Mockito.when(builder.environment()).thenReturn(new HashMap<>());
-                Mockito.when(builder.start()).thenReturn(child);
-              })) {
+              Mockito.mockConstruction(
+                  ProcessBuilder.class,
+                  (builder, ignored) -> {
+                    Mockito.when(builder.environment()).thenReturn(new HashMap<>());
+                    Mockito.when(builder.start()).thenReturn(child);
+                  });
+          // On Windows a chat launch starts through its contained native launch instead of
+          // ProcessBuilder.start(); that launch hands back the same physical child.
+          MockedStatic<WindowsEngineJob> _ = containedLaunchOf(child)) {
         LlamaServerOps.StartResult started = ops.startLlamaServer(request);
 
         ModeTransitionException failure = assertThrows(
@@ -208,12 +196,18 @@ final class LlamaServerCandidateContextTest {
     }
   }
 
+  /**
+   * CH4: the user's own server is the one named by {@code justsearch.inference.external_endpoint}.
+   * A strict apply needs a managed configuration witness, so it refuses that server; Online
+   * activation's legacy request uses it. Without the endpoint the server is not adopted at all.
+   */
   @Test
-  void strictRequestRefusesUnregisteredServerWhileLegacyRequestAdopts(@TempDir Path tmp)
+  void strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt(@TempDir Path tmp)
       throws Exception {
     HttpServer server = healthyServer();
     InferenceConfig inference = inference(tmp, server.getAddress().getPort(), "external");
-    LlamaServerConfigContext context = new LlamaServerConfigContext(inference, resolved(false, true));
+    LlamaServerConfigContext context = new LlamaServerConfigContext(
+        inference, resolved(false, true, null, null, server.getAddress().getPort()));
     LlamaServerOps ops = newOps(Mode.OFFLINE, new RecordingObserver(), ignored -> {});
     try {
       ModeTransitionException refused =
@@ -233,8 +227,22 @@ final class LlamaServerCandidateContextTest {
                   context, LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL));
       assertEquals(LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL, adopted.disposition());
       assertSame(adopted, ops.activeStartResult().orElseThrow());
+
+      // Without the endpoint, the same healthy server on the configured port is not adopted: the
+      // legacy request launches its own (here an unrunnable executable, so the launch fails).
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+      LlamaServerConfigContext withoutEndpoint =
+          new LlamaServerConfigContext(inference, resolved(false, false));
+      assertThrows(
+          Exception.class,
+          () ->
+              ops.startLlamaServer(
+                  new LlamaServerOps.StartRequest(
+                      withoutEndpoint, LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL)),
+          "a server on the configured port is never adopted without the endpoint");
+      assertFalse(ops.isExternalServerActive());
     } finally {
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
       server.stop(0);
     }
@@ -243,20 +251,7 @@ final class LlamaServerCandidateContextTest {
   @Test
   void armedLaunchedChildCleanExitSignalsCapturedOwnerFailure(@TempDir Path tmp) throws Exception {
     HttpServer server = healthyServer();
-    Process child =
-        new ProcessBuilder(
-                Path.of(
-                        System.getProperty("java.home"),
-                        "bin",
-                        System.getProperty("os.name").startsWith("Windows")
-                            ? "java.exe"
-                            : "java")
-                    .toString(),
-                "-cp",
-                System.getProperty("java.class.path"),
-                CleanExitChild.class.getName())
-            .start();
-    Path executable = Path.of(child.info().command().orElseThrow());
+    Path executable = Path.of(LlamaServerTestAccess.javaArgv(CleanExitChild.class).getFirst());
     Path model = Files.createFile(tmp.resolve("clean-exit.gguf"));
     InferenceConfig inference =
         new InferenceConfig(executable, model, null, server.getAddress().getPort(), 4096, 0, false);
@@ -280,32 +275,20 @@ final class LlamaServerCandidateContextTest {
               recovery.countDown();
             });
     try {
-      installActive(ops, start, child);
+      var child = LlamaServerTestAccess.startThroughControl(
+          ops, LlamaServerTestAccess.javaArgv(CleanExitChild.class));
+      LlamaServerTestAccess.installChild(ops, start, child);
       ops.waitForServerHealth(start);
 
-      assertTrue(child.waitFor(5, TimeUnit.SECONDS));
-      assertEquals(0, child.exitValue());
+      var exit = child.exit().toCompletableFuture().get(5, TimeUnit.SECONDS);
+      assertEquals(java.util.OptionalInt.of(0), exit.code());
       assertTrue(recovery.await(5, TimeUnit.SECONDS));
       assertNotNull(guard.get());
       assertTrue(guard.get().getAsBoolean());
     } finally {
       ops.shutdown();
-      child.destroyForcibly();
       server.stop(0);
     }
-  }
-
-  private static void installActive(
-      LlamaServerOps ops, LlamaServerOps.StartResult start, Process process) throws Exception {
-    java.lang.reflect.Field processField = LlamaServerOps.class.getDeclaredField("process");
-    processField.setAccessible(true);
-    processField.set(ops, process);
-    java.lang.reflect.Method install =
-        LlamaServerOps.class.getDeclaredMethod(
-            "installActive", LlamaServerOps.StartResult.class, Process.class,
-            ProcessHandle.class);
-    install.setAccessible(true);
-    install.invoke(ops, start, process, null);
   }
 
   @Test
@@ -340,7 +323,7 @@ final class LlamaServerCandidateContextTest {
     } finally {
       release.countDown();
       executor.shutdownNow();
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
       server.stop(0);
     }
@@ -391,7 +374,7 @@ final class LlamaServerCandidateContextTest {
     } finally {
       release.countDown();
       executor.shutdownNow();
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
       server.stop(0);
     }
@@ -401,7 +384,8 @@ final class LlamaServerCandidateContextTest {
       LlamaServerOps ops, InferenceConfig inference) throws Exception {
     return ops.startLlamaServer(
         new LlamaServerOps.StartRequest(
-            new LlamaServerConfigContext(inference, resolved(false, true)),
+            new LlamaServerConfigContext(
+                inference, resolved(false, true, null, null, inference.serverPort())),
             LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL));
   }
 
@@ -424,7 +408,17 @@ final class LlamaServerCandidateContextTest {
 
   private static ResolvedConfig resolved(
       boolean thinking, boolean gpuAllowed, Path dataDir, Path repoRoot) {
+    return resolved(thinking, gpuAllowed, dataDir, repoRoot, 0);
+  }
+
+  /** As above; a positive {@code externalPort} names the user's own server there (CH4). */
+  private static ResolvedConfig resolved(
+      boolean thinking, boolean gpuAllowed, Path dataDir, Path repoRoot, int externalPort) {
     ResolvedConfigBuilder builder = ResolvedConfig.builder();
+    if (externalPort > 0) {
+      builder.putDefault(
+          "justsearch.inference.external_endpoint", "http://127.0.0.1:" + externalPort);
+    }
     builder.putDefault("justsearch.context.size", "4096");
     builder.putDefault("justsearch.llm.slots", "1");
     builder.putDefault("justsearch.llm.kv_type", "q8_0");
@@ -522,11 +516,32 @@ final class LlamaServerCandidateContextTest {
     return server;
   }
 
+  /** Answers a contained chat launch with {@code child}, forwarding every Process method to it. */
+  private static MockedStatic<WindowsEngineJob> containedLaunchOf(Process child) {
+    WindowsEngineJob.ChatProcess contained = Mockito.mock(WindowsEngineJob.ChatProcess.class,
+        invocation -> {
+          java.lang.reflect.Method method = invocation.getMethod();
+          try {
+            return Process.class.getMethod(method.getName(), method.getParameterTypes())
+                .invoke(child, invocation.getArguments());
+          } catch (NoSuchMethodException containmentOnly) {
+            // resume() and releaseScope() have nothing to do; the scope has no descendants.
+            return method.getName().equals("scopeDescendants") ? List.of() : null;
+          } catch (java.lang.reflect.InvocationTargetException thrown) {
+            throw thrown.getCause();
+          }
+        });
+    MockedStatic<WindowsEngineJob> launch =
+        Mockito.mockStatic(WindowsEngineJob.class, Mockito.CALLS_REAL_METHODS);
+    launch.when(() -> WindowsEngineJob.createChat(Mockito.any())).thenReturn(contained);
+    return launch;
+  }
+
   private static LlamaServerOps newOps(
       Mode mode,
       PropsObserver observer,
       java.util.function.Consumer<java.util.function.BooleanSupplier> recovery) {
-    return newOps(mode, observer, recovery, ManagedChildRegistry.noop(), handle -> true);
+    return newOps(mode, observer, recovery, ManagedChildRegistry.noop(), null);
   }
 
   private static LlamaServerOps newOps(
@@ -534,19 +549,25 @@ final class LlamaServerCandidateContextTest {
       PropsObserver observer,
       java.util.function.Consumer<java.util.function.BooleanSupplier> recovery,
       ManagedChildRegistry registry,
-      LlamaServerOps.ManagedHandleTermination termination) {
+      io.justsearch.gpu.GpuCapabilitiesService gpu) {
     return new LlamaServerOps(
         new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
         HttpClient.newHttpClient(),
         new ObjectMapper(),
-        null,
+        gpu,
         () -> mode,
         observer,
         recovery,
         (ignored, guard) -> {},
         NoopInferenceTelemetryEvents.INSTANCE,
-        registry,
-        termination);
+        registry);
+  }
+
+  private static int freePort() throws java.io.IOException {
+    try (java.net.ServerSocket socket =
+        new java.net.ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+      return socket.getLocalPort();
+    }
   }
 
   private static final class RecordingObserver implements PropsObserver {
@@ -573,25 +594,6 @@ final class LlamaServerCandidateContextTest {
     public Integer observedContextTokens() {
       return context.get();
     }
-  }
-
-  private static final class FixedRegistry implements ManagedChildRegistry {
-    private final ManagedChild child;
-
-    private FixedRegistry(ManagedChild child) {
-      this.child = child;
-    }
-
-    @Override
-    public List<ManagedChild> snapshot() {
-      return List.of(child);
-    }
-
-    @Override
-    public void register(ManagedChild ignored) {}
-
-    @Override
-    public void remove(String ignored) {}
   }
 
   private static final class KillingRegistry implements ManagedChildRegistry {

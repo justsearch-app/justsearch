@@ -757,6 +757,12 @@ def _status_body(variant: str) -> str:
             "reasonCodes": ["encoders.health.embedding_not_ready"],
         }
         d["worker"]["core"]["indexedDocuments"] = 1
+        # These variants submit chat turns. The operating view owns chat readiness,
+        # so it must agree with their online inference fixture below.
+        d["operating"]["chat"].update({
+            "state": "READY", "reason": None, "detail": None, "reasonCode": None,
+            "load": None, "queued": 0,
+        })
         return json.dumps(d)
     return _BODY_STATUS
 

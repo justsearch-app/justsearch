@@ -103,6 +103,82 @@ final class DefaultWorkerAppServicesProducerTransferTest {
   }
 
   @Test
+  void deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan(@TempDir Path tempDir)
+      throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      Path root = Files.createDirectory(tempDir.resolve("scanned"));
+      Files.writeString(root.resolve("document.txt"), "queued document",
+          java.nio.charset.StandardCharsets.UTF_8);
+      when(fixture.jobQueue.enqueueEntries(any(), eq("docs"), any())).thenAnswer(
+          invocation -> invocation.<List<?>>getArgument(0).size());
+      DefaultWorkerAppServices deferred = fixture.newDeferredIncumbent();
+      DefaultWorkerAppServices successor = DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
+          fixture.executors, fixture.greenContext(), () -> false, null,
+          IndexingPacing.unthrottled(),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), fixture.configuration,
+          deferred);
+      var scanAccepted = new CountDownLatch(1);
+      var finishScan = new CountDownLatch(1);
+      var handoffPrepared = new CountDownLatch(1);
+      var publish = new CountDownLatch(1);
+      var scanFailure = new AtomicReference<Throwable>();
+      var handoffFailure = new AtomicReference<Throwable>();
+      Thread scan = Thread.ofPlatform().start(() -> {
+        try {
+          deferred.ingestService().scanRoot(io.justsearch.ipc.ScanRootRequest.newBuilder()
+              .setRootPath(root.toString()).setCollection("docs").build(), progress -> {
+                if (!progress.getComplete()) return;
+                scanAccepted.countDown();
+                try {
+                  if (!finishScan.await(5, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Queue scan was not released");
+                  }
+                } catch (InterruptedException interrupted) {
+                  Thread.currentThread().interrupt();
+                  throw new AssertionError(interrupted);
+                }
+              }, io.justsearch.indexerworker.services.CallContext.none());
+        } catch (Throwable failure) { scanFailure.set(failure); }
+      });
+      Thread handoff = null;
+      try {
+        assertTrue(scanAccepted.await(2, TimeUnit.SECONDS), "Real queue scan did not start");
+        handoff = Thread.ofPlatform().start(() -> {
+          try (var prepared = deferred.prepareDeferredWatcherHandoffTo(successor)) {
+            handoffPrepared.countDown();
+            if (!publish.await(5, TimeUnit.SECONDS)) {
+              throw new AssertionError("Deferred publication was not released");
+            }
+            prepared.install();
+          } catch (Throwable failure) { handoffFailure.set(failure); }
+        });
+        assertTrue(handoffPrepared.await(500, TimeUnit.MILLISECONDS),
+            "Deferred watcher handoff incorrectly drains the whole admitted queue scan");
+        publish.countDown();
+        handoff.join(2_000);
+        assertFalse(handoff.isAlive());
+        assertNull(handoffFailure.get(), String.valueOf(handoffFailure.get()));
+        assertThrows(IllegalStateException.class,
+            () -> deferred.mutationAdmission().enter(deferred.mutationOwnerToken()));
+        try (var issued = successor.mutationAdmission().enter(successor.mutationOwnerToken())) {
+          assertNotNull(issued);
+        }
+        assertNull(successor.mutationAdmission().beginFinalFence(
+            successor.mutationOwnerToken(), 0),
+            "Generation cutover must still drain the accepted scan");
+      } finally {
+        publish.countDown();
+        finishScan.countDown();
+        scan.join(2_000);
+        if (handoff != null) handoff.join(2_000);
+        successor.close();
+      }
+      assertFalse(scan.isAlive());
+      assertNull(scanFailure.get(), String.valueOf(scanFailure.get()));
+    }
+  }
+
+  @Test
   void abandonedDeferredWriterUpgradeLeavesWatcherOwnershipWithIncumbent(
       @TempDir Path tempDir) throws Exception {
     try (Fixture fixture = new Fixture(tempDir)) {
@@ -139,13 +215,13 @@ final class DefaultWorkerAppServicesProducerTransferTest {
           mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
       deferred.wireEmbeddingProvider(deferredProvider);
       deferred.wireSpladeEncoder(deferredSplade);
+      var watchRequest = io.justsearch.ipc.WatchRootRequest.newBuilder()
+          .setRootPath(root.toString()).setCollection("docs");
+      // The person's add records its volume. Older declared before-states have no marker.
+      var rootAdded = watchRequest.getDescriptorForType().findFieldByName("root_added");
+      if (rootAdded != null) watchRequest.setField(rootAdded, true);
       var watched = deferred.ingestService().watchRoot(
-          io.justsearch.ipc.WatchRootRequest.newBuilder()
-              .setRootPath(root.toString())
-              .setCollection("docs")
-              // The person's add (task t-20261013-ef3c41, round 8): only it records the volume.
-              .setRootAdded(true)
-              .build(),
+          watchRequest.build(),
           io.justsearch.indexerworker.services.CallContext.none());
       assertTrue(watched.getWatching(), watched.getErrorMessage());
 

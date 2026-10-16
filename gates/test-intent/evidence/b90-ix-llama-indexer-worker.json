@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T13:14:49.310Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "ea695eefe9fb4a893b513c5ecfbb9508ebb3f8df",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.plannedP12ReplacementFromCpuSourceFitsFiveGiBFree\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.generationBoundFp32CannotUseASiblingsMeasuredGpuPlan\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.retirementDoesNotCreditAnUnusedArenaCeiling\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 21187
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#plannedP12ReplacementFromCpuSourceFitsFiveGiBFree",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7db16e02e320c527767769d16f45a90a0d8336f6313cc889e64b854318eec73b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plannedP12ReplacementFromCpuSourceFitsFiveGiBFree(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#generationBoundFp32CannotUseASiblingsMeasuredGpuPlan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7db16e02e320c527767769d16f45a90a0d8336f6313cc889e64b854318eec73b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationBoundFp32CannotUseASiblingsMeasuredGpuPlan(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#retirementDoesNotCreditAnUnusedArenaCeiling",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7db16e02e320c527767769d16f45a90a0d8336f6313cc889e64b854318eec73b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retirementDoesNotCreditAnUnusedArenaCeiling(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.plannedP12ReplacementFromCpuSourceFitsFiveGiBFree\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.generationBoundFp32CannotUseASiblingsMeasuredGpuPlan\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.retirementDoesNotCreditAnUnusedArenaCeiling\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 66741
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#plannedP12ReplacementFromCpuSourceFitsFiveGiBFree",
+        "classification": "assertion",
+        "detail": "plannedP12ReplacementFromCpuSourceFitsFiveGiBFree(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: one concurrent activation allowance plus retained weights fits the free device line ==> expected: <BESIDE> but was: <REFUSED>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#generationBoundFp32CannotUseASiblingsMeasuredGpuPlan",
+        "classification": "assertion",
+        "detail": "generationBoundFp32CannotUseASiblingsMeasuredGpuPlan(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the bound FP32 artifact must be budgeted or receive explicit CPU placement ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#retirementDoesNotCreditAnUnusedArenaCeiling",
+        "classification": "assertion",
+        "detail": "retirementDoesNotCreditAnUnusedArenaCeiling(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an allocator ceiling is not a retained allocation and cannot authorize replacement ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:f91f2a7c38dcc82b01129a71b19d6e7b13c237f9cf044329f6d96064227de642"
+}

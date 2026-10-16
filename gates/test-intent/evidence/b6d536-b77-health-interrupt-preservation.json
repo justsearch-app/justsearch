@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-12T19:02:16.642Z",
+  "revision": "b639e82c5422800b853ddf08e89a37f9fecc1aeb",
+  "tree": "30ca9acc4e2062da09608e33d334743d663508db",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=C:/agent-sandbox-tmp/b77/tmp",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.stream.SseStreamChannelPublisherInterruptTest.unsubscribeRacesOnAPlainChannelNeverInterruptThePublisher\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10467
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelPublisherInterruptTest.java#unsubscribeRacesOnAPlainChannelNeverInterruptThePublisher",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca612e01bcedc94cab739dc2370dea663e88b92cbfe8a14f0b95623026561f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unsubscribeRacesOnAPlainChannelNeverInterruptThePublisher()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:55e1b31cc40b54a10a833e760c960d3e195a1a542441a4fae63c8d3823bd64a8"
+}

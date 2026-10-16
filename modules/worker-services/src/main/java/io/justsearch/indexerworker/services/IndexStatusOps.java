@@ -12,6 +12,7 @@ import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
+import io.justsearch.indexerworker.loop.BackfillScheduler;
 import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.metrics.BatchTimingKeys;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
@@ -425,7 +426,7 @@ final class IndexStatusOps {
         VisualExtractionStatus.newBuilder()
             .setOcrEnabled(ocrConfig.enabled())
             .setOcrEngineAvailable(TikaOcrRuntime.isEngineAvailable())
-            .setOcrEngine(OcrRoutingConfig.ENGINE)
+            .setOcrEngine(TikaOcrRuntime.engineStatus())
             .setVisualTextNeededCount(visualTextNeededCount)
             .setVisualEnrichmentNeededCount(visualEnrichmentNeededCount);
     if (!blockedReason.isBlank()) {
@@ -809,6 +810,16 @@ final class IndexStatusOps {
     // degrades this one surface instead of failing the whole StatusResponse.
     LuceneRuntimeTypes.StageCompletenessCounts stages =
         queried == null ? LuceneRuntimeTypes.StageCompletenessCounts.EMPTY : queried;
+    // Spec E step E0b: the S5 unit, one joint count (never derived from the per-stage counters).
+    long embeddedAndSparse =
+        ingestCountOps != null ? ingestCountOps.queryEmbeddedAndSparseCount() : 0L;
+    // Spec E step E1 (§1.7): live per-stage availability, read from the loop's own checks. No loop
+    // (a deferred or read-only service set) means no stage can drain anything.
+    BackfillScheduler.StageAvailability available =
+        indexingLoop == null ? null : indexingLoop.enrichmentStageAvailability();
+    if (available == null) {
+      available = BackfillScheduler.StageAvailability.NONE;
+    }
 
     return EnrichmentCoverage.newBuilder()
         .setEmbedding(
@@ -871,6 +882,10 @@ final class IndexStatusOps {
         .setEmbeddingEnabled(embeddingEnabled)
         .setSpladeEnabled(spladeEnabled)
         .setNerEnabled(nerEnabled)
+        .setEmbeddedAndSparseCount(embeddedAndSparse)
+        .setEmbeddingAvailable(available.embedding())
+        .setSpladeAvailable(available.sparse())
+        .setNerAvailable(available.ner())
         .putAllEnrichmentCompleted(metrics.getEnrichmentCompleted())
         .setBatchTiming(
             PipelineBatchTiming.newBuilder()

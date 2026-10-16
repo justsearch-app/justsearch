@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.services;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.SystemAccess;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.indexerworker.disambiguation.EntityClusterSnapshot;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
@@ -11,12 +12,14 @@ import io.justsearch.indexerworker.server.EncoderBindings;
 import io.justsearch.indexerworker.services.execute.SearchExecutor;
 import io.justsearch.indexerworker.services.input.SearchInputCapture;
 import io.justsearch.indexerworker.services.input.SearchInputs;
+import io.justsearch.indexerworker.services.input.SemanticDeadline;
 import io.justsearch.indexerworker.services.plan.SearchDecision;
 import io.justsearch.indexerworker.services.plan.SearchPlanner;
 import io.justsearch.indexerworker.services.respond.SearchResponseBuilder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
+import io.justsearch.ort.QueryDevice;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -181,15 +184,19 @@ public final class SearchOrchestrator {
    * then threw its result away.
    *
    * @param ctx the caller's context; {@link CallContext#none()} for a caller that cannot cancel
+   * @param acquisition the caller's inference request, taken once per search from {@code ctx}
+   * @param semantic the search's semantic sub-budget (Spec D §1.3)
    */
   public SearchResponse execute(
       SearchRequest request,
       boolean allowQueryEmbeddings,
       String compatReasonCode,
-      CallContext ctx) {
+      CallContext ctx,
+      InferenceRequest acquisition,
+      SemanticDeadline semantic) {
     CallContext call = ctx == null ? CallContext.none() : ctx;
     SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode,
-        call.inferenceRequest());
+        acquisition, semantic);
     afterCapture.accept(inputs);
     abortIfCancelled(call, "capture");
     SearchDecision decision = planner.plan(inputs);
@@ -206,7 +213,58 @@ public final class SearchOrchestrator {
    */
   public SearchResponse execute(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode) {
-    return execute(request, allowQueryEmbeddings, compatReasonCode, CallContext.none());
+    CallContext none = CallContext.none();
+    return execute(request, allowQueryEmbeddings, compatReasonCode, none,
+        none.inferenceRequest(), SemanticDeadline.unbounded());
+  }
+
+  /**
+   * The device the request's query encoder legs will select (Spec D §1.1): {@code GPU} only when
+   * every requested leg that runs a model would run on a GPU session; otherwise {@code CPU}. A leg
+   * with no encoder wired yet counts as {@code CPU}. The CPU IDF SPLADE path is not a semantic leg
+   * and does not count.
+   */
+  QueryDevice queryDevice(SearchRequest request) {
+    var pipeline = request.hasPipeline() ? request.getPipeline()
+        : SearchPlanner.modeToDefaultPipeline(request.getMode());
+    boolean wantDense = pipeline.getDenseEnabled() || pipeline.getDenseAuto();
+    boolean wantSplade = pipeline.getSpladeEnabled();
+    EncoderBindings.Snapshot encoders = encoderBindings.snapshot();
+    if (encoders.bgeM3Encoder() != null && (wantDense || wantSplade)) {
+      return deviceOrCpu(encoders.bgeM3Encoder().queryDevice());
+    }
+    boolean gpu = true;
+    if (wantDense) {
+      EmbeddingProvider provider = embeddingProvider;
+      gpu = provider != null && deviceOrCpu(provider.queryDevice()) == QueryDevice.GPU;
+    }
+    if (gpu && wantSplade && spladeIdfQueryEncoder == null) {
+      gpu = encoders.spladeEncoder() != null
+          && deviceOrCpu(encoders.spladeEncoder().queryDevice()) == QueryDevice.GPU;
+    }
+    return gpu ? QueryDevice.GPU : QueryDevice.CPU;
+  }
+
+  /**
+   * Whether every configured query encoder would run now without creating a session (Spec D §4.2
+   * item 3): BGE-M3 when bound; otherwise the available embedding provider and the SPLADE ONNX
+   * query encoder (not the CPU IDF path). The EMBEDDING readiness input reads this.
+   */
+  boolean queryEncodersWarm() {
+    EncoderBindings.Snapshot encoders = encoderBindings.snapshot();
+    if (encoders.bgeM3Encoder() != null) return encoders.bgeM3Encoder().isQueryWarm();
+    EmbeddingProvider provider = embeddingProvider;
+    if (provider != null && !switch (provider.availability().state()) {
+      case READY -> provider.isQueryWarm();
+      case STARTING -> false;
+      case ABSENT, FAILED -> true;
+    }) return false;
+    return encoders.spladeEncoder() == null || spladeIdfQueryEncoder != null
+        || encoders.spladeEncoder().isQueryWarm();
+  }
+
+  private static QueryDevice deviceOrCpu(QueryDevice device) {
+    return device == null ? QueryDevice.CPU : device;
   }
 
   private static void abortIfCancelled(CallContext ctx, String stage) {

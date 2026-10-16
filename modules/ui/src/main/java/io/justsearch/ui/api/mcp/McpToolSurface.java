@@ -61,6 +61,15 @@ public final class McpToolSurface {
         : Optional.ofNullable(resolveOperation(operationId));
   }
 
+  /** The status tool reads the same bounded snapshot surface as the HTTP status routes. */
+  boolean observationTool(String toolName) {
+    return "justsearch_status".equals(toolName);
+  }
+
+  boolean observationResource(String uri) {
+    return "justsearch://index/summary".equals(uri);
+  }
+
   private static final Logger log = LoggerFactory.getLogger(McpToolSurface.class);
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private static final long RETRIEVE_TIMEOUT_MS = 15_000;
@@ -399,9 +408,9 @@ public final class McpToolSurface {
   private static final List<ToolDefinition> PRODUCTION_TOOL_DEFINITIONS =
       List.of(
           new ToolDefinition(
-              "justsearch_answer", ANSWER_DESC, ANSWER_SCHEMA, Map.of("readOnlyHint", true)),
+              "justsearch_answer", ANSWER_DESC, ANSWER_SCHEMA, Map.of("readOnlyHint", true), true),
           new ToolDefinition(
-              "justsearch_search", SEARCH_DESC, SEARCH_SCHEMA, Map.of("readOnlyHint", true)),
+              "justsearch_search", SEARCH_DESC, SEARCH_SCHEMA, Map.of("readOnlyHint", true), true),
           new ToolDefinition(
               "justsearch_browse",
               BROWSE_DESC,
@@ -412,7 +421,7 @@ public final class McpToolSurface {
                       "list_files", prop("boolean", "List individual files instead of subfolders"),
                       "operationKey", OPERATION_KEY_SCHEMA),
                   List.of()),
-              Map.of("readOnlyHint", true)),
+              Map.of("readOnlyHint", true), true),
           new ToolDefinition(
               "justsearch_ingest",
               INGEST_DESC,
@@ -432,14 +441,14 @@ public final class McpToolSurface {
                                   + " rejected."),
                       "operationKey", OPERATION_KEY_SCHEMA),
                   List.of("paths")),
-              orderedMap("readOnlyHint", false, "idempotentHint", true)),
+              orderedMap("readOnlyHint", false, "idempotentHint", true), true),
           new ToolDefinition(
-              "justsearch_status", STATUS_DESC, STATUS_SCHEMA, Map.of("readOnlyHint", true)),
+              "justsearch_status", STATUS_DESC, STATUS_SCHEMA, Map.of("readOnlyHint", true), false),
           new ToolDefinition(
               "justsearch_runtime_manifest",
               RUNTIME_MANIFEST_DESC,
               RUNTIME_MANIFEST_SCHEMA,
-              Map.of("readOnlyHint", true)),
+              Map.of("readOnlyHint", true), false),
           new ToolDefinition(
               "justsearch_operation_outcome",
               "Read the recorded outcome for an operation key after a lost response or restart. "
@@ -450,7 +459,35 @@ public final class McpToolSurface {
                   + "Timestamps are UTC epoch milliseconds. The answer matches "
                   + "GET /api/operation-history/{operationKey} and contains metadata only.",
               OUTCOME_SCHEMA,
-              Map.of("readOnlyHint", true)));
+              Map.of("readOnlyHint", true), false));
+
+  static {
+    io.justsearch.ui.api.ObservationJustifications.validateMcp(PRODUCTION_TOOL_DEFINITIONS.stream()
+        .collect(java.util.stream.Collectors.toUnmodifiableMap(ToolDefinition::name, ToolDefinition::userActivity)));
+  }
+
+  /**
+   * The activity role of reading each resource: the index summary, the indexed roots and the
+   * catalog resources are status an unattended client polls (observation); the facet reads run
+   * searches a client asks for (user action). A URI not listed here is a deliberate request.
+   */
+  static final Map<String, Boolean> RESOURCE_USER_ACTIVITY = Map.of(
+      "justsearch://index/summary", false,
+      "justsearch://index/roots", false,
+      "justsearch://index/top-sources", true,
+      "justsearch://index/top-entities", true,
+      "justsearch://resource/*", false);
+
+  static boolean isResourceReadUserActivity(String uri) {
+    if (uri == null) return true;
+    String declared = uri.startsWith("justsearch://resource/") ? "justsearch://resource/*" : uri;
+    return RESOURCE_USER_ACTIVITY.getOrDefault(declared, true);
+  }
+
+  static boolean isUserActivity(String toolName) {
+    return PRODUCTION_TOOL_DEFINITIONS.stream().filter(tool -> tool.name().equals(toolName))
+        .anyMatch(ToolDefinition::userActivity);
+  }
 
   /** No production tool is deprecated; fake lifecycle rows are injected only by focused tests. */
   private static final List<ToolLifecycle> PRODUCTION_TOOL_LIFECYCLE = List.of();
@@ -1449,7 +1486,8 @@ public final class McpToolSurface {
   private static void appendDegradationNote(StringBuilder sb, SearchTrace trace) {
     if (trace == null || trace.degradation() == null) return;
     SearchTrace.Degradation degradation = trace.degradation();
-    if (!degradation.vectorBlocked() && !degradation.hybridFallback()) return;
+    boolean spladeBudgetSkip = McpEvidenceProjection.semanticSpladeSkip(degradation);
+    if (!degradation.vectorBlocked() && !degradation.hybridFallback() && !spladeBudgetSkip) return;
     List<String> reasons = new ArrayList<>();
     if (degradation.vectorBlocked()
         && degradation.vectorBlockedReason() != null
@@ -1460,12 +1498,26 @@ public final class McpToolSurface {
         && degradation.hybridFallbackReason() != null
         && !degradation.hybridFallbackReason().isBlank()
         && !reasons.contains(degradation.hybridFallbackReason())) {
-      reasons.add(degradation.hybridFallbackReason());
+      reasons.add(withCause(degradation.hybridFallbackReason(), degradation.hybridFallbackCause()));
+    }
+    // Spec D §1.8: a SPLADE leg that missed the semantic sub-budget is reported per leg, too.
+    if (spladeBudgetSkip) {
+      reasons.add(
+          "SPLADE " + withCause(degradation.spladeSkipReason(), degradation.spladeSkipCause()));
     }
     String reasonText = reasons.isEmpty() ? "reason unavailable" : String.join("; ", reasons);
+    boolean denseLost = degradation.vectorBlocked() || degradation.hybridFallback();
     sb.append("\nNote: semantic ranking degraded (")
         .append(reasonText)
-        .append("); results may be keyword-ranked only.");
+        .append(
+            denseLost
+                ? "); results may be keyword-ranked only."
+                : "); results are ranked without the SPLADE leg.");
+  }
+
+  /** A reason code, followed by {@code (cause: <cause>)} when a semantic budget cause is carried. */
+  private static String withCause(String reason, String cause) {
+    return cause == null || cause.isBlank() ? reason : reason + " (cause: " + cause + ")";
   }
 
   // =========================================================================
@@ -2040,7 +2092,8 @@ public final class McpToolSurface {
       String name,
       String description,
       Map<String, Object> inputSchema,
-      Map<String, Object> annotations) {
+      Map<String, Object> annotations,
+      boolean userActivity) {
     ToolDefinition {
       name = requireNonBlank(name, "tool name");
       description = requireNonBlank(description, "tool description");
@@ -2146,10 +2199,36 @@ public final class McpToolSurface {
   }
 
   static Map<String, Object> errorContent(String message, ApiErrorCode code) {
-    Map<String, Object> apiError = ApiErrorHandler.toResponse(code, message);
+    return errorContent(message, code, null);
+  }
+
+  /**
+   * The MCP projection of a typed error that may know when to retry: the "retryAfterMs" field is
+   * carried in {@code structuredContent} and worded in the text when present (ADR-0050).
+   */
+  static Map<String, Object> errorContent(
+      String message, ApiErrorCode code, java.time.Duration retryAfter) {
+    Map<String, Object> apiError = ApiErrorHandler.toResponse(code, message, retryAfter);
     var failure = new LinkedHashMap<String, Object>();
     for (String key : List.of("error", "errorCode", "errorClass", "retryable")) {
       failure.put(key, apiError.get(key));
+    }
+    if (apiError.containsKey("retryAfterMs")) failure.put("retryAfterMs", apiError.get("retryAfterMs"));
+    return errorContent(failure);
+  }
+
+  /**
+   * The MCP projection of a chat refusal (Spec A step 9): the same typed error, {@code retryAfterMs},
+   * refusal {@code reason} and {@code forceAllowed} as the HTTP body. An MCP client never forces a
+   * load, so {@code forceAllowed} only tells it a person could.
+   */
+  static Map<String, Object> errorContent(io.justsearch.app.api.chat.ChatRefusal refusal) {
+    Map<String, Object> body =
+        io.justsearch.ui.api.ChatResidencyGate.refusalBody(refusal, null, null);
+    var failure = new LinkedHashMap<String, Object>();
+    for (String key : List.of(
+        "error", "errorCode", "errorClass", "retryable", "retryAfterMs", "reason", "forceAllowed")) {
+      if (body.containsKey(key)) failure.put(key, body.get(key));
     }
     return errorContent(failure);
   }
@@ -2168,6 +2247,12 @@ public final class McpToolSurface {
       if (Boolean.FALSE.equals(failure.get("retryable"))) {
         text.append(" Automatic retry is not recommended.");
       }
+    }
+    if (failure.containsKey("retryAfterMs")) {
+      text.append(" Retry after: ").append(failure.get("retryAfterMs")).append(" ms.");
+    }
+    if (failure.containsKey("reason")) {
+      text.append(" Reason: ").append(failure.get("reason")).append('.');
     }
     for (String field : List.of("operationKey", "operationRecordId")) {
       if (failure.containsKey(field)) text.append("\n").append(field).append(": ").append(failure.get(field));
@@ -2200,6 +2285,8 @@ public final class McpToolSurface {
         && e.getCause() instanceof Exception cause && seen.add(e)) {
       e = cause;
     }
+    // Spec A step 9: a chat refusal keeps its typed reason, retry time and forceAllowed.
+    if (e instanceof io.justsearch.app.api.chat.ChatRefusal refusal) return errorContent(refusal);
     String detail = e.getMessage() != null ? e.getMessage() : "no additional detail";
     String message = tool
         + " failed: "

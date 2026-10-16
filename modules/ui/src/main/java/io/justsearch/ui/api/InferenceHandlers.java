@@ -45,7 +45,8 @@ final class InferenceHandlers {
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private final Supplier<ComponentRecoveryAuthority> componentRecovery;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; nvidia-smi availability
-  // is read from gpuCapabilitiesService.snapshot().nvidiaSmi().available().
+  // is read from gpuCapabilitiesService.snapshot().nvidiaSmi().available(), or from
+  // nvidiaSmiToolAvailable() where NVML supplied that section (task b6d536 b101).
   private final GpuCapabilitiesService gpuCapabilitiesService;
   private final EnterprisePolicyService enterprisePolicyService;
   private final io.justsearch.app.services.settings.UiSettingsStore settingsStore;
@@ -209,16 +210,20 @@ final class InferenceHandlers {
     // both as a diagnostic signal and to preserve frontend compatibility for
     // callers that explicitly want the legacy answer.
     // Tempdoc 374 alpha.27: read nvidia-smi availability from the snapshot's
-    // nvidiaSmi() accessor instead of a direct VramDetector reference. The
-    // snapshot's NvidiaSmi probe runs the same nvidia-smi shell-out internally.
+    // nvidiaSmi() accessor instead of a direct VramDetector reference. Task b6d536
+    // b101: where NVML answers, that section carries NVML's figures (source
+    // "read in-process (NVML)") and no nvidia-smi process starts; nvidiaSmiAvailable
+    // then still reports the tool itself, from its detector, without starting it.
     GpuCapabilities snapshot = null;
     try {
       snapshot = gpuCapabilitiesService.snapshot();
     } catch (Exception ignored) {
       // best-effort
     }
-    boolean nvidiaSmiAvailable =
-        snapshot != null && snapshot.nvidiaSmi() != null && snapshot.nvidiaSmi().available();
+    boolean nvidiaSmiAvailable = snapshot != null && snapshot.nvidiaSmi() != null
+        && (GpuCapabilities.NvidiaSmi.SOURCE_NVML.equals(snapshot.nvidiaSmi().source())
+            ? gpuCapabilitiesService.nvidiaSmiToolAvailable()
+            : snapshot.nvidiaSmi().available());
     boolean cudaAvailable = snapshot != null
         && snapshot.effective() != null
         && snapshot.effective().cudaAvailable();
@@ -552,23 +557,26 @@ final class InferenceHandlers {
 
   private void writeIntentRefusal(Context ctx, io.justsearch.agent.api.registry.OperationResult refusal) {
     String code = refusal.errorCode().orElse("SETTINGS_RECOVERY_REQUIRED");
+    // A refusal its owner marks retryable (a transition such as a draining chat server) is never
+    // projected as a permanent server fault: unlisted codes become 503 SERVICE_UNAVAILABLE.
+    boolean retryable = refusal.retryable().orElse(false);
     int status = switch (code) {
       case "INVALID_REQUEST", "OPERATION_KEY_INVALID" -> 400;
       case "SETTINGS_READ_ONLY", "VERSION_CONFLICT", "RECONFIGURE_IN_PROGRESS",
           "OPERATION_KEY_EXPIRED", "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> 409;
       case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY" -> 503;
-      default -> 500;
+      default -> retryable ? 503 : 500;
     };
     ApiErrorCode classification = switch (code) {
       case "SETTINGS_READ_ONLY" -> ApiErrorCode.SETTINGS_READ_ONLY;
       case "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT", "OPERATION_KEY_EXPIRED",
           "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> ApiErrorCode.INVALID_REQUEST;
       case "RECONFIGURE_IN_PROGRESS", "OPERATIONS_CAPACITY" -> ApiErrorCode.SERVICE_UNAVAILABLE;
-      default -> ApiErrorCode.INVALID_STATE;
+      default -> retryable ? ApiErrorCode.SERVICE_UNAVAILABLE : ApiErrorCode.INVALID_STATE;
     };
     var payload = ApiErrorHandler.toResponse(classification, refusal.message(), telemetry, ApiErrorHandler.routeOf(ctx));
     payload.put("errorCode", code);
-    payload.put("retryable", refusal.retryable().orElse(false));
+    payload.put("retryable", retryable);
     for (String field : List.of("operationKey", "operationRecordId")) {
       Object value = refusal.structuredData().get(field);
       if (value != null) payload.put(field, value);

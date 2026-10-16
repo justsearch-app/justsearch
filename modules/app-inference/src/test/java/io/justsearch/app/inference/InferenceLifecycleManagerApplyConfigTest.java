@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeTransitionException;
+import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.inference.InferenceLifecycleManager.ConfigApplyDisposition;
@@ -68,6 +69,108 @@ import org.mockito.MockedConstruction;
 final class InferenceLifecycleManagerApplyConfigTest {
   @TempDir Path directory;
   private ConfigStore previousStore;
+
+  @ParameterizedTest(name = "settingsPreparationCannotReplaceAHeldVduServer({0})")
+  @ValueSource(booleans = {false, true})
+  void settingsPreparationCannotReplaceAHeldVduServer(boolean enabled) throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig rc = resolved("vdu-held", true);
+    installGlobal(rc);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, rc, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      manager.enterVduMode();
+      int starts = server.starts.size();
+      int stops = server.stopReasons.size();
+      var failure = assertThrows(ModeTransitionException.class,
+          () -> manager.prepareResolvedConfig(b, rc, enabled));
+      assertTrue(failure.getMessage().contains("VDU"));
+      assertTrue(manager.currentConfig().vduMode());
+      assertEquals(starts, server.starts.size());
+      assertEquals(stops, server.stopReasons.size());
+      manager.exitVduMode();
+      assertSame(a, manager.currentConfig());
+    }
+  }
+
+  @Test
+  void adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig rc = resolved("external-self-test", true);
+    installGlobal(rc);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, rc, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      when(server.mock().isExternalServerActive()).thenReturn(true);
+      var router = io.justsearch.app.inference.chat.ChatActuationRouter.inline(manager.chatActuator());
+      var failure = assertThrows(ModeTransitionException.class,
+          () -> router.route(manager.chatActuator().selfTestStop()));
+      assertTrue(failure.getMessage().contains("external"));
+      assertTrue(server.stopReasons.isEmpty(), "external ownership must be preserved");
+      assertEquals(1, server.starts.size());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1024, 0, 256})
+  void promptCachePolicySurvivesEveryRelaunchPath(int chatMiB) throws Exception {
+    String cacheKey = "justsearch.llm.prompt_cache_mib";
+    String oldCache = System.getProperty(cacheKey);
+    String oldEval = System.getProperty("justsearch.eval.mode");
+    try {
+      System.clearProperty(cacheKey);
+      System.setProperty("justsearch.eval.mode", String.valueOf(chatMiB == 0));
+      if (chatMiB == 256) System.setProperty(cacheKey, "256");
+      InferenceConfig initial = config(0, 4096);
+      ResolvedConfig resolved = resolved("cache", true);
+      installGlobal(resolved);
+      try (var server = new FakeServer();
+          var executors = new io.justsearch.core.execution.TestEngineExecutors();
+          var manager = manager(executors, initial, resolved, InferenceTelemetryEvents.noop())) {
+        List<List<String>> launches = new ArrayList<>();
+        server.onStart = request -> launches.add(LlamaServerOps.buildLaunchCommand(
+            request.context().inference(), request.context().resolved(),
+            request.effectiveGpuLayers(), ContextWindowPolicy.auto(false, null)));
+        manager.switchToOnlineMode();
+        // The head's boot-static choice survives later property changes, including profile copies.
+        System.setProperty(cacheKey, "2048");
+        System.setProperty("justsearch.eval.mode", "false");
+        manager.switchToIndexingMode();
+        manager.switchToOnlineMode();
+        var profile = io.justsearch.configuration.model.ChatModelProfile.DEFAULT;
+        Path models = Files.createDirectories(directory.resolve("data/models"));
+        Files.writeString(models.resolve(profile.modelFile()), "test profile");
+        var service = new OnlineAiServiceImpl(mock(io.justsearch.app.api.EngineAdmissionService.class),
+            manager);
+        service.applyChatProfile(profile,
+            io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
+        server.failure.accept(() -> true);
+        var recovery = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+        assertEquals(ComponentRecoveryAction.Outcome.RECOVERED,
+            manager.recoverComponent(recovery, (inference, snapshot) -> "A").outcome());
+        manager.enterVduMode();
+        manager.exitVduMode();
+        assertEquals(6, launches.size());
+        String[] paths = {"initial chat", "mode change", "profile change", "crash recovery",
+            "VDU enter", "VDU exit"};
+        org.junit.jupiter.api.Assertions.assertAll(java.util.stream.IntStream.range(0, 6)
+            .mapToObj(i -> (org.junit.jupiter.api.function.Executable) () -> {
+              List<String> argv = launches.get(i);
+              assertEquals(1, argv.stream().filter("--cache-ram"::equals).count(), paths[i]);
+              assertEquals(String.valueOf(i == 4 ? 0 : chatMiB),
+                  argv.get(argv.indexOf("--cache-ram") + 1), paths[i]);
+            }));
+      }
+    } finally {
+      if (oldCache == null) System.clearProperty(cacheKey);
+      else System.setProperty(cacheKey, oldCache);
+      if (oldEval == null) System.clearProperty("justsearch.eval.mode");
+      else System.setProperty("justsearch.eval.mode", oldEval);
+    }
+  }
 
   @BeforeEach
   void captureGlobalStore() {
@@ -187,6 +290,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals("candidate-b.gguf", manager.lastKnownModelId());
       assertSame(b, server.active.get().context().inference());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.MODEL_SWITCH), server.stopReasons,
+          "the incumbent is stopped for the model switch");
     }
   }
 
@@ -312,7 +417,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       assertNull(server.active.get());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
     }
   }
 
@@ -374,6 +480,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertSame(a, server.active.get().context().inference());
       assertSame(resolvedA, server.active.get().context().resolved());
       assertEquals(3, server.starts.size());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.RECONFIGURE, io.justsearch.app.api.runtime.child.StopReason.ROLLBACK),
+          server.stopReasons, "A stops to reconfigure; the aborted B stops as a rollback");
       assertEquals(Mode.ONLINE, manager.getCurrentMode());
     }
   }
@@ -596,7 +704,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(ConfigApplyDisposition.UNCHANGED, result.disposition());
       assertNotNull(result.failure());
       assertEquals(ModeTransitionException.Reason.INSUFFICIENT_VRAM, result.failure().reason());
-      verify(serverOps, never()).stopLlamaServer();
+      verify(serverOps, never()).stopLlamaServer(any());
       verify(tokenOps, never()).clearCaches();
       verify(events, times(1)).onConfigApplyFailure(any());
       assertSame(a, manager.currentConfig());
@@ -774,6 +882,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertSame(b, manager.currentConfig());
       assertEquals(Mode.ONLINE, manager.getCurrentMode());
       assertEquals(3, server.starts.size());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.VDU_ENTER, io.justsearch.app.api.runtime.child.StopReason.VDU_EXIT),
+          server.stopReasons);
       LlamaServerOps.StartRequest enter = server.starts.get(1);
       LlamaServerOps.StartRequest exit = server.starts.get(2);
       assertTrue(enter.context().inference().vduMode());
@@ -827,6 +937,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
+  @SuppressWarnings("removal") // states that the keep-running request is refused
   void managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose() throws Exception {
     InferenceConfig a = config(0, 4096);
     ResolvedConfig resolvedA = resolved("a", true);
@@ -845,7 +956,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
         manager.close();
       }
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
-      assertNotNull(server.active.get(), "preserved child ownership remains available for adoption");
+      // ADR-0051 decision 2: close always stops the managed server, even when asked to leave it
+      // running; nothing is kept for adoption.
+      assertNull(server.active.get(), "close ends the managed server; no ownership is preserved");
       server.failure.accept(() -> true);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
     }
@@ -912,7 +1025,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       assertNull(server.active.get());
-      verify(server.mock()).stopLlamaServer();
+      verify(server.mock()).stopLlamaServer(any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.ROLLBACK), server.stopReasons);
     }
   }
 
@@ -965,7 +1079,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var incumbent = server.active.get();
       server.failure.accept(() -> true);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertSame(incumbent, server.active.get());
     }
   }
@@ -1023,14 +1137,15 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS));
       assertEquals(1, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size());
 
       releaseRequest.countDown();
       requestUse.get(5, TimeUnit.SECONDS);
       var result = recovery.get(5, TimeUnit.SECONDS);
       assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.CRASH_RECOVERY), server.stopReasons);
       assertEquals(2, server.starts.size(), "the admission launches exactly one replacement");
       assertEquals(1, result.observation().recoveryAttempts());
     } finally {
@@ -1068,7 +1183,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(1, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size(), "cancelled drain must not launch a replacement");
     } finally {
       releaseRequest.countDown();
@@ -1111,7 +1226,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(Mode.INDEXING, manager.getCurrentMode());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
       assertEquals(1, server.starts.size(),
           "recovery must not reopen A after the explicit same-context stop");
     } finally {
@@ -1157,7 +1273,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(ComponentRecoveryAction.Outcome.FAILED, recoveryResult.get().outcome());
       assertEquals(1, recoveryResult.get().observation().recoveryAttempts());
       assertTrue(recoveryResult.get().observation().evidence().contains("drain interrupted"));
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size());
 
       releaseRequest.countDown();
@@ -1195,7 +1311,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(Mode.INDEXING, manager.getCurrentMode());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
       assertEquals(0, server.starts.size(),
           "recovery must not open failed initial A after explicit indexing intent");
     }
@@ -1223,7 +1340,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
-  void failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence() throws Exception {
+  void failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence() throws Exception {
     InferenceConfig a = config(0, 4096);
     ResolvedConfig resolvedA = resolved("a", true);
     installGlobal(resolvedA);
@@ -1238,7 +1355,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
 
       assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
-      assertEquals("inference.crashed", result.observation().reasonCode());
+      assertEquals("inference.startup_timeout", result.observation().reasonCode());
       assertTrue(LifecycleReasonCode.allowedCodes().contains(result.observation().reasonCode()));
       assertTrue(result.observation().evidence().contains("health_timeout"));
     }
@@ -1308,7 +1425,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.REFUSED, result.outcome());
       assertEquals(0, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size());
     }
   }
@@ -1417,6 +1534,172 @@ final class InferenceLifecycleManagerApplyConfigTest {
     }
   }
 
+  // ==================== F1/F2: every start says why it failed ====================
+
+  @Test
+  void aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      server.failNextHealth(modelLoadExit());
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
+      assertEquals("inference.model_load_failed", result.observation().reasonCode(),
+          "the retry's own start failure, not the earlier crash");
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      FailedCode earlier = manager.lastChatFailedCode();
+      assertNotNull(earlier, "the crash latched a failure");
+      List<String> seenAtLanding = new java.util.concurrent.CopyOnWriteArrayList<>();
+      manager.addModeTransitionListener((from, to, reason) -> {
+        if (to == Mode.OFFLINE) seenAtLanding.add(String.valueOf(manager.lastChatFailedCode()));
+      });
+      server.failNextHealth(modelLoadExit());
+
+      var result = manager.applyResolvedConfig(
+          b, resolvedB, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+
+      assertEquals(ConfigApplyDisposition.LEFT_OFFLINE, result.disposition());
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      assertEquals(List.of("MODEL_LOAD_FAILED"), seenAtLanding,
+          "the apply's landing names its own failure, not the " + earlier + " before it");
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      List<String> seenAtLanding = new java.util.concurrent.CopyOnWriteArrayList<>();
+      manager.addModeTransitionListener((from, to, reason) -> {
+        if (to == Mode.OFFLINE) seenAtLanding.add(String.valueOf(manager.lastChatFailedCode()));
+      });
+      server.failNextHealth(healthFailure("candidate B failed"));
+      server.failNextHealth(modelLoadExit());
+
+      var result = manager.applyResolvedConfig(
+          b, resolvedB, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+
+      assertEquals(ConfigApplyDisposition.LEFT_OFFLINE, result.disposition());
+      assertEquals(List.of("MODEL_LOAD_FAILED"), seenAtLanding,
+          "chat is down because A did not start again: that start's cause");
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      List<String> seenAtLanding = new java.util.concurrent.CopyOnWriteArrayList<>();
+      manager.addModeTransitionListener((from, to, reason) -> {
+        if (to == Mode.OFFLINE) seenAtLanding.add(String.valueOf(manager.lastChatFailedCode()));
+      });
+      server.failNextHealth(healthFailure("candidate B failed"));
+      server.failNextHealth(modelLoadExit());
+
+      assertThrows(ModeTransitionException.class, () -> manager.prepareResolvedConfig(b, resolvedB));
+
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      assertEquals(List.of("MODEL_LOAD_FAILED"), seenAtLanding);
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      assertNotNull(manager.chatActuator().failureLatch(), "the crash latched a failure");
+
+      // The same configuration: only the successful start can clear the latch.
+      var result = manager.applyResolvedConfig(
+          a, resolvedA, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+
+      assertEquals(ConfigApplyDisposition.APPLIED, result.disposition());
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertNull(manager.chatActuator().failureLatch());
+    }
+  }
+
+  @Test
+  void aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()
+      throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      assertNotNull(manager.chatActuator().failureLatch(), "the crash latched a failure");
+
+      var prepared = manager.prepareResolvedConfig(a, resolvedA);
+      prepared.withLifecycleLock(() -> {
+        prepared.validateForCommit();
+        prepared.installAfterSettingsCommit();
+      });
+      prepared.notifyAfterSettingsCommit();
+      prepared.retireAfterSettingsCommit();
+
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertNull(manager.chatActuator().failureLatch());
+    }
+  }
+
+  /** A start that exited on a model file llama-server could not load (Spec A §7.1). */
+  private static LlamaServerExitException modelLoadExit() {
+    return new LlamaServerExitException(ModeTransitionException.Reason.ONLINE_START_FAILED,
+        "llama-server exited (1): error loading model", 1,
+        new LlamaServerExitClassifier.Classification(LlamaServerExitClassifier.CrashClass.CONFIG,
+            FailedCode.MODEL_LOAD_FAILED, "error loading model"));
+  }
+
   private static EngineComponentSnapshot.Component component(
       ComponentState state, String applied, String desired, int attempts) {
     var spec = new ComponentSpec("generative", false, Set.of(),
@@ -1501,10 +1784,14 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var retained = server.active.get();
       assertNotNull(retained);
       assertSame(resolvedA, retained.context().resolved());
-      assertTrue(retained.context().inference().serverPort() != a.serverPort());
+      // ADR-0051 decision 2 / CH2: the managed launch binds its own fresh port, so detach no longer
+      // writes a substitute port into the configuration; the configured port is left as it was.
+      assertEquals(a.serverPort(), retained.context().inference().serverPort(),
+          "detach keeps the configured port; the launch chooses its own fresh port");
       assertEquals(LlamaServerOps.StartDisposition.LAUNCHED_MANAGED, retained.disposition());
-      assertEquals(LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
-          retained.adoptionPolicy());
+      // CH4: the strict witness policy refuses while an external endpoint is configured, so detach
+      // carries its own policy that always launches managed and never uses the external server.
+      assertEquals("MANAGED_DETACHED_FROM_EXTERNAL", retained.adoptionPolicy().name());
       assertTrue(failure.getMessage().contains("detach"));
       assertNotNull(failure.getCause());
       assertTrue(java.util.Arrays.asList(failure.getCause().getSuppressed()).contains(candidateFailure));
@@ -1544,11 +1831,30 @@ final class InferenceLifecycleManagerApplyConfigTest {
     return server;
   }
 
-  private static GenerativeRequestGate.Lease requestGateLease(
-      InferenceLifecycleManager manager) throws Exception {
+  /**
+   * An in-flight reply's lease: the manager's GENERATE admission. The test is also the
+   * no-adoption fail-before check, so on a tree without {@code admitExchange} it takes the request
+   * gate's lease instead (the same admission there).
+   */
+  private static AutoCloseable requestGateLease(InferenceLifecycleManager manager)
+      throws Exception {
+    for (var method : InferenceLifecycleManager.class.getMethods()) {
+      if (method.getName().equals("admitExchange") && method.getParameterCount() == 2) {
+        Object generate = null;
+        for (Object kind : method.getParameterTypes()[0].getEnumConstants()) {
+          if (((Enum<?>) kind).name().equals("GENERATE")) {
+            generate = kind;
+          }
+        }
+        return (AutoCloseable) method.invoke(manager, generate, null);
+      }
+    }
     var field = InferenceLifecycleManager.class.getDeclaredField("requestGate");
     field.setAccessible(true);
-    return ((GenerativeRequestGate) field.get(manager)).acquire();
+    Object gate = field.get(manager);
+    var acquire = gate.getClass().getDeclaredMethod("acquire");
+    acquire.setAccessible(true);
+    return (AutoCloseable) acquire.invoke(gate);
   }
 
   private static String expectedHash(InferenceConfig config, ResolvedConfig resolved) {
@@ -1583,6 +1889,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
     private final List<LlamaServerOps.StartRequest> starts = new ArrayList<>();
     private final ArrayDeque<ModeTransitionException> healthFailures = new ArrayDeque<>();
     private final AtomicReference<RuntimeException> stopFailure = new AtomicReference<>();
+    /** Spec B T21: the reason of every stop the manager asked for, in order. */
+    private final List<io.justsearch.app.api.runtime.child.StopReason> stopReasons =
+        new java.util.concurrent.CopyOnWriteArrayList<>();
     private final AtomicBoolean wrongNextHash = new AtomicBoolean();
     private final AtomicBoolean candidateAlive = new AtomicBoolean(true);
     private final MockedConstruction<LlamaServerOps> construction;
@@ -1622,6 +1931,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
                         });
                 doAnswer(
                         invocation -> {
+                          io.justsearch.app.api.runtime.child.StopRequest stop =
+                              invocation.getArgument(0);
+                          stopReasons.add(stop.reason());
                           RuntimeException failure = stopFailure.getAndSet(null);
                           if (failure != null) throw failure;
                           active.set(null);
@@ -1629,7 +1941,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
                           return null;
                         })
                     .when(server)
-                    .stopLlamaServer();
+                    .stopLlamaServer(any());
                 when(server.activeStartResult())
                     .thenAnswer(invocation -> Optional.ofNullable(active.get()));
                 when(server.recoveryStartRequest())

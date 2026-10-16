@@ -1,0 +1,97 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:59:42.993Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "806f127eba98166bc11776519b1c4132dfcb3626",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.deadlineTooShortForASemanticBudgetIsStillADeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchDoesNotWaitForModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchNeverTouchesTheSemanticBudget\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8172
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.aReSearchThatKeepsItsSemanticLegsIsApplied\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8279
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#deadlineTooShortForASemanticBudgetIsStillADeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deadlineTooShortForASemanticBudgetIsStillADeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchDoesNotWaitForModels",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lexicalOnlySearchDoesNotWaitForModels()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchNeverTouchesTheSemanticBudget",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c333e354e8998eb6b33a49d2af9f4a84f5ce2b4a4ba7aa19e9f0b219643c9ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lexicalOnlySearchNeverTouchesTheSemanticBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#aReSearchThatKeepsItsSemanticLegsIsApplied",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc54c3620492070e3e4eaed501c085918fed466cd949da3ded7b7acb40d8ebfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReSearchThatKeepsItsSemanticLegsIsApplied()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5788a20e33ba89b12665348b130380796ffd36db19d6b32ea87a2af5f17f76e5"
+}

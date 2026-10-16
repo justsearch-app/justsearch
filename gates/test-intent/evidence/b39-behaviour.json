@@ -1,0 +1,277 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-09T02:36:57.822Z",
+  "revision": "a600f71b616f9cd17ae2deefbecacd1427afd58c",
+  "tree": "0d4c7e85ffcea96754659263095ff93ee1eb8f69",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.readyAcrossAllModesPreservesQueueExpiry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.startingAcrossAllModesPreservesQueueExpiry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.absentAcrossAllModesPreservesAbsence\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.timelyFailedAcrossAllModesPreservesUnavailableOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.failedAcrossAllModesKeepsUnavailableOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.removedProviderAcrossAllModesKeepsAbsence\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 67529
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootEmbeddingFailureTest.embeddingFailureRetainsOriginalCause\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootEmbeddingFailureTest.inputCaptureFailureRetainsOriginalCause\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerAvailabilityTest.installedModelIsStartingBeforePublication\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerAvailabilityTest.failedLoadIsPublishedWithOriginalCause\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerAvailabilityTest.unconfiguredModelStaysAbsent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24705
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#readyAcrossAllModesPreservesQueueExpiry",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1698c88c14955bcbd305f4f554c68428e9b86b801ced846e3d54b09f235640c9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readyAcrossAllModesPreservesQueueExpiry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#startingAcrossAllModesPreservesQueueExpiry",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1698c88c14955bcbd305f4f554c68428e9b86b801ced846e3d54b09f235640c9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "startingAcrossAllModesPreservesQueueExpiry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#absentAcrossAllModesPreservesAbsence",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1698c88c14955bcbd305f4f554c68428e9b86b801ced846e3d54b09f235640c9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentAcrossAllModesPreservesAbsence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#timelyFailedAcrossAllModesPreservesUnavailableOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1698c88c14955bcbd305f4f554c68428e9b86b801ced846e3d54b09f235640c9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelyFailedAcrossAllModesPreservesUnavailableOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#failedAcrossAllModesKeepsUnavailableOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1698c88c14955bcbd305f4f554c68428e9b86b801ced846e3d54b09f235640c9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedAcrossAllModesKeepsUnavailableOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootEmbeddingFailureTest.java#embeddingFailureRetainsOriginalCause",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootEmbeddingFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0dc760b2fef4fd6a8c2dc5e28d8a097f852d262ce0805b6e0c150f6191a06ff4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "embeddingFailureRetainsOriginalCause(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootEmbeddingFailureTest.java#inputCaptureFailureRetainsOriginalCause",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootEmbeddingFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0dc760b2fef4fd6a8c2dc5e28d8a097f852d262ce0805b6e0c150f6191a06ff4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inputCaptureFailureRetainsOriginalCause(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java#installedModelIsStartingBeforePublication",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfa2cbcebed301731640953fd57746f2523269878587087d35361b46c060cd36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installedModelIsStartingBeforePublication()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java#failedLoadIsPublishedWithOriginalCause",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfa2cbcebed301731640953fd57746f2523269878587087d35361b46c060cd36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedLoadIsPublishedWithOriginalCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java#unconfiguredModelStaysAbsent",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfa2cbcebed301731640953fd57746f2523269878587087d35361b46c060cd36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unconfiguredModelStaysAbsent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#removedProviderAcrossAllModesKeepsAbsence",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1698c88c14955bcbd305f4f554c68428e9b86b801ced846e3d54b09f235640c9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "removedProviderAcrossAllModesKeepsAbsence()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a600f71b6",
+    "revision": "a600f71b616f9cd17ae2deefbecacd1427afd58c",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.readyAcrossAllModesPreservesQueueExpiry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.startingAcrossAllModesPreservesQueueExpiry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.absentAcrossAllModesPreservesAbsence\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.timelyFailedAcrossAllModesPreservesUnavailableOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.failedAcrossAllModesKeepsUnavailableOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest.removedProviderAcrossAllModesKeepsAbsence\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 72332
+      },
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootEmbeddingFailureTest.embeddingFailureRetainsOriginalCause\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootEmbeddingFailureTest.inputCaptureFailureRetainsOriginalCause\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerAvailabilityTest.installedModelIsStartingBeforePublication\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerAvailabilityTest.failedLoadIsPublishedWithOriginalCause\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerAvailabilityTest.unconfiguredModelStaysAbsent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27802
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#readyAcrossAllModesPreservesQueueExpiry",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#startingAcrossAllModesPreservesQueueExpiry",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#absentAcrossAllModesPreservesAbsence",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#timelyFailedAcrossAllModesPreservesUnavailableOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#failedAcrossAllModesKeepsUnavailableOutcome",
+        "classification": "assertion",
+        "detail": "failedAcrossAllModesKeepsUnavailableOutcome(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: All modes for FAILED (4 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: FAILED HYBRID ==> expected: <NO_EMBEDDING_SERVICE> but was: <SEMANTIC_BUDGET_EXCEEDED>&#13;&#10;&#9;org.opentest4j.AssertionFailedError: expected: <false> but was: <true>&#13;&#1"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootEmbeddingFailureTest.java#embeddingFailureRetainsOriginalCause",
+        "classification": "assertion",
+        "detail": "embeddingFailureRetainsOriginalCause(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: A failed embedding assembly must retain its actual load cause ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.indexerworker.server.InferenceSurface.embeddingFailure()"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootEmbeddingFailureTest.java#inputCaptureFailureRetainsOriginalCause",
+        "classification": "assertion",
+        "detail": "inputCaptureFailureRetainsOriginalCause(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Capture must retain the actual failure rather than only its text ==> Unexpected type, expected: <java.lang.Throwable> but was: <java.lang.String>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java#installedModelIsStartingBeforePublication",
+        "classification": "assertion",
+        "detail": "installedModelIsStartingBeforePublication(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <STARTING> but was: <ABSENT>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java#failedLoadIsPublishedWithOriginalCause",
+        "classification": "assertion",
+        "detail": "failedLoadIsPublishedWithOriginalCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <FAILED> but was: <ABSENT>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java#unconfiguredModelStaysAbsent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceAvailabilityTest.java#removedProviderAcrossAllModesKeepsAbsence",
+        "classification": "assertion",
+        "detail": "removedProviderAcrossAllModesKeepsAbsence(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: All modes for ABSENT (1 failure)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: expected: <NO_EMBEDDING_SERVICE> but was: <SEMANTIC_BUDGET_EXCEEDED>"
+      }
+    ]
+  },
+  "digest": "sha256:25c39ceb22634d5d4e12d42d91f93ae54bfa320aa3eba5018edbe39702b04b64"
+}

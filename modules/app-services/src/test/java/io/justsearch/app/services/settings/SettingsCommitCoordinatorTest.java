@@ -949,7 +949,10 @@ final class SettingsCommitCoordinatorTest {
             io.justsearch.configuration.resolved.ResolvedConfig desired,
             Map<String, Set<String>> affected, SettingsCandidateContext context) {
           assertEquals(Set.of("generative"), affected.keySet());
-          assertEquals(Set.of("chatProfile"), affected.get("generative"));
+          assertEquals("compact", desired.ai().chatProfile(),
+              "selected chat profile must be resolved before component preparation");
+          assertEquals(Set.of("chatProfile", "justsearch.chat.profile", "justsearch.vlm.model",
+              "justsearch.mmproj.model"), affected.get("generative"));
           seen.set(context);
           return new Prepared() {
             @Override public void includeObservation(
@@ -2218,5 +2221,44 @@ final class SettingsCommitCoordinatorTest {
     @Override public boolean admitCommit(SettingsCommitOwner.Receipt receipt) { return admit; }
     @Override public void committed(SettingsCommitOwner.Receipt receipt) { this.receipt = receipt; }
     @Override public void uncertain() {}
+  }
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksSettingsCommitAndNotExactReplay() throws Exception {
+    try (var operations = operations("status-counter")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          temp.resolve("counter-settings.json"));
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      SettingsComponentComposer components = (candidate, desired, affected) ->
+          new SettingsComponentComposer.Prepared() {
+            @Override public void includeObservation(io.justsearch.core.component.EngineComponentSnapshot.Component value) {}
+            @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
+            @Override public void validate() {}
+            @Override public void install() {}
+            @Override public void notifyObservers() {}
+            @Override public void retire() {}
+            @Override public void abort() {}
+          };
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(operations, owner);
+      var candidate = new UiSettings(); candidate.setChatEnabled(true);
+      var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
+      long before = statusCounter();
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(before + 1, statusCounter(), "canonical chat intent must invalidate at settings commit");
+      settings.inspect(); config.get();
+      runner.start(attempt, handle -> { throw new AssertionError("replay executed"); });
+      assertEquals(before + 1, statusCounter(), "exact replay and reads must not invalidate");
+    }
   }
 }

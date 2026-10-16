@@ -218,6 +218,87 @@ final class InferenceCapabilityWiringTest {
     assertNull(fixture.handle().snapshot().reasonCode());
   }
 
+  /*
+   * Spec A step 7: a crash that the controller classified as running out of memory is published as
+   * that failure. Before, every crash landing read "stopped unexpectedly" (inference.crashed).
+   */
+  @Test
+  void aCrashLatchedAsOutOfMemoryIsPublishedAsOutOfMemory() {
+    Fixture fixture = fixture(Mode.ONLINE, true, null);
+    when(fixture.manager().lastChatFailedCode())
+        .thenReturn(io.justsearch.app.api.chat.FailedCode.RESOURCE_EXHAUSTED);
+    fixture.mode().set(Mode.OFFLINE);
+    transitionListener(fixture.manager()).onModeTransition(
+        Mode.ONLINE, Mode.OFFLINE, TransitionReason.CRASH_RECOVERY);
+
+    assertEquals(ComponentState.FAILED, fixture.handle().snapshot().state());
+    assertEquals("inference.out_of_memory", fixture.handle().snapshot().reasonCode());
+  }
+
+  /*
+   * Spec A step 7: a first start that failed names its classified failure (here a model file that
+   * would not load) rather than the generic "failed to switch modes".
+   */
+  @Test
+  void aFailedActivationNamesItsClassifiedFailure() {
+    Fixture fixture = fixture(Mode.TRANSITIONING, true, null);
+    when(fixture.manager().lastChatFailedCode())
+        .thenReturn(io.justsearch.app.api.chat.FailedCode.MODEL_LOAD_FAILED);
+    fixture.mode().set(Mode.OFFLINE);
+    transitionListener(fixture.manager()).onModeTransition(
+        Mode.TRANSITIONING, Mode.OFFLINE, TransitionReason.AUTO_START);
+
+    assertEquals(ComponentState.FAILED, fixture.handle().snapshot().state());
+    assertEquals("inference.model_load_failed", fixture.handle().snapshot().reasonCode());
+  }
+
+  /*
+   * Spec A step 7: a latched failure never outlives the user's choice to turn chat off; the
+   * deactivation still reads as a deactivation.
+   */
+  @Test
+  void aLatchedFailureDoesNotOverrideTurningChatOff() {
+    RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
+    AtomicReference<Runnable> specListener = captureSpecListener(reconciler);
+    Fixture fixture = fixture(Mode.OFFLINE, true, reconciler);
+    when(fixture.manager().lastChatFailedCode())
+        .thenReturn(io.justsearch.app.api.chat.FailedCode.START_FAILED);
+
+    fixture.intent().spec().setChatEnabled(false);
+    specListener.get().run();
+
+    assertEquals(ComponentState.ABSENT, fixture.handle().snapshot().state());
+    assertEquals(LifecycleReasonCode.INFERENCE_DEACTIVATED.code(),
+        fixture.handle().snapshot().reasonCode());
+  }
+
+  /*
+   * Spec A §7.2: a server that serves after a step-down to a smaller context window carries the
+   * context_reduced notice; one at its planned window carries none.
+   */
+  @Test
+  void aSteppedDownServerIsReadyWithTheContextReducedNotice() {
+    Fixture stepped = fixture(Mode.OFFLINE, true, null);
+    when(stepped.manager().launchedContextWindow()).thenReturn(
+        new io.justsearch.app.api.OnlineAiRuntimeIntrospection.ContextWindow(
+            4096, "stepped-from:8192", null, 1, "q8_0"));
+    stepped.mode().set(Mode.ONLINE);
+    transitionListener(stepped.manager()).onModeTransition(
+        Mode.TRANSITIONING, Mode.ONLINE, TransitionReason.CRASH_RECOVERY);
+    assertEquals(ComponentState.READY, stepped.handle().snapshot().state());
+    assertEquals("inference.context_reduced", stepped.handle().snapshot().reasonCode());
+
+    Fixture planned = fixture(Mode.OFFLINE, true, null);
+    when(planned.manager().launchedContextWindow()).thenReturn(
+        new io.justsearch.app.api.OnlineAiRuntimeIntrospection.ContextWindow(
+            8192, "top-rung", null, 1, "q8_0"));
+    planned.mode().set(Mode.ONLINE);
+    transitionListener(planned.manager()).onModeTransition(
+        Mode.TRANSITIONING, Mode.ONLINE, TransitionReason.AUTO_START);
+    assertEquals(ComponentState.READY, planned.handle().snapshot().state());
+    assertNull(planned.handle().snapshot().reasonCode());
+  }
+
   private static AtomicReference<Runnable> captureSpecListener(RuntimeReconciler reconciler) {
     AtomicReference<Runnable> listener = new AtomicReference<>();
     doAnswer(invocation -> {

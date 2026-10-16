@@ -1,0 +1,306 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T21:19:30.152Z",
+  "revision": "61210e340dcc377c89509a840f6c9a76351a202f",
+  "tree": "052c6f02f45e22fd27f3df5d3a87ab0905045da2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.fencedAdmissionDoesNotSpinResidencyRetries\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.combinedPressureUsesProfileSpecificReason\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.overlappingLeasesResumeOnlyAfterTheLastClose\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.bothPressureSourcesCanArriveAndClearInEitherOrder\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.theRemainingPressureSourceDecidesAfterTheOtherClears\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16374
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#fencedAdmissionDoesNotSpinResidencyRetries",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fencedAdmissionDoesNotSpinResidencyRetries()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#combinedPressureUsesProfileSpecificReason",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "combinedPressureUsesProfileSpecificReason(P8, game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "combinedPressureUsesProfileSpecificReason(P12, game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "combinedPressureUsesProfileSpecificReason(P16_PLUS, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "combinedPressureUsesProfileSpecificReason(NO_GPU, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "combinedPressureUsesProfileSpecificReason(UNRESOLVED, gpu_busy)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#overlappingLeasesResumeOnlyAfterTheLastClose",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingLeasesResumeOnlyAfterTheLastClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload(true)",
+          "status": "passed"
+        },
+        {
+          "name": "pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload(false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#bothPressureSourcesCanArriveAndClearInEitherOrder",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bothPressureSourcesCanArriveAndClearInEitherOrder(GAME, GAME)",
+          "status": "passed"
+        },
+        {
+          "name": "bothPressureSourcesCanArriveAndClearInEitherOrder(GAME, EXTERNAL_MEMORY)",
+          "status": "passed"
+        },
+        {
+          "name": "bothPressureSourcesCanArriveAndClearInEitherOrder(EXTERNAL_MEMORY, GAME)",
+          "status": "passed"
+        },
+        {
+          "name": "bothPressureSourcesCanArriveAndClearInEitherOrder(EXTERNAL_MEMORY, EXTERNAL_MEMORY)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#theRemainingPressureSourceDecidesAfterTheOtherClears",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P12, GAME, GAME)",
+          "status": "passed"
+        },
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P12, GAME, EXTERNAL_MEMORY)",
+          "status": "passed"
+        },
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P12, EXTERNAL_MEMORY, GAME)",
+          "status": "passed"
+        },
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P12, EXTERNAL_MEMORY, EXTERNAL_MEMORY)",
+          "status": "passed"
+        },
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P16_PLUS, GAME, GAME)",
+          "status": "passed"
+        },
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P16_PLUS, GAME, EXTERNAL_MEMORY)",
+          "status": "passed"
+        },
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P16_PLUS, EXTERNAL_MEMORY, GAME)",
+          "status": "passed"
+        },
+        {
+          "name": "theRemainingPressureSourceDecidesAfterTheOtherClears(P16_PLUS, EXTERNAL_MEMORY, EXTERNAL_MEMORY)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "83b5d54cf",
+    "revision": "83b5d54cf4ef3bb6203a004e7546c980fb34ecce",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.fencedAdmissionDoesNotSpinResidencyRetries\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.combinedPressureUsesProfileSpecificReason\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.overlappingLeasesResumeOnlyAfterTheLastClose\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.bothPressureSourcesCanArriveAndClearInEitherOrder\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.theRemainingPressureSourceDecidesAfterTheOtherClears\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 46610
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce",
+        "classification": "assertion",
+        "detail": "stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a rejected callback must not lose the only wakeup under unchanged pressure ==> expected: <[unload:gpu_busy]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread",
+        "classification": "assertion",
+        "detail": "rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an immediate registration notification may be rejected on the controller thread ==> expected: <[unload:gpu_busy]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#fencedAdmissionDoesNotSpinResidencyRetries",
+        "classification": "assertion",
+        "detail": "fencedAdmissionDoesNotSpinResidencyRetries(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a recovery fence is not an open lease and supplies no lease-close retry ==> expected: <1> but was: <5>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#combinedPressureUsesProfileSpecificReason",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#overlappingLeasesResumeOnlyAfterTheLastClose",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#bothPressureSourcesCanArriveAndClearInEitherOrder",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#theRemainingPressureSourceDecidesAfterTheOtherClears",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d63bfc601c2481231b9a0ba9b91e0712410de4bea93b0d62c60ab7e0293d2d20"
+}

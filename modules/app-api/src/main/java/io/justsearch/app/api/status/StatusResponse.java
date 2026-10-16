@@ -4,6 +4,7 @@ package io.justsearch.app.api.status;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
+import io.justsearch.app.api.status.operating.OperatingStateView;
 
 /**
  * Top-level response record for the /api/status endpoint.
@@ -89,7 +90,10 @@ public record StatusResponse(
     TelemetryHealthView telemetryHealth,
 
     // 333 §5: Freshness and provenance metadata
-    StatusMeta meta) {
+    StatusMeta meta,
+
+    // ADR-0050: chat, indexing and GPU operating state, assembled in the same sampler pass.
+    OperatingStateView operating) {
 
   public StatusResponse {
     observedAt = observedAt == null ? "" : observedAt;

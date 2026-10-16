@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T21:53:51.665Z",
+  "revision": "61210e340dcc377c89509a840f6c9a76351a202f",
+  "tree": "a0e499665ddaee4c9e1f09fe44dee255f8b42549",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameWithMemoryPressureBelowSixteenGigabytesUnloadsForTheGame\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20619
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#gameWithMemoryPressureBelowSixteenGigabytesUnloadsForTheGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gameWithMemoryPressureBelowSixteenGigabytesUnloadsForTheGame()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b384bc78e0b1ce388c823c366c02a261e4ecd14fed87d70a26063c2117f9dd70"
+}

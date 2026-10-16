@@ -1,0 +1,121 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T13:51:58.838Z",
+  "revision": "429efb084be2b6d7c88f38f5728b61c3abc74ade",
+  "tree": "04006e089db11ba3d9f86b6c8af04d7aa8668c8a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGenerationDutyTest.generationOnAGpuProfileRunsAtFiftyPercent\" --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGenerationDutyTest.generationOffAGpuProfileKeepsTodaysDuty\" --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGenerationDutyTest.searchDutyGovernsWhenBothAreBusy\" --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGenerationDutyTest.noInputNoYield\" --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGenerationDutyTest.generationEndingMidYieldReleases\" --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGenerationDutyTest.searchEndingMidYieldDropsToTheGenerationCap\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3608
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java#generationOnAGpuProfileRunsAtFiftyPercent",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f8414e5d7171fe49a59a15ca8a0eeee9a33872eacc6a2a811fb10be2aac9ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationOnAGpuProfileRunsAtFiftyPercent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java#generationOffAGpuProfileKeepsTodaysDuty",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f8414e5d7171fe49a59a15ca8a0eeee9a33872eacc6a2a811fb10be2aac9ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationOffAGpuProfileKeepsTodaysDuty()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java#searchDutyGovernsWhenBothAreBusy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f8414e5d7171fe49a59a15ca8a0eeee9a33872eacc6a2a811fb10be2aac9ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchDutyGovernsWhenBothAreBusy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java#noInputNoYield",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f8414e5d7171fe49a59a15ca8a0eeee9a33872eacc6a2a811fb10be2aac9ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noInputNoYield()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java#generationEndingMidYieldReleases",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f8414e5d7171fe49a59a15ca8a0eeee9a33872eacc6a2a811fb10be2aac9ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationEndingMidYieldReleases()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java#searchEndingMidYieldDropsToTheGenerationCap",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGenerationDutyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f8414e5d7171fe49a59a15ca8a0eeee9a33872eacc6a2a811fb10be2aac9ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchEndingMidYieldDropsToTheGenerationCap()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:73ac31fa8ef69f97a50433592b3ed31925045ec055a9fe8c742842904bc899d4"
+}

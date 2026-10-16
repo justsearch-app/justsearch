@@ -1,0 +1,586 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:49:21.543Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/autoTitleActivity.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.ask.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts\" \"src/shell-v0/state/conversationListStore.test.ts\" \"src/shell-v0/state/legacyTitleAdoptionRaces.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-18020-1791992922195.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 15913
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/autoTitleActivity.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/autoTitleActivity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:576eef7a03f64bbe066532df8436b79089403071727633712106893a2765905e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the roles are really read: a person's own chat dispatch is the activity this guards",
+          "status": "passed"
+        },
+        {
+          "name": "an untouched window after an answer — list refresh and automatic naming — sends nothing that counts as a person acting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+      "file": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1269311a0afa3d459d302c0054b24112afafd219236d34d2ce3c4f0d6b97ae04",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mount, render, timers, and corpus-growth updates send only observations with no person acting",
+          "status": "passed"
+        },
+        {
+          "name": "an untouched shell open on Library: mount, reload, timers, streams, status delivery and a resting pointer send no USER_ACTION request and no presence signal",
+          "status": "passed"
+        },
+        {
+          "name": "an untouched Search v3 window after an answer: the refresh and the automatic name it starts by itself send no USER_ACTION request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cf8c64d14d04b5dc3a9ef22571f7b1642f956498ee3126bd019fe7f2cd74514",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window has exactly ONE ask-issuance site lets no file but sv3-ask.ts consume the shared shape stream",
+          "status": "passed"
+        },
+        {
+          "name": "a send asks the local model, once, through the one site dispatches the shape with the question and this session as the conversation",
+          "status": "passed"
+        },
+        {
+          "name": "a send asks the local model, once, through the one site sends on Enter and leaves Shift+Enter to the field",
+          "status": "passed"
+        },
+        {
+          "name": "a send asks the local model, once, through the one site empties the draft on a send that was accepted",
+          "status": "passed"
+        },
+        {
+          "name": "the transcript is the session, in order renders each turn as question-then-answer, oldest first, and appends deltas as they arrive",
+          "status": "passed"
+        },
+        {
+          "name": "the primary slot renders exactly one of Send and Stop is Send while idle and Stop while a response streams — never both",
+          "status": "passed"
+        },
+        {
+          "name": "the primary slot renders exactly one of Send and Stop halts on Stop, keeps what streamed, and says the reader stopped it",
+          "status": "passed"
+        },
+        {
+          "name": "every terminal is distinct, and says only what happened words the session lock through the shared vocabulary, not a local phrase",
+          "status": "passed"
+        },
+        {
+          "name": "every terminal is distinct, and says only what happened reports a failure with the stream's own words, and never as a halt",
+          "status": "passed"
+        },
+        {
+          "name": "every terminal is distinct, and says only what happened says an empty completed response is empty rather than leaving a blank slot",
+          "status": "passed"
+        },
+        {
+          "name": "an unreachable model refuses the send and keeps the draft shows the availability authority's reason and dispatches nothing",
+          "status": "passed"
+        },
+        {
+          "name": "an unreachable model refuses the send and keeps the draft drops the notice once the model is available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0318f0989afe9ffb513ee86c0692187c9411b1afdc8d8880798fec5ea03f491c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a lock taken ELSEWHERE reaches this window, and locks the transcript picks the lock up from the poll and makes the transcript unreadable",
+          "status": "passed"
+        },
+        {
+          "name": "a lock taken ELSEWHERE reaches this window, and locks the transcript gives the reader the cause's own remedy, and navigates through the one seam",
+          "status": "passed"
+        },
+        {
+          "name": "a lock taken ELSEWHERE reaches this window, and locks the transcript gives the transcript back when the lock lifts, and drops the refusal with it",
+          "status": "passed"
+        },
+        {
+          "name": "a lock taken ELSEWHERE reaches this window, and locks the transcript does not unlock itself on a snapshot that never mentions the lock",
+          "status": "passed"
+        },
+        {
+          "name": "a lock taken ELSEWHERE reaches this window, and locks the transcript says what became of a send the lock refused, without claiming to have kept the text",
+          "status": "passed"
+        },
+        {
+          "name": "a settled answer carries its basis, its duration and its model derives the whole line — the wording from the shared authority, the model from the snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "a settled answer carries its basis, its duration and its model re-states the model in the tail when it is NOT the one the composer names",
+          "status": "passed"
+        },
+        {
+          "name": "a settled answer carries its basis, its duration and its model says nothing about grounding when the answer IS grounded — the marks already do",
+          "status": "passed"
+        },
+        {
+          "name": "a settled answer carries its basis, its duration and its model frames nothing while the answer is still arriving",
+          "status": "passed"
+        },
+        {
+          "name": "the inline marks are the SHARED resolver's output, and they preview on hover hands the markdown block exactly what claimsToCitations resolved — nothing ad hoc",
+          "status": "passed"
+        },
+        {
+          "name": "the inline marks are the SHARED resolver's output, and they preview on hover shows the product's ONE hover card, from the mark's own source",
+          "status": "passed"
+        },
+        {
+          "name": "the inline marks are the SHARED resolver's output, and they preview on hover shows nothing for an event carrying no resolved source",
+          "status": "passed"
+        },
+        {
+          "name": "the inline marks are the SHARED resolver's output, and they preview on hover mints NO mark from a lexical citation_delta, whatever its word-overlap score says",
+          "status": "passed"
+        },
+        {
+          "name": "the inline marks are the SHARED resolver's output, and they preview on hover keeps the verified score when BOTH producers scored one sentence (no cross-scale max)",
+          "status": "passed"
+        },
+        {
+          "name": "the inline marks are the SHARED resolver's output, and they preview on hover a doubly-matched sentence resolves through the VERIFIED ref, not the delta that arrived first",
+          "status": "passed"
+        },
+        {
+          "name": "the inline marks are the SHARED resolver's output, and they preview on hover an out-of-range index mints NO mark — no wrong-target link is constructible",
+          "status": "passed"
+        },
+        {
+          "name": "the question retrieval actually ran on is shown back renders the rewrite as a transparency note, and keeps it past the stream",
+          "status": "passed"
+        },
+        {
+          "name": "the question retrieval actually ran on is shown back shows no note when the backend rewrote nothing",
+          "status": "passed"
+        },
+        {
+          "name": "the model's thinking is its own block, never mixed into the answer renders the shared block while thinking and keeps it on the settled turn",
+          "status": "passed"
+        },
+        {
+          "name": "the model's thinking is its own block, never mixed into the answer a record refresh never blanks the thinking the window observed (tempdoc 848)",
+          "status": "passed"
+        },
+        {
+          "name": "the model's thinking is its own block, never mixed into the answer renders no block at all for a turn the model did not think out loud in",
+          "status": "passed"
+        },
+        {
+          "name": "a stream failure is worded by the shared mapping, and an abort is not a failure maps an interrupted stream to the shared sentence",
+          "status": "passed"
+        },
+        {
+          "name": "a stream failure is worded by the shared mapping, and an abort is not a failure never routes the reader's own Stop through that mapping",
+          "status": "passed"
+        },
+        {
+          "name": "the landing says what there is to search, or offers the way to get some states the default-scope population when there is one",
+          "status": "passed"
+        },
+        {
+          "name": "the landing says what there is to search, or offers the way to get some offers the remedy on a REPORTED zero, and navigates to the surface that owns it",
+          "status": "passed"
+        },
+        {
+          "name": "the landing says what there is to search, or offers the way to get some claims nothing before a settled poll — the case the shipped landing gets wrong",
+          "status": "passed"
+        },
+        {
+          "name": "the landing says what there is to search, or offers the way to get some spends no chrome on the corpus once the window is working",
+          "status": "passed"
+        },
+        {
+          "name": "an answer can be copied and a conversation exported, through the shared utilities copies the settled answer and confirms it",
+          "status": "passed"
+        },
+        {
+          "name": "an answer can be copied and a conversation exported, through the shared utilities offers no copy for a turn with no settled answer to copy",
+          "status": "passed"
+        },
+        {
+          "name": "an answer can be copied and a conversation exported, through the shared utilities exports the conversation as the SHARED serialisation, from the palette",
+          "status": "passed"
+        },
+        {
+          "name": "an answer can be copied and a conversation exported, through the shared utilities exports nothing when there is no claimed conversation",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it asks the store's naming authority once the first answer has landed",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it never asks twice for the same conversation",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it NEVER names a conversation the reader named first — the rename wins",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it still names the NEXT conversation, so the guard is a refusal and not a breakage",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it writes the reader's name back when they rename while the model is still naming it",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it a late automatic title never writes this window's rename over a newer rename from another tab",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it never re-names a conversation the reader named BEFORE a reload (tempdoc 838)",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation gets a model-generated name, and a rename beats it does not name a conversation whose only turn was stopped by the reader",
+          "status": "passed"
+        },
+        {
+          "name": "this window re-splits no word the product has already settled spends no copy on \"offline\" at all (tempdoc 813 §6; inventory E8)",
+          "status": "passed"
+        },
+        {
+          "name": "this window re-splits no word the product has already settled keeps the composer model label to IDENTITY, never a second sense of \"offline\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323d7e3b5e6842c00268df2b3f0508b0af2f8eca262cb751d247c16d621425a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Tempdoc 610 Phase B — siblingSessionsAt returns the base alone when there are no branches",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase B — siblingSessionsAt orders base first, then branches at the same fork by creation time",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase B — siblingSessionsAt groups empty-prefix (first-message) edits under the sentinel key",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching branchConversation POSTs the branch endpoint with fromMsgId and returns new sessionId",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching branchConversation URL-encodes parent + msgId path segments",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching branchConversation returns null on non-2xx response",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching branchConversation returns null when response lacks sessionId",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching branchConversation returns null on network error",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching fetchMessageIds returns the message list with ids",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching fetchMessageIds returns null on non-2xx",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching fetchMessageIds returns null on network error",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching resumeConversation surfaces parentSessionId + branchPointMessageId when the backend includes them",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching resumeConversation CLAIMS the active conversation by default, and not when the caller declines",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching 941 — resumeConversation preserves per-message shape data reads the top-level per-message shapeId the store stamps",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching 941 — resumeConversation preserves per-message shape data also accepts the unified-thread spelling (attributes.shapeId)",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching 941 — resumeConversation preserves per-message shape data leaves shapeId absent for a pre-863 row, and for a blank one",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching 941 — resumeConversation preserves per-message shape data 941 review — returns the TRIMMED value, so a padded shapeId still narrows",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching 941 — resumeConversation preserves per-message shape data carries rag.standaloneQuestion when the record has it, under either spelling",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching resumeConversation omits parent pointers for a root session",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching Slice 516 FIX-T5: resumeConversation surfaces parentFirstUserMessage from response",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching Slice 516 FIX-T5: branchConversation records the new session as recent (when preview supplied)",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching Slice 516 FIX-T5: branchConversation does NOT record when no preview is supplied",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching Tempdoc 562: recordRecentSession stores ONLY the pointer (no message content)",
+          "status": "passed"
+        },
+        {
+          "name": "conversationListStore branching Tempdoc 562: getRecentSessions purges legacy cached plaintext at rest",
+          "status": "passed"
+        },
+        {
+          "name": "deleteConversationWithCascade (Slice 517 FIX-U1) happy path: 2xx delete returns ok:true and clears local state",
+          "status": "passed"
+        },
+        {
+          "name": "deleteConversationWithCascade (Slice 517 FIX-U1) 409 without onChildsFound callback returns ok:false with childIds",
+          "status": "passed"
+        },
+        {
+          "name": "deleteConversationWithCascade (Slice 517 FIX-U1) 409 with onChildsFound returning false leaves parent + children intact",
+          "status": "passed"
+        },
+        {
+          "name": "deleteConversationWithCascade (Slice 517 FIX-U1) 409 with onChildsFound returning true cascades: children first, then parent",
+          "status": "passed"
+        },
+        {
+          "name": "deleteConversationWithCascade (Slice 517 FIX-U1) cascade aborts if a child delete fails — parent stays intact",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend renames optimistically, then POSTs the name and its provenance",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend drops a retained name another window settled, and shows the name the server keeps",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend URL-encodes the session id and carries an auto-title as `auto`",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend REVERTS the row when the store refuses, and reports the status so the caller can word it",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend reverts on an unreachable Head too, and calls that status 0",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend holds a name the conversation was too young for (404) and re-sends it on the next list",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend adopts a legacy browser-local title, then ERASES the key — the migration completes",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend does NOT erase a legacy title the locked store refused, and stops re-POSTing it",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend drops a legacy entry the backend has already outgrown, without a second write",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend reads title + provenance off the wire, and narrows an unknown provenance to none",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 835 §10f — auto-title generation is plumbing, not an answer asks the conversation's own auto-title route, with no prompt and no throwaway turn",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 835 §10f — auto-title generation is plumbing, not an answer waits out a busy chat lane and asks again, so the name still arrives",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 835 §10f — auto-title generation is plumbing, not an answer a name a closed window left unsettled is asked for again on the next list load, once",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 835 §10f — auto-title generation is plumbing, not an answer recentPendingAutoTitleResumesAfterReloadWithoutFurtherInput",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 835 §10f — auto-title generation is plumbing, not an answer stops on an answer waiting cannot change, and never overrides a name the server kept",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 859 slice C PR-2 — the list joins a second record, so a row can be run-backed reads a synthesized delegate row without inventing a message count",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 859 slice C PR-2 — the list joins a second record, so a row can be run-backed treats a row with no storeBacked key as store-backed, so every existing row is unchanged",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/legacyTitleAdoptionRaces.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/legacyTitleAdoptionRaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9e793e57b26c70a8678f7932adfcfd58606c3d26f023e169c0b1b8172f39f326",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "verify-vdu8 legacy title adoption races L11 the local copy stays until a list answer requested after the write reflects it",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu8 legacy title adoption races L12 a failed adoption write (500) keeps the local copy and the shown title; a later reload and input retries",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu8 legacy title adoption races L13 a rename of the SAME conversation made while its adoption is in flight wins on the server, on screen and after reload",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu8 legacy title adoption races L14 every list state from the first input on shows the retained title (no flash of the first message)",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu8 legacy title adoption races L15 two tabs: a rename made in tab B after B adopted is not overwritten when the person later acts in tab A",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu8 legacy title adoption races L16 (record) two tabs acting while the first adoption is still in transit: final server title and number of writes",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu8 legacy title adoption races L17 (record) tab B renames while its own adoption is in transit and tab A acts before B confirms",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "80f03cb54",
+    "revision": "80f03cb5459825e0e32660b386a87b624da9a450",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/autoTitleActivity.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.ask.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts\" \"src/shell-v0/state/conversationListStore.test.ts\" \"src/shell-v0/state/legacyTitleAdoptionRaces.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-18020-1791992944356.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13535
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/autoTitleActivity.test.ts",
+        "classification": "assertion",
+        "detail": "an untouched window after an answer — list refresh and automatic naming — sends nothing that counts as a person acting:  AssertionError: every request the window makes by itself after an answer must be an observation: expected [ …(3) ] to deeply equal []\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-Up5d8R/modules/ui-web/src/shell-v0/state/autoTitleActivity.test.ts:93:86\n    at file:///F:/justs"
+      },
+      {
+        "id": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+        "classification": "assertion",
+        "detail": "an untouched Search v3 window after an answer: the refresh and the automatic name it starts by itself send no USER_ACTION request:  AssertionError: an untouched window sends no USER_ACTION request after an answer: expected [ 'POST /api/chat/dispatch', …(2) ] to deeply equal []\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-Up5d8R/modules/ui-web/src/activity/idleSurfaces.test.ts:323:71\n    at file:///F:/jus"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+        "classification": "assertion",
+        "detail": "a send asks the local model, once, through the one site dispatches the shape with the question and this session as the conversation:  AssertionError: expected [ [ …(2) ], [ …(2) ] ] to have a length of 1 but got 2\n    at Proxy.<anonymous> (file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb-2-ui/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///F:/justsearch-public/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+        "classification": "assertion",
+        "detail": "a conversation gets a model-generated name, and a rename beats it asks the store's naming authority once the first answer has landed:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb-2-ui/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///F:/justsearch-public/.claude/worktrees/b6d536-p | a conversation gets a model-generated name, and a rename beats"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+        "classification": "assertion",
+        "detail": "tempdoc 838 — conversation titles are written through to the backend drops a retained name another window settled, and shows the name the server keeps:  AssertionError: expected 'Legacy' to be 'Person chose this' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-Up5d8R/modules/ui-web/src/shell-v0/state/conversationListStore.test.ts:574:66\n    at Timeout.checkCallback (file:///F:/justsearch-public/.claude/wor | tempdoc 835 §10f — auto-title generation is "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/legacyTitleAdoptionRaces.test.ts",
+        "classification": "assertion",
+        "detail": "verify-vdu8 legacy title adoption races L13 a rename of the SAME conversation made while its adoption is in flight wins on the server, on screen and after reload:  AssertionError: expected 'Legacy' to be 'Person chose this' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-Up5d8R/modules/ui-web/src/shell-v0/state/legacyTitleAdoptionRaces.test.ts:106:70\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-phaseb | verify-vdu8 legacy title adoption"
+      }
+    ]
+  },
+  "digest": "sha256:9c04dd8c8da4d272142dcfa96e881b4b61ac46bea70a6777140ec81f276ad864"
+}

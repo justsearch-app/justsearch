@@ -44,7 +44,7 @@ final class HeadHealthEventsEmitterTest {
   @BeforeEach
   void setUp() {
     occurrences = new OccurrenceLog();
-    changes = new HealthEventChangeRegistry();
+    changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     listener = new RecordingListener();
     changes.subscribeTyped(listener);
     clock = Clock.fixed(T0, ZoneId.of("UTC"));

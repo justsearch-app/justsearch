@@ -96,6 +96,7 @@ import {
   PROBE_OBSERVATION,
   classifyInferenceOrphan,
   observeDirectoryEntries,
+  observeRecordedInference,
   observeOptionalJsonFile,
   observePath,
   probeLoopbackHttpStatus,
@@ -177,6 +178,7 @@ const {
   resolveForeignRegisterDir,
   readForeignRegister,
   probeForeignRuns,
+  recordedLlamaServers,
 } = _ownReq('../lib/process-record.cjs');
 
 /** Read non-expired op-leases (mirrors the dev-runner filter) and bucket by criticality. */
@@ -626,8 +628,19 @@ async function resolveApiBaseUrl({ runId, apiPort, mainRepoRoot }) {
   return { ok: true, apiBaseUrl, runId: result.runId, chatProfile };
 }
 
-/** Default inference server port (llama-server). Read once at module load. */
-const INFERENCE_PORT = parseInt(process.env.JUSTSEARCH_SERVER_PORT, 10) || 8080;
+/**
+ * Data dirs whose runtime manifest may record a llama-server child: the run's own (when a run
+ * record names one), then the dev-runner default (`modules/ui-web/.dev-data`) of this checkout and
+ * of the main checkout. llama-server has no fixed port (ADR-0051 decision 2); its record does.
+ */
+export function inferenceRecordDataDirs({ runJson, repoRoot, mainRepoRoot }) {
+  const dirs = [];
+  if (typeof runJson?.dataDir === 'string' && runJson.dataDir) dirs.push(path.resolve(runJson.dataDir));
+  for (const root of [repoRoot, mainRepoRoot]) {
+    if (root) dirs.push(path.resolve(root, 'modules', 'ui-web', '.dev-data'));
+  }
+  return [...new Set(dirs)];
+}
 
 /* ── Tempdoc 844 B4a — honest JSON projection ──────────────────────────────────────────────── */
 
@@ -1091,7 +1104,10 @@ export async function checkRunMutationOwnership({
   const { ownership, decision } = await buildOwnershipProjection({
     mainRepoRoot, callerRepoRoot, callerIdentity, takeover, active, runJson, evidence: 'full', stateRoot,
   });
-  if (decision && decision.action === 'conflict') {
+  // `takeover_denied` refuses a start that would stop another owner's stale stack. A call that
+  // mutates the run (stop, reload) is not a takeover, so it keeps its earlier disposition, as
+  // dev-runner's assertMayMutateRun does.
+  if (decision && decision.action === 'conflict' && decision.reason !== 'takeover_denied') {
     const idle = decision.verdict === 'IDLE_HOLD';
     return {
       allowed: false,
@@ -1279,7 +1295,8 @@ export async function main() {
         'Common errors:',
         '- NO_ACTIVE_RUN: call start, then retry.',
         '- OWNER_CONFLICT: another agent owns the stack. Call quick_health to see the owner,',
-        '  then ask the user before retrying with takeover: "warn".',
+        '  then ask the user before retrying with takeover: "warn". An idle, dead or abandoned owner',
+        '  needs no approval: its actionRequired says to retry with takeover: "warn" directly.',
         '  If the message says the stack is your own, an operation is running in it (named in the',
         '  message and criticalOps): wait for it to finish, or restart with takeover: "force"',
         '  (an UNSAFE_TO_INTERRUPT operation also needs --confirm-interrupt=<opId>, a dev-runner CLI flag).',
@@ -1340,6 +1357,7 @@ export async function main() {
           const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
           if (decision && decision.action === 'conflict') {
             const idle = decision.verdict === 'IDLE_HOLD';
+            const stale = decision.reason === 'takeover_denied';
             return toToolResult({
               ok: false,
               error: {
@@ -1349,10 +1367,13 @@ export async function main() {
               ownership,
               actionRequired: idle
                 ? 'Owner is idle — retry with takeover: "warn" (no user approval needed).'
-                : 'Ask the user before retrying with takeover: "warn".',
+                : stale
+                  ? 'Previous ownership is dead or abandoned — retry with takeover: "warn" to reclaim it (no user approval needed).'
+                  : 'Ask the user before retrying with takeover: "warn".',
             });
           }
-          // decision.action === 'proceed' (abandoned / dead / no-owner / self) → fall through to start.
+          // decision.action === 'proceed' (no-owner / self) → fall through to start. A dead or
+          // abandoned foreign stack needs an explicit takeover: deny never stops another's processes.
         } catch (_) { /* active.json missing or unreadable — proceed to start */ }
       }
 
@@ -1462,6 +1483,19 @@ export async function main() {
           ok: false, conflict: true,
         });
         return toToolResult(parsed);
+      }
+
+      // Spec F §5.3 (X09-F5): the takeover's stop of the previous stack did not end it; nothing
+      // was started and the previous stack may still be (partly) running.
+      if (!parsed.ok && parsed.error?.code === 'TAKEOVER_STOP_FAILED') {
+        maybeAppendNdjson(mainRepoRoot, {
+          event: 'tool_start_result', tool: 'justsearch.dev.start',
+          ok: false, takeoverStopFailed: true,
+        });
+        return toToolResult({
+          ...parsed,
+          actionRequired: 'Call quick_health (detail: "full") to see what is still running, then stop it before retrying.',
+        });
       }
 
       // After successful start, wait for readiness if requested
@@ -2108,6 +2142,7 @@ export async function main() {
       }
 
       // 2. No stale or active run
+      let recordedRunJson = null;
       const activeObservation = await observeOptionalJsonFile({
         repoRoot: mainRepoRoot,
         relPosix: 'tmp/dev-runner/active.json',
@@ -2148,6 +2183,7 @@ export async function main() {
                 + `${runObservation.error?.message || 'no readable run record'}`,
             );
           } else {
+            recordedRunJson = runObservation.value;
             const pids = runObservation.value?.pids || {};
             const anyAlive = Object.values(pids).some((pid) => {
               if (typeof pid !== 'number' || pid <= 0) return false;
@@ -2195,26 +2231,36 @@ export async function main() {
         );
       }
 
-      // 4. Inference port available. A response proves occupancy, not listener identity.
-      const inferenceObservation = await probeLoopbackHttpStatus(
-        `http://127.0.0.1:${INFERENCE_PORT}/health`,
-        { timeoutMs: 2_000 },
-      );
+      // 4. No recorded llama-server still answers. llama-server binds a fresh port per launch
+      // (ADR-0051 decision 2), so each one recorded in a runtime manifest is probed on its own
+      // port. A response proves occupancy, not listener identity.
+      const inferenceObservation = await observeRecordedInference({
+        recorded: await recordedLlamaServers(
+          inferenceRecordDataDirs({ runJson: recordedRunJson, repoRoot, mainRepoRoot })),
+      });
       if (inferenceObservation.state === PROBE_OBSERVATION.REFUSED) {
-        setCheck('noInferenceOrphan', 'PASS', `OK (connection refused on port ${INFERENCE_PORT})`);
+        const looked = inferenceObservation.recordedPorts;
+        setCheck(
+          'noInferenceOrphan',
+          'PASS',
+          looked.length > 0
+            ? `OK (connection refused on recorded llama-server port(s) ${looked.join(', ')})`
+            : 'OK (no llama-server recorded in a runtime manifest)',
+        );
       } else if (inferenceObservation.state === PROBE_OBSERVATION.REACHABLE) {
         setCheck(
           'noInferenceOrphan',
           'FAIL',
-          `A listener answered on inference port ${INFERENCE_PORT} (HTTP ${inferenceObservation.statusCode ?? '?'}). `
+          `A recorded llama-server (pid ${inferenceObservation.pid ?? '?'}) still answers on port `
+            + `${inferenceObservation.port} (HTTP ${inferenceObservation.statusCode ?? '?'}). `
             + 'Do not assume the port/GPU is free; identify its owning process before cleanup.',
         );
       } else {
         setCheck(
           'noInferenceOrphan',
           'UNKNOWN',
-          `Could not determine whether port ${INFERENCE_PORT} is free (${inferenceObservation.state}): `
-            + `${inferenceObservation.error?.message || 'probe failed'}`,
+          `Could not determine whether recorded llama-server port ${inferenceObservation.port} is free `
+            + `(${inferenceObservation.state}): ${inferenceObservation.error?.message || 'probe failed'}`,
         );
       }
 
@@ -2412,12 +2458,15 @@ export async function main() {
         }
       }
 
-      // Observe inference-port availability when no active run is proven or its backend is dead.
+      // Recorded llama-servers, each on its own recorded port (ADR-0051 decision 2: no fixed port).
+      const recordedInference = probe
+        ? await recordedLlamaServers(
+          inferenceRecordDataDirs({ runJson: activeRunJson, repoRoot, mainRepoRoot }))
+        : [];
+
+      // Observe them when no active run is proven or its backend is dead.
       if (probe && (runState !== 'ACTIVE' || httpReady === false)) {
-        const inferenceObservation = await probeLoopbackHttpStatus(
-          `http://127.0.0.1:${INFERENCE_PORT}/health`,
-          { timeoutMs: 2_000 },
-        );
+        const inferenceObservation = await observeRecordedInference({ recorded: recordedInference });
         probes.inference = inferenceObservation;
         inferenceOrphan = classifyInferenceOrphan({
           inferenceObservation,
@@ -2472,6 +2521,7 @@ export async function main() {
         ownedRunState: runState,
         ownedApiPort: apiPort,
         aiActive,
+        inferencePorts: recordedInference.map((r) => r.port),
         registerDir: resolveForeignRegisterDir(mainRepoRoot),
         probe: probeStatusCodeOrThrow,
       });
@@ -2611,8 +2661,8 @@ export async function main() {
         'Tempdoc 606: wait until the shared dev stack becomes acquirable (the current owner releases, '
         + 'goes abandoned, or a critical op clears), then return HOW to take it — replacing the '
         + 'conflict→ask-user→manual-retry round-trip with one waited call. Polls the single ownership '
-        + 'verdict. acquirable:true returns recommendedTakeover ("deny" = just start; "warn" = idle owner, '
-        + 'self-authorize). acquirable:false on timeout (owner stayed active → ask the user or takeover:"force").',
+        + 'verdict. acquirable:true returns recommendedTakeover ("deny" = just start; "warn" = idle, dead or '
+        + 'abandoned owner, self-authorize). acquirable:false on timeout (owner stayed active → ask the user or takeover:"force").',
       inputSchema: AcquireWhenFreeInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -2701,6 +2751,13 @@ export async function main() {
 
       const parsed = DevRunnerStopJsonSchema.parse(json);
       const out = coerceExitAwareOk(parsed, exitCode);
+      // Spec F §5.3: the stack was not verified gone (or a port is held outside it, never killed).
+      // active.json is kept with stopFailed; the caller must not treat the stack as stopped.
+      if (json?.error?.code === 'STOP_INCOMPLETE') {
+        out.actionRequired = 'The stop could not verify the stack is gone; call quick_health (detail: "full") '
+          + 'and inspect foreignPortOwner / errors before starting again. '
+          + 'Forgetting leaves processes running; a person decides. Only the recorded owner may forget after an incomplete stop; processes left behind must be ended or inspected first.';
+      }
 
       // Merge cleanup if requested
       if (clean !== 'none') {

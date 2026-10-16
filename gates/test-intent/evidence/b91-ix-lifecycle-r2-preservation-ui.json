@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:46:25.137Z",
+  "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+  "tree": "a6d6d82b77b68da21e6639b9f0a23793828f2077",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.reservationPersistenceFailureStillRefusesBeforeTerminalShutdown\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17898
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#reservationPersistenceFailureStillRefusesBeforeTerminalShutdown",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5fe94bbc2aabc72828c7b5b6f609e5920fbcbabedda0984109635424b4ab16dc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reservationPersistenceFailureStillRefusesBeforeTerminalShutdown(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "32d00dda8",
+    "revision": "32d00dda8bf9f5f03951fc6f6618a9f1380e852c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.reservationPersistenceFailureStillRefusesBeforeTerminalShutdown\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 47461
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#reservationPersistenceFailureStillRefusesBeforeTerminalShutdown",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:ee03197dcb917ce14ed483898fd0677b6f66df9d1d079c8e34299a6e95d00343"
+}

@@ -96,26 +96,35 @@ export async function saveAbsoluteSettings(
   const captured = captureSettingsPatch(patch);
   const headers = new Headers(options.headers);
   let attempt: SettingsAttempt | undefined;
+  let completion: SettingsCompletion;
   try {
-    return await withinDeadline(options, async (signal) => {
+    completion = await withinDeadline(options, async (signal) => {
       const settings = await readSettingsObservation(send, { ...options, signal });
       signal.throwIfAborted();
       attempt = createSettingsAttempt(captured, requireSettingsWitness(settings.witness), headers);
-      return executeSettingsAttempt(send, attempt, { ...options, signal });
+      return executeSettingsReceipt(send, attempt, { ...options, signal });
     });
   } catch (error) {
     if (!attempt || (error instanceof SettingsAttemptError && error.attempt)) throw error;
     throw new SettingsAttemptError(error instanceof Error ? error.message : 'Settings completion is unknown',
       'SETTINGS_COMPLETION_UNKNOWN', attempt);
   }
+  return completion;
 }
 
 /** Retry exact serialized bytes until COMPLETE, terminal refusal, cancellation or bounded timeout. */
 export async function executeSettingsAttempt(
   send: SettingsTransport, attempt: SettingsAttempt, options: SettingsAttemptOptions = {},
 ): Promise<SettingsCompletion> {
+  const completion = await executeSettingsReceipt(send, attempt, options);
+  return completion;
+}
+
+async function executeSettingsReceipt(
+  send: SettingsTransport, attempt: SettingsAttempt, options: SettingsAttemptOptions,
+): Promise<SettingsCompletion> {
   try {
-    return await withinDeadline(options, async (signal) => {
+    return await withinDeadline<SettingsCompletion>(options, async (signal) => {
       for (;;) {
         signal.throwIfAborted();
         let response: Response;

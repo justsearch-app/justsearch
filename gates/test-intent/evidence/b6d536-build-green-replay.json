@@ -1,0 +1,70 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
+  },
+  "createdAt": "2026-10-15T22:39:02.830Z",
+  "revision": "8043f327fb6bb54b0ade2708b2ed8024d241fca9",
+  "tree": "466c225699e5939aa9abec021707e1e965be4672",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.VduReplayFailureRetentionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22719
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduReplayFailureRetentionTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduReplayFailureRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cf3fb4ae50b86fbb4d4b547907ecd9118d1d3d02a069d81d4186f162af4c309",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a later chunk insertion failure retains the VDU update and prevents terminal parent write",
+          "status": "passed"
+        },
+        {
+          "name": "chunk deletion failure retains the VDU update and prevents terminal parent write",
+          "status": "passed"
+        },
+        {
+          "name": "successful VDU replay observes its buffer before clearing it",
+          "status": "passed"
+        },
+        {
+          "name": "blankPayloadIsRetainedForDiagnosisInsteadOfClearedAsApplied()",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableRuntimeDoesNotDiscardTheAcceptedUpdate()",
+          "status": "passed"
+        },
+        {
+          "name": "a missing parent retains the same VDU update across queue reopen",
+          "status": "passed"
+        },
+        {
+          "name": "commit failure retains the payload and a retry clears it only after commit",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5124e83d3759effc23ced0d22e8a2879b9499607c7b72fe1391fa1a029976641"
+}

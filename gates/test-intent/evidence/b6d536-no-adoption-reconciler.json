@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:31:34.298Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "b70699a31d06624bedc9cc14259235c79f0e9571",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot\" --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.llamaRecordWithReusedPidLeavesTheLiveProcessUntouched\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3185
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#llamaRecordWithReusedPidLeavesTheLiveProcessUntouched",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "llamaRecordWithReusedPidLeavesTheLiveProcessUntouched()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4999802ae63b1f49f0472a01513d65e84b9ce913b6ea8ca2c582d8f57dc7581f"
+}

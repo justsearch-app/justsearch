@@ -1,0 +1,155 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:01:16.767Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "819c4a06663e73c2650ff6e6d2c60f71308566d0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11190
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15153
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8530
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java#cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d10c1dee6e057371aec92ef1e311fa144454082534b33c3e5d5f8bc6bd8c795b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7188a658c79af0f3abb7ef78163dbb9be0daa9794972c1f6e6cdec9e51f1dad6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java#aTurnedAwayLegIsRecordedForItsTraceAndForStatus",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:01fabfbec98772764c97084e00ab2191ccda35bec5a864476da31ffa5cfe926e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aTurnedAwayLegIsRecordedForItsTraceAndForStatus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java#theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bba97e06eba6177911fbd8d5aa6ae926b22dd81eefd37ae6ddc3e6671a282e79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1e333857b",
+    "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-batch1-cpu-repair-compat.patch",
+        "contentDigest": "sha256:c182bf0d739827af4b2ee4fb19e8b37c77aa193c9c69fa681d0fc63749ea87cb"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 64074
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 22799
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7312
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java#cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes",
+        "classification": "assertion",
+        "detail": "cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the real status assembler must not label two CPU misses as CPU-served searches ==> expected: <null> but was: <encoders.health.query_on_cpu>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause",
+        "classification": "assertion",
+        "detail": "aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU-only misses must not claim successfully served searches ==> expected: <OptionalLong.empty> but was: <OptionalLong[55652322631700]>"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java#aTurnedAwayLegIsRecordedForItsTraceAndForStatus",
+        "classification": "assertion",
+        "detail": "aTurnedAwayLegIsRecordedForItsTraceAndForStatus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: selecting a CPU lease does not certify a successful encoding ==> expected: <OptionalLong.empty> but was: <OptionalLong[55661259744100]>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java#theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs",
+        "classification": "assertion",
+        "detail": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a lease selection cannot claim successful CPU service ==> expected: <OptionalLong.empty> but was: <OptionalLong[55647128328000]>"
+      }
+    ]
+  },
+  "digest": "sha256:4bc179cf049dd736037e87059523392264951903520afc6b7c10523ee93a42c4"
+}

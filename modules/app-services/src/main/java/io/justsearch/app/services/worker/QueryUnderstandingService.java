@@ -164,8 +164,18 @@ public final class QueryUnderstandingService {
             Map.of("role", "user", "content", "Query: \"" + query + "\""));
 
     long startNs = System.nanoTime();
-    return aiService
-        .chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING, engineContext)
+    CompletableFuture<String> completion;
+    try {
+      // Spec E step E2: query assistance (ASSIST) never slows indexing.
+      completion = io.justsearch.app.api.chat.DemandScope.call(
+          io.justsearch.app.api.chat.DemandKind.ASSIST,
+          () -> aiService.chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING, engineContext));
+    } catch (io.justsearch.app.api.chat.GenerationUnavailableException refused) {
+      // Chat is draining, starting or stopping: skip exactly as when AI is off.
+      log.debug("QU extraction skipped, generation unavailable: {}", refused.getMessage());
+      return null;
+    }
+    return completion
         .orTimeout(QU_DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             json -> {

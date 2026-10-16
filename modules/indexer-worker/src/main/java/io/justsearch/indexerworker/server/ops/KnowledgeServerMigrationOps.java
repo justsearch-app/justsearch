@@ -11,7 +11,7 @@ import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.configuration.SystemAccess;
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
@@ -1877,7 +1877,7 @@ public final class KnowledgeServerMigrationOps {
     for (Path root : roots.keySet()) requireMigrationRoot(root);
     // Startup's version marker is not a migration coverage authority.
     var help = collections == null ? null : collections.bundledHelp();
-    if (!Boolean.parseBoolean(SystemAccess.sysProp("justsearch.eval.mode"))
+    if (!EnvRegistry.EVAL_MODE.getBoolean(false)
         && help != null && Files.isDirectory(help.path())) roots.put(help.path(), help);
     return List.copyOf(roots.values());
   }

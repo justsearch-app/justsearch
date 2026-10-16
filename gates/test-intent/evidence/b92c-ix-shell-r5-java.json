@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T18:33:57.121Z",
+  "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+  "tree": "4fd814af4220bf6ce8a078ac0b5610b54871d553",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.journalRewriteKeepsAnUnreadableLineVerbatimAndCountsIt\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.journalCompactionKeepsAnUnreadableLineVerbatim\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23828
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#journalRewriteKeepsAnUnreadableLineVerbatimAndCountsIt",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0846fad02b23b793d6794abce231b2b49696c13e15298360ec9f417fbb3f057f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "journalRewriteKeepsAnUnreadableLineVerbatimAndCountsIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#journalCompactionKeepsAnUnreadableLineVerbatim",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0846fad02b23b793d6794abce231b2b49696c13e15298360ec9f417fbb3f057f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "journalCompactionKeepsAnUnreadableLineVerbatim()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a3063df41",
+    "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.journalRewriteKeepsAnUnreadableLineVerbatimAndCountsIt\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.journalCompactionKeepsAnUnreadableLineVerbatim\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 15326
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#journalRewriteKeepsAnUnreadableLineVerbatimAndCountsIt",
+        "classification": "assertion",
+        "detail": "journalRewriteKeepsAnUnreadableLineVerbatimAndCountsIt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the unreadable journal line is counted as corrupt ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#journalCompactionKeepsAnUnreadableLineVerbatim",
+        "classification": "assertion",
+        "detail": "journalCompactionKeepsAnUnreadableLineVerbatim(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: compaction keeps the unreadable journal line ==> expected: <1> but was: <0>"
+      }
+    ]
+  },
+  "digest": "sha256:cb02a63fbde0b98fae2757af36e36597ec4916939c9a0e57c93a06c6fd927888"
+}

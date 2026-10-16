@@ -1,0 +1,13 @@
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java b/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
+--- a/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
+@@ -148,6 +148,9 @@
+   private final Object workerSamplingLock = new Object();
+   // ADR-0050: keeps the operating block's seq and indexing since across passes.
+   private final OperatingStateAssembler operatingStateAssembler = new OperatingStateAssembler();
++  void setChatResidency(Supplier<io.justsearch.app.inference.chat.ChatResidency> source) {
++    // Compatibility only: the old projection still has no reload status producer.
++  }
+   // ADR-0050: the operating block's GPU memory reading (diagnostic only); null without a reader.
+   private volatile GpuMemoryReaderHold gpuMemory;
+ 

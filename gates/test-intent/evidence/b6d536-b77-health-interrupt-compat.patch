@@ -1,0 +1,16 @@
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+index 80b078791..092e97b1b 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/health/HealthEventChangeRegistry.java
+@@ -42,6 +42,11 @@ public final class HealthEventChangeRegistry {
+     this(new SseStreamChannel(STREAM_ID));
+   }
+ 
++  /** Compat scaffolding for fail-before evidence: the executor is ignored; delivery stays as before. */
++  public HealthEventChangeRegistry(java.util.concurrent.ExecutorService ignored) {
++    this();
++  }
++
+   public HealthEventChangeRegistry(SseStreamChannel channel) {
+     this.channel = Objects.requireNonNull(channel, "channel").withInterruptibleDelivery();
+   }

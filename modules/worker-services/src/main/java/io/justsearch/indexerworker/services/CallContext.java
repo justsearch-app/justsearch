@@ -38,7 +38,21 @@ public record CallContext(String traceId, String requestId, CancelSignal cancel,
     io.justsearch.core.context.EngineContext engineContext,
     io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance,
     io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-    long deadlineNanos) {
+    long deadlineNanos, long startNanos) {
+
+  /**
+   * A call that starts as it is built. {@code startNanos} is otherwise the {@link System#nanoTime()}
+   * at which the caller's Engine call began, before any wait for a worker thread, so budgets that
+   * count from the start of the call (a search's semantic cap) include that wait.
+   */
+  public CallContext(String traceId, String requestId, CancelSignal cancel,
+      io.justsearch.core.context.EngineContext engineContext,
+      io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance,
+      io.justsearch.core.execution.EngineTaskLifetime childLifetime,
+      long deadlineNanos) {
+    this(traceId, requestId, cancel, engineContext, provenance, childLifetime, deadlineNanos,
+        System.nanoTime());
+  }
 
   /** Local bounded authority for maintenance and callers without an Engine budget. */
   public CallContext(String traceId, String requestId, CancelSignal cancel,
@@ -94,6 +108,14 @@ public record CallContext(String traceId, String requestId, CancelSignal cancel,
             ? System.nanoTime() + java.time.Duration.ofMinutes(5).toNanos()
             : deadlineNanos,
         this::cancelled);
+  }
+
+  /**
+   * When this call's budgets start counting: the start of the caller's Engine call, or {@code
+   * nowNanos} for {@link #none()} and for a start that is not before {@code nowNanos}.
+   */
+  public long startNanos(long nowNanos) {
+    return this == NONE || startNanos - nowNanos >= 0 ? nowNanos : startNanos;
   }
 
   /** Registers a handler to run if the caller abandons this call. */

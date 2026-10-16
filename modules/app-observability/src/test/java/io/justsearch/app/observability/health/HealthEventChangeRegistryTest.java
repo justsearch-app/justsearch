@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ final class HealthEventChangeRegistryTest {
   @Test
   @DisplayName("subscribe + broadcast delivers an envelope with bumped seq")
   void subscribeAndBroadcast() {
-    HealthEventChangeRegistry registry = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry registry = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     AtomicInteger count = new AtomicInteger();
     long initialSeq = registry.currentSeq();
     registry.subscribe(envelope -> count.incrementAndGet());
@@ -50,7 +51,7 @@ final class HealthEventChangeRegistryTest {
   @Test
   @DisplayName("unsubscribe removes the listener")
   void unsubscribe() {
-    HealthEventChangeRegistry registry = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry registry = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     AtomicInteger count = new AtomicInteger();
     var sub = registry.subscribe(change -> count.incrementAndGet());
     sub.unsubscribe();
@@ -61,7 +62,7 @@ final class HealthEventChangeRegistryTest {
   @Test
   @DisplayName("dead listener (throws) removed inline on broadcast")
   void deadListenerCleanup() {
-    HealthEventChangeRegistry registry = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry registry = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     AtomicInteger goodCount = new AtomicInteger();
     registry.subscribe(
         change -> {
@@ -77,7 +78,7 @@ final class HealthEventChangeRegistryTest {
   @Test
   @DisplayName("broadcast wraps payload in SseEnvelope with HealthDelta payload")
   void broadcastEnvelopeShape() {
-    HealthEventChangeRegistry registry = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry registry = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     List<SseEnvelope> seen = new ArrayList<>();
     registry.subscribe(seen::add);
 

@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T11:29:48.691Z",
+  "revision": "75917a07325f85c402b837e5a17eba4cb4b2bd5c",
+  "tree": "10436ebe716506ec059097562916e12ad6395ef0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ExternalInferenceEndpointTest.blankMeansJustSearchRunsItsOwnServer\" --tests \"io.justsearch.app.inference.ExternalInferenceEndpointTest.loopbackHttpUrlWithPortIsAccepted\" --tests \"io.justsearch.app.inference.ExternalInferenceEndpointTest.unusableValuesAreRefusedWithAReason\" --tests \"io.justsearch.app.inference.ExternalInferenceEndpointTest.serverOnConfiguredPortWithoutEndpointIsReportedAsIgnored\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4916
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#blankMeansJustSearchRunsItsOwnServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f894a1c8dfc5de04fcbf81d041b23e67387b3afe12c249c792bef4e1d68bde49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blankMeansJustSearchRunsItsOwnServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#loopbackHttpUrlWithPortIsAccepted",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f894a1c8dfc5de04fcbf81d041b23e67387b3afe12c249c792bef4e1d68bde49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loopbackHttpUrlWithPortIsAccepted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#unusableValuesAreRefusedWithAReason",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f894a1c8dfc5de04fcbf81d041b23e67387b3afe12c249c792bef4e1d68bde49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unusableValuesAreRefusedWithAReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#serverOnConfiguredPortWithoutEndpointIsReportedAsIgnored",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f894a1c8dfc5de04fcbf81d041b23e67387b3afe12c249c792bef4e1d68bde49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "serverOnConfiguredPortWithoutEndpointIsReportedAsIgnored(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:bc0ae38bc67bec22c4ceba5dc3d4867207858fe840d699222f48df0864c0a864"
+}

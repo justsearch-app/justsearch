@@ -1,0 +1,146 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T13:54:38.036Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "3fda2c30d75b4113228cbdfd5fe65294c20a50fe",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet\" --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anInfeasibleSingleItemIsRefusedBeforeNativeDispatch\" --tests \"io.justsearch.ort.GpuCallPackerTest.anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceLostTest.lossDuringCreationCannotPublishOrCloseTheReturningGpuCandidate\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aCapBelowRetainedWeightsSelectsCpuBeforeGpuCreation\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 125271
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e124612beca188d8b6b39ee7272e4abcd8b07787c5e3b42223370c551581ffa0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anInfeasibleSingleItemIsRefusedBeforeNativeDispatch",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e124612beca188d8b6b39ee7272e4abcd8b07787c5e3b42223370c551581ffa0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInfeasibleSingleItemIsRefusedBeforeNativeDispatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java#anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0aac8611f80541b2a58f894269cfc1e58f3fe8ab9938408a24f47c572c5dbbd4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java#lossDuringCreationCannotPublishOrCloseTheReturningGpuCandidate",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f7fee4de4382a84beab1e91ab2f089be4900b339e6684935bad33ba1848e9dc0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossDuringCreationCannotPublishOrCloseTheReturningGpuCandidate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aCapBelowRetainedWeightsSelectsCpuBeforeGpuCreation",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3e34a5e26a926d7e27f07e8d6277c04558a067ad50778621e5cea980c96e201f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCapBelowRetainedWeightsSelectsCpuBeforeGpuCreation()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet\" --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anInfeasibleSingleItemIsRefusedBeforeNativeDispatch\" --tests \"io.justsearch.ort.GpuCallPackerTest.anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceLostTest.lossDuringCreationCannotPublishOrCloseTheReturningGpuCandidate\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aCapBelowRetainedWeightsSelectsCpuBeforeGpuCreation\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 32488
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet",
+        "classification": "assertion",
+        "detail": "anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the stored cap cannot accommodate the promised single 512-token SPLADE call ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anInfeasibleSingleItemIsRefusedBeforeNativeDispatch",
+        "classification": "assertion",
+        "detail": "anInfeasibleSingleItemIsRefusedBeforeNativeDispatch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java#anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked",
+        "classification": "assertion",
+        "detail": "anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a known infeasible call must not reach native allocation ==> Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java#lossDuringCreationCannotPublishOrCloseTheReturningGpuCandidate",
+        "classification": "assertion",
+        "detail": "lossDuringCreationCannotPublishOrCloseTheReturningGpuCandidate(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (3 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: a candidate returned after device loss must not be leased ==> expected: <true> but was: <false>&#13;&#10;&#9;org.opentest4j.AssertionFailedError: READY must not overwrite loss ==> e"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aCapBelowRetainedWeightsSelectsCpuBeforeGpuCreation",
+        "classification": "assertion",
+        "detail": "aCapBelowRetainedWeightsSelectsCpuBeforeGpuCreation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a cap below the retained weights must not initialize CUDA ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:f2b66d29745f09204ec3f7239f946e088bbc53bdd459708042980e546af161e6"
+}

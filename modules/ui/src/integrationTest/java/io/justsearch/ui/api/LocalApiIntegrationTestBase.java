@@ -97,9 +97,11 @@ abstract class LocalApiIntegrationTestBase {
         settingsResources.components());
     settingsComponents.register("generative",
         new io.justsearch.app.services.GenerativeSettingsComponentOwner(
-            null, generativeObservation,
+            settingsInferenceManager(), generativeObservation,
             io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
                 settingsConfig.get(), System.getProperty("user.dir")), false));
+    configureSettingsComponents(settingsComponents, settingsResources.components(), settingsConfig,
+        settingsStore);
     settingsComponents.seal();
     var settingsOwner =
         new io.justsearch.app.services.settings.SettingsCommitCoordinator(
@@ -193,6 +195,17 @@ abstract class LocalApiIntegrationTestBase {
    * with {@link #setPropForTest} so they are restored in teardown.
    */
   protected void beforeServerStart() throws Exception {}
+
+  protected io.justsearch.app.inference.InferenceLifecycleManager settingsInferenceManager()
+      throws Exception {
+    return null;
+  }
+
+  protected void configureSettingsComponents(
+      io.justsearch.app.services.settings.FixedSettingsComponentComposer composer,
+      io.justsearch.core.component.EngineComponentRegistry registry,
+      io.justsearch.configuration.resolved.ConfigStore config, UiSettingsStore settings)
+      throws Exception {}
 
   /** Hook for subclasses that need to customize the server under test (e.g. a session token). */
   protected LocalApiServer.Builder configureServer(LocalApiServer.Builder builder) {

@@ -110,6 +110,25 @@ final class AgentController {
             "agent-stream-heartbeat");
   }
 
+  /** The residency gate an agent run passes before it streams (Spec A step 9). */
+  private volatile ChatResidencyGate residencyGate = ChatResidencyGate.none();
+
+  /** Installs the residency gate; without one every run is admitted. */
+  void setResidencyGate(ChatResidencyGate gate) {
+    this.residencyGate = java.util.Objects.requireNonNull(gate, "gate");
+  }
+
+  /** The body as a map; a body that does not parse is empty here (the run reports it). */
+  private static Map<String, Object> bodyOrEmpty(Context ctx) {
+    try {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> parsed = MAPPER.readValue(ctx.body(), Map.class);
+      return parsed == null ? Map.of() : parsed;
+    } catch (Exception malformed) {
+      return Map.of();
+    }
+  }
+
   /** Resolves the live agent service. Always re-fetches so late-bound updates surface. */
   private AgentService agentService() {
     return agentServiceSupplier.get();
@@ -153,6 +172,10 @@ final class AgentController {
     // without this the engine's user-turn append would throw INTO the already-committed stream and the
     // reader would get a generic BAD_REQUEST SSE error instead of the typed, actionable locked answer.
     if (refuseWhileLocked(ctx)) {
+      return;
+    }
+    // Spec A step 9: chat unloaded for another GPU user answers a typed refusal before the stream.
+    if (!residencyGate.admitChat(ctx, bodyOrEmpty(ctx))) {
       return;
     }
 

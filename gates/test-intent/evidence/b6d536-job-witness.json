@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T17:19:42.189Z",
+  "revision": "0d90a33886e2136c68eab09c8ce4b3f3800fc84a",
+  "tree": "b404c5815d4eed5a69723dea6fe8a3c35667d170",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessTest.recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 25172
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java#recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:121547ecb7980ae4310304903ada11f07fc4471b72f91730aebcc0d0df256ece",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e546e9e54",
+    "revision": "e546e9e54880a7d9a26631b81d3c1d34c7e5756b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessTest.recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 82400
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java#recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild",
+        "classification": "assertion",
+        "detail": "recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: NEW and EXIT carry exact held-handle PID/birth/code: witness.probe.identity=31408 FILETIME:134365583401856680&#13;&#10;witness.child.identity=12356 FILETIME:134365583406541207&#13;&#10;witness.child.identity=22300 FILETIME:134365583407413080&#13;&#10;witness.chil"
+      }
+    ]
+  },
+  "digest": "sha256:0bb641d2780f978d9843c4d6002ea28577a9c3d27c73d9a27fa4acd10ef856ce"
+}

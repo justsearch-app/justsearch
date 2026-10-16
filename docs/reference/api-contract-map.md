@@ -11,6 +11,35 @@ This doc answers: "Where is the source of truth for JustSearch API schemas and s
 
 ## HTTP (Local API)
 
+### Status publication metadata (additive)
+
+Every head API response carries `X-JustSearch-Status-Epoch` (opaque process identity) and
+`X-JustSearch-Status-Change` (nonnegative monotonic integer within that epoch). These headers
+are exposed through CORS. The counter is advanced by state owners at publication, never by
+classifying request URLs, operation names, receipt success or stream completions. Reading it
+is an atomic memory read and never requests a status sample. Replays, stream reattachments
+and reads leave it unchanged. Failed requests that publish no state leave it unchanged too.
+
+`GET /api/status`, including `?fresh=true`, additionally carries
+`X-JustSearch-Status-Reflected`: a conservative lower bound on the publication counter
+reflected by every independently sampled source in that response. A failed, blocked or
+unfinished source retains its previous revision; the response never certifies such a source
+as reflecting the current counter. The existing bounded fresh-read, admission and refusal
+contracts continue to apply. Live measurement timestamps, ages and uptime are observations,
+not state-owner publications. `operating.seq` remains the existing operating-content sequence.
+
+Existing SSE payloads add `statusChangeEpoch` and `statusChangeCounter` at transport delivery,
+including replay delivery. Bare run events and the extensible lifecycle payloads of envelope events use the same
+process clock. Typed UPDATE payloads and the envelope schema are preserved; periodic
+lifecycle frames carry later publications.
+Retained events and resume cursors are unchanged. Consumers ignore absent metadata for
+compatibility and malformed counters; they compare counters only within one epoch. A new
+epoch invalidates a displayed snapshot from the previous process. The shared UI transport
+and stream readers coalesce newer signals into a canonical fresh read and acknowledge the
+reflected revision only after validating and publishing its body. A stale response does not
+cause an immediate retry loop; the next request or scheduled poll can retry.
+
+
 ### Route contract policy and SDK projection
 
 `modules/ui/src/main/java/io/justsearch/ui/api/RouteContractPolicy.java` is the declarative route
@@ -109,12 +138,35 @@ Capacity is bounded per `(clientKind, clientId)` and across the Engine; all decl
 use identical caps. Aggregate exhaustion takes precedence when both budgets are exhausted.
 `GET /api/debug/effective-config` projects the running owner's immutable `engineAdmission` limits:
 `perContextLimit`, `aggregateLimit`, and `retryAfterSeconds`, plus current `activeWorkCount`
-excluding the inspecting HTTP request. Internal background producers count toward the aggregate.
+excluding the inspecting HTTP request. That count includes ordinary work and observations.
+Internal background producers count toward the ordinary aggregate.
+A client can keep at most 16 ordinary work items in flight under the packaged policy; capacity refusals
+are typed `429` responses and clients must honour `Retry-After`. HTTP MCP attribution without
+a server-issued MCP session shares the anonymous client bucket. Foreground semantic calls, over
+HTTP and native MCP, share eight inference workers under the packaged policy (half of
+`foregroundThreads`, which is 16), with no
+executor queue. Calls beyond that shared serving capacity receive `ADMISSION_ENGINE_LIMIT` and
+`Retry-After`, including when the client has ordinary work allowance remaining. The supplied
+scripted client runs one search, one chat and one status read concurrently.
+Status reads (`GET /api/status`,
+`GET /api/knowledge/status`, MCP `justsearch_status`, and the `justsearch://index/summary`
+resource) have a separate bounded observation reservation. Its aggregate bound is the background
+call lane's worker and queue capacity
+(4 workers + 64 queued reads under the packaged policy), capped by the existing aggregate limit;
+the same per-client limit applies. Semantic searches use a separate inference lane.
+Status admission cannot be refused because search or chat occupies work capacity. Overlapping observations
+can still exhaust their own reservation and receive a typed refusal. Observations remain tracked
+until their actual owners exit, and obey upgrade freezing and process closing.
 A startup aggregate reduction is
 bounded by the packaged maximum; the diagnostic projection reports the applied value.
 `RequestEngineWork` maps capacity refusal to HTTP `429` with `ADMISSION_CONTEXT_LIMIT` or
 `ADMISSION_ENGINE_LIMIT`, with `Retry-After`; upgrade freezing returns `503` with
-`UPGRADE_PREPARING`. Health remains available while admission is full or frozen. CORS
+`UPGRADE_PREPARING`. A request that may run inference and finds every foreground inference thread
+busy waits for one in a queue as long as the thread pool, within its own deadline; time spent
+waiting counts against the request's deadline and the search's semantic deadline. When the
+threads and that queue are both full, the request is refused with HTTP `429`
+`ADMISSION_INFERENCE_BUSY` and `Retry-After` (MCP `-32000` with the same `errorCode`). It is raised
+mid-request, so `retrySafe` is `false` and clients do not replay it. Health remains available while admission is full or frozen. CORS
 `OPTIONS` preflights never reserve Engine work, including while full or frozen; the Host and
 Origin checks still apply. Allowed browser origins can read `Retry-After` through
 `Access-Control-Expose-Headers`.
@@ -614,6 +666,8 @@ Response includes:
 
 - `context_sufficient: boolean` (in quality object) — LLM-assessed context sufficiency signal. Returns `null` on timeout/error/LLM unavailable (366)
 - Chunk content, retrieval mode, quality metrics
+- `quality.retrieval_mode_reason` (string) — stable reason for the retrieval mode, including `SEMANTIC_BUDGET_EXCEEDED` when semantic retrieval falls back to BM25.
+- `quality.retrieval_mode_cause` (optional string) — non-empty semantic fallback cause (`loading`, `cold`, `contended` or `stuck`), projected from the service result like MCP's `quality.retrievalModeCause`. Time queued before the seat counts as `contended`; a models-ready wait begun within the semantic budget can report `loading` (Spec D / FP3).
 
 Source: tempdoc 366.
 
@@ -653,7 +707,9 @@ Conversation management (slice 513 + 515):
   - It also deletes the conversation's **agent runs** (tempdoc 859 slice C), which is what makes a run-backed row removable rather than a sidebar that only grows; the response carries `agentRunsDeleted`. Every run joined on that `conversationId` goes, whatever its shape — deleting a conversation destroys the conversation, and leaving other-shape runs alive would keep `GET /api/thread/{id}` serving content for a conversation the reader deleted. The store deletion runs first, so a 409 aborts before any run is destroyed, and the run deletion fails closed while the run store is sealed + locked.
 - `POST /api/chat/conversations/{sessionId}/branch?fromMsgId=<id>` — Create a branch from an existing session at the given message id. Response: `{sessionId, parentSessionId, branchPointMessageId}`. **400** if `fromMsgId` doesn't exist in the parent's resolved history (slice 515 FIX-2). The branch carries no messages of its own; loadHistory resolves the parent prefix on every call.
 - `POST /api/chat/conversations/{sessionId}/title` — Name a conversation durably (tempdoc 838). Body: `{title, source?}` where `source` is `"user"` (default) or `"auto"`. Response: `{ok, title, titleSource}` — `title` is what was STORED, trimmed and capped at 200 characters. **400** on a blank title (clearing is `DELETE`) or an unrecognised `source`; **404** when the session has no `meta.json` (a rename must not mint a zero-message conversation); **423** when the conversation store's data key is locked, via the global `KeyLockedException` mapping.
+  - With the request header `If-None-Match: *` the name is stored only while the conversation has none; otherwise **412** with `{error, errorCode: "INVALID_STATE", title, titleSource}` carrying the name it keeps. The web UI sends a browser's retained legacy name this way, so a late adoption can never replace a name a person gave the conversation meanwhile, from any window.
 - `DELETE /api/chat/conversations/{sessionId}/title` — Clear the name (tempdoc 838). Idempotent: a conversation with no name, or no such conversation, is a no-op `{ok: true}`.
+- `POST /api/chat/conversations/{sessionId}/auto-title` — The model names the conversation after its first answer; the web UI asks for this on its own, so the route is declared `OBSERVATION` and never counts as a person acting. No body: the only input is the conversation id, and the prompt is built from the stored first question and answer (each clipped to 200 characters, thinking off, at most 32 tokens). The name is stored as `auto` only while the conversation has none. Response: `{ok, generated, title?, titleSource?}` — `generated` is false when the conversation already had a name, which is returned instead. It is background inference in the chat lane (`DemandKind.BACKGROUND`): it never loads the model and is refused with the typed chat refusal (**503** `CHAT_UNAVAILABLE`, `reason` `BUSY`/`SELF_TEST`, `retryAfterMs`; **503** `AI_STARTING` while chat is unloaded) while picture reading, a self-test or another exchange holds the model; past the lane's two-minute aging bound one request is let through. **503** `SERVICE_UNAVAILABLE` with `retryAfterMs` when the model cannot answer now; **404** for no such conversation; **409** `INVALID_STATE` when nothing has been answered yet; **422** when the reply is not a title.
 
 Header: `X-JustSearch-Audience` (optional; defaults to `USER`).
 
@@ -733,6 +789,12 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
 - `debug` (tempdoc 549 Phase D2: requests the optional numeric per-hit detail tier on
   `searchTrace`'s per-hit `HitStage.detail`; alias for `include_detail`. The structural per-hit
   trace slice is always-on regardless.)
+
+`POST /api/knowledge/collection-facet` is the observation read used by Library mount and
+corpus-growth hydration. Its body contains only a positive integer `maxDocsScanned`.
+The server fixes the query to `*:*`, lexical retrieval, and the `collection` facet; it returns
+`facets` and `facetsTruncated`. Extra fields return `400` / `INVALID_REQUEST`. The existing
+Worker capability gate and session-token policy apply.
 
 Response fields (additive/optional-by-presence):
 
@@ -884,9 +946,15 @@ Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` tes
 + `modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java` (`resolvePathHash`)
 + `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java`
 
-`POST /api/library/resolve-hash`:
+`POST /api/library/resolve-hash` is the deliberate read. `POST /api/library/path-label`
+is the observation read for automatic row-label hydration; it accepts only `pathHash` and
+reuses `ResolvePathHashHandler`, including its scoped watched-root fallback. Resolver
+unavailability returns `503` / `SERVICE_UNAVAILABLE`, so labels remain retryable. A malformed or
+invalid body (anything other than a non-blank string `pathHash`) returns `400` with the
+operation-invocation error body it replaced: `{"success": false, "message": "...",
+"structuredData": {}, "errorClass": "BAD_REQUEST"}`.
 
-- **Privacy contract:** the ONLY HTTP endpoint allowed to convert a `pathHash` back to a filename. Diagnostic export endpoints (`/api/diagnostics/ingestion/recent`, `/api/diagnostics/ingestion/summary`, `/api/diagnostics/export` — POST, optional `{ feTelemetry }` body embedded as `frontend/fe-telemetry.json` in the export zip, tempdoc 683) MUST NOT call this endpoint or its underlying `IndexingService.resolvePathHash`. Enforced by ArchUnit pin `LibraryResolveHashOnlyCallerPin` in `modules/app-launcher`.
+- **Privacy contract:** these reads use the existing approved scoped resolver owners to convert a `pathHash` back to a filename. Diagnostic export endpoints (`/api/diagnostics/ingestion/recent`, `/api/diagnostics/ingestion/summary`, `/api/diagnostics/export` — POST, optional `{ feTelemetry }` body embedded as `frontend/fe-telemetry.json` in the export zip, tempdoc 683) MUST NOT call these resolvers or the underlying `IndexingService.resolvePathHash`. Enforced by ArchUnit pin `LibraryResolveHashOnlyCallerPin` in `modules/app-launcher`.
 - Request body: `{"pathHash": "<64-char SHA-256 hex>"}`.
 - Response (found): `{"found": true, "path": "<normalized absolute path>", "lastSeenAtMs": <epoch>, "removedAtMs": <epoch or 0>}` — the file is still under a watched root and within the `JUSTSEARCH_PATH_RESOLUTION_RETENTION_DAYS` window (default 90).
 - Response (not found): `{"found": false}` — hash never recorded, retention expired, or the watched root was unwatched (immediate prune).

@@ -91,14 +91,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private final WorkerHost workerHost;
 
     /**
-     * Tempdoc 672 follow-up: epoch-ms of the most recent {@link #recordUserActivity()} call. Since
-     * tempdoc 885 item 3 this is the <b>only</b> consumer of that fact: the Worker no longer
-     * receives a Head-written activity byte at all (it observes its own in-flight foreground RPCs),
-     * so what remains here is a purely Head-local signal for the Head's own idle checks — VDU
-     * pacing and the service-phase idle gate.
+     * The Engine admission owner's activity source, shared with VDU idle checks across bootstrap
+     * reconnects. The Worker still paces on its own foreground RPCs rather than this idle signal.
      */
-    private final java.util.concurrent.atomic.AtomicLong lastUserActivityEpochMs =
-        new java.util.concurrent.atomic.AtomicLong(0);
+    private final io.justsearch.core.scheduling.UserActivity userActivity;
 
     /**
      * Lane F item A5: the one in-process GPU-scheduling gauge. Chat activity is written
@@ -108,6 +104,14 @@ public final class KnowledgeServerBootstrap implements Closeable {
      */
     private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
         new io.justsearch.core.scheduling.GpuSchedulingGauge();
+
+    /**
+     * Spec E step E1: Switch A, the one bulk-work verdict for this Engine, beside the gauge. The
+     * energy poller mirrors into it (status only; the gauge keeps the energy actuation, P7). The
+     * operating status block reads its snapshot. Step E2: it is the host's gate when the host owns
+     * one (the Engine root wires chat generation into it), else this bootstrap's own.
+     */
+    private final io.justsearch.core.scheduling.BulkWorkGate bulkWork;
 
     /**
      * Tempdoc 630's OS energy-intent poll, moved off the spawner at item A5 because it had to
@@ -210,7 +214,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.publicationLock = java.util.Objects.requireNonNull(publicationLock, "publicationLock");
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
+        this.bulkWork = java.util.Objects.requireNonNullElseGet(
+            workerHost.bulkWork(), io.justsearch.core.scheduling.BulkWorkGate::new);
+        this.userActivity = java.util.Objects.requireNonNullElseGet(
+            workerHost.userActivity(), io.justsearch.core.scheduling.UserActivity::new);
         this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
+        this.energyPoller.mirrorEnergyTo(bulkWork);
         this.config = config;
         this.bootFaultsRemaining = new java.util.concurrent.atomic.AtomicInteger(config.bootFaultInjectAttempts());
         this.telemetry = telemetry != null ? telemetry : new NoopTelemetry();
@@ -597,9 +606,6 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     boolean automaticRootProducersSuppressed() { return !automaticRootProducers; }
 
-    /** Data-directory anchor for the installed recovery harness barrier. */
-    Path dataDirForHarness() { return config.dataDir(); }
-
     /**
      * Returns true if the Knowledge Server is ready.
      * Delegates to {@link io.justsearch.app.api.lifecycle.Capability#available()}.
@@ -720,6 +726,19 @@ public final class KnowledgeServerBootstrap implements Closeable {
         return gpuScheduling;
     }
 
+    /** Switch A (Spec E §1.2): this Engine's bulk-work gate. */
+    public io.justsearch.core.scheduling.BulkWorkGate bulkWork() {
+        return bulkWork;
+    }
+
+    /**
+     * Spec E step E3: the Engine's GPU residency sampler, owner of the one GPU memory reader; null
+     * when the host has none. Status reads its {@code statusReader()} instead of opening a reader.
+     */
+    public io.justsearch.app.services.gpu.GpuResidencySampler gpuResidency() {
+        return workerHost.gpuResidency();
+    }
+
     /**
      * Marks an OS resume just handled (tempdoc 630). Called by the health monitor's
      * post-resume eager re-validation so /api/status can surface a brief "Catching up after sleep"
@@ -744,8 +763,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * indexing on its own in-flight foreground-RPC gauge, not on a wall-clock byte the Head writes.
      */
     public void recordUserActivity() {
-        lastUserActivityEpochMs.set(System.currentTimeMillis());
+        userActivity.record();
     }
+
+    public long userActivityVersion() { return userActivity.version(); }
 
     /**
      * Tempdoc 672 follow-up: milliseconds since the most recent {@link #recordUserActivity()}
@@ -754,8 +775,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * never-throttle-on-uncertainty posture).
      */
     public long msSinceLastUserActivity(long nowEpochMs) {
-        long last = lastUserActivityEpochMs.get();
-        return last == 0 ? Long.MAX_VALUE : nowEpochMs - last;
+        return userActivity.msSince(nowEpochMs);
     }
 
     /**
@@ -1075,7 +1095,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // (precision, doc counts) with non-eval content. `justsearch.eval.mode` is the
             // same flag that gates `/api/debug/reset-index` (LocalApiServer) and is set by
             // the `runHeadlessEval` Gradle task.
-            if (Boolean.getBoolean("justsearch.eval.mode")) {
+            if (EnvRegistry.EVAL_MODE.getBoolean(false)) {
                 log.info("Skipping help-file auto-ingest (eval mode)");
                 return;
             }

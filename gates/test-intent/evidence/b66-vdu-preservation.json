@@ -1,0 +1,230 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T13:41:50.379Z",
+  "revision": "63c28232fb4e72bbb70b64b75af1e22ea3635377",
+  "tree": "5f2b6ae6f79dc92f70fbcfd2090d8961b35a3b66",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.CollectionFacetObservationTest\" --tests \"io.justsearch.ui.api.PathLabelObservationTest\" --tests \"io.justsearch.ui.api.ObservationRegistryScopeTest\" --tests \"io.justsearch.ui.api.VerifierRoundFourActivityTest\" --tests \"io.justsearch.ui.api.VerifierRoundFourCallerAuditTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 33101
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/CollectionFacetObservationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/CollectionFacetObservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:08b02ad00f632e22d0473be157b5f6eabee14008355b619d10e4b52e30694df8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "observationReadPreservesActivityWhileInteractiveSearchAdvancesIt()",
+          "status": "passed"
+        },
+        {
+          "name": "enumerationIsFixedLexicalAndDoesNotAcceptAnInteractiveQuery()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelObservationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelObservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:605414aecc684c61433705decacd7b757a3c1ce87889301e24a4cabb10c0bab4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watchedRootLabelsKeepTheCoreResolverFallbackAndRequestScope()",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableResolverIsAnHttpFailureSoHydrationCanRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ObservationRegistryScopeTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ObservationRegistryScopeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f3cc04d0eb5593c2e5d47645a367fe03c85cc0db88b6c948f70e6ddc847e2831",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "removedMcpToolCannotLeaveAStaleJustification()",
+          "status": "passed"
+        },
+        {
+          "name": "optionalGroupsExactlyMatchTheirRealRouteDeclarations()",
+          "status": "passed"
+        },
+        {
+          "name": "missingCoreRouteFailsEvenWithoutOptionalOwners()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourActivityTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:958770b064ddf6a59a514133f0a618f9e2b3407bdc5f31dbf9ea7937b07e9ac0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] /api/knowledge/suggest",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/preview",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/operations/{id}/preview",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/chat/sessions/last",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/chat/sessions/{id}/transcript",
+          "status": "passed"
+        },
+        {
+          "name": "[6] /api/chat/agent/history",
+          "status": "passed"
+        },
+        {
+          "name": "[7] /api/chat/agent/history/{batchId}",
+          "status": "passed"
+        },
+        {
+          "name": "[8] /api/meta/openapi.json",
+          "status": "passed"
+        },
+        {
+          "name": "[9] /api/registry/prompts",
+          "status": "passed"
+        },
+        {
+          "name": "[10] /api/debug/events",
+          "status": "passed"
+        },
+        {
+          "name": "[11] /api/debug/engine-log",
+          "status": "passed"
+        },
+        {
+          "name": "[12] /api/debug/chunks",
+          "status": "passed"
+        },
+        {
+          "name": "[13] /api/indexing/suggested-roots",
+          "status": "passed"
+        },
+        {
+          "name": "deniedAdmissionDoesNotReportUserInput()",
+          "status": "passed"
+        },
+        {
+          "name": "undeclaredAndAmbiguousRoutesCannotShip()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] /api/inference/transitions",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/conversations/encryption",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/chat/agent/tools",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/indexing/failed-jobs",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/runtime/manifest",
+          "status": "passed"
+        },
+        {
+          "name": "[1] /api/knowledge/folders",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/knowledge/folder-files",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/conversations/encryption/unlock",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/conversations/encryption/lock",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/ui/activity",
+          "status": "passed"
+        },
+        {
+          "name": "automaticLockIsNotExplicitLock()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourCallerAuditTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourCallerAuditTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80fdf35e0e7a248170e3447445d6a8dcaf5b40d185727aa0a9685cdf8340126b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitResultOpenStillIsUserInput()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitIngestionEventReadIsUserInput()",
+          "status": "passed"
+        },
+        {
+          "name": "deliberatelyPostedDispositionIsUserInput()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:91454ca9ecbff84548499adc6cb2922387dbab71d0e617334f055b81039431a5"
+}

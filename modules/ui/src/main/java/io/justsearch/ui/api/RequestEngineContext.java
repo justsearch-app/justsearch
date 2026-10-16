@@ -58,6 +58,37 @@ public final class RequestEngineContext {
     return observer ? EngineContext.Urgency.BACKGROUND : EngineContext.Urgency.FOREGROUND;
   }
 
+  /** User input is independent of work scheduling. Polls never extend the idle window. */
+  static boolean isUserActivity(Context request) {
+    return ActivityRole.isUserActivity(request);
+  }
+
+  /** The web UI's presence signal; its body may say how long ago the reported input happened. */
+  static final String PRESENCE_PATH = "/api/ui/activity";
+
+  /**
+   * How long before arrival the input a request reports happened: the presence signal's
+   * {@code inputAgeMs}, which the web UI sets on the report it sends when a presence interval ends.
+   * Every other request, and a presence report without a usable age, is input happening now. The
+   * activity owner bounds the age, so no client can place input in the future or far in the past.
+   */
+  static long reportedInputAgeMs(Context request) {
+    if (!PRESENCE_PATH.equals(request.path()) || request.method() != io.javalin.http.HandlerType.POST) {
+      return 0;
+    }
+    try {
+      String body = request.body();
+      if (body.isBlank()) return 0;
+      var age = PRESENCE_JSON.readTree(body).path("inputAgeMs");
+      return age.isNumber() ? age.asLong() : 0;
+    } catch (RuntimeException unreadable) {
+      return 0;
+    }
+  }
+
+  private static final tools.jackson.databind.ObjectMapper PRESENCE_JSON =
+      new tools.jackson.databind.ObjectMapper();
+
   /** Direct resume/fork/undo enters the same agent trust boundary as the shape runner. */
   public static EngineContext agent(Context request) {
     EngineContext incoming = get(request);

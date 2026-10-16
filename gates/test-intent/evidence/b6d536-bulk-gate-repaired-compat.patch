@@ -1,0 +1,15 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRecordType.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRecordType.java
+index 90838ee77..0005e6a0e 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRecordType.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRecordType.java
+@@ -22,7 +22,9 @@ public enum LedgerRecordType {
+   ENGINE_EXIT("engine-exit", LedgerFamily.ENGINE),
+   ENGINE_OWNER_DIED("engine-owner-died", LedgerFamily.ENGINE),
+   /** Written by any writer, on the next successful write after records were lost. */
+-  LEDGER_GAP("ledger-gap", null);
++  LEDGER_GAP("ledger-gap", null),
++  /** Compat (fail-before only): the later helper-start record; nothing here writes it. */
++  HELPER_START("helper-start", LedgerFamily.CHILDREN);
+ 
+   private final String token;
+   /** The one family this type belongs to, or null for a type of every family. */

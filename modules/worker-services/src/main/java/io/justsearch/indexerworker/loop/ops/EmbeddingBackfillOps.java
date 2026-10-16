@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop.ops;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
@@ -201,19 +202,25 @@ public final class EmbeddingBackfillOps {
     // throttles CPU backfill too.
     boolean mainGpuActive = context.signalBus().isMainGpuActive();
     boolean energyReduced = context.signalBus().isEnergyReduced();
+    // Spec E step E3: the bulk hold stops this pass too, when its encoder (embedding, the only one
+    // this pass runs) is on the GPU. CPU embedding is not GPU work and is not held (P2).
+    boolean bulkHeld = context.signalBus().isBulkHeld();
     boolean shouldInterrupt =
         LoopPacingPolicy.shouldInterruptBackfill(
             context.runningSupplier().getAsBoolean(),
             mainGpuActive,
             energyReduced,
+            bulkHeld,
+            false,
             embeddingProvider);
     if (shouldInterrupt) {
       boolean backfillBlocked =
-          !LoopPacingPolicy.shouldRunBackfill(mainGpuActive, energyReduced, embeddingProvider);
+          !LoopPacingPolicy.shouldRunBackfill(
+              mainGpuActive, energyReduced, bulkHeld, false, embeddingProvider);
       context
           .log()
           .debug(
-              "{} interrupted: backfill blocked (GPU/energy)={}, stopping={}",
+              "{} interrupted: backfill blocked (GPU/energy/hold)={}, stopping={}",
               label,
               backfillBlocked,
               !context.runningSupplier().getAsBoolean());
@@ -243,7 +250,7 @@ public final class EmbeddingBackfillOps {
     int failed = 0;
     int markedFailed = 0;
     try {
-      float[] vector = embeddingProvider.embedDocument(content);
+      float[] vector = embeddingProvider.embedDocument(content, InferenceRequest.background());
       if (vector != null && vector.length > 0) {
         Map<String, Object> updates = new HashMap<>();
         updates.put(SchemaFields.VECTOR, vector);
@@ -414,7 +421,8 @@ public final class EmbeddingBackfillOps {
         for (int i = 0; i < batchChunkIds.size(); i++) {
           String chunkId = batchChunkIds.get(i);
           try {
-            float[] vector = embeddingProvider.embedDocument(batchContents.get(i));
+            float[] vector =
+                embeddingProvider.embedDocument(batchContents.get(i), InferenceRequest.background());
             if (vector != null && vector.length > 0) {
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.CHUNK_VECTOR, vector);

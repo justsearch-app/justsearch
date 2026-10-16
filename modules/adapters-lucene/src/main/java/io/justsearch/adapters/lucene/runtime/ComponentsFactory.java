@@ -62,20 +62,16 @@ final class ComponentsFactory {
    *     resolvedConfig paths are both null)
    */
   static Components build(
-      ResolvedConfig resolvedConfig,
-      Path fallbackIndexPath,
-      Path indexPath,
-      boolean readOnly,
-      FieldMapper fieldMapper,
-      SsotAnalyzerRegistry analyzerRegistry,
-      KnnVectorsFormat knnVectorsFormatOverride,
-      SoftDeletesMetrics softDeletesMetrics,
-      IndexOpenGuard indexOpenGuard,
-      AtomicLong lastRefreshNanos,
-      NrtReopenStats nrtStats,
-      long nrtTargetMaxStaleMsDefault,
-      long nrtHardMaxStaleMsDefault)
-      throws IOException {
+      ResolvedConfig resolvedConfig, Path fallbackIndexPath, Path indexPath, boolean readOnly,
+      FieldMapper fieldMapper, SsotAnalyzerRegistry analyzerRegistry,
+      KnnVectorsFormat knnVectorsFormatOverride, SoftDeletesMetrics softDeletesMetrics,
+      IndexOpenGuard indexOpenGuard, AtomicLong lastRefreshNanos, NrtReopenStats nrtStats,
+      long nrtTargetMaxStaleMsDefault, long nrtHardMaxStaleMsDefault,
+      ChunkSetCompleteness... suppliedCompleteness) throws IOException {
+    if (suppliedCompleteness.length > 1)
+      throw new IllegalArgumentException("At most one admission cache can be supplied");
+    ChunkSetCompleteness completeness = suppliedCompleteness.length == 0
+        ? new ChunkSetCompleteness() : java.util.Objects.requireNonNull(suppliedCompleteness[0]);
     ResolvedConfig rc = resolvedConfig;
     ResolvedConfig.Index idx = rc.index();
     // A null explicit path means auto-temp, regardless of configured persistent paths.
@@ -330,7 +326,7 @@ final class ComponentsFactory {
         softDeletesReader =
             new SoftDeletesDirectoryReaderWrapper(
                 DirectoryReader.open(dir), softDeleteFieldResolved);
-        mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory());
+        mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory(completeness));
         stats.install(mgr, lastRefreshNanos, null);
 
         return new Components(
@@ -372,7 +368,7 @@ final class ComponentsFactory {
           new SoftDeletesDirectoryReaderWrapper(
               DirectoryReader.open(w, /*applyAllDeletes=*/ true, /*writeAllDeletes=*/ true),
               softDeleteFieldResolved);
-      mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory());
+      mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory(completeness));
       stats.install(mgr, lastRefreshNanos, w);
       thread = NrtReopenThreads.create(w, mgr, reopenTargetMs, reopenHardMs);
 
@@ -460,12 +456,14 @@ final class ComponentsFactory {
    * Returns a SearcherFactory that disables the query cache (shared by read-only and read-write
    * paths).
    */
-  private static SearcherFactory newNoCacheSearcherFactory() {
+  private static SearcherFactory newNoCacheSearcherFactory(ChunkSetCompleteness completeness) {
     return new SearcherFactory() {
       @Override
       public IndexSearcher newSearcher(IndexReader reader, IndexReader previous) throws IOException {
         IndexSearcher searcher = new IndexSearcher(reader);
         searcher.setQueryCache(null);
+        // Admission sees a validated immutable reader: it never performs child work itself.
+        completeness.prepare(searcher);
         return searcher;
       }
     };

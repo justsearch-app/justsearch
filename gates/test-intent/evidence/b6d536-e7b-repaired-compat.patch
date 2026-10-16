@@ -1,0 +1,32 @@
+Compat before-patch for b6d536-e7b-repaired-b15-refresh, applied to 481434f82 (coordinator
+decision 4; revised after the phase B verifier rejection of the earlier do-nothing lease).
+
+Production, one add-only delegating method: GpuCallPacker.acquireForCall, which
+GpuCallPackerTest calls (1f8ce3e01, b9abcaf97). It delegates to sessions.acquire(request), which
+is the dispatch every encoder call site in 481434f82 performed for a call (SpladeEncoder,
+OnnxEmbeddingEncoder, CrossEncoderReranker, BertNerInference; 1f8ce3e01 replaced exactly those
+sessions.acquire(acquisition) calls with acquireForCall). It adds no packing and no CPU
+selection, so the check observes the old dispatch. No production code in this state calls it.
+
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java b/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
+index adc7addee..62f51ff1a 100644
+--- a/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/GpuCallPacker.java
+@@ -89,6 +89,17 @@ public final class GpuCallPacker {
+         .flatMap(GpuArenaPlan.Role::bulkCpuReason);
+   }
+ 
++  /**
++   * Compat method for fail-before runs only; nothing in this state reads it. It performs the
++   * dispatch the 481434f82 encoder call sites used for every call: sessions.acquire(request),
++   * whatever the role or padded shape. It adds no packing and no CPU selection.
++   */
++  public static SessionHandle.Lease acquireForCall(
++      SessionHandle sessions, SessionAcquisitionRequest request, EncoderRole role,
++      int paddedCount, int paddedLength) {
++    return sessions.acquire(request);
++  }
++
+   private static Optional<GpuArenaPlan.Role> packedRole(
+       Optional<GpuArenaPlan> plan, EncoderRole role) {
+     return plan.filter(GpuArenaPlan::planned)

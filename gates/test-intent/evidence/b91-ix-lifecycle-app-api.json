@@ -1,0 +1,126 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T14:49:51.011Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "64a2064436d67e57146440552507753977ab2a25",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperRollbackTest.failedHandleAcquisitionRollsBackSpawn\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperRollbackTest.failedRollbackReturnsTheExactSurvivor\" --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessBoundTest.blockedStorageCannotOutliveFinishAllowance\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.persistenceFailureWarnsOnceAndRecoveryIsReported\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20239
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperRollbackTest.java#failedHandleAcquisitionRollsBackSpawn",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperRollbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9539e91b8f3b8f74efc473b9457c6354026ae8dcd27e6d0f4b9593c7b7eb284c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedHandleAcquisitionRollsBackSpawn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperRollbackTest.java#failedRollbackReturnsTheExactSurvivor",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperRollbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9539e91b8f3b8f74efc473b9457c6354026ae8dcd27e6d0f4b9593c7b7eb284c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedRollbackReturnsTheExactSurvivor()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessBoundTest.java#blockedStorageCannotOutliveFinishAllowance",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessBoundTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:afaf1429072134d5d1b0128188843f2915dc70bb5589ac2c604119b8d30cddfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedStorageCannotOutliveFinishAllowance()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#persistenceFailureWarnsOnceAndRecoveryIsReported",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:67fa959765ef32f68e5d454655e3a4fb83634da6fcbd765e9d0032a513271abf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "persistenceFailureWarnsOnceAndRecoveryIsReported()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperRollbackTest.failedHandleAcquisitionRollsBackSpawn\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperRollbackTest.failedRollbackReturnsTheExactSurvivor\" --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessBoundTest.blockedStorageCannotOutliveFinishAllowance\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.persistenceFailureWarnsOnceAndRecoveryIsReported\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 40057
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperRollbackTest.java#failedHandleAcquisitionRollsBackSpawn",
+        "classification": "assertion",
+        "detail": "failedHandleAcquisitionRollsBackSpawn(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: failed registration must roll back the exact spawn before returning ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperRollbackTest.java#failedRollbackReturnsTheExactSurvivor",
+        "classification": "assertion",
+        "detail": "failedRollbackReturnsTheExactSurvivor(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unconfirmed rollback must return explicit ownership of its survivor ==> Unexpected exception thrown: java.lang.NoSuchMethodException: java.io.IOException.survivor()"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessBoundTest.java#blockedStorageCannotOutliveFinishAllowance",
+        "classification": "assertion",
+        "detail": "blockedStorageCannotOutliveFinishAllowance(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: finish must report failure while the disk writer is still blocked ==> Unexpected exception thrown: java.util.concurrent.TimeoutException"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#persistenceFailureWarnsOnceAndRecoveryIsReported",
+        "classification": "assertion",
+        "detail": "persistenceFailureWarnsOnceAndRecoveryIsReported(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: one visible warning per failure episode ==> expected: <1> but was: <0>"
+      }
+    ]
+  },
+  "digest": "sha256:9d23a1c904b296ec0373e257e55973d96930cd8dd6128d138971c8f7d4cf813d"
+}

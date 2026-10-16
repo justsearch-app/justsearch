@@ -1,0 +1,745 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:08:23.109Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "e32b9d9b10db29dba0c9e0434f653aa6c49f5097",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistoryTest.anEmptyDataDirectoryHasNoEarlierRestarts\" --tests \"io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistoryTest.onlyDeviceLostSelfIntentsCountInLedgerOrder\" --tests \"io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistoryTest.anUnreadableLineMakesTheHistoryUnreadable\" --tests \"io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistoryTest.aWriteStillInProgressAtTheTailIsNotAnError\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5075
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aServerThatAnswersHealthAndOneTokenPassesTheProbe\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aFailedOneTokenProbeStopsTheServerAndRelaunchesItOnce\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aProbeFailureWithDeviceLostTextReportsTheCodeAndLeavesTheServerToTheController\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.withChatOffThereIsNothingToProbe\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.theDeviceLostStopEndsTheServerAndLatchesDeviceLostLimit\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.withinTheLimitTheDeviceLostStopEndsTheServerFirstAndLatchesNothing\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aResumeRestartsTheStartsHealthDeadlineInFull\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.withoutAResumeTheStartsHealthDeadlineStillEnds\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aStartExitNamingALostDeviceIsReportedToTheController\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aStartExitWithoutDeviceLostTextIsNotReported\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLostCodeTest.theCudaErrorsOnTheListNameTheirCodes\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLostCodeTest.everyCodeOnSpecEsListIsDeviceLossByItsCudaErrorText\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLostCodeTest.numberedAndNamedCodesOnTheListAreDeviceLoss\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLostCodeTest.codesOffTheListAreNotDeviceLoss\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLostCodeTest.otherDeviceSuspectExitsAndOutOfMemoryAreNotDeviceLoss\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLostCodeTest.serverOutputNamesTheCodeWhileTheProcessLives\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14921
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.withinTheLimitTheServerStopsNowAndTheEngineRestarts\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.theServerStopsBeforeTheLedgerIsRead\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.overTheLimitTheServerAlsoStopsBeforeTheLedgerIsRead\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.twoEarlierRestartsInTheHourStillLeaveRoomForAThird\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.aRestartInTheLastTenMinutesFailsChatInsteadOfRestarting\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.threeRestartsInTheLastHourFailChatInsteadOfRestarting\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.anUnreadableLedgerFailsClosed\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.noBoundRestartPathFailsClosed\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.aSecondReportWhileTheFirstIsHandledIsIgnored\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.theLimitCountsTheNewRestartAgainstBothWindows\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.theResidencyDwellRestartsInFullOnResume\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.theServerTimersResetAtOnceAndAServingServerIsProbedAfterTheStepInProgress\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.aProbeThatFindsTheDeviceLostTakesTheDeviceLostPath\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.aPassingProbeChangesNothing\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.theResumeClearsAFailureLatchAndSendsTheIntentAgain\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.withoutALatchTheResumeDoesNotReplan\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.theBootOrderDeadlineRestartsInFullOnResume\" --tests \"io.justsearch.app.services.chat.ChatResumeTest.aResumeAfterTheControllerStoppedDoesNothing\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8235
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownDeviceLostTest.aDeviceLostRestartRecordsItsIntentClosesInRestartOrderAndExitsFour\" --tests \"io.justsearch.app.engine.EngineShutdownDeviceLostTest.anUncleanCloseExitsFatalInstead\" --tests \"io.justsearch.app.engine.EngineShutdownDeviceLostTest.aSecondExitRequestAddsNothing\" --tests \"io.justsearch.app.engine.EngineShutdownDeviceLostTest.theIntentIsTheOneTheSupervisorExpectsForDeviceLost\" --tests \"io.justsearch.app.engine.EngineDeviceLossWitnessTest.anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5724
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.aFailedSelfIntentWriteFailsTheCountClosed\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5128
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java#anEmptyDataDirectoryHasNoEarlierRestarts",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aefd446229f5d75a217f963b0be479e08178b36e608d5091294e85385a156c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEmptyDataDirectoryHasNoEarlierRestarts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java#onlyDeviceLostSelfIntentsCountInLedgerOrder",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aefd446229f5d75a217f963b0be479e08178b36e608d5091294e85385a156c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlyDeviceLostSelfIntentsCountInLedgerOrder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java#anUnreadableLineMakesTheHistoryUnreadable",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aefd446229f5d75a217f963b0be479e08178b36e608d5091294e85385a156c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnreadableLineMakesTheHistoryUnreadable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java#aWriteStillInProgressAtTheTailIsNotAnError",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/DeviceLostRestartHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aefd446229f5d75a217f963b0be479e08178b36e608d5091294e85385a156c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWriteStillInProgressAtTheTailIsNotAnError()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aServerThatAnswersHealthAndOneTokenPassesTheProbe",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aServerThatAnswersHealthAndOneTokenPassesTheProbe()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aFailedOneTokenProbeStopsTheServerAndRelaunchesItOnce",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedOneTokenProbeStopsTheServerAndRelaunchesItOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aProbeFailureWithDeviceLostTextReportsTheCodeAndLeavesTheServerToTheController",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aProbeFailureWithDeviceLostTextReportsTheCodeAndLeavesTheServerToTheController()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#withChatOffThereIsNothingToProbe",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withChatOffThereIsNothingToProbe()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#theDeviceLostStopEndsTheServerAndLatchesDeviceLostLimit",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theDeviceLostStopEndsTheServerAndLatchesDeviceLostLimit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#withinTheLimitTheDeviceLostStopEndsTheServerFirstAndLatchesNothing",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withinTheLimitTheDeviceLostStopEndsTheServerFirstAndLatchesNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aResumeRestartsTheStartsHealthDeadlineInFull",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aResumeRestartsTheStartsHealthDeadlineInFull()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#withoutAResumeTheStartsHealthDeadlineStillEnds",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withoutAResumeTheStartsHealthDeadlineStillEnds()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aStartExitNamingALostDeviceIsReportedToTheController",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStartExitNamingALostDeviceIsReportedToTheController()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aStartExitWithoutDeviceLostTextIsNotReported",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStartExitWithoutDeviceLostTextIsNotReported()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java#theCudaErrorsOnTheListNameTheirCodes",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c7ea688cc5fed0c25882fabb3638944c3648107b0ca24624c25421a5c30de3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theCudaErrorsOnTheListNameTheirCodes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java#everyCodeOnSpecEsListIsDeviceLossByItsCudaErrorText",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c7ea688cc5fed0c25882fabb3638944c3648107b0ca24624c25421a5c30de3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyCodeOnSpecEsListIsDeviceLossByItsCudaErrorText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java#numberedAndNamedCodesOnTheListAreDeviceLoss",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c7ea688cc5fed0c25882fabb3638944c3648107b0ca24624c25421a5c30de3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "numberedAndNamedCodesOnTheListAreDeviceLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java#codesOffTheListAreNotDeviceLoss",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c7ea688cc5fed0c25882fabb3638944c3648107b0ca24624c25421a5c30de3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "codesOffTheListAreNotDeviceLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java#otherDeviceSuspectExitsAndOutOfMemoryAreNotDeviceLoss",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c7ea688cc5fed0c25882fabb3638944c3648107b0ca24624c25421a5c30de3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "otherDeviceSuspectExitsAndOutOfMemoryAreNotDeviceLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java#serverOutputNamesTheCodeWhileTheProcessLives",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLostCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c7ea688cc5fed0c25882fabb3638944c3648107b0ca24624c25421a5c30de3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "serverOutputNamesTheCodeWhileTheProcessLives()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#withinTheLimitTheServerStopsNowAndTheEngineRestarts",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withinTheLimitTheServerStopsNowAndTheEngineRestarts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#theServerStopsBeforeTheLedgerIsRead",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theServerStopsBeforeTheLedgerIsRead()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#overTheLimitTheServerAlsoStopsBeforeTheLedgerIsRead",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overTheLimitTheServerAlsoStopsBeforeTheLedgerIsRead()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#twoEarlierRestartsInTheHourStillLeaveRoomForAThird",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "twoEarlierRestartsInTheHourStillLeaveRoomForAThird()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#aRestartInTheLastTenMinutesFailsChatInsteadOfRestarting",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRestartInTheLastTenMinutesFailsChatInsteadOfRestarting()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#threeRestartsInTheLastHourFailChatInsteadOfRestarting",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "threeRestartsInTheLastHourFailChatInsteadOfRestarting()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#anUnreadableLedgerFailsClosed",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnreadableLedgerFailsClosed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#noBoundRestartPathFailsClosed",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noBoundRestartPathFailsClosed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#aSecondReportWhileTheFirstIsHandledIsIgnored",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSecondReportWhileTheFirstIsHandledIsIgnored()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#theLimitCountsTheNewRestartAgainstBothWindows",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theLimitCountsTheNewRestartAgainstBothWindows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#theResidencyDwellRestartsInFullOnResume",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theResidencyDwellRestartsInFullOnResume()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#theServerTimersResetAtOnceAndAServingServerIsProbedAfterTheStepInProgress",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theServerTimersResetAtOnceAndAServingServerIsProbedAfterTheStepInProgress()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#aProbeThatFindsTheDeviceLostTakesTheDeviceLostPath",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aProbeThatFindsTheDeviceLostTakesTheDeviceLostPath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#aPassingProbeChangesNothing",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPassingProbeChangesNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#theResumeClearsAFailureLatchAndSendsTheIntentAgain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theResumeClearsAFailureLatchAndSendsTheIntentAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#withoutALatchTheResumeDoesNotReplan",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withoutALatchTheResumeDoesNotReplan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#theBootOrderDeadlineRestartsInFullOnResume",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theBootOrderDeadlineRestartsInFullOnResume()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java#aResumeAfterTheControllerStoppedDoesNothing",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aResumeAfterTheControllerStoppedDoesNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java#aDeviceLostRestartRecordsItsIntentClosesInRestartOrderAndExitsFour",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a049e82e92dc13242d2c55191460c9a4739405bf3398f96b19834bbc8e3df70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDeviceLostRestartRecordsItsIntentClosesInRestartOrderAndExitsFour(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java#anUncleanCloseExitsFatalInstead",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a049e82e92dc13242d2c55191460c9a4739405bf3398f96b19834bbc8e3df70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUncleanCloseExitsFatalInstead(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java#aSecondExitRequestAddsNothing",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a049e82e92dc13242d2c55191460c9a4739405bf3398f96b19834bbc8e3df70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSecondExitRequestAddsNothing(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java#theIntentIsTheOneTheSupervisorExpectsForDeviceLost",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownDeviceLostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a049e82e92dc13242d2c55191460c9a4739405bf3398f96b19834bbc8e3df70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theIntentIsTheOneTheSupervisorExpectsForDeviceLost()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDeviceLossWitnessTest.java#anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDeviceLossWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d15e9d180b5e1b27785181ea32fb8abe73ae0da87291cbd3dc56ee13b6da458f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#aFailedSelfIntentWriteFailsTheCountClosed",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedSelfIntentWriteFailsTheCountClosed(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:587fbe71c6c0b289a026c59ebdb61e602bae98b957ffd34a6bf835b4b3517a60"
+}

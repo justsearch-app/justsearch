@@ -406,7 +406,9 @@ public final class RemoteDocumentService implements DocumentService {
             response.getRetrievalMode(),
             response.getRetrievalModeReason(),
             response.getContextTruncated(),
-            sections);
+            sections,
+            null, // no quality signals on this path; ContextResult normalises null to EMPTY
+            response.getRetrievalModeCause());
 
       } catch (Exception e) {
         EngineRefusals.rethrow(e);
@@ -430,15 +432,26 @@ public final class RemoteDocumentService implements DocumentService {
     return supplyWithCapturedClient(engineContext, client -> {
       var effectiveParams = params;
       try {
-        // When doc_ids are empty, do a pre-search to find relevant documents.
-        // This is necessary because entity/path/date filters are indexed on parent
-        // documents, not on chunks. The pre-search finds matching parent docs,
-        // then the RAG pipeline searches chunks within those docs.
+        RetrieveContextResponse response;
         if (params.docIds().isEmpty()) {
-          Set<String> discoveredDocIds = preSearchForDocIds(params, params.topK() * 2, engineContext, client);
-          if (!discoveredDocIds.isEmpty()) {
+          // When doc_ids are empty, do a pre-search to find relevant documents.
+          // This is necessary because entity/path/date filters are indexed on parent
+          // documents, not on chunks. The pre-search finds matching parent docs,
+          // then the RAG pipeline searches chunks within those docs.
+          //
+          // Spec D §1.2, §5.1: the two steps are one answer, so they share one request deadline
+          // D, fixed here, and each step's semantic sub-budget is carved from what is left of it.
+          // Before, each step took a fresh budget, so while the models loaded the pre-search and
+          // the retrieval each waited out a full sub-budget (8 s on the CPU cap) and the answer
+          // outlived its caller's limit with neither result nor reason.
+          long answerDeadline = openRetrievalDeadline(client);
+          PreSearch preSearch =
+              HeadSearchDeadline.within(
+                  answerDeadline,
+                  () -> preSearchForDocIds(params, params.topK() * 2, engineContext, client));
+          if (!preSearch.docIds().isEmpty()) {
             effectiveParams = new io.justsearch.app.api.RetrieveContextParams(
-                params.question(), discoveredDocIds, params.topK(), params.maxContextTokens(),
+                params.question(), preSearch.docIds(), params.topK(), params.maxContextTokens(),
                 params.entityPersons(), params.entityOrganizations(), params.entityLocations(),
                 params.modifiedAt(), params.freshnessEnabled(), params.pathPrefix(),
                 params.fileKind(), params.autoEntityExtract(), params.contextFormat(),
@@ -446,14 +459,20 @@ public final class RemoteDocumentService implements DocumentService {
                 params.metaPublishedAt(), params.returnFullDocuments(),
                 params.excludedSourceIds(), params.collection());
           }
+          logRichRetrieval(effectiveParams);
+          var retrieval = effectiveParams;
+          // A pre-search that already waited out its sub-budget on loading models tells the
+          // retrieval not to wait for them again; it answers with BM25 and the cause instead.
+          response =
+              HeadSearchDeadline.within(
+                  answerDeadline,
+                  () -> preSearch.semanticLoading()
+                      ? client.retrieveContextAfterLoadingModels(retrieval, engineContext)
+                      : client.retrieveContext(retrieval, engineContext));
+        } else {
+          logRichRetrieval(effectiveParams);
+          response = client.retrieveContext(effectiveParams, engineContext);
         }
-
-        log.debug("Retrieving RAG context (rich params): question='{}', topK={}, "
-            + "docIds={}, autoEntityExtract={}, format={}",
-            effectiveParams.question(), effectiveParams.topK(), effectiveParams.docIds().size(),
-            effectiveParams.autoEntityExtract(), effectiveParams.contextFormat());
-
-        RetrieveContextResponse response = client.retrieveContext(effectiveParams, engineContext);
         return mapRetrieveContextResponse(response);
       } catch (Exception e) {
         EngineRefusals.rethrow(e);
@@ -464,11 +483,52 @@ public final class RemoteDocumentService implements DocumentService {
     });
   }
 
+  private static void logRichRetrieval(io.justsearch.app.api.RetrieveContextParams params) {
+    log.debug("Retrieving RAG context (rich params): question='{}', topK={}, "
+        + "docIds={}, autoEntityExtract={}, format={}",
+        params.question(), params.topK(), params.docIds().size(),
+        params.autoEntityExtract(), params.contextFormat());
+  }
+
+  /**
+   * The request deadline {@code D} of an open retrieval, shared by its pre-search and its retrieval
+   * (Spec D §1.2): the client's request deadline from now, or the caller's own {@code D} when the
+   * call already runs inside one and it is earlier.
+   */
+  private static long openRetrievalDeadline(KnowledgeClient client) {
+    long own =
+        System.nanoTime()
+            + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(client.requestDeadlineMs());
+    java.util.OptionalLong caller = HeadSearchDeadline.current();
+    return caller.isPresent() ? HeadSearchDeadline.earlier(own, caller.getAsLong()) : own;
+  }
+
+  /**
+   * What an open retrieval's pre-search found.
+   *
+   * @param docIds the discovered parent documents, in rank order
+   * @param semanticLoading whether a semantic leg of the pre-search missed its sub-budget with the
+   *     cause {@code loading}, i.e. it waited out its sub-budget on models that were still loading
+   */
+  private record PreSearch(Set<String> docIds, boolean semanticLoading) {
+    static final PreSearch NONE = new PreSearch(Set.of(), false);
+  }
+
+  /** Whether a pre-search's trace reports a semantic leg that missed on loading models. */
+  private static boolean semanticLoading(io.justsearch.ipc.SearchResponse response) {
+    var degradation = response.getSearchTrace().getDegradation();
+    return LOADING_CAUSE.equals(degradation.getHybridFallbackCause())
+        || LOADING_CAUSE.equals(degradation.getSpladeSkipCause());
+  }
+
+  /** The wire spelling of {@code SearchReasonCode.LegCause.LOADING} (indexing.proto). */
+  private static final String LOADING_CAUSE = "loading";
+
   /**
    * Pre-search to discover relevant document IDs for open retrieval.
    * Uses the existing port search with optional filters to find top-matching documents.
    */
-  private Set<String> preSearchForDocIds(
+  private PreSearch preSearchForDocIds(
       io.justsearch.app.api.RetrieveContextParams params,
       int limit,
       EngineContext engineContext,
@@ -560,13 +620,14 @@ public final class RemoteDocumentService implements DocumentService {
           docIds.add(path);
         }
       }
-      log.debug("Pre-search for open retrieval: found {} documents (filters={})",
-          docIds.size(), hasFilters);
-      return docIds;
+      boolean semanticLoading = semanticLoading(searchResponse);
+      log.debug("Pre-search for open retrieval: found {} documents (filters={}, semanticLoading={})",
+          docIds.size(), hasFilters, semanticLoading);
+      return new PreSearch(docIds, semanticLoading);
     } catch (Exception e) {
       EngineRefusals.rethrow(e);
       log.warn("Pre-search for open retrieval failed", e);
-      return Set.of();
+      return PreSearch.NONE;
     }
   }
 
@@ -602,7 +663,7 @@ public final class RemoteDocumentService implements DocumentService {
         response.getRetrievalMode(),
         response.getRetrievalModeReason(),
         response.getContextTruncated(),
-        sections, quality);
+        sections, quality, response.getRetrievalModeCause());
   }
 
   private static ContextCitation toCitation(ContextChunk c) {

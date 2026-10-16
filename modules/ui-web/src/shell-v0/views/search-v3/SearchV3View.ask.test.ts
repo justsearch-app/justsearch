@@ -112,13 +112,10 @@ function stubStatus(status: number): void {
  */
 const dispatches = (): unknown[][] =>
   fetchMock.mock.calls
-    .filter((call) => String(call[0]).includes('/api/chat/dispatch'))
-    // Phase F7 (inventory A11) added a SECOND POST to the same endpoint after an answer lands: the
-    // conversation store's own auto-titling, a throwaway `core.free-chat` turn against a
-    // `_title_…` session it then deletes (`state/conversationListStore.ts:206-253`). It is not a
-    // second issuance site — it is the product's naming authority, reached through the store — so it
-    // is excluded here, and asserted on its own terms in the auto-titling case below.
-    .filter((call) => !String((call[1] as { body?: unknown } | undefined)?.body ?? '').includes('_title_'));
+    // The conversation store's own auto-titling (Phase F7, inventory A11) used to be a second POST
+    // here, a throwaway `_title_…` turn; it has its own `…/auto-title` route now, so every call to
+    // this endpoint is an issuance.
+    .filter((call) => String(call[0]).includes('/api/chat/dispatch'));
 
 beforeEach(() => {
   // Phase F6 wired this window to APP-WIDE, process-lifetime authorities (the conversation store,

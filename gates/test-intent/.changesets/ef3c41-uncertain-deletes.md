@@ -7,6 +7,14 @@ author-session: aae08035fcc266bae
 
 # Test-intent entries
 
+Merge integration with b6d536 preserves the lost-brake recovery assertions.
+`WorkerSnapshotTapLostBrakeTest` now supplies and closes its delivery executor on the
+merged API, uses the original no-argument registry only on the declared before-state,
+and closes the channel when that API supports AutoCloseable. No recovery assertion changes.
+The round-2 and round-3 evidence files are refreshed against their original declared
+before-states. This note brings the existing entries into the merge diff for review;
+the builder does not renew their acceptance.
+
 Task t-20261013-ef3c41: JustSearch never deletes indexed content, and never approves an index as compatible,
 when it cannot tell. Repaired checks fail on cf3f14655 by assertion (evidence
 `gates/test-intent/evidence/ef3c41-uncertain-deletes-repaired.json`). Must-not-break checks pass before and after (`gates/test-intent/evidence/ef3c41-uncertain-deletes-preserved.json`, run with
@@ -2347,5 +2355,16 @@ Round 9 (on top of 925610f44, decisions under the owner's delegation): on a plat
   "verdict": "accept",
   "digest": "sha256:88251cfa317e9059b399529f50ed9526a435162358ad534e99d5d7805aa6da5f",
   "note": "Independent verifier accepted round 9 (fdefda2f6): no platform volume identity defers nothing (seam run 2,710 tests, 0 failed); deleted, corrupt, malformed and denied volume ledger deletes nothing live; store-recoverability gate passes; full suite 9,816/0. a1d143cee only removes two unused exports (dead-code gate), with no behaviour change."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS5c-20261016",
+  "verdict": "accept",
+  "digest": "sha256:591f702d37f91194fc790f952f6c50f47ab82807d34cbf31ccb1fbcd4bd973f9",
+  "note": "Reviewed the merge compatibility against origin/main 298354254: the helpers call the real old/new APIs and retain the original assertions. All 25 refreshed-evidence candidate selectors pass, both declared unpatched before states reproduce 21 named assertion failures plus four preservation passes, and the changed status-fixture consumers pass."
 }
 ```

@@ -14,8 +14,21 @@ public record LlmSettingsV2(
     Integer maxTokens,
     Integer gpuLayers,
     String modelPath,
-    String llamaLibPath
+    String llamaLibPath,
+    String gameDetection
 ) {
+  public LlmSettingsV2 {
+    if (gameDetection != null && !gameDetection.equals("auto") && !gameDetection.equals("off")) {
+      throw new IllegalArgumentException("gameDetection must be auto or off");
+    }
+  }
+
+  /** Existing callers omit the GPU game-detection override. */
+  public LlmSettingsV2(String serverExecutable, Integer contextWindow, Integer maxTokens,
+      Integer gpuLayers, String modelPath, String llamaLibPath) {
+    this(serverExecutable, contextWindow, maxTokens, gpuLayers, modelPath, llamaLibPath, null);
+  }
+
   public static LlmSettingsV2 defaults() {
     return new LlmSettingsV2(null, 4096, 1024, null, null, null);
   }

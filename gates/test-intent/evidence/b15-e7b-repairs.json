@@ -1,0 +1,266 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T18:05:03.794Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "a62107ea9f8c613e00da90dea652c884b65f23b6",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 29438
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22486
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17029
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15506
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15976
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8c46613ba11dbf04a8d05faa000dffce75a3ae634fa11b33f8b99c24c4243ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f416e634a4d5dc644836a5ef671c15c0deb544a2d5230a5c21a42db2a11030e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f416e634a4d5dc644836a5ef671c15c0deb544a2d5230a5c21a42db2a11030e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd611f184f886fc788fff8ed6b4e38385bebc37e8b21033d64a3629620529de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37e0fe404e97ff24be210a22e1590c304e7e450d81b0bc8be2fa08b60d274956",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInfeasibleSingleItemRemainsAvailableForCpuDispatch()",
+          "status": "passed"
+        },
+        {
+          "name": "anExplicitCompactChatRepeatsTheProfileRuleWithItsOwnFootprint()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] 6144, BELOW_P8",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 10240, P8",
+          "status": "passed"
+        },
+        {
+          "name": "anExplicitNineBOnACompactSizedDeviceIsKeptAndReportedUnmet()",
+          "status": "passed"
+        },
+        {
+          "name": "anExplicitCapTooSmallForTheLongestSingleItemIsReportedUnmet()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5970a2de5",
+    "revision": "5970a2de5cd5a309f7aa701a2fbec06f60d7f730",
+    "overlays": [
+      "modules/ui/build.gradle.kts",
+      "modules/ui/src/integrationTest/java/io/justsearch/ui/api/LocalApiIntegrationTestBase.java",
+      "modules/ui/src/integrationTest/java/io/justsearch/indexerworker/server/PlannedSettingsQueryOwner.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:integrationTest --tests \"io.justsearch.ui.api.PlannedContextSettingsIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 32721
+      },
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 25486
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved\" --tests \"io.justsearch.ui.api.OperatingGpuProfileTest.bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16383
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16665
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13840
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/PlannedContextSettingsIntegrationTest.java",
+        "classification": "assertion",
+        "detail": "[1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: partial context write: {\"error\":\"Settings update could not complete\",\"errorCode\":\"SETTINGS_RECOVERY_REQUIRED\",\"errorClass\":\"PERMANENT\",\"retryable\":false,\"i18nKey\":\"errors.INVALID_STATE\"} ==> expected: <200> but was: <503> | [2] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: partial context write: {\"error\":\"Settings update could not complete\",\"errorCode\":\"SETTINGS_RECOVERY_REQUIRED\""
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions",
+        "classification": "assertion",
+        "detail": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a cap change has no bulk session to replace when the physical bulk surface is empty ==> Unexpected exception thrown: java.lang.IllegalStateException: Query-only settings cannot change index model ownership"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved",
+        "classification": "assertion",
+        "detail": "belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the preserved 9B over-commit must be visible ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java#bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan",
+        "classification": "assertion",
+        "detail": "bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: BGE-M3 CPU fallback must explain why ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead",
+        "classification": "assertion",
+        "detail": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: file + 1,450 MiB ==> expected: <2450.0> but was: <1450.0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder",
+        "classification": "assertion",
+        "detail": "anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: indexing must finish both documents after the admitting request expires ==> Unexpected exception thrown: java.lang.reflect.InvocationTargetException"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
+        "classification": "assertion",
+        "detail": "anExplicitCompactChatRepeatsTheProfileRuleWithItsOwnFootprint(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the pinned small chat fits all encoder shapes ==> expected: <P16_PLUS> but was: <P12> | [1] 6144, BELOW_P8: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: keep the explicit window ==> expected: <OptionalInt[131072]> but was: <OptionalInt.empty> | [2] 10240, P8: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: k"
+      }
+    ]
+  },
+  "digest": "sha256:3606b81574ebaf55e9ce8326b8353b66287bcd96c2a095fd7cd05f649a037093"
+}

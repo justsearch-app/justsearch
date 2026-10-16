@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:58:12.107Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "7de29453b7d516553fe329e8cc9296b8734b4b34",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.VduGenerationDoesNotSlowIndexingTest.vduGenerationLeavesIndexingRunning\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8268
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/VduGenerationDoesNotSlowIndexingTest.java#vduGenerationLeavesIndexingRunning",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/VduGenerationDoesNotSlowIndexingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5054641d2c570766adf4da2caf62f996b31f606b750ae5fb4788464e8e0e074b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vduGenerationLeavesIndexingRunning(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f5c7df712",
+    "revision": "f5c7df712a6cf7e4ba1c8bf560f6a62738bd352e",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.VduGenerationDoesNotSlowIndexingTest.vduGenerationLeavesIndexingRunning\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 88522
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/VduGenerationDoesNotSlowIndexingTest.java#vduGenerationLeavesIndexingRunning",
+        "classification": "assertion",
+        "detail": "vduGenerationLeavesIndexingRunning(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a VDU generation with no chat reply must not slow indexing; verdict: Verdict[mode=DUTY_FLOOR, reasons=[CHAT_GENERATING], since=2026-10-14T15:58:09.594493500Z] ==> expected: <RUN> but was: <DUTY_FLOOR>"
+      }
+    ]
+  },
+  "digest": "sha256:be4da5f8c1765dfaeda62c091b45fa17cc0eba9479031c9c040787641740dd67"
+}

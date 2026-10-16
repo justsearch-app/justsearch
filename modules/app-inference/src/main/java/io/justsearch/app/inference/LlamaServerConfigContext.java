@@ -10,4 +10,9 @@ record LlamaServerConfigContext(InferenceConfig inference, ResolvedConfig resolv
     Objects.requireNonNull(inference, "inference");
     Objects.requireNonNull(resolved, "resolved");
   }
+
+  /** The device decision for this attempt, retained across configuration changes and failures. */
+  LlamaDevicePlan devicePlan() {
+    return LlamaDevicePlan.resolve(resolved, inference.gpuLayers(), java.util.Optional.empty());
+  }
 }

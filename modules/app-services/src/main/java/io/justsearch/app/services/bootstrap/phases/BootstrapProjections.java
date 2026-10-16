@@ -68,8 +68,8 @@ public final class BootstrapProjections {
    * fields ({@code chatEnabledSpec}/{@code engineState}/{@code engineReason}/{@code procedure}/
    * {@code leaseHolder}) from the reconciler's live {@link RuntimeSpec} + {@link RuntimeStatus}.
    * Nullable — an absent reconciler (mgr null, or the rare pre-reconciler-attach boot window)
-   * projects them at their empty/default value; {@code phase} and every pre-existing field's
-   * derivation is byte-identical to before this projection.
+   * projects them at their empty/default value. A pending VDU restoration that has exhausted
+   * automatic retries retains its failure code and adds the stopped-retries status text.
    */
   public static InferenceRuntimeView projectInferenceSnapshot(
       InferenceLifecycleManager mgr, RuntimeReconciler reconciler) {
@@ -88,7 +88,11 @@ public final class BootstrapProjections {
             .orElse(null);
     InferenceFailureView failureView =
         mgr.lastFailure()
-            .map(f -> new InferenceFailureView(f.wireCode(), f.detail()))
+            .map(f -> new InferenceFailureView(f.wireCode(),
+                mgr.chatResidency() != null && mgr.chatResidency().vduRestorationRetriesStopped()
+                    ? f.detail() + " Automatic retries stopped after five failed attempts."
+                        + " Send a chat request or apply settings to try again."
+                    : f.detail()))
             .orElse(null);
     long transitionsTotal = mgr.identity().map(RuntimeIdentity::generationId).orElse(0L);
     LifecycleCounters counters = new LifecycleCounters(0L, 0L, transitionsTotal);

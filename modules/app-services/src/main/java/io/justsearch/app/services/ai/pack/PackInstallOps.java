@@ -158,6 +158,12 @@ final class PackInstallOps {
     try {
       PackStagingOps.moveAtomicBestEffort(stagedChat, destChat);
       PackStagingOps.moveAtomicBestEffort(stagedEmbed, destEmbed);
+      try {
+        io.justsearch.app.inference.ChatArtifactIdentity.promoted(
+            stagedChat, destChat, chat.sizeBytes, chat.sha256);
+      } catch (java.io.IOException unavailable) {
+        log.debug("Pack chat verification receipt could not follow promotion", unavailable);
+      }
     } catch (Exception e) {
       throw new PackInstallException(
           "PACK_INSTALL_FAILED", "Failed to install models: " + e.getMessage(), e);

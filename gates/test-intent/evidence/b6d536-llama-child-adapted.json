@@ -1,0 +1,271 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T14:57:15.915Z",
+  "revision": "291cd260b39c94193499aa2c28c91d7d34cfde78",
+  "tree": "7d9db8d91a0b2bbf7d8b5a0f90044b05dce95ec0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anOverrideThatDoesNotFitFailsWithoutAStepDown\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anUnknownArchitectureFailsAfterExactlyOneLaunch\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.anUnclassifiedExitWhileStartingFailsAtOnce\" --tests \"io.justsearch.app.inference.LlamaServerStartFailureTest.aWindowThatDoesNotFitStepsDownOneRungAndServes\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.explicitExternalEndpointIsUsedAndNeverStopped\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindRetriesOnceOnAFreshPortAtTheSameContextRung\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest.closeAlwaysStopsServer\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt\" --tests \"io.justsearch.app.inference.LlamaServerProcessOwnershipTest.terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31594
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anOverrideThatDoesNotFitFailsWithoutAStepDown",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOverrideThatDoesNotFitFailsWithoutAStepDown()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anUnknownArchitectureFailsAfterExactlyOneLaunch",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnknownArchitectureFailsAfterExactlyOneLaunch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#anUnclassifiedExitWhileStartingFailsAtOnce",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnclassifiedExitWhileStartingFailsAtOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java#aWindowThatDoesNotFitStepsDownOneRungAndServes",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWindowThatDoesNotFitStepsDownOneRungAndServes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a5662234e764af5d15d09ad08bcbd16fe7eee6642a63c2b2a067a4ffc375d6fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#explicitExternalEndpointIsUsedAndNeverStopped",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a5662234e764af5d15d09ad08bcbd16fe7eee6642a63c2b2a067a4ffc375d6fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitExternalEndpointIsUsedAndNeverStopped(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a5662234e764af5d15d09ad08bcbd16fe7eee6642a63c2b2a067a4ffc375d6fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindRetriesOnceOnAFreshPortAtTheSameContextRung",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a5662234e764af5d15d09ad08bcbd16fe7eee6642a63c2b2a067a4ffc375d6fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lostBindRetriesOnceOnAFreshPortAtTheSameContextRung(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a5662234e764af5d15d09ad08bcbd16fe7eee6642a63c2b2a067a4ffc375d6fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#closeAlwaysStopsServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c04d7b613034f1fefcba576b49dbc3c116ffbbe61aa16430fb7bb6a419fef44e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closeAlwaysStopsServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1a124677a8ebcb1050020ff385c1169831c7b779a5e0eadc57a561b6e38ab126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1a124677a8ebcb1050020ff385c1169831c7b779a5e0eadc57a561b6e38ab126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java#terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2103e38442a01c5a14f0df482175ddc418ad0fa16fa0d36e4e48ebfa8fd935f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9160fbbcbfc8a37faf796db429bf2d87d5c4837919b5ba1940ca097f5d79396f"
+}

@@ -15,8 +15,8 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.inference.InferenceLifecycleManager;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
+import io.justsearch.app.services.runtimestate.TestActivationForwarders;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.settings.UiSettingsStore;
@@ -86,7 +86,9 @@ final class BootstrapProjectionsTest {
     RuntimeSpecStore spec = specStore(true);
     RuntimeReconciler reconciler =
         new RuntimeReconciler(
-            control, control::mode, control::external, control::detach, null, spec, new RuntimeGpuLease());
+            control, control::mode, control::external, null, spec,
+                TestActivationForwarders.switching(control, control::external, control::detach),
+                () -> false);
     reconciler.start();
     assertTrue(reconciler.awaitQuiescent(5_000));
 
@@ -114,7 +116,9 @@ final class BootstrapProjectionsTest {
     RuntimeSpecStore spec = specStore(true);
     RuntimeReconciler reconciler =
         new RuntimeReconciler(
-            control, control::mode, control::external, control::detach, null, spec, new RuntimeGpuLease());
+            control, control::mode, control::external, null, spec,
+                TestActivationForwarders.switching(control, control::external, control::detach),
+                () -> false);
     reconciler.start();
     reconciler.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "vdu-test");
     assertTrue(reconciler.awaitQuiescent(5_000));
@@ -134,7 +138,7 @@ final class BootstrapProjectionsTest {
     when(manager.lastFailure()).thenReturn(Optional.empty());
     RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
     when(reconciler.current()).thenReturn(
-        RuntimeStatus.derive(Mode.INDEXING, false, RuntimeGpuLease.Holder.INDEXING,
+        RuntimeStatus.derive(Mode.INDEXING, false, RuntimeStatus.LEASE_INDEXING,
             0L, java.time.Instant.parse("2026-10-01T00:00:00Z")));
 
     InferenceRuntimeView view = BootstrapProjections.projectInferenceSnapshot(manager, reconciler);

@@ -32,6 +32,7 @@ export interface InferenceStatusResponse {
     lastHealthOkAtMs?: number;
     modelId?: string | null;
     modelMismatch?: boolean;
+    note?: string | null;
     usingExternalLlamaServer?: boolean;
     verificationError?: string | null;
     verified?: boolean;
@@ -78,6 +79,7 @@ export const inferenceStatusResponseSchema = z.strictObject({
     "lastHealthOkAtMs": z.number().int().optional(),
     "modelId": z.string().nullable().optional(),
     "modelMismatch": z.boolean().optional(),
+    "note": z.string().nullable().optional(),
     "usingExternalLlamaServer": z.boolean().optional(),
     "verificationError": z.string().nullable().optional(),
     "verified": z.boolean().optional(),

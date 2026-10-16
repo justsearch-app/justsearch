@@ -11,9 +11,9 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
+import io.justsearch.app.services.runtimestate.TestActivationForwarders;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -27,7 +27,8 @@ final class SwitchInferenceModeHandlerTest {
 
   private RuntimeReconciler reconciler(RuntimeSpecStore spec) {
     return new RuntimeReconciler(
-        null, () -> Mode.OFFLINE, () -> false, null, null, spec, new RuntimeGpuLease());
+        null, () -> Mode.OFFLINE, () -> false, null, spec,
+            TestActivationForwarders.switching(null, () -> false, null), () -> false);
   }
 
   @Test

@@ -421,7 +421,6 @@ public class IndexingLoop implements Closeable {
     this.writer =
         new JobBatchWriter(
             indexingCoordinator,
-            documentFieldOps,
             signalBus,
             embeddingLifecycle,
             this.encoderBindings::spladeEncoder,
@@ -975,8 +974,10 @@ public class IndexingLoop implements Closeable {
     // inline > 7 docs/sec RMW backfill). precomputedEmbedding in buildDocument() takes priority
     // over allowEmbeddingWrites, so batch-computed vectors are written regardless.
     EmbeddingProvider provider = embeddingLifecycle.embeddingProvider();
+    // Spec E section 1.3 item 4: no migration batch embed starts while bulk GPU work is held; the
+    // documents keep PENDING vectors for backfill.
     boolean canBatchEmbed =
-        migrationActiveSupplier.getAsBoolean() && provider.isAvailable();
+        migrationActiveSupplier.getAsBoolean() && provider.isAvailable() && !signalBus.isBulkHeld();
     float[][] embeddings = null;
 
     if (canBatchEmbed) {
@@ -1217,6 +1218,15 @@ public class IndexingLoop implements Closeable {
     if (!isRunning()) {
       start();
     }
+  }
+
+  /**
+   * Whether each enrichment stage can drain its backlog right now, by the backfill scheduler's own
+   * checks (Spec E §1.7, step E1). The status surface reads it so that a backlog no stage can drain
+   * does not keep indexing from reading IDLE.
+   */
+  public BackfillScheduler.StageAvailability enrichmentStageAvailability() {
+    return backfillScheduler.stageAvailability();
   }
 
   /**

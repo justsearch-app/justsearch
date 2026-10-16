@@ -11,9 +11,7 @@ import {
   QUICK_PIPELINE,
   recordInspectorOpen,
   recordInspectorClose,
-  buildCollectionFacetProbe,
   fetchCollectionFacet,
-  COLLECTION_FACET_FIELD,
 } from './searchState.js';
 import {
   setFilterRange,
@@ -507,39 +505,8 @@ describe('searchState — DWELLED (tempdoc 580 §17 P3)', () => {
   });
 });
 
-/**
- * Tempdoc 811 C-2a — the collection enumeration probe. It is issued from this module because this
- * is the ONE `/api/knowledge/search` site (577 Ext II / the `search-issuance` gate); it is an
- * aggregation rather than a user query, so it does NOT go through `buildSearchIntent`.
- */
-describe('collection enumeration probe (811 C-2a)', () => {
-  const probe = () =>
-    buildCollectionFacetProbe(120_000) as {
-      query: string;
-      querySyntax: string;
-      limit: number;
-      pipeline: { sparseEnabled: boolean; denseEnabled: boolean; expansionEnabled: boolean };
-      facets: { include: boolean; maxDocsScanned: number; fields: Array<{ field: string }> };
-    };
-
-  it('asks for the collection facet over a NON-BLANK corpus-wide query', () => {
-    // SearchPlanner.plan short-circuits a blank query to EmptyQueryDecision BEFORE any facet is
-    // planned, so a blank query would silently answer with no facets at all.
-    const body = probe();
-    expect(body.query.trim().length).toBeGreaterThan(0);
-    expect(body.querySyntax).toBe('lucene');
-    expect(body.facets.include).toBe(true);
-    expect(body.facets.fields).toEqual([{ field: COLLECTION_FACET_FIELD, size: 100 }]);
-    expect(body.facets.maxDocsScanned).toBe(120_000);
-  });
-
-  it('runs the cheap sparse-only pipeline — no dense leg, no expansion', () => {
-    const body = probe();
-    expect(body.pipeline).toEqual(QUICK_PIPELINE);
-    expect(body.limit).toBe(1);
-  });
-
-  it('POSTs to the one search endpoint and returns the parsed body', async () => {
+describe('collection enumeration observation', () => {
+  it('POSTs only the scan bound to the observation endpoint and returns the parsed body', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -553,9 +520,9 @@ describe('collection enumeration probe (811 C-2a)', () => {
         string,
         { method: string; body: string },
       ];
-      expect(url).toBe('http://test/api/knowledge/search');
+      expect(url).toBe('http://test/api/knowledge/collection-facet');
       expect(init.method).toBe('POST');
-      expect(JSON.parse(init.body)).toEqual(buildCollectionFacetProbe(50_000));
+      expect(JSON.parse(init.body)).toEqual({ maxDocsScanned: 50_000 });
     } finally {
       vi.unstubAllGlobals();
     }

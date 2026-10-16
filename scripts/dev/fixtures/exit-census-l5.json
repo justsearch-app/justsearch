@@ -1,0 +1,3643 @@
+{
+  "source": "verify-census live/candidate-lifecycle, five incarnations; ledger cut at actual census arming, unchanged native births and snapshot times",
+  "run": {
+    "runId": "3cfcc897-1380-44d0-b095-5684c41c1664",
+    "pids": {
+      "runnerPid": 34620,
+      "backendRootPid": 13216,
+      "frontendRootPid": 28412
+    }
+  },
+  "manifest": {
+    "instanceId": "3fe9d46c-d709-4e17-9659-90559a281550",
+    "pid": 13216,
+    "children": [],
+    "containment": {
+      "status": "CONTAINED"
+    },
+    "incarnation": {
+      "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+      "n": 5
+    }
+  },
+  "manifests": [
+    {
+      "instanceId": "0f7ff297-325d-44b8-a83b-5d1e679de8ee",
+      "pid": 17812,
+      "children": [],
+      "containment": {
+        "status": "CONTAINED"
+      },
+      "incarnation": {
+        "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+        "n": 2
+      }
+    },
+    {
+      "instanceId": "3fe9d46c-d709-4e17-9659-90559a281550",
+      "pid": 13216,
+      "children": [],
+      "containment": {
+        "status": "CONTAINED"
+      },
+      "incarnation": {
+        "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+        "n": 5
+      }
+    },
+    {
+      "instanceId": "882ecf78-7630-493a-a7cb-f3ce4c3efceb",
+      "pid": 4184,
+      "children": [],
+      "containment": {
+        "status": "CONTAINED"
+      },
+      "incarnation": {
+        "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+        "n": 1
+      }
+    },
+    {
+      "instanceId": "b55738d9-806e-478d-bb0b-725a5fe5746e",
+      "pid": 29608,
+      "children": [
+        {
+          "id": "3f265b47-b707-4453-b011-07e7bd3e4b28",
+          "kind": "LLAMA_SERVER",
+          "pid": 35344,
+          "startedAt": "2026-10-07T15:26:20.606Z",
+          "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+          "endpoint": "http://127.0.0.1:54177",
+          "modelPath": "f:\\justsearch-public\\models\\compact\\qwen3.5-4b-q4_k_m.gguf",
+          "declaredConfigHash": "ad797a9c57a987b71edf5cc89d4e4d3dff0ec0913947988b89b95a5673e47230",
+          "realizedArgvHash": "ab5bf5543277f74188cd30e7d929f8dc02cfbe688dd2d1fa1bdb6cc29991822d"
+        },
+        {
+          "id": "160187e6-bb03-455f-bfa1-928f4591889c",
+          "kind": "EXTRACTION",
+          "pid": 8516,
+          "startedAt": "2026-10-07T15:28:35.109Z",
+          "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+          "endpoint": "stdio",
+          "declaredConfigHash": "43ecdf631c6d5921102b64aef49408b38dd4c1451287e9c8c3e55be6470e67f5",
+          "realizedArgvHash": "a7b787cc8db1829615a2a7aeb81d2ca917a8a97a7eeb54c70b55fcfb56658c33"
+        }
+      ],
+      "containment": {
+        "status": "CONTAINED"
+      },
+      "incarnation": {
+        "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+        "n": 4
+      }
+    },
+    {
+      "instanceId": "fcc99365-6c4a-4f1d-931a-eb2d92ebffac",
+      "pid": 36272,
+      "children": [],
+      "containment": {
+        "status": "CONTAINED"
+      },
+      "incarnation": {
+        "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+        "n": 3
+      }
+    }
+  ],
+  "ledgers": {
+    "engine": [
+      {
+        "schemaVersion": 1,
+        "type": "engine-start",
+        "seq": 1,
+        "at": "2026-10-07T15:23:12.280Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 1
+        },
+        "pid": 4184,
+        "creationFileTime": "134358601917984900",
+        "processStartedAt": "2026-10-07T15:23:11.798Z",
+        "executable": "F:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "cause": "INITIAL",
+        "supervisorKind": "dev-runner"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-self-intent",
+        "seq": 1,
+        "at": "2026-10-07T15:24:01.504Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "engine": {
+          "pid": 4184,
+          "creationFileTime": "134358601917984908",
+          "instanceId": "882ecf78-7630-493a-a7cb-f3ce4c3efceb"
+        },
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "expectedCode": 4
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-exit",
+        "seq": 2,
+        "at": "2026-10-07T15:24:03.317Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 1
+        },
+        "exitClass": "REQUESTED",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "code": 4,
+        "codeName": "requested_restart",
+        "exitedAt": null,
+        "observedAt": "2026-10-07T15:24:03.314Z",
+        "terminateCalledAt": null,
+        "forced": false,
+        "phase": "STOPPING",
+        "codeDistinctive": true,
+        "contract": {
+          "action": "restart",
+          "exitClass": "REQUESTED",
+          "counted": false
+        },
+        "containment": "LIBUV_JOB",
+        "jobEmpty": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-start",
+        "seq": 3,
+        "at": "2026-10-07T15:24:03.881Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 2
+        },
+        "pid": 17812,
+        "creationFileTime": "134358602433332060",
+        "processStartedAt": "2026-10-07T15:24:03.333Z",
+        "executable": "F:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "cause": "RESTART",
+        "supervisorKind": "dev-runner"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-self-intent",
+        "seq": 1,
+        "at": "2026-10-07T15:24:48.319Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "engine": {
+          "pid": 17812,
+          "creationFileTime": "134358602433332061",
+          "instanceId": "0f7ff297-325d-44b8-a83b-5d1e679de8ee"
+        },
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "expectedCode": 4
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-exit",
+        "seq": 4,
+        "at": "2026-10-07T15:24:50.613Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 2
+        },
+        "exitClass": "REQUESTED",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "code": 4,
+        "codeName": "requested_restart",
+        "exitedAt": null,
+        "observedAt": "2026-10-07T15:24:50.612Z",
+        "terminateCalledAt": null,
+        "forced": false,
+        "phase": "STOPPING",
+        "codeDistinctive": true,
+        "contract": {
+          "action": "restart",
+          "exitClass": "REQUESTED",
+          "counted": false
+        },
+        "containment": "LIBUV_JOB",
+        "jobEmpty": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-start",
+        "seq": 5,
+        "at": "2026-10-07T15:24:51.098Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 3
+        },
+        "pid": 36272,
+        "creationFileTime": "134358602906261520",
+        "processStartedAt": "2026-10-07T15:24:50.626Z",
+        "executable": "F:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "cause": "RESTART",
+        "supervisorKind": "dev-runner"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-self-intent",
+        "seq": 1,
+        "at": "2026-10-07T15:25:49.847Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "engine": {
+          "pid": 36272,
+          "creationFileTime": "134358602906261524",
+          "instanceId": "fcc99365-6c4a-4f1d-931a-eb2d92ebffac"
+        },
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "expectedCode": 4
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-exit",
+        "seq": 6,
+        "at": "2026-10-07T15:25:52.354Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 3
+        },
+        "exitClass": "REQUESTED",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "code": 4,
+        "codeName": "requested_restart",
+        "exitedAt": null,
+        "observedAt": "2026-10-07T15:25:52.353Z",
+        "terminateCalledAt": null,
+        "forced": false,
+        "phase": "STOPPING",
+        "codeDistinctive": true,
+        "contract": {
+          "action": "restart",
+          "exitClass": "REQUESTED",
+          "counted": false
+        },
+        "containment": "LIBUV_JOB",
+        "jobEmpty": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-start",
+        "seq": 7,
+        "at": "2026-10-07T15:25:52.860Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 4
+        },
+        "pid": 29608,
+        "creationFileTime": "134358603523654010",
+        "processStartedAt": "2026-10-07T15:25:52.365Z",
+        "executable": "F:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "cause": "RESTART",
+        "supervisorKind": "dev-runner"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-exit",
+        "seq": 8,
+        "at": "2026-10-07T15:31:33.838Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 4
+        },
+        "exitClass": "UNEXPECTED",
+        "reason": null,
+        "detail": null,
+        "code": 4294967295,
+        "codeName": "unknown(4294967295)",
+        "exitedAt": null,
+        "observedAt": "2026-10-07T15:31:33.836Z",
+        "terminateCalledAt": null,
+        "forced": false,
+        "phase": "RUNNING",
+        "codeDistinctive": true,
+        "contract": {
+          "action": "restart",
+          "exitClass": "TRANSIENT",
+          "counted": true
+        },
+        "containment": "LIBUV_JOB",
+        "jobEmpty": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "engine-start",
+        "seq": 9,
+        "at": "2026-10-07T15:31:35.593Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 34620,
+          "startedAt": "2026-10-07T15:23:11.795Z"
+        },
+        "incarnation": {
+          "session": "3cfcc897-1380-44d0-b095-5684c41c1664",
+          "n": 5
+        },
+        "pid": 13216,
+        "creationFileTime": "134358606949201570",
+        "processStartedAt": "2026-10-07T15:31:34.920Z",
+        "executable": "F:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "cause": "RESTART",
+        "supervisorKind": "dev-runner"
+      }
+    ],
+    "children": [
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 1,
+        "at": "2026-10-07T15:23:16.420Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-4a7848af-c12b-492e-bf46-9a43d8ff02a1",
+        "kind": "EXTRACTION",
+        "label": "extraction",
+        "owner": {
+          "pid": 4184,
+          "creationFileTime": "134358601917984908",
+          "instanceId": "882ecf78-7630-493a-a7cb-f3ce4c3efceb"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 2,
+        "at": "2026-10-07T15:23:16.448Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-4a7848af-c12b-492e-bf46-9a43d8ff02a1",
+        "pid": 41428,
+        "processStartedAt": "2026-10-07T15:23:16.430Z",
+        "creationFileTime": "134358601964308357",
+        "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "argvHash": "64f28403e393f4a2ae2d831d91025f5b57f56f26bbade564c901a6fb5755011a",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 3,
+        "at": "2026-10-07T15:23:18.154Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-4a7848af-c12b-492e-bf46-9a43d8ff02a1",
+        "intentId": "s-b83572c0-3646-46c7-a368-371b9c236a28",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "requestedAt": "2026-10-07T15:23:18.154Z",
+        "requestedBy": "extraction-pool"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 4,
+        "at": "2026-10-07T15:23:18.203Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-4a7848af-c12b-492e-bf46-9a43d8ff02a1",
+        "intentId": "s-b83572c0-3646-46c7-a368-371b9c236a28",
+        "exitClass": "REQUESTED",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "code": 0,
+        "codeName": "OK",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:23:18.185Z",
+        "observedAt": "2026-10-07T15:23:18.202Z",
+        "terminateCalledAt": null,
+        "terminateResult": "NOT_CALLED",
+        "cooperativeAt": "2026-10-07T15:23:18.161Z",
+        "forced": false,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 5,
+        "at": "2026-10-07T15:23:19.330Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-85c942e6-e096-47e9-9fbd-d0fa9ea9235b",
+        "kind": "EXTRACTION",
+        "label": "extraction",
+        "owner": {
+          "pid": 4184,
+          "creationFileTime": "134358601917984908",
+          "instanceId": "882ecf78-7630-493a-a7cb-f3ce4c3efceb"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 6,
+        "at": "2026-10-07T15:23:19.342Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-85c942e6-e096-47e9-9fbd-d0fa9ea9235b",
+        "pid": 36256,
+        "processStartedAt": "2026-10-07T15:23:19.338Z",
+        "creationFileTime": "134358601993384769",
+        "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "argvHash": "64f28403e393f4a2ae2d831d91025f5b57f56f26bbade564c901a6fb5755011a",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 7,
+        "at": "2026-10-07T15:23:44.968Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-cfa2b96b-1e9f-4751-9f78-ad7eecf0293c",
+        "kind": "LLAMA_SELF_TEST",
+        "label": "llama-self-test",
+        "owner": {
+          "pid": 4184,
+          "creationFileTime": "134358601917984908",
+          "instanceId": "882ecf78-7630-493a-a7cb-f3ce4c3efceb"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 8,
+        "at": "2026-10-07T15:23:44.977Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-cfa2b96b-1e9f-4751-9f78-ad7eecf0293c",
+        "pid": 32424,
+        "processStartedAt": "2026-10-07T15:23:44.974Z",
+        "creationFileTime": "134358602249741004",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "1027ee513b493adeef30884387bf0a64c993320a3cc611e4e08dffc8b2d91702",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 9,
+        "at": "2026-10-07T15:23:48.658Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-cfa2b96b-1e9f-4751-9f78-ad7eecf0293c",
+        "intentId": "s-b9b9d142-86e0-4f43-9052-7640e4716b9b",
+        "reason": "SELF_TEST",
+        "detail": null,
+        "mode": "NOW",
+        "requestedAt": "2026-10-07T15:23:48.658Z",
+        "requestedBy": "chat-controller"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 10,
+        "at": "2026-10-07T15:23:49.059Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-cfa2b96b-1e9f-4751-9f78-ad7eecf0293c",
+        "intentId": "s-b9b9d142-86e0-4f43-9052-7640e4716b9b",
+        "exitClass": "REQUESTED",
+        "reason": "SELF_TEST",
+        "detail": null,
+        "mode": "NOW",
+        "code": 1246953473,
+        "codeName": "JS_CHILD_STOP",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:23:48.715Z",
+        "observedAt": "2026-10-07T15:23:49.059Z",
+        "terminateCalledAt": "2026-10-07T15:23:48.664Z",
+        "terminateResult": "OK",
+        "cooperativeAt": null,
+        "forced": true,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "gpu-release",
+        "seq": 11,
+        "at": "2026-10-07T15:23:49.569Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-cfa2b96b-1e9f-4751-9f78-ad7eecf0293c",
+        "result": "recovered",
+        "waitedMs": 502,
+        "usedBeforeBytes": 7405268992,
+        "usedAfterBytes": 3642073088,
+        "expectedBytes": null,
+        "probe": "NVML"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 12,
+        "at": "2026-10-07T15:23:50.117Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-a93ca5cb-c5c8-486c-bf28-720c0d370558",
+        "kind": "LLAMA_SERVER",
+        "label": "llama-server",
+        "owner": {
+          "pid": 4184,
+          "creationFileTime": "134358601917984908",
+          "instanceId": "882ecf78-7630-493a-a7cb-f3ce4c3efceb"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 13,
+        "at": "2026-10-07T15:23:50.125Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-a93ca5cb-c5c8-486c-bf28-720c0d370558",
+        "pid": 9212,
+        "processStartedAt": "2026-10-07T15:23:50.121Z",
+        "creationFileTime": "134358602301216783",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "cd2cfaafbf85d047fb52cb9e9de0e890bc4dd68e82f75948883c8c69d1fbf3c6",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 1,
+        "at": "2026-10-07T15:24:01.023Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:24:01.023Z"
+        },
+        "childId": "verifier-fallback-orphan-25200",
+        "kind": "LLAMA_SERVER",
+        "label": "verifier-fallback",
+        "owner": {
+          "pid": 4184,
+          "creationFileTime": "134358601917984908",
+          "instanceId": "882ecf78-7630-493a-a7cb-f3ce4c3efceb"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 2,
+        "at": "2026-10-07T15:24:01.026Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:24:01.023Z"
+        },
+        "childId": "verifier-fallback-orphan-25200",
+        "pid": 25200,
+        "creationFileTime": "134358602369136737",
+        "processStartedAt": "2026-10-07T15:23:56.913Z",
+        "executable": "F:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "contained": false,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 14,
+        "at": "2026-10-07T15:24:01.635Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-a93ca5cb-c5c8-486c-bf28-720c0d370558",
+        "intentId": "s-67a8edc7-29f6-4d6e-8f13-2138c082d6c0",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "mode": "NOW",
+        "requestedAt": "2026-10-07T15:24:01.635Z",
+        "requestedBy": "engine-shutdown"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 15,
+        "at": "2026-10-07T15:24:01.810Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-a93ca5cb-c5c8-486c-bf28-720c0d370558",
+        "intentId": "s-67a8edc7-29f6-4d6e-8f13-2138c082d6c0",
+        "exitClass": "REQUESTED",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "mode": "NOW",
+        "code": 1246953473,
+        "codeName": "JS_CHILD_STOP",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:24:01.684Z",
+        "observedAt": "2026-10-07T15:24:01.810Z",
+        "terminateCalledAt": "2026-10-07T15:24:01.639Z",
+        "terminateResult": "OK",
+        "cooperativeAt": null,
+        "forced": true,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 16,
+        "at": "2026-10-07T15:24:02.075Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-85c942e6-e096-47e9-9fbd-d0fa9ea9235b",
+        "intentId": "s-9aff45a4-c1ee-48a8-8070-303be38778e5",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "requestedAt": "2026-10-07T15:24:02.075Z",
+        "requestedBy": "extraction-pool"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 17,
+        "at": "2026-10-07T15:24:02.098Z",
+        "writer": {
+          "role": "engine",
+          "pid": 4184,
+          "startedAt": "2026-10-07T15:23:11.798Z"
+        },
+        "childId": "c-85c942e6-e096-47e9-9fbd-d0fa9ea9235b",
+        "intentId": "s-9aff45a4-c1ee-48a8-8070-303be38778e5",
+        "exitClass": "REQUESTED",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "code": 0,
+        "codeName": "OK",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:24:02.086Z",
+        "observedAt": "2026-10-07T15:24:02.098Z",
+        "terminateCalledAt": null,
+        "terminateResult": "NOT_CALLED",
+        "cooperativeAt": "2026-10-07T15:24:02.081Z",
+        "forced": false,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-survived",
+        "seq": 1,
+        "at": "2026-10-07T15:24:05.078Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "verifier-fallback-orphan-25200",
+        "intentId": null,
+        "attempts": 1,
+        "basis": "owner_died_alive"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 2,
+        "at": "2026-10-07T15:24:05.512Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "verifier-fallback-orphan-25200",
+        "intentId": "s-c741a73d-099a-4c06-bb1e-3c825d1aa5b8",
+        "reason": "CRASH_RECOVERY",
+        "detail": null,
+        "mode": "NOW",
+        "requestedAt": "2026-10-07T15:24:05.512Z",
+        "requestedBy": "predecessor-fallback"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 3,
+        "at": "2026-10-07T15:24:05.879Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "verifier-fallback-orphan-25200",
+        "intentId": "s-c741a73d-099a-4c06-bb1e-3c825d1aa5b8",
+        "exitClass": "REQUESTED",
+        "reason": "CRASH_RECOVERY",
+        "detail": null,
+        "mode": "NOW",
+        "code": 1246953473,
+        "codeName": "JS_CHILD_STOP",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:24:05.537Z",
+        "observedAt": "2026-10-07T15:24:05.879Z",
+        "terminateCalledAt": "2026-10-07T15:24:05.517Z",
+        "terminateResult": "OK",
+        "cooperativeAt": null,
+        "forced": true,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 4,
+        "at": "2026-10-07T15:24:06.936Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a3a18483-a9a8-4958-9b91-811f8e31b946",
+        "kind": "EXTRACTION",
+        "label": "extraction",
+        "owner": {
+          "pid": 17812,
+          "creationFileTime": "134358602433332061",
+          "instanceId": "0f7ff297-325d-44b8-a83b-5d1e679de8ee"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 5,
+        "at": "2026-10-07T15:24:06.962Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a3a18483-a9a8-4958-9b91-811f8e31b946",
+        "pid": 30556,
+        "processStartedAt": "2026-10-07T15:24:06.946Z",
+        "creationFileTime": "134358602469462527",
+        "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "argvHash": "a9a10b29d92f484e1843fc5cc8219319d8dfcaa786a2031d5fb6e046ab32429e",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 6,
+        "at": "2026-10-07T15:24:08.470Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a3a18483-a9a8-4958-9b91-811f8e31b946",
+        "intentId": "s-205a3b17-5391-4d29-a7ca-f16044469cbd",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "requestedAt": "2026-10-07T15:24:08.469Z",
+        "requestedBy": "extraction-pool"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 7,
+        "at": "2026-10-07T15:24:08.498Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a3a18483-a9a8-4958-9b91-811f8e31b946",
+        "intentId": "s-205a3b17-5391-4d29-a7ca-f16044469cbd",
+        "exitClass": "REQUESTED",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "code": 0,
+        "codeName": "OK",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:24:08.483Z",
+        "observedAt": "2026-10-07T15:24:08.498Z",
+        "terminateCalledAt": null,
+        "terminateResult": "NOT_CALLED",
+        "cooperativeAt": "2026-10-07T15:24:08.474Z",
+        "forced": false,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 8,
+        "at": "2026-10-07T15:24:31.717Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a87b97f6-352a-44ad-9b32-51c61f48e20f",
+        "kind": "LLAMA_SERVER",
+        "label": "llama-server",
+        "owner": {
+          "pid": 17812,
+          "creationFileTime": "134358602433332061",
+          "instanceId": "0f7ff297-325d-44b8-a83b-5d1e679de8ee"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 9,
+        "at": "2026-10-07T15:24:31.732Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a87b97f6-352a-44ad-9b32-51c61f48e20f",
+        "pid": 27712,
+        "processStartedAt": "2026-10-07T15:24:31.724Z",
+        "creationFileTime": "134358602717247213",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "ef3f5a22677576c3d45165aa7d413af823c3824b60b93a46551c8328eca56e0e",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 10,
+        "at": "2026-10-07T15:24:48.884Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a87b97f6-352a-44ad-9b32-51c61f48e20f",
+        "intentId": "s-fb73a641-544e-4d5c-9640-f30143c19226",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "mode": "NOW",
+        "requestedAt": "2026-10-07T15:24:48.884Z",
+        "requestedBy": "engine-shutdown"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 11,
+        "at": "2026-10-07T15:24:49.255Z",
+        "writer": {
+          "role": "engine",
+          "pid": 17812,
+          "startedAt": "2026-10-07T15:24:03.333Z"
+        },
+        "childId": "c-a87b97f6-352a-44ad-9b32-51c61f48e20f",
+        "intentId": "s-fb73a641-544e-4d5c-9640-f30143c19226",
+        "exitClass": "REQUESTED",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "mode": "NOW",
+        "code": 1246953473,
+        "codeName": "JS_CHILD_STOP",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:24:48.923Z",
+        "observedAt": "2026-10-07T15:24:49.255Z",
+        "terminateCalledAt": "2026-10-07T15:24:48.888Z",
+        "terminateResult": "OK",
+        "cooperativeAt": null,
+        "forced": true,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 1,
+        "at": "2026-10-07T15:24:53.510Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-fcdf4bb8-0d9a-47c6-9a46-60a21378a8e7",
+        "kind": "EXTRACTION",
+        "label": "extraction",
+        "owner": {
+          "pid": 36272,
+          "creationFileTime": "134358602906261524",
+          "instanceId": "fcc99365-6c4a-4f1d-931a-eb2d92ebffac"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 2,
+        "at": "2026-10-07T15:24:53.535Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-fcdf4bb8-0d9a-47c6-9a46-60a21378a8e7",
+        "pid": 37464,
+        "processStartedAt": "2026-10-07T15:24:53.521Z",
+        "creationFileTime": "134358602935214564",
+        "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "argvHash": "a6379c01862f864220a8ba67988e36969784b0727add4d59aa9e43086fe5cc7d",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 3,
+        "at": "2026-10-07T15:24:55.056Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-fcdf4bb8-0d9a-47c6-9a46-60a21378a8e7",
+        "intentId": "s-87f99d08-9b26-4c0e-8d97-5e76dd70467b",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "requestedAt": "2026-10-07T15:24:55.056Z",
+        "requestedBy": "extraction-pool"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 4,
+        "at": "2026-10-07T15:24:55.090Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-fcdf4bb8-0d9a-47c6-9a46-60a21378a8e7",
+        "intentId": "s-87f99d08-9b26-4c0e-8d97-5e76dd70467b",
+        "exitClass": "REQUESTED",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "code": 0,
+        "codeName": "OK",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:24:55.076Z",
+        "observedAt": "2026-10-07T15:24:55.089Z",
+        "terminateCalledAt": null,
+        "terminateResult": "NOT_CALLED",
+        "cooperativeAt": "2026-10-07T15:24:55.062Z",
+        "forced": false,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 5,
+        "at": "2026-10-07T15:25:19.559Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-248d9136-e315-46bf-b81b-80bd7474499d",
+        "kind": "LLAMA_SERVER",
+        "label": "llama-server",
+        "owner": {
+          "pid": 36272,
+          "creationFileTime": "134358602906261524",
+          "instanceId": "fcc99365-6c4a-4f1d-931a-eb2d92ebffac"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 6,
+        "at": "2026-10-07T15:25:19.570Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-248d9136-e315-46bf-b81b-80bd7474499d",
+        "pid": 39616,
+        "processStartedAt": "2026-10-07T15:25:19.565Z",
+        "creationFileTime": "134358603195659789",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "9de31f096be8abdf2f9d1eb0968d1e552b9465cbdf9a2c149a23776a956cc927",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 1,
+        "at": "2026-10-07T15:25:48.953Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:25:48.952Z"
+        },
+        "childId": "verifier-fallback-orphan-22960",
+        "kind": "LLAMA_SERVER",
+        "label": "verifier-fallback",
+        "owner": {
+          "pid": 36272,
+          "creationFileTime": "134358602906261524",
+          "instanceId": "fcc99365-6c4a-4f1d-931a-eb2d92ebffac"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 2,
+        "at": "2026-10-07T15:25:48.956Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:25:48.952Z"
+        },
+        "childId": "verifier-fallback-orphan-22960",
+        "pid": 22960,
+        "creationFileTime": "134358603450305444",
+        "processStartedAt": "2026-10-07T15:25:45.030Z",
+        "executable": "F:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "contained": false,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 7,
+        "at": "2026-10-07T15:25:49.995Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-248d9136-e315-46bf-b81b-80bd7474499d",
+        "intentId": "s-7d5c4460-65e9-47fd-b502-3545cfeaa0dc",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "mode": "NOW",
+        "requestedAt": "2026-10-07T15:25:49.995Z",
+        "requestedBy": "engine-shutdown"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 8,
+        "at": "2026-10-07T15:25:50.392Z",
+        "writer": {
+          "role": "engine",
+          "pid": 36272,
+          "startedAt": "2026-10-07T15:24:50.626Z"
+        },
+        "childId": "c-248d9136-e315-46bf-b81b-80bd7474499d",
+        "intentId": "s-7d5c4460-65e9-47fd-b502-3545cfeaa0dc",
+        "exitClass": "REQUESTED",
+        "reason": "ENGINE_RESTART",
+        "detail": null,
+        "mode": "NOW",
+        "code": 1246953473,
+        "codeName": "JS_CHILD_STOP",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:25:50.045Z",
+        "observedAt": "2026-10-07T15:25:50.392Z",
+        "terminateCalledAt": "2026-10-07T15:25:49.999Z",
+        "terminateResult": "OK",
+        "cooperativeAt": null,
+        "forced": true,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "owner-died",
+        "seq": 1,
+        "at": "2026-10-07T15:25:53.946Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "verifier-fallback-orphan-22960",
+        "previousOwner": {
+          "pid": 36272,
+          "creationFileTime": "134358602906261524",
+          "instanceId": "fcc99365-6c4a-4f1d-931a-eb2d92ebffac"
+        },
+        "basis": "OPEN_START",
+        "osCheck": "GONE",
+        "exitClass": "OWNER_DIED"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 2,
+        "at": "2026-10-07T15:25:55.247Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-f855e2f6-f925-4ec9-b652-c996da916c76",
+        "kind": "EXTRACTION",
+        "label": "extraction",
+        "owner": {
+          "pid": 29608,
+          "creationFileTime": "134358603523654013",
+          "instanceId": "b55738d9-806e-478d-bb0b-725a5fe5746e"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 3,
+        "at": "2026-10-07T15:25:55.268Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-f855e2f6-f925-4ec9-b652-c996da916c76",
+        "pid": 3416,
+        "processStartedAt": "2026-10-07T15:25:55.255Z",
+        "creationFileTime": "134358603552552784",
+        "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "argvHash": "a7b787cc8db1829615a2a7aeb81d2ca917a8a97a7eeb54c70b55fcfb56658c33",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 4,
+        "at": "2026-10-07T15:25:56.790Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-f855e2f6-f925-4ec9-b652-c996da916c76",
+        "intentId": "s-aafa7a59-5ca4-443e-b22f-8bfb255a8792",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "requestedAt": "2026-10-07T15:25:56.790Z",
+        "requestedBy": "extraction-pool"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 5,
+        "at": "2026-10-07T15:25:56.821Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-f855e2f6-f925-4ec9-b652-c996da916c76",
+        "intentId": "s-aafa7a59-5ca4-443e-b22f-8bfb255a8792",
+        "exitClass": "REQUESTED",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "code": 0,
+        "codeName": "OK",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:25:56.808Z",
+        "observedAt": "2026-10-07T15:25:56.820Z",
+        "terminateCalledAt": null,
+        "terminateResult": "NOT_CALLED",
+        "cooperativeAt": "2026-10-07T15:25:56.794Z",
+        "forced": false,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 6,
+        "at": "2026-10-07T15:26:20.600Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-483dc6ce-ca84-4b47-9a04-184afe238a5e",
+        "kind": "LLAMA_SERVER",
+        "label": "llama-server",
+        "owner": {
+          "pid": 29608,
+          "creationFileTime": "134358603523654013",
+          "instanceId": "b55738d9-806e-478d-bb0b-725a5fe5746e"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 7,
+        "at": "2026-10-07T15:26:20.611Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-483dc6ce-ca84-4b47-9a04-184afe238a5e",
+        "pid": 35344,
+        "processStartedAt": "2026-10-07T15:26:20.606Z",
+        "creationFileTime": "134358603806064809",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "ab5bf5543277f74188cd30e7d929f8dc02cfbe688dd2d1fa1bdb6cc29991822d",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 8,
+        "at": "2026-10-07T15:28:35.104Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-2842d7db-9557-4785-b5ab-6fba93a9dbb8",
+        "kind": "EXTRACTION",
+        "label": "extraction",
+        "owner": {
+          "pid": 29608,
+          "creationFileTime": "134358603523654013",
+          "instanceId": "b55738d9-806e-478d-bb0b-725a5fe5746e"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 9,
+        "at": "2026-10-07T15:28:35.119Z",
+        "writer": {
+          "role": "engine",
+          "pid": 29608,
+          "startedAt": "2026-10-07T15:25:52.365Z"
+        },
+        "childId": "c-2842d7db-9557-4785-b5ab-6fba93a9dbb8",
+        "pid": 8516,
+        "processStartedAt": "2026-10-07T15:28:35.109Z",
+        "creationFileTime": "134358605151095081",
+        "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "argvHash": "a7b787cc8db1829615a2a7aeb81d2ca917a8a97a7eeb54c70b55fcfb56658c33",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "owner-died",
+        "seq": 1,
+        "at": "2026-10-07T15:31:37.078Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-483dc6ce-ca84-4b47-9a04-184afe238a5e",
+        "previousOwner": {
+          "pid": 29608,
+          "creationFileTime": "134358603523654013",
+          "instanceId": "b55738d9-806e-478d-bb0b-725a5fe5746e"
+        },
+        "basis": "OPEN_START",
+        "osCheck": "GONE",
+        "exitClass": "OWNER_DIED"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "owner-died",
+        "seq": 2,
+        "at": "2026-10-07T15:31:37.095Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-2842d7db-9557-4785-b5ab-6fba93a9dbb8",
+        "previousOwner": {
+          "pid": 29608,
+          "creationFileTime": "134358603523654013",
+          "instanceId": "b55738d9-806e-478d-bb0b-725a5fe5746e"
+        },
+        "basis": "OPEN_START",
+        "osCheck": "GONE",
+        "exitClass": "OWNER_DIED"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 3,
+        "at": "2026-10-07T15:31:39.792Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-67d786e7-9ee2-4272-bdb5-20bd7a2dfc7b",
+        "kind": "EXTRACTION",
+        "label": "extraction",
+        "owner": {
+          "pid": 13216,
+          "creationFileTime": "134358606949201573",
+          "instanceId": "3fe9d46c-d709-4e17-9659-90559a281550"
+        },
+        "gpu": false
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 4,
+        "at": "2026-10-07T15:31:39.823Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-67d786e7-9ee2-4272-bdb5-20bd7a2dfc7b",
+        "pid": 2144,
+        "processStartedAt": "2026-10-07T15:31:39.802Z",
+        "creationFileTime": "134358606998025897",
+        "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+        "argvHash": "7d1643fbd89f402cd267ef710a1c7b51b21823b192b2efd69882810bbd2a79de",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 5,
+        "at": "2026-10-07T15:31:42.091Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-67d786e7-9ee2-4272-bdb5-20bd7a2dfc7b",
+        "intentId": "s-a156348e-f1f9-46c1-a14c-c9435dfd8482",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "requestedAt": "2026-10-07T15:31:42.090Z",
+        "requestedBy": "extraction-pool"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 6,
+        "at": "2026-10-07T15:31:42.141Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-67d786e7-9ee2-4272-bdb5-20bd7a2dfc7b",
+        "intentId": "s-a156348e-f1f9-46c1-a14c-c9435dfd8482",
+        "exitClass": "REQUESTED",
+        "reason": "QUIT",
+        "detail": null,
+        "mode": "COOPERATIVE",
+        "code": 0,
+        "codeName": "OK",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:31:42.124Z",
+        "observedAt": "2026-10-07T15:31:42.141Z",
+        "terminateCalledAt": null,
+        "terminateResult": "NOT_CALLED",
+        "cooperativeAt": "2026-10-07T15:31:42.098Z",
+        "forced": false,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 7,
+        "at": "2026-10-07T15:32:10.839Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-70329271-82ba-463c-99de-0cece0aa441a",
+        "kind": "LLAMA_SERVER",
+        "label": "llama-server",
+        "owner": {
+          "pid": 13216,
+          "creationFileTime": "134358606949201573",
+          "instanceId": "3fe9d46c-d709-4e17-9659-90559a281550"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 8,
+        "at": "2026-10-07T15:32:10.852Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-70329271-82ba-463c-99de-0cece0aa441a",
+        "pid": 24976,
+        "processStartedAt": "2026-10-07T15:32:10.846Z",
+        "creationFileTime": "134358607308465530",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "cf5afb787be2477c6db53cb0a83fa7ec36740b3fad410c79ee89bb91d61ad8be",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 9,
+        "at": "2026-10-07T15:32:18.156Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-70329271-82ba-463c-99de-0cece0aa441a",
+        "intentId": "s-3924f1ea-2a7d-452f-b7bb-e00b44b249a4",
+        "reason": "VDU_ENTER",
+        "detail": null,
+        "mode": "NOW",
+        "requestedAt": "2026-10-07T15:32:18.156Z",
+        "requestedBy": "chat-controller"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 10,
+        "at": "2026-10-07T15:32:18.604Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-70329271-82ba-463c-99de-0cece0aa441a",
+        "intentId": "s-3924f1ea-2a7d-452f-b7bb-e00b44b249a4",
+        "exitClass": "REQUESTED",
+        "reason": "VDU_ENTER",
+        "detail": null,
+        "mode": "NOW",
+        "code": 1246953473,
+        "codeName": "JS_CHILD_STOP",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:32:18.207Z",
+        "observedAt": "2026-10-07T15:32:18.603Z",
+        "terminateCalledAt": "2026-10-07T15:32:18.161Z",
+        "terminateResult": "OK",
+        "cooperativeAt": null,
+        "forced": true,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "gpu-release",
+        "seq": 11,
+        "at": "2026-10-07T15:32:19.114Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-70329271-82ba-463c-99de-0cece0aa441a",
+        "result": "recovered",
+        "waitedMs": 503,
+        "usedBeforeBytes": 8432504832,
+        "usedAfterBytes": 3427270656,
+        "expectedBytes": null,
+        "probe": "NVML"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 12,
+        "at": "2026-10-07T15:32:19.117Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-1f88f86d-2596-40d2-aea3-c12c29a1e896",
+        "kind": "LLAMA_SERVER",
+        "label": "llama-server",
+        "owner": {
+          "pid": 13216,
+          "creationFileTime": "134358606949201573",
+          "instanceId": "3fe9d46c-d709-4e17-9659-90559a281550"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 13,
+        "at": "2026-10-07T15:32:19.126Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-1f88f86d-2596-40d2-aea3-c12c29a1e896",
+        "pid": 37072,
+        "processStartedAt": "2026-10-07T15:32:19.122Z",
+        "creationFileTime": "134358607391222942",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "fa1f920d96d8f3024eb1b0b41c29bd6875d34a3982cccf173d2095865696aa39",
+        "contained": true,
+        "gpuDevice": null
+      },
+      {
+        "schemaVersion": 1,
+        "type": "stop-intent",
+        "seq": 14,
+        "at": "2026-10-07T15:32:24.644Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-1f88f86d-2596-40d2-aea3-c12c29a1e896",
+        "intentId": "s-2c9cb12e-edd3-4607-98a0-e69aa756a35a",
+        "reason": "VDU_EXIT",
+        "detail": null,
+        "mode": "NOW",
+        "requestedAt": "2026-10-07T15:32:24.644Z",
+        "requestedBy": "chat-controller"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-exit",
+        "seq": 15,
+        "at": "2026-10-07T15:32:25.084Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-1f88f86d-2596-40d2-aea3-c12c29a1e896",
+        "intentId": "s-2c9cb12e-edd3-4607-98a0-e69aa756a35a",
+        "exitClass": "REQUESTED",
+        "reason": "VDU_EXIT",
+        "detail": null,
+        "mode": "NOW",
+        "code": 1246953473,
+        "codeName": "JS_CHILD_STOP",
+        "codeDistinctive": true,
+        "exitedAt": "2026-10-07T15:32:24.693Z",
+        "observedAt": "2026-10-07T15:32:25.084Z",
+        "terminateCalledAt": "2026-10-07T15:32:24.648Z",
+        "terminateResult": "OK",
+        "cooperativeAt": null,
+        "forced": true,
+        "phase": "STOPPING"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "gpu-release",
+        "seq": 16,
+        "at": "2026-10-07T15:32:25.590Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-1f88f86d-2596-40d2-aea3-c12c29a1e896",
+        "result": "recovered",
+        "waitedMs": 501,
+        "usedBeforeBytes": 8433618944,
+        "usedAfterBytes": 3429564416,
+        "expectedBytes": null,
+        "probe": "NVML"
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-spawn",
+        "seq": 17,
+        "at": "2026-10-07T15:32:25.593Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-f346ca20-bd47-42bb-92f0-b08675e7ff76",
+        "kind": "LLAMA_SERVER",
+        "label": "llama-server",
+        "owner": {
+          "pid": 13216,
+          "creationFileTime": "134358606949201573",
+          "instanceId": "3fe9d46c-d709-4e17-9659-90559a281550"
+        },
+        "gpu": true
+      },
+      {
+        "schemaVersion": 1,
+        "type": "child-start",
+        "seq": 18,
+        "at": "2026-10-07T15:32:25.602Z",
+        "writer": {
+          "role": "engine",
+          "pid": 13216,
+          "startedAt": "2026-10-07T15:31:34.920Z"
+        },
+        "childId": "c-f346ca20-bd47-42bb-92f0-b08675e7ff76",
+        "pid": 35772,
+        "processStartedAt": "2026-10-07T15:32:25.598Z",
+        "creationFileTime": "134358607455988795",
+        "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+        "argvHash": "0950a36d3aab9c891b2e6336cb4335881b9c47005ead884cef730be2ea6733a5",
+        "contained": true,
+        "gpuDevice": null
+      }
+    ]
+  },
+  "observed": [
+    {
+      "pid": 4184,
+      "creationFileTimeUtc": "134358601917984900",
+      "role": "engine",
+      "parentPid": 34620,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386598790,
+      "lastSeenAtMs": 1791386643061
+    },
+    {
+      "pid": 42208,
+      "creationFileTimeUtc": "134358601918037170",
+      "role": "console-host",
+      "parentPid": 4184,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386598790,
+      "lastSeenAtMs": 1791386643061
+    },
+    {
+      "pid": 36256,
+      "creationFileTimeUtc": "134358601993384760",
+      "role": "extraction-child",
+      "parentPid": 4184,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386599690,
+      "lastSeenAtMs": 1791386642178
+    },
+    {
+      "pid": 8424,
+      "creationFileTimeUtc": "134358601993436270",
+      "role": "console-host",
+      "parentPid": 36256,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386599690,
+      "lastSeenAtMs": 1791386642178
+    },
+    {
+      "pid": 18400,
+      "creationFileTimeUtc": "134358602070870070",
+      "role": "other",
+      "parentPid": 4184,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386607466,
+      "lastSeenAtMs": 1791386607466
+    },
+    {
+      "pid": 37436,
+      "creationFileTimeUtc": "134358602070904950",
+      "role": "console-host",
+      "parentPid": 18400,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386607466,
+      "lastSeenAtMs": 1791386607466
+    },
+    {
+      "pid": 20892,
+      "creationFileTimeUtc": "134358602169720050",
+      "role": "other",
+      "parentPid": 4184,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386617276,
+      "lastSeenAtMs": 1791386617276
+    },
+    {
+      "pid": 42256,
+      "creationFileTimeUtc": "134358602169762090",
+      "role": "console-host",
+      "parentPid": 20892,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386617276,
+      "lastSeenAtMs": 1791386617276
+    },
+    {
+      "pid": 32424,
+      "creationFileTimeUtc": "134358602249741000",
+      "role": "llama-server",
+      "parentPid": 4184,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386625991,
+      "lastSeenAtMs": 1791386628269
+    },
+    {
+      "pid": 15848,
+      "creationFileTimeUtc": "134358602249836600",
+      "role": "console-host",
+      "parentPid": 32424,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386625991,
+      "lastSeenAtMs": 1791386628269
+    },
+    {
+      "pid": 37944,
+      "creationFileTimeUtc": "134358602267622080",
+      "role": "other",
+      "parentPid": 4184,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386627081,
+      "lastSeenAtMs": 1791386627081
+    },
+    {
+      "pid": 38488,
+      "creationFileTimeUtc": "134358602267798590",
+      "role": "other",
+      "parentPid": 4184,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386627081,
+      "lastSeenAtMs": 1791386627081
+    },
+    {
+      "pid": 41300,
+      "creationFileTimeUtc": "134358602267850730",
+      "role": "console-host",
+      "parentPid": 38488,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386627081,
+      "lastSeenAtMs": 1791386627081
+    },
+    {
+      "pid": 4976,
+      "creationFileTimeUtc": "134358602267981830",
+      "role": "console-host",
+      "parentPid": 37944,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386627081,
+      "lastSeenAtMs": 1791386627081
+    },
+    {
+      "pid": 9212,
+      "creationFileTimeUtc": "134358602301216780",
+      "role": "llama-server",
+      "parentPid": 4184,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386630768,
+      "lastSeenAtMs": 1791386641297
+    },
+    {
+      "pid": 29032,
+      "creationFileTimeUtc": "134358602301307370",
+      "role": "console-host",
+      "parentPid": 9212,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386630768,
+      "lastSeenAtMs": 1791386641297
+    },
+    {
+      "pid": 22496,
+      "creationFileTimeUtc": "134358602316394390",
+      "role": "other",
+      "parentPid": 4184,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386632092,
+      "lastSeenAtMs": 1791386632092
+    },
+    {
+      "pid": 27384,
+      "creationFileTimeUtc": "134358602316731840",
+      "role": "console-host",
+      "parentPid": 22496,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386632092,
+      "lastSeenAtMs": 1791386632092
+    },
+    {
+      "pid": 24296,
+      "creationFileTimeUtc": "134358602356884100",
+      "role": "other",
+      "parentPid": 4184,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386635929,
+      "lastSeenAtMs": 1791386635929
+    },
+    {
+      "pid": 20008,
+      "creationFileTimeUtc": "134358602356923010",
+      "role": "console-host",
+      "parentPid": 24296,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386635929,
+      "lastSeenAtMs": 1791386635929
+    },
+    {
+      "pid": 17812,
+      "creationFileTimeUtc": "134358602433332060",
+      "role": "engine",
+      "parentPid": 34620,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386644016,
+      "lastSeenAtMs": 1791386689897
+    },
+    {
+      "pid": 41220,
+      "creationFileTimeUtc": "134358602433390590",
+      "role": "console-host",
+      "parentPid": 17812,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386644016,
+      "lastSeenAtMs": 1791386689897
+    },
+    {
+      "pid": 30556,
+      "creationFileTimeUtc": "134358602469462520",
+      "role": "extraction-child",
+      "parentPid": 17812,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386647543,
+      "lastSeenAtMs": 1791386648431
+    },
+    {
+      "pid": 23900,
+      "creationFileTimeUtc": "134358602469577040",
+      "role": "console-host",
+      "parentPid": 30556,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386647543,
+      "lastSeenAtMs": 1791386648431
+    },
+    {
+      "pid": 30180,
+      "creationFileTimeUtc": "134358602482077370",
+      "role": "other",
+      "parentPid": 30556,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386648431,
+      "lastSeenAtMs": 1791386648431
+    },
+    {
+      "pid": 41816,
+      "creationFileTimeUtc": "134358602482125620",
+      "role": "console-host",
+      "parentPid": 30180,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386648431,
+      "lastSeenAtMs": 1791386648431
+    },
+    {
+      "pid": 5564,
+      "creationFileTimeUtc": "134358602573231490",
+      "role": "other",
+      "parentPid": 17812,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386657546,
+      "lastSeenAtMs": 1791386657546
+    },
+    {
+      "pid": 39960,
+      "creationFileTimeUtc": "134358602573259500",
+      "role": "other",
+      "parentPid": 17812,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386657546,
+      "lastSeenAtMs": 1791386657546
+    },
+    {
+      "pid": 18952,
+      "creationFileTimeUtc": "134358602573268720",
+      "role": "console-host",
+      "parentPid": 5564,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386657546,
+      "lastSeenAtMs": 1791386657546
+    },
+    {
+      "pid": 35820,
+      "creationFileTimeUtc": "134358602573295850",
+      "role": "other",
+      "parentPid": 17812,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386657546,
+      "lastSeenAtMs": 1791386657546
+    },
+    {
+      "pid": 32292,
+      "creationFileTimeUtc": "134358602573304540",
+      "role": "console-host",
+      "parentPid": 39960,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386657546,
+      "lastSeenAtMs": 1791386657546
+    },
+    {
+      "pid": 18960,
+      "creationFileTimeUtc": "134358602573332060",
+      "role": "console-host",
+      "parentPid": 35820,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386657546,
+      "lastSeenAtMs": 1791386657546
+    },
+    {
+      "pid": 30044,
+      "creationFileTimeUtc": "134358602622692900",
+      "role": "other",
+      "parentPid": 17812,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386662525,
+      "lastSeenAtMs": 1791386662525
+    },
+    {
+      "pid": 26668,
+      "creationFileTimeUtc": "134358602622732310",
+      "role": "console-host",
+      "parentPid": 30044,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386662525,
+      "lastSeenAtMs": 1791386662525
+    },
+    {
+      "pid": 27712,
+      "creationFileTimeUtc": "134358602717247210",
+      "role": "llama-server",
+      "parentPid": 17812,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386671986,
+      "lastSeenAtMs": 1791386689103
+    },
+    {
+      "pid": 1136,
+      "creationFileTimeUtc": "134358602717352160",
+      "role": "console-host",
+      "parentPid": 27712,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386671986,
+      "lastSeenAtMs": 1791386689103
+    },
+    {
+      "pid": 36272,
+      "creationFileTimeUtc": "134358602906261520",
+      "role": "engine",
+      "parentPid": 34620,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386691572,
+      "lastSeenAtMs": 1791386751617
+    },
+    {
+      "pid": 37144,
+      "creationFileTimeUtc": "134358602906295550",
+      "role": "console-host",
+      "parentPid": 36272,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386691572,
+      "lastSeenAtMs": 1791386751617
+    },
+    {
+      "pid": 37464,
+      "creationFileTimeUtc": "134358602935214560",
+      "role": "extraction-child",
+      "parentPid": 36272,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386694260,
+      "lastSeenAtMs": 1791386695130
+    },
+    {
+      "pid": 30988,
+      "creationFileTimeUtc": "134358602935305790",
+      "role": "console-host",
+      "parentPid": 37464,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386694260,
+      "lastSeenAtMs": 1791386695130
+    },
+    {
+      "pid": 33216,
+      "creationFileTimeUtc": "134358602948915740",
+      "role": "other",
+      "parentPid": 37464,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386695130,
+      "lastSeenAtMs": 1791386695130
+    },
+    {
+      "pid": 14024,
+      "creationFileTimeUtc": "134358602948957650",
+      "role": "console-host",
+      "parentPid": 33216,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386695130,
+      "lastSeenAtMs": 1791386695130
+    },
+    {
+      "pid": 42536,
+      "creationFileTimeUtc": "134358603087503580",
+      "role": "other",
+      "parentPid": 36272,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386708967,
+      "lastSeenAtMs": 1791386708967
+    },
+    {
+      "pid": 16728,
+      "creationFileTimeUtc": "134358603087545640",
+      "role": "console-host",
+      "parentPid": 42536,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386708967,
+      "lastSeenAtMs": 1791386708967
+    },
+    {
+      "pid": 39616,
+      "creationFileTimeUtc": "134358603195659780",
+      "role": "llama-server",
+      "parentPid": 36272,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386719943,
+      "lastSeenAtMs": 1791386749965
+    },
+    {
+      "pid": 38084,
+      "creationFileTimeUtc": "134358603195728950",
+      "role": "console-host",
+      "parentPid": 39616,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386719943,
+      "lastSeenAtMs": 1791386749965
+    },
+    {
+      "pid": 16932,
+      "creationFileTimeUtc": "134358603338670930",
+      "role": "other",
+      "parentPid": 36272,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386734095,
+      "lastSeenAtMs": 1791386734095
+    },
+    {
+      "pid": 18560,
+      "creationFileTimeUtc": "134358603338707910",
+      "role": "console-host",
+      "parentPid": 16932,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386734095,
+      "lastSeenAtMs": 1791386734095
+    },
+    {
+      "pid": 20584,
+      "creationFileTimeUtc": "134358603428995910",
+      "role": "other",
+      "parentPid": 36272,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386743128,
+      "lastSeenAtMs": 1791386743128
+    },
+    {
+      "pid": 28160,
+      "creationFileTimeUtc": "134358603429030980",
+      "role": "console-host",
+      "parentPid": 20584,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386743128,
+      "lastSeenAtMs": 1791386743128
+    },
+    {
+      "pid": 29608,
+      "creationFileTimeUtc": "134358603523654010",
+      "role": "engine",
+      "parentPid": 34620,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386753293,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 30164,
+      "creationFileTimeUtc": "134358603523700270",
+      "role": "console-host",
+      "parentPid": 29608,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386753293,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 3416,
+      "creationFileTimeUtc": "134358603552552780",
+      "role": "extraction-child",
+      "parentPid": 29608,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386755886,
+      "lastSeenAtMs": 1791386756716
+    },
+    {
+      "pid": 25788,
+      "creationFileTimeUtc": "134358603552647650",
+      "role": "console-host",
+      "parentPid": 3416,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386755886,
+      "lastSeenAtMs": 1791386756716
+    },
+    {
+      "pid": 42864,
+      "creationFileTimeUtc": "134358603556264230",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386755886,
+      "lastSeenAtMs": 1791386755886
+    },
+    {
+      "pid": 26960,
+      "creationFileTimeUtc": "134358603556347830",
+      "role": "console-host",
+      "parentPid": 42864,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386755886,
+      "lastSeenAtMs": 1791386755886
+    },
+    {
+      "pid": 31848,
+      "creationFileTimeUtc": "134358603564963030",
+      "role": "other",
+      "parentPid": 3416,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386756716,
+      "lastSeenAtMs": 1791386756716
+    },
+    {
+      "pid": 40764,
+      "creationFileTimeUtc": "134358603565012950",
+      "role": "console-host",
+      "parentPid": 31848,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386756716,
+      "lastSeenAtMs": 1791386756716
+    },
+    {
+      "pid": 26356,
+      "creationFileTimeUtc": "134358603565175680",
+      "role": "other",
+      "parentPid": 31848,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386756716,
+      "lastSeenAtMs": 1791386756716
+    },
+    {
+      "pid": 2900,
+      "creationFileTimeUtc": "134358603775907020",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386778011,
+      "lastSeenAtMs": 1791386778011
+    },
+    {
+      "pid": 10624,
+      "creationFileTimeUtc": "134358603775946180",
+      "role": "console-host",
+      "parentPid": 2900,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386778011,
+      "lastSeenAtMs": 1791386778011
+    },
+    {
+      "pid": 35532,
+      "creationFileTimeUtc": "134358603803312810",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386780535,
+      "lastSeenAtMs": 1791386780535
+    },
+    {
+      "pid": 42924,
+      "creationFileTimeUtc": "134358603803352410",
+      "role": "console-host",
+      "parentPid": 35532,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386780535,
+      "lastSeenAtMs": 1791386780535
+    },
+    {
+      "pid": 35344,
+      "creationFileTimeUtc": "134358603806064800",
+      "role": "llama-server",
+      "parentPid": 29608,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386781420,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 32772,
+      "creationFileTimeUtc": "134358603806158080",
+      "role": "console-host",
+      "parentPid": 35344,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386781420,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 23944,
+      "creationFileTimeUtc": "134358604036002650",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386803798,
+      "lastSeenAtMs": 1791386803798
+    },
+    {
+      "pid": 34504,
+      "creationFileTimeUtc": "134358604036036640",
+      "role": "console-host",
+      "parentPid": 23944,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386803798,
+      "lastSeenAtMs": 1791386803798
+    },
+    {
+      "pid": 24668,
+      "creationFileTimeUtc": "134358604093421380",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386809538,
+      "lastSeenAtMs": 1791386809538
+    },
+    {
+      "pid": 25688,
+      "creationFileTimeUtc": "134358604093459810",
+      "role": "console-host",
+      "parentPid": 24668,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386809538,
+      "lastSeenAtMs": 1791386809538
+    },
+    {
+      "pid": 40676,
+      "creationFileTimeUtc": "134358604336253210",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386833893,
+      "lastSeenAtMs": 1791386833893
+    },
+    {
+      "pid": 41652,
+      "creationFileTimeUtc": "134358604336298160",
+      "role": "console-host",
+      "parentPid": 40676,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386833893,
+      "lastSeenAtMs": 1791386833893
+    },
+    {
+      "pid": 24192,
+      "creationFileTimeUtc": "134358604436288100",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386843945,
+      "lastSeenAtMs": 1791386843945
+    },
+    {
+      "pid": 31160,
+      "creationFileTimeUtc": "134358604436334070",
+      "role": "console-host",
+      "parentPid": 24192,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386843945,
+      "lastSeenAtMs": 1791386843945
+    },
+    {
+      "pid": 27832,
+      "creationFileTimeUtc": "134358604536735200",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386854002,
+      "lastSeenAtMs": 1791386854002
+    },
+    {
+      "pid": 20932,
+      "creationFileTimeUtc": "134358604536770340",
+      "role": "console-host",
+      "parentPid": 27832,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386854002,
+      "lastSeenAtMs": 1791386854002
+    },
+    {
+      "pid": 24696,
+      "creationFileTimeUtc": "134358604728794080",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386873181,
+      "lastSeenAtMs": 1791386873181
+    },
+    {
+      "pid": 27212,
+      "creationFileTimeUtc": "134358604728837580",
+      "role": "console-host",
+      "parentPid": 24696,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386873181,
+      "lastSeenAtMs": 1791386873181
+    },
+    {
+      "pid": 42408,
+      "creationFileTimeUtc": "134358604892814770",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386889495,
+      "lastSeenAtMs": 1791386889495
+    },
+    {
+      "pid": 17860,
+      "creationFileTimeUtc": "134358604892848740",
+      "role": "console-host",
+      "parentPid": 42408,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386889495,
+      "lastSeenAtMs": 1791386889495
+    },
+    {
+      "pid": 8516,
+      "creationFileTimeUtc": "134358605151095080",
+      "role": "extraction-child",
+      "parentPid": 29608,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386916320,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 36396,
+      "creationFileTimeUtc": "134358605151236130",
+      "role": "console-host",
+      "parentPid": 8516,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386916320,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 24204,
+      "creationFileTimeUtc": "134358605159744710",
+      "role": "other",
+      "parentPid": 8516,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386916320,
+      "lastSeenAtMs": 1791386916320
+    },
+    {
+      "pid": 27980,
+      "creationFileTimeUtc": "134358605159853040",
+      "role": "console-host",
+      "parentPid": 24204,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386916320,
+      "lastSeenAtMs": 1791386916320
+    },
+    {
+      "pid": 17708,
+      "creationFileTimeUtc": "134358605160055560",
+      "role": "other",
+      "parentPid": 24204,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386916320,
+      "lastSeenAtMs": 1791386916320
+    },
+    {
+      "pid": 42020,
+      "creationFileTimeUtc": "134358605537178860",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386954119,
+      "lastSeenAtMs": 1791386954119
+    },
+    {
+      "pid": 41204,
+      "creationFileTimeUtc": "134358605537220980",
+      "role": "console-host",
+      "parentPid": 42020,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386954119,
+      "lastSeenAtMs": 1791386954119
+    },
+    {
+      "pid": 20604,
+      "creationFileTimeUtc": "134358605637225720",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386964030,
+      "lastSeenAtMs": 1791386964030
+    },
+    {
+      "pid": 16448,
+      "creationFileTimeUtc": "134358605637288690",
+      "role": "console-host",
+      "parentPid": 20604,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386964030,
+      "lastSeenAtMs": 1791386964030
+    },
+    {
+      "pid": 41748,
+      "creationFileTimeUtc": "134358605737772950",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386974373,
+      "lastSeenAtMs": 1791386974373
+    },
+    {
+      "pid": 2788,
+      "creationFileTimeUtc": "134358605737819320",
+      "role": "console-host",
+      "parentPid": 41748,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386974373,
+      "lastSeenAtMs": 1791386974373
+    },
+    {
+      "pid": 35088,
+      "creationFileTimeUtc": "134358605843499580",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386984685,
+      "lastSeenAtMs": 1791386984685
+    },
+    {
+      "pid": 20832,
+      "creationFileTimeUtc": "134358605843564380",
+      "role": "console-host",
+      "parentPid": 35088,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386984685,
+      "lastSeenAtMs": 1791386984685
+    },
+    {
+      "pid": 17924,
+      "creationFileTimeUtc": "134358605940531580",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386994381,
+      "lastSeenAtMs": 1791386994381
+    },
+    {
+      "pid": 16324,
+      "creationFileTimeUtc": "134358605940613860",
+      "role": "console-host",
+      "parentPid": 17924,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791386994381,
+      "lastSeenAtMs": 1791386994381
+    },
+    {
+      "pid": 33996,
+      "creationFileTimeUtc": "134358606037913380",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387004171,
+      "lastSeenAtMs": 1791387004171
+    },
+    {
+      "pid": 7076,
+      "creationFileTimeUtc": "134358606037963110",
+      "role": "console-host",
+      "parentPid": 33996,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387004171,
+      "lastSeenAtMs": 1791387004171
+    },
+    {
+      "pid": 42384,
+      "creationFileTimeUtc": "134358606105556210",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387010798,
+      "lastSeenAtMs": 1791387010798
+    },
+    {
+      "pid": 30748,
+      "creationFileTimeUtc": "134358606105603170",
+      "role": "console-host",
+      "parentPid": 42384,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387010798,
+      "lastSeenAtMs": 1791387010798
+    },
+    {
+      "pid": 17212,
+      "creationFileTimeUtc": "134358606237695910",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387024833,
+      "lastSeenAtMs": 1791387024833
+    },
+    {
+      "pid": 35252,
+      "creationFileTimeUtc": "134358606237798990",
+      "role": "console-host",
+      "parentPid": 17212,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387024833,
+      "lastSeenAtMs": 1791387024833
+    },
+    {
+      "pid": 22272,
+      "creationFileTimeUtc": "134358606337694750",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387034041,
+      "lastSeenAtMs": 1791387034041
+    },
+    {
+      "pid": 35240,
+      "creationFileTimeUtc": "134358606337760370",
+      "role": "console-host",
+      "parentPid": 22272,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387034041,
+      "lastSeenAtMs": 1791387034041
+    },
+    {
+      "pid": 5252,
+      "creationFileTimeUtc": "134358606692834130",
+      "role": "other",
+      "parentPid": 29608,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387069757,
+      "lastSeenAtMs": 1791387069757
+    },
+    {
+      "pid": 41728,
+      "creationFileTimeUtc": "134358606926505220",
+      "role": "other",
+      "parentPid": 8516,
+      "name": "tesseract.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387093072,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 34032,
+      "creationFileTimeUtc": "134358606926710440",
+      "role": "console-host",
+      "parentPid": 41728,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387093072,
+      "lastSeenAtMs": 1791387093072
+    },
+    {
+      "pid": 13216,
+      "creationFileTimeUtc": "134358606949201570",
+      "role": "engine",
+      "parentPid": 34620,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387096398,
+      "lastSeenAtMs": 1791387259518
+    },
+    {
+      "pid": 18412,
+      "creationFileTimeUtc": "134358606949353550",
+      "role": "console-host",
+      "parentPid": 13216,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387096398,
+      "lastSeenAtMs": 1791387259518
+    },
+    {
+      "pid": 2144,
+      "creationFileTimeUtc": "134358606998025890",
+      "role": "extraction-child",
+      "parentPid": 13216,
+      "name": "java.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387100581,
+      "lastSeenAtMs": 1791387101844
+    },
+    {
+      "pid": 38064,
+      "creationFileTimeUtc": "134358606998161150",
+      "role": "console-host",
+      "parentPid": 2144,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387100581,
+      "lastSeenAtMs": 1791387101844
+    },
+    {
+      "pid": 42552,
+      "creationFileTimeUtc": "134358607026372220",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387102933,
+      "lastSeenAtMs": 1791387102933
+    },
+    {
+      "pid": 7396,
+      "creationFileTimeUtc": "134358607026419590",
+      "role": "console-host",
+      "parentPid": 42552,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387102933,
+      "lastSeenAtMs": 1791387102933
+    },
+    {
+      "pid": 27516,
+      "creationFileTimeUtc": "134358607264316810",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387126694,
+      "lastSeenAtMs": 1791387126694
+    },
+    {
+      "pid": 2604,
+      "creationFileTimeUtc": "134358607264360000",
+      "role": "console-host",
+      "parentPid": 27516,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387126694,
+      "lastSeenAtMs": 1791387126694
+    },
+    {
+      "pid": 17728,
+      "creationFileTimeUtc": "134358607307776460",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387131122,
+      "lastSeenAtMs": 1791387131122
+    },
+    {
+      "pid": 40044,
+      "creationFileTimeUtc": "134358607307828100",
+      "role": "console-host",
+      "parentPid": 17728,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387131122,
+      "lastSeenAtMs": 1791387131122
+    },
+    {
+      "pid": 24976,
+      "creationFileTimeUtc": "134358607308465530",
+      "role": "llama-server",
+      "parentPid": 13216,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387132219,
+      "lastSeenAtMs": 1791387138790
+    },
+    {
+      "pid": 33028,
+      "creationFileTimeUtc": "134358607308613240",
+      "role": "console-host",
+      "parentPid": 24976,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387132219,
+      "lastSeenAtMs": 1791387137792
+    },
+    {
+      "pid": 42552,
+      "creationFileTimeUtc": "134358607318697260",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387132219,
+      "lastSeenAtMs": 1791387132219
+    },
+    {
+      "pid": 34892,
+      "creationFileTimeUtc": "134358607318743260",
+      "role": "console-host",
+      "parentPid": 42552,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387132219,
+      "lastSeenAtMs": 1791387132219
+    },
+    {
+      "pid": 37072,
+      "creationFileTimeUtc": "134358607391222940",
+      "role": "llama-server",
+      "parentPid": 13216,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387139778,
+      "lastSeenAtMs": 1791387144907
+    },
+    {
+      "pid": 576,
+      "creationFileTimeUtc": "134358607391335000",
+      "role": "console-host",
+      "parentPid": 37072,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387139778,
+      "lastSeenAtMs": 1791387144907
+    },
+    {
+      "pid": 24768,
+      "creationFileTimeUtc": "134358607445943810",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387144907,
+      "lastSeenAtMs": 1791387144907
+    },
+    {
+      "pid": 37816,
+      "creationFileTimeUtc": "134358607445997130",
+      "role": "console-host",
+      "parentPid": 24768,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387144907,
+      "lastSeenAtMs": 1791387144907
+    },
+    {
+      "pid": 35772,
+      "creationFileTimeUtc": "134358607455988790",
+      "role": "llama-server",
+      "parentPid": 13216,
+      "name": "llama-server.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387145884,
+      "lastSeenAtMs": 1791387256727
+    },
+    {
+      "pid": 35708,
+      "creationFileTimeUtc": "134358607456084150",
+      "role": "console-host",
+      "parentPid": 35772,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387145884,
+      "lastSeenAtMs": 1791387256727
+    },
+    {
+      "pid": 26104,
+      "creationFileTimeUtc": "134358607504234110",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387150673,
+      "lastSeenAtMs": 1791387150673
+    },
+    {
+      "pid": 28584,
+      "creationFileTimeUtc": "134358607504273400",
+      "role": "console-host",
+      "parentPid": 26104,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387150673,
+      "lastSeenAtMs": 1791387150673
+    },
+    {
+      "pid": 26744,
+      "creationFileTimeUtc": "134358607601121580",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387160416,
+      "lastSeenAtMs": 1791387160416
+    },
+    {
+      "pid": 16584,
+      "creationFileTimeUtc": "134358607601159480",
+      "role": "console-host",
+      "parentPid": 26744,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387160416,
+      "lastSeenAtMs": 1791387160416
+    },
+    {
+      "pid": 40460,
+      "creationFileTimeUtc": "134358607682839450",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387168659,
+      "lastSeenAtMs": 1791387168659
+    },
+    {
+      "pid": 22552,
+      "creationFileTimeUtc": "134358607682884000",
+      "role": "console-host",
+      "parentPid": 40460,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387168659,
+      "lastSeenAtMs": 1791387168659
+    },
+    {
+      "pid": 15128,
+      "creationFileTimeUtc": "134358607782590190",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387178803,
+      "lastSeenAtMs": 1791387178803
+    },
+    {
+      "pid": 41016,
+      "creationFileTimeUtc": "134358608082800020",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387208615,
+      "lastSeenAtMs": 1791387208615
+    },
+    {
+      "pid": 16188,
+      "creationFileTimeUtc": "134358608082842140",
+      "role": "console-host",
+      "parentPid": 41016,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387208615,
+      "lastSeenAtMs": 1791387208615
+    },
+    {
+      "pid": 14544,
+      "creationFileTimeUtc": "134358608176303540",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "nvidia-smi.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387217998,
+      "lastSeenAtMs": 1791387217998
+    },
+    {
+      "pid": 36236,
+      "creationFileTimeUtc": "134358608176383060",
+      "role": "console-host",
+      "parentPid": 14544,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387217998,
+      "lastSeenAtMs": 1791387217998
+    },
+    {
+      "pid": 20376,
+      "creationFileTimeUtc": "134358608283366300",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387228810,
+      "lastSeenAtMs": 1791387228810
+    },
+    {
+      "pid": 36408,
+      "creationFileTimeUtc": "134358608283406000",
+      "role": "console-host",
+      "parentPid": 20376,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387228810,
+      "lastSeenAtMs": 1791387228810
+    },
+    {
+      "pid": 42252,
+      "creationFileTimeUtc": "134358608553155430",
+      "role": "other",
+      "parentPid": 13216,
+      "name": "powershell.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387255661,
+      "lastSeenAtMs": 1791387255661
+    },
+    {
+      "pid": 12156,
+      "creationFileTimeUtc": "134358608553242410",
+      "role": "console-host",
+      "parentPid": 42252,
+      "name": "conhost.exe",
+      "executable": null,
+      "firstSeenAtMs": 1791387255661,
+      "lastSeenAtMs": 1791387255661
+    }
+  ],
+  "originalGaps": [
+    {
+      "pid": 18400,
+      "creationFileTimeUtc": "134358602070870070",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 37436,
+      "creationFileTimeUtc": "134358602070904950",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 20892,
+      "creationFileTimeUtc": "134358602169720050",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 42256,
+      "creationFileTimeUtc": "134358602169762090",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 37944,
+      "creationFileTimeUtc": "134358602267622080",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 38488,
+      "creationFileTimeUtc": "134358602267798590",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 41300,
+      "creationFileTimeUtc": "134358602267850730",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 4976,
+      "creationFileTimeUtc": "134358602267981830",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 22496,
+      "creationFileTimeUtc": "134358602316394390",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 27384,
+      "creationFileTimeUtc": "134358602316731840",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 24296,
+      "creationFileTimeUtc": "134358602356884100",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 20008,
+      "creationFileTimeUtc": "134358602356923010",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 5564,
+      "creationFileTimeUtc": "134358602573231490",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 39960,
+      "creationFileTimeUtc": "134358602573259500",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 18952,
+      "creationFileTimeUtc": "134358602573268720",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 35820,
+      "creationFileTimeUtc": "134358602573295850",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 32292,
+      "creationFileTimeUtc": "134358602573304540",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 18960,
+      "creationFileTimeUtc": "134358602573332060",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 30044,
+      "creationFileTimeUtc": "134358602622692900",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 26668,
+      "creationFileTimeUtc": "134358602622732310",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 42536,
+      "creationFileTimeUtc": "134358603087503580",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 16728,
+      "creationFileTimeUtc": "134358603087545640",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 16932,
+      "creationFileTimeUtc": "134358603338670930",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 18560,
+      "creationFileTimeUtc": "134358603338707910",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 20584,
+      "creationFileTimeUtc": "134358603428995910",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 28160,
+      "creationFileTimeUtc": "134358603429030980",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 42864,
+      "creationFileTimeUtc": "134358603556264230",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 26960,
+      "creationFileTimeUtc": "134358603556347830",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 2900,
+      "creationFileTimeUtc": "134358603775907020",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 10624,
+      "creationFileTimeUtc": "134358603775946180",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 35532,
+      "creationFileTimeUtc": "134358603803312810",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 42924,
+      "creationFileTimeUtc": "134358603803352410",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 23944,
+      "creationFileTimeUtc": "134358604036002650",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 34504,
+      "creationFileTimeUtc": "134358604036036640",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 24668,
+      "creationFileTimeUtc": "134358604093421380",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 25688,
+      "creationFileTimeUtc": "134358604093459810",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 40676,
+      "creationFileTimeUtc": "134358604336253210",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 41652,
+      "creationFileTimeUtc": "134358604336298160",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 24192,
+      "creationFileTimeUtc": "134358604436288100",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 31160,
+      "creationFileTimeUtc": "134358604436334070",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 27832,
+      "creationFileTimeUtc": "134358604536735200",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 20932,
+      "creationFileTimeUtc": "134358604536770340",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 24696,
+      "creationFileTimeUtc": "134358604728794080",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 27212,
+      "creationFileTimeUtc": "134358604728837580",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 42408,
+      "creationFileTimeUtc": "134358604892814770",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 17860,
+      "creationFileTimeUtc": "134358604892848740",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 42020,
+      "creationFileTimeUtc": "134358605537178860",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 41204,
+      "creationFileTimeUtc": "134358605537220980",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 20604,
+      "creationFileTimeUtc": "134358605637225720",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 16448,
+      "creationFileTimeUtc": "134358605637288690",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 41748,
+      "creationFileTimeUtc": "134358605737772950",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 2788,
+      "creationFileTimeUtc": "134358605737819320",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 35088,
+      "creationFileTimeUtc": "134358605843499580",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 20832,
+      "creationFileTimeUtc": "134358605843564380",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 17924,
+      "creationFileTimeUtc": "134358605940531580",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 16324,
+      "creationFileTimeUtc": "134358605940613860",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 33996,
+      "creationFileTimeUtc": "134358606037913380",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 7076,
+      "creationFileTimeUtc": "134358606037963110",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 42384,
+      "creationFileTimeUtc": "134358606105556210",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 30748,
+      "creationFileTimeUtc": "134358606105603170",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 17212,
+      "creationFileTimeUtc": "134358606237695910",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 35252,
+      "creationFileTimeUtc": "134358606237798990",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 22272,
+      "creationFileTimeUtc": "134358606337694750",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    },
+    {
+      "pid": 35240,
+      "creationFileTimeUtc": "134358606337760370",
+      "role": "console-host",
+      "reason": "orphan_console_host",
+      "detail": "console parent is not accounted: parent is not a run Engine or one of its ledger children"
+    },
+    {
+      "pid": 5252,
+      "creationFileTimeUtc": "134358606692834130",
+      "role": "other",
+      "reason": "unaccounted_process",
+      "detail": "tier C executable outside the Engine job (containment CONTAINED)"
+    }
+  ]
+}

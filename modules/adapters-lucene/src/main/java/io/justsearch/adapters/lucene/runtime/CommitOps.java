@@ -16,6 +16,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +42,12 @@ public final class CommitOps {
   static final long DEFAULT_COMMIT_TIMER_INTERVAL_MS = 10_000L;
 
   private final RuntimeSession session;
+  // Prepare admission metadata during durable publication, never in a normal unchanged check.
+  // The monitor closes the durability-to-reader window; a second epoch read detects a commit
+  // racing an already leased searcher.
+  private volatile long admissionCommitEpoch;
+  private long admissionReaderEpoch;
+  private SearcherManager admissionManager;
   private volatile ScheduledExecutorService commitTimer;
   private volatile ScheduledFuture<?> commitTimerFuture;
 
@@ -106,6 +116,9 @@ public final class CommitOps {
           w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
           long start = System.nanoTime();
           w.commit();
+          admissionCommitEpoch++;
+          refreshAdmissionReader();
+          admissionReaderEpoch = admissionCommitEpoch;
           long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
           if (trackedReason != null) {
             session.pendingDocs.addAndGet(-pendingAtCommit);
@@ -122,6 +135,72 @@ public final class CommitOps {
       // shutdown and must not make the shutdown hook wait behind the failed commit's lock.
       session.reportTerminalWriterFailureIfPresent();
     }
+  }
+
+  record AdmissionResult<T>(long epoch, T value) {}
+
+  <T> AdmissionResult<T> withAdmissionSearcher(
+      SearcherBridge fallback, ReadPathOps.SearcherOperation<T> operation) throws IOException {
+    SearcherManager manager;
+    IndexSearcher searcher;
+    long epoch;
+    synchronized (this) {
+      if (admissionReaderEpoch != admissionCommitEpoch) {
+        // Retry a failed commit-time preparation; an old reader cannot certify completeness.
+        refreshAdmissionReader();
+        admissionReaderEpoch = admissionCommitEpoch;
+      }
+      manager = admissionManager;
+      searcher = manager == null ? null : manager.acquire();
+      epoch = admissionCommitEpoch;
+    }
+    if (manager == null) return new AdmissionResult<>(epoch, fallback.withSearcher(operation));
+    try {
+      return new AdmissionResult<>(epoch, operation.execute(searcher));
+    } finally {
+      manager.release(searcher);
+    }
+  }
+
+  private void refreshAdmissionReader() throws IOException {
+    if (admissionManager == null) {
+      var snapshot = session.snapshot;
+      if (snapshot == null) throw new IllegalStateException("Runtime closed during admission publication");
+      var reader = new SoftDeletesDirectoryReaderWrapper(
+          DirectoryReader.open(snapshot.writer(), true, true), session.softDeleteField);
+      try {
+        admissionManager = new SearcherManager(reader, new SearcherFactory() {
+          @Override
+          public IndexSearcher newSearcher(IndexReader current, IndexReader previous) throws IOException {
+            var searcher = new IndexSearcher(current);
+            searcher.setQueryCache(null);
+            session.chunkCompleteness.prepare(searcher);
+            return searcher;
+          }
+        });
+      } catch (IOException | RuntimeException | Error failure) {
+        reader.close();
+        throw failure;
+      }
+    } else {
+      admissionManager.maybeRefreshBlocking();
+    }
+  }
+
+  synchronized void refreshAdmissionAfterBackfill() throws IOException {
+    if (admissionManager != null) refreshAdmissionReader();
+  }
+
+  synchronized void closeAdmissionReader() throws IOException {
+    if (admissionManager != null) {
+      admissionManager.close();
+      admissionManager = null;
+    }
+  }
+
+  boolean admissionReaderStillCurrent(long epoch) {
+    // Wait out an in-progress durable commit as well as checking completed ones.
+    synchronized (this) { return epoch == admissionCommitEpoch; }
   }
 
   public Map<String, Object> buildMetadataSnapshot() {

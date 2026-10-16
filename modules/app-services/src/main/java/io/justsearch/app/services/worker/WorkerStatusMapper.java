@@ -175,6 +175,11 @@ final class WorkerStatusMapper {
                         .spladeEnabled(enrichment.getSpladeEnabled())
                         .nerEnabled(enrichment.getNerEnabled())
                         .backfillMode(enrichment.getBackfillMode())
+                        // Spec E E0b / E1: the joint S5 count and live stage availability.
+                        .embeddedAndSparseCount(enrichment.getEmbeddedAndSparseCount())
+                        .embeddingAvailable(enrichment.getEmbeddingAvailable())
+                        .spladeAvailable(enrichment.getSpladeAvailable())
+                        .nerAvailable(enrichment.getNerAvailable())
                         .enrichmentCompleted(enrichment.getEnrichmentCompletedMap())
                         .batchTiming(new BatchTimingView(
                                 enrichment.getBatchTiming().getBatchCountMap(),
@@ -211,6 +216,13 @@ final class WorkerStatusMapper {
                 .buildStamp(status.getBuildStamp().isEmpty() ? null : status.getBuildStamp())
                 .aiReady(health != null ? health.getAiReady() : null)
                 .embeddingReady(health != null ? health.getEmbeddingReady() : null)
+                .queryEncodersCold(health != null ? health.getQueryEncodersCold() : null)
+                .semanticStuckSinceMs(
+                        health != null && health.getSemanticStuckSinceMs() > 0L
+                                ? health.getSemanticStuckSinceMs() : null)
+                .queryCpuRecourseAtMs(
+                        health != null && health.getQueryCpuRecourseAtMs() > 0L
+                                ? health.getQueryCpuRecourseAtMs() : null)
                 .build();
     }
 

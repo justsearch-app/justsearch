@@ -46,6 +46,66 @@ import tools.jackson.databind.json.JsonMapper;
 class McpProtocolHandlerTest {
 
   @Test
+  void nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget() throws Exception {
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 8, 2);
+    var incoming = TestRequestContexts.mcp(null);
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    var status = mock(io.justsearch.app.api.knowledge.KnowledgeStatus.class);
+    when(status.extras()).thenReturn(Map.of());
+    when(adapter.status(any(EngineContext.class))).thenReturn(status);
+    var controller = mock(KnowledgeSearchController.class);
+    when(controller.getAdapter()).thenReturn(adapter);
+    var surface = new McpToolSurface(List.of(OperationCatalog.of("core", List.of())),
+        dispatcher, () -> controller, () -> null, FIXED_CLOCK);
+    var protocol = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK, admission);
+    for (String request : List.of("""
+        {"jsonrpc":"2.0","id":81,"method":"tools/call",
+         "params":{"name":"justsearch_status","arguments":{}}}
+        """, """
+        {"jsonrpc":"2.0","id":81,"method":"resources/read",
+         "params":{"uri":"justsearch://index/summary"}}
+        """)) {
+      clearInvocations(adapter);
+      var ctx = mock(Context.class);
+      var attributes = new java.util.HashMap<String, Object>();
+      attributes.put(io.justsearch.ui.api.RequestEngineContext.ATTRIBUTE, incoming);
+      when(ctx.attribute(anyString())).thenAnswer(invocation -> attributes.get(invocation.getArgument(0)));
+      doAnswer(invocation -> {
+        attributes.put(invocation.getArgument(0), invocation.getArgument(1));
+        return null;
+      }).when(ctx).attribute(anyString(), any());
+      when(ctx.path()).thenReturn("/mcp");
+      when(ctx.body()).thenReturn(request);
+      when(ctx.contentType(anyString())).thenReturn(ctx);
+      when(ctx.status(anyInt())).thenReturn(ctx);
+      var result = ArgumentCaptor.forClass(String.class);
+      when(ctx.result(result.capture())).thenReturn(ctx);
+      try (var search = admission.admit(incoming, false);
+          var chat = admission.admit(incoming, false)) {
+        assertNotNull(search, "search capacity must be occupied before observing native status");
+        assertNotNull(chat, "chat capacity must be occupied before observing native status");
+        try {
+          protocol.handlePost(ctx);
+          var wire = MAPPER.readTree(result.getValue());
+          assertTrue(wire.has("result"), "native status must bypass the occupied work budget: " + wire);
+          assertFalse(wire.path("result").path("isError").asBoolean());
+          var contents = wire.path("result").has("contents")
+              ? wire.path("result").path("contents") : wire.path("result").path("content");
+          assertTrue(contents.path(0).path("text").asText().contains("documents: 0"),
+              "both status surfaces return the same observed document count");
+          var context = ArgumentCaptor.forClass(EngineContext.class);
+          verify(adapter).status(context.capture());
+          assertEquals(EngineContext.Urgency.BACKGROUND, context.getValue().urgency());
+        } finally {
+          var work = io.justsearch.ui.api.RequestEngineWork.get(ctx);
+          if (work != null) work.close();
+        }
+      }
+    }
+    assertEquals(0, admission.activeWorkCount());
+  }
+
+  @Test
   void surfaceRefusalsReachProtocolAcrossToolsAndResources() throws Exception {
     for (String endpoint : List.of("status", "summary", "facets", "entities", "searchStatus")) {
       for (boolean admission : List.of(false, true)) {
@@ -297,13 +357,15 @@ class McpProtocolHandlerTest {
         String expectedCode = switch (reason) {
           case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
           case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+          case INFERENCE_BUSY -> "ADMISSION_INFERENCE_BUSY";
           case FROZEN -> "UPGRADE_PREPARING";
           case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
         };
         assertEquals(expectedCode, data.get("errorCode"));
         assertEquals(false, data.get("retrySafe"));
         boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
-            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY;
         verify(ctx).status(capacity ? 429 : 503);
         if (capacity) verify(ctx).header("Retry-After", "7");
         else verify(ctx, never()).header(eq("Retry-After"), anyString());

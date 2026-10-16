@@ -1,26 +1,58 @@
 #!/usr/bin/env node
 /**
  * Dev helper: starts the backend (runHeadless) and Vite together with a clean data dir and a free port.
- * Usage: npm run dev:all
+ * Usage: npm run dev:all [-- --data-dir <path>]
+ *
+ * The Engine's data and home folder is modules/ui-web/.dev-data unless --data-dir names another
+ * (JUSTSEARCH_DATA_DIR and JUSTSEARCH_HOME are both set to it, as dev-runner does), so a dev stack
+ * never reads the person's own settings or writes into their data. Each start cleans that folder,
+ * so it must be one a dev tool created and marked (scripts/dev/lib/dev-data-folder.cjs); any other
+ * non-empty folder is refused unchanged. Ctrl+C, or either child ending,
+ * stops the stack in order: the Engine is asked to quit (POST /api/lifecycle/shutdown) and given
+ * its quit deadline plus a margin to exit, then whatever is left in each child's job is ended.
  */
-const { spawn } = require("child_process");
 const path = require("path");
 const process = require("process");
 const fs = require("fs");
 const net = require("net");
 const http = require("http");
 const detLib = require("./lib/determinism-budget.cjs");
+// Each child runs in its own Windows job (kernel-tracked membership, never parent links), so the
+// stop ends what Gradle and Vite start below them. Vite's node entry is started directly;
+// gradlew.bat runs through cmd.exe, its interpreter, inside the job.
+const jobRun = require("../../../scripts/dev/lib/job-run.cjs");
+const engineActuator = require("../../../scripts/dev/lib/engine-actuator.cjs");
+const devDataFolder = require("../../../scripts/dev/lib/dev-data-folder.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const uiWebDir = path.resolve(rootDir, "modules", "ui-web");
 const gradleCmd = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
 const gradlePath = path.resolve(rootDir, gradleCmd);
 const basePort = Number(process.env.JUSTSEARCH_API_PORT || 33221);
-const dataDir = process.env.JUSTSEARCH_DATA_DIR || path.join(uiWebDir, ".dev-data");
+/** The Engine's quit deadline plus a margin for the Gradle run around it to end. */
+const QUIT_WAIT_MS = engineActuator.QUIT_DEADLINE_MS + 2000;
+
+function parseArgs(argv) {
+  const out = { dataDir: null, help: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--help" || arg === "-h") out.help = true;
+    else if (arg === "--data-dir") out.dataDir = argv[(i += 1)] ?? "";
+    else if (arg.startsWith("--data-dir=")) out.dataDir = arg.slice("--data-dir=".length);
+    else throw new Error(`Unknown option: ${arg}`);
+    if (out.dataDir === "") throw new Error("--data-dir needs a path");
+  }
+  return out;
+}
+
+/** The Engine's data and home folder, chosen at startup (below). */
+let dataDir = null;
 
 let backend;
 let frontend;
-let shuttingDown = false;
+let apiPort = null;
+let shutdownPromise = null;
+const childRuns = new WeakMap();
 const det = detLib.createDeterminismBudget({ stdoutSentinel: "JUSTSEARCH_API_PORT=..." });
 
 async function findFreePort(startPort) {
@@ -51,8 +83,10 @@ function cleanDataDir(dir) {
   // (see KnowledgeClient / WatchedRootsStore), so if we delete it we can end up with:
   //   - non-zero indexedDocuments (index still present)
   //   - empty roots list in the UI library (roots file gone)
+  // ui/ holds the Engine's settings (JUSTSEARCH_HOME is this folder), kept as dev-runner keeps it.
+  // The marker stays: it is what makes this folder one a dev tool may clean.
   const keep = new Set([
-    "config", "index", "watched_roots.json",
+    devDataFolder.MARKER, "config", "index", "watched_roots.json", "ui",
     "models", "installed-packs.v1.json", "policy.v1.json",
   ]);
   if (!fs.existsSync(dir)) {
@@ -121,28 +155,32 @@ async function waitForBackendReady(port, timeoutMs) {
   });
 }
 
-function killProcessTreeWindows(pid) {
-  if (!pid) return;
-  try {
-    // Best-effort. `/T` kills the process tree so the worker doesn't linger.
-    spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-      stdio: "ignore",
-      windowsHide: true,
-      shell: false,
-    });
-  } catch (_) {
-    // ignore
-  }
+/**
+ * Starts one child in its own job; the host's identity is read in this spawn turn. The root starts
+ * a new process group, so the console's Ctrl+C reaches only this script, which stops in order.
+ */
+function startOwnedChild(command, args, options) {
+  const run = jobRun.startInJob({ command, args, newProcessGroup: true, ...options });
+  childRuns.set(run.child, run);
+  run.child.on("exit", () => jobRun.retireRunRecord(run));
+  return run.child;
 }
 
 function terminateChild(proc) {
-  if (!proc) return;
-  if (proc.exitCode != null) return;
+  if (!proc) return null;
 
   if (process.platform === "win32") {
-    killProcessTreeWindows(proc.pid);
-    return;
+    // The recorded run: its host (PID plus creation time) and, through the host's job, every
+    // process started below it. Never a tree through parent links. A run that already ended is
+    // verified and its record removed.
+    const run = childRuns.get(proc);
+    const options = { code: jobRun.NON_DISTINCTIVE_KILL_CODE };
+    const result = proc.exitCode != null || proc.signalCode != null
+      ? jobRun.settleRunRecord(run, options) : jobRun.stopJobRunSync(run, options);
+    if (!result.ok) console.error(`Incomplete child stop (${proc.pid}): ${result.outcome}`);
+    return result;
   }
+  if (proc.exitCode != null) return null;
 
   try {
     proc.kill("SIGTERM");
@@ -158,6 +196,7 @@ function terminateChild(proc) {
       // ignore
     }
   }, 2500);
+  return null;
 }
 
 async function startBackend(port) {
@@ -175,7 +214,7 @@ async function startBackend(port) {
     };
 
     const aiEnv = resolveAiDevEnv();
-    backend = spawn(
+    backend = startOwnedChild(
       gradlePath,
       ["--no-daemon", "--no-configuration-cache", "-PskipWebBuild=true", ":modules:ui:runHeadless"],
       {
@@ -184,9 +223,12 @@ async function startBackend(port) {
           ...process.env,
           ...aiEnv,
           JUSTSEARCH_API_PORT: String(port),
+          // The Engine's data and home: its settings, index and logs all stay in this folder.
           JUSTSEARCH_DATA_DIR: dataDir,
+          JUSTSEARCH_HOME: dataDir,
         },
-        shell: process.platform === "win32",
+        stdio: "pipe",
+        label: "dev-all-backend",
       }
     );
 
@@ -200,8 +242,8 @@ async function startBackend(port) {
         finishErr(new Error(`Backend exited with code ${code}`));
         return;
       }
-      shutdown();
-      process.exit(code || 0);
+      if (!shutdownPromise) console.error(`[dev-all] the backend exited (code ${code}); stopping the stack`);
+      shutdown(code || 0);
     });
 
     // Deterministic readiness: poll /api/status instead of waiting on a log line.
@@ -223,7 +265,9 @@ async function startBackend(port) {
 }
 
 function startFrontend(port) {
-  frontend = spawn("npm", ["run", "dev", "--", "--host", "--port", "5173", "--strictPort"], {
+  // ui-web's `dev` script is `vite`: run Vite's own node entry directly, as dev-runner does.
+  const viteEntry = path.join(uiWebDir, "node_modules", "vite", "bin", "vite.js");
+  frontend = startOwnedChild(process.execPath, [viteEntry, "--host", "--port", "5173", "--strictPort"], {
     cwd: uiWebDir,
     env: {
       ...process.env,
@@ -232,30 +276,95 @@ function startFrontend(port) {
       // Vite proxy currently reads VITE_API_PORT; keep for back-compat until vite.config.js is aligned.
       VITE_API_PORT: String(port),
     },
-    shell: process.platform === "win32",
     stdio: "inherit",
+    label: "dev-all-frontend",
   });
 
   frontend.on("exit", (code) => {
-    shutdown();
-    process.exit(code || 0);
+    shutdown(code || 0);
   });
 }
 
-function shutdown() {
-  if (shuttingDown) return;
-  shuttingDown = true;
-
-  terminateChild(frontend);
-  terminateChild(backend);
+function waitForExit(proc, ms) {
+  if (!proc || proc.exitCode != null || proc.signalCode != null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const onExit = () => { clearTimeout(timer); resolve(true); };
+    const timer = setTimeout(() => { proc.removeListener("exit", onExit); resolve(false); }, ms);
+    proc.once("exit", onExit);
+  });
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+/**
+ * The ordered stop: ask the Engine to quit through its lifecycle endpoint (it runs its ordered
+ * shutdown, which records its QUIT and exits 0), stop the frontend, wait for the backend to exit
+ * within the Engine's quit deadline plus a margin, then end whatever is left in each job.
+ * Returns whether every recorded process has verifiably ended.
+ */
+async function orderedShutdown() {
+  let quit = null;
+  if (backend && backend.exitCode == null && backend.signalCode == null && apiPort) {
+    console.log("[dev-all] asking the Engine to quit (POST /api/lifecycle/shutdown)");
+    quit = await engineActuator.postShutdown(apiPort, "quit", 2000,
+      { deadlineAtEpochMs: Date.now() + engineActuator.QUIT_DEADLINE_MS });
+    if (!quit.ok) console.error(`[dev-all] the Engine did not accept the quit (${quit.status ?? "no answer"}); ending its job`);
+  }
+  const results = [terminateChild(frontend)];
+  if (quit?.ok && !(await waitForExit(backend, QUIT_WAIT_MS))) {
+    console.error(`[dev-all] the backend did not exit within ${QUIT_WAIT_MS} ms of the quit; ending its job`);
+  }
+  results.push(terminateChild(backend));
+  return results.every((r) => !r || r.ok);
+}
+
+function shutdown(code = 0) {
+  if (!shutdownPromise) {
+    shutdownPromise = orderedShutdown()
+      .catch((err) => { console.error("[dev-all] stop failed", err); return false; })
+      .then((clean) => process.exit(clean ? code : code || 1));
+  }
+  return shutdownPromise;
+}
+
+process.on("SIGINT", () => shutdown(0));
+process.on("SIGTERM", () => shutdown(0));
+
+let opts;
+try {
+  opts = parseArgs(process.argv.slice(2));
+} catch (err) {
+  console.error(`[dev-all] ${err.message}`);
+  process.exit(2);
+}
+if (opts.help) {
+  console.log("Usage: npm run dev:all [-- --data-dir <path>]\n"
+    + "  --data-dir  the Engine's data and home folder (default modules/ui-web/.dev-data). Each start removes\n"
+    + "              everything in it except config, index, ui, watched_roots.json, models and the pack and policy\n"
+    + "              files, so only a folder a dev tool created and marked is used: a new or empty folder is marked,\n"
+    + "              any other folder is refused unchanged.");
+  process.exit(0);
+}
+// Only an explicit --data-dir leaves the isolated dev folder; an inherited variable does not.
+dataDir = opts.dataDir ? path.resolve(opts.dataDir) : path.join(uiWebDir, ".dev-data");
+if (!opts.dataDir && process.env.JUSTSEARCH_DATA_DIR && path.resolve(process.env.JUSTSEARCH_DATA_DIR) !== dataDir) {
+  console.log("[dev-all] Not using JUSTSEARCH_DATA_DIR from the environment; pass --data-dir to choose a folder.");
+}
+// Each start cleans the data folder: only one a dev tool created and marked, before anything starts.
+const claim = devDataFolder.claimDevDataFolder(dataDir, {
+  tool: "dev-all",
+  isDefault: dataDir === path.join(uiWebDir, ".dev-data"),
+  registerPath: path.join(rootDir, "governance", "store-recoverability.v1.json"),
+  defaultHint: "modules/ui-web/.dev-data",
+});
+if (!claim.ok) {
+  console.error(`[dev-all] ${claim.message}`);
+  process.exit(2);
+}
+if (claim.action === "adopt") console.log(`[dev-all] Marked ${dataDir} as the dev data folder (it held only dev-data contents).`);
 
 (async () => {
   try {
     const port = await findFreePort(basePort);
+    apiPort = port;
     cleanDataDir(dataDir);
     await startBackend(port);
 
@@ -270,7 +379,6 @@ process.on("SIGTERM", shutdown);
     startFrontend(port);
   } catch (err) {
     console.error("Failed to start dev stack", err);
-    shutdown();
-    process.exit(1);
+    shutdown(1);
   }
 })();

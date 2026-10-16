@@ -10,7 +10,21 @@
     "retryable": { "type": "boolean" },
     "retrySafe": { "type": "boolean" },
     "i18nKey": { "type": "string" },
-    "requestId": { "type": "string" }
+    "requestId": { "type": "string" },
+    "retryAfterMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know."
+    },
+    "reason": {
+      "type": "string",
+      "enum": ["GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF", "LOADING", "BUSY", "OFF", "FAILED", "REFUSED", "ENGINE_STOPPING", "DEVICE_RECOVERING", "SELF_TEST", "EXTERNAL_SERVER"],
+      "description": "A chat refusal's reason (Spec A step 9): why this one request was not admitted. Present only on chat refusals."
+    },
+    "forceAllowed": {
+      "type": "boolean",
+      "description": "On a chat refusal: true when the app may offer the person a load in spite of it (POST /api/chat/load-anyway). Never true for an agent."
+    }
   },
   "required": ["error", "errorCode"],
   "additionalProperties": false

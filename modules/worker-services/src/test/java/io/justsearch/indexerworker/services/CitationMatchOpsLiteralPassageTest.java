@@ -426,8 +426,8 @@ class CitationMatchOpsLiteralPassageTest extends io.justsearch.adapters.lucene.r
     }
 
     @Override
-    public boolean isAvailable() {
-      return true;
+    public Availability availability() {
+      return Availability.READY;
     }
 
     @Override
@@ -473,8 +473,8 @@ class CitationMatchOpsLiteralPassageTest extends io.justsearch.adapters.lucene.r
     }
 
     @Override
-    public boolean isAvailable() {
-      return false;
+    public Availability availability() {
+      return Availability.ABSENT;
     }
 
     @Override

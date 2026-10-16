@@ -1,0 +1,102 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:16:10.962Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "1fff4c12cf3363d9dcc9fb5146b70355e1e4592d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.pathPrefixGoesInFrontOfTheInheritedPath\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20448
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest.theEngineReadsItsIncarnationThroughTheConfigurationRegistry\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7840
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#pathPrefixGoesInFrontOfTheInheritedPath",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pathPrefixGoesInFrontOfTheInheritedPath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestIncarnationPublishTest.java#theEngineReadsItsIncarnationThroughTheConfigurationRegistry",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestIncarnationPublishTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ad84d5af51f40a021f8357f5fd26d2f82296d31699785ce63861d4a248517c17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theEngineReadsItsIncarnationThroughTheConfigurationRegistry()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f648453b5",
+    "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
+    "overlays": [
+      "modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ChildSpec.java",
+      "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/FakeChild.java",
+      "modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.pathPrefixGoesInFrontOfTheInheritedPath\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 24575
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest.theEngineReadsItsIncarnationThroughTheConfigurationRegistry\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 83850
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#pathPrefixGoesInFrontOfTheInheritedPath",
+        "classification": "assertion",
+        "detail": "pathPrefixGoesInFrontOfTheInheritedPath(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the child's PATH starts with the prefix, in order ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestIncarnationPublishTest.java#theEngineReadsItsIncarnationThroughTheConfigurationRegistry",
+        "classification": "assertion",
+        "detail": "theEngineReadsItsIncarnationThroughTheConfigurationRegistry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <run-registry> but was: <>"
+      }
+    ]
+  },
+  "digest": "sha256:576b0fcb1bbdd3ddb1695c9b2007988f590b6d07fbd721865ebc735ed465d867"
+}

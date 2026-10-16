@@ -1,0 +1,273 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T11:21:54.561Z",
+  "revision": "150a989ca2720acbd8955c22a22eadbf32808f18",
+  "tree": "f66f62a286ca076b66f7436d1d5bc47deab60fcd",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DevicePlanP16PacingTest.p16PlusGeneratingSlowsBulkAndExternalPressureIsReported\" --tests \"io.justsearch.app.inference.DevicePlanStartOrderTest.chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11011
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.aPlannedRungTopsTheDerivedLadder\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.projectorOnTheCpuAddsOneFlagAfterTheProjector\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3584
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaPlanTest\" --tests \"io.justsearch.ort.GpuCallPackerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4121
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/DevicePlanP16PacingTest.java#p16PlusGeneratingSlowsBulkAndExternalPressureIsReported",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/DevicePlanP16PacingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c93c093c3f1d304d0f9fdaf040c4065a07288ccedc57fdb27ab60cf60a026bc7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p16PlusGeneratingSlowsBulkAndExternalPressureIsReported()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/inference/DevicePlanStartOrderTest.java#chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/inference/DevicePlanStartOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3d83f7d12ee807f30fc21c130fe91598612aa36238f6098d7ba8d8a419bf521c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#aPlannedRungTopsTheDerivedLadder",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:595544a9c61ea4a35316ef03700e9829d92bcb1e20f95598113554af4327fd38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPlannedRungTopsTheDerivedLadder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#projectorOnTheCpuAddsOneFlagAfterTheProjector",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:595544a9c61ea4a35316ef03700e9829d92bcb1e20f95598113554af4327fd38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "projectorOnTheCpuAddsOneFlagAfterTheProjector()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c14f69fa75f3ef65972107cef115026c553608ba868d6987f11422333058bb56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theResolverReadsNoFreeMemoryChatStatePressureOrStartOrder()",
+          "status": "passed"
+        },
+        {
+          "name": "theMinimumActivationsAreTodaysLargestCallAndTheLargestSmallestCall()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutCompactADeviceBelowP12KeepsTodaysConstants()",
+          "status": "passed"
+        },
+        {
+          "name": "chatMemoryIsZeroOnlyWhenNoChatCanRunOnTheDevice()",
+          "status": "passed"
+        },
+        {
+          "name": "anExplicitRoleCapIsKeptAndItsRoleIsPackedAgainstIt()",
+          "status": "passed"
+        },
+        {
+          "name": "theFormulaGivesTheReferenceDevicesTheirBudgetsAndCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "theEmbeddingActivationIsNeverBelowTheMeasuredPoints()",
+          "status": "passed"
+        },
+        {
+          "name": "bgeM3BulkRunsOnTheCpuWithAReasonAndTheOtherRolesKeepThePlan()",
+          "status": "passed"
+        },
+        {
+          "name": "theFirstPlanInOrderThatFitsIsTakenAtTheDerivedBoundaries()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitChatSettingsChangeCAndAPlanTheyBreakIsUserSettingUnmet()",
+          "status": "passed"
+        },
+        {
+          "name": "theVduProjectorFollowsThePlanNeverLiveFreeMemory()",
+          "status": "passed"
+        },
+        {
+          "name": "noGpuWhenTheGpuIsOffOrNoDeviceIsUsable()",
+          "status": "passed"
+        },
+        {
+          "name": "theFinalChatFootprintsAndKvSlopeAreTheMeasuredOnes()",
+          "status": "passed"
+        },
+        {
+          "name": "aChatModelWithoutAMeasuredFootprintIsEstimatedAndMarkedExtrapolated()",
+          "status": "passed"
+        },
+        {
+          "name": "deviceSeatsDivideTheActivationBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f87f5860cad996ded7693ea7766cd1a40c8aa16a69fe7421e225860c8350554b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p12ShapesMatchTheProfileTable()",
+          "status": "passed"
+        },
+        {
+          "name": "p16PlusKeepsEveryOneOfTodaysShapes()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutAPlanEveryCallTakesTodaysCount()",
+          "status": "passed"
+        },
+        {
+          "name": "p8ShapesMatchTheProfileTable()",
+          "status": "passed"
+        },
+        {
+          "name": "aCallPadsToItsLongestItemSoAPrefixStopsAtTheFirstItemThatDoesNotFit()",
+          "status": "passed"
+        },
+        {
+          "name": "anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "481434f82",
+    "revision": "481434f828d142e12ae2166df76ad346c3ab9170",
+    "overlays": [
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/DevicePlanTestSupport.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-e7b-repaired-compat.patch",
+        "contentDigest": "sha256:acabbfe274b8c06135042544959480796a2c2ab126fc24ca50a7786623d839fd"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.DevicePlanP16PacingTest.p16PlusGeneratingSlowsBulkAndExternalPressureIsReported\" --tests \"io.justsearch.app.inference.DevicePlanStartOrderTest.chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 24453
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.aPlannedRungTopsTheDerivedLadder\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.projectorOnTheCpuAddsOneFlagAfterTheProjector\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5009
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaPlanTest\" --tests \"io.justsearch.ort.GpuCallPackerTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5443
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/DevicePlanP16PacingTest.java#p16PlusGeneratingSlowsBulkAndExternalPressureIsReported",
+        "classification": "assertion",
+        "detail": "p16PlusGeneratingSlowsBulkAndExternalPressureIsReported(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the gate takes the plan's profile ==> expected: <P16_PLUS> but was: <UNRESOLVED>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/inference/DevicePlanStartOrderTest.java#chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing",
+        "classification": "assertion",
+        "detail": "chatFirstAndEncodersFirstApplyTheSamePlanAndChatTogglesChangeNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat activated first ==> expected: <Applied[profile=P12, capsMb={SPLADE=2342, EMBEDDING=2466, RERANKER=2468, NER=2125}, window=32768, projectorOnCpu=true, activationPerRunMiB=1867.0, lateMaxTokens=5632, shapes=[5, 8, 7, 2, 32, 18]]> but was: <Applied[profile=no p"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#aPlannedRungTopsTheDerivedLadder",
+        "classification": "assertion",
+        "detail": "aPlannedRungTopsTheDerivedLadder(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[8192, 4096]> but was: <[32768, 16384, 8192, 4096]>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#projectorOnTheCpuAddsOneFlagAfterTheProjector",
+        "classification": "assertion",
+        "detail": "projectorOnTheCpuAddsOneFlagAfterTheProjector(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the default places the projector where llama-server does: no flag ==> expected: <[bin\\llama-server.exe, -m, models\\chat.gguf, --mmproj, models\\mmproj.gguf, --cache-ram, 1024, --jinja]> but was: <[bin\\llama-server.exe, -m, models\\chat.gguf, --mmproj, models\\mmproj"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java",
+        "classification": "assertion",
+        "detail": "theResolverReadsNoFreeMemoryChatStatePressureOrStartOrder(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[deviceTotalMiB, gpuRoleWeightsMiB, installedChatModels, chatModelFileMiB, externalChat, deviceSeats, kvType]> but was: <[deviceTotalMiB, gpuRoleWeightsMiB, installedChatModels, chatModelFileMiB, externalChat, deviceSeats]> | withoutCompactADeviceBelowP12KeepsTodaysConstants(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: exp"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
+        "classification": "assertion",
+        "detail": "p12ShapesMatchTheProfileTable(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <7> but was: <8> | p16PlusKeepsEveryOneOfTodaysShapes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <7> but was: <8> | withoutAPlanEveryCallTakesTodaysCount(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <8> but was: <2> | p8ShapesMatchTheProfileTable(): org.opentest4j.AssertionFailedError org.opentest4j"
+      }
+    ]
+  },
+  "digest": "sha256:8e082d2b5b8d4a16017d5ef0f3ff4e49a665c638a95724ce8c7388eea059c0b4"
+}

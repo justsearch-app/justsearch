@@ -138,7 +138,9 @@ final class SearchTraceMapper {
               d.getHybridFallback(),
               d.getHybridFallbackReason().isBlank() ? null : d.getHybridFallbackReason(),
               d.getSpladeExecuted(),
-              d.getSpladeSkipReason().isBlank() ? null : d.getSpladeSkipReason());
+              d.getSpladeSkipReason().isBlank() ? null : d.getSpladeSkipReason(),
+              d.getHybridFallbackCause().isBlank() ? null : d.getHybridFallbackCause(),
+              d.getSpladeSkipCause().isBlank() ? null : d.getSpladeSkipCause());
     }
     return new io.justsearch.app.api.knowledge.SearchTrace(
         io.justsearch.app.api.knowledge.SearchTrace.SCHEMA_VERSION,

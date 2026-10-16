@@ -2,6 +2,7 @@
 package io.justsearch.ui.api.routes;
 
 import io.javalin.Javalin;
+import io.justsearch.ui.api.ActivityRole;
 import io.javalin.http.Handler;
 import io.justsearch.ui.api.ChunkInfoController;
 import io.justsearch.ui.api.DebugStateController;
@@ -24,21 +25,21 @@ public final class DebugRoutes {
       SessionPoliciesController sessionPoliciesController,
       Handler resetIndexHandler,
       Handler adminRuntimeReloadHandler) {
-    app.get("/api/debug/state", debugStateController::handleGetState);
-    app.get("/api/debug/commit-metadata", debugStateController::handleGetCommitMetadata);
-    app.get("/api/debug/effective-config", effectiveConfigController::handleGetEffectiveConfig);
-    app.get("/api/debug/events", debugStateController::handleGetEvents);
-    app.get("/api/debug/engine-log", debugStateController::handleGetEngineLog);
-    app.get("/api/debug/dashboard", debugDashboardHandler);
-    app.get("/api/debug/chunks", chunkInfoController::handleGetChunkInfo);
-    app.get("/api/debug/logging", logLevelController::handleGetLogLevels);
-    app.post("/api/debug/logging", logLevelController::handleSetLogLevel);
-    app.get("/api/debug/metrics/timeseries", timeSeriesController::handleGetTimeSeries);
-    app.get("/api/debug/metrics/timeseries/available", timeSeriesController::handleGetAvailable);
-    app.get("/api/debug/session-policies", sessionPoliciesController::handle);
-    app.post("/api/debug/reset-index", resetIndexHandler);
+    app.get("/api/debug/state", debugStateController::handleGetState, ActivityRole.OBSERVATION);
+    app.get("/api/debug/commit-metadata", debugStateController::handleGetCommitMetadata, ActivityRole.OBSERVATION);
+    app.get("/api/debug/effective-config", effectiveConfigController::handleGetEffectiveConfig, ActivityRole.OBSERVATION);
+    app.get("/api/debug/events", debugStateController::handleGetEvents, ActivityRole.USER_ACTION);
+    app.get("/api/debug/engine-log", debugStateController::handleGetEngineLog, ActivityRole.USER_ACTION);
+    app.get("/api/debug/dashboard", debugDashboardHandler, ActivityRole.OBSERVATION);
+    app.get("/api/debug/chunks", chunkInfoController::handleGetChunkInfo, ActivityRole.USER_ACTION);
+    app.get("/api/debug/logging", logLevelController::handleGetLogLevels, ActivityRole.USER_ACTION);
+    app.post("/api/debug/logging", logLevelController::handleSetLogLevel, ActivityRole.USER_ACTION);
+    app.get("/api/debug/metrics/timeseries", timeSeriesController::handleGetTimeSeries, ActivityRole.USER_ACTION);
+    app.get("/api/debug/metrics/timeseries/available", timeSeriesController::handleGetAvailable, ActivityRole.USER_ACTION);
+    app.get("/api/debug/session-policies", sessionPoliciesController::handle, ActivityRole.OBSERVATION);
+    app.post("/api/debug/reset-index", resetIndexHandler, ActivityRole.USER_ACTION);
     // Tempdoc 406 — admin-triggered runtime swap. Triggers a holder swap on the
     // ingest runtime via an in-process port ReloadRuntime; returns swap duration in ms.
-    app.post("/api/admin/runtime/reload", adminRuntimeReloadHandler);
+    app.post("/api/admin/runtime/reload", adminRuntimeReloadHandler, ActivityRole.USER_ACTION);
   }
 }

@@ -66,6 +66,7 @@ public final class HeadAssembly implements AutoCloseable {
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
 
   private static final Logger log = LoggerFactory.getLogger(HeadAssembly.class);
+  public static final java.time.Duration TERMINAL_GENERATIVE_ALLOWANCE = java.time.Duration.ofSeconds(12);
   private static final Set<String> GENERATIVE_DEPENDENCIES = Set.of(
       EnvRegistry.LLM_ENABLED.configKey(),
       EnvRegistry.AI_DISABLED.configKey(),
@@ -116,6 +117,7 @@ public final class HeadAssembly implements AutoCloseable {
   private final List<io.justsearch.app.services.encryption.UnlockDeferredScan> unlockScans =
       new java.util.ArrayList<>();
   private final io.justsearch.app.services.vdu.OfflineCoordinator offlineCoordinator;
+  private boolean enrichmentTerminalStopRequired;
   private final Telemetry telemetry;
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration foregroundDocumentOwner;
@@ -124,6 +126,8 @@ public final class HeadAssembly implements AutoCloseable {
   private final java.util.concurrent.ExecutorService backgroundDocuments;
   private final AutoCloseable operationsMaintenanceTimer;
   private final AutoCloseable operationsHistoryProjector;
+  /** Spec A step 8: the encoder-readiness subscription that opens chat's boot-order gate. */
+  private final AutoCloseable chatBootOrderHook;
 
 
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
@@ -335,20 +339,107 @@ public final class HeadAssembly implements AutoCloseable {
   }
 
   /**
-   * Configures whether closing this assembly also stops its managed generative backend.
-   *
-   * <p>The ordered Engine shutdown calls this immediately before {@link #close()}. Restart and
-   * hang shutdowns leave llama-server alive for adoption; quit and upgrade shutdowns stop it.
+   * Records how the Engine is ending (QUIT, ENGINE_RESTART, UPGRADE), before Head closes: the
+   * llama-server's terminal stop records that reason in the exit ledger. The first record wins.
    */
-  public void setStopGenerativeBackendOnClose(boolean stop) {
-    if (inferenceManager != null) {
-      inferenceManager.setStopServerOnClose(stop);
-    }
+  public void recordTerminalStop(io.justsearch.app.api.runtime.child.StopRequest request) {
+    if (inferenceManager != null) inferenceManager.recordTerminalStop(request);
   }
 
   /** Stop the terminal-owned child even when Head's dependency drain refuses full closure. */
   public void stopGenerativeBackendForTerminalShutdown(java.time.Duration timeout) {
     if (inferenceManager != null) inferenceManager.stopServerForTerminalShutdown(timeout);
+  }
+
+  /** Fence new passes; an owned pass makes chat terminal before its cancellation can restore chat. */
+  public synchronized boolean prepareEnrichmentShutdown(io.justsearch.app.api.runtime.child.StopRequest request) {
+    if (offlineCoordinator != null) {
+      offlineCoordinator.prepareForShutdown(() -> {
+        enrichmentTerminalStopRequired = true;
+        recordTerminalStop(request);
+        if (inferenceManager != null) inferenceManager.beginTerminalShutdown();
+      });
+    }
+    return enrichmentTerminalStopRequired;
+  }
+
+  /**
+   * A quit's share of the picture-reading quiesce (Spec F §4.3): at QB1 it fences new documents and
+   * chat actuations and asks the owned pass to cancel, without waiting and without stopping
+   * llama-server, which the quit stops only through the chat controller. Null when no pass is owned.
+   * The returned stage ends when the pass has ended; {@link #awaitEnrichmentCancelForQuit} waits for
+   * it within the quit's budget.
+   */
+  public java.util.concurrent.CompletableFuture<Void> cancelEnrichmentForQuit(
+      io.justsearch.app.api.runtime.child.StopRequest request) {
+    if (!prepareEnrichmentShutdown(request)) return null;
+    return offlineCoordinator == null
+        ? java.util.concurrent.CompletableFuture.completedFuture(null)
+        : offlineCoordinator.cancelForShutdown().toCompletableFuture();
+  }
+
+  /**
+   * Waits up to {@code wait} (the quit's remaining live-work budget) for a pass cancelled by
+   * {@link #cancelEnrichmentForQuit}. A pass that has not ended by then is left to the supervisor's
+   * forced exit and the next start's recovery. Returns null or a named outcome, never throws.
+   */
+  public static String awaitEnrichmentCancelForQuit(
+      java.util.concurrent.CompletableFuture<Void> exited, java.time.Duration wait) {
+    if (exited == null) return null;
+    try {
+      exited.get(Math.max(0, wait.toMillis()), java.util.concurrent.TimeUnit.MILLISECONDS);
+      return null;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      log.warn("Enrichment quit drain interrupted; later shutdown steps will continue", interrupted);
+      return "VDU_DRAIN_INTERRUPTED";
+    } catch (java.util.concurrent.TimeoutException timeoutFailure) {
+      log.warn("Enrichment quit drain did not end within the quit budget ({} ms)", wait.toMillis());
+      return "VDU_DRAIN_TIMEOUT";
+    } catch (java.util.concurrent.ExecutionException failure) {
+      log.warn("Enrichment quit cleanup failed; later shutdown steps will continue", failure);
+      return "VDU_DRAIN_FAILED";
+    }
+  }
+
+  /** Quiesce an owned pass before the live-work drain; ordinary chat retains its late shutdown. */
+  public String quiesceEnrichmentForTerminalShutdown(
+      io.justsearch.app.api.runtime.child.StopRequest request, java.time.Duration timeout) {
+    if (!prepareEnrichmentShutdown(request)) return null;
+    long deadline = System.nanoTime() + timeout.toNanos();
+    var exited = offlineCoordinator == null
+        ? java.util.concurrent.CompletableFuture.<Void>completedFuture(null)
+        : offlineCoordinator.cancelForShutdown().toCompletableFuture();
+    // An explicit pass can still be draining normal chat. Its entry cancellation releases the
+    // pass; that chat exchange keeps the ordinary interactive cancellation and late stop order.
+    // VDU leases never count as chat generation, so a document still gets the early stop.
+    boolean chatGenerating = inferenceManager != null && inferenceManager.generationActivity().generating();
+    RuntimeException stopFailure = null;
+    if (!chatGenerating) {
+      try { stopGenerativeBackendForTerminalShutdown(timeout); }
+      catch (RuntimeException failure) { stopFailure = failure; }
+    }
+    String outcome = chatGenerating ? "VDU_STOP_DEFERRED_CHAT" : null;
+    try {
+      exited.get(Math.max(0, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      log.warn("Enrichment terminal drain interrupted; later shutdown steps will continue", interrupted);
+      outcome = "VDU_DRAIN_INTERRUPTED";
+    } catch (java.util.concurrent.TimeoutException timeoutFailure) {
+      log.warn("Enrichment terminal drain exceeded its allowance; later shutdown steps will continue");
+      outcome = "VDU_DRAIN_TIMEOUT";
+    } catch (java.util.concurrent.ExecutionException failure) {
+      log.warn("Enrichment terminal cleanup failed; later shutdown steps will continue", failure);
+      outcome = "VDU_DRAIN_FAILED";
+    }
+    if (stopFailure != null) {
+      // The ordinary late terminal step checks ownership again after the later drains. A slow
+      // stop is an outcome here; only a process surviving that final stop fails the exit.
+      log.warn("Early picture-reading process stop incomplete; final terminal cleanup will retry", stopFailure);
+      return "VDU_STOP_INCOMPLETE";
+    }
+    return outcome;
   }
 
   /**
@@ -421,6 +512,31 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.services.bootstrap.OperationAuthority authority,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
       io.justsearch.core.component.EngineComponentRegistry componentRegistry) {
+    this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
+        managedChildRegistry, operationLeases, engineAdmission, authority, recordedIngestion,
+        componentRegistry, null);
+  }
+
+  /**
+   * Process boot: every llama-server child, the self-test candidate included, is started and
+   * stopped through the Engine's {@code childControl} (Spec B steps 5 and 6). Null keeps a control
+   * of the inference manager's own over {@code managedChildRegistry} (compatibility and tests).
+   */
+  public HeadAssembly(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      Telemetry telemetry,
+      ConfigManagerBootstrap configManager,
+      KnowledgeServerBootstrap knowledgeServer,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
+      io.justsearch.app.api.OperationLeaseService operationLeases,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry,
+      io.justsearch.app.api.runtime.child.ChildControl childControl) {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.recordedIngestion = Objects.requireNonNull(recordedIngestion, "recordedIngestion");
@@ -527,9 +643,15 @@ public final class HeadAssembly implements AutoCloseable {
 
     // §4 Phase 3 — ServicePhase.
     InferenceLifecycleManager manager =
-        io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.createInferenceManager(
-            executors, inferenceConfigured, rc, io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
-            managedChildRegistry);
+        childControl != null
+            ? io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.createInferenceManager(
+                executors, inferenceConfigured, rc,
+                io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
+                childControl)
+            : io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.createInferenceManager(
+                executors, inferenceConfigured, rc,
+                io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
+                managedChildRegistry);
     this.inferenceManager = manager;
     if (generativeObservation != null && (manager != null || !inferenceConfigured)) {
       String version = manager == null ? generativeAbsentVersion(rc, liteMode)
@@ -584,7 +706,8 @@ public final class HeadAssembly implements AutoCloseable {
                             attempts,
                             this.lateBindings,
                             () -> this.knowledgeClient,
-                            this::currentKnowledgeServer, operationLeases, recordedIngestion, authority.roots(), configStore)))
+                            this::currentKnowledgeServer, operationLeases, recordedIngestion, authority.roots(), configStore,
+                            componentRegistry)))
             .orThrow();
     long t_service_1 = System.currentTimeMillis();
     this.serviceOut = serviceOut;
@@ -1034,6 +1157,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operationsHistoryProjector =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
             operations, executors, this.substrateOut.operationOut());
+    this.chatBootOrderHook = attachChatBootOrderHook(this.inferenceManager, componentRegistry);
     this.generativeComponent = generativeObservation;
     } catch (RuntimeException | Error failure) {
       if (generativeObservation != null) {
@@ -1205,6 +1329,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operationsHistoryProjector =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
             operations, executors, this.substrateOut.operationOut());
+    this.chatBootOrderHook = null;
     this.generativeComponent = null;
     this.capabilityConditions = null;
     } catch (RuntimeException | Error failure) {
@@ -1811,6 +1936,13 @@ public final class HeadAssembly implements AutoCloseable {
       catch (Exception failure) { throw new IllegalStateException("Operations maintenance did not drain", failure); }
     }
     if (!closed.compareAndSet(false, true)) return;
+    if (chatBootOrderHook != null) {
+      try {
+        chatBootOrderHook.close();
+      } catch (Exception e) {
+        log.warn("Failed to close the chat boot-order hook", e);
+      }
+    }
     if (serviceOut != null) {
       try {
         serviceOut.runtimeActivationHelper().close();
@@ -1919,6 +2051,28 @@ public final class HeadAssembly implements AutoCloseable {
 
   private static String normalized(Path path) {
     return path == null ? null : path.toAbsolutePath().normalize().toString();
+  }
+
+  /**
+   * Spec A §6.2 step 3: subscribes chat's boot-order gate (armed in the service phase) to the
+   * KnowledgeServer's encoder readiness. It runs after the composition root's last acquisition, so
+   * a failed boot never strands it, and it never fails the boot: without it the gate opens after
+   * its own 45 s.
+   *
+   * @return the subscription to close with the Head, or null when there is no gate or registry
+   */
+  private static AutoCloseable attachChatBootOrderHook(InferenceLifecycleManager manager,
+      io.justsearch.core.component.EngineComponentRegistry registry) {
+    var bootOrder = manager == null ? null : manager.chatBootOrder();
+    if (bootOrder == null || registry == null) return null;
+    try {
+      return io.justsearch.app.services.chat.QueryEncoderReadiness.whenReady(
+          registry, bootOrder::reportQueryEncodersReady);
+    } catch (RuntimeException failure) {
+      log.warn("Chat's boot-order gate is not following encoder readiness; it opens after its"
+          + " bound instead", failure);
+      return null;
+    }
   }
 
   private static void closeFailedOwners(List<AutoCloseable> owners, Throwable failure) {
@@ -2070,10 +2224,17 @@ public final class HeadAssembly implements AutoCloseable {
     return generativeComponent;
   }
 
-  /** Physical action used by the shared component monitor; absent when inference is unconfigured. */
+  /**
+   * Physical action used by the shared component monitor; absent when inference is unconfigured.
+   * Operator-only (Spec A §4.2, §7.2): the chat controller decides every automatic relaunch from
+   * the classified exit, so the monitor admits no automatic generative attempt; the recover
+   * endpoint's request is one same-configuration attempt per call (O6).
+   */
   public io.justsearch.core.component.ComponentRecoveryAction generativeRecoveryAction() {
     return inferenceManager == null ? null
-        : request -> inferenceManager.recoverComponent(request, HeadAssembly::generativeAppliedVersion);
+        : io.justsearch.core.component.ComponentRecoveryAction.operatorOnly(
+            request -> inferenceManager.recoverComponent(
+                request, HeadAssembly::generativeAppliedVersion));
   }
 
   /** Fixed settings owner for the Head-managed generative runtime. */

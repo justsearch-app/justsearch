@@ -425,6 +425,47 @@ final class BackgroundRunServiceTest {
   }
 
   @Test
+  void inferenceBusyRefusalIsRecordedWithItsOwnCode() {
+    // Task t-20261005-b6d536, FP11: a run refused because the inference threads and queue are full
+    // records ADMISSION_INFERENCE_BUSY. Looked up by name so the check fails by assertion where absent.
+    var busy = java.util.Arrays.stream(io.justsearch.app.api.EngineAdmissionException.Reason.values())
+        .filter(r -> r.name().equals("INFERENCE_BUSY")).findFirst();
+    assertTrue(busy.isPresent(), "no INFERENCE_BUSY admission reason");
+    var refusal = new io.justsearch.app.api.EngineAdmissionException(busy.orElseThrow(), 1);
+    var reasons = new java.util.concurrent.CopyOnWriteArrayList<String>();
+    var recording = (OperationAttemptRunner) java.lang.reflect.Proxy.newProxyInstance(
+        OperationAttemptRunner.class.getClassLoader(), new Class<?>[] {OperationAttemptRunner.class},
+        (proxy, method, args) -> {
+          if (method.getName().equals("rejectBeforeStart")) reasons.add((String) args[1]);
+          try {
+            return method.invoke(attempts, args);
+          } catch (java.lang.reflect.InvocationTargetException failure) {
+            throw failure.getCause();
+          }
+        });
+    var refusing = (io.justsearch.app.api.EngineAdmissionService) java.lang.reflect.Proxy.newProxyInstance(
+        io.justsearch.app.api.EngineAdmissionService.class.getClassLoader(),
+        new Class<?>[] {io.justsearch.app.api.EngineAdmissionService.class},
+        (proxy, method, args) -> {
+          if (method.getName().equals("admit")) throw refusal;
+          throw new UnsupportedOperationException(method.getName());
+        });
+    var loop = new FakeLoop(new AgentRunStore(operationDirectory.resolve("agent-runs")));
+    try (var registry = new TestEngineExecutors()) {
+      var background = new BackgroundRunService(recording, loop, registry, refusing);
+      try {
+        var thrown = assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+            () -> background.runInBackground(request("busy"), EngineContextTestFixtures.AGENT_LOOP_BACKGROUND));
+        assertTrue(thrown == refusal);
+        assertEquals(List.of("ADMISSION_INFERENCE_BUSY"), reasons);
+        assertEquals(0, loop.bodyCalls(), "a refused run never enters the agent body");
+      } finally {
+        background.shutdown();
+      }
+    }
+  }
+
+  @Test
   @DisplayName("a closed scheduler preserves its rejection when failed refusal persistence is injected")
   void closedSchedulerRejectionRetainsPersistenceFailure() throws Exception {
     var runStore = new AgentRunStore(operationDirectory.resolve("agent-runs"));

@@ -1,0 +1,69 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T11:24:44.547Z",
+  "revision": "150a989ca2720acbd8955c22a22eadbf32808f18",
+  "tree": "95e67bcdad6dc15e4a8434919f0b5524647d119d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::held_crash_before_commit_still_launches_installer\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 767
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+      "file": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:21c058a7212aead1479bf442b9393c089b8c13b1d06a73962d06178dd6c674bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6b5b019a",
+    "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder",
+      "modules/shell/src-tauri/src/updater_p5_oracle.rs"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::held_crash_before_commit_still_launches_installer\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 23317
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+        "classification": "assertion",
+        "detail": "updater::handoff_tests::held_crash_before_commit_still_launches_installer:  ---- updater::handoff_tests::held_crash_before_commit_still_launches_installer stdout ----\n\nthread 'updater::handoff_tests::held_crash_before_commit_still_launches_installer' (18076) panicked at src\\updater_handoff_tests.rs:289:5:\nassertion `left == right` failed: held crash before commit must proceed to install: Err(\"Head child process witness is unavailable; Engine replacement remains held; update recovery is required\""
+      }
+    ]
+  },
+  "digest": "sha256:d919f899e6791286adb7118adcb545d925af99d99c31c561cc0f992869c16681"
+}

@@ -53,6 +53,7 @@ const failures = [];
 
 for (const file of files) {
   const rel = path.relative(process.cwd(), file);
+  if (VERBOSE) console.log(`RUN   ${rel}`);
   const started = Date.now();
   const res = spawnSync(process.execPath, [file], { encoding: 'utf8' });
   const tookMs = Date.now() - started;

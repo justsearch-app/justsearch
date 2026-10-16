@@ -15,6 +15,7 @@ import io.justsearch.app.services.worker.RecoveryOccurrence;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.TestEngineComponents;
 import java.util.ArrayList;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,7 @@ final class CapabilityHealthBridgeRecoveryTest {
   @Test
   void attemptedOccurrenceRendersMonitorForensicContextAndBroadcasts() {
     OccurrenceLog occurrences = new OccurrenceLog();
-    HealthEventChangeRegistry changes = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
 
     CapabilityHealthBridge.emitRecoveryOccurrence(
         new RecoveryOccurrence(
@@ -49,7 +50,7 @@ final class CapabilityHealthBridgeRecoveryTest {
   @Test
   void recoveredOccurrenceRendersAttemptWithoutInventingFaultAttributes() {
     OccurrenceLog occurrences = new OccurrenceLog();
-    HealthEventChangeRegistry changes = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
 
     CapabilityHealthBridge.emitRecoveryOccurrence(
         new RecoveryOccurrence(
@@ -66,7 +67,7 @@ final class CapabilityHealthBridgeRecoveryTest {
 
   @Test
   void registryTransitionsNeverFabricateRecoveryOccurrences() throws Exception {
-    HealthEventChangeRegistry changes = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     var kinds = new ArrayList<HealthEventChangeRegistry.Kind>();
     var subscription = changes.subscribeTyped(change -> kinds.add(change.kind()));
     try {

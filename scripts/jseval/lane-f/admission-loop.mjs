@@ -18,7 +18,7 @@ const ARM_TIMEOUT_MS = 5 * 60 * 1000;
  */
 export function analyzeArm(capture, expectedArm) {
   const failures = [];
-  const counts = { offered: 0, admitted: 0, contextRejected: 0, engineRejected: 0 };
+  const counts = { offered: 0, admitted: 0, contextRejected: 0, engineRejected: 0, inferenceBusy: 0 };
   const positiveInteger = (value) => Number.isSafeInteger(value) && value > 0;
   if (!capture || capture.arm !== expectedArm || !positiveInteger(capture.offered)
       || !positiveInteger(capture.concurrency) || capture.concurrency > capture.offered
@@ -81,6 +81,13 @@ export function analyzeArm(capture, expectedArm) {
         && Number.isSafeInteger(Number(request.retryAfter))) {
       if (request.code === 'ADMISSION_CONTEXT_LIMIT') counts.contextRejected++;
       else counts.engineRejected++;
+    } else if (request.status === 429 && request.code === 'ADMISSION_INFERENCE_BUSY'
+        && request.retrySafe === false
+        && typeof request.retryAfter === 'string' && /^[1-9]\d*$/.test(request.retryAfter)
+        && Number.isSafeInteger(Number(request.retryAfter))) {
+      // The inference threads and their queue were full: a capacity answer raised mid-request, so
+      // never safe to replay, and not an admission refusal, so it is counted on its own.
+      counts.inferenceBusy++;
     } else {
       // An upgrade barrier is distinguishable, but cannot substitute for a load measurement.
       failures.push(`${request.id}: unexpected response ${request.status}/${request.code ?? 'no-code'}`);
@@ -315,6 +322,16 @@ async function selfTest() {
     checked++;
   }
   assert.equal(analyzePair(null, null).verdict, 'FAIL');
+  // Task t-20261005-b6d536, FP11: full inference threads and queue are their own legal 429.
+  const busy = capture('context-many');
+  busy.requests[1] = { ...busy.requests[1], code: 'ADMISSION_INFERENCE_BUSY', retrySafe: false };
+  const busyArm = analyzeArm(busy, 'context-many');
+  assert.equal(busyArm.counts.inferenceBusy, 1);
+  assert.equal(busyArm.counts.engineRejected, 1);
+  assert.deepEqual(busyArm.failures, []);
+  busy.requests[1].retrySafe = true;
+  assert.ok(analyzeArm(busy, 'context-many').failures.some(f => f.includes('unexpected response')));
+  checked += 2;
   const [many, one] = valid();
   one.requests[1].contextId = 'client-2';
   assert.equal(analyzePair(many, one).verdict, 'FAIL');

@@ -1,0 +1,145 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-09T10:13:37.776Z",
+  "revision": "5be13f8e0a760ecd824f44335bca7699812eb9c0",
+  "tree": "94b97dbaa561ade7f5299b3086987c1869cb3ada",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ReservedSeatQueueTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 33168
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ReservedSeatQueueTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ReservedSeatQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:61aab27d79e77bc2989cc747b74f552a95719bdfbf6ce9e0a08970f74723f3bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrentArrivalCancellationAndRemovalNeverOverAdmitsAndRestoresFullCapacity()",
+          "status": "passed"
+        },
+        {
+          "name": "shutdownDuringFailedWorkerCreationAfterOfferStillTerminates()",
+          "status": "passed"
+        },
+        {
+          "name": "directQueueInsertionConsumesCapacityAndRemovalReturnsIt()",
+          "status": "passed"
+        },
+        {
+          "name": "queueRemovalByRunningTaskIsNotAWorkerHandoff()",
+          "status": "passed"
+        },
+        {
+          "name": "duplicateRunnableAndStaleIteratorReturnOnlyTheirOwnOccurrence()",
+          "status": "passed"
+        },
+        {
+          "name": "failedWorkerCreationAfterBufferingRemovesTheRejectedOccurrence()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] PURGE",
+          "status": "passed"
+        },
+        {
+          "name": "[2] REMOVE",
+          "status": "passed"
+        },
+        {
+          "name": "[3] REMOVE_IF",
+          "status": "passed"
+        },
+        {
+          "name": "[4] CLEAR",
+          "status": "passed"
+        },
+        {
+          "name": "[5] DRAIN",
+          "status": "passed"
+        },
+        {
+          "name": "[6] DRAIN_LIMITED",
+          "status": "passed"
+        },
+        {
+          "name": "[7] POLL",
+          "status": "passed"
+        },
+        {
+          "name": "[8] TIMED_POLL",
+          "status": "passed"
+        },
+        {
+          "name": "[9] TAKE",
+          "status": "passed"
+        },
+        {
+          "name": "[10] ITERATOR",
+          "status": "passed"
+        },
+        {
+          "name": "[11] REMOVE_ALL",
+          "status": "passed"
+        },
+        {
+          "name": "[12] RETAIN_ALL",
+          "status": "passed"
+        },
+        {
+          "name": "[13] REMOVE_HEAD",
+          "status": "passed"
+        },
+        {
+          "name": "[14] POOL_REMOVE",
+          "status": "passed"
+        },
+        {
+          "name": "cancelledFutureThatRunsAsANoopReturnsItsSeatOnlyOnCompletion()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5be13f8e0",
+    "revision": "5be13f8e0a760ecd824f44335bca7699812eb9c0",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ReservedSeatQueueTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 61093
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ReservedSeatQueueTest.java",
+        "classification": "assertion",
+        "detail": "concurrentArrivalCancellationAndRemovalNeverOverAdmitsAndRestoresFullCapacity(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: removed seats must all be reusable ==> Unexpected exception thrown: io.justsearch.core.execution.EngineExecutorRejectedException: QUEUE_LIMIT: seats | shutdownDuringFailedWorkerCreationAfterOfferStillTerminates(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: failed offer must recheck termination ==> expected: <true> "
+      }
+    ]
+  },
+  "digest": "sha256:3dc4d51299c757efa1a789eff3b19dc48554e73ea21558d8838f56711c615a5f"
+}

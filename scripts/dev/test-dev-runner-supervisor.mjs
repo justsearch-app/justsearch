@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Lane F stage B item B8 — the dev-runner supervisor's actuator, at unit level.
  *
@@ -321,9 +322,14 @@ async function testHostRequestWriterAndHandoffAdmission() {
   const root = tempRoot('request');
   try {
     const dataDir = path.join(root, 'data');
-    await writeShutdownRequestFile(dataDir, { reason: 'restart', deadlineEpochMs: 1 });
+    await writeShutdownRequestFile(dataDir, { reason: 'restart', deadlineEpochMs: 1, incarnation: 'writer/1' });
     const body = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'shutdown-request.v1.json'), 'utf8'));
-    assert.deepEqual(body, { schemaVersion: 1, reason: 'restart', deadlineEpochMs: 1, issuedBy: 'dev-runner' });
+    assert.equal(body.incarnation, 'writer/1');
+    assert.match(body.requestNonce, /^[0-9a-f-]{36}$/);
+    assert.deepEqual({ ...body, requestNonce: undefined }, { schemaVersion: 1, reason: 'restart',
+      deadlineEpochMs: 1, issuedBy: 'dev-runner', incarnation: 'writer/1', requestNonce: undefined });
+    await assert.rejects(writeShutdownRequestFile(dataDir, { reason: 'quit', deadlineEpochMs: 1 }),
+      /requires incarnation/);
     const manifest = { schemaVersion: 2, pid: 42, instanceId: 'boot',
       shutdownHandoff: { state: 'pending', reason: 'restart' } };
     assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 42, 'boot'), 'restart');
@@ -525,6 +531,34 @@ async function testTerminalChildCleanupRequiresAllIdentityAxes() {
   console.log('test-dev-runner-supervisor: terminal cleanup is identity-safe — PASS');
 }
 
+// --- the Engine's self-intent beside the owner's -------------------------------------------------
+
+/**
+ * Spec B §6.1-6.2: the Engine records its own intent before every close it runs, including one its
+ * supervisor asked for. When both expect the exit code, the exit is the owner's request: a hang
+ * request answered with a clean 0 is TIMEOUT/hang, not the Engine's ENGINE_RESTART/hang. The
+ * Engine's own intent classifies an exit nobody asked for (an escalated restart), and expects
+ * nothing about a crash.
+ */
+function testTheOwnersIntentOutranksTheEnginesOwn() {
+  const { classifyEngineExit } = require(path.join(__dirname, 'lib', 'engine-actuator.cjs'));
+  const hangRequest = { reason: 'TIMEOUT', detail: 'hang', mode: 'COOPERATIVE', channel: 'REQUEST_FILE' };
+  const selfHang = { reason: 'ENGINE_RESTART', detail: 'hang', expectedCode: 0 };
+  const pick = (c) => [c.exitClass, c.reason, c.detail];
+  assert.deepEqual(pick(classifyEngineExit({ code: 0, intents: [hangRequest], selfIntent: selfHang,
+    policy: PRODUCT_POLICY })), ['REQUESTED', 'TIMEOUT', 'hang'], 'the supervisor asked for this close');
+  const restartRequest = { reason: 'ENGINE_RESTART', detail: null, mode: 'COOPERATIVE', channel: 'REQUEST_FILE' };
+  const selfQuit = { reason: 'QUIT', detail: null, expectedCode: 0 };
+  assert.deepEqual(pick(classifyEngineExit({ code: 4, intents: [restartRequest], selfIntent: selfQuit,
+    policy: PRODUCT_POLICY })), ['REQUESTED', 'ENGINE_RESTART', null], 'the code names the intent it answers');
+  const selfEscalated = { reason: 'ENGINE_RESTART', detail: 'escalated', expectedCode: 5 };
+  assert.deepEqual(pick(classifyEngineExit({ code: 5, intents: [], selfIntent: selfEscalated,
+    policy: PRODUCT_POLICY })), ['REQUESTED', 'ENGINE_RESTART', 'escalated'], 'nobody else asked');
+  assert.deepEqual(pick(classifyEngineExit({ code: 1, intents: [hangRequest], selfIntent: selfHang,
+    policy: PRODUCT_POLICY })), ['UNEXPECTED', 'TIMEOUT', 'hang'], 'a crash during the asked-for close stays a crash');
+  console.log('test-dev-runner-supervisor: the owner\'s intent outranks the Engine\'s own — PASS');
+}
+
 async function main() {
   const server = http.createServer((_req, res) => { res.writeHead(503); res.end(); });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -575,6 +609,7 @@ async function main() {
   testStopReportCarriesTheIncarnationOnlyWhenSupervised();
   testARestartIsNotAnAbandonedStack();
   await testTerminalChildCleanupRequiresAllIdentityAxes();
+  testTheOwnersIntentOutranksTheEnginesOwn();
   console.log('test-dev-runner-supervisor: ALL PASS');
 }
 

@@ -566,7 +566,7 @@ def _clean_data_dir(resolved_data: Path) -> None:
 def stop_backend(proc: subprocess.Popen, data_dir: Path | None = None) -> None:
     """Stop the Engine process tree and retire its foreign-run record.
 
-    Uses taskkill /T /F on Windows. data_dir is retained for caller compatibility;
+    Uses the original Popen handle on Windows. data_dir is retained for caller compatibility;
     registered-child cleanup is owned by dev-runner, not a jseval process scan.
     Unregistering by proc.pid also covers boot failures before registration.
     """
@@ -576,18 +576,14 @@ def stop_backend(proc: subprocess.Popen, data_dir: Path | None = None) -> None:
         pid = proc.pid
         log.info("Stopping backend (PID=%d)...", pid)
 
-        if os.name == "nt":
-            # Windows: must kill process tree, not just the root.
-            subprocess.run(
-                ["taskkill", "/PID", str(pid), "/T", "/F"],
-                capture_output=True,
-            )
-        else:
-            proc.terminate()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+        # Popen retains the Windows process handle opened at this fixture's start.
+        # The Engine's job owns helper cleanup; no PID tree or name-based kill.
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=10)
 
         log.info("Backend stopped")
 

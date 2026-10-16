@@ -121,6 +121,17 @@ export function buildRequestBody(
 }
 
 /**
+ * Spec A step 9 (reconciliation F8/CH1) — marks a dispatch body as a person's chat: `allowLoad: true`
+ * lets the Engine load an unloaded chat model for this turn (or offer "load anyway" under pressure)
+ * instead of refusing it as an agent's request. Only the chat window's own send path calls this,
+ * for `/api/chat/dispatch`; the Engine also requires the app's own client before it believes it.
+ */
+export function withHumanLoad(body: Record<string, unknown>): Record<string, unknown> {
+  body.allowLoad = true;
+  return body;
+}
+
+/**
  * Tempdoc 565 §13 + §13.8/§13.9 — the agent window's DECLARED multi-zone composition. The grid frame is
  * GENERATED from this by {@link composeGridStyles} (no hand-authored `grid-template-columns`).
  *

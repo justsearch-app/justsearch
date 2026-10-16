@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T01:22:50.343Z",
+  "revision": "714ea049b505d7a4148866c38c362cfd7ded4fa3",
+  "tree": "38ffddcc06e307ad332219d3dd330c3bd69b2356",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement.primaryRateWithAndWithoutProbeChurn\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 114024
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ProbeChurnPrimaryRateMeasurement.java#primaryRateWithAndWithoutProbeChurn",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ProbeChurnPrimaryRateMeasurement.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59b44fde9c3559585be9bba9c35f11e31251f5bab5639c6fc2b43f14116ff28f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "primaryRateWithAndWithoutProbeChurn(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement.primaryRateWithAndWithoutProbeChurn\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 309651
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ProbeChurnPrimaryRateMeasurement.java#primaryRateWithAndWithoutProbeChurn",
+        "classification": "assertion",
+        "detail": "primaryRateWithAndWithoutProbeChurn(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a burst may write at most 24 ledger records, Engine and extraction child together, whatever the document count:&#13;&#10;  round 0: 3636 ledger records (4.04 per document) took 34.619 s of 49.64 s indexing (69.73%)&#10;  round 1: 3636 ledger records (4.04 per doc"
+      }
+    ]
+  },
+  "digest": "sha256:3e11d189cf93e583eb24e24a6ba1afa6dfae9ef96bcbbf81446f43ca238f20cc"
+}

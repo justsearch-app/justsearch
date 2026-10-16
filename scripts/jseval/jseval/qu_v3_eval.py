@@ -276,7 +276,8 @@ def compute_metrics(
 
 @click.command("qu-v3")
 @click.option("--base-url", default="http://127.0.0.1:33221", show_default=True)
-@click.option("--llm-port", default=8080, help="llama-server port for QU extraction")
+@click.option("--llm-port", default=33221, show_default=True,
+              help="Engine API port whose /v1 proxy serves QU extraction")
 @click.option("--max-queries", default=50, type=int, help="Limit queries (0=all)")
 @click.option("--retrieval-depth", default=10, type=int, help="How many docs to retrieve (10=shallow, 100=deep pool)")
 @click.option("--json", "json_output", is_flag=True)

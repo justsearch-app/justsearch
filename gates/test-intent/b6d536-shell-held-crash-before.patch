@@ -1,0 +1,23 @@
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -2915,3 +2915,11 @@
+ #[cfg(test)]
+ #[path = "updater_handoff_tests.rs"]
+ mod handoff_tests;
++
++#[cfg(test)]
++fn resolve_commit_delivery<T>(receipt: Result<T, String>, _observe: impl FnOnce() -> Result<(), String>) -> Result<T, String> { receipt }
++#[cfg(test)]
++fn finish_held_actor_exit(_host: &crate::engine_host::EngineHost, _timeout: Duration) -> Result<(), String> { Err("actor observation unavailable".into()) }
++#[cfg(test)]
++#[path = "updater_commit_delivery_tests.rs"]
++mod commit_delivery_tests;
+--- a/modules/shell/src-tauri/src/shell_actuator.rs
++++ b/modules/shell/src-tauri/src/shell_actuator.rs
+@@ -511,3 +511,6 @@
+     }
+     serde_json::from_str(body).or_else(|_| Ok(json!({"accepted":true})))
+ }
++
++#[cfg(test)]
++pub(crate) const UPGRADE_COMMIT_NOT_SENT: &str = "Upgrade commit request was not sent";

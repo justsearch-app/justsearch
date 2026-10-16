@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tempdoc": 627,
-  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption. Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel. Lane F stage A item A11 retired the Worker entry (`status: \"retired\"`): the Worker is no longer a process, and the Engine's own supervisor contract lands at stage B (design 7.1). A retired entry is skipped by assertions (1) and (3) and still checked by (2). It is skipped by (3) on purpose: the guards a retired row names were deleted with the thing they guarded, so resolving them would fail the build for the retirement itself — see the Worker entry's `guardsNote` for which of its FQCNs no longer exist. Lane F stage B item B7 added the `engine` row that replaces it, and two things about that row are different in kind rather than in degree. FIRST, the register is the AUTHORITY for it, not a declaration OF code: the Engine's supervisor is deliberately not a JVM (7.1's `never`), so both implementations READ these numbers at runtime — the dev-runner parses this file, the Tauri shell embeds it with include_str! — and the Java `EngineSupervisionPolicy` is a mirror kept honest by `EngineSupervisionPolicyTest`, which the row names in `driftCheck` because the module edge forbids `SupervisionContractTest` from importing it. SECOND, a guard may now be a repo-relative PATH as well as an FQCN, because the tests that exercise this row are a Node conformance harness and a Rust `#[cfg(test)]` table; the path still has to exist. The row also carries two things the older rows do not: `exitCodes` (a projection of `io.justsearch.app.engine.EngineExit`, drift-checked in both directions) and `conformanceCases` (the case list `scripts/supervisor-conformance/contract.mjs` and `modules/shell/src-tauri/src/supervisor.rs`'s decision-table tests BOTH read, so 'one contract, two implementations' is a fact about one list rather than two lists that agree today).",
+  "note": "The single declared 3-process supervision / crash-recovery contract (tempdoc 627). For each supervised process and fault mode: the declared detection -> recovery -> terminal-state, plus guard(s) — a test that exercises the row, or an explicit sentinel where a unit test is infeasible (real OOM, Windows-only exit codes, process-suspend hangs). This is the 'single authority rather than scattered monitor/spawner logic' the tempdoc's Goal 2 asks for, covering BOTH the Worker (Body) and llama-server (Brain), including external-adoption (the user's own server, explicit endpoint only) and no-adoption (a predecessor's managed llama-server is ended, never kept). Asserted by SupervisionContractTest: (1) the per-process `policy` block must equal the live policy record defaults (SupervisionPolicy / BrainSupervisionPolicy) — drift fails the build; (2) every fault mode is present per process; (3) every guard resolves to a real test file or an allowed sentinel. Lane F stage A item A11 retired the Worker entry (`status: \"retired\"`): the Worker is no longer a process, and the Engine's own supervisor contract lands at stage B (design 7.1). A retired entry is skipped by assertions (1) and (3) and still checked by (2). It is skipped by (3) on purpose: the guards a retired row names were deleted with the thing they guarded, so resolving them would fail the build for the retirement itself — see the Worker entry's `guardsNote` for which of its FQCNs no longer exist. Lane F stage B item B7 added the `engine` row that replaces it, and two things about that row are different in kind rather than in degree. FIRST, the register is the AUTHORITY for it, not a declaration OF code: the Engine's supervisor is deliberately not a JVM (7.1's `never`), so both implementations READ these numbers at runtime — the dev-runner parses this file, the Tauri shell embeds it with include_str! — and the Java `EngineSupervisionPolicy` is a mirror kept honest by `EngineSupervisionPolicyTest`, which the row names in `driftCheck` because the module edge forbids `SupervisionContractTest` from importing it. SECOND, a guard may now be a repo-relative PATH as well as an FQCN, because the tests that exercise this row are a Node conformance harness and a Rust `#[cfg(test)]` table; the path still has to exist. The row also carries two things the older rows do not: `exitCodes` (a projection of `io.justsearch.app.engine.EngineExit`, drift-checked in both directions) and `conformanceCases` (the case list `scripts/supervisor-conformance/contract.mjs` and `modules/shell/src-tauri/src/supervisor.rs`'s decision-table tests BOTH read, so 'one contract, two implementations' is a fact about one list rather than two lists that agree today).",
   "guardSentinels": [
     "dev-stack-smoke",
     "audit-verdict"
@@ -12,7 +12,8 @@
     "oom",
     "zombie",
     "partial-boot",
-    "external-adoption"
+    "external-adoption",
+    "no-adoption"
   ],
   "processes": [
     {
@@ -96,55 +97,73 @@
       "policy": {
         "consecutiveFailuresBeforeRestart": 3,
         "periodicHealthIntervalMs": 30000,
-        "healthCheckTimeoutMs": 120000
+        "healthCheckTimeoutMs": 120000,
+        "stabilityWindowMs": 600000,
+        "sameConfigRestartsPerStableWindow": 1,
+        "startingSameConfigRetries": 0,
+        "periodicHealthScheduling": "fixed-delay",
+        "note": "Spec A §7 (step 4, C9). The chat controller decides every automatic relaunch from the classified exit (LlamaServerExitClassifier -> ChatCrashPolicy); the component monitor admits NO automatic generative attempt (§4.2) and an operator retry is one attempt per call (O6). There is no same-configuration retry loop: a start that fails is never retried with the same configuration (startingSameConfigRetries 0), and a server that crashes after READY earns one same-configuration restart only once it has been READY for stabilityWindowMs (T28), at most sameConfigRestartsPerStableWindow per configuration until activation, a configuration change or an operator retry clears the latch (T34). All deadlines and the READY time are measured on the monotonic clock; the periodic health probe runs with a fixed delay so a slow probe cannot stack the next."
       },
       "faultModes": [
         {
           "mode": "clean-exit",
-          "detection": "Process.waitFor crash monitor (LlamaServerOps.handleServerCrash)",
-          "recovery": "One failure signal to the generative component. The common component monitor owns admission, backoff and at most two same-applied-configuration attempts; the native owner performs one launch per admission.",
-          "terminalState": "FAILED after the component budget is exhausted; the optional generative component remains unavailable while the Engine serves other components.",
+          "detection": "Process.waitFor crash monitor (LlamaServerOps.handleServerCrash); the exit is classified from its exit code and the launch log (LlamaServerExitClassifier: RESOURCE, DEVICE_SUSPECT, CONFIG, PORT_LOST, OTHER).",
+          "recovery": "The chat controller decides (ChatCrashPolicy.afterReadyFailure), not the component monitor. RESOURCE: step down one rung (T27). OTHER after READY for at least stabilityWindowMs, with the restart unspent: one same-configuration restart (T28). Anything else: no relaunch (T29). CONFIG fails with its own code; DEVICE_SUSPECT is never restarted in place (§7.1).",
+          "terminalState": "chat FAILED with crash_loop (T29), resource_exhausted (no lower rung or an override) or the CONFIG code; the generative component stays FAILED until an operator retry, activation or a configuration change. The component carries the failure's own reason code (Spec A step 7, ChatReasonCodes.forFailure): crash_loop as inference.crashed, resource_exhausted as inference.out_of_memory.",
           "guards": [
-            "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest"
+            "io.justsearch.app.inference.ChatCrashRestartTest",
+            "io.justsearch.app.inference.ChatCrashPolicyTest",
+            "io.justsearch.app.inference.LlamaServerExitClassifierTest",
+            "io.justsearch.app.services.worker.GenerativeRecoveryAdmissionTest",
+            "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest",
+            "io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest"
           ]
         },
         {
           "mode": "hang",
-          "detection": "periodic /health poll (LlamaServerOps.schedulePeriodicHealthCheck, periodicHealthIntervalMs, consecutiveFailuresBeforeRestart) while the process is alive",
-          "recovery": "managed: handleServerCrash signals component failure for the common monitor. external-adopted: goOfflineFromExternalFailure; recovery never kills or restarts a foreign process.",
-          "terminalState": "forceOffline -> OFFLINE after the streak",
+          "detection": "periodic /health probe at a fixed delay (LlamaServerOps.schedulePeriodicHealthCheck, periodicHealthIntervalMs, periodicHealthScheduling) while the process is alive; consecutiveFailuresBeforeRestart misses in a row is a hang (T30).",
+          "recovery": "managed: the hang is ended and treated as an OTHER exit, so ChatCrashPolicy.afterReadyFailure decides exactly as for a crash (T28/T29). external-adopted: goOfflineFromExternalFailure; recovery never kills or restarts a foreign process.",
+          "terminalState": "same as clean-exit for a managed server; OFFLINE for an external one",
           "guards": [
             "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest",
-            "io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest"
+            "io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest",
+            "io.justsearch.app.inference.ChatCrashPolicyTest"
           ]
         },
         {
           "mode": "oom",
-          "detection": "Process.waitFor crash monitor (OOM exits the server process -> same path as clean-exit crash)",
-          "recovery": "Common component monitor admission and budget, identical to clean-exit; no native retry scheduler.",
-          "terminalState": "Generative component FAILED after its shared monitor budget is exhausted",
+          "detection": "Process exit whose launch log carries an allocation failure (cudaMalloc / alloc_buffer / failed to allocate / failed to create context / out of memory) or the Windows no-memory status; classified RESOURCE. A CUDA OOM is not device loss (F17).",
+          "recovery": "RESOURCE steps the derived context window down one rung and relaunches there: while starting (T6) and while READY (T27). The stepped rung is sticky for the configuration in this Engine. An operator override is never reduced (T7, P4).",
+          "terminalState": "chat FAILED with resource_exhausted (reason code inference.out_of_memory) when there is no lower rung or the window is an override",
           "guards": [
-            "audit-verdict"
+            "io.justsearch.app.inference.LlamaServerStartFailureTest",
+            "io.justsearch.app.inference.ChatCrashRestartTest",
+            "io.justsearch.app.inference.LlamaServerExitClassifierTest",
+            "io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest"
           ],
-          "note": "OOM is a process crash; LlamaServerOps.handleServerCrash handles it identically to clean-exit (exit code not distinguished). Covered by the clean-exit guard; a real GPU-OOM loop is a dev-stack smoke."
+          "note": "The guards drive a separate llama-server stand-in process that prints the real llama-server allocation-failure lines and exits; a real GPU OOM on hardware is still a dev-stack smoke."
         },
         {
           "mode": "partial-boot",
-          "detection": "LlamaServerOps.waitForServerHealth: process exits during model load, or /health never ready before healthCheckTimeoutMs deadline (diagnosed via log-tail: arch mismatch / CUDA OOM / missing DLL / port-in-use)",
-          "recovery": "Retain the exact attempted StartRequest before launch. The common component monitor can admit up to two attempts of that configuration after the initial failure; each uses health polling without a nested relaunch ladder.",
-          "terminalState": "Generative component FAILED with the startup cause after its monitor budget is exhausted",
+          "detection": "LlamaServerOps.waitForServerHealth: the process exits during model load (classified from its exit code and launch log), or /health is not ready before the monotonic healthCheckTimeoutMs deadline.",
+          "recovery": "ChatCrashPolicy.afterStartExit, one decision per exit and no same-configuration retry (startingSameConfigRetries 0): RESOURCE steps down one rung (T6); a lost port bind relaunches once on a new port at the same rung (CH3); CONFIG (unknown architecture, missing DLL, unloadable model) fails at once with its code (T9); OTHER fails at once (T10); the health deadline is startup_timeout with no step-down (T11).",
+          "terminalState": "chat FAILED with the classified code after exactly the launches above, each with its reason code: model_load_failed as inference.model_load_failed, missing_dll as inference.runtime_not_installed, resource_exhausted as inference.out_of_memory, start_failed as inference.start_failed, startup_timeout as inference.startup_timeout",
           "guards": [
-            "audit-verdict"
+            "io.justsearch.app.inference.LlamaServerStartFailureTest",
+            "io.justsearch.app.inference.ChatCrashPolicyTest",
+            "io.justsearch.app.inference.ManagedLlamaAdoptionTest",
+            "io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest"
           ],
-          "note": "waitForServerHealth diagnosis path; a real partial boot (bad model / missing DLL / 120s timeout) is a dev-stack smoke — too slow/platform-specific for a unit test."
+          "note": "LlamaServerStartFailureTest proves one step-down on a real fit failure (I4) and exactly one launch for an unknown architecture (I5) against a launched process. A real 120 s timeout is too slow for a unit test and stays a dev-stack smoke."
         },
         {
           "mode": "external-adoption",
-          "detection": "adoptExistingServerIfPresent on every start (health + /props probe, policy gates)",
-          "recovery": "adopt an externally-started server instead of spawning (no restart loop); health-only adoption behind a dev sysprop; admin policy can forbid external; an adopted server that fails health -> forced OFFLINE (cannot restart — no process handle)",
-          "terminalState": "OFFLINE on adopted-server failure (recovery deliberately declined — by design)",
+          "detection": "only when `justsearch.inference.external_endpoint` names the user's own loopback llama-server (ADR-0051 decision 2, ruling CH4): health + /props probe and policy gates on every start. A healthy server on the configured port without that setting is NOT used: one WARN and the status note `external_server_ignored`, and the Engine launches its own on a fresh port.",
+          "recovery": "use the named server instead of spawning (no restart loop) and never stop it; health-only use behind a dev sysprop; admin policy can forbid external; an external server that fails health -> forced OFFLINE (cannot restart — not ours). An invalid endpoint value is refused with a reason.",
+          "terminalState": "OFFLINE on external-server failure (recovery deliberately declined — by design)",
           "guards": [
-            "io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest"
+            "io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest",
+            "io.justsearch.app.inference.ManagedLlamaAdoptionTest"
           ]
         }
       ]
@@ -167,7 +186,10 @@
         "gracefulStopDeadlineMs": 15000,
         "hangPollIntervalMs": 10000,
         "hangUnhealthyThreshold": 3,
-        "note": "Stage B §2's re-cut of the 627 seeds, for one process instead of a child behind a live API. The cooldown FLOOR is not a number: it is the process handle closing, which the death path waits for anyway and which Windows makes load-bearing. Above that floor the ramp is LINEAR (+cooldownIncrementMs per attempt), not exponential, because with one process the cooldown is dead-API time and the restart COUNT is what bounds a crash loop. maxCooldownMs does not bind at maxRestartAttempts 3 (the ramp reaches 3000 ms on the last attempt); it bounds the ramp if the attempt budget is ever raised, and the conformance case cooldown-ceiling-binds-when-budget-raised is the only place it is exercised. stabilityWindowMs is counted by the host monotonic clock across one continuous `readiness.engineComponents.index.state=READY` epoch, identified by `stateSince`, not from spawn. Missing/malformed state or epoch, a new epoch, or loss of liveness restarts the interval; optional AI does not gate it. hangPollIntervalMs and hangUnhealthyThreshold are PLACEHOLDERS set with the collector at stage E (design 7.1): health and indexing allocation share one heap, so interval x count must exceed the worst safepoint pause the soak observes. A test may assert the hang path fires; no test may assert it fires within a tuned budget."
+        "quitDeadlineMs": 8000,
+        "quitForceMarginMs": 300,
+        "dataDirLockedWaitMs": 15000,
+        "note": "quitDeadlineMs is the one quit deadline (Spec F §4.2): a supervisor that asked the Engine to quit forces it at quitDeadlineMs − quitForceMarginMs, and the Engine budgets its own close to the same deadline minus the margin (QuitBudget). Restart and hang requests keep gracefulStopDeadlineMs. Stage B §2's re-cut of the 627 seeds, for one process instead of a child behind a live API. The cooldown FLOOR is not a number: it is the process handle closing, which the death path waits for anyway and which Windows makes load-bearing. Above that floor the ramp is LINEAR (+cooldownIncrementMs per attempt), not exponential, because with one process the cooldown is dead-API time and the restart COUNT is what bounds a crash loop. maxCooldownMs does not bind at maxRestartAttempts 3 (the ramp reaches 3000 ms on the last attempt); it bounds the ramp if the attempt budget is ever raised, and the conformance case cooldown-ceiling-binds-when-budget-raised is the only place it is exercised. stabilityWindowMs is counted by the host monotonic clock across one continuous `readiness.engineComponents.index.state=READY` epoch, identified by `stateSince`, not from spawn. Missing/malformed state or epoch, a new epoch, or loss of liveness restarts the interval; optional AI does not gate it. hangPollIntervalMs and hangUnhealthyThreshold are PLACEHOLDERS set with the collector at stage E (design 7.1): health and indexing allocation share one heap, so interval x count must exceed the worst safepoint pause the soak observes. A test may assert the hang path fires; no test may assert it fires within a tuned budget."
       },
       "harnessOverrides": {
         "flag": "JUSTSEARCH_SUPERVISOR_HARNESS",
@@ -188,10 +210,11 @@
         { "code": 1, "name": "FATAL_OR_UNCAUGHT", "class": "TRANSIENT" },
         { "code": 2, "name": "DATA_DIR_LOCKED", "class": "NON_TRANSIENT" },
         { "code": 3, "name": "OUT_OF_MEMORY", "class": "TRANSIENT" },
-        { "code": 5, "name": "ESCALATED_RESTART", "class": "TRANSIENT" }
+        { "code": 5, "name": "ESCALATED_RESTART", "class": "TRANSIENT" },
+        { "code": 1246953474, "name": "SUPERVISOR_FORCED", "class": "TRANSIENT" }
       ],
       "unknownExitClass": "TRANSIENT",
-      "exitCodesNote": "A projection of io.justsearch.app.engine.EngineExit (stage B item B1), which is the code that produces these integers. It is duplicated here rather than parsed out of Java by two non-JVM readers, and EngineSupervisionPolicyTest fails the build if the two disagree — including if EngineExit gains a constant this list does not carry. scripts/supervisor-conformance/contract.mjs re-checks the same agreement at harness start, so the harness refuses to run on drift without waiting for Gradle. unknownExitClass is TRANSIENT on purpose: a wrong retry costs one cooldown, a wrong `exhausted` costs the product.",
+      "exitCodesNote": "A projection of io.justsearch.app.engine.EngineExit (stage B item B1), which is the code that produces these integers. It is duplicated here rather than parsed out of Java by two non-JVM readers, and EngineSupervisionPolicyTest fails the build if the two disagree — including if EngineExit gains a constant this list does not carry. scripts/supervisor-conformance/contract.mjs re-checks the same agreement at harness start, so the harness refuses to run on drift without waiting for Gradle. SUPERVISOR_FORCED (1246953474 = 0x4A530002, TerminateCodes.JS_ENGINE_STOP) is never produced by the Engine itself: it is the code a supervisor terminates the Engine's job with when it forces a quit past quitDeadlineMs − quitForceMarginMs or a hung Engine down (Spec F step 4, S15). Until a supervisor terminates with it, a forced stop is taskkill /F and reads as exit 1. unknownExitClass is TRANSIENT on purpose: a wrong retry costs one cooldown, a wrong `exhausted` costs the product.",
       "faultModes": [
         {
           "mode": "clean-exit",
@@ -246,16 +269,17 @@
           "note": "The host running edge records a responsive admitted binding. Budget reset separately reads only `readiness.engineComponents.index.state` and its `stateSince` epoch; the Engine owns the API/index/freshness conjunction. The host measures elapsed stability with its own monotonic clock."
         },
         {
-          "mode": "external-adoption",
-          "detection": "Engine startup reads retained schema-v2 managed-child identities before child-capable work and verifies PID, process start time, executable and declared configuration.",
-          "recovery": "A compatible owned llama-server is revalidated and adopted with its handle; incompatible verified children are terminated. Unknown/reused identities are left alone, and uncertain termination blocks replacement. Extraction children are never adopted.",
-          "terminalState": "Adopted child remains monitored; terminal shutdown kills verified owned children and retains incomplete evidence if cleanup fails.",
+          "mode": "no-adoption",
+          "detection": "Engine startup reads retained schema-v2 managed-child identities before child-capable work and verifies PID, process start time and executable.",
+          "recovery": "No child outlives the Engine that started it (ADR-0051 decision 2): every child is created inside the Engine's kill-on-close job and ends when the Engine process ends, a compatible healthy llama-server included; none is adopted. At the next boot LedgerReconciler records each open child as OWNER_DIED when it is gone or child-survived when it is still alive (Spec B step 7). A matched live child the ledger records inside its Engine's job is left running and its record kept; every other verified-owned predecessor child is still terminated, the fallback while the Engine has no job or for children of an earlier version, until Spec F step 13 retires it. Unknown/reused identities are left alone, and uncertain termination keeps the record. Every managed llama-server launch binds a fresh loopback port; a lost bind race retries once on a new port at the same context rung.",
+          "terminalState": "The old Engine's llama-server has ended (with its Engine's job, recorded OWNER_DIED, or by the boot fallback); the new Engine starts its own, and chat is ready again within its bound. Close always stops the managed llama-server; terminal shutdown kills verified owned children and retains incomplete evidence if cleanup fails.",
           "guards": [
             "io.justsearch.ui.runtime.ManagedChildReconcilerTest",
+            "io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest",
             "io.justsearch.app.inference.ManagedLlamaAdoptionTest",
             "io.justsearch.ui.runtime.MutableManagedChildRegistryTest"
           ],
-          "note": "B11/B12 implemented and reviewed 2026-09-08; see docs/design/lane-f-engine-jvm/evidence/B/b11-b12-managed-child-registry.md. The separate unowned external-server compatibility path remains described by the brain row."
+          "note": "Replaces the B11/B12 adoption row (docs/design/lane-f-engine-jvm/evidence/B/b11-b12-managed-child-registry.md) per specs-reconciliation-v2 rulings CH2-CH5. The user's own server is the brain row's external-adoption mode, reachable only through the explicit endpoint setting."
         }
       ],
       "conformanceCases": [
@@ -503,6 +527,1157 @@
           "observation": { "event": "start-deadline-elapsed", "restartCount": 0, "state": "starting" },
           "expect": { "action": "request-shutdown", "reason": "hang" },
           "why": "`starting` has no hang detection, so without this edge a boot that never publishes a port is a supervisor that waits forever."
+        },
+        {
+          "id": "start-death-before-manifest-is-one-exit-path",
+          "faultMode": "clean-exit",
+          "drives": [
+            "start"
+          ],
+          "enginePlan": [
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 1,
+              "exitAfterMs": 300
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "forced": false,
+                "phase": "STARTING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec F §7.2 and STOPF I2: a death in the port phase takes the same exit path as any other (T4), so it is recorded once with phase STARTING and decided by the contract, not by a discovery-only branch."
+        },
+        {
+          "id": "start-death-after-manifest-before-http",
+          "faultMode": "clean-exit",
+          "drives": [
+            "discovery"
+          ],
+          "enginePlan": [
+            {
+              "mode": "die-after-manifest-before-http",
+              "exitCode": 1,
+              "exitAfterMs": 800
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "seenPhase": {
+              "incarnation": 1,
+              "phase": "discovered"
+            },
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "forced": false,
+                "phase": "STARTING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec F §3.3, the P1 residual: an Engine that published its manifest and died before answering HTTP is a death from starting/discovered (T4), not a readiness timeout that abandons the start."
+        },
+        {
+          "id": "readiness-death-uses-the-death-path",
+          "faultMode": "clean-exit",
+          "drives": [
+            "discovery"
+          ],
+          "enginePlan": [
+            {
+              "mode": "die-during-readiness",
+              "exitCode": 1,
+              "exitAfterMs": 2500
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "seenPhase": {
+              "incarnation": 1,
+              "phase": "discovered"
+            },
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "forced": false,
+                "phase": "STARTING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "STOPF I2(b): a death while readiness probes are in flight must reach death processing at once; the readiness wait used to ignore the exit until its own timeout."
+        },
+        {
+          "id": "port-phase-exit-keeps-requested-reason",
+          "faultMode": "partial-boot",
+          "drives": [
+            "discovery"
+          ],
+          "startTimeoutMs": 1500,
+          "enginePlan": [
+            {
+              "mode": "slow-start",
+              "slowStartMs": 60000,
+              "requestPollMs": 100
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 0,
+              "requestedReason": "hang",
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "code": 0,
+                "forced": false,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "STOPF I2(a) and W09-F2: the first boot's start timeout requests a stop instead of abandoning a live Engine, and the exit that answers the request keeps its requestedReason, so a clean 0 is still charged as the hang it was."
+        },
+        {
+          "id": "start-deadline-stops-and-records",
+          "faultMode": "partial-boot",
+          "drives": [
+            "start"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitCode": 1,
+              "exitAfterMs": 1500
+            },
+            {
+              "mode": "slow-start",
+              "slowStartMs": 60000,
+              "ignoreShutdown": true
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "forcedKill": true,
+            "reach": {
+              "state": "running",
+              "incarnation": 3,
+              "restartCount": 2
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "phase": "RUNNING"
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              },
+              {
+                "type": "engine-intent",
+                "n": 2,
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-intent",
+                "n": 2,
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "mode": "NOW",
+                "channel": "TERMINATE"
+              },
+              {
+                "type": "engine-exit",
+                "n": 2,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "code": 1246953474,
+                "forced": true,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 3,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Extends start-deadline-stops-a-partial-boot (W09-F2): the start deadline writes its intent before the request file, the forced kill that ends an Engine ignoring it leaves JS_ENGINE_STOP (0x4A530002) rather than a crash's code, and both are recorded."
+        },
+        {
+          "id": "hang-forced-kill-is-distinctive",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "hang-hard",
+              "hangAfterMs": 1200
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "forcedKill": true,
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "NOW",
+                "channel": "TERMINATE"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "code": 1246953474,
+                "forced": true,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec B C6 and Q6: a supervisor's forced kill must not read as a crash. The kill leaves JS_ENGINE_STOP (the dev fallback taskkill leaves 1 and records codeDistinctive:false), and the exit is REQUESTED(TIMEOUT/hang) forced."
+        },
+        {
+          "id": "owner-died-recorded-after-supervisor-kill",
+          "faultMode": "zombie",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "killSupervisor": true,
+            "reach": {
+              "state": "running",
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-owner-died",
+                "session": "previous",
+                "n": 1,
+                "basis": "OPEN_START",
+                "osCheck": "GONE",
+                "exitClass": "OWNER_DIED"
+              },
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              }
+            ]
+          },
+          "why": "RV2 F7: a supervisor killed outright cannot record its Engine's exit, so the next supervisor on the data directory closes the open start as engine-owner-died after an OS identity check, before it starts its own Engine, and never kills anything to do so."
+        },
+        {
+          "id": "engine-self-restart-is-requested",
+          "faultMode": "clean-exit",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "clean-exit",
+              "exitCode": 5,
+              "exitAfterMs": 1500,
+              "selfIntent": {
+                "reason": "ENGINE_RESTART",
+                "detail": "escalated",
+                "expectedCode": 5
+              }
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 5,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-self-intent",
+                "n": 1,
+                "reason": "ENGINE_RESTART",
+                "detail": "escalated",
+                "expectedCode": 5
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "ENGINE_RESTART",
+                "detail": "escalated",
+                "code": 5,
+                "forced": false,
+                "phase": "RUNNING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec B §6.1-6.2 (S15): an Engine that ends itself records engine-self-intent first, with the code it expects to leave, so its escalated restart is REQUESTED(ENGINE_RESTART, escalated) in the ledger while the contract still counts it. Driven as the Engine's own end of an incarnation, the counterpart of the supervisor's kill."
+        },
+        {
+          "id": "hang-close-the-engine-runs-is-the-supervisors-timeout",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "hang-soft",
+              "hangAfterMs": 1200,
+              "writesSelfIntent": true
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 0,
+              "requestedReason": "hang",
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-self-intent",
+                "n": 1,
+                "reason": "ENGINE_RESTART",
+                "detail": "hang",
+                "expectedCode": 0
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "code": 0,
+                "forced": false,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec B §6.2: a hung Engine that still reads the request file closes on the supervisor's hang request and records its own ENGINE_RESTART/hang self-intent as it does; when both expect the code, the exit is the owner's REQUESTED(TIMEOUT, hang), never the Engine's own reason."
+        },
+        {
+          "id": "a-crash-during-the-requested-close-stays-unexpected",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "hang-soft",
+              "hangAfterMs": 1200,
+              "writesSelfIntent": true,
+              "requestExitCode": 1
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-self-intent",
+                "n": 1,
+                "reason": "ENGINE_RESTART",
+                "detail": "hang",
+                "expectedCode": 0
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "code": 1,
+                "forced": false,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "S15: a real crash during an intended stop stays unexpected. Both the supervisor's hang request and the Engine's own self-intent expect 0; an exit with 1 matches neither and is UNEXPECTED, recorded under the owner's reason."
+        },
+        {
+          "id": "engine-exit-ends-its-helpers",
+          "faultMode": "crash",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "dev containment of Engine children is the Engine's own job, which a Node fake cannot create; covered by S14-L1 and T23 on a real JVM; supervisor death on dev is S18-I1",
+          "enginePlan": [
+            {
+              "mode": "spawn-grandchild",
+              "exitCode": 1,
+              "exitAfterMs": 1500
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "helperGoneWithinMs": 1000
+          },
+          "why": "S14: observed Engine death ends its incarnation job."
+        },
+        {
+          "id": "supervisor-killed-ends-engine-and-helpers",
+          "faultMode": "crash",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "dev containment of Engine children is the Engine's own job, which a Node fake cannot create; covered by S14-L1 and T23 on a real JVM; supervisor death on dev is S18-I1",
+          "enginePlan": [
+            {
+              "mode": "spawn-grandchild"
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "helperGoneWithinMs": 2000
+          },
+          "why": "S13: shell death ends Engine and helpers."
+        },
+        {
+          "id": "quit-cooperative-records-requested-quit",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "cooperative",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "one-exit-record-per-incarnation",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "triggers",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-past-deadline-is-forced-and-distinct",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "forced",
+          "enginePlan": [
+            {
+              "mode": "ignore-shutdown"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-crash-stays-unexpected",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "crash",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "requestExitCode": 1
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-during-cooldown-spawns-nothing",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "cooldown",
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 1500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-during-start",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "start",
+          "enginePlan": [
+            {
+              "mode": "slow-start",
+              "slowStartMs": 60000
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-deadline-is-the-contract-value",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "deadline",
+          "enginePlan": [
+            {
+              "mode": "ignore-shutdown"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "stale-request-file-is-not-honoured",
+          "faultMode": "clean-exit",
+          "drives": [
+            "start"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "stale",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "data-dir-locked-after-own-predecessor-waits-once",
+          "why": "An owned predecessor can still release the data lock; one bounded uncounted retry is allowed, then code 2 exhausts.",
+          "faultMode": "hang",
+          "drives": [
+            "start"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "locked",
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 1200
+            },
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 2,
+              "exitAfterMs": 200
+            },
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 2,
+              "exitAfterMs": 200
+            }
+          ]
+        },
+        {
+          "id": "suspend-gap-is-not-a-hang",
+          "why": "Reported sleep freezes active deadlines and must not spend the hang budget.",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "suspend",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "freezeWindow": {
+                "fromMs": 1000,
+                "toMs": 3000
+              }
+            }
+          ]
+        },
+        {
+          "id": "misses-after-resume-grace-still-hang",
+          "why": "After resume grace, sustained unhealthy probes still invoke the existing hang recovery path.",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "resume-hang",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "freezeWindow": {
+                "fromMs": 1000,
+                "toMs": 15000
+              }
+            },
+            {
+              "mode": "honour"
+            }
+          ]
+        },
+        {
+          "id": "quit-with-stream-and-extraction",
+          "why": "S16: quitting while chat streams and extraction runs ends the Engine and its contained helper within the quit budget.",
+          "faultMode": "hang",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "A Node fake cannot install the Engine containment job; real JVM dev containment is verified separately.",
+          "probe": "stream",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "spawnGrandchild": true
+            }
+          ]
+        },
+        {
+          "id": "session-end-begins-at-query",
+          "why": "S16-W1: the real hidden top-level window starts QUIT/session_end at QUERYENDSESSION and waits for recorded exit at ENDSESSION.",
+          "faultMode": "hang",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "Windows session messages belong to the desktop shell hidden top-level window.",
+          "probe": "session",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ]
+        },
+        {
+          "id": "updater-hold-returns-at-once-and-stays-supervised",
+          "why": "Amendment 1: hold is admission only, returns at once and keeps the live Engine supervised.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-hold",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "holdWithinMs": 100
+          }
+        },
+        {
+          "id": "updater-actor-records-upgrade-before-empty-handoff",
+          "why": "Amendment 1/P5/S15: the actor sends UPGRADE, records its intent and requested exit, publishes stopped(upgrade), and confirms job empty before handoff.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-upgrade",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reason": "UPGRADE",
+            "jobEmpty": true
+          }
+        },
+        {
+          "id": "updater-held-exit-is-unexpected-without-restart",
+          "why": "Amendment 1/S15: a held Engine crash is recorded unexpected; admission hold prevents a successor while the actor keeps reaping.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-held-exit",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "exitClass": "UNEXPECTED",
+            "starts": 1
+          }
+        },
+        {
+          "id": "updater-quit-while-held-refuses-upgrade-and-stays-staged",
+          "why": "Amendment 1/S16: quit during prepare wins, upgrade is refused, the installer never launches, the update stays staged and nothing runs.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-quit",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reason": "QUIT",
+            "launches": 0,
+            "updateState": "staged"
+          }
+        },
+        {
+          "id": "updater-failed-prepare-releases-the-same-actor",
+          "why": "Amendment 1: release after a held crash restarts through the same actor; failed prepare releases admission without replacing that actor or its live Engine.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-release",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "incarnation": 2,
+            "resumes": 1
+          }
+        },
+        {
+          "id": "updater-nonempty-job-never-launches-installer",
+          "why": "P5-U2: a job-empty fault edge still reports a real live process after terminate confirmation; production coordinator records repair_required, attempts resume and never launches.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-nonempty",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "launches": 0,
+            "emptyChecks": 2,
+            "terminates": 1,
+            "resumes": 1,
+            "phase": "REPAIR_REQUIRED"
+          }
         }
       ]
     }

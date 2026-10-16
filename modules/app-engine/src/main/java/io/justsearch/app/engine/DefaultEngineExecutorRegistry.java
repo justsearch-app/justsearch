@@ -218,19 +218,33 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
 
     @Override
     public ExecutorService open(ThreadFactory threadFactory) {
+      return openPlatform(threadFactory, false);
+    }
+
+    @Override
+    public ExecutorService openWithReservedSeats(ThreadFactory threadFactory) {
+      return openPlatform(threadFactory, true);
+    }
+
+    private ExecutorService openPlatform(ThreadFactory threadFactory, boolean reserveSeats) {
       Objects.requireNonNull(threadFactory, "threadFactory");
       synchronized (lock) {
         requireMode(Mode.PLATFORM);
         prepareOpenLocked();
-        BlockingQueue<Runnable> queue = spec.queueCapacity() == 0
-            ? new SynchronousQueue<>() : new ArrayBlockingQueue<>(spec.queueCapacity());
         var identity = new java.util.concurrent.atomic.AtomicReference<ExecutorService>();
-        ExecutorService executor = new ThreadPoolExecutor(
-            spec.threadCount(), spec.threadCount(), 0L, TimeUnit.MILLISECONDS, queue,
-            trackingFactory(threadFactory, identity),
-            (task, owner) -> {
-              throw rejected(owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
-            });
+        ExecutorService executor;
+        if (reserveSeats) {
+          executor = new SeatReservedExecutor(spec, trackingFactory(threadFactory, identity));
+        } else {
+          BlockingQueue<Runnable> queue = spec.queueCapacity() == 0
+              ? new SynchronousQueue<>() : new ArrayBlockingQueue<>(spec.queueCapacity());
+          executor = new ThreadPoolExecutor(
+              spec.threadCount(), spec.threadCount(), 0L, TimeUnit.MILLISECONDS, queue,
+              trackingFactory(threadFactory, identity),
+              (task, owner) -> {
+                throw rejected(owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
+              });
+        }
         identity.set(executor);
         instances.add(executor);
         return executor;
@@ -287,7 +301,8 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
       int queued = 0;
       for (ExecutorService instance : instances) {
         if (instance.isShutdown()) shutdown++;
-        if (instance instanceof ThreadPoolExecutor pool) queued += pool.getQueue().size();
+        if (instance instanceof SeatReservedExecutor pool) queued += pool.waitingTasks();
+        else if (instance instanceof ThreadPoolExecutor pool) queued += pool.getQueue().size();
       }
       return new EngineExecutorSnapshot.Registration(
           spec, registrationClosed, instances.size(), shutdown, queued);
@@ -307,6 +322,80 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
     private List<ExecutorService> markClosedLocked() {
       registrationClosed = true;
       return new ArrayList<>(instances);
+    }
+  }
+
+  /**
+   * A fixed pool with submission-time seats. ThreadPoolExecutor normally offers to its queue once
+   * core threads exist, even when those threads are idle. A warm burst can therefore overflow a
+   * queue while unused thread seats exist. Reserve the declared seats atomically instead: the
+   * first threadCount submissions own seats, and at most queueCapacity others wait for one.
+   * The dispatch buffer also holds seated tasks until their workers are scheduled; it grants no
+   * additional capacity. The dispatch queue owns buffered seats; its worker handoff transfers
+   * them to the outside-queue count under the same lock used for admission.
+   */
+  private final class SeatReservedExecutor extends ThreadPoolExecutor {
+    private final ReservedSeatQueue seats;
+    private final EngineExecutorSpec spec;
+
+    SeatReservedExecutor(EngineExecutorSpec spec, ThreadFactory factory) {
+      this(spec, factory, new ReservedSeatQueue(Math.addExact(spec.threadCount(), spec.queueCapacity())));
+    }
+
+    private SeatReservedExecutor(EngineExecutorSpec spec, ThreadFactory factory, ReservedSeatQueue seats) {
+      super(spec.threadCount(), spec.threadCount(), 0L, TimeUnit.MILLISECONDS,
+          seats,
+          factory, (task, owner) -> {
+            throw rejected(owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
+          });
+      this.spec = spec;
+      this.seats = seats;
+      seats.worker = () -> RUNNING_EXECUTOR.get() == this;
+    }
+
+    @Override
+    public void setThreadFactory(ThreadFactory factory) {
+      var identity = new java.util.concurrent.atomic.AtomicReference<ExecutorService>(this);
+      super.setThreadFactory(trackingFactory(Objects.requireNonNull(factory, "factory"), identity));
+    }
+
+    @Override
+    public void execute(Runnable task) {
+      Objects.requireNonNull(task, "task");
+      if (isShutdown()) throw rejected(Reason.CLOSED, spec.name());
+      ReservedSeatQueue.Seat seat = seats.reserve(task);
+      if (seat == null) throw rejected(isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
+      try {
+        super.execute(seat);
+      } catch (RuntimeException | Error failure) {
+        // Besides unlinking buffered work, remove runs ThreadPoolExecutor's termination recheck.
+        super.remove(seat);
+        seats.reject(seat);
+        throw failure;
+      }
+    }
+
+    @Override
+    protected void beforeExecute(Thread thread, Runnable task) {
+      try {
+        seats.executing.set(true);
+        super.beforeExecute(thread, task);
+      } catch (RuntimeException | Error failure) {
+        // ThreadPoolExecutor does not call afterExecute when this hook fails.
+        seats.completed();
+        seats.executing.remove();
+        throw failure;
+      }
+    }
+
+    int waitingTasks() {
+      return Math.max(0, seats.used() - spec.threadCount());
+    }
+
+    @Override
+    protected void afterExecute(Runnable task, Throwable failure) {
+      try { super.afterExecute(task, failure); }
+      finally { seats.completed(); seats.executing.remove(); }
     }
   }
 

@@ -26,6 +26,17 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("ResolvedConfigBuilder")
 final class ResolvedConfigBuilderTest {
+  @Test
+  void gpuPolicyVetoIncludesBothRerankersEvenWithExplicitGpuOverrides() {
+    var cfg = new ResolvedConfigBuilder()
+        .putDefault("policy.gpu_acceleration_enabled", "false")
+        .putDefault("justsearch.gpu.enabled", "true")
+        .putDefault("justsearch.rerank.gpu.enabled", "true")
+        .putDefault("justsearch.rerank.chunks.gpu.enabled", "true").build();
+    assertFalse(cfg.ai().reranker().gpuEnabled(), "NO_GPU must veto the search reranker");
+    assertFalse(cfg.ai().reranker().chunks().gpuEnabled(), "NO_GPU must veto the chunk reranker");
+  }
+
 
   // ==================== Ordinal Chain Resolution ====================
 

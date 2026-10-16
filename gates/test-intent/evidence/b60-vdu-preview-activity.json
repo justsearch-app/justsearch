@@ -1,0 +1,205 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-10T22:44:39.491Z",
+  "revision": "b45615514adf5e7cf4eaa21bea80a615ee273f3a",
+  "tree": "83977d85b4f0701e36e281cd430cf688b1ea92cc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.IndependentDeclaredActivityTest\" --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 58264
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentDeclaredActivityTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentDeclaredActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e1a96a797afc8b4b36461411c9addec3c5083203d31d37a4fd7aa592f1722fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] /api/knowledge/suggest",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/preview",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/operations/{id}/preview",
+          "status": "passed"
+        },
+        {
+          "name": "deniedAdmissionDoesNotReportUserInput()",
+          "status": "passed"
+        },
+        {
+          "name": "undeclaredAndAmbiguousRoutesCannotShip()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] /api/chat/sessions/last",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/chat/sessions/{id}/transcript",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/chat/agent/history",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/chat/agent/history/{batchId}",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/debug/events",
+          "status": "passed"
+        },
+        {
+          "name": "[6] /api/debug/engine-log",
+          "status": "passed"
+        },
+        {
+          "name": "[7] /api/debug/chunks",
+          "status": "passed"
+        },
+        {
+          "name": "[8] /api/indexing/suggested-roots",
+          "status": "passed"
+        },
+        {
+          "name": "[9] /api/registry/prompts",
+          "status": "passed"
+        },
+        {
+          "name": "[10] /api/meta/openapi.json",
+          "status": "passed"
+        },
+        {
+          "name": "[11] /api/knowledge/search",
+          "status": "passed"
+        },
+        {
+          "name": "[1] /api/diagnostics/traces",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/inference/transitions",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/conversations/encryption",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/chat/agent/tools",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/indexing/failed-jobs",
+          "status": "passed"
+        },
+        {
+          "name": "[6] /api/runtime/manifest",
+          "status": "passed"
+        },
+        {
+          "name": "[1] /api/knowledge/folders",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/knowledge/folder-files",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/conversations/encryption/unlock",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/conversations/encryption/lock",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/ui/activity",
+          "status": "passed"
+        },
+        {
+          "name": "automaticLockIsNotExplicitLock()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e2a7d39d782c5d7607eb1ec92c08dd0c1d673778c224f95856fc499a6084c3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyProductionRouteDeclaresActivityAtRegistration()",
+          "status": "passed"
+        },
+        {
+          "name": "newUndeclaredPollingOperationCannotInventActivity()",
+          "status": "passed"
+        },
+        {
+          "name": "brainTimerAndAutomaticPostLeavePassBoundaryUntouched()",
+          "status": "passed"
+        },
+        {
+          "name": "registeredUserOperationsAndUnattendedReadsHaveTheirDeclaredHttpBehavior()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b45615514",
+    "revision": "b45615514adf5e7cf4eaa21bea80a615ee273f3a",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.IndependentDeclaredActivityTest\" --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 34556
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentDeclaredActivityTest.java",
+        "classification": "assertion",
+        "detail": "[3] /api/operations/{id}/preview: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: get /api/operations/{id}/preview hints=false must follow user intent, production role=[OBSERVATION] ==> expected: <true> but was: <false> | [1] /api/chat/sessions/last: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: get /api/chat/sessions/last hints=false must follow user intent, production role=[OBSERVATION] ==> expected: <true> but was: <false> | [2] /api/chat/se"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+        "classification": "assertion",
+        "detail": "registeredUserOperationsAndUnattendedReadsHaveTheirDeclaredHttpBehavior(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GET /api/indexing/suggested-roots operation input semantics ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:5daad36cc7f01fc561d8ede41adc1f9edf7d2470760c86bc10da1f1eeba8b7b2"
+}

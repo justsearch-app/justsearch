@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -28,7 +29,7 @@ final class ConversationProtectionHealthTapTest {
   private ConversationProtectionHealthTap tap(ConditionStore store) {
     return new ConversationProtectionHealthTap(
         store,
-        new HealthEventChangeRegistry(),
+        new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()),
         HEAD,
         Clock.fixed(Instant.parse("2026-06-23T00:00:00Z"), ZoneOffset.UTC),
         () -> false); // unused — tests drive reconcile(...) directly

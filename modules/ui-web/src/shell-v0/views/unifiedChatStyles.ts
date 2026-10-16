@@ -1484,6 +1484,21 @@ export const unifiedChatBodyStyles = css`
       color: var(--accent);
       border-color: var(--accent);
     }
+    /* Spec A step 9 — chat unloaded for another GPU user: calm, not an error. */
+    .chat-residency-notice {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0.375rem;
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+    }
+    .chat-residency-notice p {
+      margin: 0;
+      flex: 1;
+    }
     .error {
       padding: 0.5rem 0.75rem;
       background: var(--accent-danger-08);

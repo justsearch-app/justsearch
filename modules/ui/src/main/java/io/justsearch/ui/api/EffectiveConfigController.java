@@ -175,6 +175,7 @@ public final class EffectiveConfigController {
     // -------------------------------------------------------------------------
     keys.add(keyContextSize(envInference));
     keys.add(keyGpuLayers(runtimeInfo, envInference, policy));
+    keys.add(keyGameDetection());
     keys.add(keyAiDisabled());
 
     // -------------------------------------------------------------------------
@@ -241,6 +242,18 @@ public final class EffectiveConfigController {
     else source = "default";
 
     return key("justsearch.api.port", parsed, source, details);
+  }
+
+  private Map<String, Object> keyGameDetection() {
+    String name = EnvRegistry.GPU_GAME_DETECTION.sysProp();
+    ResolvedConfig current = configStore != null ? configStore.get() : null;
+    ConfigResolution resolution = current != null ? current.resolution(name) : null;
+    String value = current != null ? current.ai().gpuGameDetection()
+        : EnvRegistry.GPU_GAME_DETECTION.getString("auto");
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("applyScope", "hot");
+    if (resolution != null) details.put("sourceOrdinal", resolution.sourceOrdinal());
+    return key(name, value, resolution != null ? resolution.sourceName() : "default", details);
   }
 
   private Map<String, Object> keyProcessApiPort(Integer apiPort) {

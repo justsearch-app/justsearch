@@ -8,8 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.ChildView;
+import io.justsearch.app.api.runtime.child.DefaultChildControl;
+import io.justsearch.app.api.runtime.child.ExitClass;
+import io.justsearch.app.api.runtime.child.ProcessTerminator;
+import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.api.runtime.child.TerminateCodes;
+import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import io.justsearch.telemetry.catalog.TestMetricRegistry;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -21,6 +28,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -104,42 +113,74 @@ final class PersistentExtractionSandboxTest {
     assertTrue(handle == null || !handle.isAlive(), "an unregistered child must be reaped");
   }
 
+  /**
+   * A child whose manifest registration fails is rolled back; when that terminate does not take,
+   * its handle is retained (by the child control) and the control's close retries it.
+   */
   @Test
-  void failedRegistrationRollbackRetainsHandleForCloseRetry() {
-    RetryKillProcess process = new RetryKillProcess();
-    PersistentExtractionSandbox sandbox =
-        sandbox(List.of("unused-command"), Duration.ofSeconds(1));
+  @Timeout(40)
+  void failedRegistrationRollbackRetainsHandleForCloseRetry() throws Exception {
+    var terminator = new ChildControlFixtures.RefusingTerminator(true);
+    var registry = new ChildControlFixtures.RefusingRegistry();
+    var control = DefaultChildControl.of(
+        new ChildControlFixtures.RecordingLedger(), terminator, registry);
+    try (var sandbox = ChildControlFixtures.pool(
+        javaCommand(ScriptedChild.class), Duration.ofSeconds(10), 500, null, control)) {
+      var failure = assertThrows(SandboxExtractionException.class,
+          () -> sandbox.extract(file("rollback.txt")));
+      assertTrue(failure.getCause() instanceof java.io.IOException, failure.toString());
+      long pid = registry.attempted.getFirst().pid();
+      assertTrue(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
+      assertEquals(2, terminator.terminateCalls.get(), "the rollback tried to end the child");
+      List<ChildView> held = control.list();
+      assertEquals(1, held.size(), "the unregistered child's handle is retained");
+      assertEquals(pid, held.getFirst().pid());
 
-    sandbox.rollbackFailedRegistration(process, new java.io.IOException("disk full"));
-    assertTrue(process.isAlive());
-    assertEquals(1, process.destroyCalls);
-
-    sandbox.close();
-    assertFalse(process.isAlive());
-    assertEquals(2, process.destroyCalls);
+      terminator.refuse = false;
+      control.close();
+      assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
+      assertEquals(3, terminator.terminateCalls.get());
+      assertTrue(control.list().isEmpty());
+    } finally {
+      terminator.refuse = false;
+      control.close();
+    }
   }
 
+  /**
+   * A rolled-back child that survives every terminate is reported, and its handle is kept for a
+   * final retry that ends it. The report is the child control's {@code child-survived} record and
+   * its SURVIVED handle (formerly an IllegalStateException from the pool's close).
+   */
   @Test
-  void survivingRollbackMakesCloseFailAndKeepsHandleForFinalRetry() {
-    RetryKillProcess process = new RetryKillProcess();
-    process.killAfter = Integer.MAX_VALUE;
-    PersistentExtractionSandbox sandbox = sandbox(List.of("unused-command"), Duration.ofSeconds(1));
-    try {
-      sandbox.rollbackFailedRegistration(process, new java.io.IOException("disk full"));
-      IllegalStateException failure = assertThrows(IllegalStateException.class, sandbox::close);
-      assertTrue(failure.getMessage().contains("KillOutcome[exited=false, exitCode=-1,"),
-          failure.getMessage());
-      assertTrue(failure.getMessage().contains("waitedMs="), failure.getMessage());
-      assertTrue(failure.getMessage().contains("interrupted=false"), failure.getMessage());
-      assertTrue(process.isAlive());
-      assertEquals(2, process.destroyCalls);
-      process.killAfter = 3;
-      sandbox.close();
-      assertFalse(process.isAlive());
-      assertEquals(3, process.destroyCalls);
+  @Timeout(40)
+  void survivingRollbackIsReportedAndKeepsHandleForFinalRetry() throws Exception {
+    var terminator = new ChildControlFixtures.RefusingTerminator(true);
+    var registry = new ChildControlFixtures.RefusingRegistry();
+    var ledger = new ChildControlFixtures.RecordingLedger();
+    var control = DefaultChildControl.of(ledger, terminator, registry);
+    try (var sandbox = ChildControlFixtures.pool(
+        javaCommand(ScriptedChild.class), Duration.ofSeconds(10), 500, null, control)) {
+      assertThrows(SandboxExtractionException.class, () -> sandbox.extract(file("rollback.txt")));
+      long pid = registry.attempted.getFirst().pid();
+
+      control.close();
+      assertTrue(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
+      assertEquals(4, terminator.terminateCalls.get(), "rollback and close each tried twice");
+      assertEquals(ChildHandle.State.SURVIVED, control.list().getFirst().state());
+      assertEquals(2, ledger.of(LedgerRecordType.CHILD_SURVIVED, pid).size(),
+          "each failed attempt is reported");
+      assertEquals(StopReason.ROLLBACK,
+          ledger.of(LedgerRecordType.STOP_INTENT, pid).getFirst().get("reason"));
+
+      terminator.refuse = false;
+      control.close();
+      assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
+      assertEquals(5, terminator.terminateCalls.get());
+      assertTrue(control.list().isEmpty());
     } finally {
-      process.killAfter = 0;
-      sandbox.close();
+      terminator.refuse = false;
+      control.close();
     }
   }
 
@@ -169,76 +210,48 @@ final class PersistentExtractionSandboxTest {
     }
   }
 
+  /**
+   * A child that does not exit on EOF within the grace is forced, and only after the whole grace.
+   * The termination intent is the control's child record: the exit is REQUESTED for QUIT, forced,
+   * with the control's own terminate code (JS_CHILD_STOP on Windows) as the real OS exit code.
+   */
   @Test
   @Timeout(40)
   void gracefulCloseForceKillsChildIgnoringEofOnlyAfterGracePeriod() throws Exception {
-    Process realChild = new ProcessBuilder(javaCommand(IgnoringShutdownChild.class)).start();
-    Process observed =
-        org.mockito.Mockito.mock(
-            Process.class, org.mockito.AdditionalAnswers.delegatesTo(realChild));
-    var forcedAt = new java.util.concurrent.atomic.AtomicLong();
-    var evidence = new ByteArrayOutputStream();
-    String intentPrefix = "JUSTSEARCH_MANAGED_CHILD_TERMINATION ";
-    PrintStream originalErr = System.err;
-    System.setErr(new PrintStream(evidence, true, StandardCharsets.UTF_8));
-    org.mockito.Mockito.doAnswer(
-            kill -> {
-              String marker =
-                  evidence
-                      .toString(StandardCharsets.UTF_8)
-                      .lines()
-                      .filter(line -> line.startsWith(intentPrefix))
-                      .findFirst()
-                      .orElseThrow();
-              var intent =
-                  JsonMapper.builder().build().readTree(marker.substring(intentPrefix.length()));
-              assertEquals(ProcessHandle.current().pid(), intent.get("enginePid").asLong());
-              assertEquals(
-                  ProcessHandle.current().info().startInstant().orElseThrow().toString(),
-                  intent.get("engineStartedAt").asString());
-              assertEquals(realChild.pid(), intent.get("child").get("pid").asLong());
-              assertEquals(
-                  realChild.info().startInstant().orElseThrow().toString(),
-                  intent.get("child").get("startedAt").asString());
-              assertEquals(
-                  ManagedChild.normalizePath(Path.of(realChild.info().command().orElseThrow())),
-                  intent.get("child").get("executable").asString());
-              assertFalse(intent.get("child").get("id").asString().isBlank());
-              assertEquals("graceful-close-fallback", intent.get("reason").asString());
-              assertTrue(intent.get("requestedAtMs").asLong() <= System.currentTimeMillis());
-              forcedAt.set(System.nanoTime());
-              return realChild.destroyForcibly();
-            })
-        .when(observed)
-        .destroyForcibly();
-    try (var sandbox = sandbox(javaCommand(IgnoringShutdownChild.class), Duration.ofSeconds(30))) {
-      try (var _ =
-          org.mockito.Mockito.mockConstruction(
-              ProcessBuilder.class,
-              (builder, context) ->
-                  org.mockito.Mockito.when(builder.start()).thenReturn(observed))) {
-        sandbox.extract(file("ignores-close.txt"));
-        assertTrue(realChild.isAlive());
-        long started = System.nanoTime();
-        sandbox.close();
-        assertFalse(realChild.isAlive());
-        org.mockito.Mockito.verify(observed).destroyForcibly();
-        assertTrue(
-            forcedAt.get() - started
-                >= TimeUnit.MILLISECONDS.toNanos(
-                    PersistentExtractionSandbox.GRACEFUL_CLOSE_WAIT_MS),
-            "force kill must follow the complete grace period");
-        assertTrue(
-            System.nanoTime() - started < TimeUnit.SECONDS.toNanos(15),
-            "child cleanup must fit the host stop budget");
-        assertNotEquals(
-            0, realChild.exitValue(), "retain the real OS exit code beside termination intent");
-        if (File.separatorChar == '\\') assertEquals(1, realChild.exitValue());
-      }
+    var ledger = new ChildControlFixtures.RecordingLedger();
+    var terminator = ProcessTerminator.forCurrentOs();
+    try (var control = DefaultChildControl.of(ledger, terminator, ManagedChildRegistry.noop());
+        var sandbox = ChildControlFixtures.pool(javaCommand(IgnoringShutdownChild.class),
+            Duration.ofSeconds(30), 500, null, control)) {
+      sandbox.extract(file("ignores-close.txt"));
+      long pid = sandbox.firstChildPid();
+      ProcessHandle child = ProcessHandle.of(pid).orElseThrow();
+      assertTrue(child.isAlive());
+      java.time.Instant closeStarted = java.time.Instant.now();
+      long started = System.nanoTime();
+      sandbox.close();
+      assertFalse(child.isAlive());
+      assertTrue(
+          System.nanoTime() - started < TimeUnit.SECONDS.toNanos(15),
+          "child cleanup must fit the host stop budget");
+
+      var exit = ledger.exitOf(pid);
+      assertEquals(ExitClass.REQUESTED, exit.get("exitClass"));
+      assertEquals(Optional.of(StopReason.QUIT), exit.get("reason"));
+      assertEquals(true, exit.get("forced"), "a child ignoring EOF must be forced");
+      var forcedAt = ((Optional<?>) exit.get("terminateCalledAt")).orElseThrow();
+      assertTrue(
+          !Duration.between(closeStarted, (java.time.Instant) forcedAt)
+              .minus(PersistentExtractionSandbox.GRACEFUL_CLOSE_WAIT).isNegative(),
+          "force kill must follow the complete grace period");
+      assertTrue(((java.time.Instant) exit.get("cooperativeAt"))
+          .isBefore((java.time.Instant) forcedAt), "EOF comes before the force");
+      OptionalInt code = (OptionalInt) exit.get("code");
+      assertEquals(OptionalInt.of(terminator.ourCode()), code,
+          "retain the real OS exit code beside the termination intent");
+      assertNotEquals(0, code.getAsInt());
+      if (File.separatorChar == '\\') assertEquals(TerminateCodes.JS_CHILD_STOP, code.getAsInt());
     } finally {
-      System.setErr(originalErr);
-      if (realChild.isAlive()) realChild.destroyForcibly();
-      assertTrue(realChild.waitFor(5, TimeUnit.SECONDS));
     }
   }
 
@@ -753,23 +766,17 @@ final class PersistentExtractionSandboxTest {
   @Timeout(40)
   void survivingRetirementRetainsItsSlotUntilKillActuallyCompletes() throws Exception {
     Process realChild = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();
-    var allowKill = new java.util.concurrent.atomic.AtomicBoolean();
-    Process retained = org.mockito.Mockito.mock(Process.class,
-        org.mockito.AdditionalAnswers.delegatesTo(realChild));
-    org.mockito.Mockito.doAnswer(kill -> {
-      if (allowKill.get()) realChild.destroyForcibly();
-      return retained;
-    }).when(retained).destroyForcibly();
-    org.mockito.Mockito.doAnswer(wait -> allowKill.get()
-        && realChild.waitFor((Long) wait.getArgument(0), wait.getArgument(1)))
-        .when(retained).waitFor(org.mockito.ArgumentMatchers.anyLong(),
-            org.mockito.ArgumentMatchers.any(TimeUnit.class));
+    // The kill is refused by the injected terminator until it is allowed.
+    var terminator = new ChildControlFixtures.RefusingTerminator(true);
     // This probes retained ownership, not a one-second cold-JVM startup requirement.
     // Keep the same deadline allowance as hangingChildIsKilledAtTheDeadlineAndTheNextRequestSucceeds.
     // SlowStartingChild makes the formerly load-dependent replacement failure deterministic.
-    try (var sandbox = sandbox(javaCommand(SlowStartingChild.class), Duration.ofSeconds(10))) {
+    try (var control = DefaultChildControl.of(
+            new ChildControlFixtures.RecordingLedger(), terminator, ManagedChildRegistry.noop());
+        var sandbox = ChildControlFixtures.pool(
+            javaCommand(SlowStartingChild.class), Duration.ofSeconds(10), 500, null, control)) {
       try (var spawns = org.mockito.Mockito.mockConstruction(ProcessBuilder.class,
-          (builder, context) -> org.mockito.Mockito.when(builder.start()).thenReturn(retained))) {
+          (builder, context) -> org.mockito.Mockito.when(builder.start()).thenReturn(realChild))) {
         assertThrows(IllegalStateException.class, () -> sandbox.extract(file("hang.txt")));
         assertTrue(realChild.isAlive());
         assertEquals(
@@ -778,12 +785,12 @@ final class PersistentExtractionSandboxTest {
         assertEquals(1, spawns.constructed().size(), "retiring slot cannot spawn a replacement");
         assertEquals(1, sandbox.spawnCount());
       }
-      allowKill.set(true);
+      terminator.refuse = false;
       assertEquals("recovered.txt", sandbox.extract(file("recovered.txt")).result().content());
       assertFalse(realChild.isAlive());
       assertNotEquals(realChild.pid(), sandbox.firstChildPid());
     } finally {
-      allowKill.set(true);
+      terminator.refuse = false;
       realChild.destroyForcibly();
       assertTrue(realChild.waitFor(5, TimeUnit.SECONDS));
     }
@@ -979,27 +986,6 @@ final class PersistentExtractionSandboxTest {
     public static void main(String[] args) {
       // Intentionally empty: the JVM exits immediately.
     }
-  }
-
-  private static final class RetryKillProcess extends Process {
-    private boolean alive = true;
-    private int destroyCalls;
-    private int killAfter = 2;
-
-    @Override public OutputStream getOutputStream() { return OutputStream.nullOutputStream(); }
-    @Override public InputStream getInputStream() { return InputStream.nullInputStream(); }
-    @Override public InputStream getErrorStream() { return InputStream.nullInputStream(); }
-    @Override public int waitFor() { alive = false; return 0; }
-    @Override public boolean waitFor(long timeout, TimeUnit unit) { return !alive; }
-    @Override public int exitValue() { if (alive) throw new IllegalThreadStateException(); return 0; }
-    @Override public void destroy() { destroyForcibly(); }
-    @Override public Process destroyForcibly() {
-      destroyCalls++;
-      if (destroyCalls >= killAfter) alive = false;
-      return this;
-    }
-    @Override public boolean isAlive() { return alive; }
-    @Override public long pid() { return 424243L; }
   }
 
   public static final class IgnoringShutdownChild {

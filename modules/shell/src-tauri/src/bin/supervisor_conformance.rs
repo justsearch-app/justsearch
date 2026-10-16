@@ -26,285 +26,303 @@
 // `allow(dead_code)`: this binary includes the whole supervisor module by path and uses the part it
 // needs. The unused remainder is what `lib.rs` uses, and warning about it here would be warning
 // that two consumers of one module do not consume it identically.
-#[path = "../supervisor.rs"]
-#[allow(dead_code)]
-mod supervisor;
-#[path = "../engine_probe.rs"]
-mod engine_probe;
 #[path = "../binding.rs"]
 #[allow(dead_code)]
 mod binding;
 #[path = "../engine_host.rs"]
 #[allow(dead_code)]
 mod engine_host;
+#[path = "../engine_probe.rs"]
+mod engine_probe;
+#[path = "../supervisor.rs"]
+#[allow(dead_code)]
+mod supervisor;
+// Spec F §2.1: the fake engine starts inside its incarnation job exactly as the real Engine does,
+// so the containment cases exercise the production spawn with no Tauri link.
+#[path = "../containment.rs"]
+#[allow(dead_code)]
+mod containment;
+#[path = "../exit_ledger.rs"]
+#[allow(dead_code)]
+mod exit_ledger;
 
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-
-use supervisor::{
-    load_policy, run_supervision, Actuator, Outcome, Ready, StateRecord, Supervisor,
-};
-
-struct EngineHostActuator {
-    node: PathBuf,
-    fake_engine: PathBuf,
-    plan: PathBuf,
-    data_dir: PathBuf,
+#[path = "../quit.rs"]
+mod quit;
+#[path = "../session_window.rs"]
+mod session_window;
+#[path = "../shell_actuator.rs"]
+mod shell_actuator;
+// Binary-only updater edge injection; the product coordinator is included unchanged.
+#[allow(dead_code)]
+mod updater_probe {
+    include!("../updater.rs");
+    include!("support/updater_probe.inc.rs");
+}
+// AppHandle paths are never driven by the conformance binary. Fail explicitly if used.
+pub struct BackendState {
     host: Arc<engine_host::EngineHost>,
-    started: Instant,
-    run_ms: u64,
-    /// Stop once an incarnation at least this high has reached `running`; 0 means "run to a
-    /// terminal outcome or the run budget".
-    stop_after_incarnation: u32,
-    /// What the supervisor published last — the stop condition reads it, so a case ends as soon as
-    /// its observable has landed rather than after a fixed wall-clock wait.
-    last_state: String,
-    last_incarnation: u32,
-    forced_kill: bool,
-    requests_written: Vec<String>,
-    host_request: Option<String>,
-    ready_at: Option<Instant>,
 }
-
-impl EngineHostActuator {
-    // Joined literally, for the reason `ShellActuator` states: this file is scanned by
-    // check-runtime-manifest-closure, and a `runtime_dir()` helper would hide the artifact names
-    // from it.
-    fn manifest_path(&self) -> PathBuf {
-        self.data_dir.join("runtime").join("manifest.json")
+impl BackendState {
+    fn child_pid(&self) -> Option<u32> {
+        self.host.child_pid()
     }
-
-    fn request_path(&self) -> PathBuf {
-        self.data_dir.join("runtime").join("shutdown-request.v1.json")
+    fn get_port(&self) -> Option<u16> {
+        self.host.binding_snapshot().port
     }
-
-    fn state_path(&self) -> PathBuf {
-        self.data_dir.join("runtime").join("supervisor.v1.json")
+    fn get_session_token(&self) -> Option<String> {
+        self.host.binding_snapshot().token
     }
-
-    fn read_manifest(&self) -> Option<serde_json::Value> {
-        std::fs::read_to_string(self.manifest_path())
-            .ok()
-            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+    fn has_spawn_error(&self) -> bool {
+        self.host.has_spawn_error()
     }
-
-    fn write_atomic(path: &Path, bytes: &str) -> Result<(), String> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, path).map_err(|e| e.to_string())
-    }
-
-}
-
-impl Actuator for EngineHostActuator {
-    fn spawn_engine(&mut self) -> Result<u32, String> {
-        // Every incarnation starts from a clean discovery surface: a restarted Engine that inherited
-        // the dead one's manifest would be discovered at the dead one's port with the dead one's
-        // session token — the residue tempdoc 805 G.1 named on this side of the product.
-        let _ = std::fs::remove_file(self.manifest_path());
-        self.host.reset_for_successor()?;
-        let mut command = Command::new(&self.node);
-        command
-            .arg(&self.fake_engine)
-            .env("JUSTSEARCH_DATA_DIR", &self.data_dir)
-            .env("JUSTSEARCH_API_PORT", "0")
-            .env("JUSTSEARCH_FAKE_ENGINE_PLAN", &self.plan)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        self.host.admit(engine_host::PreparedCommand { command }).map(|child| child.pid)
-    }
-
-    fn await_ready(&mut self, deadline_ms: u64) -> Result<Ready, String> {
-        loop {
-            if !self.should_continue() {
-                return Err("supervision cancelled while awaiting startup".into());
-            }
-            if let Some(manifest) = binding::read_manifest_if_present(&self.manifest_path()) {
-                self.host.observe_manifest(&manifest);
-            }
-            if let Some(binding) = self.host.observe_current_binding(|port|
-                engine_probe::responds(port, "/api/health", Duration::from_millis(800))) {
-                self.ready_at = Some(Instant::now());
-                return Ok(Ready {
-                    pid: self.host.child_pid(),
-                    api_port: binding.port,
-                    instance_id: binding.instance_id,
-                });
-            }
-            if self.monotonic_ms() >= deadline_ms {
-                return Err("the incarnation did not publish a port and answer in time".into());
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-    }
-
-    fn poll_exit(&mut self) -> Option<i32> {
-        self.host.try_reap()
-    }
-
-    fn probe_health(&mut self) -> bool {
-        self.host.observe_current_binding(|port|
-            engine_probe::responds(port, "/api/health", Duration::from_millis(700))).is_some()
-    }
-
-    fn probe_essential_ready(&mut self) -> Option<engine_probe::ReadyEpoch> {
-        self.host.observe_current_value(|port|
-            engine_probe::essential_ready(port, Duration::from_millis(700))).map(|(_, epoch)| epoch)
-    }
-
-    fn observed_shutdown_reason(&mut self, current: &Ready) -> Option<String> {
-        self.host.observed_shutdown_reason(&self.read_manifest()?, current)
-    }
-
-    fn take_host_request(&mut self) -> Option<String> {
-        if self.ready_at?.elapsed() < Duration::from_millis(500) { return None; }
-        self.host_request.take()
-    }
-
-    fn write_shutdown_request(&mut self, reason: &str, deadline_epoch_ms: u64) -> Result<(), String> {
-        self.requests_written.push(reason.to_string());
-        let body = serde_json::json!({
-            "schemaVersion": 1,
-            "reason": reason,
-            "deadlineEpochMs": deadline_epoch_ms,
-            "issuedBy": "tauri-supervisor-conformance",
-        });
-        Self::write_atomic(&self.request_path(), &format!("{body}\n"))
-    }
-
-    fn force_kill(&mut self) {
-        self.forced_kill = true;
-        self.host.with_child_mut(|child| { let _ = child.kill(); });
-    }
-
-    fn wait_for_handle_release(&mut self) -> bool {
-        let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
-            let alive = self.host.child_pid().is_some();
-            let log_free = {
-                let log = self.data_dir.join("logs").join("engine.log");
-                !log.exists()
-                    || std::fs::OpenOptions::new().append(true).open(&log).is_ok()
-            };
-            if !alive && log_free {
-                return true;
-            }
-            if Instant::now() >= deadline {
-                return false;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-    }
-
-    fn sleep(&mut self, ms: u64) {
-        if ms > 0 {
-            std::thread::sleep(Duration::from_millis(ms));
-        }
-    }
-
-    fn monotonic_ms(&mut self) -> u64 {
-        self.started.elapsed().as_millis() as u64
-    }
-
-    fn publish_state(&mut self, record: &StateRecord) {
-        self.last_state = record.state.clone();
-        self.last_incarnation = record.incarnation;
-        if record.state == "running" {
-            let manifest = self.read_manifest().expect("running Engine manifest");
-            let current = self.host.observe_current_binding(|_| true).expect("running owned binding");
-            assert_eq!(record.pid, self.host.child_pid());
-            assert_eq!(record.instance_id, current.instance_id);
-            assert_eq!(manifest.get("pid").and_then(|v| v.as_u64()), record.pid.map(u64::from));
-            assert_eq!(manifest.get("instanceId").and_then(|v| v.as_str()), record.instance_id.as_deref());
-        }
-        self.host.publish_state(Some(&self.state_path()), record, |_| {});
-    }
-
-    fn should_continue(&mut self) -> bool {
-        // Stop as soon as THIS case's observable has landed, or when the run budget is spent. The
-        // condition is passed in rather than assumed: "a second incarnation reached running" is what
-        // every RESTART case asserts, but a case whose whole point is the terminal state has to be
-        // allowed to reach it — the first cut stopped `budget-exhausted-after-max-attempts` at
-        // incarnation 2 and reported `cancelled` with one restart spent.
-        if self.stop_after_incarnation > 0
-            && self.last_state == "running"
-            && self.last_incarnation >= self.stop_after_incarnation
-        {
-            return false;
-        }
-        (self.started.elapsed().as_millis() as u64) < self.run_ms
+    fn wait_for_child_exit(&self, timeout: Duration) -> bool {
+        self.host.wait_for_exit(timeout)
     }
 }
-
+fn resolve_app_data_dir(_: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Err("AppHandle is outside supervisor conformance".into())
+}
+fn reconcile_registered_children(_: &std::path::Path) -> Result<(), String> {
+    Err("registered-child reconciliation is outside this probe".into())
+}
+fn start_supervision(_: &tauri::AppHandle, _: Arc<BackendState>) -> Result<(), String> {
+    Err("conformance must keep its original actor".into())
+}
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use supervisor::{Actuator, Outcome};
 fn arg(name: &str) -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
-    args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
+    args.iter()
+        .position(|a| a == name)
+        .and_then(|i| args.get(i + 1).cloned())
 }
-
 fn main() {
-    let data_dir = PathBuf::from(arg("--data-dir").expect("--data-dir is required"));
-    let fake_engine = PathBuf::from(arg("--fake-engine").expect("--fake-engine is required"));
-    let plan = PathBuf::from(arg("--plan").expect("--plan is required"));
-    let node = PathBuf::from(arg("--node").unwrap_or_else(|| "node".to_string()));
-    let run_ms = arg("--run-ms").and_then(|v| v.parse::<u64>().ok()).unwrap_or(15_000);
-    let stop_after_incarnation = arg("--stop-after-incarnation")
+    let data_dir = PathBuf::from(arg("--data-dir").expect("data dir"));
+    let fake_engine = PathBuf::from(arg("--fake-engine").expect("fake engine"));
+    let plan = PathBuf::from(arg("--plan").expect("plan"));
+    let node = PathBuf::from(arg("--node").unwrap_or("node".into()));
+    let run_ms = arg("--run-ms")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(25000);
+    let stop_after = arg("--stop-after-incarnation")
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(0);
-
-    std::fs::create_dir_all(data_dir.join("runtime")).expect("data dir");
-
-    let policy = load_policy();
-    let mut sup = Supervisor::new(policy);
-    let mut actuator = EngineHostActuator {
-        node,
-        fake_engine,
-        plan,
-        data_dir,
-        host: Arc::new(engine_host::EngineHost::default()),
-        started: Instant::now(),
-        run_ms,
-        stop_after_incarnation,
-        last_state: String::new(),
-        last_incarnation: 0,
-        forced_kill: false,
-        requests_written: Vec::new(),
-        host_request: arg("--request-reason").filter(|s| !s.is_empty()),
-        ready_at: None,
-    };
-
-    // The shell spawns the Engine at setup and the loop picks it up from `await_ready`, so the
-    // driver's first incarnation is spawned here for the same reason.
-    if let Err(error) = actuator.spawn_engine() {
-        println!("{}", serde_json::json!({ "ok": false, "error": error }));
-        std::process::exit(1);
-    }
-
-    let outcome = run_supervision(&mut sup, &mut actuator);
-
-    let summary = serde_json::json!({
-        "ok": true,
-        "outcome": match &outcome {
-            Outcome::Stopped { reason, exit_code } =>
-                serde_json::json!({ "kind": "stopped", "reason": reason, "exitCode": exit_code }),
-            Outcome::Exhausted { reason, exit_code } =>
-                serde_json::json!({ "kind": "exhausted", "reason": reason, "exitCode": exit_code }),
-            Outcome::Cancelled => serde_json::json!({ "kind": "cancelled" }),
+    let request = arg("--request-reason").filter(|s| !s.is_empty());
+    let host = Arc::new(engine_host::EngineHost::default());
+    let coordinator = Arc::new(quit::QuitCoordinator::new(host.clone()));
+    let _session =
+        session_window::start(host.clone(), coordinator.clone()).expect("session window");
+    let spawn_host = host.clone();
+    let spawn_dir = data_dir.clone();
+    let checkpoint = Arc::new(Mutex::new(None::<supervisor::StateRecord>));
+    let saved = checkpoint.clone();
+    let event_host = host.clone();
+    let actor_thread = Arc::new(Mutex::new(None::<String>));
+    let event_actor = actor_thread.clone();
+    let mut actuator = shell_actuator::ShellActuator::new(
+        host.clone(),
+        data_dir.clone(),
+        move || {
+            spawn_host.reset_for_successor()?;
+            let mut command = Command::new(&node);
+            command
+                .arg(&fake_engine)
+                .env("JUSTSEARCH_DATA_DIR", &spawn_dir)
+                .env("JUSTSEARCH_API_PORT", "0")
+                .env("JUSTSEARCH_FAKE_ENGINE_PLAN", &plan)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+            spawn_host
+                .admit(engine_host::PreparedCommand { command })
+                .map(|c| c.pid)
         },
-        "state": sup.state.name(),
-        "incarnation": sup.incarnation,
-        "restartCount": sup.restart_count,
-        "lastExit": sup.last_exit,
-        "forcedKill": actuator.forced_kill,
-        "requestsWritten": actuator.requests_written,
-        "policyProfile": if sup.policy.harness_active { "harness" } else { "product" },
+        move |record| {
+            *event_actor.lock().unwrap() = Some(format!("{:?}", std::thread::current().id()));
+            if stop_after > 0
+                && record.state == "running"
+                && record.incarnation >= stop_after
+                && saved.lock().unwrap().is_none()
+            {
+                *saved.lock().unwrap() = Some(record.clone());
+                let _ = event_host.post_stop(
+                    "quit",
+                    None,
+                    Duration::from_millis(supervisor::load_policy().quit_deadline_ms),
+                );
+            }
+        },
+    );
+    let control_host = host.clone();
+    let control_dir = data_dir.clone();
+    let control_actor = actor_thread.clone();
+    let trigger_coordinator = coordinator.clone();
+    let timer = std::thread::spawn(move || {
+        let started = Instant::now();
+        let mut request = request;
+        loop {
+            if control_host.terminal_outcome().is_some() {
+                break;
+            }
+            let state = control_host.latest_record();
+            if started.elapsed().as_millis() as u64 >= run_ms {
+                let _ = control_host.post_stop(
+                    "quit",
+                    None,
+                    Duration::from_millis(supervisor::load_policy().quit_deadline_ms),
+                );
+            }
+            if state.as_ref().is_some_and(|r| r.state == "running")
+                && started.elapsed() >= Duration::from_millis(500)
+            {
+                if let Some(reason) = request.take() {
+                    let budget = if reason == "quit" {
+                        supervisor::load_policy().quit_deadline_ms
+                    } else {
+                        supervisor::load_policy().graceful_stop_deadline_ms
+                    };
+                    let _ = control_host.post_stop(&reason, None, Duration::from_millis(budget));
+                }
+            }
+            if let Ok(raw) = std::fs::read_to_string(control_dir.join("shell-control.json")) {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    let _ = std::fs::remove_file(control_dir.join("shell-control.json"));
+                    match value["action"].as_str() {
+                        Some("triggers") => {
+                            trigger_coordinator.begin(quit::QuitCause::TrayQuit);
+                            trigger_coordinator.begin(quit::QuitCause::Drop);
+                            trigger_coordinator.begin(quit::QuitCause::WindowExit);
+                        }
+                        Some("hold") => {
+                            let started = Instant::now();
+                            let result = control_host.acquire_replacement_hold(Duration::ZERO);
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "ok": result.is_ok(), "error": result.err(),
+                                    "elapsedMs": started.elapsed().as_millis(),
+                                    "held": control_host.replacement_held(),
+                                    "actorRunning": control_host.supervisor_running(),
+                                    "continues": control_host.should_continue(),
+                                    "actorThread": control_actor.lock().unwrap().clone(),
+                                    "pid": control_host.child_pid()
+                                }),
+                            );
+                        }
+                        Some("release") => {
+                            let result = control_host.release_replacement_hold();
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "ok": result.is_ok(), "error": result.err(),
+                                    "held": control_host.replacement_held(),
+                                    "actorRunning": control_host.supervisor_running()
+                                }),
+                            );
+                        }
+                        Some("upgrade") => {
+                            let result = control_host.stop_owned_engine(Duration::from_secs(2));
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "ok": result.is_ok(), "error": result.err(),
+                                    "jobEmpty": control_host.predecessor_job_empty(),
+                                    "pid": control_host.child_pid()
+                                }),
+                            );
+                        }
+                        Some("quit-upgrade") => {
+                            let quit = control_host.post_stop("quit", None, Duration::from_secs(2));
+                            let upgrade = control_host.post_stop("upgrade", None, Duration::ZERO);
+                            let commit =
+                                control_host.upgrade_commit("prepare", "nonce", Duration::ZERO);
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "quitAccepted": quit.is_ok(), "upgradeRefused": upgrade.is_err(),
+                                    "commitRefused": commit.is_err()
+                                }),
+                            );
+                        }
+                        Some("updater-nonempty")
+                        | Some("updater-quit")
+                        | Some("updater-prepare-failure") => {
+                            let mut result = updater_probe::drive(
+                                control_host.clone(),
+                                &control_dir,
+                                value["action"].as_str().unwrap(),
+                            );
+                            result["actorThread"] =
+                                serde_json::json!(control_actor.lock().unwrap().clone());
+                            write_control_result(&control_dir, &value, result);
+                        }
+                        Some("suspend") => control_host.note_power(supervisor::PowerEvent::Suspend),
+                        Some("resume") => control_host.note_power(supervisor::PowerEvent::Resume),
+                        _ => {
+                            let _ = control_host.post_stop(
+                                value["reason"].as_str().unwrap_or("quit"),
+                                value["detail"].as_str().map(String::from),
+                                Duration::from_millis(
+                                    value["budgetMs"]
+                                        .as_u64()
+                                        .unwrap_or(supervisor::load_policy().quit_deadline_ms),
+                                ),
+                            );
+                        }
+                    }
+                }
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
     });
+    let (sent, received) = std::sync::mpsc::channel();
+    host.start_supervisor(move || {
+        let mut supervisor = supervisor::Supervisor::new(supervisor::load_policy());
+        let outcome = supervisor::run_supervision(&mut supervisor, &mut actuator);
+        sent.send((outcome, supervisor)).unwrap();
+    })
+    .expect("one actor");
+    let (outcome, supervisor) = received.recv().unwrap();
+    let _ = timer.join();
+    let records = exit_ledger::read_ledger(
+        &exit_ledger::ledger_directory(&data_dir),
+        exit_ledger::Family::Engine,
+    )
+    .unwrap()
+    .records;
+    let checkpoint = checkpoint.lock().unwrap().clone();
+    let last_exit = checkpoint
+        .as_ref()
+        .and_then(|r| r.last_exit.clone())
+        .or(supervisor.last_exit.clone());
+    let forced = records
+        .iter()
+        .any(|r| r["type"] == "engine-exit" && r["forced"] == true);
+    let summary = serde_json::json!({"ok":true,"outcome":match outcome {
+        Outcome::Stopped {reason,exit_code}=>serde_json::json!({"kind":"stopped","reason":reason,"exitCode":exit_code}),
+        Outcome::Exhausted {reason,exit_code}=>serde_json::json!({"kind":"exhausted","reason":reason,"exitCode":exit_code}),
+        Outcome::NoEngine=>serde_json::json!({"kind":"stopped","reason":"quit"}) },
+        "state":supervisor.state.name(),"checkpoint":checkpoint,"incarnation":supervisor.incarnation,
+        "restartCount":supervisor.restart_count,"lastExit":last_exit,"forcedKill":forced,
+        "requestsWritten":records.iter().filter(|r|r["type"]=="engine-intent" && r["channel"]!="TERMINATE").map(|r|match r["reason"].as_str(){Some("TIMEOUT")=>"hang",Some("ENGINE_RESTART")=>"restart",Some("UPGRADE")=>"upgrade",_=>"quit"}).collect::<Vec<_>>(),
+        "policyProfile":if supervisor.policy.harness_active {"harness"} else {"product"}});
     println!("{summary}");
+}
 
-    // Never leave a child behind: the harness runs ten of these back to back.
-    actuator.host.kill_and_reap();
+fn write_control_result(
+    dir: &std::path::Path,
+    request: &serde_json::Value,
+    result: serde_json::Value,
+) {
+    let payload = serde_json::json!({"nonce": request["nonce"], "result": result});
+    let path = dir.join("shell-control-result.json");
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, serde_json::to_vec(&payload).unwrap()).unwrap();
+    std::fs::rename(tmp, path).unwrap();
 }

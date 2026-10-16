@@ -61,10 +61,10 @@ final class UpgradeApiModule implements ApiModule {
 
   @Override
   public void register(Javalin app) {
-    app.post("/api/upgrade/prepare", controller::prepare);
-    app.post("/api/upgrade/cancel", controller::cancel);
-    app.post("/api/upgrade/commit-shutdown", controller::commitShutdown);
-    app.post("/api/upgrade/reconcile", controller::reconcile);
+    app.post("/api/upgrade/prepare", controller::prepare, ActivityRole.USER_ACTION);
+    app.post("/api/upgrade/cancel", controller::cancel, ActivityRole.USER_ACTION);
+    app.post("/api/upgrade/commit-shutdown", controller::commitShutdown, ActivityRole.USER_ACTION);
+    app.post("/api/upgrade/reconcile", controller::reconcile, ActivityRole.USER_ACTION);
   }
 
   @Override

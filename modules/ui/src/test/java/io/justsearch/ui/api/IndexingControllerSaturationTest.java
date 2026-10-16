@@ -53,6 +53,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.stubbing.Answer;
 
 @Timeout(10)
 final class IndexingControllerSaturationTest {
@@ -70,7 +71,7 @@ final class IndexingControllerSaturationTest {
     TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "admittedRequestPreservesActualSubmissionRefusal({arguments})")
   @ValueSource(strings = {"remove", "retrieve", "openRetrieve", "status", "clear", "retry", "cancel", "gc", "settle"})
   @SuppressWarnings("unchecked")
   void admittedRequestPreservesActualSubmissionRefusal(String endpoint) throws Exception {
@@ -79,6 +80,7 @@ final class IndexingControllerSaturationTest {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var callPool = new AtomicReference<ThreadPoolExecutor>();
+    var callSpec = new AtomicReference<EngineExecutorSpec>();
     // S6 (ee0f0806b): open retrieval now dispatches through the isolated inference pool.
     String poolName = endpoint.equals("openRetrieve")
         ? "engine-knowledge-inference-foreground" : "engine-knowledge-call-foreground";
@@ -89,12 +91,19 @@ final class IndexingControllerSaturationTest {
       doAnswer(invocation -> {
         var registration = (EngineExecutorRegistry.Registration) invocation.callRealMethod();
         if (!registration.spec().name().equals(poolName)) return registration;
+        callSpec.set(registration.spec());
         var observed = spy(registration);
-        doAnswer(open -> {
+        Answer<Object> capturePool = open -> {
           var pool = (ThreadPoolExecutor) open.callRealMethod();
           callPool.set(pool);
           return pool;
-        }).when(observed).open(any());
+        };
+        // FP1's reserved inference seats use their own opening method; capture that real pool.
+        if (endpoint.equals("openRetrieve")) {
+          doAnswer(capturePool).when(observed).openWithReservedSeats(any());
+        } else {
+          doAnswer(capturePool).when(observed).open(any());
+        }
         return observed;
       }).when(registry).register(any());
       try (var client = new EngineKnowledgeClient(registry, () -> services,
@@ -111,12 +120,12 @@ final class IndexingControllerSaturationTest {
             }
           });
           assertTrue(entered.await(2, TimeUnit.SECONDS));
-          if (!endpoint.equals("openRetrieve")) {
-            pool.execute(() -> {});
-            assertEquals(1, pool.getQueue().size());
-          }
+          // Fill the declared waiting capacity: the reserved-seat executor's dispatch buffer also
+          // holds seated tasks before their workers run, without admitting extra requests (FP1).
+          int queueCapacity = callSpec.get().queueCapacity();
+          for (int i = 0; i < queueCapacity; i++) pool.execute(() -> {});
+          assertEquals(queueCapacity, pool.getQueue().size());
           assertEquals(1, pool.getActiveCount());
-          assertEquals(0, pool.getQueue().remainingCapacity(), "the selected pool must be saturated");
 
           // Share the public client's admission owner, as EngineRoot and EngineObserverPacingTest do.
           var admissionField = EngineKnowledgeClient.class.getDeclaredField("admission");
@@ -137,7 +146,9 @@ final class IndexingControllerSaturationTest {
             var response = ArgumentCaptor.forClass(Object.class);
             verify(ctx).json(response.capture());
             var body = (Map<String, Object>) response.getValue();
-            assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode"));
+            // FP4: full inference threads and queue refuse with their own code.
+            assertEquals(endpoint.equals("openRetrieve") ? "ADMISSION_INFERENCE_BUSY" : "ADMISSION_ENGINE_LIMIT",
+                body.get("errorCode"));
             assertEquals(false, body.get("retrySafe"));
             verify(services, never()).ingestService();
           }

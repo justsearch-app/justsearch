@@ -1,0 +1,670 @@
+[
+  {
+    "family": "engine",
+    "type": "engine-intent",
+    "atMs": 1791273601000,
+    "writer": {
+      "role": "shell",
+      "pid": 4100,
+      "startedAt": 1791273600000
+    },
+    "fields": {
+      "incarnation": {
+        "session": "s-fixture-shell",
+        "n": 1
+      },
+      "intentId": "i-session-end",
+      "reason": "QUIT",
+      "detail": "session_end",
+      "mode": "COOPERATIVE",
+      "channel": "HTTP_SHUTDOWN",
+      "requestedAt": "2026-10-06T08:00:01.000Z",
+      "deadlineAt": "2026-10-06T08:00:06.000Z"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-intent",
+    "atMs": 1791274201000,
+    "writer": {
+      "role": "dev-cli",
+      "pid": 4200,
+      "startedAt": 1791274200000
+    },
+    "fields": {
+      "incarnation": {
+        "session": "s-fixture-dev",
+        "n": 1
+      },
+      "intentId": "i-takeover",
+      "reason": "QUIT",
+      "detail": "takeover",
+      "mode": "COOPERATIVE",
+      "channel": "REQUEST_FILE",
+      "requestedAt": "2026-10-06T08:10:01.000Z",
+      "deadlineAt": "2026-10-06T08:10:11.000Z"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-intent",
+    "atMs": 1791274801000,
+    "writer": {
+      "role": "dev-runner",
+      "pid": 4300,
+      "startedAt": 1791274800000
+    },
+    "fields": {
+      "incarnation": {
+        "session": "s-fixture-dev",
+        "n": 2
+      },
+      "intentId": "i-interrupted",
+      "reason": "QUIT",
+      "detail": "interrupted",
+      "mode": "COOPERATIVE",
+      "channel": "HTTP_SHUTDOWN",
+      "requestedAt": "2026-10-06T08:20:01.000Z",
+      "deadlineAt": null
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-spawn",
+    "atMs": 1791282427480,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-9ad03519-4aaf-4096-8d86-2729de12d981",
+      "kind": "EXTRACTION",
+      "label": "fake-sleep",
+      "owner": {
+        "pid": 22924,
+        "creationFileTime": "134357560263342745",
+        "instanceId": "inst-fixture"
+      },
+      "gpu": false
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-start",
+    "atMs": 1791282427565,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-9ad03519-4aaf-4096-8d86-2729de12d981",
+      "pid": 35592,
+      "processStartedAt": "2026-10-06T10:27:07.552Z",
+      "creationFileTime": "134357560275525462",
+      "executable": "c:\\program files\\justsearch\\runtime\\bin\\java.exe",
+      "argvHash": "91bb5d04bb77694e4d94d87db916e1d0a819f1590d8a0381e7fcc17171003f86",
+      "contained": null,
+      "gpuDevice": null
+    }
+  },
+  {
+    "family": "children",
+    "type": "stop-intent",
+    "atMs": 1791282427578,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-9ad03519-4aaf-4096-8d86-2729de12d981",
+      "intentId": "s-6056bb59-8f42-4bfe-b325-dcfc05009992",
+      "reason": "TIMEOUT",
+      "detail": "request",
+      "mode": "NOW",
+      "requestedAt": "2026-10-06T10:27:07.578Z",
+      "requestedBy": "extraction-pool"
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-exit",
+    "atMs": 1791282427601,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-9ad03519-4aaf-4096-8d86-2729de12d981",
+      "intentId": "s-6056bb59-8f42-4bfe-b325-dcfc05009992",
+      "exitClass": "REQUESTED",
+      "reason": "TIMEOUT",
+      "detail": "request",
+      "mode": "NOW",
+      "code": 1246953473,
+      "codeName": "JS_CHILD_STOP",
+      "codeDistinctive": true,
+      "exitedAt": "2026-10-06T10:27:07.596Z",
+      "observedAt": "2026-10-06T10:27:07.600Z",
+      "terminateCalledAt": "2026-10-06T10:27:07.594Z",
+      "terminateResult": "OK",
+      "cooperativeAt": null,
+      "forced": true,
+      "phase": "STOPPING"
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-spawn",
+    "atMs": 1791282427611,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-ae15ec62-0e6d-47e4-9db8-0a697906f131",
+      "kind": "EXTRACTION",
+      "label": "fake-eof",
+      "owner": {
+        "pid": 22924,
+        "creationFileTime": "134357560263342745",
+        "instanceId": "inst-fixture"
+      },
+      "gpu": false
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-start",
+    "atMs": 1791282427623,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-ae15ec62-0e6d-47e4-9db8-0a697906f131",
+      "pid": 30924,
+      "processStartedAt": "2026-10-06T10:27:07.620Z",
+      "creationFileTime": "134357560276206684",
+      "executable": "c:\\program files\\justsearch\\runtime\\bin\\java.exe",
+      "argvHash": "c77aa33b579a23a296cbf95b9aaf1e5a54b8585b15e6bed60c99a9c2897973bb",
+      "contained": null,
+      "gpuDevice": null
+    }
+  },
+  {
+    "family": "children",
+    "type": "stop-intent",
+    "atMs": 1791282427632,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-ae15ec62-0e6d-47e4-9db8-0a697906f131",
+      "intentId": "s-cdfb575f-7bc5-4067-9f14-9f2f7ba6c98a",
+      "reason": "QUIT",
+      "detail": "interrupted",
+      "mode": "COOPERATIVE",
+      "requestedAt": "2026-10-06T10:27:07.632Z",
+      "requestedBy": "extraction-pool"
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-exit",
+    "atMs": 1791282427678,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-ae15ec62-0e6d-47e4-9db8-0a697906f131",
+      "intentId": "s-cdfb575f-7bc5-4067-9f14-9f2f7ba6c98a",
+      "exitClass": "REQUESTED",
+      "reason": "QUIT",
+      "detail": "interrupted",
+      "mode": "COOPERATIVE",
+      "code": 0,
+      "codeName": "OK",
+      "codeDistinctive": true,
+      "exitedAt": "2026-10-06T10:27:07.674Z",
+      "observedAt": "2026-10-06T10:27:07.678Z",
+      "terminateCalledAt": null,
+      "terminateResult": "NOT_CALLED",
+      "cooperativeAt": "2026-10-06T10:27:07.642Z",
+      "forced": false,
+      "phase": "STOPPING"
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-spawn",
+    "atMs": 1791282427686,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-e6f62a1c-2865-426f-bd01-c360ea26c8e2",
+      "kind": "EXTRACTION",
+      "label": "fake-exit",
+      "owner": {
+        "pid": 22924,
+        "creationFileTime": "134357560263342745",
+        "instanceId": "inst-fixture"
+      },
+      "gpu": false
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-start",
+    "atMs": 1791282427700,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-e6f62a1c-2865-426f-bd01-c360ea26c8e2",
+      "pid": 31968,
+      "processStartedAt": "2026-10-06T10:27:07.697Z",
+      "creationFileTime": "134357560276974953",
+      "executable": "c:\\program files\\justsearch\\runtime\\bin\\java.exe",
+      "argvHash": "cfec89e3087be838759d73a7c0b0d118cdca02ffef276fcb8eeb05f277272939",
+      "contained": null,
+      "gpuDevice": null
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-exit",
+    "atMs": 1791282428253,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-e6f62a1c-2865-426f-bd01-c360ea26c8e2",
+      "intentId": null,
+      "exitClass": "UNEXPECTED",
+      "reason": null,
+      "detail": null,
+      "mode": null,
+      "code": 1,
+      "codeName": null,
+      "codeDistinctive": true,
+      "exitedAt": "2026-10-06T10:27:08.248Z",
+      "observedAt": "2026-10-06T10:27:08.253Z",
+      "terminateCalledAt": null,
+      "terminateResult": "NOT_CALLED",
+      "cooperativeAt": null,
+      "forced": false,
+      "phase": "RUNNING"
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-note",
+    "atMs": 1791282428265,
+    "writer": {
+      "role": "engine",
+      "pid": 22924,
+      "startedAt": 1791282426334
+    },
+    "fields": {
+      "childId": "c-e6f62a1c-2865-426f-bd01-c360ea26c8e2",
+      "token": "oom"
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-spawn",
+    "atMs": 1791277260000,
+    "writer": {
+      "role": "engine",
+      "pid": 7400,
+      "startedAt": 1791277202000
+    },
+    "fields": {
+      "childId": "c-1",
+      "kind": "LLAMA_SERVER",
+      "label": "llama-server",
+      "owner": {
+        "pid": 7400,
+        "creationFileTime": "134044416020000000",
+        "instanceId": "inst-1"
+      },
+      "gpu": true
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-start",
+    "atMs": 1791277260500,
+    "writer": {
+      "role": "engine",
+      "pid": 7400,
+      "startedAt": 1791277202000
+    },
+    "fields": {
+      "childId": "c-1",
+      "pid": 8800,
+      "processStartedAt": "2026-10-06T09:01:00.4Z",
+      "creationFileTime": "134044416604000000",
+      "executable": "C:/x/llama-server.exe",
+      "argvHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "contained": true,
+      "gpuDevice": null
+    }
+  },
+  {
+    "family": "children",
+    "type": "stop-intent",
+    "atMs": 1791281040000,
+    "writer": {
+      "role": "engine",
+      "pid": 7400,
+      "startedAt": 1791277202000
+    },
+    "fields": {
+      "childId": "c-1",
+      "intentId": "s-1",
+      "reason": "QUIT",
+      "detail": "interrupted",
+      "mode": "COOPERATIVE",
+      "requestedAt": "2026-10-06T10:04:00Z",
+      "requestedBy": "engine-shutdown"
+    }
+  },
+  {
+    "family": "children",
+    "type": "child-exit",
+    "atMs": 1791281042000,
+    "writer": {
+      "role": "engine",
+      "pid": 7400,
+      "startedAt": 1791277202000
+    },
+    "fields": {
+      "childId": "c-1",
+      "intentId": "s-1",
+      "exitClass": "REQUESTED",
+      "reason": "QUIT",
+      "detail": "interrupted",
+      "mode": "COOPERATIVE",
+      "code": 1246953473,
+      "codeName": "JS_CHILD_STOP",
+      "codeDistinctive": true,
+      "exitedAt": -11644473600000,
+      "observedAt": "2026-10-06T10:04:02Z",
+      "terminateCalledAt": "2026-10-06T10:04:01Z",
+      "terminateResult": "OK",
+      "cooperativeAt": null,
+      "forced": true,
+      "phase": "STOPPING"
+    }
+  },
+  {
+    "family": "children",
+    "type": "owner-died",
+    "atMs": 1791281160000,
+    "writer": {
+      "role": "engine",
+      "pid": 7500,
+      "startedAt": 1791281159000
+    },
+    "fields": {
+      "childId": "c-2",
+      "previousOwner": {
+        "pid": 7400,
+        "creationFileTime": "134044416020000000",
+        "instanceId": "inst-1"
+      },
+      "basis": "OPEN_START",
+      "osCheck": "IDENTITY_UNKNOWN",
+      "exitClass": "UNKNOWN"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-start",
+    "atMs": 1791273601000,
+    "writer": {
+      "role": "shell",
+      "pid": 4100,
+      "startedAt": 1791273600000
+    },
+    "fields": {
+      "incarnation": {
+        "session": "shell-1",
+        "n": 1
+      },
+      "pid": 7300,
+      "creationFileTime": "134044416000000000",
+      "processStartedAt": "2026-10-06T08:00:01Z",
+      "executable": "C:/JustSearch/javaw.exe",
+      "cause": "INITIAL",
+      "supervisorKind": "shell"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "ledger-gap",
+    "atMs": 1791274200000,
+    "writer": {
+      "role": "shell",
+      "pid": 4100,
+      "startedAt": 1791273600000
+    },
+    "fields": {
+      "reason": "WRITE_FAILED",
+      "count": 2,
+      "since": "2026-10-06T08:05:00Z"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-intent",
+    "atMs": 1791279001000,
+    "writer": {
+      "role": "dev-cli",
+      "pid": 6300,
+      "startedAt": 1791279000000
+    },
+    "fields": {
+      "incarnation": {
+        "session": "run-7f3a",
+        "n": 1
+      },
+      "intentId": "i-1",
+      "reason": "QUIT",
+      "detail": "takeover",
+      "mode": "COOPERATIVE",
+      "channel": "REQUEST_FILE",
+      "requestedAt": "2026-10-06T09:30:01Z",
+      "deadlineAt": "2026-10-06T09:30:09Z"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-exit",
+    "atMs": 1791288000000,
+    "writer": {
+      "role": "dev-runner",
+      "pid": 5200,
+      "startedAt": 1791277200250
+    },
+    "fields": {
+      "incarnation": {
+        "session": "run-7f3a",
+        "n": 1
+      },
+      "exitClass": "UNEXPECTED",
+      "reason": null,
+      "detail": "brand_new_detail",
+      "code": 1,
+      "codeName": "FATAL_OR_UNCAUGHT",
+      "exitedAt": 0,
+      "observedAt": "2026-10-06T09:31:02Z",
+      "terminateCalledAt": -11644473600000,
+      "forced": false,
+      "phase": "RUNNING",
+      "codeDistinctive": true,
+      "contract": {
+        "action": "restart",
+        "exitClass": "TRANSIENT",
+        "counted": true
+      },
+      "processStartedAt": "1601-01-01T00:00:00Z"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-exit",
+    "atMs": 1791288000000,
+    "writer": {
+      "role": "dev-runner",
+      "pid": 5200,
+      "startedAt": 1791277200250
+    },
+    "fields": {
+      "incarnation": {
+        "session": "run-7f3a",
+        "n": 2
+      },
+      "exitClass": "UNKNOWN",
+      "reason": null,
+      "detail": null,
+      "code": null,
+      "codeName": null,
+      "exitedAt": null,
+      "observedAt": "2026-10-06T09:40:00Z",
+      "terminateCalledAt": null,
+      "forced": false,
+      "phase": "STARTING",
+      "codeDistinctive": false,
+      "contract": {
+        "action": "stop",
+        "exitClass": "NON_TRANSIENT",
+        "counted": false
+      }
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-intent",
+    "atMs": 1791280800123,
+    "writer": {
+      "role": "dev-runner",
+      "pid": 5200,
+      "startedAt": 1791277200250
+    },
+    "fields": {
+      "incarnation": {
+        "session": "run-7f3a",
+        "n": 2
+      },
+      "intentId": "i-2",
+      "reason": "TIMEOUT",
+      "detail": "start",
+      "mode": "COOPERATIVE",
+      "channel": "REQUEST_FILE",
+      "requestedAt": "2001-01-01T00:00:00Z",
+      "deadlineAt": "2026-10-06T10:00:08+00:00"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-owner-died",
+    "atMs": 1791288000000,
+    "writer": {
+      "role": "dev-runner",
+      "pid": 5200,
+      "startedAt": 1791277200250
+    },
+    "fields": {
+      "incarnation": {
+        "session": "run-7f3a",
+        "n": 2
+      },
+      "basis": "OPEN_START",
+      "osCheck": "GONE",
+      "exitClass": "OWNER_DIED"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "ledger-gap",
+    "atMs": 1791280920000,
+    "writer": {
+      "role": "dev-runner",
+      "pid": 5200,
+      "startedAt": 1791277200250
+    },
+    "fields": {
+      "reason": "ROTATE_FAILED",
+      "count": 1,
+      "since": "2026-10-06T10:01:30.5Z"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-intent",
+    "atMs": 1791288000000,
+    "writer": {
+      "role": "dev-runner",
+      "pid": 5200,
+      "startedAt": 1791277200250
+    },
+    "fields": {
+      "incarnation": {
+        "session": "run-7f3a",
+        "n": 3
+      },
+      "intentId": "i-3",
+      "reason": "TIMEOUT",
+      "detail": "hang",
+      "mode": "COOPERATIVE",
+      "channel": "TERMINATE",
+      "requestedAt": "2026-10-06t10:03:00Z",
+      "deadlineAt": "2026-10-06T24:00:00Z"
+    }
+  },
+  {
+    "family": "engine",
+    "type": "engine-self-intent",
+    "atMs": 1791281040000,
+    "writer": {
+      "role": "engine",
+      "pid": 7400,
+      "startedAt": 1791277202000
+    },
+    "fields": {
+      "engine": {
+        "pid": 7400,
+        "creationFileTime": null,
+        "instanceId": "inst-1"
+      },
+      "reason": "QUIT",
+      "detail": "session_end",
+      "expectedCode": 0,
+      "futureField": {
+        "nested": [
+          1,
+          2
+        ]
+      }
+    }
+  }
+]

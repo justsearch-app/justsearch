@@ -11,20 +11,20 @@ Write-Host ""
 
 $found = @()
 
-Get-Process java -ErrorAction SilentlyContinue | ForEach-Object {
+Get-CimInstance Win32_Process -Filter "Name='java.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
     try {
         $proc = $_
-        $wmiProc = Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
-        $cmd = $wmiProc.CommandLine
+        $cmd = $proc.CommandLine
         
         # Lane F stage A item A13: the "indexer-worker" arm (labelled IndexerWorker) is gone with
         # the Worker child process and its start script: there is no such command line to match.
-        if ($cmd -match "HeadlessApp|justsearch|io\.justsearch") {
+        if ($proc.CreationDate -and $cmd -match "HeadlessApp|justsearch|io\.justsearch") {
             $found += [PSCustomObject]@{
-                PID = $proc.Id
+                PID = $proc.ProcessId
+                CreationFileTimeUtc = [string]$proc.CreationDate.ToFileTimeUtc()
                 Name = if ($cmd -match "HeadlessApp") { "HeadlessApp" }
                        else { "JustSearch" }
-                Memory = [math]::Round($proc.WorkingSet64 / 1MB, 1)
+                Memory = [math]::Round($proc.WorkingSetSize / 1MB, 1)
                 Command = if ($cmd.Length -gt 80) { $cmd.Substring(0, 80) + "..." } else { $cmd }
             }
         }
@@ -43,21 +43,24 @@ Write-Host ""
 $found | Format-Table -AutoSize
 
 if ($Force) {
+    $incomplete = $false
     Write-Host "Killing all processes..." -ForegroundColor Red
     $found | ForEach-Object {
         Write-Host "  Stopping PID $($_.PID) ($($_.Name))..." -ForegroundColor Yellow
-        Stop-Process -Id $_.PID -Force -ErrorAction SilentlyContinue
+        & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PSScriptRoot/lib/terminate-process.ps1" -Pid $_.PID -CreationFileTimeUtc $_.CreationFileTimeUtc -Code 1
+        if ($LASTEXITCODE -ne 0) { $incomplete = $true }
     }
     Write-Host ""
+    if ($incomplete) { Write-Host "Incomplete: at least one recorded process could not be ended." -ForegroundColor Yellow; exit 1 }
     Write-Host "Done." -ForegroundColor Green
 } else {
     Write-Host ""
     Write-Host "To kill these processes, run:" -ForegroundColor Gray
     Write-Host "  .\scripts\dev\cleanup.ps1 -Force" -ForegroundColor White
     Write-Host ""
-    Write-Host "Or kill specific PIDs:" -ForegroundColor Gray
+    Write-Host "Or stop one recorded identity:" -ForegroundColor Gray
     $found | ForEach-Object {
-        Write-Host "  Stop-Process -Id $($_.PID) -Force" -ForegroundColor White
+        Write-Host "  powershell.exe -NoProfile -File scripts/dev/lib/terminate-process.ps1 -Pid $($_.PID) -CreationFileTimeUtc $($_.CreationFileTimeUtc) -Code 1" -ForegroundColor White
     }
 }
 

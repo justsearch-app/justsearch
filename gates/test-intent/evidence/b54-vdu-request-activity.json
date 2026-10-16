@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:31:06.769Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "108e5aa87193aa9ed3637e55e90c6efde263db48",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14218
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4366dceb0455b37763aefd2eb321de38a4726ca7ecc47ef8601ae13ec09a4df6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "earlierRequestDoesNotInterruptAndObserversDoNotResetIdle()",
+          "status": "passed"
+        },
+        {
+          "name": "reportedInputAgeIsBoundedSoNoClientPlacesInputInTheFutureOrFarInThePast()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] during",
+          "status": "passed"
+        },
+        {
+          "name": "[2] prior",
+          "status": "passed"
+        },
+        {
+          "name": "[3] quiet",
+          "status": "passed"
+        },
+        {
+          "name": "reportOfInputAfterAcceptanceInterruptsThePass()",
+          "status": "passed"
+        },
+        {
+          "name": "endOfIntervalReportOfInputBeforeAcceptanceDoesNotInterruptThePass()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] ui-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[2] api-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[3] mcp-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[4] openai-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[5] search",
+          "status": "passed"
+        },
+        {
+          "name": "[6] typing-suggest",
+          "status": "passed"
+        },
+        {
+          "name": "[7] native-mcp-answer",
+          "status": "passed"
+        },
+        {
+          "name": "[8] native-mcp-search",
+          "status": "passed"
+        },
+        {
+          "name": "[9] native-mcp-resource",
+          "status": "passed"
+        },
+        {
+          "name": "[10] native-mcp-prompt",
+          "status": "passed"
+        },
+        {
+          "name": "[11] preview",
+          "status": "passed"
+        },
+        {
+          "name": "[12] folders",
+          "status": "passed"
+        },
+        {
+          "name": "[13] folder-files",
+          "status": "passed"
+        },
+        {
+          "name": "[14] future-action",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "164a24b1a",
+    "revision": "164a24b1af7d61abc098137eda3636a0f5daeae7",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b54-vdu-request-activity-compat.patch",
+        "contentDigest": "sha256:0cb938e714bb20ce1172ff3fe86cb9bdb44f9c45653eaec90df5c8e5d8c80731"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 31652
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
+        "classification": "assertion",
+        "detail": "reportedInputAgeIsBoundedSoNoClientPlacesInputInTheFutureOrFarInThePast(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a far-past claim is placed five seconds back: 9223372036854775807 ==> expected: <true> but was: <false> | [1] during: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: during ==> expected: <1> but was: <2> | reportOfInputAfterAcceptanceInterruptsThePass(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError:"
+      }
+    ]
+  },
+  "digest": "sha256:5268d7a392a15920e8af3432607075c4e88ff3f923027d50a8e28dec94a93480"
+}

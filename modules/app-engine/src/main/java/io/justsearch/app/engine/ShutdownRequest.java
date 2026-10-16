@@ -36,9 +36,24 @@ import tools.jackson.databind.ObjectMapper;
  * Optional#empty()}. The alternative — guessing a reason — means a file corrupted mid-write could
  * stop the product. An unreadable request is logged and ignored; the supervisor's deadline still
  * covers the case where ignoring it was wrong.
+ *
+ * <p><b>Whose request it is (Spec F §4.3, RV2 F14).</b> A supervisor that knows the incarnation it
+ * spawned writes {@code incarnation} ({@code <session>/<n>}, the value it put in {@code
+ * JUSTSEARCH_ENGINE_INCARNATION}) and a fresh {@code requestNonce}; the Engine honours such a request
+ * only when the incarnation is its own ({@link #ownership}). A file a predecessor left behind is then
+ * never honoured by its successor. Missing incarnation or nonce is stale at every checkpoint,
+ * including a request written after the first boot clear (Q2).
+ *
+ * <p>{@code requestNonce} is deliberately not {@code nonce}: {@code nonce} is the upgrade receipt's
+ * shutdown nonce, which the host channel refuses outright so that a file can never forge an
+ * upgrade receipt.
+ *
+ * <p>The deadline is read from {@code deadlineEpochMs}, or from {@code deadlineAtEpochMs} (the name
+ * the lifecycle endpoint's body uses) when the first is absent.
  */
 public record ShutdownRequest(
-    Reason reason, long deadlineEpochMs, String nonce, String issuedBy, String preparationId) {
+    Reason reason, long deadlineEpochMs, String nonce, String issuedBy, String preparationId,
+    String incarnation, String requestNonce) {
 
   private static final Logger log = LoggerFactory.getLogger(ShutdownRequest.class);
   private static final ObjectMapper JSON = new ObjectMapper();
@@ -46,18 +61,50 @@ public record ShutdownRequest(
   /** The file name inside {@code <dataDir>/runtime/}. */
   public static final String FILENAME = "shutdown-request.v1.json";
 
+  /** A request from a writer that names no incarnation. */
+  public ShutdownRequest(
+      Reason reason, long deadlineEpochMs, String nonce, String issuedBy, String preparationId) {
+    this(reason, deadlineEpochMs, nonce, issuedBy, preparationId, null, null);
+  }
+
+  /** Whether a request belongs to the Engine reading it. */
+  public enum Ownership {
+    /** It names this process's incarnation and carries a request nonce. */
+    THIS_INCARNATION,
+    /**
+     * It names an incarnation that is not this process's, names one this process cannot check (no
+     * {@code JUSTSEARCH_ENGINE_INCARNATION}), or names this one without a nonce. Never honoured.
+     */
+    STALE
+  }
+
   /**
-   * Why the Engine is being asked to stop. The wire form is the lower-case name; design 7.3 step 6
-   * branches on it, and 7.1 charges {@link #RESTART} and {@link #UPGRADE} to nobody's crash budget.
+   * Whose request this is.
+   *
+   * @param current this process's incarnation, parsed from {@code JUSTSEARCH_ENGINE_INCARNATION};
+   *     null when the Engine was started without one
+   */
+  public Ownership ownership(io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo current) {
+    if (incarnation == null) return Ownership.STALE;
+    var named = io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo.parse(incarnation);
+    if (named == null || current == null || !named.equals(current)) return Ownership.STALE;
+    return requestNonce == null || requestNonce.isBlank() ? Ownership.STALE
+        : Ownership.THIS_INCARNATION;
+  }
+
+  /**
+   * Why the Engine is being asked to stop. The wire form is the lower-case name; 7.1 charges
+   * {@link #RESTART} and {@link #UPGRADE} to nobody's crash budget. For every reason the Engine's
+   * llama-server ends with it (ADR-0051 decision 2): no successor Engine adopts a chat server.
    */
   public enum Reason {
-    /** The product is closing. llama-server stops (7.3 step 6). */
+    /** The product is closing. */
     QUIT,
-    /** A restart is wanted; llama-server is LEFT RUNNING for the next Engine to adopt (7.2). */
+    /** A restart is wanted; the next Engine starts its own chat server. */
     RESTART,
-    /** The updater is about to overwrite binaries. llama-server stops so nothing holds them. */
+    /** The updater is about to overwrite binaries, so nothing may hold them. */
     UPGRADE,
-    /** The supervisor believes the Engine is hung. llama-server is left for adoption. */
+    /** The supervisor believes the Engine is hung. */
     HANG;
 
     /** The lower-case wire form, e.g. {@code "quit"}. */
@@ -66,22 +113,14 @@ public record ShutdownRequest(
     }
 
     /**
-     * Whether the ordered shutdown stops llama-server for this reason (design 7.3 step 6).
-     *
-     * <p>{@code quit} and {@code upgrade} stop it: the installer must be able to overwrite the
-     * binary, and nothing may hold VRAM behind a closed product. {@code restart} and {@code hang}
-     * leave it running for the next Engine to adopt (7.2) — the model is loaded and the VRAM is
-     * warm, and making a restarted Engine reload it costs about forty seconds of encoder load for
-     * no gain.
-     *
-     * <p>Expressed as a switch over every constant rather than a set membership test, so adding a
-     * fifth reason is a compile error here instead of a silent default.
+     * Always true: the ordered shutdown stops llama-server for every reason (ADR-0051 decision 2),
+     * because no successor Engine adopts it. No production caller; kept because {@code
+     * GenerativeBackendByReasonTest} and {@code HeadlessAppFailedDrainBackendTest} still state the
+     * per-reason rule through it.
      */
+    @Deprecated(forRemoval = true)
     public boolean stopsGenerativeBackend() {
-      return switch (this) {
-        case QUIT, UPGRADE -> true;
-        case RESTART, HANG -> false;
-      };
+      return true;
     }
 
     static Optional<Reason> fromWire(String raw) {
@@ -130,7 +169,8 @@ public record ShutdownRequest(
             text(root, "reason"));
         return Optional.empty();
       }
-      JsonNode deadline = root.get("deadlineEpochMs");
+      JsonNode deadline = root.has("deadlineEpochMs")
+          ? root.get("deadlineEpochMs") : root.get("deadlineAtEpochMs");
       if (deadline == null || !deadline.isIntegralNumber()) {
         log.warn("Ignoring {}: deadlineEpochMs is missing or not an integer", FILENAME);
         return Optional.empty();
@@ -141,7 +181,9 @@ public record ShutdownRequest(
               deadline.asLong(),
               text(root, "nonce"),
               text(root, "issuedBy"),
-              text(root, "preparationId")));
+              text(root, "preparationId"),
+              text(root, "incarnation"),
+              text(root, "requestNonce")));
     } catch (Exception malformedOrUnreadable) {
       // Deliberately broad and deliberately non-fatal: a half-written file caught mid-rename, a
       // truncated write, a file another process holds. None of them is a reason to stop.

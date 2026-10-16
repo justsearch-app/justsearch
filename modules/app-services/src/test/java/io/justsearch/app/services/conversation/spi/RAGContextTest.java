@@ -482,6 +482,21 @@ final class RAGContextTest {
   }
 
   @Test
+  void emptySemanticFallbackEmitsItsMetadataBeforeTheTerminalError() {
+    var retrieval = new ContextResult("", 0, 0, 0, List.of(), "FULLTEXT_FALLBACK",
+        "SEMANTIC_BUDGET_EXCEEDED", false, List.of(),
+        null, "loading");
+    var result = new RAGContext(new StubDocs(retrieval, Map.of()))
+        .inject(stubCtx(Map.of("question", "unmatched")));
+    assertEquals("NO_CONTENT", result.terminalError().orElseThrow().payload().get("errorCode"));
+    assertEquals(1, result.events().stream().filter(e -> "rag.meta".equals(e.name())).count(),
+        "a terminal Ask must retain the retrieval explanation");
+    var meta = result.events().stream().filter(e -> "rag.meta".equals(e.name())).findFirst().orElseThrow();
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", meta.payload().get("retrieval_mode_reason"));
+    assertEquals("loading", meta.payload().get("retrieval_mode_cause"));
+  }
+
+  @Test
   @DisplayName("RetrieveContextWithMeta throwing falls through to batch fetch")
   void retrievalExceptionFallsBackToBatch() {
     var batch =

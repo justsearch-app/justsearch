@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop.pacing;
 
+import io.justsearch.ort.DeviceEncoderGate;
+import io.justsearch.core.scheduling.BulkPacingInput;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
@@ -19,6 +22,15 @@ import org.slf4j.LoggerFactory;
  * interval down toward {@code dutyPct}. Nothing stops: at the default 20% the loop still indexes
  * roughly one fifth of the time under a continuous search load, where the old pause indexed
  * nothing at all.
+ *
+ * <p><b>Time waiting for a device seat is yield, not work.</b> Spec D §3.3: "pace points every ≤
+ * {@code bulkPaceTargetMs} of GPU work". A bulk slice's GPU runs wait at the {@link
+ * DeviceEncoderGate}, which seats foreground first; that wait is the device yielded to foreground,
+ * so the interval's work is its wall time less the thread's gate wait ({@link
+ * DeviceEncoderGate#waitedNanosOnCurrentThread()}), and the wall-clock pause owed for that work is
+ * reduced by the wait already spent. A slice that waited at least {@code (100 - dutyPct) / dutyPct}
+ * times its work is not paused at all. Otherwise pacing and the gate's aging would each take the
+ * foreground's share, and bulk would get less than {@code dutyPct}.
  *
  * <p><b>{@code dutyPct} is a target, and the bounds below bias the error toward indexing, not away
  * from it.</b> A work unit longer than {@link #MAX_WORK_SLICE_MS} claims credit for only that much,
@@ -43,6 +55,16 @@ import org.slf4j.LoggerFactory;
  * <p>{@code dutyPct == 100} disables throttling entirely (the yield formula evaluates to zero), so
  * {@link #unthrottled()} is the honest no-op for scaffolding and tests rather than a null check at
  * every call site.
+ *
+ * <p><b>Chat generation is the second input of this one governor</b> (Spec E §1.4, step E2). While
+ * Switch A's {@link BulkPacingInput#dutyFloor()} holds and no search runs, the duty is the
+ * generation duty and the debt cap its own; when search and generation overlap, the search duty
+ * governs (ADR-0048 unchanged):
+ *
+ * <pre>
+ * effectiveDuty = searchBusy ? dutyPct     : dutyFloor ? generationDutyPct : 100
+ * maxDebt       = searchBusy ? MAX_DEBT_MS : generationMaxDebtMs
+ * </pre>
  */
 public final class IndexingPacing {
 
@@ -74,15 +96,19 @@ public final class IndexingPacing {
   }
 
   private final ForegroundLoad load;
+  private final BulkPacingInput bulk;
   private final int dutyPct;
   private final long cooldownMs;
   private final LongSupplier clockMs;
   private final LongSupplier nanoClock;
   private final Sleeper sleeper;
 
-  /** Per-thread {@code [lastReleaseNanos, debtNanos]}; {@code Long.MIN_VALUE} = never paced. */
+  /**
+   * Per-thread {@code [lastReleaseNanos, debtNanos, gateWaitedNanosAtRelease]}; {@code
+   * Long.MIN_VALUE} = never paced.
+   */
   private final ThreadLocal<long[]> threadState =
-      ThreadLocal.withInitial(() -> new long[] {Long.MIN_VALUE, 0L});
+      ThreadLocal.withInitial(() -> new long[] {Long.MIN_VALUE, 0L, 0L});
 
   private final AtomicLong pacedIntervalsTotal = new AtomicLong();
   private final AtomicLong yieldedMsTotal = new AtomicLong();
@@ -95,7 +121,12 @@ public final class IndexingPacing {
   private long lastWindowDutyPct = 100L;
 
   public IndexingPacing(ForegroundLoad load, int dutyPct, long cooldownMs) {
-    this(load, dutyPct, cooldownMs, System::currentTimeMillis, System::nanoTime, Thread::sleep);
+    this(load, BulkPacingInput.NEVER, dutyPct, cooldownMs);
+  }
+
+  /** @param bulk Switch A's generation input (Spec E step E2) */
+  public IndexingPacing(ForegroundLoad load, BulkPacingInput bulk, int dutyPct, long cooldownMs) {
+    this(load, bulk, dutyPct, cooldownMs, System::currentTimeMillis, System::nanoTime, Thread::sleep);
   }
 
   public IndexingPacing(
@@ -105,7 +136,19 @@ public final class IndexingPacing {
       LongSupplier clockMs,
       LongSupplier nanoClock,
       Sleeper sleeper) {
+    this(load, BulkPacingInput.NEVER, dutyPct, cooldownMs, clockMs, nanoClock, sleeper);
+  }
+
+  public IndexingPacing(
+      ForegroundLoad load,
+      BulkPacingInput bulk,
+      int dutyPct,
+      long cooldownMs,
+      LongSupplier clockMs,
+      LongSupplier nanoClock,
+      Sleeper sleeper) {
     this.load = load;
+    this.bulk = Objects.requireNonNull(bulk, "bulk");
     this.clockMs = clockMs;
     this.nanoClock = nanoClock;
     this.sleeper = sleeper;
@@ -140,11 +183,19 @@ public final class IndexingPacing {
   }
 
   /**
-   * Whether foreground work is in flight, or completed recently enough that the next request of a
-   * burst has not arrived yet. The cooldown is what keeps a stream of short queries from reading as
-   * idle in the gaps between them.
+   * Whether indexing is paced now: search work is busy ({@link #searchBusy()}) or chat generation
+   * holds Switch A's duty floor.
    */
   public boolean foregroundBusy() {
+    return searchBusy() || bulk.dutyFloor();
+  }
+
+  /**
+   * Whether foreground search work is in flight, or completed recently enough that the next request
+   * of a burst has not arrived yet. The cooldown is what keeps a stream of short queries from
+   * reading as idle in the gaps between them.
+   */
+  public boolean searchBusy() {
     if (load.inFlight() > 0) {
       return true;
     }
@@ -152,31 +203,54 @@ public final class IndexingPacing {
     return last > 0L && clockMs.getAsLong() - last < cooldownMs;
   }
 
+  /** The duty that applies now: the search duty, else the generation duty, else 100. */
+  int effectiveDutyPct() {
+    if (searchBusy()) return dutyPct;
+    if (!bulk.dutyFloor()) return 100;
+    return Math.max(1, Math.min(100, bulk.generationDutyPct(dutyPct)));
+  }
+
+  /** The yield-debt cap paired with {@link #effectiveDutyPct()}. */
+  long effectiveMaxDebtMs() {
+    return searchBusy() ? MAX_DEBT_MS : Math.max(0L, bulk.generationMaxDebtMs(MAX_DEBT_MS));
+  }
+
   /**
-   * The throttle point. Accounts the work done since this thread was last released and, while
-   * {@link #foregroundBusy()}, yields the wall time that brings the thread's share of the interval
-   * down to {@link #dutyPct()}.
+   * The throttle point. Accounts the work done since this thread was last released (its wall time
+   * less the time it waited at a device gate) and, while {@link #foregroundBusy()}, yields the wall
+   * time that brings the thread's share of the interval, gate wait included, down to the effective
+   * duty (the search duty {@link #dutyPct()}, or the generation duty while only chat generates).
    */
   public void pace() {
     long[] st = threadState.get();
     long now = nanoClock.getAsLong();
+    long waitedTotal = DeviceEncoderGate.waitedNanosOnCurrentThread();
     long workedNanos = 0L;
+    long waitedNanos = 0L;
     if (st[0] != Long.MIN_VALUE) {
-      workedNanos = Math.max(0L, Math.min(now - st[0], MAX_WORK_SLICE_MS * NANOS_PER_MS));
+      long wallNanos = Math.max(0L, now - st[0]);
+      waitedNanos = Math.min(wallNanos, Math.max(0L, waitedTotal - st[2]));
+      workedNanos = Math.min(wallNanos - waitedNanos, MAX_WORK_SLICE_MS * NANOS_PER_MS);
     }
 
     if (!foregroundBusy()) {
       st[0] = now;
       st[1] = 0L;
-      recordWindow(workedNanos, 0L);
+      st[2] = waitedTotal;
+      recordWindow(workedNanos, waitedNanos);
       return;
     }
 
-    long debtNanos = st[1] + (workedNanos * (100L - dutyPct)) / dutyPct;
-    debtNanos = Math.min(debtNanos, MAX_DEBT_MS * NANOS_PER_MS);
+    // The yield owed for the work, less the time the slice already yielded at the device gate.
+    int duty = effectiveDutyPct();
+    long debtNanos = st[1] + (workedNanos * (100L - duty)) / duty - waitedNanos;
+    debtNanos = Math.max(0L, Math.min(debtNanos, effectiveMaxDebtMs() * NANOS_PER_MS));
 
     long yieldedNanos = 0L;
     while (debtNanos >= NANOS_PER_MS && foregroundBusy()) {
+      // Each chunk re-reads the inputs: a search that ends mid-yield leaves the generation cap.
+      debtNanos = Math.min(debtNanos, effectiveMaxDebtMs() * NANOS_PER_MS);
+      if (debtNanos < NANOS_PER_MS) break;
       long chunkMs = Math.min(debtNanos / NANOS_PER_MS, MAX_SLEEP_CHUNK_MS);
       try {
         sleeper.sleepMs(chunkMs);
@@ -190,8 +264,9 @@ public final class IndexingPacing {
 
     st[0] = nanoClock.getAsLong();
     st[1] = foregroundBusy() ? Math.max(0L, debtNanos) : 0L;
+    st[2] = DeviceEncoderGate.waitedNanosOnCurrentThread();
 
-    recordWindow(workedNanos, yieldedNanos);
+    recordWindow(workedNanos, yieldedNanos + waitedNanos);
     if (yieldedNanos > 0L) {
       pacedIntervalsTotal.incrementAndGet();
       yieldedMsTotal.addAndGet(yieldedNanos / NANOS_PER_MS);
@@ -278,14 +353,16 @@ public final class IndexingPacing {
     long sinceLast = intervals - loggedIntervalsAtLastLog.getAndSet(intervals);
     log.info(
         "Indexing paced by foreground load: {} yields in the last {}s ({} total), {} ms yielded"
-            + " total, observed duty {}% (target {}%), foreground inFlight={} cooldownMs={}",
+            + " total, observed duty {}% (target {}%), foreground inFlight={} cooldownMs={}"
+            + " chatGenerating={}",
         sinceLast,
         LOG_INTERVAL_MS / 1000,
         intervals,
         yieldedMsTotal.get(),
         observedDutyPct(),
-        dutyPct,
+        effectiveDutyPct(),
         load.inFlight(),
-        cooldownMs);
+        cooldownMs,
+        bulk.dutyFloor());
   }
 }

@@ -75,7 +75,8 @@ public final class ContextWindowPolicy {
   public static final String REASON_OVERRIDE = "override";
 
   /** Prefix of the recorded reason after a step-down: {@code stepped-from:<planned top rung>}. */
-  public static final String REASON_STEPPED_FROM_PREFIX = "stepped-from:";
+  public static final String REASON_STEPPED_FROM_PREFIX =
+      io.justsearch.app.api.chat.ChatReasonCodes.STEPPED_FROM_PREFIX;
 
   /** The full rung set, descending. A backend's ladder is the suffix at or below its top rung. */
   private static final List<Integer> RUNGS =
@@ -126,6 +127,22 @@ public final class ContextWindowPolicy {
   public static Plan auto(boolean gpuBacked, Long freeVramBytes) {
     int top = gpuBacked ? GPU_TOP_RUNG : CPU_TOP_RUNG;
     return new Plan(RUNGS.stream().filter(rung -> rung <= top).toList(), REASON_TOP_RUNG, freeVramBytes);
+  }
+
+  /**
+   * The derived ladder for a backend, starting no higher than {@code plannedTopRung}: the rung the
+   * device-memory plan chose (Spec E step E7b). A planned value that is not below the backend's
+   * top rung, or below every rung, leaves the derived ladder unchanged.
+   *
+   * @param gpuBacked true when {@code -ngl} is greater than zero
+   * @param freeVramBytes NVML free VRAM, recorded only (may be null)
+   * @param plannedTopRung the plan's rung
+   */
+  public static Plan auto(boolean gpuBacked, Long freeVramBytes, int plannedTopRung) {
+    int top = Math.min(autoTopRung(gpuBacked), plannedTopRung);
+    List<Integer> ladder = RUNGS.stream().filter(rung -> rung <= top).toList();
+    return ladder.isEmpty()
+        ? auto(gpuBacked, freeVramBytes) : new Plan(ladder, REASON_TOP_RUNG, freeVramBytes);
   }
 
   /**

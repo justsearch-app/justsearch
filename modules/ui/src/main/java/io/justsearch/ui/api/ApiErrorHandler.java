@@ -144,6 +144,27 @@ public final class ApiErrorHandler {
         return buildTypedResponse(message, code);
     }
 
+    /**
+     * A typed error response that also says when to try again, as the body field "retryAfterMs"
+     * (ADR-0050). Only a retryable code may carry a retry time; a negative duration is a caller bug.
+     *
+     * @param retryAfter the earliest useful retry, or {@code null} when the Engine does not know
+     */
+    public static Map<String, Object> toResponse(
+            ApiErrorCode code, String customMessage, java.time.Duration retryAfter) {
+        var response = toResponse(code, customMessage);
+        if (retryAfter != null) {
+            if (!code.isRetryable()) {
+                throw new IllegalArgumentException(code + " is not retryable; it has no retry time");
+            }
+            if (retryAfter.isNegative()) {
+                throw new IllegalArgumentException("retryAfter must not be negative");
+            }
+            response.put("retryAfterMs", retryAfter.toMillis());
+        }
+        return response;
+    }
+
     // ── Auto-recording overloads (build response + record telemetry) ────────
 
     /**
@@ -286,6 +307,7 @@ public final class ApiErrorHandler {
             return switch (refused.reason()) {
                 case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT;
                 case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+                case INFERENCE_BUSY -> ApiErrorCode.ADMISSION_INFERENCE_BUSY;
                 case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
             };
         }
@@ -480,7 +502,7 @@ public final class ApiErrorHandler {
         if (code == null) return 500;
         return switch (code) {
             case TIMEOUT -> 504;
-            case ADMISSION_CONTEXT_LIMIT, ADMISSION_ENGINE_LIMIT -> 429;
+            case ADMISSION_CONTEXT_LIMIT, ADMISSION_ENGINE_LIMIT, ADMISSION_INFERENCE_BUSY -> 429;
             case SERVICE_UNAVAILABLE, INDEX_UNAVAILABLE, AI_STARTING,
                  LLM_OVERLOADED, MANIFEST_UNAVAILABLE, SETTINGS_UNAVAILABLE -> 503;
             case NOT_FOUND -> 404;

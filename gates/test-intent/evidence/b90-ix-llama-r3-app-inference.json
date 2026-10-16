@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T07:57:15.476Z",
+  "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+  "tree": "b334af3c1892c94e087329748141ccdce0d27588",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceConfigArtifactIdentityTest.configurationPreparationDoesNotStreamTheChatModel\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16060
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigArtifactIdentityTest.java#configurationPreparationDoesNotStreamTheChatModel",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigArtifactIdentityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:23f8838c4ef5c543b0c1a7dee5a78772f11283051995e77ab9632b3a3a63996a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "configurationPreparationDoesNotStreamTheChatModel()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1f8ce3e01",
+    "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceConfigArtifactIdentityTest.configurationPreparationDoesNotStreamTheChatModel\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 35450
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigArtifactIdentityTest.java#configurationPreparationDoesNotStreamTheChatModel",
+        "classification": "assertion",
+        "detail": "configurationPreparationDoesNotStreamTheChatModel(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: configuration preparation must read bounded identity metadata, not stream the model: 262144 model bytes ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:5ac0580759f184b24aa0f73aae3bf5eb737f6b247b82f7e4334eed4906a85f1a"
+}

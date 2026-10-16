@@ -1,0 +1,14 @@
+diff --git a/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java b/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java
+--- a/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java
++++ b/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java
+@@ -1302,6 +1302,10 @@
+   }
+ 
+   /** Stop attachment producers before the process drains admitted work and closes Head. */
++  public void quiesceProducers(java.time.Duration timeout) {
++    quiesceProducers();
++  }
++
+   public void quiesceProducers() {
+     try {
+       recordedIngestion.stopProducers(deadlineMs);

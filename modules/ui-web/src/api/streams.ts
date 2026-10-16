@@ -7,9 +7,11 @@
  */
 
 import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
-import { parseSseBuffer, parseSseBufferJson } from './sse';
+import { parseSseBuffer, parseSseBufferJson, type SseEvent } from './sse';
+import { observeStatusEvent } from './statusInvalidation.js';
 import { fetchWithAdmissionWait } from './admissionFetch.js';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
+import { parseChatRefusal, type ChatRefusalDetail } from '../shell-v0/state/chatResidency.js';
 // Tempdoc 941 — what the app DOES when one of our per-event handlers throws (reader notice +
 // diagnostics ring). The POLICY lives in shell-v0 beside the message-class vocabulary it names,
 // not here: this module's job is to detect the throw and keep the stream alive. Imported for the
@@ -101,6 +103,11 @@ export interface RagMetaPayload {
   retrieval_mode?: string;
   /** Reason code explaining the mode choice */
   retrieval_mode_reason?: string;
+  /**
+   * Why the query embedding missed its semantic budget ('contended', 'loading' or 'stuck'); present
+   * only with retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED (Spec D §5.1).
+   */
+  retrieval_mode_cause?: string;
   /** True if context was truncated due to budget */
   context_truncated?: boolean;
   /** Number of chunks used */
@@ -660,8 +667,16 @@ export async function consumeShapeStream(
     const text = await response.text().catch(() => '');
     const err = new Error(
       `consumeShapeStream: HTTP ${response.status} from ${target} — ${text.slice(0, 200)}`,
-    ) as Error & { status?: number; runNotFound?: RunNotFoundDetail };
+    ) as Error & {
+      status?: number;
+      runNotFound?: RunNotFoundDetail;
+      chatRefusal?: ChatRefusalDetail;
+    };
     err.status = response.status;
+    // Spec A step 9 — a refused chat request carries a typed refusal (why, and whether a person may
+    // load chat anyway); the chat window words it instead of showing the raw HTTP error.
+    const refusal = parseChatRefusal(text);
+    if (refusal) err.chatRefusal = refusal;
     // Tempdoc 834 §1.6 — a run stream answers an unknown/retired runId with a TYPED 404 naming
     // where the record lives. Surfacing it as a generic HTTP error would throw away the only thing
     // that tells the caller whether to show "this run is over, read the transcript" or a real error.
@@ -698,7 +713,9 @@ export async function consumeShapeStream(
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      buffer = parseSseBuffer(buffer, (ev) => {
+      const frames: SseEvent[] = [];
+      buffer = parseSseBuffer(buffer, ev => { frames.push(ev); });
+      const events = frames.map(ev => {
         let payload: unknown = ev.data;
         if (ev.data && ev.data.length > 0) {
           try {
@@ -707,6 +724,13 @@ export async function consumeShapeStream(
             // Non-JSON payloads pass through as raw string.
           }
         }
+        return { event: ev.event, payload };
+      });
+      // Observe the whole received batch together so simultaneous completions coalesce.
+      // Deliver completion to consumers only after the shared canonical read publishes.
+      await Promise.all(events.map(ev => observeStatusEvent(ev.payload)));
+      for (const ev of events) {
+        const payload = ev.payload;
         if (ev.event === 'done' || ev.event === 'error') {
           receivedTerminal = true;
         }
@@ -735,7 +759,7 @@ export async function consumeShapeStream(
           // guarantees the caller gets a real one.
           reportStreamHandlerFailure(ev.event, handlerError, reportedHandlerEvents);
         }
-      });
+      }
     }
   } finally {
     reader.releaseLock();

@@ -6,10 +6,14 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeChangeListener;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiLifecycleControl;
+import io.justsearch.app.inference.chat.ChatActuationRouter;
+import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -18,45 +22,38 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Converges explicit runtime intent toward {@link RuntimeSpec} ∧ policy
- * (tempdoc 737 §12a). One dedicated daemon thread + a level-triggered dirty flag — <b>no reconcile
- * work ever runs on a caller or listener thread.</b>
+ * Forwards explicit runtime intent ({@link RuntimeSpec} ∧ policy) to the chat server's single
+ * writer (tempdoc 737 §12a; Spec A step 2). One dedicated daemon thread + a level-triggered dirty
+ * flag — <b>no forwarding work ever runs on a caller or listener thread.</b>
+ *
+ * <p>The chat controller ({@code io.justsearch.app.services.chat.ChatServerControllerImpl}) is the
+ * guarded single writer. This class only publishes the desired activation to it through {@link
+ * ActivationForwarder#setActivation} (Spec A §4.1/§4.2, reconciliation F6); the controller
+ * serializes and coalesces that step with every other start, stop and relaunch.
  *
  * <h3>Re-entrancy contract (R2)</h3>
  *
  * {@code TransitionRunner} fires {@link ModeChangeListener}s <i>under its lock</i>, and a
  * re-entrant {@code run()} from a listener throws {@code IllegalStateException} ("Already
  * transitioning"). Therefore this reconciler's mode-change listener ONLY updates
- * {@link RuntimeStatus} + the {@link RuntimeGpuLease} mirror and marks the loop dirty;
- * convergence (the {@code switchTo*} calls) runs later on the reconciler thread.
+ * {@link RuntimeStatus}'s lease holder and marks the loop dirty.
  *
- * <h3>Convergence scope (Phase 2 — continuous return-to-spec)</h3>
+ * <h3>Forwarding scope</h3>
  *
- * Convergence runs on (a) boot ({@link #requestBootConvergence()}), (b) explicit spec writes
- * ({@link #specChanged()}), (c) procedure end ({@link #endProcedure}), and (d) any observed mode
- * change (foreign flip) while <b>no procedure is active</b> and the observed engine state differs
- * from the spec target, unless the physical owner retains a failed activation for component
- * recovery. Failed activation retries belong to the common component monitor. With a procedure
- * active, foreign states are tolerated — that is the
- * procedure's business (§12a); at {@link #endProcedure} the reconciler returns the engine to spec.
- * This is what makes §3d's never-switch-back <i>inexpressible</i>.
+ * Intent is forwarded on (a) boot ({@link #requestBootConvergence()}), (b) explicit spec writes
+ * ({@link #specChanged()}) and (c) the last hold's end ({@link #endProcedure}), unless the physical owner
+ * retains a failed activation for component recovery. An observed mode change is never forwarded:
+ * a foreign flip only republishes status (Spec A step 2 deleted foreign-flip convergence and its
+ * anti-flap guard, reconciliation F6), so nothing here reloads chat behind the controller's back.
  *
- * <h3>Procedures (the ONLY sanctioned non-spec hold)</h3>
+ * <h3>Procedures: the chat controller's holds</h3>
  *
- * {@link #beginProcedure}/{@link #endProcedure} bracket a machine-actor procedure (VDU batch,
- * runtime-variant activation, install smoke test);
- * {@link #procedureRequireEngine(boolean)} is procedure-scoped engine control. A procedure is the
- * only sanctioned way for a machine actor to hold the engine in a non-spec state. Procedures of
- * distinct kinds may overlap — drift convergence stays suppressed until the <b>last</b> one ends,
- * at which point the reconciler converges the engine back to the then-current spec.
- *
- * <h3>Anti-flap (item 2)</h3>
- *
- * The existing backoff covers failed DOWN intent enforcement. A separate guard covers "transition
- * succeeded but something flipped it back": if the same foreign flip recurs more than
- * {@link #FLAP_MAX} times inside {@link #FLAP_WINDOW_MS}, the reconciler stops fighting, logs WARN,
- * and stamps the ENGINE condition {@link RuntimeStatus#REASON_CONVERGENCE_HELD_FLAP} until a spec /
- * procedure / policy input changes.
+ * A machine actor that needs the engine in a non-spec state takes a hold on the chat controller
+ * (Spec A step 6: self-test session, VDU hold, running hold, convergence freeze), and the
+ * controller drives the server for it. {@link #followHolds} mirrors those holds here as the
+ * procedures they replaced ({@link #beginProcedure}/{@link #endProcedure}): the status overlay
+ * shows them, forwarding is deferred while any is open, and when the <b>last</b> one ends the
+ * reconciler forwards the then-current spec, returning the engine to it.
  */
 public final class RuntimeReconciler implements AutoCloseable {
 
@@ -65,41 +62,31 @@ public final class RuntimeReconciler implements AutoCloseable {
   private static final long BASE_BACKOFF_MS = 1_000L;
   private static final long MAX_BACKOFF_MS = 60_000L;
 
-  /** Anti-flap window and cap (item 2): > FLAP_MAX foreign flips inside the window → hold. */
-  static final long FLAP_WINDOW_MS = 5 * 60 * 1000L;
-  static final int FLAP_MAX = 3;
-
-  /** Stop-primitive that may throw the same checked exception the switch primitives do. */
-  @FunctionalInterface
-  public interface DetachAction {
-    void detach() throws ModeTransitionException;
-  }
-
   /**
-   * Reason-bearing engine switch (task 5). Wired at the composition root to the concrete manager's
-   * {@code switchToOnlineMode(TransitionReason)} / {@code switchToIndexingMode(TransitionReason)}
-   * overloads. Nullable — when absent the reconciler falls back to the reason-free
-   * {@link OnlineAiLifecycleControl} methods (the {@code app-api} interface cannot carry the
-   * {@code app-inference} {@code TransitionReason} type, since {@code app-inference} depends on
-   * {@code app-api}, not the reverse).
+   * Where intent goes: the chat controller's {@code setActivation} (Spec A §4.1). Wired at the
+   * composition root to {@code InferenceLifecycleManager.setActivation}.
    */
   @FunctionalInterface
-  public interface ReasonedSwitch {
-    void switchTo(TransitionReason reason) throws ModeTransitionException;
+  public interface ActivationForwarder {
+    CompletionStage<Void> setActivation(ChatActuationRouter.Activation activation);
   }
 
   private final OnlineAiLifecycleControl control;
   private final Supplier<Mode> modeSupplier;
   private final BooleanSupplier externalAdoption;
-  private final DetachAction detach; // nullable
   private final EnterprisePolicyService policy; // nullable
   private final RuntimeSpecStore specStore;
-  private final RuntimeGpuLease lease;
-  private final ReasonedSwitch onlineSwitch; // nullable — see ReasonedSwitch
-  private final ReasonedSwitch indexingSwitch; // nullable
+  private final ActivationForwarder forwarder;
   private final BooleanSupplier componentRecoveryPending;
 
   private final AtomicReference<RuntimeStatus> status = new AtomicReference<>(RuntimeStatus.initial());
+
+  /**
+   * The LEASE axis value, derived from the observed mode ({@link RuntimeStatus#leaseHolderFor}): a
+   * transition keeps the holder of the last committed mode. Spec A step 12 deleted the passive
+   * {@code RuntimeGpuLease} mirror and its unused grant logic; the wire value is unchanged.
+   */
+  private volatile String leaseHolder = RuntimeStatus.LEASE_NONE;
   private final AtomicLong specVersion = new AtomicLong(0);
 
   /**
@@ -128,66 +115,33 @@ public final class RuntimeReconciler implements AutoCloseable {
 
   // Procedure overlay (guarded by lock). One entry per active machine-actor procedure, keyed by
   // kind — multiple kinds (e.g. an ACTIVATION window overlapping a VDU_BATCH) may hold the engine at
-  // once. Drift convergence is suppressed while this is non-empty; return-to-spec re-arms only when
-  // it empties (tempdoc 737 §12a fix pack). Insertion-ordered so the status overlay can pick a
+  // once. Forwarding is deferred while this is non-empty; return-to-spec re-arms only when it
+  // empties (tempdoc 737 §12a fix pack). Insertion-ordered so the status overlay can pick a
   // stable representative (the most-recently-begun distinct kind).
   private final java.util.Map<RuntimeStatus.ProcedureKind, RuntimeStatus.Procedure> activeProcedures =
       new java.util.LinkedHashMap<>();
 
-  // Anti-flap tracking (guarded by lock).
-  private boolean flapHold = false;
-  private int flapCount = 0;
-  private long flapWindowStartMillis = 0;
-  private String flapDirection = null;
-
   private Thread thread;
   private ModeChangeListener attachedListener;
 
+  /**
+   * The Engine's reconciler: every boot, spec and procedure request becomes one {@code
+   * setActivation} on the chat controller.
+   */
   public RuntimeReconciler(
       OnlineAiLifecycleControl control,
       Supplier<Mode> modeSupplier,
       BooleanSupplier externalAdoption,
-      DetachAction detach,
       EnterprisePolicyService policy,
       RuntimeSpecStore specStore,
-      RuntimeGpuLease lease) {
-    this(control, modeSupplier, externalAdoption, detach, policy, specStore, lease, null, null);
-  }
-
-  public RuntimeReconciler(
-      OnlineAiLifecycleControl control,
-      Supplier<Mode> modeSupplier,
-      BooleanSupplier externalAdoption,
-      DetachAction detach,
-      EnterprisePolicyService policy,
-      RuntimeSpecStore specStore,
-      RuntimeGpuLease lease,
-      ReasonedSwitch onlineSwitch,
-      ReasonedSwitch indexingSwitch) {
-    this(control, modeSupplier, externalAdoption, detach, policy, specStore, lease,
-        onlineSwitch, indexingSwitch, () -> false);
-  }
-
-  public RuntimeReconciler(
-      OnlineAiLifecycleControl control,
-      Supplier<Mode> modeSupplier,
-      BooleanSupplier externalAdoption,
-      DetachAction detach,
-      EnterprisePolicyService policy,
-      RuntimeSpecStore specStore,
-      RuntimeGpuLease lease,
-      ReasonedSwitch onlineSwitch,
-      ReasonedSwitch indexingSwitch,
+      ActivationForwarder forwarder,
       BooleanSupplier componentRecoveryPending) {
     this.control = control;
     this.modeSupplier = modeSupplier;
     this.externalAdoption = externalAdoption;
-    this.detach = detach;
     this.policy = policy;
     this.specStore = specStore;
-    this.lease = lease;
-    this.onlineSwitch = onlineSwitch;
-    this.indexingSwitch = indexingSwitch;
+    this.forwarder = java.util.Objects.requireNonNull(forwarder, "forwarder");
     this.componentRecoveryPending = java.util.Objects.requireNonNull(
         componentRecoveryPending, "componentRecoveryPending");
   }
@@ -206,14 +160,14 @@ public final class RuntimeReconciler implements AutoCloseable {
 
     // Mirror initial state synchronously BEFORE forwarding transitions.
     Mode initial = safeMode();
-    lease.mirrorFromMode(initial);
-    status.set(RuntimeStatus.derive(initial, safeExternal(), lease.holder(), null, specVersion.get(), Instant.now()));
+    leaseHolder = RuntimeStatus.leaseHolderFor(initial, leaseHolder);
+    status.set(RuntimeStatus.derive(initial, safeExternal(), leaseHolder, null, specVersion.get(), Instant.now()));
 
     if (control != null) {
       attachedListener =
           (from, to) -> {
             // Runs UNDER the runner's lock — do NOT converge here. Fast, non-reentrant only.
-            lease.mirrorFromMode(to);
+            leaseHolder = RuntimeStatus.leaseHolderFor(to, leaseHolder);
             markStatusDirty();
           };
       control.addModeChangeListener(attachedListener);
@@ -232,9 +186,6 @@ public final class RuntimeReconciler implements AutoCloseable {
   /** A spec write happened — bump the observed spec version and converge (USER_SWITCH intent). */
   public void specChanged() {
     specVersion.incrementAndGet();
-    synchronized (lock) {
-      resetFlapLocked(); // spec input changed — release any flap hold
-    }
     requestConvergence(TransitionReason.USER_SWITCH);
     notifySpecChangeListeners();
   }
@@ -271,21 +222,19 @@ public final class RuntimeReconciler implements AutoCloseable {
     }
   }
 
-  // ==================== Procedures (§12a — the only sanctioned non-spec engine hold) ====================
+  // ==================== Procedures (the chat controller's holds, §12a) ====================
 
   /**
-   * Begin a machine-actor procedure of the given {@code kind}. While ANY procedure is active, the
-   * reconciler tolerates foreign engine states (no drift convergence) — the procedure owns the
-   * engine. Resets any flap hold (procedure input changed). Idempotent per kind (a repeat begin of
-   * the same kind replaces its overlay entry). Must be paired with {@link #endProcedure} in a
-   * {@code finally}.
+   * Begin a procedure of the given {@code kind}: the first open hold of that kind ({@link
+   * #followHolds}). While ANY procedure is active, the reconciler defers spec forwarding — the
+   * holder owns the engine. Idempotent per kind (a repeat begin of the same kind replaces its
+   * overlay entry). Paired with {@link #endProcedure}.
    */
   public void beginProcedure(RuntimeStatus.ProcedureKind kind, String reason) {
     synchronized (lock) {
       activeProcedures.put(kind, new RuntimeStatus.Procedure(kind, Instant.now(), "starting", reason));
       retryAtMillis = 0;
       backoffMillis = 0;
-      resetFlapLocked();
       dirty = true; // republish status with the overlay
       lock.notifyAll();
     }
@@ -297,14 +246,12 @@ public final class RuntimeReconciler implements AutoCloseable {
    * that leaves NO procedure active does the reconciler re-arm a return-to-spec convergence
    * (AUTO_START intent). This is the §3d fix: whatever non-spec state the last procedure left the
    * engine in, the reconciler then returns it to {@code spec ∧ policy}. Ending one of several
-   * overlapping procedures keeps drift suppressed for the survivors and defers any pending spec
-   * write until the final end.
+   * overlapping procedures defers any pending spec write until the final end.
    */
   public void endProcedure(RuntimeStatus.ProcedureKind kind) {
     boolean lastEnded;
     synchronized (lock) {
       activeProcedures.remove(kind);
-      resetFlapLocked();
       lastEnded = activeProcedures.isEmpty();
       if (lastEnded) {
         retryAtMillis = 0;
@@ -318,7 +265,7 @@ public final class RuntimeReconciler implements AutoCloseable {
     if (lastEnded) {
       log.info("RuntimeReconciler: procedure {} ended (last active) — converging back to spec", kind);
     } else {
-      log.info("RuntimeReconciler: procedure {} ended — other procedure(s) active, drift stays suppressed", kind);
+      log.info("RuntimeReconciler: procedure {} ended — other procedure(s) active, forwarding stays deferred", kind);
     }
   }
 
@@ -332,63 +279,65 @@ public final class RuntimeReconciler implements AutoCloseable {
   }
 
   /**
-   * Procedure-scoped engine control: bring the engine up ({@code up=true}) or park it into the
-   * indexing/down state ({@code up=false}). Executed <b>synchronously on the caller's (procedure
-   * worker) thread</b> — that thread is never a {@link ModeChangeListener} callback, so the R2
-   * re-entrancy hazard (calling {@code switchTo*} under {@code TransitionRunner}'s lock) does not
-   * apply; and because the reconciler suppresses its own drift convergence while a procedure is
-   * active, there is a single writer at any instant (the procedure thread during the procedure, the
-   * reconciler thread otherwise). The {@code switchTo*} call physically resides on this class, so
-   * the single-writer ArchUnit guard is satisfied.
+   * Follows the chat controller's holds (Spec A step 6): each open kind is shown as the procedure
+   * it replaced, forwarding is deferred while any is open, and the last close returns chat to the
+   * intent. The holder, not this reconciler, drives the server meanwhile.
+   *
+   * @return closing it stops following
    */
-  public void procedureRequireEngine(boolean up) throws ModeTransitionException {
-    updateProcedurePhase(up ? "engine-up" : "engine-down");
-    if (up) {
-      if (safeMode() != Mode.ONLINE) {
-        doSwitchOnline(TransitionReason.VDU_ENTER);
+  public AutoCloseable followHolds(ChatHolds holds) {
+    java.util.Objects.requireNonNull(holds, "holds");
+    return holds.addListener(new ChatHolds.Listener() {
+      @Override
+      public void kindOpened(ChatHolds.OpenHold first) {
+        beginProcedure(procedureKind(first.kind()), first.owner());
       }
-    } else {
-      if (safeMode() != Mode.INDEXING) {
-        doSwitchIndexing(TransitionReason.VDU_EXIT);
+
+      @Override
+      public void kindClosed(ChatHolds.Kind kind, boolean noneOpen) {
+        endProcedure(procedureKind(kind));
       }
-    }
-    refreshStatus();
+    });
   }
 
-  private void updateProcedurePhase(String phase) {
-    synchronized (lock) {
-      RuntimeStatus.Procedure rep = representativeProcedureLocked();
-      if (rep != null) {
-        activeProcedures.put(
-            rep.kind(),
-            new RuntimeStatus.Procedure(rep.kind(), rep.startedAt(), phase, rep.reason()));
-      }
-    }
+  /** The status procedure each hold replaced. */
+  static RuntimeStatus.ProcedureKind procedureKind(ChatHolds.Kind kind) {
+    return switch (kind) {
+      case FREEZE -> RuntimeStatus.ProcedureKind.INSTALL_ACQUISITION;
+      case SELF_TEST -> RuntimeStatus.ProcedureKind.ACTIVATION;
+      case VDU -> RuntimeStatus.ProcedureKind.VDU_BATCH;
+      case RUNNING -> RuntimeStatus.ProcedureKind.INSTALL_SMOKE_TEST;
+    };
   }
 
-  /** Reset the anti-flap tracking. Caller MUST hold {@link #lock}. */
-  private void resetFlapLocked() {
-    flapHold = false;
-    flapCount = 0;
-    flapWindowStartMillis = 0;
-    flapDirection = null;
-  }
-
-  private void doSwitchOnline(TransitionReason reason) throws ModeTransitionException {
+  /**
+   * Publishes the activation to the chat controller and waits for its step on this (reconciler or
+   * procedure worker) thread. A later activation that replaced it, or a terminal controller, settles
+   * the request: the newer intent or the shutdown owns the server.
+   */
+  private void forward(boolean active, TransitionReason reason) throws ModeTransitionException {
     lastConvergenceReason = reason;
-    if (onlineSwitch != null) {
-      onlineSwitch.switchTo(reason);
-    } else {
-      control.switchToOnlineMode();
-    }
-  }
-
-  private void doSwitchIndexing(TransitionReason reason) throws ModeTransitionException {
-    lastConvergenceReason = reason;
-    if (indexingSwitch != null) {
-      indexingSwitch.switchTo(reason);
-    } else {
-      control.switchToIndexingMode();
+    try {
+      forwarder.setActivation(new ChatActuationRouter.Activation(active, reason))
+          .toCompletableFuture().get();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new ModeTransitionException(ModeTransitionException.Reason.INTERRUPTED,
+          "Interrupted while forwarding the activation", interrupted);
+    } catch (ExecutionException failed) {
+      Throwable cause = failed.getCause();
+      if (cause instanceof ChatActuationRouter.SupersededException
+          || cause instanceof ChatActuationRouter.RefusedException) {
+        log.info("RuntimeReconciler: activation settled without running: {}", cause.getMessage());
+        return;
+      }
+      if (cause instanceof ModeTransitionException transition) throw transition;
+      if (cause instanceof RuntimeException runtime) throw runtime;
+      if (cause instanceof Error error) throw error;
+      throw new ModeTransitionException(active
+          ? ModeTransitionException.Reason.ONLINE_START_FAILED
+          : ModeTransitionException.Reason.INDEXING_START_FAILED,
+          "Activation failed: " + safeMessage(cause), cause);
     }
   }
 
@@ -481,18 +430,13 @@ public final class RuntimeReconciler implements AutoCloseable {
 
       refreshStatus();
 
-      // A procedure owns the engine while active — the reconciler neither converges on drift NOR on
-      // an explicit spec-write mid-procedure (that would be a second writer fighting the procedure).
-      // {@link #endProcedure} re-arms an explicit convergence toward the then-current spec, so a
-      // spec-write during a procedure is honored the moment the procedure ends, not lost.
-      if (!procActive && !retryDeferred) {
-        if (explicit) {
-          // Boot / spec-write / procedure-end: always converge toward spec, bypassing the flap hold.
-          reconcileToSpec(reason, false);
-        } else {
-          // Foreign mode change with no procedure active: continuous return-to-spec (anti-flap gated).
-          reconcileToSpec(TransitionReason.AUTO_START, true);
-        }
+      // A procedure owns the engine while active — the reconciler does not forward an explicit
+      // spec-write mid-procedure (that would be a second writer fighting the procedure).
+      // {@link #endProcedure} re-arms an explicit forward of the then-current spec, so a spec-write
+      // during a procedure is honored the moment the procedure ends, not lost. A pass woken only by
+      // an observed mode change republishes status and forwards nothing (reconciliation F6).
+      if (!procActive && !retryDeferred && explicit) {
+        reconcileToSpec(reason);
       }
 
       synchronized (lock) {
@@ -503,21 +447,16 @@ public final class RuntimeReconciler implements AutoCloseable {
   }
 
   /**
-   * Converge the observed engine toward {@code spec ∧ policy}. {@code driftTriggered} distinguishes
-   * a foreign-flip convergence (anti-flap gated, item 2) from an explicit boot/spec/procedure-end
-   * request (always attempted).
+   * Forward an explicit boot/spec/procedure-end request: converge the observed engine toward
+   * {@code spec ∧ policy} through the chat controller.
    */
-  private void reconcileToSpec(TransitionReason reason, boolean driftTriggered) {
+  private void reconcileToSpec(TransitionReason reason) {
     Mode mode = safeMode();
     if (mode == Mode.TRANSITIONING) {
-      // Mid-transition — cannot switch (would throw "Already transitioning"). Defer: an explicit
-      // request re-arms; a drift-triggered one relies on the settling transition's listener to
-      // re-wake the loop and re-evaluate.
-      if (!driftTriggered) {
-        synchronized (lock) {
-          convergePending = true;
-          pendingReason = reason;
-        }
+      // Mid-transition — re-arm; the settling transition's listener re-wakes the loop.
+      synchronized (lock) {
+        convergePending = true;
+        pendingReason = reason;
       }
       return;
     }
@@ -532,8 +471,7 @@ public final class RuntimeReconciler implements AutoCloseable {
     boolean needDown = !effective && healthy;
 
     if (!needUp && !needDown) {
-      // At spec — settle. Clear the failure backoff; flap tracking ages out of its window or
-      // resets on the next spec/procedure/policy input change.
+      // At spec — settle. Clear the failure backoff.
       synchronized (lock) {
         retryAtMillis = 0;
         backoffMillis = 0;
@@ -553,27 +491,11 @@ public final class RuntimeReconciler implements AutoCloseable {
       return;
     }
 
-    // Drift from spec. Anti-flap only applies to drift-triggered (autonomous) convergence — an
-    // explicit user/boot/procedure-end request is always honored.
-    if (driftTriggered && !passesFlapGate(needUp)) {
-      return;
-    }
-
     try {
-      if (needUp) {
-        log.info("RuntimeReconciler: converging engine UP (reason={}, drift={})", reason, driftTriggered);
-        doSwitchOnline(reason);
-      } else { // needDown
-        if (external) {
-          log.info("RuntimeReconciler: chat disabled + external adoption -> detach (reason={})", reason);
-          if (detach != null) {
-            detach.detach();
-          }
-        } else {
-          log.info("RuntimeReconciler: converging engine DOWN (reason={}, drift={})", reason, driftTriggered);
-          doSwitchIndexing(reason);
-        }
-      }
+      // An adopted external server is detached by the controller's inactive step.
+      log.info("RuntimeReconciler: forwarding activation {} (reason={}, external={})",
+          needUp ? "UP" : "DOWN", reason, external);
+      forward(needUp, reason);
       synchronized (lock) {
         retryAtMillis = 0;
         backoffMillis = 0;
@@ -600,62 +522,17 @@ public final class RuntimeReconciler implements AutoCloseable {
     }
   }
 
-  /**
-   * Anti-flap gate (item 2). Counts each foreign flip inside {@link #FLAP_WINDOW_MS}; once the same
-   * direction recurs past {@link #FLAP_MAX}, sets the hold, WARNs once, stamps the ENGINE condition,
-   * and returns {@code false} (do not attempt). Returns {@code true} when convergence may proceed.
-   */
-  private boolean passesFlapGate(boolean needUp) {
-    boolean held;
-    boolean warn = false;
-    synchronized (lock) {
-      if (flapHold) {
-        held = true;
-      } else {
-        long now = System.currentTimeMillis();
-        if (flapWindowStartMillis == 0 || now - flapWindowStartMillis > FLAP_WINDOW_MS) {
-          flapWindowStartMillis = now;
-          flapCount = 0;
-        }
-        flapCount++;
-        flapDirection = needUp ? "UP" : "DOWN";
-        if (flapCount > FLAP_MAX) {
-          flapHold = true;
-          held = true;
-          warn = true;
-        } else {
-          held = false;
-        }
-      }
-    }
-    if (held) {
-      if (warn) {
-        log.warn(
-            "RuntimeReconciler: convergence held ({}): foreign flip recurred > {} times within {}ms;"
-                + " holding until spec/procedure/policy input changes",
-            flapDirection,
-            FLAP_MAX,
-            FLAP_WINDOW_MS);
-      }
-      publishEngineOverlay(
-          RuntimeStatus.REASON_CONVERGENCE_HELD_FLAP,
-          "Convergence held: suspected engine flapping (foreign state repeatedly reverted)");
-      return false;
-    }
-    return true;
-  }
-
   /** Recompute and publish the observed status from live signals, incl. the procedure overlay. */
   private void refreshStatus() {
     Mode mode = safeMode();
     boolean external = safeExternal();
-    lease.mirrorFromMode(mode);
+    leaseHolder = RuntimeStatus.leaseHolderFor(mode, leaseHolder);
     RuntimeStatus.Procedure proc;
     synchronized (lock) {
       proc = representativeProcedureLocked();
     }
     RuntimeStatus base =
-        RuntimeStatus.derive(mode, external, lease.holder(), proc, specVersion.get(), Instant.now());
+        RuntimeStatus.derive(mode, external, leaseHolder, proc, specVersion.get(), Instant.now());
     // Soft-off legibility (§15 decision 1 / task 3): a procedure holds the engine UP while the
     // user's spec disables chat — stamp a legible ENGINE reason rather than a bare "healthy" that
     // looks like chat should be available.
@@ -668,9 +545,24 @@ public final class RuntimeReconciler implements AutoCloseable {
                 base,
                 RuntimeStatus.REASON_ENGINE_UP_FOR_BACKGROUND,
                 "Inference engine running for background document understanding; chat is unavailable");
+      } else if (proc.kind() == RuntimeStatus.ProcedureKind.VDU_BATCH
+          && "automatic-vdu".equals(proc.reason())) {
+        base = overlayEngine(base, "automatic-vdu",
+            "Picture reading is temporarily borrowing loaded chat");
       }
     }
-    status.set(base);
+    publishStatus(base);
+  }
+
+  private synchronized void publishStatus(RuntimeStatus next) {
+    var previous = status.getAndSet(next);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(
+        statusContent(previous), statusContent(next));
+  }
+
+  private static Object statusContent(RuntimeStatus value) {
+    return value.conditions().stream().map(c ->
+        java.util.Arrays.asList(c.axis(), c.status(), c.reason())).toList();
   }
 
   /** Overlay a reason/message onto the ENGINE condition without inventing a new axis. */
@@ -695,8 +587,8 @@ public final class RuntimeReconciler implements AutoCloseable {
       proc = representativeProcedureLocked();
     }
     RuntimeStatus base =
-        RuntimeStatus.derive(mode, safeExternal(), lease.holder(), proc, specVersion.get(), Instant.now());
-    status.set(overlayEngine(base, reason, message));
+        RuntimeStatus.derive(mode, safeExternal(), leaseHolder, proc, specVersion.get(), Instant.now());
+    publishStatus(overlayEngine(base, reason, message));
   }
 
   private void recordEngineFailure(ModeTransitionException e) {
@@ -764,9 +656,9 @@ public final class RuntimeReconciler implements AutoCloseable {
   public boolean awaitQuiescent(long timeoutMs) {
     long deadlineNanos = System.nanoTime() + timeoutMs * 1_000_000L;
     synchronized (lock) {
-      // {@code dirty} is included: a foreign-flip (drift-triggered) convergence marks dirty WITHOUT
-      // setting convergePending, so a barrier that ignored dirty could return before the loop had a
-      // chance to process the drift.
+      // {@code dirty} is included: an observed mode change marks dirty WITHOUT setting
+      // convergePending, so a barrier that ignored dirty could return before the loop had a chance
+      // to republish status for it.
       while (running && (dirty || (convergePending && activeProcedures.isEmpty())
           || converging || retryAtMillis > 0)) {
         long remainMs = (deadlineNanos - System.nanoTime()) / 1_000_000L;

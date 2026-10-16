@@ -1,0 +1,810 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T10:29:16.577Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "fb5d421305b59eb78723440efa6e3daeed1e64d5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatVocabularyTest\" --tests \"io.justsearch.app.api.status.operating.OperatingStateViewTest\" --tests \"io.justsearch.app.api.runtime.child.ChildControlVocabularyTest\" --tests \"io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriterTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerReaderTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerSchemaTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest\" --tests \"io.justsearch.app.api.gpu.GpuMemorySampleTest\" --tests \"io.justsearch.app.api.status.StatusRecordSchemaTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13026
+    },
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.memory.WindowsGpuMemoryReaderTest\" --tests \"io.justsearch.gpu.memory.WindowsGpuMemoryReaderMachineTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3914
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest\" --tests \"io.justsearch.ui.api.StatusOperatingStateTest\" --tests \"io.justsearch.ui.api.OperatingGpuProjectionTest\" --tests \"io.justsearch.ui.api.mcp.ChatUnavailableErrorTest\" --tests \"io.justsearch.ui.api.LocalApiCorsPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12054
+    },
+    {
+      "command": "npx vitest run \"src/api/contract.test.ts\" \"src/api/generated/schema-types/status-response.test.ts\" \"src/api/clientKind.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-3028-1792060154910.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1663
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d228a9c561fafa0ff8f2cd1725b645955435d01fd0f605f07d358ec34f0285de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "wire casing is the constant name",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: generating is exactly inFlight > 0",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: each reason slot is legal only in its own state",
+          "status": "passed"
+        },
+        {
+          "name": "ChatRefusal and Demand reject negative durations",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: UNLOADED needs a reason, and a pressure unload names gpu_busy or game_mode",
+          "status": "passed"
+        },
+        {
+          "name": "exactMembers() — every enum keeps its members and the additive external-server refusal",
+          "status": "passed"
+        },
+        {
+          "name": "Activation names its reason exactly when not effective",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/status/operating/OperatingStateViewTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/status/operating/OperatingStateViewTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a993e36aa2ae026c7f282f1e93bde5d3348e07240a37e1f006bd39467f568ce3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the block validates its envelope and omits absent chat and indexing on the wire",
+          "status": "passed"
+        },
+        {
+          "name": "gpu: unknown has no readings; profile source pairs with a resolved profile",
+          "status": "passed"
+        },
+        {
+          "name": "enums have exactly the reconciled members and wire casing",
+          "status": "passed"
+        },
+        {
+          "name": "chat counts are consistent; a load estimate names its source",
+          "status": "passed"
+        },
+        {
+          "name": "chat reason must belong to the vocabulary of its state",
+          "status": "passed"
+        },
+        {
+          "name": "indexing reasons are distinct, ordered, and required when PAUSED or SLOWED",
+          "status": "passed"
+        },
+        {
+          "name": "a chat detail serializes as its lower-case token",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlVocabularyTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlVocabularyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cba579bfe2449b61f137dc24b98d30f57b4008bbeac08bccbb0e0d3c690e9fa1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit class vs the supervision contract's restart class: only REQUESTED is shared",
+          "status": "passed"
+        },
+        {
+          "name": "ChildSurvivedException names the survivor",
+          "status": "passed"
+        },
+        {
+          "name": "ExitOutcome: a REQUESTED exit names its reason; terminate time pairs with the call",
+          "status": "passed"
+        },
+        {
+          "name": "exactly QUIT, UPGRADE, ENGINE_RESTART and DEVICE_LOST end the Engine",
+          "status": "passed"
+        },
+        {
+          "name": "wire casing: UPPER names, lower-case detail tokens, round-trip",
+          "status": "passed"
+        },
+        {
+          "name": "TerminateResult carries an error exactly when FAILED, with the ledger wire form",
+          "status": "passed"
+        },
+        {
+          "name": "CooperativeStop: NONE has no grace, and grace is never negative",
+          "status": "passed"
+        },
+        {
+          "name": "ChildSpec copies its collections and rejects a path label or an empty argv",
+          "status": "passed"
+        },
+        {
+          "name": "every enum has exactly the reconciled members, in order",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/EngineSelfIntentWriterTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/EngineSelfIntentWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c70b3507ef3bc147f3350b1064c1ee3607879f66bdb01f450cf0b47d81dff4ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "writes the Engine's identity, reason, detail and expected code to engine.v1.jsonl",
+          "status": "passed"
+        },
+        {
+          "name": "an unwritable ledger never stops the exit, and the writer reports it",
+          "status": "passed"
+        },
+        {
+          "name": "the identity refuses values a reader could not use",
+          "status": "passed"
+        },
+        {
+          "name": "only a reason that ends the Engine is a self-intent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f101f720b1d950266a896278422b1c71c4b4b5365ddf15424914748d79e1e1a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a newer schemaVersion is refused line by line and counted, never fatal",
+          "status": "passed"
+        },
+        {
+          "name": "a torn last line is ignored and reported",
+          "status": "passed"
+        },
+        {
+          "name": "an unknown timestamp reads as unknown without dropping the record",
+          "status": "passed"
+        },
+        {
+          "name": "missing files are an empty ledger, not an error",
+          "status": "passed"
+        },
+        {
+          "name": "malformed, oversized and envelope-less lines are corrupt; unknown and foreign types counted",
+          "status": "passed"
+        },
+        {
+          "name": "the older generation is read before the current one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSchemaTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSchemaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aabb59de91ea83c56008119340f3cbb09cfb6793a8c2e3276eee4c9ff71c6848",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "every record the Java writers write conforms",
+          "status": "passed"
+        },
+        {
+          "name": "a gap record written after a failure conforms",
+          "status": "passed"
+        },
+        {
+          "name": "the schema's enums are exactly the app-api enums",
+          "status": "passed"
+        },
+        {
+          "name": "the schema rejects what a writer must never write",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:67fa959765ef32f68e5d454655e3a4fb83634da6fcbd765e9d0032a513271abf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a rotating writer rotates before an append would pass the hard cap",
+          "status": "passed"
+        },
+        {
+          "name": "a torn line another writer leaves mid-session is closed before the next record",
+          "status": "passed"
+        },
+        {
+          "name": "sessionRotation()",
+          "status": "passed"
+        },
+        {
+          "name": "a session closes a torn tail with a newline so the next record starts clean",
+          "status": "passed"
+        },
+        {
+          "name": "records round-trip with the v1 envelope, seq from 1, and land under runtime/exit-ledger",
+          "status": "passed"
+        },
+        {
+          "name": "a write failure returns false, never throws, and leaves a gap on the next write",
+          "status": "passed"
+        },
+        {
+          "name": "an append-only writer never rotates",
+          "status": "passed"
+        },
+        {
+          "name": "caller bugs are refused: wrong family, envelope fields, oversized records",
+          "status": "passed"
+        },
+        {
+          "name": "a rotation failure keeps appending and records a ROTATE_FAILED gap",
+          "status": "passed"
+        },
+        {
+          "name": "persistenceFailureWarnsOnceAndRecoveryIsReported()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/gpu/GpuMemorySampleTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/gpu/GpuMemorySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3fc4cb0ce13bcc6f72482960769588c7016b619df9f62a79ed128783f1b48bcd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "per-process values come only from PDH and are never negative",
+          "status": "passed"
+        },
+        {
+          "name": "a LUID is formatted and normalized the way PDH names its instances",
+          "status": "passed"
+        },
+        {
+          "name": "a known sample names device, total and used; free is floored at zero",
+          "status": "passed"
+        },
+        {
+          "name": "UNKNOWN carries a reason and no values, and frees nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/memory/WindowsGpuMemoryReaderTest.java",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/memory/WindowsGpuMemoryReaderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71be744efe1835197cc1b65dca09d4ae8166fd153a9b4c5fcba1616e8618727e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a mapped compute device picks the adapter among several, keeping its CUDA ordinal",
+          "status": "passed"
+        },
+        {
+          "name": "no NVIDIA hardware adapter is UNKNOWN, and the adapters are listed again next time",
+          "status": "passed"
+        },
+        {
+          "name": "PDH failing falls back to NVML totals, with no per-process memory",
+          "status": "passed"
+        },
+        {
+          "name": "PDH: adapter use and per-PID dedicated and shared use on the NVIDIA LUID only",
+          "status": "passed"
+        },
+        {
+          "name": "another OS is UNSUPPORTED_OS and touches no native source",
+          "status": "passed"
+        },
+        {
+          "name": "NVML is not used when it cannot be mapped: several adapters or several NVML devices",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent samples are serialized: native reads never interleave",
+          "status": "passed"
+        },
+        {
+          "name": "an adapter-list failure is retried on the next sample",
+          "status": "passed"
+        },
+        {
+          "name": "close releases every source once; later samples are CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "a LUID PDH no longer reports (driver reset) relists the adapters; NVML covers the gap",
+          "status": "passed"
+        },
+        {
+          "name": "several NVIDIA adapters without a LUID map are UNMAPPED_MULTI_GPU, never a guess",
+          "status": "passed"
+        },
+        {
+          "name": "every source failing is READ_FAILED, including linkage errors, and never throws",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/memory/WindowsGpuMemoryReaderMachineTest.java",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/memory/WindowsGpuMemoryReaderMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f1f668286c648a0d87e23e39935775f8408698b4607587796da8a45eef00ee4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the NVML fallback reads the single NVIDIA adapter when PDH is unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "PDH instance names carry the DXGI LUIDs (case-insensitively)",
+          "status": "passed"
+        },
+        {
+          "name": "a reading is PDH-known on one NVIDIA adapter, otherwise a named UNKNOWN; never throws",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ecf8c1c6dc2cf7618ccc810d377916539d09e4e63192732d1624f4832552fadf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the assembled view always validates (every projected chat reason is in vocabulary)",
+          "status": "passed"
+        },
+        {
+          "name": "gpu is unknown and degradations empty: no producer feeds them yet",
+          "status": "passed"
+        },
+        {
+          "name": "seq starts at 1 and grows only when content other than sample times changes",
+          "status": "passed"
+        },
+        {
+          "name": "engine Healthy + generative READY -> READY",
+          "status": "passed"
+        },
+        {
+          "name": "engine Starting + generative STARTING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine Recovering + generative RELOADING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine Down + generative FAILED -> FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "engine Down + generative ABSENT -> OFF",
+          "status": "passed"
+        },
+        {
+          "name": "engine Down + generative UNAVAILABLE -> OFF",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative READY -> READY",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative STARTING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative RELOADING -> LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative FAILED -> FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "engine  + generative ABSENT -> OFF",
+          "status": "passed"
+        },
+        {
+          "name": "indexing since moves only when the state or reasons change",
+          "status": "passed"
+        },
+        {
+          "name": "indexing: IDLE with nothing pending, RUNNING with work, PAUSED for energy saver",
+          "status": "passed"
+        },
+        {
+          "name": "ledgerWriteFailureIsVisibleUntilDurableRecovery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "indexing is absent without a Worker view, and listed stale when the sample is",
+          "status": "passed"
+        },
+        {
+          "name": "gpu: the projected reading passes through; byte figures do not move seq, a stale one is listed",
+          "status": "passed"
+        },
+        {
+          "name": "chat reasonCode and since are the generative component's own (same pass)",
+          "status": "passed"
+        },
+        {
+          "name": "lifecycle LIFECYCLE_STATE_STOPPING omits chat",
+          "status": "passed"
+        },
+        {
+          "name": "lifecycle LIFECYCLE_STATE_STOPPED omits chat",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusOperatingStateTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusOperatingStateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2d1aa5011dccb8e353b01954d59b1c765394b4baf5bf9e4ed7f190094acde737",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a healthy engine is READY, and repeated reads of the same state keep seq",
+          "status": "passed"
+        },
+        {
+          "name": "a wired GPU memory reader fills operating.gpu after a background first sample; closing it returns gpu to unknown",
+          "status": "passed"
+        },
+        {
+          "name": "chat projects the ENGINE axis and the same generative component the response shows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProjectionTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4654073b7f03a993d7a187b0a0f6a75e0a50df250b9b91ae86f8209b99a704c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PDH: total, free, our dedicated and shared over Engine and children, external = used - ours",
+          "status": "passed"
+        },
+        {
+          "name": "listing child processes failing counts the Engine alone",
+          "status": "passed"
+        },
+        {
+          "name": "external use is floored at zero",
+          "status": "passed"
+        },
+        {
+          "name": "before the first sample exists a pass is unknown and never calls the reader",
+          "status": "passed"
+        },
+        {
+          "name": "a reading older than three windows is stale",
+          "status": "passed"
+        },
+        {
+          "name": "a pass does not wait for a first sample still in flight",
+          "status": "passed"
+        },
+        {
+          "name": "any UNKNOWN reading is the unknown block",
+          "status": "passed"
+        },
+        {
+          "name": "NVML: adapter figures only, no our-use or external-use",
+          "status": "passed"
+        },
+        {
+          "name": "a reader that fails to link is the unknown block too",
+          "status": "passed"
+        },
+        {
+          "name": "one sample per 2 s window; inside it only the age moves",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent status passes after the window take exactly one new sample",
+          "status": "passed"
+        },
+        {
+          "name": "aDepartedChildKeepsTheOwnershipCapturedWithItsMemorySample()",
+          "status": "passed"
+        },
+        {
+          "name": "pdhWithoutProcessFiguresPreservesUnknownAttribution()",
+          "status": "passed"
+        },
+        {
+          "name": "a reader that throws is the unknown block, cached for the window like any reading",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/status/StatusRecordSchemaTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/status/StatusRecordSchemaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0cca9196e576029799210a48e844ffa02a9b916171b0ce04af382e00b0089cce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Regenerate baseline schemas when -PupdateSchemas=true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/contract.test.ts",
+      "file": "modules/ui-web/src/api/contract.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:03b3df4d5ea07bb7162dcb5bebfd8cf7d27f1829d23bbb27e24af1c88a6320f9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Cross-language contract: StatusResponse vs generated statusResponseSchema Java-serialized StatusResponse passes Zod validation",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: StatusResponse vs generated statusResponseSchema fixture contains expected top-level fields",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: StatusResponse vs generated statusResponseSchema readiness envelope has expected structure",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: SettingsV2 round-trip Java-serialized SettingsV2 passes generated Zod validation",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: SettingsV2 round-trip fixture contains all expected settings fields",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema Java-serialized search response passes generated Zod validation, then maps",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema mapped response preserves hit data",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema mapped response preserves metadata fields (364 T1-C)",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema raw fixture has expected wire format fields",
+          "status": "passed"
+        },
+        {
+          "name": "380: Mapper propagation — no silent field drops all fields map entries from rich fixture hit propagate to mapped SearchHit",
+          "status": "passed"
+        },
+        {
+          "name": "380: Mapper propagation — no silent field drops sparse hit (missing optional fields) maps without crashing",
+          "status": "passed"
+        },
+        {
+          "name": "380: Mapper propagation — no silent field drops top-level result properties propagate when present",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/generated/schema-types/status-response.test.ts",
+      "file": "modules/ui-web/src/api/generated/schema-types/status-response.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94c57c3f7551312a7e4bf8d40c8b96f031bc12b901a6b975664003323f5b446a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) validates the real captured status wire fixture with no contract drift",
+          "status": "passed"
+        },
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) accepts the INDEXING GPU lease holder projected by the Engine",
+          "status": "passed"
+        },
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) exposes the six engine-component states as a distinct generated vocabulary",
+          "status": "passed"
+        },
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) rejects the retired aggregate spelling and unknown component states",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/ChatUnavailableErrorTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/ChatUnavailableErrorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92fcb68e5741c6de9143c861eed19bf4ab497b52e30ca1e12c2827cb4b57c267",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the MCP projection carries retryAfterMs in structuredContent and words it in text",
+          "status": "passed"
+        },
+        {
+          "name": "the code is TRANSIENT, and the HTTP body with retryAfterMs conforms to the schema",
+          "status": "passed"
+        },
+        {
+          "name": "an unknown retry time is absent, never zero",
+          "status": "passed"
+        },
+        {
+          "name": "a permanent code cannot carry a retry time, and a negative one is refused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/clientKind.test.ts",
+      "file": "modules/ui-web/src/api/clientKind.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d58c2effaddf2b104f3b1840498ee29289bc955d6a560936049c07a8cb6b149b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests never adds it to a GET or HEAD, so a simple read gains no CORS preflight",
+          "status": "passed"
+        },
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests never adds it to a non-JSON write: multipart, text body or no body",
+          "status": "passed"
+        },
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests adds it to a non-GET with a JSON body and keeps every other init field",
+          "status": "passed"
+        },
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests keeps the caller header shape: record, Headers and tuple list",
+          "status": "passed"
+        },
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests never overrides a kind the caller declared, in any casing",
+          "status": "passed"
+        },
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests reads method and headers from a Request input and keeps its headers",
+          "status": "passed"
+        },
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests the admission seam sends it on the first attempt and on every retry of a JSON write",
+          "status": "passed"
+        },
+        {
+          "name": "the webview declares X-JustSearch-Client-Kind: WEBVIEW only on already-preflighted requests shell-v0 authorizedFetch: a GET goes without it, a JSON write carries it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiCorsPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b923b07be2772b4cabeb59c9255d554985670abdf78af45020b9621edd1d3519",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Dev mode: preflight denies non-loopback origins with 403",
+          "status": "passed"
+        },
+        {
+          "name": "Prod mode: only desktop origins are allowed (tauri://localhost and http(s)://tauri.localhost)",
+          "status": "passed"
+        },
+        {
+          "name": "Dev mode: preflight allows loopback http origin and echoes allow-origin",
+          "status": "passed"
+        },
+        {
+          "name": "Prod mode: the webview's JSON-write preflight may declare X-JustSearch-Client-Kind",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ab319ae927a17a6e8b9b37842bd213159510b4a3c639930287802b71db75cec6"
+}

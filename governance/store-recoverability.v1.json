@@ -988,7 +988,8 @@
       "reconciliation": "PUBLISH_CURRENT_INSTANCE_AND_RETAIN_BOUNDED_HISTORY",
       "status": "READY",
       "implementationSources": [
-        "modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java"
+        "modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java",
+        "modules/shell/src-tauri/src/shell_actuator.rs"
       ],
       "tests": [
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java",
@@ -1633,6 +1634,7 @@
       "implementationSources": [
         "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java",
         "modules/shell/src-tauri/src/lib.rs",
+        "modules/shell/src-tauri/src/shell_actuator.rs",
         "scripts/dev/dev-runner.cjs"
       ],
       "tests": [
@@ -1673,6 +1675,85 @@
       ],
       "fixtures": [],
       "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about."
+    },
+    {
+      "id": "engine-exit-ledger-children",
+      "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Process bookkeeping only (ADR-0051): child kind, a diagnostic label that is never a path, pids, start and exit times, the normalized executable path, a SHA-256 of the argv (never the argv), exit codes and stop reasons. Not recorded: argv, environment, model or document paths, prompts, MCP arguments. The executable path can contain the Windows user name, the same exposure as runtime/manifest.json. Never sent anywhere; included only in local diagnostics bundles.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": ["runtime/exit-ledger/children.v1*.jsonl", "runtime/exit-ledger/children.v1*.jsonl.pending"],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "Exit ledger v1: append-only JSON lines of at most 4 KiB each (governance/exit-ledger.v1.schema.json), a current file, numbered archives retained within 128 MiB per family, and a compacting loss journal",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedger.java",
+      "futureVersionRefusalTest": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+      "writeMode": "APPEND_ONLY",
+      "atomicity": "SINGLE_APPEND",
+      "corruptionPolicy": "SKIP_UNREADABLE_LINE_AND_WARN",
+      "reconciliation": "The next owner closes the records the last one left open as OWNER_DIED after an OS identity check, and never kills. Readers skip a torn last line, corrupt or oversized lines, newer schema versions and unknown types and report each; missing files are an empty ledger. Retention is by size only: the Engine, the family's single rotator, rotates at session start over 1 MiB and before an append past 2 MiB, keeping one older generation.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerFamily.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriter.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReader.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRetention.java",
+        "modules/shell/src-tauri/src/exit_ledger.rs"
+      ],
+      "tests": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSchemaTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java"
+      ],
+      "fixtures": [],
+      "note": "ADR-0051. The Engine owns child records and is the family's single rotator. Java and Rust readers consume numbered archives, loss receipts and the current file. The reconciliation field remains the frozen compatibility-strategy identifier, including its historical one-generation wording; actual retention now preserves numbered archives within 128 MiB and persists identity/session-scoped EVIDENCE_LOST receipts before eviction. Loss-journal compaction explicitly loses membership detail while preserving known evidence scope; malformed lines are retained and counted, not silently discarded. The source registrations add the retention helper and shared Rust reader without changing the store identity, schema or reconciliation token."
+    },
+    {
+      "id": "engine-exit-ledger-incarnations",
+      "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Process bookkeeping only (ADR-0051): Engine incarnation ids, pids, start and exit times, the executable path, exit codes, stop reasons and the supervision contract's decision. No user content and no secret; the same exposure as runtime/supervisor.v1.json. Never sent anywhere.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": ["runtime/exit-ledger/engine.v1*.jsonl", "runtime/exit-ledger/engine.v1*.jsonl.pending"],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "Exit ledger v1: append-only JSON lines of at most 4 KiB each (governance/exit-ledger.v1.schema.json), a current file, numbered archives retained within 128 MiB per family, and a compacting loss journal",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedger.java",
+      "futureVersionRefusalTest": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+      "writeMode": "APPEND_ONLY",
+      "atomicity": "SINGLE_APPEND",
+      "corruptionPolicy": "SKIP_UNREADABLE_LINE_AND_WARN",
+      "reconciliation": "The next supervisor closes an incarnation the last one left open as OWNER_DIED after an OS identity check, and never kills. Several writers append (the supervisor, the dev stop command and the Engine's own engine-self-intent); each record is one append of at most 4 KiB, and only the supervisor rotates. Readers tolerate torn, corrupt, newer and unknown lines as for the children family.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerFamily.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/EngineSelfIntentWriter.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriter.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReader.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRetention.java",
+        "modules/shell/src-tauri/src/exit_ledger.rs",
+        "modules/shell/src-tauri/src/shell_actuator.rs",
+        "scripts/dev/lib/exit-ledger.cjs"
+      ],
+      "tests": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/EngineSelfIntentWriterTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSchemaTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java"
+      ],
+      "fixtures": [],
+      "note": "ADR-0051. The Tauri shell or dev-runner supervisor writes engine-start, engine-intent and engine-exit and is the only rotator; the Engine appends self-intent without rotating. The compatibility tuple and reconciliation token remain unchanged. Current retention uses the same 128 MiB numbered-archive and loss-receipt protocol as the children family, including preservation of unreadable loss-journal lines and explicit incomplete scope after lossy compaction. encryption is NOT_APPLICABLE rather than UNSEALED_NO_JVM_CIPHER because the Engine also writes this file."
     },
     {
       "id": "operation-fault-harness-barrier",
@@ -1793,29 +1874,6 @@
       "fixtures": []
     },
     {
-      "id": "generative-recovery-harness-barrier",
-      "pathVerification": "COMPOSED",
-      "pathVerificationNote": "KnowledgeServerHealthMonitor selects the generative-recovery-1 family only for the first automatic retry of an exact FAILED generative observation; HarnessBarrierProtocol composes reached, pending and release suffixes.",
-      "encryption": "NOT_APPLICABLE",
-      "encryptionNote": "Opt-in installed-test coordination only: process ID, component state and timestamp, attempt count, and desired/applied version identities; no model bytes, document content, credentials or user settings.",
-      "owner": "HEAD",
-      "root": "DATA_DIR",
-      "ownedPaths": ["runtime/generative-recovery-1-reached.json", "runtime/generative-recovery-1-reached.pending", "runtime/generative-recovery-1-release"],
-      "recoverability": "EPHEMERAL",
-      "upgradeHandling": "RESET",
-      "format": "Unversioned installed-test generative recovery marker JSON and release presence signal",
-      "currentVersion": 0,
-      "readableLegacyVersions": [],
-      "writeMode": "FULL_REWRITE",
-      "atomicity": "ATOMIC_REACHED_PUBLICATION_AND_SINGLE_WRITE_PENDING_RELEASE",
-      "corruptionPolicy": "FAIL_LOUD",
-      "reconciliation": "Both supervisor harness mode and the explicit generative selector are required. The Engine publishes the immutable FAILED/count-zero observation before physical retry admission while retaining the monitor's single recovery slot. The harness verifies the exact managed child identity, process incarnation and marker before faulting its fixture-private runtime. It always releases the barrier and restores the executable in finally. Every scenario uses a fresh data directory; normal startup never selects or consumes these files.",
-      "status": "READY",
-      "implementationSources": ["modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerHealthMonitor.java", "modules/core/src/main/java/io/justsearch/core/harness/HarnessBarrierProtocol.java", "scripts/supervisor-conformance/component-recovery-scenario.mjs"],
-      "tests": ["modules/app-services/src/test/java/io/justsearch/app/services/worker/ComponentRecoveryMonitorTest.java", "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java"],
-      "fixtures": []
-    },
-    {
       "id": "operations-db",
       "pathVerification": "COMPOSED",
       "pathVerificationNote": "HeadlessApp and LauncherEnvironment resolve operations.db under DATA_DIR; SqliteOperationStore composes SQLite sidecars and timestamped preservation directories.",
@@ -1864,6 +1922,18 @@
     }
   ],
   "nonDurableWriteSites": [
+    {
+      "path": "modules/shell/src-tauri/src/bin/support/updater_probe.inc.rs",
+      "reason": "Included only by the supervisor-conformance binary. Its updater-probe/staged/probe/installer.exe fixture, upgrade intent and witness are written below the harness's throwaway per-case data directory; no product binary includes this probe. Losing these files costs a rerun of that conformance case."
+    },
+    {
+      "path": "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs",
+      "reason": "Included by updater.rs only under cfg(test), additionally Windows-only. Witness.root is a tempfile::TempDir holding staged/attempt-1/installer.exe and updater test state; no production path includes these writes, and the temporary fixture is discarded after the case."
+    },
+    {
+      "path": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs",
+      "reason": "Included by updater.rs only under cfg(test). DeliveryFixture.root is a tempfile::TempDir holding staged/probe/installer.exe and coordinator test state; no production path includes these writes, and losing the fixture costs only a rerun."
+    },
     {
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/EmbeddedResourceBudget.java",
       "reason": "JVM/OS temp scratch: each justsearch-embedded-*.bin file materializes a budget-bounded embedded resource for the current parse only. parseEmbedded deletes it in finally after closing streams, including on budget or parser failure; losing it costs only re-extraction from the source document."
@@ -2008,6 +2078,22 @@
   "pendingDurableClassification": {
     "cap": 8,
     "note": "Durable write sites the write-call scanner found that have NO durableStores row yet. This is NOT nonDurableWriteSites: every one of these holds state that survives, so classifying them as scratch would be the escape hatch this register forbids. It is also not a durableStores row, because a row is a runtime commitment on the upgrade path (again: see the note), and each of these needs a settled corruption policy plus a recovery/preservation test before it can be READY. `cap` is a ratchet: the list may not grow past it without a deliberate edit, so a later agent cannot quietly park a new store here. Every entry names its blocker. DRAINED to empty by tempdoc 909 (wave-1 residue R4): all eight became READY rows above, each after the product work its blocker named - a boot+unlock re-derivation for agent-history transcripts, an atomic write for install-attempts.json, a stated-and-tested absent-on-unparseable policy for the GPL eval snapshot, a source-scan test proving the two GPL stage-3 reports have no reader, bounded rotation for llama-server.log, and content-verified COPY-undo for the user's own documents. The block and its cap stay so the ratchet survives an empty list: a future write site may be parked here again, but only deliberately and only up to eight.",
-    "entries": []
+    "entries": [
+      {
+        "path": "modules/app-inference/src/main/java/io/justsearch/app/inference/ChatArtifactIdentity.java",
+        "state": "Persistent <canonical selected model path>.justsearch-identity.v1 Properties receipt: version, canonical path, filesystem file key, size, modified time and SHA-256. Selected model paths may be outside AI_HOME. Missing, oversized, malformed or version-mismatched receipts leave identity unmeasured and queue background verification; successful verification replaces the receipt with an atomic-move fallback.",
+        "blocker": "Needs a settled durable-store root for configured model siblings, an explicit future-receipt/corruption disposition, and focused corruption/recovery coverage before adding a READY compatibility owner. Existing InferenceConfigArtifactIdentityTest proves absent-receipt verification, persisted reuse and stale-version rejection, but does not cover every malformed/future receipt. This CI repair records the gap rather than claiming process-scoped scratch or adding an unimplemented upgrade authority."
+      },
+      {
+        "path": "modules/app-inference/src/main/java/io/justsearch/app/inference/chat/ChildSelfTestLauncher.java",
+        "state": "Creates the configured self-test log directory and starts ChildControl with AppendToLog. RuntimeActivationService supplies <AI_HOME>/logs/llama-server-selftest.log, so child stdout/stderr persist across self-tests; they can contain request-shaped diagnostics and are not the DATA_DIR llama-server.log covered by the existing log row.",
+        "blocker": "Needs a settled retention/corruption policy and preservation/recovery test for the self-test log. Current behavior is append-only without bounded rotation; registering it as the existing three-generation llama-server log would be false. No logging or upgrade behavior is changed by this classification."
+      },
+      {
+        "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/tokenizer/HuggingFaceNativeRuntime.java",
+        "state": "Persistent DJL engine cache: <Utils.getEngineCacheDir(tokenizers)>/<version>-cpu-<classifier>/{libwinpthread-1.dll,libgcc_s_seh-1.dll,libstdc++-6.dll,tokenizers.dll}. Missing CPU DLLs are copied from bundled resources through sibling pending files; existing regular files and GPU architecture subdirectories are preserved. The shared cache survives JVM exit and is not process-scoped scratch.",
+        "blocker": "Needs an explicit platform-default/configured DJL cache root and a stated-and-tested corrupted-existing-DLL policy before becoming a READY compatibility owner. NoDeviceTokenizerCacheTest covers missing CPU extraction with preservation of a GPU architecture cache; current preparation does not verify or repair an existing corrupt regular DLL. This entry records that limit without changing the loader or pretending the existing ORT cache owner governs it."
+      }
+    ]
   }
 }

@@ -21,9 +21,19 @@ public enum LifecycleReasonCode {
   COMPONENT_RECOVERY_EXHAUSTED("component.recovery_exhausted"),
   // --- Engine components ---
   ENGINE_NOT_STARTED("engine.not_started"),
+  // Spec F §1.3: the Engine could not create or join its own Windows job at boot, so the processes
+  // it starts are not guaranteed to end with it (the desktop shell's job still contains them; a dev
+  // Engine's helpers can outlive it). Observed once, at boot, and never re-derived.
+  ENGINE_CONTAINMENT_UNAVAILABLE("engine.containment_unavailable"),
   ENCODERS_RELOADING("encoders.reloading"),
   ENCODERS_HEALTH_EMBEDDING_NOT_READY("encoders.health.embedding_not_ready"),
   ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING("encoders.health.embedding_probe_missing"),
+  // Spec D §6.3: a device's breaker has been open for breakerStandingMs, because a GPU run has
+  // held its seat past stuckAfterMs; searches skip their semantic legs meanwhile.
+  ENCODERS_HEALTH_SEMANTIC_STUCK("encoders.health.semantic_stuck"),
+  // Searches turned away by a busy or stuck GPU had their query encoded on the warm CPU session
+  // within the last QueryCpuRecourse.RECENT_MS: semantic search is answered, more slowly.
+  ENCODERS_HEALTH_QUERY_ON_CPU("encoders.health.query_on_cpu"),
 
   // --- Index serving / embedding compatibility ---
   INDEX_STARTING("index.starting"),
@@ -106,6 +116,29 @@ public enum LifecycleReasonCode {
   // it is the one that trained alarm-blindness: the banner told a user who had just switched chat off
   // that something was broken.
   INFERENCE_DEACTIVATED("inference.deactivated"),
+  // Spec A step 7: the classified chat failure (Spec A §7.1, the FailedCode the controller latched)
+  // instead of the one collapsed "stopped unexpectedly". ChatReasonCodes maps each FailedCode; a
+  // missing runtime library reuses runtime_not_installed and a crash loop keeps crashed.
+  INFERENCE_OUT_OF_MEMORY("inference.out_of_memory"),
+  INFERENCE_STARTUP_TIMEOUT("inference.startup_timeout"),
+  INFERENCE_START_FAILED("inference.start_failed"),
+  INFERENCE_MODEL_LOAD_FAILED("inference.model_load_failed"),
+  // Spec A §7.2: chat serves, at a smaller context window than planned, after running out of
+  // memory (the sticky stepped-from rung). A notice on a READY component, never a fault.
+  INFERENCE_CONTEXT_REDUCED("inference.context_reduced"),
+  // Spec A step 9 (T21): the chat controller unloaded the idle model because another application
+  // needs the graphics memory, or a game is running. Not a fault: it reloads on demand.
+  INFERENCE_UNLOADED_GPU_PRESSURE("inference.unloaded_gpu_pressure"),
+  INFERENCE_UNLOADED_GAME_MODE("inference.unloaded_game_mode"),
+  // Spec E step E7b (P4): an explicit user setting outranks the device-memory plan and this
+  // machine cannot honour it. The reasonCode of the operating block's user_setting_unmet
+  // degradation, computed per request by the operating-state assembler; never held in a slot.
+  INFERENCE_SETTING_UNMET("inference.setting_unmet"),
+  // Spec E step E7b: the pinned GPU is below the P8 boundary, so no plan applies and today's
+  // constants stay. The reasonCode of the operating block's device_below_p8 degradation.
+  INFERENCE_DEVICE_BELOW_P8("inference.device_below_p8"),
+  INFERENCE_DEVICE_MEMORY_OVERCOMMIT("inference.device_memory_overcommit"),
+  INDEXING_BGE_M3_UNMEASURED("indexing.bge_m3_unmeasured"),
 
   // --- Visual text extraction (OCR/VDU) ---
   OCR_DISABLED("ocr.disabled"),
@@ -115,6 +148,10 @@ public enum LifecycleReasonCode {
   VDU_INSUFFICIENT_VRAM("vdu.insufficient_vram"),
   VDU_MISSING_MMPROJ("vdu.missing_mmproj"),
   VDU_CIRCUIT_OPEN("vdu.circuit_open"),
+  /** Automatic picture reading paused: repeated automatic passes had every attempt refused. */
+  VDU_BREAKER_OPEN_REFUSED("vdu.breaker_open.refused"),
+  /** Automatic picture reading paused: repeated automatic passes could not enter vision mode. */
+  VDU_BREAKER_OPEN_ENTRY_FAILED("vdu.breaker_open.entry_failed"),
 
   // --- Telemetry ---
   TELEMETRY_UNAVAILABLE("telemetry.unavailable"),
@@ -125,6 +162,22 @@ public enum LifecycleReasonCode {
   // --- Chunk Embedding (Phase 2 backfill) ---
   CHUNK_EMBEDDING_NOT_READY("chunk_embedding.not_ready"),
   CHUNK_EMBEDDING_IN_PROGRESS("chunk_embedding.in_progress"),
+
+  // --- Indexing (operating status block, Spec E step E1) ---
+  // Indexing is PAUSED because the OS asks for energy saving. Computed per request by the
+  // operating-state assembler from the energy poll; never held in a capability reason slot.
+  INDEXING_PAUSED_ENERGY_SAVER("indexing.paused_energy_saver"),
+  // Indexing is SLOWED to the duty floor while chat is answering (Spec E step E2). Computed per
+  // request by the operating-state assembler from the bulk-work gate; never held in a reason slot.
+  INDEXING_SLOWED_CHAT_GENERATING("indexing.slowed_chat_generating"),
+  // Indexing is PAUSED because another application needs the graphics card's memory (Spec E step
+  // E3). Computed per request by the operating-state assembler from the bulk-work gate, whose
+  // external-pressure input the Engine's GPU residency sampler sets; never held in a reason slot.
+  INDEXING_PAUSED_GPU_BUSY("indexing.paused_gpu_busy"),
+  // Indexing is PAUSED because a game runs (Spec E step E4). Computed per request by the
+  // operating-state assembler from the bulk-work gate, whose game input the Engine's GPU residency
+  // sampler sets from game detection; never held in a reason slot.
+  INDEXING_PAUSED_GAME_MODE("indexing.paused_game_mode"),
 
   // --- LambdaMART (reranking model) ---
   LAMBDAMART_NOT_CONFIGURED("lambdamart.not_configured"),
@@ -209,6 +262,10 @@ public enum LifecycleReasonCode {
       // notice the user gets that their preferences were reset.
       case DATA_NEWER_BUILD, SETTINGS_RESET_FROM_CORRUPT, SETTINGS_RECOVERY_REQUIRED, OPERATIONS_HISTORY_RESET, OPERATIONS_PERSISTENCE_FAILED -> RetentionClass.STICKY;
 
+      // Spec F §1.3: decided once, at the first statement of the Engine's entry point, and true
+      // for the whole session. Nothing later re-derives it, so nothing may erase it.
+      case ENGINE_CONTAINMENT_UNAVAILABLE -> RetentionClass.STICKY;
+
       // Physical failure is a real cause, whether the index never opened or was lost after READY.
       case COMPONENT_START_DEADLINE, COMPONENT_RECOVERY_FAILED,
           INDEX_FAILED, INDEX_MODEL_NOT_INSTALLED,
@@ -218,7 +275,11 @@ public enum LifecycleReasonCode {
           INFERENCE_RUNTIME_NOT_INSTALLED,
           INFERENCE_POLICY_ONLINE_AI_DISABLED,
           INFERENCE_POLICY_GPU_DISABLED,
-          INFERENCE_ACTIVATION_FAILED -> RetentionClass.FAULT;
+          INFERENCE_ACTIVATION_FAILED,
+          INFERENCE_OUT_OF_MEMORY,
+          INFERENCE_STARTUP_TIMEOUT,
+          INFERENCE_START_FAILED,
+          INFERENCE_MODEL_LOAD_FAILED -> RetentionClass.FAULT;
 
       // The one "I know nothing" fallback in this vocabulary.
       case INFERENCE_OFFLINE -> RetentionClass.GENERIC;
@@ -233,10 +294,19 @@ public enum LifecycleReasonCode {
           INDEX_THROUGHPUT_DEGRADED,
           ENCODERS_HEALTH_EMBEDDING_NOT_READY,
           ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING,
+          ENCODERS_HEALTH_SEMANTIC_STUCK,
+          ENCODERS_HEALTH_QUERY_ON_CPU,
           INFERENCE_STARTING,
           INFERENCE_GPU_YIELDED_TO_INDEXING,
           INFERENCE_UP_FOR_BACKGROUND,
           INFERENCE_DEACTIVATED,
+          INFERENCE_CONTEXT_REDUCED,
+          INFERENCE_UNLOADED_GPU_PRESSURE,
+          INFERENCE_UNLOADED_GAME_MODE,
+          INFERENCE_SETTING_UNMET,
+          INFERENCE_DEVICE_BELOW_P8,
+          INFERENCE_DEVICE_MEMORY_OVERCOMMIT,
+          INDEXING_BGE_M3_UNMEASURED,
           INDEX_NOT_HEALTHY,
           INDEX_BLOCKED_LEGACY,
           INDEX_SCHEMA_MISMATCH,
@@ -254,12 +324,18 @@ public enum LifecycleReasonCode {
           VDU_INSUFFICIENT_VRAM,
           VDU_MISSING_MMPROJ,
           VDU_CIRCUIT_OPEN,
+          VDU_BREAKER_OPEN_REFUSED,
+          VDU_BREAKER_OPEN_ENTRY_FAILED,
           TELEMETRY_UNAVAILABLE,
           TELEMETRY_METRICS_STALE,
           TELEMETRY_METRICS_HIGH_FAILURE_RATE,
           TELEMETRY_DISK_SPACE_LOW,
           CHUNK_EMBEDDING_NOT_READY,
           CHUNK_EMBEDDING_IN_PROGRESS,
+          INDEXING_PAUSED_ENERGY_SAVER,
+          INDEXING_SLOWED_CHAT_GENERATING,
+          INDEXING_PAUSED_GPU_BUSY,
+          INDEXING_PAUSED_GAME_MODE,
           LAMBDAMART_NOT_CONFIGURED,
           LAMBDAMART_TRAINING,
           LAMBDAMART_FAILED,

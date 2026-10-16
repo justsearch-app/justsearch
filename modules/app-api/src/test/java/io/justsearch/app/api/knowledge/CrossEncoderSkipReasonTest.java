@@ -23,6 +23,13 @@ class CrossEncoderSkipReasonTest {
   // every skip it reports, so blank means "the Worker could not say" — and guessing "deadline" is
   // the same mislabel, one layer up, that F-054 removes from the Worker.
   @Test
+  void aColdRerankIsWordedAsLoadingRatherThanUnknown() {
+    var reason = CrossEncoderSkipReason.fromWorkerSkipReason("MODEL_LOADING");
+    assertEquals("MODEL_LOADING", reason.wire());
+    assertTrue(reason.isDrop());
+  }
+
+  @Test
   @DisplayName("an empty Worker skip reason is UNKNOWN, not a guessed deadline")
   void blankWorkerReasonIsUnknown() {
     assertEquals(CrossEncoderSkipReason.UNKNOWN, CrossEncoderSkipReason.fromWorkerSkipReason(""));
@@ -68,6 +75,7 @@ class CrossEncoderSkipReasonTest {
       boolean expectedDrop =
           switch (r) {
             case DEADLINE_EXCEEDED,
+                SEARCH_DEADLINE_EXCEEDED,
                 RPC_FAILED,
                 MODEL_NOT_LOADED,
                 INFERENCE_FAILED,
@@ -79,6 +87,10 @@ class CrossEncoderSkipReasonTest {
                 PIPELINE_NOT_ELIGIBLE,
                 MODEL_NOT_CONFIGURED,
                 FUSION_CONFIDENT -> false;
+            default -> {
+              assertEquals("MODEL_LOADING", r.name(), "any new reason needs an explicit drop decision");
+              yield true;
+            }
           };
       assertEquals(expectedDrop, r.isDrop(), r.name());
     }

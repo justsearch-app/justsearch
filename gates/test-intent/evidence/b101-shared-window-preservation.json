@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T23:24:37.538Z",
+  "revision": "0d9b84e2ae8356ac5bc645fc0152a942982fe3a4",
+  "tree": "5dfff4dcdeda1712d82b83b52d75a943e5898cd5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SharedHelperWindowTest.aLeaseThatCouldOutliveTheDeadlineOpensAFreshWindow\" --tests \"io.justsearch.app.api.runtime.child.SharedHelperWindowTest.shutdownEndsAnIdleWindowNowAndALeasedOneAtItsRelease\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8040
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#aLeaseThatCouldOutliveTheDeadlineOpensAFreshWindow",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:865bd1988f76941c96f6e1460be8fc255c3979371a205923b4c9349d041e8bcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLeaseThatCouldOutliveTheDeadlineOpensAFreshWindow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#shutdownEndsAnIdleWindowNowAndALeasedOneAtItsRelease",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:865bd1988f76941c96f6e1460be8fc255c3979371a205923b4c9349d041e8bcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownEndsAnIdleWindowNowAndALeasedOneAtItsRelease()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.SharedHelperWindowTest.aLeaseThatCouldOutliveTheDeadlineOpensAFreshWindow\" --tests \"io.justsearch.app.api.runtime.child.SharedHelperWindowTest.shutdownEndsAnIdleWindowNowAndALeasedOneAtItsRelease\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16058
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#aLeaseThatCouldOutliveTheDeadlineOpensAFreshWindow",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/SharedHelperWindowTest.java#shutdownEndsAnIdleWindowNowAndALeasedOneAtItsRelease",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:4b17117571fc9966a42e2a836fbc4eaac5cd2e16c543c39bcbe84f13a054a646"
+}

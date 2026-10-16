@@ -74,6 +74,8 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
         none.provenance(), none.childLifetime(), deadline);
     var embeddings = Mockito.mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
     Mockito.when(embeddings.isAvailable()).thenReturn(true);
+    Mockito.lenient().when(embeddings.availability()).thenReturn(
+        io.justsearch.indexerworker.embed.EmbeddingProvider.Availability.READY);
     Mockito.when(embeddings.embedQuery(Mockito.anyString(), Mockito.any()))
         .thenAnswer(invocation -> {
           var authority = (InferenceRequest) invocation.getArgument(1);
@@ -128,6 +130,8 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
     var wrapped = new java.util.concurrent.CompletionException(cancellation);
     var embeddings = Mockito.mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
     Mockito.when(embeddings.isAvailable()).thenReturn(true);
+    Mockito.lenient().when(embeddings.availability()).thenReturn(
+        io.justsearch.indexerworker.embed.EmbeddingProvider.Availability.READY);
     Mockito.when(embeddings.embedQuery(Mockito.anyString(), Mockito.any())).thenThrow(wrapped);
     var service = new WorkerSearchService(lifecycle, embeddings);
     if (branch.equals("scorer")) {

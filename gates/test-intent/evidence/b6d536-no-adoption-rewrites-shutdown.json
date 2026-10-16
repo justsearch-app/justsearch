@@ -1,0 +1,150 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:19:29.581Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "7107d29c390977ddb0441f81b6c75e4a0ceb8c77",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.HeadAssemblyTest.heldInferenceManagerAlwaysStopsItsServerOnClose\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6538
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppShutdownWiringTest.everyReasonClosesTheAssemblyAndItsChatServer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5846
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.GenerativeBackendByReasonTest.everyReasonStopsTheGenerativeBackend\" --tests \"io.justsearch.app.engine.GenerativeBackendByReasonTest.eachReasonIndividually\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3336
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java#heldInferenceManagerAlwaysStopsItsServerOnClose",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:875e47b21fae869b8433f1774df8fd47cf902fb741fe585f80e6f428682c1090",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldInferenceManagerAlwaysStopsItsServerOnClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppShutdownWiringTest.java#everyReasonClosesTheAssemblyAndItsChatServer",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppShutdownWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54efed3a10ab9e88ffbf8b91dc345dd02ead2b1aaade200361f82fb5ceffd588",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyReasonClosesTheAssemblyAndItsChatServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/GenerativeBackendByReasonTest.java#everyReasonStopsTheGenerativeBackend",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/GenerativeBackendByReasonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac3088ff7d3837b36d1e53cab025d114d5701a12597f46e188ffd9d2a02357d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyReasonStopsTheGenerativeBackend()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/GenerativeBackendByReasonTest.java#eachReasonIndividually",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/GenerativeBackendByReasonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac3088ff7d3837b36d1e53cab025d114d5701a12597f46e188ffd9d2a02357d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachReasonIndividually()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6f7895a79",
+    "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.HeadAssemblyTest.heldInferenceManagerAlwaysStopsItsServerOnClose\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14444
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppShutdownWiringTest.everyReasonClosesTheAssemblyAndItsChatServer\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 36587
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.GenerativeBackendByReasonTest.everyReasonStopsTheGenerativeBackend\" --tests \"io.justsearch.app.engine.GenerativeBackendByReasonTest.eachReasonIndividually\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5688
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java#heldInferenceManagerAlwaysStopsItsServerOnClose",
+        "classification": "assertion",
+        "detail": "heldInferenceManagerAlwaysStopsItsServerOnClose(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the Head has no directive to leave its chat server running on close ==> Expected java.lang.NoSuchMethodException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppShutdownWiringTest.java#everyReasonClosesTheAssemblyAndItsChatServer",
+        "classification": "assertion",
+        "detail": "everyReasonClosesTheAssemblyAndItsChatServer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no shutdown reason may tell the assembly to leave its chat server running ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/GenerativeBackendByReasonTest.java#everyReasonStopsTheGenerativeBackend",
+        "classification": "assertion",
+        "detail": "everyReasonStopsTheGenerativeBackend(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[QUIT, RESTART, UPGRADE, HANG]> but was: <[QUIT, UPGRADE]>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/GenerativeBackendByReasonTest.java#eachReasonIndividually",
+        "classification": "assertion",
+        "detail": "eachReasonIndividually(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:75333c0306c33f946f6fa06f7392f64eb7688f08b87a297fe8cb5bc7a5aa5fec"
+}

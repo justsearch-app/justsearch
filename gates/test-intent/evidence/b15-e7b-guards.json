@@ -1,0 +1,118 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T18:06:17.384Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "9f9f2dc037c982b16c9b861a8d4832dc1d2abc79",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.aQueryEmbeddingLadderStillStopsAtItsRequestDeadline\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18284
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anExplicitNineBOnACompactSizedDeviceIsKeptAndReportedUnmet\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13334
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#aQueryEmbeddingLadderStillStopsAtItsRequestDeadline",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd611f184f886fc788fff8ed6b4e38385bebc37e8b21033d64a3629620529de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQueryEmbeddingLadderStillStopsAtItsRequestDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anExplicitNineBOnACompactSizedDeviceIsKeptAndReportedUnmet",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37e0fe404e97ff24be210a22e1590c304e7e450d81b0bc8be2fa08b60d274956",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitNineBOnACompactSizedDeviceIsKeptAndReportedUnmet()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5970a2de5",
+    "revision": "5970a2de5cd5a309f7aa701a2fbec06f60d7f730",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.aQueryEmbeddingLadderStillStopsAtItsRequestDeadline\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 22412
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaExplicitSettingsTest.anExplicitNineBOnACompactSizedDeviceIsKeptAndReportedUnmet\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 13224
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#aQueryEmbeddingLadderStillStopsAtItsRequestDeadline",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaExplicitSettingsTest.java#anExplicitNineBOnACompactSizedDeviceIsKeptAndReportedUnmet",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:0420c288296f2ed67d050fd4b0393772e56d03381a70aa438391d6b57540c36a"
+}

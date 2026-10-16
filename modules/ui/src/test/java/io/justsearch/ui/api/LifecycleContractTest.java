@@ -160,6 +160,7 @@ final class LifecycleContractTest {
     OnlineAiService __onlineAi = OnlineAiService.unavailable();
     LocalApiServer server = serverBuilder(settingsStore).onlineAiService(__onlineAi).build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -212,6 +213,7 @@ final class LifecycleContractTest {
             .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -266,6 +268,7 @@ final class LifecycleContractTest {
             .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -311,6 +314,7 @@ final class LifecycleContractTest {
             .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -370,6 +374,7 @@ final class LifecycleContractTest {
             .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -423,6 +428,7 @@ final class LifecycleContractTest {
             .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -470,6 +476,7 @@ final class LifecycleContractTest {
             .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
         .build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -522,6 +529,7 @@ final class LifecycleContractTest {
             .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
             .build();
     try {
+      sampleStatus(server);
       HttpResponse<String> resp =
           client.send(
               HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + "/api/status"))
@@ -653,6 +661,13 @@ final class LifecycleContractTest {
     when(mockKs.hasClient()).thenReturn(true);
     when(mockKs.workerCapability()).thenReturn(cap);
     when(mockKs.isReady()).thenReturn(true);
+  }
+
+  private static void sampleStatus(LocalApiServer server) throws Exception {
+    var field = LocalApiServer.class.getDeclaredField("core");
+    field.setAccessible(true);
+    ((CoreApiAssembly.Result) field.get(server)).statusLifecycleHandler()
+        .sampleAndBuildStatusSnapshot();
   }
 
   private LocalApiServer.Builder serverBuilder(UiSettingsStore settingsStore) {

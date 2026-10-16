@@ -2,6 +2,11 @@
 package io.justsearch.ort;
 
 import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.justsearch.configuration.model.ExecutionProvider;
+import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
 import java.util.Optional;
 
@@ -37,6 +42,19 @@ import java.util.Optional;
  */
 public record ModelSessionPolicy(
     VariantSelection variant, Gpu gpu, Cpu cpu, Lifecycle lifecycle, RunOptions runOptions) {
+
+  public static final String UNMEASURED_PRECISION = "planned_profile_precision_unmeasured";
+
+  /** Why a requested CUDA variant is intentionally placed on CPU, without changing its identity. */
+  @JsonIgnore
+  public Optional<String> cpuPlacementReason() {
+    if (variant != null && gpu.plannedProfile() && gpu.arenaCapBytes() == 0
+        && variant.executionProvider() == ExecutionProvider.CUDA
+        && variant.precision() != ModelPrecision.FP16) {
+      return Optional.of(UNMEASURED_PRECISION);
+    }
+    return Optional.empty();
+  }
 
   /**
    * Synthesises a minimal {@link ModelSessionPolicy} for the {@code verifyModel} Gradle task
@@ -107,9 +125,29 @@ public record ModelSessionPolicy(
    * @param arenaExtendStrategyOverride optional per-session override of
    *     {@link RuntimePolicy.Arena#extendStrategy()} (for the embed-only {@code kNextPowerOfTwo}
    *     experiment from 394); empty = use the runtime-wide default
+   * @param plannedProfile whether the device runs a planned profile (Spec E revision 4 §2.2). On a
+   *     planned profile the cap budgets the FP16 weights, so a failed FP16 GPU creation never loads
+   *     the FP32 file on the GPU (invariant 4): the role runs on the CPU instead. Step E7a applies
+   *     no plan, so this is false in production and is left out of the policy snapshot
    */
   public record Gpu(
-      long arenaCapBytes, int cudaDeviceId, Optional<String> arenaExtendStrategyOverride) {}
+      long arenaCapBytes,
+      int cudaDeviceId,
+      Optional<String> arenaExtendStrategyOverride,
+      @JsonIgnore boolean plannedProfile) {
+
+    /**
+     * A GPU policy outside any planned profile: today's FP32 fallback on the GPU stays. The policy
+     * snapshot is read back through this constructor, since it leaves {@code plannedProfile} out.
+     */
+    @JsonCreator
+    public Gpu(
+        @JsonProperty("arenaCapBytes") long arenaCapBytes,
+        @JsonProperty("cudaDeviceId") int cudaDeviceId,
+        @JsonProperty("arenaExtendStrategyOverride") Optional<String> arenaExtendStrategyOverride) {
+      this(arenaCapBytes, cudaDeviceId, arenaExtendStrategyOverride, false);
+    }
+  }
 
   /**
    * CPU-session options. Today's only field is {@link OptLevel}, derived from

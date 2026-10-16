@@ -52,10 +52,10 @@ final class RuntimeReconcilerTest {
         control,
         control::currentModeValue,
         control::externalValue,
-        control::detach,
         policy,
         spec,
-        new RuntimeGpuLease());
+        TestActivationForwarders.switching(control, control::externalValue, control::detach),
+        () -> false);
   }
 
   private static EnterprisePolicyService policyOnlineEnabled(boolean enabled) {
@@ -71,7 +71,8 @@ final class RuntimeReconcilerTest {
     var pending = new AtomicBoolean();
     var attempts = new AtomicInteger();
     try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
-        control::externalValue, control::detach, null, specStore(true), new RuntimeGpuLease(),
+        control::externalValue, null, specStore(true),
+        TestActivationForwarders.switching(control, control::externalValue, control::detach,
         reason -> {
           attempts.incrementAndGet();
           if (reason == TransitionReason.AUTO_START) {
@@ -82,7 +83,7 @@ final class RuntimeReconcilerTest {
           }
           pending.set(false);
           control.switchToOnlineMode();
-        }, reason -> control.switchToIndexingMode(), pending::get)) {
+        }, reason -> control.switchToIndexingMode()), pending::get)) {
       reconciler.start();
       reconciler.requestBootConvergence();
       assertTrue(reconciler.awaitQuiescent(5_000), "failed UP must not schedule a private retry");
@@ -105,7 +106,8 @@ final class RuntimeReconcilerTest {
     var failedAt = new AtomicLong();
     var retriedAt = new AtomicLong();
     try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
-        control::externalValue, control::detach, null, specStore(false), new RuntimeGpuLease(),
+        control::externalValue, null, specStore(false),
+        TestActivationForwarders.switching(control, control::externalValue, control::detach,
         reason -> control.switchToOnlineMode(), reason -> {
           if (downAttempts.incrementAndGet() == 1) {
             control.fireModeChange(Mode.ONLINE, Mode.TRANSITIONING);
@@ -116,7 +118,7 @@ final class RuntimeReconcilerTest {
           }
           retriedAt.set(System.nanoTime());
           control.switchToIndexingMode();
-        }, () -> true)) {
+        }), () -> true)) {
       reconciler.start();
       reconciler.requestBootConvergence();
       assertTrue(reconciler.awaitQuiescent(5_000));
@@ -133,10 +135,12 @@ final class RuntimeReconcilerTest {
     var spec = specStore(false);
     var reasonSeen = new AtomicReference<TransitionReason>();
     try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
-        control::externalValue, control::detach, null, spec, new RuntimeGpuLease(), reason -> {
+        control::externalValue, null, spec,
+        TestActivationForwarders.switching(control, control::externalValue, control::detach,
+        reason -> {
           reasonSeen.set(reason);
           control.switchToOnlineMode();
-        }, reason -> control.switchToIndexingMode(), () -> true)) {
+        }, reason -> control.switchToIndexingMode()), () -> true)) {
       reconciler.start();
       reconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION, "install");
       spec.setChatEnabled(true);
@@ -178,10 +182,9 @@ final class RuntimeReconcilerTest {
     r.close();
   }
 
-  // NOTE: the former Phase-1 test `foreignModeChangeDoesNotReTriggerConvergence` (asserting a
-  // foreign flip does NOT re-converge) was removed — Phase 2 intentionally REMOVES that scope limit
-  // (continuous return-to-spec). Its inverse is now the passing test
-  // `foreignFlipNoProcedure_convergesBackOnline` below.
+  // NOTE: Spec A step 2 deleted Phase 2's continuous return-to-spec and its anti-flap hold
+  // (reconciliation F6); `foreignUnloadWithChatEnabled_neverReloads` below pins that a foreign flip
+  // no longer re-converges.
 
   // (d) admin policy off is a hard ceiling that wins over spec-on.
   @Test
@@ -217,9 +220,10 @@ final class RuntimeReconcilerTest {
 
   // ==================== Phase 2 (tempdoc 737 task 7 a–e) ====================
 
-  // (a) §3d regression — the never-switch-back bug becomes IMPOSSIBLE by construction.
-  // Procedure with spec-on: begin → engine-up → phase-B down → endProcedure → engine converges back
-  // ONLINE. Asserts the exact switch call sequence [online, indexing, online].
+  // (a) §3d regression — the never-switch-back bug becomes IMPOSSIBLE by construction. Spec A
+  // step 6: the chat controller (not the reconciler) brings the engine up for the VDU hold, and the
+  // embedding hand-off park is gone (O2). With spec on, the engine the hold started is already the
+  // spec, so the end of the hold makes no reconciler switch at all.
   @Test
   void procedureWithSpecOn_returnsEngineOnlineAfterEnd() throws Exception {
     RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
@@ -227,21 +231,13 @@ final class RuntimeReconcilerTest {
     r.start(); // no boot convergence — start the procedure from a down engine
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true); // Phase A: bring engine up
-    assertEquals(Mode.ONLINE, control.currentModeValue());
-    assertEquals(TransitionReason.VDU_ENTER, r.lastConvergenceReason(), "engine-up carries VDU_ENTER");
-    r.procedureRequireEngine(false); // Phase B: park to indexing
-    assertEquals(Mode.INDEXING, control.currentModeValue());
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
+    assertTrue(r.awaitQuiescent(5_000));
     r.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
 
     assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(Mode.ONLINE, control.currentModeValue(), "engine must return to spec (ONLINE) after procedure");
-    assertEquals(
-        List.of("online", "indexing", "online"),
-        control.switchLog,
-        "exact §3d sequence: up for VDU, park for embeddings, back up to spec");
-    assertEquals(
-        TransitionReason.AUTO_START, r.lastConvergenceReason(), "return-to-spec carries AUTO_START");
+    assertEquals(Mode.ONLINE, control.currentModeValue(), "engine must be at spec (ONLINE) after procedure");
+    assertEquals(List.of(), control.switchLog, "no park for embeddings and no reconciler switch");
     r.close();
   }
 
@@ -253,20 +249,24 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true); // procedure may use the engine even when chat is disabled
+    // The controller starts the engine for the hold even when chat is disabled.
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE);
+    assertTrue(r.awaitQuiescent(5_000));
     assertEquals(Mode.ONLINE, control.currentModeValue());
-    r.procedureRequireEngine(false);
     r.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
 
     assertTrue(r.awaitQuiescent(5_000));
-    assertNotEquals(Mode.ONLINE, control.currentModeValue(), "spec-off: engine must NOT return online");
-    assertEquals(1, control.onlineSwitchCount.get(), "only the procedure's Phase-A up; no return-to-spec up");
+    assertNotEquals(Mode.ONLINE, control.currentModeValue(), "spec-off: engine must NOT stay online");
+    assertEquals(0, control.onlineSwitchCount.get(), "no return-to-spec up");
+    assertEquals(List.of("indexing"), control.switchLog, "one return-to-spec stop");
     r.close();
   }
 
-  // (c) foreign flip with no procedure active — continuous return-to-spec converges back ONLINE.
+  // (c) Spec A step 2 (reconciliation F6): an engine that went down behind the reconciler's back
+  // with chatEnabled still true is NOT reloaded — foreign-flip convergence is deleted, so only the
+  // chat controller's own decisions start chat. Status still reflects the observed state.
   @Test
-  void foreignFlipNoProcedure_convergesBackOnline() throws Exception {
+  void foreignUnloadWithChatEnabled_neverReloads() throws Exception {
     RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
     RuntimeReconciler r = reconciler(control, specStore(true), null);
     r.start();
@@ -275,41 +275,21 @@ final class RuntimeReconcilerTest {
     assertTrue(r.awaitQuiescent(5_000));
     assertEquals(1, control.onlineSwitchCount.get());
 
-    // A foreign actor parks the engine. Phase 2: the reconciler converges it back.
-    control.fireModeChange(Mode.ONLINE, Mode.INDEXING);
-    assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(Mode.ONLINE, control.currentModeValue(), "foreign flip must be corrected back to spec");
-    assertEquals(2, control.onlineSwitchCount.get(), "exactly one re-convergence");
-    r.close();
-  }
-
-  // (d) anti-flap — > FLAP_MAX foreign flips in the window → held, condition reason set, WARN logged.
-  @Test
-  void repeatedForeignFlips_heldWithFlapReason() throws Exception {
-    RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
-    RuntimeReconciler r = reconciler(control, specStore(true), null);
-    r.start();
-    r.requestBootConvergence();
-    assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(1, control.onlineSwitchCount.get());
-
-    // FLAP_MAX (=3) flips are each corrected; the 4th (> FLAP_MAX) trips the hold.
-    for (int i = 0; i < RuntimeReconciler.FLAP_MAX; i++) {
+    // The engine is unloaded by something other than the reconciler, repeatedly (past the old
+    // anti-flap cap of 3, so neither convergence nor a flap hold can explain the outcome).
+    for (int i = 0; i < 5; i++) {
       control.fireModeChange(Mode.ONLINE, Mode.INDEXING);
       assertTrue(r.awaitQuiescent(5_000));
-      assertEquals(Mode.ONLINE, control.currentModeValue(), "flip within cap is corrected");
+      assertEquals(Mode.INDEXING, control.currentModeValue(), "a foreign unload stays unloaded");
+      assertEquals(
+          RuntimeStatus.REASON_GPU_YIELDED_TO_INDEXING,
+          r.current().condition(RuntimeStatus.Axis.ENGINE).orElseThrow().reason(),
+          "status still republishes the observed state");
+      control.fireModeChange(Mode.INDEXING, Mode.ONLINE);
+      assertTrue(r.awaitQuiescent(5_000));
     }
-    assertEquals(1 + RuntimeReconciler.FLAP_MAX, control.onlineSwitchCount.get());
-
-    // The flip that exceeds the cap: reconciler holds instead of fighting.
-    control.fireModeChange(Mode.ONLINE, Mode.INDEXING);
-    assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(Mode.INDEXING, control.currentModeValue(), "held: no further convergence");
-    assertEquals(1 + RuntimeReconciler.FLAP_MAX, control.onlineSwitchCount.get(), "no re-converge past the cap");
-    assertEquals(
-        RuntimeStatus.REASON_CONVERGENCE_HELD_FLAP,
-        r.current().condition(RuntimeStatus.Axis.ENGINE).orElseThrow().reason(),
-        "ENGINE condition carries the flap-held reason");
+    assertEquals(1, control.onlineSwitchCount.get(), "only the boot forward; no reload");
+    assertEquals(List.of("online"), control.switchLog);
     r.close();
   }
 
@@ -322,7 +302,8 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true);
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
+    assertTrue(r.awaitQuiescent(5_000));
 
     assertEquals(Mode.ONLINE, control.currentModeValue());
     RuntimeStatus.Condition engine = r.current().condition(RuntimeStatus.Axis.ENGINE).orElseThrow();
@@ -349,7 +330,8 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true);
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
+    assertTrue(r.awaitQuiescent(5_000));
     assertEquals(Mode.ONLINE, control.currentModeValue());
     int indexingAfterUp = control.indexingSwitchCount.get();
 
@@ -400,9 +382,10 @@ final class RuntimeReconcilerTest {
     r.close();
   }
 
-  // (fix-b) INSTALL_SMOKE_TEST with spec off: procedureRequireEngine(true) brings the engine up and
+  // (fix-b) INSTALL_SMOKE_TEST with spec off: the controller's running hold brings the engine up and
   // it is NOT parked during the window; endProcedure returns to spec → exactly one down-switch
-  // (install != enable). Sequence-pinned [online, indexing].
+  // (install != enable). Sequence-pinned [indexing]: the up is the controller's, not a reconciler
+  // switch.
   @Test
   void installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd() throws Exception {
     RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
@@ -410,9 +393,9 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.INSTALL_SMOKE_TEST, "smoke");
-    r.procedureRequireEngine(true);
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
     assertEquals(Mode.ONLINE, control.currentModeValue());
-    assertEquals(1, control.onlineSwitchCount.get(), "exactly the procedure's up-switch");
+    assertEquals(0, control.onlineSwitchCount.get(), "the reconciler makes no up-switch");
     // The reconciler gets a chance to (wrongly) park the engine — it must not, procedure active.
     assertTrue(r.awaitQuiescent(5_000));
     assertEquals(0, control.indexingSwitchCount.get(), "no down-switch while the procedure holds the engine");
@@ -422,9 +405,9 @@ final class RuntimeReconcilerTest {
     assertNotEquals(Mode.ONLINE, control.currentModeValue(), "spec off: engine returns down (install != enable)");
     assertEquals(1, control.indexingSwitchCount.get(), "exactly one return-to-spec down-switch");
     assertEquals(
-        List.of("online", "indexing"),
+        List.of("indexing"),
         control.switchLog,
-        "up for the smoke test, then one park back to spec");
+        "one park back to spec after the smoke test");
     r.close();
   }
 
@@ -465,5 +448,29 @@ final class RuntimeReconcilerTest {
         control.switchLog,
         "boot up, then one convergence up after the last procedure ends (the foreign park is not a switch call)");
     r.close();
+  }
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksActivationProcedureAndNotStatusRead() throws Exception {
+    var control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
+    try (var reconciler = reconciler(control, specStore(false), null)) {
+      reconciler.start(); assertTrue(reconciler.awaitQuiescent(5_000));
+      long before = statusCounter();
+      reconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION, "activation");
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(before + 1, statusCounter(), "runtime activation axis must invalidate status");
+      reconciler.current(); reconciler.current();
+      assertEquals(before + 1, statusCounter(), "canonical authority read must not invalidate");
+      reconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(before + 2, statusCounter());
+    }
   }
 }

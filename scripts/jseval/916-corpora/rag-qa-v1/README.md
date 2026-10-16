@@ -67,10 +67,13 @@ present — regenerates the fixture and asserts the digests still match the pinn
 python -m jseval tier2-eval \
   --queries scripts/jseval/tmp/916-part1/rag-qa-v1/mixed_enron-qa/queries.json \
   --base-url http://127.0.0.1:<api-port> \
-  --llm-url  http://127.0.0.1:8080 \
+  --llm-url  http://127.0.0.1:<api-port> \
   --top-k 10 --max-context-tokens 4096 \
   --output-dir scripts/jseval/tmp/916-part1/rag/<arm>
 ```
+
+`--llm-url` is the Engine's `/v1` proxy on the same API port, never llama-server's own port: the
+proxy holds a generation lease for each reply, so a reconfigure or unload cannot cut it off.
 
 **Chat profile: `standard`, not the dev-default `compact`.** `tier2-eval` refuses a compact model
 outright (`CompactModelNotAllowedError`), and quality-sensitive verification runs on `ai_activate {chatProfile:"standard"}`. Do not pass

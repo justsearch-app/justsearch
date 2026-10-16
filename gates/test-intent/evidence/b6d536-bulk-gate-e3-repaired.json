@@ -1,0 +1,155 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T16:37:15.309Z",
+  "revision": "d1c278ba32023c378a667460046ab7aae8ee7134",
+  "tree": "4a86f8dd08456cec1fefea99d58c20a08ad8a7dc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGpuBusyTest.externalUsePausesWithTheGpuBusyCode\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 33168
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.InlineEmbeddingBulkHoldTest.heldBulkWorkDefersInlineEmbedding\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 26294
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.combinedCycleStartsNoBatchAfterTheRaise\" --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.bgeM3BatchDoesNotEncodeAfterTheRaise\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 35689
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGpuBusyTest.java#externalUsePausesWithTheGpuBusyCode",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGpuBusyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f49395dc39d522bcd9d65ea83492567817efaa2e18f6acdefbc8d9ae85b02e7b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalUsePausesWithTheGpuBusyCode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/InlineEmbeddingBulkHoldTest.java#heldBulkWorkDefersInlineEmbedding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/InlineEmbeddingBulkHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:99561087d70a9caf70ada346babc27ffb55bb32667d77b95d92135e8a8a083aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldBulkWorkDefersInlineEmbedding(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ExternalPressureHoldsBackfillTest.java#combinedCycleStartsNoBatchAfterTheRaise",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ExternalPressureHoldsBackfillTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d3b98cb887f8413e4ecce9fa34ec5f1e446fe9b87bf4ef6d31834cc6176bca20",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "combinedCycleStartsNoBatchAfterTheRaise()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ExternalPressureHoldsBackfillTest.java#bgeM3BatchDoesNotEncodeAfterTheRaise",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ExternalPressureHoldsBackfillTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d3b98cb887f8413e4ecce9fa34ec5f1e446fe9b87bf4ef6d31834cc6176bca20",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeM3BatchDoesNotEncodeAfterTheRaise()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "124def8a1",
+    "revision": "124def8a103222373661d9ef2fc1bb27b7f8e64b",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-e3-historical-sampler-compat.patch",
+        "contentDigest": "sha256:6080508d12d2375692bd4ec2c85f64c03554e8dd759d69a5cdaf2e310614cda5"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGpuBusyTest.externalUsePausesWithTheGpuBusyCode\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 159874
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.InlineEmbeddingBulkHoldTest.heldBulkWorkDefersInlineEmbedding\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 37888
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.combinedCycleStartsNoBatchAfterTheRaise\" --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest.bgeM3BatchDoesNotEncodeAfterTheRaise\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 39876
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGpuBusyTest.java#externalUsePausesWithTheGpuBusyCode",
+        "classification": "assertion",
+        "detail": "externalUsePausesWithTheGpuBusyCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <indexing.paused_gpu_busy> but was: <null>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/InlineEmbeddingBulkHoldTest.java#heldBulkWorkDefersInlineEmbedding",
+        "classification": "assertion",
+        "detail": "heldBulkWorkDefersInlineEmbedding(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no inline embed starts while bulk work is held ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ExternalPressureHoldsBackfillTest.java#combinedCycleStartsNoBatchAfterTheRaise",
+        "classification": "assertion",
+        "detail": "combinedCycleStartsNoBatchAfterTheRaise(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the in-flight batch finishes and no further combined batch starts after the raise ==> expected: <1> but was: <6>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ExternalPressureHoldsBackfillTest.java#bgeM3BatchDoesNotEncodeAfterTheRaise",
+        "classification": "assertion",
+        "detail": "bgeM3BatchDoesNotEncodeAfterTheRaise(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: that batch's encode does not start after the raise ==> expected: <0> but was: <1>"
+      }
+    ]
+  },
+  "digest": "sha256:80c352dbae2d2b2eab01f2510b775d38884b86befb9e096239e1b96cb2a482aa"
+}

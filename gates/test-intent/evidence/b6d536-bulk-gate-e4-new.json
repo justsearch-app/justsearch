@@ -1,0 +1,394 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T16:01:32.834Z",
+  "revision": "5f600de970f5bdc69b1bd03449b619ae3543ab47",
+  "tree": "7859a9fe134e36651a06ee88d07333cc8de0096f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GameDetectorTest.gameModeAloneIsAGame\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.eachCandidateBranchWithOneGibIsAGame\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.eachCandidateBranchUnderOneGibIsNoGame\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.anOrdinaryWindowIsNoGame\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.ourOwnForegroundIsNoGame\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.shellPresentationAndNotPresentAreNoGame\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.unreadPartsAreNoGame\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.debounceRaisesAfterTwoAndClearsAfterFive\" --tests \"io.justsearch.app.services.gpu.GameDetectorTest.seedDecidesAtOnce\" --tests \"io.justsearch.app.services.gpu.GpuResidencyGameTest.gameRaisesHoldsAndReportsThenClears\" --tests \"io.justsearch.app.services.gpu.GpuResidencyGameTest.gameOutranksExternalMemory\" --tests \"io.justsearch.app.services.gpu.GpuResidencyGameTest.bootSampleDetectsAGameAtOnce\" --tests \"io.justsearch.app.services.gpu.GpuResidencyGameTest.detectionOffClearsAtOnceAndDetectsNothing\" --tests \"io.justsearch.app.services.gpu.GpuResidencyGameTest.aFailedForegroundReadIsNoGame\" --tests \"io.justsearch.app.services.gpu.GpuResidencyGameTest.closeClearsTheGameAndClosesBothReaders\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17664
+    },
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.context.UserContextSignalsTest.readsTheRealUserContext\" --tests \"io.justsearch.gpu.context.UserContextSignalsTest.aClosedReaderReadsNothing\" --tests \"io.justsearch.gpu.context.UserContextSignalsTest.coversNeedsEveryEdge\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15383
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineGameDetectionWitnessTest.aGameAtBootHoldsBeforeTheFirstTickAndChatHearsIt\" --tests \"io.justsearch.app.engine.EngineGameDetectionWitnessTest.detectionOffInTheEngineConfigurationDetectsNoGame\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24805
+    },
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.GameDetectionSettingTest.defaultsToAuto\" --tests \"io.justsearch.configuration.resolved.GameDetectionSettingTest.offTurnsDetectionOff\" --tests \"io.justsearch.configuration.resolved.GameDetectionSettingTest.anyOtherValueIsAuto\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13129
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#gameModeAloneIsAGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gameModeAloneIsAGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#eachCandidateBranchWithOneGibIsAGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachCandidateBranchWithOneGibIsAGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#eachCandidateBranchUnderOneGibIsNoGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachCandidateBranchUnderOneGibIsNoGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#anOrdinaryWindowIsNoGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOrdinaryWindowIsNoGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#ourOwnForegroundIsNoGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ourOwnForegroundIsNoGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#shellPresentationAndNotPresentAreNoGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shellPresentationAndNotPresentAreNoGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#unreadPartsAreNoGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadPartsAreNoGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#debounceRaisesAfterTwoAndClearsAfterFive",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "debounceRaisesAfterTwoAndClearsAfterFive()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java#seedDecidesAtOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GameDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3e5c841d53a59a26353fbd9fb3d315e7848d3c8afabdb5685dd97b3cad25ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "seedDecidesAtOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java#gameRaisesHoldsAndReportsThenClears",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:21750e96fd1a87c12ef24d6fbf5606f46d3ca64cffce6fc2ab2b8ffc993f8cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gameRaisesHoldsAndReportsThenClears()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java#gameOutranksExternalMemory",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:21750e96fd1a87c12ef24d6fbf5606f46d3ca64cffce6fc2ab2b8ffc993f8cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gameOutranksExternalMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java#bootSampleDetectsAGameAtOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:21750e96fd1a87c12ef24d6fbf5606f46d3ca64cffce6fc2ab2b8ffc993f8cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootSampleDetectsAGameAtOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java#detectionOffClearsAtOnceAndDetectsNothing",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:21750e96fd1a87c12ef24d6fbf5606f46d3ca64cffce6fc2ab2b8ffc993f8cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "detectionOffClearsAtOnceAndDetectsNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java#aFailedForegroundReadIsNoGame",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:21750e96fd1a87c12ef24d6fbf5606f46d3ca64cffce6fc2ab2b8ffc993f8cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedForegroundReadIsNoGame()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java#closeClearsTheGameAndClosesBothReaders",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencyGameTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:21750e96fd1a87c12ef24d6fbf5606f46d3ca64cffce6fc2ab2b8ffc993f8cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closeClearsTheGameAndClosesBothReaders()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/context/UserContextSignalsTest.java#readsTheRealUserContext",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/context/UserContextSignalsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6236c658d89064e5b8b208f07bf432173ee91ba0f3c5b6ebbbe1eb77f0902da1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readsTheRealUserContext()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/context/UserContextSignalsTest.java#aClosedReaderReadsNothing",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/context/UserContextSignalsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6236c658d89064e5b8b208f07bf432173ee91ba0f3c5b6ebbbe1eb77f0902da1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aClosedReaderReadsNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/context/UserContextSignalsTest.java#coversNeedsEveryEdge",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/context/UserContextSignalsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6236c658d89064e5b8b208f07bf432173ee91ba0f3c5b6ebbbe1eb77f0902da1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "coversNeedsEveryEdge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGameDetectionWitnessTest.java#aGameAtBootHoldsBeforeTheFirstTickAndChatHearsIt",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGameDetectionWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f6f2d1fef6c286a7d314463a9c2868cdcccb4214880014f53a34cf141e300fd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGameAtBootHoldsBeforeTheFirstTickAndChatHearsIt(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGameDetectionWitnessTest.java#detectionOffInTheEngineConfigurationDetectsNoGame",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGameDetectionWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f6f2d1fef6c286a7d314463a9c2868cdcccb4214880014f53a34cf141e300fd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "detectionOffInTheEngineConfigurationDetectsNoGame(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/GameDetectionSettingTest.java#defaultsToAuto",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/GameDetectionSettingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd734dfa44935fa9b20bcd90e58faf5a14b8226e22f9caa4eac1289ebdb9766b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaultsToAuto()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/GameDetectionSettingTest.java#offTurnsDetectionOff",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/GameDetectionSettingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd734dfa44935fa9b20bcd90e58faf5a14b8226e22f9caa4eac1289ebdb9766b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "offTurnsDetectionOff()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/GameDetectionSettingTest.java#anyOtherValueIsAuto",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/GameDetectionSettingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd734dfa44935fa9b20bcd90e58faf5a14b8226e22f9caa4eac1289ebdb9766b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anyOtherValueIsAuto()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:82673f1fd3e9ab2cec6c1c2dc9dde2260e531a6e28e80e40b9444ed93c02aae0"
+}

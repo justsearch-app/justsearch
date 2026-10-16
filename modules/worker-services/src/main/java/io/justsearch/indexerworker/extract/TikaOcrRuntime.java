@@ -1,11 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import io.justsearch.configuration.EnvRegistry;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -24,37 +30,89 @@ public final class TikaOcrRuntime {
   private static volatile Set<String> languageCache = Set.of();
   private static volatile RuntimePaths languageCacheRuntime;
 
+  private static ResolutionInputs recordedInputs;
+  private static RuntimePaths recordedRuntime;
+  @SuppressWarnings("PMD.UnusedPrivateField") // Read reflectively by RecordedTesseractExecutableTest.
+  private static long resolutionCount;
+
   private TikaOcrRuntime() {}
 
-  public record RuntimePaths(Path executable, Path executableDirectory, Path tessdataDirectory) {
-    public boolean available() {
-      return executable != null;
+  /** Immutable executable selection; tessdata may be refreshed independently of this selection. */
+  public record RuntimePaths(Path executable, Path executableDirectory, Path tessdataDirectory,
+      String source, Path launcher, Instant resolvedAt, String unavailableReason) {
+    public RuntimePaths(Path executable, Path executableDirectory, Path tessdataDirectory) {
+      this(executable, executableDirectory, tessdataDirectory, "configured", null, Instant.now(), "");
     }
+    public boolean available() { return executable != null; }
   }
 
-  public static boolean isEngineAvailable() {
-    return resolve().available();
-  }
+  private record ResolutionInputs(String configured, List<String> appRuntimeState) {}
 
-  public static RuntimePaths resolve() {
+  public static boolean isEngineAvailable() { return resolve().available(); }
+
+  /** PATH and legacy environment are process inputs, not a fresh search on each launch. */
+  public static synchronized RuntimePaths resolve() {
     String configured = EnvRegistry.TESSERACT_PATH.get().orElse(null);
-    if (configured != null && !configured.isBlank()) {
-      return runtimePaths(executableFromPathLike(configured));
+    List<Path> roots = appOwnedRuntimeRoots();
+    ResolutionInputs inputs = new ResolutionInputs(configured, appRuntimeState(roots));
+    if (!inputs.equals(recordedInputs)) {
+      recordedRuntime = discover(configured, System.getenv("TESSERACT_PATH"), roots, System.getenv("PATH"));
+      recordedInputs = inputs;
+      resolutionCount++;
     }
-    String legacyEnv = System.getenv("TESSERACT_PATH");
-    if (legacyEnv != null && !legacyEnv.isBlank()) {
-      return runtimePaths(executableFromPathLike(legacyEnv));
-    }
+    Path tessdata = recordedRuntime.available()
+        ? findTessdataDirectory(recordedRuntime.executableDirectory()) : null;
+    if (Objects.equals(tessdata, recordedRuntime.tessdataDirectory())) return recordedRuntime;
+    return new RuntimePaths(recordedRuntime.executable(), recordedRuntime.executableDirectory(), tessdata,
+        recordedRuntime.source(), recordedRuntime.launcher(), recordedRuntime.resolvedAt(), recordedRuntime.unavailableReason());
+  }
 
-    for (Path root : appOwnedRuntimeRoots()) {
-      Path candidate = findExecutableInDirectory(root);
-      if (candidate != null) {
-        return runtimePaths(candidate);
+  private static List<String> appRuntimeState(List<Path> roots) {
+    List<String> state = new ArrayList<>();
+    for (Path root : roots.stream().distinct().toList()) {
+      state.add(root.toAbsolutePath().normalize().toString());
+      state.add(fileState(root));
+      if (Files.isDirectory(root)) {
+        try (var files = Files.list(root)) {
+          files.filter(file -> {
+            String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+            return name.endsWith(".dll") || name.endsWith(".so") || name.endsWith(".dylib");
+          }).sorted().forEach(file -> state.add(fileState(file)));
+        } catch (java.io.IOException e) { state.add("runtime libraries unreadable"); }
+      }
+      for (String name : executableNames()) {
+        Path candidate = root.resolve(name);
+        state.add(fileState(candidate));
+        state.add(fileState(shimPath(candidate)));
       }
     }
+    return List.copyOf(state);
+  }
 
-    Path pathExecutable = findExecutableOnPath();
-    return runtimePaths(pathExecutable);
+  private static String fileState(Path path) {
+    try {
+      BasicFileAttributes a = Files.readAttributes(path, BasicFileAttributes.class);
+      // Log/temporary files in the runtime directory are not executable-resolution inputs.
+      if (a.isDirectory()) return path.toRealPath() + ":" + a.fileKey();
+      return path.toRealPath() + ":" + a.fileKey() + ":" + a.size() + ":" + a.lastModifiedTime();
+    } catch (java.io.IOException e) { return "missing"; }
+  }
+
+  private static RuntimePaths discover(String configured, String legacy, List<Path> roots, String path) {
+    if (configured != null && !configured.isBlank()) return runtimePaths(executableFromPathLike(configured), "configured");
+    if (legacy != null && !legacy.isBlank()) return runtimePaths(executableFromPathLike(legacy), "legacy variable");
+    for (Path root : roots) {
+      Path candidate = findExecutableInDirectory(root);
+      if (candidate != null) return runtimePaths(candidate, "app-owned");
+    }
+    return runtimePaths(findExecutableOnPath(path), "PATH");
+  }
+
+  /** Existing free-text engine status carries support diagnostics without a wire-schema change. */
+  public static String engineStatus() {
+    RuntimePaths runtime = resolve();
+    return OcrRoutingConfig.ENGINE + " [" + runtime.source() + "] "
+        + (runtime.available() ? runtime.executable() : runtime.unavailableReason());
   }
 
   public static String blockedReason(OcrRoutingConfig config) {
@@ -80,7 +138,10 @@ public final class TikaOcrRuntime {
     return "";
   }
 
-  static void resetLanguageCacheForTests() {
+  static synchronized void resetLanguageCacheForTests() {
+    recordedInputs = null;
+    recordedRuntime = null;
+    resolutionCount = 0;
     languageCacheAtMs = 0L;
     languageCache = Set.of();
     languageCacheRuntime = null;
@@ -104,13 +165,13 @@ public final class TikaOcrRuntime {
       if (runtime.tessdataDirectory() != null) {
         builder.environment().put("TESSDATA_PREFIX", runtime.tessdataDirectory().toString());
       }
-      Process process = builder.start();
+      Process process = OwnedHelper.start(builder, "Tesseract language availability");
       boolean exited = process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
       if (!exited) {
-        process.destroyForcibly();
+        OwnedHelper.terminate(process, "timeout");
         return cached;
       }
-      String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+      String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
       Set<String> languages = new HashSet<>();
       for (String line : output.split("\\R")) {
         String value = line.trim().toLowerCase(Locale.ROOT);
@@ -130,13 +191,77 @@ public final class TikaOcrRuntime {
     }
   }
 
-  private static RuntimePaths runtimePaths(Path executable) {
-    if (executable == null) {
-      return new RuntimePaths(null, null, null);
+  private static RuntimePaths runtimePaths(Path found, String source) {
+    Instant at = Instant.now();
+    if (found == null) return new RuntimePaths(null, null, null, source, null, at, "Tesseract executable not found");
+    Path launcher = found.toAbsolutePath().normalize();
+    try {
+      Path executable = unwrapLauncher(launcher, new HashSet<>());
+      checkExecutable(executable);
+      Path directory = executable.getParent();
+      return new RuntimePaths(executable, directory, findTessdataDirectory(directory), source,
+          launcher.equals(executable) ? null : launcher, at, "");
+    } catch (Exception e) {
+      return new RuntimePaths(null, null, null, source, launcher, at,
+          "Cannot use Tesseract candidate " + launcher + ": " + e.getMessage());
     }
-    Path normalized = executable.toAbsolutePath().normalize();
-    Path executableDirectory = normalized.getParent();
-    return new RuntimePaths(normalized, executableDirectory, findTessdataDirectory(executableDirectory));
+  }
+
+  private static void checkExecutable(Path executable) throws java.io.IOException {
+    Process process = null;
+    // A real launch, once per recorded resolution: its window is written only when it spawns, its
+    // start forced before the helper's receipts, its end with them as one group.
+    var intent = OwnedHelper.launchWindow(executable.getFileName().toString(), "Tesseract recorded availability",
+        Duration.ofSeconds(5));
+    try (intent) {
+      process = OwnedHelper.start(new ProcessBuilder(executable.toString(), "--version")
+          .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD),
+          "Tesseract recorded availability");
+      if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+        OwnedHelper.terminate(process, "timeout");
+        throw new java.io.IOException("executable availability check timed out");
+      }
+      if (process.exitValue() != 0) throw new java.io.IOException("executable availability check exited " + process.exitValue());
+    } catch (InterruptedException e) {
+      if (process != null) OwnedHelper.terminate(process, "interrupted");
+      Thread.currentThread().interrupt();
+      throw new java.io.IOException("executable availability check interrupted", e);
+    }
+  }
+
+  private static Path shimPath(Path executable) {
+    String name = executable.getFileName().toString();
+    int dot = name.lastIndexOf('.');
+    return executable.resolveSibling((dot < 0 ? name : name.substring(0, dot)) + ".shim");
+  }
+
+  private static Path unwrapLauncher(Path candidate, Set<Path> visited) throws java.io.IOException {
+    Path executable = candidate.toRealPath();
+    if (!isExecutable(executable)) throw new java.io.IOException("target is not executable");
+    if (!visited.add(executable) || visited.size() > 8) throw new java.io.IOException("launcher cycle or excessive nesting");
+    Path shim = shimPath(candidate);
+    if (Files.isRegularFile(shim)) {
+      var match = Pattern.compile("(?m)^\\s*path\\s*=\\s*\"([^\"]+)\"\\s*$")
+          .matcher(Files.readString(shim, StandardCharsets.UTF_8));
+      if (!match.find()) throw new java.io.IOException("Scoop .shim has no quoted target path");
+      Path target = Path.of(match.group(1));
+      return unwrapLauncher(target.isAbsolute() ? target : candidate.getParent().resolve(target), visited);
+    }
+    String name = executable.getFileName().toString().toLowerCase(Locale.ROOT);
+    if (name.endsWith(".cmd") || name.endsWith(".bat")) {
+      // Only transparent, single-command forwarding wrappers are safe to replace. Never run cmd.exe.
+      List<String> lines = Files.readAllLines(executable, StandardCharsets.UTF_8).stream()
+          .map(String::trim).filter(line -> !line.isEmpty() && !line.equalsIgnoreCase("@echo off")
+              && !line.toLowerCase(Locale.ROOT).startsWith("rem ") && !line.startsWith("::")).toList();
+      if (lines.size() != 1) throw new java.io.IOException("batch launcher is not a transparent executable forwarder");
+      var match = Pattern.compile("@?(?:call\\s+)?\"([^\"]+\\.exe)\"\\s+%\\*", Pattern.CASE_INSENSITIVE).matcher(lines.getFirst());
+      if (!match.matches()) throw new java.io.IOException("batch launcher has no unambiguous executable target");
+      String targetText = match.group(1).replace("%~dp0", executable.getParent() + File.separator);
+      if (targetText.contains("%")) throw new java.io.IOException("batch target uses unsupported environment expansion");
+      Path target = Path.of(targetText);
+      return unwrapLauncher(target.isAbsolute() ? target : executable.getParent().resolve(target), visited);
+    }
+    return executable;
   }
 
   private static List<Path> appOwnedRuntimeRoots() {
@@ -200,8 +325,7 @@ public final class TikaOcrRuntime {
     return localAppData == null || localAppData.isBlank() ? null : Path.of(localAppData, "JustSearch").toString();
   }
 
-  private static Path findExecutableOnPath() {
-    String path = System.getenv("PATH");
+  private static Path findExecutableOnPath(String path) {
     if (path == null || path.isBlank()) {
       return null;
     }
@@ -209,7 +333,9 @@ public final class TikaOcrRuntime {
       if (dir == null || dir.isBlank()) {
         continue;
       }
-      Path candidate = findExecutableInDirectory(Path.of(dir));
+      Path candidate;
+      try { candidate = findExecutableInDirectory(Path.of(dir)); }
+      catch (java.nio.file.InvalidPathException invalid) { continue; }
       if (candidate != null) {
         return candidate;
       }
@@ -221,7 +347,9 @@ public final class TikaOcrRuntime {
     if (path == null || path.isBlank()) {
       return null;
     }
-    Path candidate = Path.of(path);
+    Path candidate;
+    try { candidate = Path.of(path); }
+    catch (java.nio.file.InvalidPathException invalid) { return null; }
     if (Files.isDirectory(candidate)) {
       return findExecutableInDirectory(candidate);
     }

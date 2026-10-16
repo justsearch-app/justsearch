@@ -107,22 +107,86 @@ public final class ChunkDocumentWriter {
         || parentDocId == null || parentDocId.isBlank()) {
       return 0;
     }
+    return writeChunks(indexingCoordinator, parentDocId, plan(content, meta), content, meta,
+        chunkSpladeEnabled, true);
+  }
 
-    if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
-      indexingCoordinator.deleteChunksForParentDocId(parentDocId);
+  /**
+   * Replaces the chunks of a parent that was just written carrying {@code plan}'s declaration
+   * ({@link #declare}) in the same document as its content.
+   *
+   * <p>The declaration then needs no separate parent rewrite: no blocking refresh, no read-back
+   * and no superseded parent version per document. No reader can see this parent's content
+   * without its declaration, and a partial child set fails the count/ordinal check, even after a
+   * process crash, exactly as with a separately published declaration.
+   */
+  public static int replaceDeclaredChunks(
+      IndexingCoordinator indexingCoordinator, String parentDocId, String content,
+      ParentChunkMetadata meta, ChunkPlan plan, boolean chunkSpladeEnabled) {
+    if (indexingCoordinator == null || parentDocId == null || parentDocId.isBlank()) {
       return 0;
     }
+    if (plan == null || !plan.revision().equals(revision(content))) {
+      throw new IllegalArgumentException("The chunk plan was not cut from this parent content");
+    }
+    return writeChunks(indexingCoordinator, parentDocId, plan, content, meta, chunkSpladeEnabled,
+        false);
+  }
 
+  /**
+   * The chunk set a parent's content is replaced with, computed once per parent revision.
+   * {@code mimeBase}/{@code fileKind} select the splitter mode exactly as chunk writing does.
+   */
+  public static ChunkPlan plan(String content, String mimeBase, String fileKind) {
+    String revision = revision(content);
+    if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
+      return new ChunkPlan(revision, List.of());
+    }
     // F2: Use MIME-based mode selection for CSV/JSON chunking awareness
-    ChunkSplitter.Mode mode = ChunkSplitter.Mode.fromMimeOrFileKind(
-        meta != null ? meta.mimeBase : null,
-        meta != null ? meta.fileKind : null);
+    ChunkSplitter.Mode mode = ChunkSplitter.Mode.fromMimeOrFileKind(mimeBase, fileKind);
     List<ChunkSplitter.Chunk> chunks =
         ChunkSplitter.splitWithMetadata(content, CHUNK_TARGET_TOKENS, CHUNK_OVERLAP_TOKENS, mode);
-    if (chunks.size() <= 1) {
+    return new ChunkPlan(revision, chunks.size() <= 1 ? List.of() : chunks);
+  }
+
+  private static ChunkPlan plan(String content, ParentChunkMetadata meta) {
+    return plan(content, meta != null ? meta.mimeBase : null, meta != null ? meta.fileKind : null);
+  }
+
+  /** Stamps the plan's declaration onto the fields of the parent that stores the same content. */
+  public static void declare(Map<String, Object> parentFields, ChunkPlan plan) {
+    parentFields.put(SchemaFields.CHUNK_TOTAL, plan.total());
+    parentFields.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, plan.revision());
+  }
+
+  /**
+   * One parent revision's intended chunk set: empty when the content is not chunked (below the
+   * threshold, or a single chunk), so its declared total is zero.
+   */
+  public record ChunkPlan(String revision, List<ChunkSplitter.Chunk> chunks) {
+    public ChunkPlan {
+      java.util.Objects.requireNonNull(revision, "revision");
+      chunks = List.copyOf(chunks);
+    }
+
+    public int total() {
+      return chunks.size();
+    }
+  }
+
+  private static String revision(String content) {
+    return ChunkParentRevision.sha256Hex(content == null ? "" : content);
+  }
+
+  private static int writeChunks(
+      IndexingCoordinator indexingCoordinator, String parentDocId, ChunkPlan plan, String content,
+      ParentChunkMetadata meta, boolean chunkSpladeEnabled, boolean declareParent) {
+    if (plan.total() == 0) {
       indexingCoordinator.deleteChunksForParentDocId(parentDocId);
+      if (declareParent) declareChunkSet(indexingCoordinator, parentDocId, 0, plan.revision());
       return 0;
     }
+    List<ChunkSplitter.Chunk> chunks = plan.chunks();
     if (meta == null || meta.parentDocUid == null || meta.parentDocUid.isBlank()) {
       throw new IllegalStateException(
           "A persisted parent document identity is required before chunk indexing");
@@ -136,7 +200,13 @@ public final class ChunkDocumentWriter {
     // Tempdoc 931 §C.1: every chunk carries the identity of the parent revision it was cut from, so
     // an RMW that re-slices chunk_content out of a LATER parent revision is detectable instead of
     // silently producing wrong text. Hashed once per parent, not once per chunk.
-    String parentContentRevision = ChunkParentRevision.sha256Hex(content);
+    String parentContentRevision = plan.revision();
+    // Publish the intended total before the first child can reach an unrelated commit.
+    // A partial replacement then fails the count/ordinal check, even after a process crash.
+    // A parent written with its declaration (replaceDeclaredChunks) already did so.
+    if (declareParent) {
+      declareChunkSet(indexingCoordinator, parentDocId, chunks.size(), parentContentRevision);
+    }
     int indexed = 0;
     for (ChunkSplitter.Chunk chunk : chunks) {
       String chunkContent = chunk.content();
@@ -224,6 +294,13 @@ public final class ChunkDocumentWriter {
     }
 
     return indexed;
+  }
+
+  private static void declareChunkSet(
+      IndexingCoordinator coordinator, String parentDocId, int total, String revision) {
+    coordinator.updateDocument(parentDocId, Map.of(
+        SchemaFields.CHUNK_TOTAL, total,
+        SchemaFields.CHUNK_PARENT_CONTENT_SHA256, revision));
   }
 
   // ========== F8 Tier 2: Line Number & Heading Extraction ==========

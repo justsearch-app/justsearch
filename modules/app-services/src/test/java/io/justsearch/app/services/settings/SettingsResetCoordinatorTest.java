@@ -109,6 +109,33 @@ final class SettingsResetCoordinatorTest {
     }
   }
 
+  /**
+   * A confirmed recovery reset leaves quarantine. It has no readable prior settings to compare, so
+   * the commit must neither invent one nor fail after the durable replacement; it reports one status
+   * change.
+   */
+  @Test
+  void confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce() throws Exception {
+    var settings = settings(true);
+    var restarts = new AtomicInteger();
+    try (var operations = operations()) {
+      var owner = owner(settings, restarts::incrementAndGet, settings::replacePrepared);
+      var runner = runner(operations, owner);
+      var attempt = SettingsResetTestSupport.accept(runner, SettingsResetPreparation.recovery("{}", settings.recoveryFingerprint()));
+      var counter = io.justsearch.core.status.StatusChangeCounter.process();
+      long before = counter.current();
+      var result = assertDoesNotThrow(() -> runner.start(attempt,
+          handle -> OperationExecution.finished(runner.applySettingsReset(handle))),
+          "a committed recovery reset must not fail after replacing the durable settings");
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(before + 1, counter.current(), "leaving quarantine is one status change");
+      assertEquals(new SettingsWitness(1, attempt.accepted().key()), settings.inspect().witness());
+      assertTrue(settings.lastRecovery().isEmpty());
+      assertEquals(1, restarts.get());
+      assertFalse(runner.persistenceFailure().toCompletableFuture().isDone());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"arm", "before-move"})
   void precommitFailureRetainsQuarantineButReleasesFenceForAnotherConfirmedReset(String fault) throws Exception {

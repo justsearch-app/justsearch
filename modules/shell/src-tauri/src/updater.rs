@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
-use crate::{restart_headless_backend, BackendState};
+use crate::BackendState;
 
 const INTENT_SCHEMA_VERSION: u32 = 1;
 const EVIDENCE_SCHEMA_VERSION: u32 = 1;
@@ -205,7 +205,9 @@ enum StopEvidence {
 }
 
 impl Default for StopEvidence {
-    fn default() -> Self { Self::Prepared {} }
+    fn default() -> Self {
+        Self::Prepared {}
+    }
 }
 
 impl StopEvidence {
@@ -321,7 +323,10 @@ impl UpdateCoordinator {
                 target_version: intent.target_version.clone(),
                 release_sequence: intent.release_sequence,
                 head_pid: u64::from(head_pid),
-                owners: target_reconciliation_owners(&intent, &app.package_info().version.to_string())?,
+                owners: target_reconciliation_owners(
+                    &intent,
+                    &app.package_info().version.to_string(),
+                )?,
             };
             let response: ReconciliationResponse = post_head(
                 &backend,
@@ -486,9 +491,19 @@ pub(crate) async fn run_install_now(
     let staged = stage_installer(&app, &attempt_id, &bytes, &digest)?;
     validate_staged_artifact(&staged, &staging_root(&app))?;
 
-    finish_staged_update(&upgrade_root(&app), &coordinator,
-        &ShellUpgradeHandoff { app: &app, backend: backend.clone() },
-        &descriptor, staged, attempt_id, app.package_info().version.to_string()).await?;
+    finish_staged_update(
+        &upgrade_root(&app),
+        &coordinator,
+        &ShellUpgradeHandoff {
+            app: &app,
+            backend: backend.clone(),
+        },
+        &descriptor,
+        staged,
+        attempt_id,
+        app.package_info().version.to_string(),
+    )
+    .await?;
     // The coordinator persisted the Windows launch witness before the shell exits.
     app.exit(0);
     Ok(())
@@ -508,15 +523,31 @@ async fn finish_staged_update(
     validate_staged_artifact(&staged, &root.join("staged"))?;
     let result = async {
         edge.hold()?;
+        if edge.quitting() {return Err("Quit won; update remains staged".into());}
         let prepared = if edge.engine_available() {
-            let prepared = edge.prepare().await?;
-            validate_prepare_response(&prepared)?;
-            if !prepared.ready {
-                edge.cancel(&prepared.preparation_id, &prepared.shutdown_nonce).await?;
-                return Err("Update is blocked until active operations drain".into());
+            match edge.prepare().await {
+                Ok(prepared) => {
+                    if edge.quitting() { return Err("Quit won; update remains staged".into()); }
+                    if !edge.engine_available() { None } else {
+                        validate_prepare_response(&prepared)?;
+                        if !prepared.ready {
+                            edge.cancel(&prepared.preparation_id, &prepared.shutdown_nonce).await?;
+                            if !edge.quitting() { edge.resume()?; }
+                            return Err("Update is blocked until active operations drain".into());
+                        }
+                        Some(prepared)
+                    }
+                }
+                Err(error) => {
+                    if edge.quitting() { return Err("Quit won; update remains staged".into()); }
+                    if !edge.engine_available() { None } else { edge.resume()?; return Err(error); }
+                }
             }
-            Some(prepared)
         } else { None };
+        // Prepare is only a live-Engine witness. The held actor may have recorded an
+        // unexpected exit since prepare returned. Before commit, that needs no receipt.
+        let prepared = prepared.filter(|_| edge.child_pid().is_some());
+        if edge.quitting() { return Err("Quit won; update remains staged".into()); }
         let stop_evidence = if prepared.is_some() { StopEvidence::Prepared {} } else {
             let engine_pid = edge.stop_unrecoverable()?;
             StopEvidence::EngineUnrecoverable {
@@ -563,28 +594,22 @@ async fn finish_staged_update(
         });
     }
 
-    let expected_head_pid = match edge.child_pid() {
-        Some(pid) => pid,
-        None => {
-            let error = "Head child process witness is unavailable".to_string();
-            let cancel =
-                edge.cancel( &prepared.preparation_id, &prepared.shutdown_nonce).await;
-            let (phase, message) = match cancel {
-                Ok(_) => (UpgradePhase::Cancelled, error),
-                Err(cancel_error) => (
-                    UpgradePhase::RepairRequired,
-                    format!("{error}; admission cancellation failed: {cancel_error}"),
-                ),
-            };
-            transition(&mut intent, phase, Some(message.clone()))?;
-            persist_intent_at(root, coordinator, &intent)?;
-            return Err(message);
-        }
+    let expected_head_pid = edge.child_pid();
+    let commit_deadline = std::time::Instant::now() + BACKEND_EXIT_TIMEOUT;
+    let committed = if expected_head_pid.is_some() {
+        edge.commit(&prepared.preparation_id, &prepared.shutdown_nonce).await
+    } else {
+        Err("Engine exited before upgrade commit request".into())
     };
-    let receipt = match edge.commit( &prepared.preparation_id, &prepared.shutdown_nonce)
-        .await
-    {
-        Ok(receipt) => receipt,
+    let committed = resolve_commit_delivery(committed, || {
+        if edge.quitting() || !edge.is_held() {
+            return Err("Quit or released hold refuses the pre-commit exit handoff".into());
+        }
+        edge.observe_precommit_exit(commit_deadline.saturating_duration_since(std::time::Instant::now()))
+    });
+    let receipt = match committed {
+        Ok(receipt) => Some(receipt),
+        Err(error) if error == "Engine exited before upgrade commit request" && edge.child_pid().is_none() => None,
         Err(error) => {
             if edge.wait_for_exit(Duration::from_millis(250)) {
                 mark_repair_required_at(
@@ -614,6 +639,7 @@ async fn finish_staged_update(
             return Err(error);
         }
     };
+    if let Some(receipt) = receipt {
     if let Err(error) =
         validate_shutdown_receipt(&receipt, &prepared.preparation_id, &prepared.shutdown_nonce)
     {
@@ -649,21 +675,51 @@ async fn finish_staged_update(
         &head_receipt,
         &prepared.preparation_id,
         &prepared.shutdown_nonce,
-        expected_head_pid,
+        expected_head_pid.expect("a commit receipt requires the live Engine witness"),
     ) {
         mark_repair_required_at(root, coordinator, intent, &error)?;
         return Err(error);
     }
     intent.head_shutdown_receipt = Some(head_receipt);
-    intent.head_pid = Some(u64::from(expected_head_pid));
+    intent.head_pid = expected_head_pid.map(u64::from);
     transition(&mut intent, UpgradePhase::HeadStopped, None)?;
+    } else {
+        if edge.quitting() { return Err("Quit won; update remains staged".into()); }
+        let engine_pid = edge.stop_unrecoverable()?;
+        intent.phase = UpgradePhase::EngineUnrecoverable;
+        intent.preparation_id.clear();
+        intent.shutdown_nonce.clear();
+        intent.stop_evidence = StopEvidence::EngineUnrecoverable {
+            attempt_id: intent.attempt_id.clone(), engine_pid,
+            confirmed_gone_at_epoch_ms: u64::try_from(now_epoch_ms())
+                .map_err(|_| "Engine stop timestamp exceeds the wire format")?,
+        };
+    }
     persist_intent_at(root, coordinator, &intent)?;
     } else {
         persist_intent_at(root, coordinator, &intent)?;
     }
+    // The accepted head receipt proves only the root stopped. Its job must also be empty.
+    let empty = match edge.await_contained_exit(Duration::from_millis(JOB_EMPTY_WAIT_MS))? {
+        crate::containment::JobEmpty::Empty { .. } => crate::containment::JobEmpty::Empty { waited: Duration::ZERO },
+        crate::containment::JobEmpty::TimedOut { .. } => {
+            let _ = edge.terminate_contained();
+            edge.await_contained_exit(Duration::from_millis(crate::containment::JOB_TERMINATE_CONFIRM_MS))?
+        }
+    };
+    if let crate::containment::JobEmpty::TimedOut { active } = empty {
+        let error = format!("helpers did not exit: {active} processes");
+        mark_repair_required_at(root, coordinator, intent, &error)?;
+        let resumed = edge.resume();
+        return Err(match resumed {
+            Ok(()) => error,
+            Err(resume_error) => format!("{error}; Engine supervised resume failed: {resume_error}"),
+        });
+    }
     transition(&mut intent, UpgradePhase::InstallLaunching, None)?;
     persist_intent_at(root, coordinator, &intent)?;
 
+    if edge.quitting() { return Err("Quit won; update remains staged".into()); }
     let launch = edge.launch(Path::new(&intent.staged_artifact.path));
     let (process_id, launched_at_epoch_ms) = match launch {
         Ok(witness) => witness,
@@ -706,6 +762,10 @@ async fn finish_staged_update(
     Ok(())
     }.await;
     match result {
+        Err(error) if edge.quitting() => {
+            set_state(coordinator, "staged", Some(error.clone()));
+            Err(error)
+        }
         Err(error) if edge.is_held() => {
             let error =
                 format!("{error}; Engine replacement remains held; update recovery is required");
@@ -716,8 +776,13 @@ async fn finish_staged_update(
     }
 }
 
+const JOB_EMPTY_WAIT_MS: u64 = 10_000;
+
 trait UpgradeHandoff: Sync {
     fn hold(&self) -> Result<(), String>;
+    fn quitting(&self) -> bool {
+        false
+    }
     fn is_held(&self) -> bool;
     fn engine_available(&self) -> bool;
     fn child_pid(&self) -> Option<u32>;
@@ -734,6 +799,18 @@ trait UpgradeHandoff: Sync {
         nonce: &str,
     ) -> impl std::future::Future<Output = Result<ShutdownReceipt, String>> + Send;
     fn wait_for_exit(&self, timeout: Duration) -> bool;
+    fn observe_precommit_exit(&self, timeout: Duration) -> Result<(), String> {
+        if !self.wait_for_exit(timeout) || self.child_pid().is_some() {
+            return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+        }
+        self.stop_unrecoverable()?;
+        Ok(())
+    }
+    fn await_contained_exit(
+        &self,
+        timeout: Duration,
+    ) -> Result<crate::containment::JobEmpty, String>;
+    fn terminate_contained(&self) -> Result<(), String>;
     fn resume(&self) -> Result<(), String>;
     fn launch(&self, path: &Path) -> Result<(u32, u128), String>;
 }
@@ -743,6 +820,9 @@ struct ShellUpgradeHandoff<'a> {
     backend: Arc<BackendState>,
 }
 impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
+    fn quitting(&self) -> bool {
+        self.backend.host.quit_started()
+    }
     fn hold(&self) -> Result<(), String> {
         self.backend
             .host
@@ -759,6 +839,9 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
     }
     fn stop_unrecoverable(&self) -> Result<Option<u32>, String> {
         let pid = self.backend.host.stop_owned_engine(BACKEND_EXIT_TIMEOUT)?;
+        if pid.is_none() {
+            finish_held_actor_exit(&self.backend.host, BACKEND_EXIT_TIMEOUT)?;
+        }
         let data_dir = crate::resolve_app_data_dir(self.app)?;
         crate::reconcile_registered_children(&data_dir)?;
         Ok(pid)
@@ -770,19 +853,38 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
         cancel_head(&self.backend, preparation, nonce).await
     }
     async fn commit(&self, preparation: &str, nonce: &str) -> Result<ShutdownReceipt, String> {
-        commit_head(&self.backend, preparation, nonce).await
+        let host = self.backend.host.clone();
+        let preparation = preparation.to_string();
+        let nonce = nonce.to_string();
+        let receipt = tauri::async_runtime::spawn_blocking(move || {
+            host.upgrade_commit(&preparation, &nonce, BACKEND_EXIT_TIMEOUT)
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        serde_json::from_value(receipt).map_err(|e| e.to_string())
     }
     fn wait_for_exit(&self, timeout: Duration) -> bool {
         self.backend.wait_for_child_exit(timeout)
     }
+    fn observe_precommit_exit(&self, timeout: Duration) -> Result<(), String> {
+        finish_held_actor_exit(&self.backend.host, timeout)
+    }
+    fn await_contained_exit(
+        &self,
+        timeout: Duration,
+    ) -> Result<crate::containment::JobEmpty, String> {
+        self.backend.host.await_contained_exit(timeout)
+    }
+    fn terminate_contained(&self) -> Result<(), String> {
+        self.backend.host.post_stop("upgrade", None, Duration::ZERO)
+    }
     fn resume(&self) -> Result<(), String> {
         self.backend.host.release_replacement_hold()?;
-        let result = (|| {
-            if self.backend.child_pid().is_none() {
-                restart_headless_backend(self.app, self.backend.clone())?;
-            }
+        let result = if self.backend.host.supervisor_running() {
+            Ok(())
+        } else {
             crate::start_supervision(self.app, self.backend.clone())
-        })();
+        };
         if result.is_err() {
             let _ = self
                 .backend
@@ -792,8 +894,51 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
         result
     }
     fn launch(&self, path: &Path) -> Result<(u32, u128), String> {
+        if self.backend.host.quit_started() {
+            return Err("Quit won; update remains staged".into());
+        }
         launch_installer(path)
     }
+}
+
+/// A consumed queue is not a send witness. Only the transport's no-write fact
+/// permits waiting for an actor-recorded held exit instead of normal receipts.
+fn resolve_commit_delivery<T>(
+    receipt: Result<T, String>,
+    observe_held_exit: impl FnOnce() -> Result<(), String>,
+) -> Result<T, String> {
+    match receipt {
+        Err(error) if error == crate::shell_actuator::UPGRADE_COMMIT_NOT_SENT
+            || error == "Engine exited before upgrade commit request" => {
+                observe_held_exit()?;
+                Err("Engine exited before upgrade commit request".into())
+            }
+        other => other,
+    }
+}
+
+fn finish_held_actor_exit(host: &crate::engine_host::EngineHost, timeout: Duration) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + timeout;
+    if host.quit_started() || !host.replacement_held() {
+        return Err("Quit or released hold refuses the pre-commit exit handoff".into());
+    }
+    if !host.wait_for_exit(timeout) || host.child_pid().is_some() {
+        return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+    }
+    // child_pid can clear during reaping, just before record_exit. Awaiting the
+    // actor's terminal publication proves its ledger write has completed too.
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    host.post_stop("upgrade", None, remaining)?;
+    if host.supervisor_running() && host.wait_terminal(host.now_ms() + remaining.as_millis() as u64).is_none() {
+        return Err("Pre-commit actor exit observation timed out".into());
+    }
+    if host.latest_record().is_some() && host.terminal_outcome().is_none() {
+        return Err("Actor ended without publishing its exit observation".into());
+    }
+    if host.quit_started() || !host.replacement_held() {
+        return Err("Quit or released hold refuses the pre-commit exit handoff".into());
+    }
+    Ok(())
 }
 
 /// Sandbox qualification autorun — tempdoc 617 §9 items 3-4.
@@ -910,7 +1055,10 @@ fn write_qualification_result(app: &AppHandle, verdict: &str, detail: &str) {
     });
     let path = upgrade_root(app).join("qualification-result.v1.json");
     if let Err(error) = write_json_atomic(&path, &payload) {
-        eprintln!("Failed to write qualification result to {}: {error}", path.display());
+        eprintln!(
+            "Failed to write qualification result to {}: {error}",
+            path.display()
+        );
     }
 }
 
@@ -1250,7 +1398,9 @@ async fn wait_for_backend_ready(backend: &BackendState) -> Result<u32, String> {
     }
 }
 
-fn prepared_evidence_kind() -> String { "PREPARED".into() }
+fn prepared_evidence_kind() -> String {
+    "PREPARED".into()
+}
 
 // The old descriptor can contain only its compatibility baseline. The installed binary must
 // reconcile its complete register, after validating every inherited target-format expectation.
@@ -1276,30 +1426,51 @@ fn target_reconciliation_owners_against(
     let mut owners = std::collections::BTreeMap::new();
     for store in local.durable_stores {
         if store.id.trim().is_empty()
-            || owners.insert(store.id.clone(), store.current_version).is_some() {
-            return Err(format!("Installed store register repeats or omits an owner id: {}", store.id));
+            || owners
+                .insert(store.id.clone(), store.current_version)
+                .is_some()
+        {
+            return Err(format!(
+                "Installed store register repeats or omits an owner id: {}",
+                store.id
+            ));
         }
     }
     let mut retired = std::collections::HashMap::new();
     for entry in local.retired_durable_stores {
         let store = entry.store;
-        if store.id.trim().is_empty() || owners.contains_key(&store.id)
+        if store.id.trim().is_empty()
+            || owners.contains_key(&store.id)
             || entry.byte_disposition != "PRESERVE_INERT"
-            || retired.insert(store.id.clone(), store.current_version).is_some() {
-            return Err(format!("Installed retired store identity/disposition is invalid: {}", store.id));
+            || retired
+                .insert(store.id.clone(), store.current_version)
+                .is_some()
+        {
+            return Err(format!(
+                "Installed retired store identity/disposition is invalid: {}",
+                store.id
+            ));
         }
     }
     let mut inherited = std::collections::HashSet::new();
     for expected in &intent.owner_expectations {
         if !inherited.insert(&expected.owner_id)
             || (owners.get(&expected.owner_id) != Some(&expected.format_version)
-                && retired.get(&expected.owner_id) != Some(&expected.format_version)) {
-            return Err(format!("Inherited owner does not match installed target: {}", expected.owner_id));
+                && retired.get(&expected.owner_id) != Some(&expected.format_version))
+        {
+            return Err(format!(
+                "Inherited owner does not match installed target: {}",
+                expected.owner_id
+            ));
         }
     }
-    Ok(owners.into_iter().map(|(owner_id, format_version)| OwnerExpectation {
-        owner_id, format_version,
-    }).collect())
+    Ok(owners
+        .into_iter()
+        .map(|(owner_id, format_version)| OwnerExpectation {
+            owner_id,
+            format_version,
+        })
+        .collect())
 }
 
 fn validate_reconciliation_response(
@@ -1307,10 +1478,12 @@ fn validate_reconciliation_response(
     response: &ReconciliationResponse,
 ) -> Result<(), String> {
     let nonce_valid = match request.stop_evidence_kind.as_str() {
-        "PREPARED" => request.shutdown_nonce.len() >= 32
-            && response.shutdown_nonce == request.shutdown_nonce,
-        "ENGINE_UNRECOVERABLE" => request.shutdown_nonce.is_empty()
-            && response.shutdown_nonce.is_empty(),
+        "PREPARED" => {
+            request.shutdown_nonce.len() >= 32 && response.shutdown_nonce == request.shutdown_nonce
+        }
+        "ENGINE_UNRECOVERABLE" => {
+            request.shutdown_nonce.is_empty() && response.shutdown_nonce.is_empty()
+        }
         _ => false,
     };
     if response.schema_version != 1
@@ -1724,13 +1897,21 @@ fn expected_head_pid(intent: &UpgradeIntent) -> Result<u32, String> {
 }
 
 fn validate_prepared_stop(intent: &UpgradeIntent) -> Result<(), String> {
-    let receipt = intent.shutdown_receipt.as_ref()
+    let receipt = intent
+        .shutdown_receipt
+        .as_ref()
         .ok_or_else(|| "Upgrade intent is missing its quiescence receipt".to_string())?;
     validate_shutdown_receipt(receipt, &intent.preparation_id, &intent.shutdown_nonce)?;
-    let final_receipt = intent.head_shutdown_receipt.as_ref()
+    let final_receipt = intent
+        .head_shutdown_receipt
+        .as_ref()
         .ok_or_else(|| "Upgrade intent is missing its final Head shutdown receipt".to_string())?;
-    validate_head_shutdown_receipt(final_receipt, &intent.preparation_id,
-        &intent.shutdown_nonce, expected_head_pid(intent)?)
+    validate_head_shutdown_receipt(
+        final_receipt,
+        &intent.preparation_id,
+        &intent.shutdown_nonce,
+        expected_head_pid(intent)?,
+    )
 }
 
 fn validate_intent_evidence(
@@ -1743,40 +1924,75 @@ fn validate_intent_evidence(
     }
     let prepared = match &intent.stop_evidence {
         StopEvidence::Prepared {} => {
-            if intent.preparation_id.trim().is_empty() || intent.shutdown_nonce.len() < 32
-                || intent.phase == UpgradePhase::EngineUnrecoverable {
-                return Err("Durable upgrade intent is missing its prepared-session identity".into());
+            if intent.preparation_id.trim().is_empty()
+                || intent.shutdown_nonce.len() < 32
+                || intent.phase == UpgradePhase::EngineUnrecoverable
+            {
+                return Err(
+                    "Durable upgrade intent is missing its prepared-session identity".into(),
+                );
             }
             true
         }
-        StopEvidence::EngineUnrecoverable { attempt_id, engine_pid, confirmed_gone_at_epoch_ms } => {
-            if attempt_id != &intent.attempt_id || *confirmed_gone_at_epoch_ms == 0
-                || engine_pid == &Some(0) || !intent.preparation_id.is_empty()
-                || !intent.shutdown_nonce.is_empty() || intent.shutdown_receipt.is_some()
-                || intent.head_shutdown_receipt.is_some() || intent.head_pid.is_some()
-                || matches!(intent.phase, UpgradePhase::Prepared | UpgradePhase::HeadStopped) {
-                return Err("Unrecoverable Engine stop evidence is missing or mixed with prepared evidence".into());
+        StopEvidence::EngineUnrecoverable {
+            attempt_id,
+            engine_pid,
+            confirmed_gone_at_epoch_ms,
+        } => {
+            if attempt_id != &intent.attempt_id
+                || *confirmed_gone_at_epoch_ms == 0
+                || engine_pid == &Some(0)
+                || !intent.preparation_id.is_empty()
+                || !intent.shutdown_nonce.is_empty()
+                || intent.shutdown_receipt.is_some()
+                || intent.head_shutdown_receipt.is_some()
+                || intent.head_pid.is_some()
+                || matches!(
+                    intent.phase,
+                    UpgradePhase::Prepared | UpgradePhase::HeadStopped
+                )
+            {
+                return Err(
+                    "Unrecoverable Engine stop evidence is missing or mixed with prepared evidence"
+                        .into(),
+                );
             }
             false
         }
     };
-    if matches!(intent.phase, UpgradePhase::Cancelled) { return Ok(()); }
+    if matches!(intent.phase, UpgradePhase::Cancelled) {
+        return Ok(());
+    }
     if matches!(intent.phase, UpgradePhase::Committed) {
-        if prepared { validate_prepared_stop(intent)?; }
+        if prepared {
+            validate_prepared_stop(intent)?;
+        }
         if intent.launch_witness.is_none() {
             return Err("Committed intent is missing its embedded installer witness".into());
         }
         return Ok(());
     }
     validate_staged_artifact(&intent.staged_artifact, staging_root)?;
-    if prepared && matches!(intent.phase, UpgradePhase::HeadStopped | UpgradePhase::InstallLaunching
-        | UpgradePhase::InstallLaunched | UpgradePhase::Reconciling) {
+    if prepared
+        && matches!(
+            intent.phase,
+            UpgradePhase::HeadStopped
+                | UpgradePhase::InstallLaunching
+                | UpgradePhase::InstallLaunched
+                | UpgradePhase::Reconciling
+        )
+    {
         validate_prepared_stop(intent)?;
     }
-    if matches!(intent.phase, UpgradePhase::InstallLaunched | UpgradePhase::Reconciling) {
+    if matches!(
+        intent.phase,
+        UpgradePhase::InstallLaunched | UpgradePhase::Reconciling
+    ) {
         let persisted: InstallerLaunchWitness = read_json(witness_path)?;
         validate_launch_witness(&persisted, intent, staging_root)?;
-        let embedded = intent.launch_witness.as_ref()
+        let embedded = intent
+            .launch_witness
+            .as_ref()
             .ok_or_else(|| "Upgrade intent is missing its installer launch witness".to_string())?;
         if serde_json::to_value(embedded).ok() != serde_json::to_value(&persisted).ok() {
             return Err("Embedded and separately durable installer witnesses differ".into());
@@ -1796,9 +2012,15 @@ fn transition(
             | (UpgradePhase::Prepared, UpgradePhase::Cancelled)
             | (UpgradePhase::Prepared, UpgradePhase::RepairRequired)
             | (UpgradePhase::HeadStopped, UpgradePhase::InstallLaunching)
-            | (UpgradePhase::EngineUnrecoverable, UpgradePhase::InstallLaunching)
+            | (
+                UpgradePhase::EngineUnrecoverable,
+                UpgradePhase::InstallLaunching
+            )
             | (UpgradePhase::EngineUnrecoverable, UpgradePhase::Cancelled)
-            | (UpgradePhase::EngineUnrecoverable, UpgradePhase::RepairRequired)
+            | (
+                UpgradePhase::EngineUnrecoverable,
+                UpgradePhase::RepairRequired
+            )
             | (UpgradePhase::HeadStopped, UpgradePhase::Cancelled)
             | (UpgradePhase::HeadStopped, UpgradePhase::RepairRequired)
             | (
@@ -1915,7 +2137,11 @@ fn persist_intent(
     persist_intent_at(&upgrade_root(app), coordinator, intent)
 }
 
-fn persist_intent_at(root: &Path, coordinator: &UpdateCoordinator, intent: &UpgradeIntent) -> Result<(), String> {
+fn persist_intent_at(
+    root: &Path,
+    coordinator: &UpdateCoordinator,
+    intent: &UpgradeIntent,
+) -> Result<(), String> {
     write_json_atomic(&root.join("intent.v1.json"), intent)?;
     set_intent_status(coordinator, intent);
     Ok(())
@@ -2749,3 +2975,11 @@ mod tests {
 #[cfg(test)]
 #[path = "updater_handoff_tests.rs"]
 mod handoff_tests;
+
+#[cfg(test)]
+#[path = "updater_commit_delivery_tests.rs"]
+mod commit_delivery_tests;
+
+#[cfg(test)]
+#[path = "updater_actor_hold_witness_tests.rs"]
+mod actor_hold_witness_tests;

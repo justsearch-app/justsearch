@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T21:11:39.305Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "7842629c38a5f614f5c9ef8b12c5b4bb608cd72b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.HelperReceiptGroupFlushTest.receiptsInsideAWindowAreUnforcedAndForcedAsAGroup\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3069
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/HelperReceiptGroupFlushTest.java#receiptsInsideAWindowAreUnforcedAndForcedAsAGroup",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/HelperReceiptGroupFlushTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7afa4d7da57fd575a3a9b18b9a0a4aefa2dd300ac029c56e94b2c431f8090c8c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "receiptsInsideAWindowAreUnforcedAndForcedAsAGroup()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "47981cfa6",
+    "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.HelperReceiptGroupFlushTest.receiptsInsideAWindowAreUnforcedAndForcedAsAGroup\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6914
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/HelperReceiptGroupFlushTest.java#receiptsInsideAWindowAreUnforcedAndForcedAsAGroup",
+        "classification": "assertion",
+        "detail": "receiptsInsideAWindowAreUnforcedAndForcedAsAGroup(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no per-helper forced write inside the window: [Event[type=helper-window-start, forced=true, atNanos=74283075342800], Event[type=helper-start, forced=true, atNanos=74283083097900], Event[type=helper-exit, forced=true, atNanos=74283105925600], Event[type=helper-sta"
+      }
+    ]
+  },
+  "digest": "sha256:9180ffee31e2dedd9cf22152799f337b8256df11a87f056049731739a680f92c"
+}

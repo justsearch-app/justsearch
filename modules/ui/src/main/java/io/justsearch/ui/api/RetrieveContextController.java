@@ -252,6 +252,10 @@ public class RetrieveContextController {
       quality.put("score_gap", q.scoreGap());
       quality.put("coverage", q.retrievalCoverage());
       quality.put("retrieval_mode", result.retrievalMode());
+      quality.put("retrieval_mode_reason", result.retrievalModeReason());
+      if (!result.retrievalModeCause().isEmpty()) {
+        quality.put("retrieval_mode_cause", result.retrievalModeCause());
+      }
       quality.put("chunks_considered", q.chunksConsidered());
       quality.put("chunks_included", q.chunksIncluded());
       quality.put("truncated", result.contextTruncated());

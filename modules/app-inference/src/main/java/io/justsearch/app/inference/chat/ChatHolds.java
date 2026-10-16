@@ -1,0 +1,130 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.app.inference.chat;
+
+import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.Hold;
+import io.justsearch.app.api.chat.SelfTestSession;
+import io.justsearch.app.api.chat.VduHold;
+import java.time.Instant;
+import java.util.Objects;
+
+/**
+ * The holds and the self-test session of the chat controller (Spec A §2.1, §4.1, §4.2 steps 5 and
+ * 6). A machine actor that needs the chat server in a state other than the user's intent takes one
+ * of these instead of driving the server itself:
+ *
+ * <ul>
+ *   <li>{@link #beginSelfTest}: the main server is stopped while an activation self-test runs.
+ *   <li>{@link #holdVdu}: the server runs with video-document understanding flags until the hold
+ *       closes; closing it is the exit from that mode.
+ *   <li>{@link #holdRunning}: the server runs (install smoke test).
+ *   <li>{@link #freezeConvergence}: the user's intent is recorded but not acted on (install
+ *       acquisition). Holds taken inside a freeze still act.
+ * </ul>
+ *
+ * <p>While any of them is open the controller does not act on a forwarded activation; when the
+ * last one closes, {@link Listener#kindClosed} lets the intent's forwarder return chat to the
+ * intent. A caller must hold no lock the controller thread takes.
+ */
+public interface ChatHolds {
+
+  /** The kinds of open holds. */
+  enum Kind {
+    FREEZE,
+    SELF_TEST,
+    VDU,
+    RUNNING
+  }
+
+  /** One open hold, for status. */
+  record OpenHold(Kind kind, String owner, Instant since) {
+    public OpenHold {
+      Objects.requireNonNull(kind, "kind");
+      Objects.requireNonNull(owner, "owner");
+      Objects.requireNonNull(since, "since");
+    }
+  }
+
+  /**
+   * Told when the first hold of a kind opens and when the last one of a kind closes, in that order,
+   * on the thread that opened or closed it. It must not call back into the controller.
+   */
+  interface Listener {
+    void kindOpened(OpenHold first);
+
+    void kindClosed(Kind kind, boolean noneOpen);
+  }
+
+  /**
+   * Starts the server with video-document understanding flags and keeps it so until the hold
+   * closes. Blocks until the server is in that mode.
+   *
+   * @throws ChatRefusal FAILED when a failure is latched (reconciliation F11), SELF_TEST while a
+   *     self-test runs, BUSY while another VDU hold is open or replies did not finish within 30 s,
+   *     ENGINE_STOPPING when the controller is terminal, LOADING when the server did not start
+   */
+  VduHold holdVdu(String owner) throws ChatRefusal;
+
+  /**
+   * Starts the server if it is not running and keeps it running until the hold closes.
+   *
+   * @throws ChatRefusal FAILED when a failure is latched (reconciliation F11), SELF_TEST while a
+   *     self-test runs, ENGINE_STOPPING when the controller is terminal, LOADING when the server
+   *     did not start
+   */
+  Hold holdRunning(String owner) throws ChatRefusal;
+
+  /** Records the user's intent without acting on it until the hold closes. */
+  Hold freezeConvergence(String owner);
+
+  /**
+   * Stops the main server (after replies finish, at most 30 s) and keeps it stopped until the
+   * session closes. From an idle state it goes straight to the session (reconciliation F17).
+   *
+   * @throws ChatRefusal BUSY when replies did not finish in 30 s or another hold is open,
+   *     ENGINE_STOPPING when the controller is terminal
+   */
+  SelfTestSession<SelfTestSpec, SelfTestRun> beginSelfTest(String owner) throws ChatRefusal;
+
+  /**
+   * Whether an automatic VDU pass may start now (Spec A §5.4, U13): chat is not running, nothing
+   * holds it, no self-test is open and no failure is latched. The trigger reads this, never the
+   * server being down, so a server stopped for a self-test or after a failure never starts a pass.
+   */
+  boolean vduMayStart();
+
+  /** Loaded chat may lend its server only after a full generation-idle window. */
+  default boolean automaticVduMayStart(java.time.Duration idleWindow) { return false; }
+
+  /**
+   * Takes an idle loaded server without waiting for any lease. The eligibility checkpoint is
+   * read again with admission closed. A person's demand waits for this hold to close, and asks
+   * its holder to finish at the next document boundary.
+   */
+  default VduHold holdAutomaticVdu(String owner, java.time.Duration idleWindow,
+      java.util.function.BooleanSupplier stillEligible) throws ChatRefusal {
+    throw new ChatRefusal(io.justsearch.app.api.chat.RefusalReason.BUSY,
+        java.util.Optional.empty(), false);
+  }
+
+  /** Registers a listener; closing the result removes it. */
+  AutoCloseable addListener(Listener listener);
+
+  /**
+   * Registers {@code listener} for actions that give automatic picture reading a fresh start: a
+   * committed settings apply and a person switching chat off or on. It receives a short event name,
+   * on the acting thread, and must not call back into the controller. Closing the result removes it.
+   */
+  default AutoCloseable addAutomaticVduResetListener(java.util.function.Consumer<String> listener) {
+    Objects.requireNonNull(listener, "listener");
+    return () -> {};
+  }
+
+  /**
+   * Attempts so far to launch a managed llama-server process, or {@code -1} when unknown. A VDU
+   * entry compares two readings to tell whether it launched or relaunched the server.
+   */
+  default long serverLaunches() {
+    return -1;
+  }
+}

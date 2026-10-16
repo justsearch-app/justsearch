@@ -18,9 +18,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OfflineProcessingOutcome;
-import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
@@ -34,8 +32,6 @@ import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.brainruntime.BrainRuntimeServiceImpl;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.TriggerOfflineProcessingHandler;
-import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.vdu.OfflineCoordinator;
 import io.justsearch.app.services.vdu.VduBatchProcessor;
 import io.justsearch.app.services.vdu.VduCapabilityState;
@@ -147,34 +143,10 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
   }
 
   @Test
-  void preselectionModeEntryFailureRecordsAiOfflineBeforeCleanupAndPreservesCause()
+  void postselectionModeEntryFailureRecordsCapturedRemainderAndPreservesCause()
       throws Exception {
-    try (var fixture = new Fixture(directory.resolve("preselection-mode-failure.db"))) {
-      when(fixture.inference.isOnline()).thenReturn(false);
-      var transition = new ModeTransitionException(
-          ModeTransitionException.Reason.ONLINE_START_FAILED, "mode entry failed");
-      org.mockito.Mockito.doThrow(transition).when(fixture.reconciler).procedureRequireEngine(true);
-
-      var running = fixture.start();
-      fixture.assertCleanupBoundary(running, 0, 0, "\"selected\":0");
-      fixture.assertCheckpointContains("\"remaining\":0", "\"blockedReason\":\"ai_offline\"");
-      verify(fixture.client, never()).queryPendingVduDocIds(any());
-      fixture.verifyNoDocumentEffects();
-      fixture.releaseCleanup.countDown();
-
-      OperationRecord terminal = fixture.await(running);
-      assertEquals(OperationState.FAILED, terminal.state());
-      assertEquals("UNCAUGHT_EXCEPTION", terminal.receipt().code());
-      Throwable failure = fixture.coordinatorFailure();
-      assertEquals(IllegalStateException.class, failure.getClass());
-      assertSame(transition, failure.getCause());
-      assertEquals(0, fixture.admission.activeWorkCount());
-    }
-  }
-
-  @Test
-  void postselectionModeEntryFailureRecordsCapturedRemainderBeforeCleanupAndPreservesCause()
-      throws Exception {
+    // A refused VDU hold acquires nothing, so there is no hold to close: the checkpoint is
+    // recorded before the operation fails and the refusal stays the cause.
     try (var fixture = new Fixture(directory.resolve("postselection-mode-failure.db"))) {
       Path first = fixture.file("mode-first.png");
       Path second = fixture.file("mode-second.png");
@@ -184,12 +156,11 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
       org.mockito.Mockito.doThrow(modeFailure).when(fixture.processor).enterVduMode();
 
       var running = fixture.start();
-      fixture.assertCleanupBoundary(running, 0, 0, "\"selected\":2");
-      fixture.assertCheckpointContains("\"remaining\":2", "\"blockedReason\":\"ai_offline\"");
-      fixture.verifyNoDocumentEffects();
-      fixture.releaseCleanup.countDown();
-
       OperationRecord terminal = fixture.await(running);
+      fixture.assertCheckpointContains("\"selected\":2", "\"remaining\":2",
+          "\"blockedReason\":\"ai_offline\"");
+      fixture.verifyNoDocumentEffects();
+      verify(fixture.processor, never()).exitVduMode();
       assertEquals(OperationState.FAILED, terminal.state());
       assertEquals("UNCAUGHT_EXCEPTION", terminal.receipt().code());
       Throwable failure = fixture.coordinatorFailure();
@@ -204,8 +175,6 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
     final OperationAttemptRunnerImpl runner;
     final DefaultEngineExecutorRegistry executors = new DefaultEngineExecutorRegistry();
     final EngineAdmissionController admission = new EngineAdmissionController(1, 1, 1);
-    final RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
-    final OnlineAiLifecycleControl inference = mock(OnlineAiLifecycleControl.class);
     final KnowledgeClient client = mock(KnowledgeClient.class);
     final VduProcessor processor = mock(VduProcessor.class);
     final CountDownLatch cleanupEntered = new CountDownLatch(1);
@@ -227,16 +196,16 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
       when(client.countPendingVdu(any())).thenReturn(1);
       var gpu = mock(GpuCapabilitiesService.class);
       when(gpu.snapshot()).thenReturn(gpuSnapshot());
-      when(inference.isOnline()).thenReturn(true);
+      // The procedure's cleanup is the batch closing its VDU hold on the chat controller.
       doAnswer(call -> {
         cleanupEntered.countDown();
         awaitIgnoringInterrupt(releaseCleanup);
         return null;
-      }).when(reconciler).endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
+      }).when(processor).exitVduMode();
       var batch = new VduBatchProcessor(processor, gpu, () -> client, VduMetricCatalog.noop(),
           new VduCapabilityState());
       coordinator = new OfflineCoordinator(
-          executors, admission, inference, reconciler, batch, () -> client, new VduCapabilityState());
+          executors, admission, batch, () -> client, new VduCapabilityState());
       var brain = new BrainRuntimeServiceImpl(mock(OnlineAiService.class),
           (context, progress) -> {
             var completion = coordinator.startOfflineProcessing(context, progress);
@@ -313,7 +282,8 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
       verify(processor, times(acknowledged)).process(any(Path.class), eq(dispatchContext));
       verify(client, times(acknowledged))
           .updateVduResult(anyString(), any(), any(), any(), anyInt(), eq(dispatchContext));
-      verify(client).countPendingEmbeddings(eq(dispatchContext));
+      // Spec A O2: no embedding hand-off, so the procedure no longer counts pending embeddings.
+      verify(client, never()).countPendingEmbeddings(any());
     }
 
     Path file(String name) throws Exception {

@@ -22,6 +22,12 @@ public final class SystemAccess {
     return (v == null || v.isBlank()) ? defaultValue : v;
   }
 
+  /** Presence-sensitive settings must distinguish an invalid blank value from absence. */
+  public static String rawSysProp(String key) {
+    if (key == null || key.isBlank()) return null;
+    return System.getProperty(key);
+  }
+
   public static void setSysProp(String key, String value) {
     if (key == null || key.isBlank()) return;
     if (value == null) {

@@ -21,6 +21,7 @@ public final class RequestEngineWork {
     return switch (failure.reason()) {
       case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT.name();
       case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT.name();
+      case INFERENCE_BUSY -> ApiErrorCode.ADMISSION_INFERENCE_BUSY.name();
       case FROZEN -> "UPGRADE_PREPARING";
       case WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE.name();
     };
@@ -28,7 +29,8 @@ public final class RequestEngineWork {
 
   public static void status(Context context, EngineAdmissionException failure) {
     boolean capacity = failure.reason() == EngineAdmissionException.Reason.CONTEXT_LIMIT
-        || failure.reason() == EngineAdmissionException.Reason.ENGINE_LIMIT;
+        || failure.reason() == EngineAdmissionException.Reason.ENGINE_LIMIT
+        || failure.reason() == EngineAdmissionException.Reason.INFERENCE_BUSY;
     context.status(capacity ? 429 : 503);
     if (capacity) context.header("Retry-After", Integer.toString(failure.retryAfterSeconds()));
   }

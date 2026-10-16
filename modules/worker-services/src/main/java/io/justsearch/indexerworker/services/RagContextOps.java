@@ -15,6 +15,8 @@ import io.justsearch.core.execution.EngineFutures;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
+import io.justsearch.indexerworker.services.input.LegCauses;
+import io.justsearch.indexerworker.services.input.SemanticDeadline;
 import io.justsearch.indexerworker.util.ParseUtils;
 import io.justsearch.indexerworker.util.VectorUtils;
 import io.justsearch.indexing.SchemaFields;
@@ -101,12 +103,17 @@ final class RagContextOps {
 
   // ==================== Records ====================
 
+  /**
+   * @param retrievalModeCause why the query embedding missed the semantic sub-budget; {@link
+   *     SearchReasonCode.LegCause#NONE} unless the reason is {@code SEMANTIC_BUDGET_EXCEEDED}
+   */
   record ChunkContextResult(
       String context,
       List<LuceneRuntimeTypes.SearchHit> usedHits,
       long totalFound,
       String retrievalMode,
       String retrievalModeReason,
+      SearchReasonCode.LegCause retrievalModeCause,
       boolean contextTruncated,
       List<ContextBudgeter.Section> sections,
       RagQualitySignals qualitySignals) {}
@@ -238,7 +245,7 @@ final class RagContextOps {
       Set<String> docIds, int topK, int maxContextTokens,
       boolean allowQueryEmbeddings, String compatibilityReason,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-      InferenceRequest acquisition) {
+      InferenceRequest acquisition, SemanticDeadline semantic) {
     acquisition.remainingNanos();
 
     String question = request.getQuestion();
@@ -280,7 +287,7 @@ final class RagContextOps {
     ChunkContextResult chunkContext =
         searchChunksWithMeta(question, effectiveDocIds, topK, maxContextTokens,
             allowQueryEmbeddings, compatibilityReason, filters, request.getExcludedChunksList(),
-            urgency, childLifetime, acquisition);
+            urgency, childLifetime, acquisition, semantic);
     if (chunkContext.context() != null && !chunkContext.context().isBlank()) {
       log.debug(
           "RAG: Found {} chars from chunks (chunksUsed={}, chunksFoundTotal={})",
@@ -310,9 +317,15 @@ final class RagContextOps {
     // re-inject its full text here. (The Head's own fetchBatchFallback is filtered the same way.)
     Set<String> fallbackDocIds =
         ChunkExclusionQuery.dropExcludedParents(effectiveDocIds, request.getExcludedChunksList());
-    return buildFallbackWithVirtualChunks(
+    var fallback = buildFallbackWithVirtualChunks(
         question, fallbackDocIds, topK, chunksFoundInSearch, fallbackReason, "FULLTEXT_FALLBACK",
         docLevelFilterFor(filters));
+    if (SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire().equals(chunkContext.retrievalModeReason())) {
+      return fallback.toBuilder()
+          .setRetrievalModeReason(chunkContext.retrievalModeReason())
+          .setRetrievalModeCause(chunkContext.retrievalModeCause().wire()).build();
+    }
+    return fallback;
   }
 
   /**
@@ -349,6 +362,7 @@ final class RagContextOps {
                 (int) Math.min(Integer.MAX_VALUE, Math.max(0L, chunkContext.totalFound())))
             .setRetrievalMode(chunkContext.retrievalMode())
             .setRetrievalModeReason(chunkContext.retrievalModeReason())
+            .setRetrievalModeCause(chunkContext.retrievalModeCause().wire())
             .setContextTruncated(chunkContext.contextTruncated())
             .setQuality(io.justsearch.ipc.QualitySignals.newBuilder()
                 .setBestChunkScore(qs.bestChunkScore())
@@ -438,16 +452,35 @@ final class RagContextOps {
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     return searchChunksWithMeta(question, docIds, topK, maxContextTokens, allowQueryEmbeddings,
         compatibilityReason, ragFilters, excludedChunks, urgency, childLifetime,
-        InferenceRequest.foreground());
+        InferenceRequest.foreground(), SemanticDeadline.unbounded());
   }
 
+  /**
+   * Whether the configured retrieval mode embeds the question ({@code hybrid}, or {@code auto} when
+   * an embedder answers): the retrieval then has a semantic leg and a semantic sub-budget (Spec D
+   * §5.1).
+   */
+  boolean retrievalWantsDense() {
+    String mode = resolvedConfigSupplier.get().rag().retrieveMode();
+    return "hybrid".equals(mode) || "auto".equals(mode);
+  }
+
+  boolean retrievalNeedsSemanticBudget() {
+    return retrievalWantsDense() || "mmr".equals(resolvedConfigSupplier.get().rag().diversifyMode());
+  }
+
+  /**
+   * @param semantic the retrieval's semantic sub-budget (Spec D §5.1): the query embedding and the
+   *     MMR embeddings run within it, and a miss falls back to BM25 with {@code
+   *     SEMANTIC_BUDGET_EXCEEDED} and a cause instead of failing the retrieval
+   */
   private ChunkContextResult searchChunksWithMeta(
       String question, Set<String> docIds, int topK, int maxContextTokens,
       boolean allowQueryEmbeddings, String compatibilityReason,
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-      InferenceRequest acquisition) {
+      InferenceRequest acquisition, SemanticDeadline semantic) {
     acquisition.remainingNanos();
     // stage_id is cleaned up by the outer MdcContext.request() scope in WorkerSearchService
     MDC.put("stage_id", "retrieve");
@@ -464,12 +497,40 @@ final class RagContextOps {
     boolean useHybrid = false;
     float[] queryVector = null;
     String retrievalModeReason;
+    SearchReasonCode.LegCause retrievalModeCause = SearchReasonCode.LegCause.NONE;
+    // Spec D §5.1: the query embedding and MMR run within the semantic sub-budget.
+    InferenceRequest semanticRequest = semantic.narrow(acquisition);
 
+    var availability = embeddingProvider.availability();
+    boolean ready = switch (availability.state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    };
+    boolean present = switch (availability.state()) {
+      case READY, STARTING -> true;
+      case ABSENT -> false;
+      case FAILED -> {
+        log.warn("RAG embedding model load failed", availability.failure());
+        yield false;
+      }
+    };
     if ("hybrid".equals(mode) || "auto".equals(mode)) {
       // Try to get query embedding for hybrid search
-      if (embeddingProvider.isAvailable() && allowQueryEmbeddings) {
+      if (allowQueryEmbeddings && present && semantic.modelsTimedOut()) {
+        // The models-ready wait used the whole sub-budget: the embedder is still loading.
+        retrievalModeCause = semanticMiss(SearchReasonCode.LegCause.LOADING, "query");
+        retrievalModeReason = SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire();
+      } else if (allowQueryEmbeddings
+          && present
+          && semantic.passed()) {
+        // The sub-budget was spent before the embedding could start (the call waited for a
+        // thread): BM25 now, without starting the encoder. Time before the seat is contention.
+        acquisition.remainingNanos();
+        retrievalModeCause = semanticMiss(SearchReasonCode.LegCause.CONTENDED, "query");
+        retrievalModeReason = SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire();
+      } else if (ready && allowQueryEmbeddings) {
         try {
-          queryVector = embeddingProvider.embedQuery(question, acquisition);
+          queryVector = embeddingProvider.embedQuery(question, semanticRequest);
           if (queryVector != null && queryVector.length > 0) {
             useHybrid = true;
             retrievalModeReason = "HYBRID_AVAILABLE";
@@ -477,17 +538,28 @@ final class RagContextOps {
             retrievalModeReason = "EMBEDDING_EMPTY";
           }
         } catch (RuntimeException e) {
+          // Spec D §1.3 catch rule: a cancelled request or a passed request deadline propagates; a
+          // passed semantic deadline is a budget miss with BM25; anything else is a failed embed.
           acquisition.remainingNanos();
           EngineFutures.rethrowExecutorRefusal(e);
           EngineFutures.rethrowCancellation(e);
-          log.debug("RAG embedding generation failed: {}, using BM25", e.getMessage());
-          retrievalModeReason = "EMBEDDING_GENERATION_FAILED";
+          queryVector = null;
+          if (semanticBudgetMissed(semantic, e)) {
+            retrievalModeCause = semanticMiss(LegCauses.of(e), "query");
+            retrievalModeReason = SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire();
+          } else {
+            log.debug("RAG embedding generation failed: {}, using BM25", e.getMessage());
+            retrievalModeReason = "EMBEDDING_GENERATION_FAILED";
+          }
         }
       } else {
         retrievalModeReason = !allowQueryEmbeddings
             ? (compatibilityReason != null ? compatibilityReason : "EMBEDDING_UNAVAILABLE")
-            : embeddingProvider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider
-                ? "NO_EMBEDDING_SERVICE" : "EMBEDDING_UNAVAILABLE";
+            : switch (availability.state()) {
+              case ABSENT -> "NO_EMBEDDING_SERVICE";
+              case STARTING, FAILED -> "EMBEDDING_UNAVAILABLE";
+              case READY -> throw new IllegalStateException("Ready embedding was not attempted");
+            };
       }
 
       // If mode is "hybrid" but no embedding, log a warning
@@ -585,8 +657,8 @@ final class RagContextOps {
 
     if (candidateHits.isEmpty()) {
       return new ChunkContextResult(
-          "", List.of(), totalFound, effectiveMode, retrievalModeReason, false, List.of(),
-          RagQualitySignals.EMPTY);
+          "", List.of(), totalFound, effectiveMode, retrievalModeReason, retrievalModeCause,
+          false, List.of(), RagQualitySignals.EMPTY);
     }
 
     MDC.put("stage_id", "rerank");
@@ -604,7 +676,7 @@ final class RagContextOps {
         ceScores = rerankResult.ceScores();
         finalHits =
             diversifyChunks(question, queryVector, rerankResult.hits(), topK, allowQueryEmbeddings,
-                acquisition);
+                semanticRequest);
         log.debug(
             "Chunk retrieval: rerank->diversify (GPU path), {} candidates -> {} final",
             candidateHits.size(),
@@ -613,7 +685,7 @@ final class RagContextOps {
         // CPU path: diversify first (bounds work), then rerank
         var diversifiedHits =
             diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings,
-                acquisition);
+                semanticRequest);
         var rerankResult = rerankChunks(question, diversifiedHits, acquisition);
         ceScores = rerankResult.ceScores();
         finalHits = rerankResult.hits();
@@ -626,8 +698,10 @@ final class RagContextOps {
       // No reranking - just diversify
       finalHits =
           diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings,
-              acquisition);
+              semanticRequest);
     }
+    // A diversification that stopped at the semantic deadline does not outlive the request's.
+    acquisition.remainingNanos();
 
     MDC.put("stage_id", "respond");
 
@@ -666,6 +740,7 @@ final class RagContextOps {
           totalFound,
           effectiveMode,
           retrievalModeReason,
+          retrievalModeCause,
           contextTruncated,
           List.copyOf(tokenBudgeter.sections()),
           quality);
@@ -692,6 +767,7 @@ final class RagContextOps {
         totalFound,
         effectiveMode,
         retrievalModeReason,
+        retrievalModeCause,
         contextTruncated,
         budgeter.sections(),
         quality);
@@ -1313,7 +1389,9 @@ final class RagContextOps {
     // CrossEncoderReranker.rerank so every rerank caller (not just
     // chunk rerank) emits a uniform span. Remove the local wrap here.
     try {
-      var rerankResult = reranker.rerank(question, chunkTexts, config.deadlineBudgetMs(), acquisition);
+      var bounded = InferenceRequest.narrowed(acquisition, acquisition.deadlineNanos(),
+          InferenceRequest.SemanticBudget.FALLBACK);
+      var rerankResult = reranker.rerank(question, chunkTexts, config.deadlineBudgetMs(), bounded);
 
       if (rerankResult.skipped()) {
         // Register F-054: name the cause the reranker actually reported. This line said
@@ -1400,6 +1478,63 @@ final class RagContextOps {
     }
   }
 
+  // ==================== Semantic sub-budget (Spec D §5.1) ====================
+
+  /**
+   * Whether a failed query embedding is a semantic budget miss (the §1.3 rule, as search capture
+   * applies it): a sub-budget applies and its deadline has passed, or the encoder reported a
+   * deadline. Called after the request's own cancellation and deadline have been checked.
+   */
+  private static boolean semanticBudgetMissed(SemanticDeadline semantic, RuntimeException e) {
+    return semantic.bounded()
+        && (semantic.passed() || e instanceof InferenceRequest.DeadlineExceeded);
+  }
+
+  /** Records a semantic budget miss of the RAG query leg as a span attribute and a log line. */
+  private static SearchReasonCode.LegCause semanticMiss(SearchReasonCode.LegCause cause, String leg) {
+    io.opentelemetry.api.trace.Span.current()
+        .setAttribute("rag.semantic_budget." + leg + ".cause", cause.wire());
+    log.info(
+        Markers.append("reason_code", SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire())
+            .and(Markers.append("leg", leg))
+            .and(Markers.append("leg_cause", cause.wire())),
+        "RAG {} embedding missed the retrieval's semantic sub-budget (cause: {}); using BM25",
+        leg,
+        cause.wire());
+    return cause;
+  }
+
+  /**
+   * After a failed MMR embedding: whether the semantic sub-budget {@code request} runs under is
+   * spent, so diversification stops embedding. A cancelled request propagates, and so does a passed
+   * deadline of a request that has no sub-budget (today's behaviour).
+   */
+  private static boolean semanticBudgetSpent(InferenceRequest request) {
+    try {
+      request.remainingNanos();
+      return false;
+    } catch (InferenceRequest.DeadlineExceededException e) {
+      if (request.semanticBudget() == InferenceRequest.SemanticBudget.NONE) throw e;
+      return true;
+    }
+  }
+
+  /**
+   * MMR stopped at the semantic deadline: position diversification instead (Spec D §5.1). Recorded
+   * as a span attribute and a log line, not a wire field.
+   */
+  private List<LuceneRuntimeTypes.SearchHit> mmrSkippedAtSemanticDeadline(
+      List<LuceneRuntimeTypes.SearchHit> hits, int targetK) {
+    io.opentelemetry.api.trace.Span.current()
+        .setAttribute(
+            "rag.mmr.skip_reason", SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire());
+    log.info(
+        Markers.append("reason_code", SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire()),
+        "MMR diversification missed the retrieval's semantic sub-budget; using position"
+            + " diversification");
+    return diversifyByPosition(hits, targetK);
+  }
+
   // ==================== Diversification ====================
 
   /**
@@ -1446,7 +1581,10 @@ final class RagContextOps {
       return hits;
     }
 
-    if (!embeddingProvider.isAvailable() || !allowQueryEmbeddings) {
+    if (!switch (embeddingProvider.availability().state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    } || !allowQueryEmbeddings) {
       log.debug(
           "MMR diversification requested but embeddings are unavailable;"
               + " using position diversification");
@@ -1464,7 +1602,7 @@ final class RagContextOps {
       try {
         qv = embeddingProvider.embedQuery(question, acquisition);
       } catch (RuntimeException e) {
-        acquisition.remainingNanos();
+        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(hits, targetK);
         log.debug("MMR query embedding failed: {}", e.getMessage());
         qv = null;
       }
@@ -1481,7 +1619,7 @@ final class RagContextOps {
         embeddedHits.add(hit);
         vectors.add(v);
       } catch (RuntimeException e) {
-        acquisition.remainingNanos();
+        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(hits, targetK);
         log.debug("MMR chunk embedding failed: {}", e.getMessage());
       }
     }
@@ -1706,8 +1844,8 @@ final class RagContextOps {
 
   private RetrieveContextResponse buildEmptyFilterResponse() {
     var emptyResult = new ChunkContextResult(
-        "", List.of(), 0, "FILTERED_EMPTY", "NO_MATCHING_PARENTS", false, List.of(),
-        RagQualitySignals.EMPTY);
+        "", List.of(), 0, "FILTERED_EMPTY", "NO_MATCHING_PARENTS", SearchReasonCode.LegCause.NONE,
+        false, List.of(), RagQualitySignals.EMPTY);
     return buildChunkResponse(emptyResult);
   }
 

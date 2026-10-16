@@ -35,6 +35,12 @@ public record GpuCapabilities(
       Integer memoryUtilizationPercent
   ) {}
 
+  /**
+   * The driver and memory figures nvidia-smi reports. Where NVML answered in-process (task b6d536
+   * b101) no nvidia-smi process is started and the same figures come from NVML: {@code source}
+   * names where they were read ({@link #SOURCE_NVIDIA_SMI} or {@link #SOURCE_NVML}), and
+   * {@code unavailable} names each figure that source did not give, with why.
+   */
   public record NvidiaSmi(
       boolean available,
       String error,
@@ -43,8 +49,27 @@ public record GpuCapabilities(
       Integer driverVersionMinor,
       Long totalVramBytes,
       Long freeVramBytes,
-      String vramDescription
-  ) {}
+      String vramDescription,
+      String source,
+      java.util.Map<String, String> unavailable
+  ) {
+    /** The figures were read from an nvidia-smi process. */
+    public static final String SOURCE_NVIDIA_SMI = "nvidia-smi";
+    /** The figures were read in-process from NVML; no nvidia-smi process was started. */
+    public static final String SOURCE_NVML = "read in-process (NVML)";
+
+    public NvidiaSmi {
+      unavailable = unavailable == null ? java.util.Map.of()
+          : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(unavailable));
+    }
+
+    /** Figures read from nvidia-smi. */
+    public NvidiaSmi(boolean available, String error, String driverVersion, Integer driverVersionMajor,
+        Integer driverVersionMinor, Long totalVramBytes, Long freeVramBytes, String vramDescription) {
+      this(available, error, driverVersion, driverVersionMajor, driverVersionMinor, totalVramBytes,
+          freeVramBytes, vramDescription, SOURCE_NVIDIA_SMI, java.util.Map.of());
+    }
+  }
 
   /**
    * The CUDA-functional axis: "is the CUDA runtime actually loadable" (the nvcuda driver-API

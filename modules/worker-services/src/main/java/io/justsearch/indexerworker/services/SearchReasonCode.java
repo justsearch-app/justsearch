@@ -16,8 +16,8 @@ package io.justsearch.indexerworker.services;
  *   <li><b>9 embedding-compat codes</b> — produced upstream by {@code
  *       EmbeddingCompatibilityController} and mapped at the orchestrator boundary
  *       via {@link #fromCompatString(String)}.
- *   <li><b>7 search-routing codes</b> — emitted for vector/hybrid degradation
- *       (encoding failed, service unavailable, etc.).
+ *   <li><b>8 search-routing codes</b> — emitted for vector/hybrid degradation
+ *       (encoding failed, service unavailable, semantic sub-budget missed, etc.).
  *   <li><b>11 chunk-merge codes</b> — emitted by chunk-augmentation gating.
  * </ul>
  *
@@ -50,7 +50,7 @@ public enum SearchReasonCode {
   /** Fall-through for unrecognised compat strings via {@link #fromCompatString}. */
   EMBEDDING_COMPATIBILITY_UNKNOWN,
 
-  // === 7 search-routing codes ===
+  // === 8 search-routing codes ===
   UNKNOWN,
   EMBEDDING_COMPATIBILITY_BLOCKED,
   NO_EMBEDDING_SERVICE,
@@ -58,6 +58,12 @@ public enum SearchReasonCode {
   EMBEDDING_EXCEPTION,
   SKIPPED_SHORT_QUERY,
   SKIPPED_NO_DISCRIMINATIVE_TERM,
+  /**
+   * Spec D §1 (ADR-0050 decision 1): a query encoder leg did not finish inside the search's
+   * semantic sub-budget, so the search answered with the legs it had. Always carries a {@link
+   * LegCause} other than {@link LegCause#NONE}.
+   */
+  SEMANTIC_BUDGET_EXCEEDED,
 
   // === 11 chunk-merge codes ===
   APPLIED,
@@ -78,6 +84,24 @@ public enum SearchReasonCode {
    */
   public String wire() {
     return name();
+  }
+
+  /**
+   * Why a leg missed its semantic sub-budget (Spec D §1.4): {@code contended} while waiting for the
+   * device, {@code loading} while models or sessions were not ready, {@code stuck} when a started
+   * native run did not return. {@link #NONE} for every reason other than {@link
+   * #SEMANTIC_BUDGET_EXCEEDED}.
+   */
+  public enum LegCause {
+    NONE,
+    CONTENDED,
+    LOADING,
+    STUCK;
+
+    /** Lower-case wire form; empty for {@link #NONE}, which is never written. */
+    public String wire() {
+      return this == NONE ? "" : name().toLowerCase(java.util.Locale.ROOT);
+    }
   }
 
   /**

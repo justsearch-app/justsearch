@@ -25,6 +25,37 @@ function linksIn(dir) {
   return stat.isDirectory() ? fs.readdirSync(dir).flatMap(name => linksIn(path.join(dir, name))) : [];
 }
 
+test('--copy-node-modules creates independent ordinary files including linked dependencies', () => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-dependencies-'));
+  const root = path.join(scratch, 'candidate');
+  const worktree = path.join(scratch, 'before');
+  const modules = path.join('modules', 'ui-web', 'node_modules');
+  const dependency = path.join(scratch, 'dependency');
+  const sourceDependency = path.join(root, modules, 'dependency');
+  const copiedDependency = path.join(worktree, modules, 'dependency');
+  try {
+    fs.mkdirSync(path.join(root, modules), { recursive: true });
+    fs.mkdirSync(dependency);
+    fs.writeFileSync(path.join(dependency, 'marker'), 'original');
+    fs.symlinkSync(dependency, sourceDependency, process.platform === 'win32' ? 'junction' : 'dir');
+    vm.runInNewContext(`${functions}
+      const args = parseArgs(['--out', 'evidence.json', '--check', 'probe', '--copy-node-modules']);
+      prepareNodeModules(worktree, args.copyNodeModules);`, {
+      fs, path, REPO_ROOT: root, IS_WIN: process.platform === 'win32', worktree,
+    });
+    assert.deepEqual(linksIn(worktree), [], 'copied dependencies must contain no junctions or symlinks');
+    assert.equal(fs.readFileSync(path.join(copiedDependency, 'marker'), 'utf8'), 'original');
+    fs.writeFileSync(path.join(copiedDependency, 'marker'), 'changed in before-worktree');
+    assert.equal(fs.readFileSync(path.join(dependency, 'marker'), 'utf8'), 'original',
+      'changes in the before-worktree must not modify the candidate dependency');
+    assert.ok(fs.lstatSync(sourceDependency).isSymbolicLink(), 'the candidate dependency link stays intact');
+  } finally {
+    for (const entry of linksIn(scratch)) fs.unlinkSync(entry);
+    assert.equal(path.dirname(scratch), path.resolve(os.tmpdir()));
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 function fixture(options, check) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-cleanup-'));
   const root = path.join(scratch, 'repo');

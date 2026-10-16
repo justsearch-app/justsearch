@@ -30,7 +30,8 @@ use serde::{Deserialize, Serialize};
 
 /// The supervision register, embedded at compile time. The path is relative to THIS file:
 /// `src -> src-tauri -> shell -> modules -> <repo root>`.
-const SUPERVISION_REGISTER: &str = include_str!("../../../../governance/supervision-contract.v1.json");
+const SUPERVISION_REGISTER: &str =
+    include_str!("../../../../governance/supervision-contract.v1.json");
 
 /// The env var that turns the per-run policy overrides on.
 ///
@@ -50,6 +51,7 @@ pub enum State {
     Stopping,
     Restarting,
     Exhausted,
+    Stopped,
 }
 
 impl State {
@@ -60,6 +62,7 @@ impl State {
             State::Stopping => "stopping",
             State::Restarting => "restarting",
             State::Exhausted => "exhausted",
+            State::Stopped => "stopped",
         }
     }
 
@@ -73,6 +76,7 @@ impl State {
             "stopping" => Some(State::Stopping),
             "restarting" => Some(State::Restarting),
             "exhausted" => Some(State::Exhausted),
+            "stopped" => Some(State::Stopped),
             _ => None,
         }
     }
@@ -159,7 +163,13 @@ pub struct Decision {
 
 impl Decision {
     fn plain(action: Action) -> Decision {
-        Decision { action, reason: None, exit_class: None, cooldown_ms: None, counted: false }
+        Decision {
+            action,
+            reason: None,
+            exit_class: None,
+            cooldown_ms: None,
+            counted: false,
+        }
     }
 
     fn with_reason(action: Action, reason: &str) -> Decision {
@@ -190,6 +200,9 @@ pub struct Policy {
     pub stability_window_counted_from: String,
     pub start_deadline_ms: u64,
     pub graceful_stop_deadline_ms: u64,
+    pub quit_deadline_ms: u64,
+    pub quit_force_margin_ms: u64,
+    pub data_dir_locked_wait_ms: u64,
     pub hang_poll_interval_ms: u64,
     pub hang_unhealthy_threshold: u32,
     pub exit_codes: Vec<ExitCodeRow>,
@@ -215,19 +228,37 @@ fn engine_row() -> serde_json::Value {
         .expect("the supervision register must carry an `engine` process row")
 }
 
-
-
 /// The overridable parameters and their env vars, in the register's `harnessOverrides` order.
 /// The restart BUDGET is deliberately absent: a harness that could widen it could hide a
 /// supervisor that never reaches `exhausted`.
 const OVERRIDES: &[(&str, &str)] = &[
-    ("stabilityWindowMs", "JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS"),
+    ("quitDeadlineMs", "JUSTSEARCH_SUPERVISOR_QUIT_DEADLINE_MS"),
+    (
+        "dataDirLockedWaitMs",
+        "JUSTSEARCH_SUPERVISOR_DATA_DIR_LOCKED_WAIT_MS",
+    ),
+    (
+        "stabilityWindowMs",
+        "JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS",
+    ),
     ("maxCooldownMs", "JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS"),
-    ("cooldownIncrementMs", "JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS"),
+    (
+        "cooldownIncrementMs",
+        "JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS",
+    ),
     ("startDeadlineMs", "JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS"),
-    ("gracefulStopDeadlineMs", "JUSTSEARCH_SUPERVISOR_GRACEFUL_STOP_DEADLINE_MS"),
-    ("hangPollIntervalMs", "JUSTSEARCH_SUPERVISOR_HANG_POLL_INTERVAL_MS"),
-    ("hangUnhealthyThreshold", "JUSTSEARCH_SUPERVISOR_HANG_THRESHOLD"),
+    (
+        "gracefulStopDeadlineMs",
+        "JUSTSEARCH_SUPERVISOR_GRACEFUL_STOP_DEADLINE_MS",
+    ),
+    (
+        "hangPollIntervalMs",
+        "JUSTSEARCH_SUPERVISOR_HANG_POLL_INTERVAL_MS",
+    ),
+    (
+        "hangUnhealthyThreshold",
+        "JUSTSEARCH_SUPERVISOR_HANG_THRESHOLD",
+    ),
 ];
 
 /// Load the policy: the register's numbers, plus the per-run overrides IF AND ONLY IF the harness
@@ -238,7 +269,9 @@ pub fn load_policy() -> Policy {
 
 fn load_policy_from(env: impl Fn(&str) -> Option<String>) -> Policy {
     let row = engine_row();
-    let declared = row.get("policy").expect("engine row must declare a policy block");
+    let declared = row
+        .get("policy")
+        .expect("engine row must declare a policy block");
     let num = |key: &str| -> u64 {
         declared
             .get(key)
@@ -257,6 +290,9 @@ fn load_policy_from(env: impl Fn(&str) -> Option<String>) -> Policy {
             .to_string(),
         start_deadline_ms: num("startDeadlineMs"),
         graceful_stop_deadline_ms: num("gracefulStopDeadlineMs"),
+        quit_deadline_ms: num("quitDeadlineMs"),
+        quit_force_margin_ms: num("quitForceMarginMs"),
+        data_dir_locked_wait_ms: num("dataDirLockedWaitMs"),
         hang_poll_interval_ms: num("hangPollIntervalMs"),
         hang_unhealthy_threshold: num("hangUnhealthyThreshold") as u32,
         exit_codes: serde_json::from_value(row.get("exitCodes").cloned().unwrap_or_default())
@@ -274,8 +310,12 @@ fn load_policy_from(env: impl Fn(&str) -> Option<String>) -> Policy {
     }
     policy.harness_active = true;
     for (key, var) in OVERRIDES {
-        let Some(value) = env(var).and_then(|raw| raw.trim().parse::<u64>().ok()) else { continue };
+        let Some(value) = env(var).and_then(|raw| raw.trim().parse::<u64>().ok()) else {
+            continue;
+        };
         match *key {
+            "quitDeadlineMs" => policy.quit_deadline_ms = value,
+            "dataDirLockedWaitMs" => policy.data_dir_locked_wait_ms = value,
             "stabilityWindowMs" => policy.stability_window_ms = value,
             "maxCooldownMs" => policy.max_cooldown_ms = value,
             "cooldownIncrementMs" => policy.cooldown_increment_ms = value,
@@ -349,8 +389,16 @@ fn decide_on_exit(observation: &Observation, policy: &Policy) -> Decision {
     // thing being recovered from was a fault. Treating it as requested-and-free would give an
     // Engine that hangs every thirty seconds an unbounded number of restarts.
     let hang = requested == Some("hang");
-    let exit_class = if hang { "TRANSIENT".to_string() } else { classify_exit(code, policy) };
-    let reason = if hang { "hang".to_string() } else { describe_exit(code, policy) };
+    let exit_class = if hang {
+        "TRANSIENT".to_string()
+    } else {
+        classify_exit(code, policy)
+    };
+    let reason = if hang {
+        "hang".to_string()
+    } else {
+        describe_exit(code, policy)
+    };
 
     if exit_class == "REQUESTED" && reason == "requested_restart" {
         return Decision {
@@ -397,7 +445,9 @@ fn decide_on_exit(observation: &Observation, policy: &Policy) -> Decision {
         reason: Some(reason),
         exit_class: Some(exit_class),
         cooldown_ms: Some(std::cmp::min(
-            policy.cooldown_increment_ms.saturating_mul(u64::from(attempt)),
+            policy
+                .cooldown_increment_ms
+                .saturating_mul(u64::from(attempt)),
             policy.max_cooldown_ms,
         )),
         counted: true,
@@ -485,6 +535,12 @@ pub struct StateRecord {
     pub requested_reason: Option<String>,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+    /// `shell_unavailable` while the current incarnation runs without its shell job (Spec F §2.1);
+    /// absent when it is contained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub containment: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -511,8 +567,8 @@ pub enum Outcome {
     Stopped { reason: String, exit_code: i32 },
     /// design 7.1's terminal state.
     Exhausted { reason: String, exit_code: i32 },
-    /// The actuator asked to stop supervising (the shell is quitting or replacing the Engine).
-    Cancelled,
+    /// A host stop with no live incarnation.
+    NoEngine,
 }
 
 /// Everything [`decide`] cannot do. `lib.rs` implements it over the real child; the
@@ -522,6 +578,47 @@ pub enum Outcome {
 /// prove a supervisor production does not run, which is the `static-green != live-working` trap
 /// wearing a Rust hat.
 pub trait Actuator {
+    fn discovery(&mut self) -> Option<Ready> {
+        None
+    }
+    fn start_initial(&mut self) -> Result<u32, String> {
+        Ok(0)
+    }
+    fn take_host_quit(&mut self) -> Option<HostQuit> {
+        None
+    }
+    fn replacement_held(&mut self) -> bool {
+        false
+    }
+    fn incarnation_number(&self) -> u32 {
+        1
+    }
+    fn lock_holder_gone(&self) -> bool {
+        false
+    }
+    fn prior_owner_recent(&mut self) -> bool {
+        false
+    }
+    fn wait_or_wake(&mut self, ms: u64) {
+        self.sleep(ms);
+    }
+    fn record_intent(
+        &mut self,
+        _reason: &str,
+        _detail: Option<&str>,
+        _channel: &str,
+        _deadline: u64,
+    ) {
+    }
+    fn record_exit(&mut self, _code: i32, _phase: &str, _decision: &Decision) {}
+    fn terminal(&mut self, _outcome: &Outcome) {}
+    fn resumed(&mut self) -> bool {
+        false
+    }
+    fn suspended_ms_since(&self, _t0: u64) -> u64 {
+        0
+    }
+    fn note_power(&self, _event: PowerEvent) {}
     /// Start the next incarnation. Returns its pid.
     fn spawn_engine(&mut self) -> Result<u32, String>;
     /// Wait until this incarnation answers, the monotonic deadline elapses, or the host cancels.
@@ -535,9 +632,15 @@ pub trait Actuator {
     /// Current admitted Engine's shutdown handoff. It bounds close but never grants a free restart.
     fn observed_shutdown_reason(&mut self, current: &Ready) -> Option<String>;
     /// A host command delivered to this loop; fixture actuators use the same owned write path.
-    fn take_host_request(&mut self) -> Option<String> { None }
+    fn take_host_request(&mut self) -> Option<String> {
+        None
+    }
     /// Item B2's out-of-band channel: the Engine's watcher reads this and runs the ordered shutdown.
-    fn write_shutdown_request(&mut self, reason: &str, deadline_epoch_ms: u64) -> Result<(), String>;
+    fn write_shutdown_request(
+        &mut self,
+        reason: &str,
+        deadline_epoch_ms: u64,
+    ) -> Result<(), String>;
     /// The deadline expired, so the request was not enough.
     fn force_kill(&mut self);
     /// The cooldown FLOOR: wait until the dead incarnation has let go of its handles. Windows keeps
@@ -557,7 +660,7 @@ pub trait Actuator {
     }
     /// Publish a transition where a reader outside this process can see it.
     fn publish_state(&mut self, record: &StateRecord);
-    /// False when the host is closing or held for replacement; returns [`Outcome::Cancelled`].
+    /// Compatibility hook for fixture hosts. False posts a coordinated quit; it never cancels.
     fn should_continue(&mut self) -> bool {
         true
     }
@@ -567,243 +670,401 @@ pub trait Actuator {
 ///
 /// Deliberately synchronous and deliberately not on the UI thread. `lib.rs` runs it on an OS thread,
 /// following the split that file already uses for its drain and manifest-watch threads.
+#[derive(Clone, Debug)]
+pub struct HostQuit {
+    pub reason: String,
+    pub detail: Option<String>,
+    pub deadline_ms: u64,
+    pub deadline_epoch_ms: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PowerEvent {
+    Suspend,
+    Resume,
+}
+
+pub const TICK_MS: u64 = 50;
+pub const SUSPEND_GAP_MS: u64 = 2000;
+pub const RESUME_GRACE_MS: u64 = 30000;
+
+fn resume_grace_ms() -> u64 {
+    if std::env::var(HARNESS_FLAG).as_deref() == Ok("1") {
+        std::env::var("JUSTSEARCH_SUPERVISOR_RESUME_GRACE_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(RESUME_GRACE_MS)
+    } else {
+        RESUME_GRACE_MS
+    }
+}
+
+/// Raw monotonic time may or may not advance during S3. Closed intervals are counted once,
+/// whether detected by a broadcast or a late tick. Enforcement uses the resulting active time.
+#[derive(Default, Debug)]
+pub struct SuspendAwareClock {
+    last: Option<u64>,
+    suspended_at: Option<u64>,
+    excluded: u64,
+    resume_until: u64,
+    resumed: bool,
+}
+impl SuspendAwareClock {
+    pub fn note(&mut self, event: PowerEvent, raw: u64) {
+        match event {
+            PowerEvent::Suspend => {
+                self.suspended_at.get_or_insert(raw);
+            }
+            PowerEvent::Resume => {
+                if let Some(start) = self.suspended_at.take() {
+                    self.excluded += raw.saturating_sub(start);
+                    self.last = Some(raw);
+                    self.resume_until = raw.saturating_sub(self.excluded) + resume_grace_ms();
+                    self.resumed = true;
+                }
+            }
+        }
+    }
+    pub fn now_ms(&mut self, raw: u64) -> u64 {
+        if let Some(start) = self.suspended_at {
+            return start.saturating_sub(self.excluded);
+        }
+        if let Some(last) = self.last {
+            let gap = raw.saturating_sub(last);
+            if gap > SUSPEND_GAP_MS {
+                self.excluded += gap.saturating_sub(TICK_MS);
+                self.resume_until = raw.saturating_sub(self.excluded) + resume_grace_ms();
+                self.resumed = true;
+            }
+        }
+        self.last = Some(raw);
+        raw.saturating_sub(self.excluded)
+    }
+    pub fn grace(&self, now: u64) -> bool {
+        now < self.resume_until || self.suspended_at.is_some()
+    }
+    pub fn take_resumed(&mut self) -> bool {
+        std::mem::take(&mut self.resumed)
+    }
+    pub fn suspended_ms_since(&self, _t0: u64) -> u64 {
+        self.excluded
+    }
+}
+
 pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut A) -> Outcome {
-    const TICK_MS: u64 = 50;
-
-    let mut ready_at: Option<u64> = None;
-    let mut ready_epoch = None;
-    // Host enforcement uses a monotonic fence; shutdown-request IPC carries a separate epoch.
-    let mut request_deadline: Option<u64> = None;
-    let mut next_health_poll: u64 = 0;
     let mut current = Ready::default();
-    // An exit observed while WAITING for an incarnation to come up. `poll_exit` takes the code, so
-    // it has to be carried to the loop rather than re-read there. Without this the start deadline
-    // fires on an incarnation that is already dead, and the resulting `hang` request rewrites a
-    // NON_TRANSIENT death as a counted transient one — the failure that showed up as
-    // `non-transient-2-exhausts-at-once` spending the whole budget.
-    let mut pending_exit: Option<i32> = None;
-
+    let mut start_phase = "spawned";
+    let mut ready_at = None;
+    let mut ready_epoch = None;
+    let mut start_deadline = actuator.monotonic_ms() + supervisor.policy.start_deadline_ms;
+    let mut request_deadline: Option<u64> = None;
+    let mut next_health_poll = 0;
+    let mut cooldown_until: Option<u64> = None;
+    let mut last_exit_at: Option<u64> = None;
+    let mut locked_retry = false;
+    let mut waiting_for_holder = false;
+    let mut incarnation_running = false;
+    let mut host_stop: Option<String> = None;
     macro_rules! publish {
         ($reason:expr) => {{
-            let now = actuator.epoch_ms();
-            let record = supervisor.record(
+            let mut record = supervisor.record(
                 current.pid,
                 current.api_port,
                 current.instance_id.clone(),
                 $reason,
-                epoch_ms_to_iso(now),
+                epoch_ms_to_iso(actuator.epoch_ms()),
             );
+            if record.state == "starting" { record.phase = Some(start_phase.into()); }
             actuator.publish_state(&record);
         }};
     }
-
-    // The first incarnation: `lib.rs` has already spawned it (the shell spawns the Engine at setup),
-    // so `await_ready` is the entry point rather than `spawn_engine`.
+    macro_rules! finish {
+        ($outcome:expr) => {{
+            let outcome = $outcome;
+            actuator.terminal(&outcome);
+            return outcome;
+        }};
+    }
+    match actuator.start_initial() {
+        Ok(pid) => current.pid = (pid != 0).then_some(pid),
+        Err(error) => {
+            supervisor.state = State::Exhausted;
+            let reason = format!("ENGINE_RESTART_EXHAUSTED:spawn_failed:{error}");
+            publish!(Some(reason.clone()));
+            finish!(Outcome::Exhausted {
+                reason,
+                exit_code: 1
+            });
+        }
+    }
+    supervisor.incarnation = actuator.incarnation_number();
     publish!(None);
-    let start_deadline = actuator.monotonic_ms() + supervisor.policy.start_deadline_ms;
-    let startup = actuator.await_ready(start_deadline);
-    if !actuator.should_continue() {
-        return Outcome::Cancelled;
-    }
-    match startup {
-        Ok(ready) => {
-            current = ready;
-            supervisor.observe(Event::Ready, None);
-            ready_at = None;
-            ready_epoch = None;
-            next_health_poll = actuator.monotonic_ms() + supervisor.policy.hang_poll_interval_ms;
-            publish!(None);
-        }
-        Err(_) => {
-            pending_exit = actuator.poll_exit();
-            if pending_exit.is_none() {
-                let decision = supervisor.observe(Event::StartDeadlineElapsed, None);
-                if decision.action == Action::RequestShutdown {
-                    let reason = decision.reason.clone().unwrap_or_else(|| "hang".into());
-                    let deadline = actuator.monotonic_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                    let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                    let _ = actuator.write_shutdown_request(&reason, epoch_deadline);
-                    request_deadline = Some(deadline);
-                    publish!(Some(reason));
-                }
-            }
-        }
-    }
-
     loop {
-        if !actuator.should_continue() {
-            return Outcome::Cancelled;
-        }
-
-        if let Some(code) = pending_exit.take().or_else(|| actuator.poll_exit()) {
+        // T4 precedes every host command and deadline. This is the sole exit consumer.
+        if let Some(code) = actuator.poll_exit() {
+            let now = actuator.monotonic_ms();
+            let phase = if supervisor.state == State::Stopping {
+                "STOPPING"
+            } else if !incarnation_running {
+                "STARTING"
+            } else {
+                "RUNNING"
+            };
+            let recent_predecessor = last_exit_at.is_some_and(|at| {
+                now.saturating_sub(at) < supervisor.policy.data_dir_locked_wait_ms
+            });
+            let waiting_for_lock = phase == "STARTING"
+                && code == 2
+                && (recent_predecessor || actuator.prior_owner_recent())
+                && !locked_retry;
+            let requested = supervisor.requested_reason.clone();
+            let mut decision = supervisor.observe(Event::Exit, Some(code));
+            if waiting_for_lock {
+                locked_retry = true;
+                waiting_for_holder = true;
+                decision = Decision {
+                    action: Action::Restart,
+                    reason: Some("data_dir_locked".into()),
+                    exit_class: Some("NON_TRANSIENT".into()),
+                    counted: false,
+                    cooldown_ms: Some(supervisor.policy.data_dir_locked_wait_ms),
+                };
+                supervisor.state = State::Restarting;
+            }
+            actuator.record_exit(code, phase, &decision);
+            last_exit_at = Some(now);
+            current.pid = None;
             request_deadline = None;
-            let decision = supervisor.observe(Event::Exit, Some(code));
+            if let Some(reason) = &host_stop {
+                supervisor.state = State::Stopped;
+                publish!(Some(reason.clone()));
+                finish!(Outcome::Stopped {
+                    reason: reason.clone(),
+                    exit_code: code
+                });
+            }
             let reason = decision.reason.clone().unwrap_or_default();
             match decision.action {
                 Action::Stop => {
+                    supervisor.state = State::Stopped;
                     publish!(Some(reason.clone()));
-                    return Outcome::Stopped { reason, exit_code: code };
+                    finish!(Outcome::Stopped {
+                        reason,
+                        exit_code: code
+                    });
                 }
                 Action::Exhausted => {
-                    let terminal = format!("ENGINE_RESTART_EXHAUSTED:{reason}");
-                    publish!(Some(terminal.clone()));
-                    return Outcome::Exhausted { reason: terminal, exit_code: code };
+                    let reason = format!("ENGINE_RESTART_EXHAUSTED:{reason}");
+                    publish!(Some(reason.clone()));
+                    finish!(Outcome::Exhausted {
+                        reason,
+                        exit_code: code
+                    });
                 }
                 Action::Restart => {
-                    // Re-checked HERE and not only at the top of the turn. The host can decide to
-                    // quit between the two, and the window is the whole of the death handling: a
-                    // supervisor that restarted the Engine while the shell was closing would
-                    // resurrect it into an empty desktop, which is worse than the crash.
-                    if !actuator.should_continue() {
-                        return Outcome::Cancelled;
-                    }
                     publish!(Some(reason));
-                    // Floor first, then the linear step. Both, in that order, every time.
                     actuator.wait_for_handle_release();
-                    actuator.sleep(decision.cooldown_ms.unwrap_or(0));
-                    supervisor.entered_starting();
-                    current = Ready::default();
+                    cooldown_until =
+                        Some(actuator.monotonic_ms() + decision.cooldown_ms.unwrap_or(0));
                     ready_at = None;
                     ready_epoch = None;
-                    publish!(None);
-                    match actuator.spawn_engine() {
-                        Ok(pid) => current.pid = Some(pid),
-                        Err(error) => {
-                            supervisor.state = State::Exhausted;
-                            let terminal = format!("ENGINE_RESTART_EXHAUSTED:restart_failed:{error}");
-                            publish!(Some(terminal.clone()));
-                            return Outcome::Exhausted {
-                                reason: terminal,
-                                exit_code: 1,
-                            };
-                        }
-                    }
-                    let deadline = actuator.monotonic_ms() + supervisor.policy.start_deadline_ms;
-                    let startup = actuator.await_ready(deadline);
-                    if !actuator.should_continue() {
-                        return Outcome::Cancelled;
-                    }
-                    match startup {
-                        Ok(ready) => {
-                            let pid = current.pid;
-                            current = ready;
-                            if current.pid.is_none() {
-                                current.pid = pid;
-                            }
-                            supervisor.observe(Event::Ready, None);
-                            ready_at = None;
-                            ready_epoch = None;
-                            next_health_poll =
-                                actuator.monotonic_ms() + supervisor.policy.hang_poll_interval_ms;
-                            publish!(None);
-                        }
-                        Err(_) => {
-                            // `starting` has no hang detection, so this deadline is the only thing
-                            // that ends the state — and it ends it the way a hang does, because the
-                            // two are one problem seen at different times: up, and not serving.
-                            // Unless it is not up at all: an incarnation that DIED while starting is
-                            // a death, and reading it as a hang would rewrite its exit class.
-                            pending_exit = actuator.poll_exit();
-                            let d = if pending_exit.is_some() {
-                                Decision::plain(Action::None)
-                            } else {
-                                supervisor.observe(Event::StartDeadlineElapsed, None)
-                            };
-                            if d.action == Action::RequestShutdown {
-                                let r = d.reason.clone().unwrap_or_else(|| "hang".into());
-                                let dl =
-                                    actuator.monotonic_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                                let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                                let _ = actuator.write_shutdown_request(&r, epoch_deadline);
-                                request_deadline = Some(dl);
-                                publish!(Some(r));
-                            }
-                        }
-                    }
                 }
                 _ => {}
             }
-            continue;
+            let _ = requested;
         }
-
         let now = actuator.monotonic_ms();
-
-        if let Some(deadline) = request_deadline {
-            if now >= deadline {
-                request_deadline = None;
-                // An Engine-local close deadline is a hang, even if exit 4 races the kill.
-                if supervisor.requested_reason.is_none() {
-                    supervisor.requested_reason = Some("hang".into());
+        // Tests and old host adapters may request a stop through this compatibility seam;
+        // it is translated to a quit, never used to cancel supervision.
+        let quit = actuator.take_host_quit().or_else(|| {
+            (!actuator.should_continue() && host_stop.is_none()).then(|| HostQuit {
+                reason: "quit".into(),
+                detail: None,
+                deadline_ms: now + supervisor.policy.quit_deadline_ms,
+                deadline_epoch_ms: actuator.epoch_ms() + supervisor.policy.quit_deadline_ms,
+            })
+        });
+        if let Some(quit) = quit {
+            if host_stop.as_deref() != Some("quit") {
+                let deadline = quit
+                    .deadline_ms
+                    .saturating_sub(supervisor.policy.quit_force_margin_ms);
+                let was_stopping = supervisor.state == State::Stopping;
+                if matches!(quit.reason.as_str(), "quit" | "upgrade") {
+                    host_stop = Some(quit.reason.clone());
                 }
-                let decision = supervisor.observe(Event::RequestDeadlineElapsed, None);
-                if decision.action == Action::ForceKill {
-                    actuator.force_kill();
+                supervisor.requested_reason = Some(quit.reason.clone());
+                if supervisor.state == State::Restarting {
+                    supervisor.state = State::Stopped;
+                    publish!(Some(quit.reason));
+                    finish!(Outcome::NoEngine);
                 }
-                actuator.sleep(TICK_MS);
-                continue;
+                actuator.record_intent(
+                    &quit.reason,
+                    quit.detail.as_deref(),
+                    if was_stopping { "none" } else { "REQUEST_FILE" },
+                    quit.deadline_epoch_ms,
+                );
+                supervisor.state = State::Stopping;
+                request_deadline = Some(request_deadline.map_or(deadline, |old| old.min(deadline)));
+                if !was_stopping {
+                    if actuator
+                        .write_shutdown_request(&quit.reason, quit.deadline_epoch_ms)
+                        .is_err()
+                        && quit.reason == "upgrade"
+                    {
+                        host_stop = None;
+                        request_deadline = None;
+                        supervisor.requested_reason = None;
+                        supervisor.state = if incarnation_running {
+                            State::Running
+                        } else {
+                            State::Starting
+                        };
+                    }
+                }
+                publish!(Some(quit.reason));
             }
         }
-
+        if actuator.resumed() {
+            supervisor.consecutive_misses = 0;
+            ready_at = None;
+            ready_epoch = None;
+        }
+        if request_deadline.is_some_and(|deadline| now >= deadline) {
+            request_deadline = None;
+            if supervisor.requested_reason.is_none() {
+                supervisor.requested_reason = Some("hang".into());
+            }
+            let epoch = actuator.epoch_ms();
+            actuator.record_intent(
+                supervisor.requested_reason.as_deref().unwrap_or("hang"),
+                None,
+                "TERMINATE",
+                epoch,
+            );
+            actuator.force_kill();
+        }
+        if supervisor.state == State::Restarting
+            && (cooldown_until.is_some_and(|at| now >= at)
+                || (waiting_for_holder && actuator.lock_holder_gone()))
+            && !actuator.replacement_held()
+        {
+            waiting_for_holder = false;
+            start_phase = "spawned";
+            supervisor.entered_starting();
+            current = Ready::default();
+            incarnation_running = false;
+            match actuator.spawn_engine() {
+                Ok(pid) => current.pid = Some(pid),
+                Err(_error) if actuator.replacement_held() => {
+                    supervisor.incarnation = supervisor.incarnation.saturating_sub(1);
+                    supervisor.state = State::Restarting;
+                    actuator.wait_or_wake(TICK_MS);
+                    continue;
+                }
+                Err(error) => {
+                    supervisor.state = State::Exhausted;
+                    let reason = format!("ENGINE_RESTART_EXHAUSTED:restart_failed:{error}");
+                    publish!(Some(reason.clone()));
+                    finish!(Outcome::Exhausted {
+                        reason,
+                        exit_code: 1
+                    });
+                }
+            }
+            start_deadline = actuator.monotonic_ms() + supervisor.policy.start_deadline_ms;
+            publish!(None);
+        }
+        if supervisor.state == State::Starting {
+            if let Some(discovered) = actuator.discovery() {
+                if current.api_port != discovered.api_port
+                    || current.instance_id != discovered.instance_id
+                {
+                    current = discovered;
+                    start_phase = "discovered";
+                    publish!(None);
+                }
+            }
+            if let Ok(mut ready) = actuator.await_ready(start_deadline) {
+                if ready.pid.is_none() {
+                    ready.pid = current.pid;
+                }
+                current = ready;
+                start_phase = "responsive";
+                publish!(None);
+                start_phase = "ready";
+                publish!(None);
+                supervisor.observe(Event::Ready, None);
+                incarnation_running = true;
+                next_health_poll =
+                    actuator.monotonic_ms() + supervisor.policy.hang_poll_interval_ms;
+                publish!(None);
+            } else if actuator.monotonic_ms() >= start_deadline {
+                supervisor.observe(Event::StartDeadlineElapsed, None);
+                let epoch = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                actuator.record_intent("hang", Some("start"), "REQUEST_FILE", epoch);
+                let _ = actuator.write_shutdown_request("hang", epoch);
+                request_deadline =
+                    Some(actuator.monotonic_ms() + supervisor.policy.graceful_stop_deadline_ms);
+                publish!(Some("hang".into()));
+            }
+        }
         if supervisor.state == State::Running {
-            if let Some(reason) = actuator.take_host_request()
-                .filter(|r| matches!(r.as_str(), "quit" | "restart" | "upgrade" | "hang")) {
+            if let Some(reason) = actuator
+                .take_host_request()
+                .filter(|r| matches!(r.as_str(), "quit" | "restart" | "upgrade" | "hang"))
+            {
+                if matches!(reason.as_str(), "quit" | "upgrade") {
+                    host_stop = Some(reason.clone());
+                }
                 supervisor.requested_reason = Some(reason.clone());
                 supervisor.state = State::Stopping;
-                let deadline = now + supervisor.policy.graceful_stop_deadline_ms;
-                request_deadline = Some(deadline);
-                let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                let _ = actuator.write_shutdown_request(&reason, epoch_deadline);
+                let epoch = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                actuator.record_intent(&reason, None, "REQUEST_FILE", epoch);
+                let _ = actuator.write_shutdown_request(&reason, epoch);
+                request_deadline = Some(now + supervisor.policy.graceful_stop_deadline_ms);
                 publish!(Some(reason));
             } else if let Some(reason) = actuator.observed_shutdown_reason(&current) {
-                // Stopping is the latch: later writes, deletion, or changedAt refresh cannot
-                // cancel or extend this deadline. Requested reason stays host-owned.
                 supervisor.state = State::Stopping;
                 request_deadline = Some(now + supervisor.policy.graceful_stop_deadline_ms);
                 publish!(Some(reason));
             }
         }
-
-        if supervisor.state == State::Running {
-            if now >= next_health_poll {
-                next_health_poll = now + supervisor.policy.hang_poll_interval_ms;
-                if actuator.probe_health() {
-                    supervisor.consecutive_misses = 0;
-                    if let Some(epoch) = actuator.probe_essential_ready() {
-                        let observed_at = actuator.monotonic_ms();
-                        if ready_epoch.as_ref() != Some(&epoch) {
-                            ready_epoch = Some(epoch);
-                            ready_at = Some(observed_at);
-                        }
-                        let at = *ready_at.get_or_insert(observed_at);
-                        if observed_at.saturating_sub(at) >= supervisor.policy.stability_window_ms
-                            && supervisor.restart_count > 0
-                        {
-                            supervisor.observe(Event::StabilityElapsed, None);
-                            publish!(None);
-                        }
-                    } else {
-                        ready_at = None;
-                        ready_epoch = None;
+        if supervisor.state == State::Running && now >= next_health_poll {
+            next_health_poll = now + supervisor.policy.hang_poll_interval_ms;
+            if actuator.probe_health() {
+                supervisor.consecutive_misses = 0;
+                if let Some(epoch) = actuator.probe_essential_ready() {
+                    if ready_epoch.as_ref() != Some(&epoch) {
+                        ready_epoch = Some(epoch);
+                        ready_at = Some(now);
+                    }
+                    if now.saturating_sub(*ready_at.get_or_insert(now))
+                        >= supervisor.policy.stability_window_ms
+                        && supervisor.restart_count > 0
+                    {
+                        supervisor.observe(Event::StabilityElapsed, None);
+                        publish!(None);
                     }
                 } else {
                     ready_at = None;
                     ready_epoch = None;
-                    supervisor.consecutive_misses += 1;
-                    let decision = supervisor.observe(Event::HealthMiss, None);
-                    if decision.action == Action::RequestShutdown {
-                        let reason = decision.reason.clone().unwrap_or_else(|| "hang".into());
-                        let deadline =
-                            actuator.monotonic_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                        let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                        let _ = actuator.write_shutdown_request(&reason, epoch_deadline);
-                        request_deadline = Some(deadline);
-                        publish!(Some(reason));
-                    }
+                }
+            } else {
+                ready_at = None;
+                ready_epoch = None;
+                supervisor.consecutive_misses += 1;
+                if supervisor.observe(Event::HealthMiss, None).action == Action::RequestShutdown {
+                    let epoch = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                    actuator.record_intent("hang", Some("hang"), "REQUEST_FILE", epoch);
+                    let _ = actuator.write_shutdown_request("hang", epoch);
+                    request_deadline = Some(now + supervisor.policy.graceful_stop_deadline_ms);
+                    publish!(Some("hang".into()));
                 }
             }
         }
-
-        actuator.sleep(TICK_MS);
+        actuator.wait_or_wake(TICK_MS);
     }
 }
 
@@ -812,11 +1073,15 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
 pub fn shutdown_handoff_reason(manifest: &serde_json::Value, current: &Ready) -> Option<String> {
     if manifest.get("schemaVersion")?.as_u64()? != 2
         || manifest.get("pid")?.as_u64()? != u64::from(current.pid?)
-        || manifest.get("instanceId")?.as_str()? != current.instance_id.as_deref()? {
+        || manifest.get("instanceId")?.as_str()? != current.instance_id.as_deref()?
+    {
         return None;
     }
     let handoff = manifest.get("shutdownHandoff")?;
-    if !matches!(handoff.get("state")?.as_str()?, "pending" | "ready" | "incomplete") {
+    if !matches!(
+        handoff.get("state")?.as_str()?,
+        "pending" | "ready" | "incomplete"
+    ) {
         return None;
     }
     let reason = handoff.get("reason")?.as_str()?;
@@ -897,7 +1162,10 @@ impl Supervisor {
             // implies: an Engine asked to stop for a hang exits with the code of a clean shutdown.
             self.last_exit = Some(LastExit {
                 code,
-                reason: decision.reason.clone().unwrap_or_else(|| describe_exit(code, &self.policy)),
+                reason: decision
+                    .reason
+                    .clone()
+                    .unwrap_or_else(|| describe_exit(code, &self.policy)),
                 class: decision
                     .exit_class
                     .clone()
@@ -925,7 +1193,7 @@ impl Supervisor {
                 self.requested_reason = None;
             }
             Action::Exhausted => self.state = State::Exhausted,
-            Action::Stop => self.state = State::Stopping,
+            Action::Stop => self.state = State::Stopped,
             Action::None | Action::ForceKill => {}
         }
         decision
@@ -939,7 +1207,14 @@ impl Supervisor {
         self.consecutive_misses = 0;
     }
 
-    pub fn record(&self, pid: Option<u32>, api_port: Option<u16>, instance_id: Option<String>, reason: Option<String>, updated_at: String) -> StateRecord {
+    pub fn record(
+        &self,
+        pid: Option<u32>,
+        api_port: Option<u16>,
+        instance_id: Option<String>,
+        reason: Option<String>,
+        updated_at: String,
+    ) -> StateRecord {
         StateRecord {
             schema_version: 1,
             kind: "engine-supervisor-state.v1".to_string(),
@@ -951,11 +1226,29 @@ impl Supervisor {
             instance_id,
             restart_count: self.restart_count,
             max_restart_attempts: self.policy.max_restart_attempts,
-            policy_profile: if self.policy.harness_active { "harness" } else { "product" }.to_string(),
+            policy_profile: if self.policy.harness_active {
+                "harness"
+            } else {
+                "product"
+            }
+            .to_string(),
             last_exit: self.last_exit.clone(),
             reason,
             requested_reason: self.requested_reason.clone(),
             updated_at,
+            containment: None,
+            phase: if self.state == State::Starting {
+                Some(
+                    if api_port.is_some() {
+                        "discovered"
+                    } else {
+                        "spawned"
+                    }
+                    .into(),
+                )
+            } else {
+                None
+            },
         }
     }
 }
@@ -975,7 +1268,13 @@ mod tests {
     use super::*;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum ClockScenario { Stability, HostStop, LocalStop, HangStop, StartupTimeout }
+    enum ClockScenario {
+        Stability,
+        HostStop,
+        LocalStop,
+        HangStop,
+        StartupTimeout,
+    }
 
     struct ClockJumpActuator {
         now: u64,
@@ -993,9 +1292,16 @@ mod tests {
     impl ClockJumpActuator {
         fn new(scenario: ClockScenario, jump_ms: i64) -> Self {
             Self {
-                now: 0, jump_ms, scenario, exit_pending: scenario == ClockScenario::Stability,
-                host_request_sent: false, spent_restart: false, reset_at: None, killed_at: None,
-                requests: Vec::new(), records: Vec::new(),
+                now: 0,
+                jump_ms,
+                scenario,
+                exit_pending: scenario == ClockScenario::Stability,
+                host_request_sent: false,
+                spent_restart: false,
+                reset_at: None,
+                killed_at: None,
+                requests: Vec::new(),
+                records: Vec::new(),
             }
         }
 
@@ -1005,19 +1311,39 @@ mod tests {
     }
 
     impl Actuator for ClockJumpActuator {
-        fn spawn_engine(&mut self) -> Result<u32, String> { Ok(43) }
+        fn spawn_engine(&mut self) -> Result<u32, String> {
+            Ok(43)
+        }
         fn await_ready(&mut self, deadline_ms: u64) -> Result<Ready, String> {
-            assert_eq!(deadline_ms, self.now + 200, "startup receives a monotonic deadline");
+            assert_eq!(
+                deadline_ms,
+                self.now + 200,
+                "startup receives a monotonic deadline"
+            );
             if self.scenario == ClockScenario::StartupTimeout {
-                while self.now < deadline_ms { self.sleep(50); }
+                while self.now < deadline_ms {
+                    self.sleep(50);
+                }
                 return Err("alive but unbound".into());
             }
-            Ok(Ready { pid: Some(43), api_port: Some(9000), instance_id: Some("boot".into()) })
+            Ok(Ready {
+                pid: Some(43),
+                api_port: Some(9000),
+                instance_id: Some("boot".into()),
+            })
         }
         fn poll_exit(&mut self) -> Option<i32> {
-            self.exit_pending.then(|| { self.exit_pending = false; 1 })
+            if self.killed_at.is_some() || self.reset_at.is_some() {
+                return Some(0);
+            }
+            self.exit_pending.then(|| {
+                self.exit_pending = false;
+                1
+            })
         }
-        fn probe_health(&mut self) -> bool { self.scenario != ClockScenario::HangStop }
+        fn probe_health(&mut self) -> bool {
+            self.scenario != ClockScenario::HangStop
+        }
         fn probe_essential_ready(&mut self) -> Option<crate::engine_probe::ReadyEpoch> {
             crate::engine_probe::ReadyEpoch::parse("2026-09-21T12:00:00Z")
         }
@@ -1028,20 +1354,38 @@ mod tests {
             if self.scenario == ClockScenario::HostStop && !self.host_request_sent {
                 self.host_request_sent = true;
                 Some("quit".into())
-            } else { None }
+            } else {
+                None
+            }
         }
-        fn write_shutdown_request(&mut self, _reason: &str, deadline_epoch_ms: u64) -> Result<(), String> {
+        fn write_shutdown_request(
+            &mut self,
+            _reason: &str,
+            deadline_epoch_ms: u64,
+        ) -> Result<(), String> {
             self.requests.push((self.now, deadline_epoch_ms));
             Ok(())
         }
-        fn force_kill(&mut self) { self.killed_at = Some(self.now); }
-        fn wait_for_handle_release(&mut self) -> bool { true }
-        fn sleep(&mut self, ms: u64) { self.now += ms; }
-        fn monotonic_ms(&mut self) -> u64 { self.now }
-        fn epoch_ms(&mut self) -> u64 { self.wall_at(self.now) }
+        fn force_kill(&mut self) {
+            self.killed_at = Some(self.now);
+        }
+        fn wait_for_handle_release(&mut self) -> bool {
+            true
+        }
+        fn sleep(&mut self, ms: u64) {
+            self.now += ms;
+        }
+        fn monotonic_ms(&mut self) -> u64 {
+            self.now
+        }
+        fn epoch_ms(&mut self) -> u64 {
+            self.wall_at(self.now)
+        }
         fn publish_state(&mut self, record: &StateRecord) {
-            if record.restart_count > 0 { self.spent_restart = true; }
-            if self.spent_restart && record.restart_count == 0 {
+            if record.restart_count > 0 {
+                self.spent_restart = true;
+            }
+            if self.spent_restart && record.restart_count == 0 && self.reset_at.is_none() {
                 self.reset_at = Some(self.now);
             }
             self.records.push((self.now, record.clone()));
@@ -1062,14 +1406,23 @@ mod tests {
         policy.stability_window_ms = 300;
         let mut supervisor = Supervisor::new(policy);
         let mut actuator = ClockJumpActuator::new(scenario, jump_ms);
-        assert!(matches!(run_supervision(&mut supervisor, &mut actuator), Outcome::Cancelled));
+        assert!(matches!(
+            run_supervision(&mut supervisor, &mut actuator),
+            Outcome::Stopped { .. } | Outcome::NoEngine
+        ));
         for (at, record) in &actuator.records {
-            assert_eq!(record.updated_at, epoch_ms_to_iso(actuator.wall_at(*at)),
-                "display timestamps remain wall-clock values");
+            assert_eq!(
+                record.updated_at,
+                epoch_ms_to_iso(actuator.wall_at(*at)),
+                "display timestamps remain wall-clock values"
+            );
         }
         for (at, deadline) in &actuator.requests {
-            assert_eq!(*deadline, actuator.wall_at(*at) + 200,
-                "deadlineEpochMs remains a wall-clock IPC value");
+            assert_eq!(
+                *deadline,
+                actuator.wall_at(*at) + 200,
+                "deadlineEpochMs remains a wall-clock IPC value"
+            );
         }
         actuator
     }
@@ -1079,7 +1432,11 @@ mod tests {
         for jump_ms in [600_000, -600_000] {
             let actuator = run_clock_jump(ClockScenario::Stability, jump_ms);
             assert!(actuator.spent_restart);
-            assert_eq!(actuator.reset_at, Some(350), "first READY at 50 plus 300 ms: {jump_ms}");
+            assert_eq!(
+                actuator.reset_at,
+                Some(350),
+                "first READY at 50 plus 300 ms: {jump_ms}"
+            );
             assert!(actuator.requests.is_empty());
         }
     }
@@ -1087,11 +1444,17 @@ mod tests {
     #[test]
     fn wall_clock_jumps_do_not_change_latched_shutdown_enforcement() {
         for jump_ms in [600_000, -600_000] {
-            for (scenario, kill_at) in [(ClockScenario::HostStop, 200),
-                (ClockScenario::LocalStop, 200), (ClockScenario::HangStop, 250)] {
+            for (scenario, kill_at) in [
+                (ClockScenario::HostStop, 200),
+                (ClockScenario::LocalStop, 200),
+                (ClockScenario::HangStop, 250),
+            ] {
                 let actuator = run_clock_jump(scenario, jump_ms);
                 assert_eq!(actuator.killed_at, Some(kill_at), "{scenario:?}: {jump_ms}");
-                assert_eq!(actuator.requests.len(), usize::from(scenario != ClockScenario::LocalStop));
+                assert_eq!(
+                    actuator.requests.len(),
+                    usize::from(scenario != ClockScenario::LocalStop)
+                );
             }
         }
     }
@@ -1102,28 +1465,51 @@ mod tests {
             let actuator = run_clock_jump(ClockScenario::StartupTimeout, jump_ms);
             assert_eq!(actuator.requests.len(), 1);
             assert_eq!(actuator.requests[0].0, 200, "startup deadline: {jump_ms}");
-            assert_eq!(actuator.killed_at, Some(400), "startup then graceful-stop deadline: {jump_ms}");
+            assert_eq!(
+                actuator.killed_at,
+                Some(400),
+                "startup then graceful-stop deadline: {jump_ms}"
+            );
         }
     }
 
     #[test]
     fn handoff_requires_current_identity_and_a_known_state_and_reason() {
-        let current = Ready { pid: Some(42), instance_id: Some("boot".into()), api_port: Some(9000) };
+        let current = Ready {
+            pid: Some(42),
+            instance_id: Some("boot".into()),
+            api_port: Some(9000),
+        };
         let valid = serde_json::json!({ "schemaVersion": 2, "pid": 42, "instanceId": "boot",
             "shutdownHandoff": { "state": "pending", "reason": "restart", "changedAt": "ignored" } });
         for state in ["pending", "ready", "incomplete"] {
             let mut candidate = valid.clone();
             candidate["shutdownHandoff"]["state"] = state.into();
-            assert_eq!(shutdown_handoff_reason(&candidate, &current).as_deref(), Some("restart"));
+            assert_eq!(
+                shutdown_handoff_reason(&candidate, &current).as_deref(),
+                Some("restart")
+            );
         }
-        for (field, value) in [("pid", serde_json::json!(43)), ("instanceId", serde_json::json!("stale")),
-            ("schemaVersion", serde_json::json!(1)), ("shutdownHandoff", serde_json::Value::Null)] {
-            let mut candidate = valid.clone(); candidate[field] = value;
-            assert!(shutdown_handoff_reason(&candidate, &current).is_none(), "{field}");
+        for (field, value) in [
+            ("pid", serde_json::json!(43)),
+            ("instanceId", serde_json::json!("stale")),
+            ("schemaVersion", serde_json::json!(1)),
+            ("shutdownHandoff", serde_json::Value::Null),
+        ] {
+            let mut candidate = valid.clone();
+            candidate[field] = value;
+            assert!(
+                shutdown_handoff_reason(&candidate, &current).is_none(),
+                "{field}"
+            );
         }
         for field in ["state", "reason"] {
-            let mut candidate = valid.clone(); candidate["shutdownHandoff"][field] = "unknown".into();
-            assert!(shutdown_handoff_reason(&candidate, &current).is_none(), "{field}");
+            let mut candidate = valid.clone();
+            candidate["shutdownHandoff"][field] = "unknown".into();
+            assert!(
+                shutdown_handoff_reason(&candidate, &current).is_none(),
+                "{field}"
+            );
         }
     }
 
@@ -1165,12 +1551,17 @@ mod tests {
                 }
             }
 
-            let obs = case.get("observation").expect("a decision case declares an observation");
+            let obs = case
+                .get("observation")
+                .expect("a decision case declares an observation");
             let event = Event::from_name(obs.get("event").and_then(|v| v.as_str()).unwrap_or(""))
                 .unwrap_or_else(|| panic!("{id}: unknown event"));
             let observation = Observation {
                 event,
-                exit_code: obs.get("exitCode").and_then(|v| v.as_i64()).map(|v| v as i32),
+                exit_code: obs
+                    .get("exitCode")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
                 requested_reason: obs
                     .get("requestedReason")
                     .and_then(|v| v.as_str())
@@ -1179,7 +1570,10 @@ mod tests {
                     .get("consecutiveMisses")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u32,
-                restart_count: obs.get("restartCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                restart_count: obs
+                    .get("restartCount")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32,
                 state: obs
                     .get("state")
                     .and_then(|v| v.as_str())
@@ -1205,7 +1599,10 @@ mod tests {
             }
             if let Some(want) = expect.get("cooldownMs").and_then(|v| v.as_u64()) {
                 if decision.cooldown_ms != Some(want) {
-                    failures.push(format!("{id}: cooldownMs {:?} != {want}", decision.cooldown_ms));
+                    failures.push(format!(
+                        "{id}: cooldownMs {:?} != {want}",
+                        decision.cooldown_ms
+                    ));
                 }
             }
             if let Some(want) = expect.get("counted").and_then(|v| v.as_bool()) {
@@ -1214,8 +1611,15 @@ mod tests {
                 }
             }
         }
-        assert!(ran >= 10, "only {ran} decision cases ran; the filter is broken, not the table");
-        assert!(failures.is_empty(), "decision-table failures:\n  {}", failures.join("\n  "));
+        assert!(
+            ran >= 10,
+            "only {ran} decision cases ran; the filter is broken, not the table"
+        );
+        assert!(
+            failures.is_empty(),
+            "decision-table failures:\n  {}",
+            failures.join("\n  ")
+        );
     }
 
     /// The register's numbers reach this implementation unaltered. This is the Rust side of the
@@ -1226,12 +1630,27 @@ mod tests {
         let policy = load_policy();
         let declared = engine_row();
         let block = declared.get("policy").unwrap();
-        assert_eq!(policy.max_restart_attempts as u64, block["maxRestartAttempts"].as_u64().unwrap());
-        assert_eq!(policy.cooldown_increment_ms, block["cooldownIncrementMs"].as_u64().unwrap());
-        assert_eq!(policy.max_cooldown_ms, block["maxCooldownMs"].as_u64().unwrap());
-        assert_eq!(policy.stability_window_ms, block["stabilityWindowMs"].as_u64().unwrap());
+        assert_eq!(
+            policy.max_restart_attempts as u64,
+            block["maxRestartAttempts"].as_u64().unwrap()
+        );
+        assert_eq!(
+            policy.cooldown_increment_ms,
+            block["cooldownIncrementMs"].as_u64().unwrap()
+        );
+        assert_eq!(
+            policy.max_cooldown_ms,
+            block["maxCooldownMs"].as_u64().unwrap()
+        );
+        assert_eq!(
+            policy.stability_window_ms,
+            block["stabilityWindowMs"].as_u64().unwrap()
+        );
         assert_eq!(policy.stability_window_counted_from, "ready");
-        assert!(!policy.exit_codes.is_empty(), "the exit table must be read, not defaulted");
+        assert!(
+            !policy.exit_codes.is_empty(),
+            "the exit table must be read, not defaulted"
+        );
         assert_eq!(policy.unknown_exit_class, "TRANSIENT");
     }
 
@@ -1246,18 +1665,28 @@ mod tests {
     fn overrides_are_inert_without_the_harness_flag() {
         let declared = load_policy_from(|_| None).stability_window_ms;
         let overrides = |name: &str| match name {
-            "JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS" | "JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS" => Some("7".into()),
+            "JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS"
+            | "JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS" => Some("7".into()),
             _ => None,
         };
         let without = load_policy_from(overrides);
-        assert_eq!(without.stability_window_ms, declared,
-            "an override took effect WITHOUT {HARNESS_FLAG}=1");
+        assert_eq!(
+            without.stability_window_ms, declared,
+            "an override took effect WITHOUT {HARNESS_FLAG}=1"
+        );
         assert!(!without.harness_active);
         assert!(without.overridden.is_empty());
         let with = load_policy_from(|name| {
-            if name == HARNESS_FLAG { Some("1".into()) } else { overrides(name) }
+            if name == HARNESS_FLAG {
+                Some("1".into())
+            } else {
+                overrides(name)
+            }
         });
-        assert_eq!(with.stability_window_ms, 7, "the flag did not enable the override");
+        assert_eq!(
+            with.stability_window_ms, 7,
+            "the flag did not enable the override"
+        );
         assert_eq!(with.max_cooldown_ms, 7);
         assert!(with.harness_active);
         assert_eq!(with.max_restart_attempts, without.max_restart_attempts);
@@ -1276,7 +1705,11 @@ mod tests {
 
         for attempt in 1..=max {
             let decision = supervisor.observe(Event::Exit, Some(1));
-            assert_eq!(decision.action, Action::Restart, "attempt {attempt} should restart");
+            assert_eq!(
+                decision.action,
+                Action::Restart,
+                "attempt {attempt} should restart"
+            );
             assert!(decision.counted);
             assert_eq!(supervisor.restart_count, attempt);
             supervisor.entered_starting();
@@ -1350,5 +1783,157 @@ mod tests {
         assert_eq!(json["maxRestartAttempts"], 3);
         assert_eq!(json["policyProfile"], "product");
         assert_eq!(json["updatedAt"], "T");
+    }
+    struct QuitProbe {
+        now: u64,
+        quitting: bool,
+        starting: bool,
+        exit: Option<i32>,
+        cooldown: bool,
+        spawns: usize,
+        reaps: usize,
+        requests: usize,
+        records: Vec<StateRecord>,
+    }
+    impl Actuator for QuitProbe {
+        fn spawn_engine(&mut self) -> Result<u32, String> {
+            self.spawns += 1;
+            Ok(42)
+        }
+        fn await_ready(&mut self, _deadline: u64) -> Result<Ready, String> {
+            if self.starting {
+                self.quitting = true;
+                Err("starting".into())
+            } else {
+                Ok(Ready {
+                    pid: Some(42),
+                    ..Ready::default()
+                })
+            }
+        }
+        fn poll_exit(&mut self) -> Option<i32> {
+            if let Some(code) = self.exit.take() {
+                self.reaps += 1;
+                return Some(code);
+            }
+            None
+        }
+        fn probe_health(&mut self) -> bool {
+            true
+        }
+        fn probe_essential_ready(&mut self) -> Option<crate::engine_probe::ReadyEpoch> {
+            None
+        }
+        fn observed_shutdown_reason(&mut self, _current: &Ready) -> Option<String> {
+            None
+        }
+        fn write_shutdown_request(&mut self, _reason: &str, _deadline: u64) -> Result<(), String> {
+            self.requests += 1;
+            self.exit = Some(0);
+            Ok(())
+        }
+        fn force_kill(&mut self) {
+            self.exit = Some(1246953474);
+        }
+        fn wait_for_handle_release(&mut self) -> bool {
+            if self.cooldown {
+                self.quitting = true;
+            }
+            true
+        }
+        fn sleep(&mut self, ms: u64) {
+            self.now += ms;
+        }
+        fn monotonic_ms(&mut self) -> u64 {
+            self.now
+        }
+        fn publish_state(&mut self, record: &StateRecord) {
+            self.records.push(record.clone());
+        }
+        fn should_continue(&mut self) -> bool {
+            !self.quitting
+        }
+    }
+    fn quit_probe() -> QuitProbe {
+        QuitProbe {
+            now: 0,
+            quitting: true,
+            starting: false,
+            exit: None,
+            cooldown: false,
+            spawns: 0,
+            reaps: 0,
+            requests: 0,
+            records: Vec::new(),
+        }
+    }
+    #[test]
+    fn try_reap_called_only_by_poll_exit() {
+        let mut actuator = quit_probe();
+        actuator.exit = Some(1);
+        let mut supervisor = Supervisor::new(load_policy());
+        let outcome = run_supervision(&mut supervisor, &mut actuator);
+        assert_eq!(
+            actuator.reaps, 1,
+            "the exit wins over concurrent quit and is observed once"
+        );
+        assert!(matches!(outcome, Outcome::NoEngine));
+    }
+    #[test]
+    fn quit_during_cooldown_spawns_nothing() {
+        let mut actuator = quit_probe();
+        actuator.quitting = false;
+        actuator.cooldown = true;
+        actuator.exit = Some(4);
+        let mut supervisor = Supervisor::new(load_policy());
+        let outcome = run_supervision(&mut supervisor, &mut actuator);
+        assert_eq!(
+            matches!(outcome, Outcome::NoEngine),
+            true,
+            "cooldown quit is terminal without exhaustion"
+        );
+        assert_eq!(actuator.spawns, 0);
+        assert_eq!(actuator.records.last().unwrap().state, "stopped");
+    }
+    #[test]
+    fn quit_during_starting_is_recorded() {
+        let mut actuator = quit_probe();
+        actuator.quitting = false;
+        actuator.starting = true;
+        let mut supervisor = Supervisor::new(load_policy());
+        let outcome = run_supervision(&mut supervisor, &mut actuator);
+        assert_eq!(
+            matches!(outcome, Outcome::Stopped { exit_code: 0, .. }),
+            true,
+            "startup quit reaches the actor's exit path"
+        );
+        assert_eq!(actuator.requests, 1);
+        assert_eq!(actuator.reaps, 1);
+        assert_eq!(actuator.records.last().unwrap().state, "stopped");
+    }
+    #[test]
+    fn suspend_aware_clock_excludes_sleep_and_preserves_resume_grace() {
+        let mut clock = SuspendAwareClock::default();
+        assert_eq!(clock.now_ms(0), 0);
+        clock.note(PowerEvent::Suspend, 50);
+        assert_eq!(
+            clock.now_ms(60050),
+            50,
+            "sleep must not consume a shutdown budget"
+        );
+        clock.note(PowerEvent::Resume, 60050);
+        assert_eq!(clock.now_ms(60100), 100);
+        assert!(clock.grace(100));
+        assert!(
+            !clock.grace(30100),
+            "hang detection returns after resume grace"
+        );
+        let mut gap = SuspendAwareClock::default();
+        gap.now_ms(0);
+        assert_eq!(
+            gap.now_ms(10000),
+            50,
+            "a missing broadcast uses the tick gap"
+        );
     }
 }

@@ -1,0 +1,71 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:114bfca66efcf8587aa4e5aaf3db7527a6da4e90a718af1f0ecbc138ba3dd5b0"
+  },
+  "createdAt": "2026-10-07T07:56:54.430Z",
+  "revision": "4cdbcfe793ef5c7a34ec5c5c74fa6b0be49d7460",
+  "tree": "2644b9d30d65fc6fda711c9fed352604ddfb2a6a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3685,
+      "environment": {
+        "LIGHTGBM_NATIVE_LIB_PATH": "F:\\justsearch-public\\.claude\\worktrees\\b6d536-bulk-gate-2\\build\\test-intent-native\\run-igxHMf"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:51440a9b204a9d069affb5bedd1ca98af8a27e25f6a5f1d2e3d221841ec5a8e5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "packagedRegisterIsTheRepositoryRegister()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fbc036129",
+    "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 10410,
+        "environment": {
+          "LIGHTGBM_NATIVE_LIB_PATH": "F:\\justsearch-public\\.claude\\worktrees\\b6d536-bulk-gate-2\\build\\test-intent-native\\run-bcSqV8"
+        }
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
+        "classification": "assertion",
+        "detail": "packagedRegisterIsTheRepositoryRegister(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <282> but was: <281>"
+      }
+    ]
+  },
+  "digest": "sha256:6f93fec510c25593c04008d66cd52fe6f7fa644f7f5281b7034ba3ce6e551dea"
+}

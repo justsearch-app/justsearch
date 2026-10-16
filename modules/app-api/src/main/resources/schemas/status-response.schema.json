@@ -107,6 +107,9 @@
         "diskEncryption" : {
           "type" : "string"
         },
+        "probedAtMs" : {
+          "type" : "integer"
+        },
         "qualityKnown" : {
           "type" : "boolean"
         },
@@ -460,6 +463,243 @@
     "observed_at" : {
       "type" : "string"
     },
+    "operating" : {
+      "type" : "object",
+      "properties" : {
+        "assembledAt" : {
+          "type" : "string"
+        },
+        "chat" : {
+          "type" : "object",
+          "properties" : {
+            "blockedBy" : {
+              "anyOf" : [ {
+                "type" : "null"
+              }, {
+                "type" : "string",
+                "enum" : [ "GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF" ]
+              } ]
+            },
+            "detail" : {
+              "anyOf" : [ {
+                "type" : "null"
+              }, {
+                "type" : "string",
+                "enum" : [ "request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window", "gpu_busy", "game_mode", "session_end", "takeover", "interrupted", "unknown" ]
+              } ]
+            },
+            "generating" : {
+              "type" : [ "boolean", "null" ]
+            },
+            "inFlight" : {
+              "type" : [ "integer", "null" ]
+            },
+            "load" : {
+              "type" : [ "object", "null" ],
+              "properties" : {
+                "elapsedMs" : {
+                  "type" : "integer"
+                },
+                "expectedMs" : {
+                  "type" : [ "integer", "null" ]
+                },
+                "expectedSource" : {
+                  "anyOf" : [ {
+                    "type" : "null"
+                  }, {
+                    "type" : "string",
+                    "enum" : [ "HISTORY", "PROFILE_DEFAULT" ]
+                  } ]
+                },
+                "phase" : {
+                  "type" : "string",
+                  "enum" : [ "SPAWNING", "LOADING_MODEL", "WARMING" ]
+                },
+                "startedAt" : {
+                  "type" : "string"
+                }
+              },
+              "required" : [ "elapsedMs", "expectedMs", "expectedSource", "phase", "startedAt" ]
+            },
+            "managed" : {
+              "type" : "boolean"
+            },
+            "nextReloadNotBefore" : {
+              "type" : [ "string", "null" ]
+            },
+            "queued" : {
+              "type" : [ "integer", "null" ]
+            },
+            "reason" : {
+              "type" : [ "string", "null" ]
+            },
+            "reasonCode" : {
+              "type" : [ "string", "null" ]
+            },
+            "reloadAllowed" : {
+              "type" : [ "boolean", "null" ]
+            },
+            "sampledAt" : {
+              "type" : "string"
+            },
+            "since" : {
+              "type" : "string"
+            },
+            "state" : {
+              "type" : "string",
+              "enum" : [ "OFF", "LOADING", "READY", "UNLOADED", "REFUSED", "FAILED" ]
+            }
+          },
+          "required" : [ "blockedBy", "detail", "generating", "inFlight", "load", "managed", "nextReloadNotBefore", "queued", "reason", "reasonCode", "reloadAllowed", "sampledAt", "since", "state" ]
+        },
+        "degradations" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object",
+            "properties" : {
+              "cause" : {
+                "type" : [ "string", "null" ]
+              },
+              "code" : {
+                "type" : "string",
+                "enum" : [ "user_setting_unmet", "device_below_p8", "device_memory_overcommit", "bge_m3_unmeasured", "chat_model_unmeasured", "chat_identity_pending", "exit_ledger_unwritable", "child_survived" ]
+              },
+              "count" : {
+                "type" : "integer"
+              },
+              "lastSeenAt" : {
+                "type" : "string"
+              },
+              "reasonCode" : {
+                "type" : "string"
+              },
+              "scope" : {
+                "type" : "string",
+                "enum" : [ "SEARCH", "RAG", "CHAT", "INDEXING", "RUNTIME" ]
+              },
+              "since" : {
+                "type" : "string"
+              }
+            },
+            "required" : [ "cause", "code", "count", "lastSeenAt", "reasonCode", "scope", "since" ]
+          }
+        },
+        "freshness" : {
+          "type" : "object",
+          "properties" : {
+            "staleAfterMs" : {
+              "type" : "integer"
+            },
+            "staleSources" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string",
+                "enum" : [ "chat", "indexing", "gpu" ]
+              }
+            }
+          },
+          "required" : [ "staleAfterMs", "staleSources" ]
+        },
+        "gpu" : {
+          "type" : "object",
+          "properties" : {
+            "adapter" : {
+              "type" : [ "string", "null" ]
+            },
+            "adapterFreeBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "adapterTotalBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "ageMs" : {
+              "type" : [ "integer", "null" ]
+            },
+            "externalUsedBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "ourDedicatedBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "ourSharedBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "profile" : {
+              "type" : "string",
+              "enum" : [ "P16_PLUS", "P12", "P8", "NO_GPU", "UNRESOLVED" ]
+            },
+            "profileSource" : {
+              "anyOf" : [ {
+                "type" : "null"
+              }, {
+                "type" : "string",
+                "enum" : [ "MEASURED", "USER_OVERRIDE" ]
+              } ]
+            },
+            "sampledAt" : {
+              "type" : [ "string", "null" ]
+            },
+            "source" : {
+              "type" : "string",
+              "enum" : [ "PDH", "NVML", "NONE" ]
+            },
+            "spillSuspected" : {
+              "type" : [ "boolean", "null" ]
+            },
+            "stale" : {
+              "type" : "boolean"
+            }
+          },
+          "required" : [ "adapter", "adapterFreeBytes", "adapterTotalBytes", "ageMs", "externalUsedBytes", "ourDedicatedBytes", "ourSharedBytes", "profile", "profileSource", "sampledAt", "source", "spillSuspected", "stale" ]
+        },
+        "indexing" : {
+          "type" : "object",
+          "properties" : {
+            "affects" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string",
+                "enum" : [ "INDEXING", "VDU" ]
+              }
+            },
+            "agingReleaseAt" : {
+              "type" : [ "string", "null" ]
+            },
+            "pendingJobs" : {
+              "type" : "integer"
+            },
+            "reasonCode" : {
+              "type" : [ "string", "null" ]
+            },
+            "reasons" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string",
+                "enum" : [ "game_mode", "gpu_busy_external", "energy_saver", "chat_generating" ]
+              }
+            },
+            "sampledAt" : {
+              "type" : "string"
+            },
+            "since" : {
+              "type" : "string"
+            },
+            "state" : {
+              "type" : "string",
+              "enum" : [ "IDLE", "RUNNING", "SLOWED", "PAUSED" ]
+            }
+          },
+          "required" : [ "affects", "agingReleaseAt", "pendingJobs", "reasonCode", "reasons", "sampledAt", "since", "state" ]
+        },
+        "schemaVersion" : {
+          "type" : "integer"
+        },
+        "seq" : {
+          "type" : "integer"
+        }
+      },
+      "required" : [ "assembledAt", "degradations", "freshness", "gpu", "schemaVersion", "seq" ]
+    },
     "power" : {
       "type" : "object",
       "properties" : {
@@ -740,6 +980,9 @@
             "searchableDocuments" : {
               "type" : "integer"
             },
+            "vduAvailable" : {
+              "type" : [ "boolean", "null" ]
+            },
             "writerPendingDocs" : {
               "type" : "integer"
             },
@@ -838,6 +1081,12 @@
                 }
               }
             },
+            "embeddedAndSparseCount" : {
+              "type" : "integer"
+            },
+            "embeddingAvailable" : {
+              "type" : [ "boolean", "null" ]
+            },
             "embeddingCompletedCount" : {
               "type" : "integer"
             },
@@ -897,11 +1146,17 @@
             "failedNerCount" : {
               "type" : "integer"
             },
+            "nerAvailable" : {
+              "type" : [ "boolean", "null" ]
+            },
             "nerEnabled" : {
               "type" : "boolean"
             },
             "pendingNerCount" : {
               "type" : "integer"
+            },
+            "spladeAvailable" : {
+              "type" : [ "boolean", "null" ]
             },
             "spladeCompletedCount" : {
               "type" : "integer"

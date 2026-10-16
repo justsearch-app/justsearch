@@ -69,6 +69,14 @@ public final class NerService implements Closeable {
   }
 
   /**
+   * Whether NER bulk work runs on the GPU (Spec E step E3): the bulk hold defers backfill only when
+   * a bulk encoder is on the GPU. False when NER is not built.
+   */
+  public boolean isGpuAvailable() {
+    return inference != null && inference.isGpuAvailable();
+  }
+
+  /**
    * Tempdoc 422: exposes the underlying ONNX session's OrtCuda status so the {@code
    * /api/inference/encoders} explainer can report runtime accelerator state for the NER encoder.
    * Returns {@code null} when NER is disabled (no inference pipeline built).

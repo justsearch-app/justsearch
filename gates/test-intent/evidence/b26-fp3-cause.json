@@ -1,0 +1,178 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:30:13.868Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "122be582d9ccc27d8685be3137b3692ce73be0a6",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithReadyModelsStillReportsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.seatedHybridWithModelsLoadingKeepsLoadingCause\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 60371
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.semanticBudgetFallbackPublishesReasonAndCause\" --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.hybridPublishesItsReasonWithoutAnEmptyCause\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20876
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedHybridWithReadyModelsStillReportsContention",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedHybridWithReadyModelsStillReportsContention()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#seatedHybridWithModelsLoadingKeepsLoadingCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "seatedHybridWithModelsLoadingKeepsLoadingCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RetrieveContextControllerFallbackTest.java#semanticBudgetFallbackPublishesReasonAndCause",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RetrieveContextControllerFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:01b9f2ff7b55332ce0b2e93071a79548932ad0d3dfa9ad5100836b1eb38c17ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "semanticBudgetFallbackPublishesReasonAndCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RetrieveContextControllerFallbackTest.java#hybridPublishesItsReasonWithoutAnEmptyCause",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RetrieveContextControllerFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:01b9f2ff7b55332ce0b2e93071a79548932ad0d3dfa9ad5100836b1eb38c17ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hybridPublishesItsReasonWithoutAnEmptyCause()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f8c4967ed",
+    "revision": "f8c4967ed5af0f2db24f29dcf7ed37de7aebf06b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.queuedHybridWithReadyModelsStillReportsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.seatedHybridWithModelsLoadingKeepsLoadingCause\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 91489
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.semanticBudgetFallbackPublishesReasonAndCause\" --tests \"io.justsearch.ui.api.RetrieveContextControllerFallbackTest.hybridPublishesItsReasonWithoutAnEmptyCause\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 62106
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels",
+        "classification": "assertion",
+        "detail": "queuedHybridWithModelsLoadingReportsContentionWithoutAwaitingModels(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <contended> but was: <loading>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels",
+        "classification": "assertion",
+        "detail": "queuedRagWithModelsLoadingReportsContentionWithoutAwaitingModels(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <contended> but was: <loading>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#queuedHybridWithReadyModelsStillReportsContention",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#seatedHybridWithModelsLoadingKeepsLoadingCause",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/RetrieveContextControllerFallbackTest.java#semanticBudgetFallbackPublishesReasonAndCause",
+        "classification": "assertion",
+        "detail": "semanticBudgetFallbackPublishesReasonAndCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/RetrieveContextControllerFallbackTest.java#hybridPublishesItsReasonWithoutAnEmptyCause",
+        "classification": "assertion",
+        "detail": "hybridPublishesItsReasonWithoutAnEmptyCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <HYBRID_AVAILABLE> but was: <>"
+      }
+    ]
+  },
+  "digest": "sha256:241b0f95ecf25e1628c421c1f9c7ab5c2b70ea6211583305a740999f23f135f8"
+}

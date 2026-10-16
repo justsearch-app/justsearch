@@ -1,0 +1,73 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T13:17:16.023Z",
+  "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+  "tree": "2e9e8c72ba04b819907372522ed57237e1ee443a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13897
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_p5_oracle.rs#updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer",
+      "file": "modules/shell/src-tauri/src/updater_p5_oracle.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d3b91a73ccee0b0efd956646eb8fc82378c8d9d7d210f16809c6385f5a4a1ad9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f7cd27765",
+    "revision": "f7cd2776599bae5cb21d7b9157052c7a8d15ffcf",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/b6d536-shell-p5-original-before.patch",
+        "contentDigest": "sha256:9cf8fcfc28461cbd511f83a69f73d7666f9115622a70d559ed9a6afc623d1658"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 12255
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater_p5_oracle.rs#updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer",
+        "classification": "assertion",
+        "detail": "updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer:  ---- updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer stdout ----\n\nthread 'updater::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer' (17004) panicked at src\\updater_p5_oracle.rs:8:9:\nassertion `left == right` failed: installer launched while the job still held a process\n  left: 1\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to "
+      }
+    ]
+  },
+  "digest": "sha256:46853ca1f7e3c6c65c3a30effea911472f44a674cb83a7042496b4706bebaae6"
+}

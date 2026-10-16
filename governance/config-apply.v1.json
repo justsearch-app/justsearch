@@ -567,6 +567,14 @@
       "applyScope": "restart-required"
     },
     {
+      "key": "justsearch.engine.incarnation",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.eval.mode",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.extraction.sandbox.command",
       "applyScope": "component:index"
     },
@@ -599,6 +607,10 @@
       "applyScope": "restart-required"
     },
     {
+      "key": "justsearch.gpu.device_available",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.gpu.device_memory_ceiling_mb",
       "applyScope": "restart-required"
     },
@@ -607,8 +619,20 @@
       "applyScope": "component:encoders"
     },
     {
+      "key": "justsearch.gpu.game_detection",
+      "applyScope": "hot"
+    },
+    {
       "key": "justsearch.gpu.layers",
       "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.gpu.memory_plan",
+      "applyScope": "component:encoders"
+    },
+    {
+      "key": "justsearch.gpu.memory_plan_unplanned_roles",
+      "applyScope": "component:encoders"
     },
     {
       "key": "justsearch.head.stamp",
@@ -643,6 +667,10 @@
       "applyScope": "component:index"
     },
     {
+      "key": "justsearch.inference.external_endpoint",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.ingestion.skip.directory_names",
       "applyScope": "component:index"
     },
@@ -675,6 +703,10 @@
       "applyScope": "component:generative"
     },
     {
+      "key": "justsearch.llm.prompt_cache_mib",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.llm.reasoning_budget",
       "applyScope": "component:generative"
     },
@@ -692,6 +724,10 @@
     },
     {
       "key": "justsearch.mmproj.model",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.mmproj.offload",
       "applyScope": "component:generative"
     },
     {

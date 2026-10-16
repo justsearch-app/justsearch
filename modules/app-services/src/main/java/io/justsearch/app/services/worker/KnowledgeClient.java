@@ -466,6 +466,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return category.apply(deadlineMs);
     }
 
+    /**
+     * The one deadline a search request spans, across all the head's worker calls for it
+     * ({@code requestDeadlineMs}, Spec D §1.2): the base deadline, unchanged by this method.
+     */
+    public final long requestDeadlineMs() {
+        return deadlineMs;
+    }
+
     private <T> T executeHealthRpc(
             String operation,
             RpcDeadlineCategory category,
@@ -513,6 +521,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     public RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
         return searchRpcOps.retrieveContext(params, engineContext);
+    }
+
+    /**
+     * The retrieval step of an open retrieval whose pre-search already waited out its semantic
+     * sub-budget on models that were still loading (Spec D §5.1): the Worker does not wait for them
+     * again and, while they are still loading, answers with BM25 and the cause {@code loading}.
+     */
+    public RetrieveContextResponse retrieveContextAfterLoadingModels(
+            io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
+        return searchRpcOps.retrieveContext(params, true, engineContext);
     }
 
     public MatchCitationsResponse matchCitations(
@@ -1809,9 +1827,31 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return vduOps.markVduProcessing(docId, maxRetries, engineContext);
     }
 
+    /**
+     * Returns a document this pass marked PROCESSING but could not attempt to PENDING, giving back
+     * the attempt the mark counted. False when it is absent or no longer PROCESSING.
+     */
+    public boolean releaseVduProcessing(String docId, EngineContext engineContext) {
+        return vduOps.releaseVduProcessing(docId, engineContext);
+    }
+
     public int recoverVduProcessing(EngineContext engineContext) {
         return vduOps.recoverVduProcessing(engineContext);
     }
+
+    /** Abandon only PROCESSING claims owned by this still-attached procedure. */
+    public int recoverVduProcessingForOwner(EngineContext engineContext) {
+        return vduOps.recoverVduProcessingForOwner(engineContext);
+    }
+
+    /**
+     * Return this procedure's claims while its admitted work is still owned, including after new
+     * admission closes. The transport retains the supplied handle through the recovery's actual
+     * exit; a context alone is not authority to cross the process-closing fence.
+     */
+    public abstract int recoverVduProcessingForRetainedOwner(
+            io.justsearch.app.api.EngineWorkHandle owner);
+
 
     /**
      * Stops the background root-walk and WAITS for it, rather than only asking it to stop.

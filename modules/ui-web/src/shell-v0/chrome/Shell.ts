@@ -220,6 +220,7 @@ import { getLayout } from '../layout/LayoutManifest.js';
 import { createHostApi } from '../plugin-api/HostApiImpl.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { startAutoLock, type AutoLockHandle } from '../utils/autoLock.js';
+import { startUserActivity } from '../utils/userActivity.js';
 import {
   registerCommand,
   setActiveSurfaceCommands,
@@ -473,6 +474,7 @@ export class Shell extends JfElement {
   private hostApi_: PluginHostApi | null = null;
   /** Tempdoc 629 (#10) — app-wide auto-lock idle watcher handle (started at mount, stopped at unmount). */
   private autoLock_: AutoLockHandle | null = null;
+  private userActivityStop: (() => void) | null = null;
   /** Tempdoc 508 §3 — global keybinding for command palette. */
   private keybindingTeardown: (() => void) | null = null;
   // Slice 501 — journal subscription + keyboard handler + savedViews teardowns.
@@ -771,6 +773,13 @@ export class Shell extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.userActivityStop = startUserActivity(this.ownerDocument, (inputAgeMs) => this.hostApi_
+      ? this.hostApi_.data.fetch('/api/ui/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputAgeMs }),
+      })
+      : Promise.reject(new Error('host not ready')));
     this.appUpdateMonitorStop = startAppUpdateMonitor();
     // Tempdoc 629 (#10): start the app-wide auto-lock idle watcher. The fetch is resolved lazily so it
     // works once hostApi_ is bound during mount; until then the tick's fetch rejects and is a no-op.
@@ -1751,6 +1760,8 @@ export class Shell extends JfElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.userActivityStop?.();
+    this.userActivityStop = null;
     this.appUpdateMonitorStop?.();
     this.appUpdateMonitorStop = null;
     this.autoLock_?.stop();

@@ -129,8 +129,10 @@ export function projectAvailability(
   }
 
   // Settled: the local AI model is offline. The single capability gate every affordance shares.
+  // Spec A step 7 (F1): when chat failed, the control says why ("The local AI model file could not
+  // be loaded"), in the same words as the readiness notice, instead of a bare "offline".
   if (!s.capabilities.chat) {
-    return unavailableFor('inference.offline', false);
+    return unavailableFor(s.chatFailureReason ?? 'inference.offline', false);
   }
 
   // Documents (RAG) additionally needs at least one indexed document. `capabilities.rag`

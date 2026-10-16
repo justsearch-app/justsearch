@@ -78,8 +78,8 @@ async function check(label, fn) {
   }
 }
 
-function killIfAlive(pid) {
-  try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+function killIfAlive(child) {
+  try { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); } catch { /* already gone */ }
 }
 
 /** Spawn a real, disposable, long-lived child this test owns — never the dev stack's own Vite. */
@@ -88,7 +88,7 @@ function spawnDisposableChild() {
     stdio: 'ignore',
     windowsHide: true,
   });
-  spawnedPids.push(child.pid);
+  spawnedPids.push(child);
   return child;
 }
 
@@ -213,7 +213,7 @@ async function main() {
         const stillThere = await fsp.stat(path.join(dir, 'w5-session-start-real-kill.json')).then(() => true, () => false);
         assert.equal(stillThere, false, 'record file should be removed after a confirmed kill');
       } finally {
-        killIfAlive(child.pid);
+        killIfAlive(child);
       }
     });
   });
@@ -840,7 +840,7 @@ async function main() {
         assert.ok(after.ok);
         assert.ok(!after.table.some((r) => Number(r?.ProcessId) === child.pid), 'the child must actually be reaped end-to-end through the real CLI subprocess');
       } finally {
-        killIfAlive(child.pid);
+        killIfAlive(child);
         await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
       }
     });
@@ -858,5 +858,5 @@ async function main() {
 }
 
 main().finally(() => {
-  for (const pid of spawnedPids) killIfAlive(pid);
+  for (const child of spawnedPids) killIfAlive(child);
 });

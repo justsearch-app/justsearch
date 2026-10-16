@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:13:28.853Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "83124501aaaceffc8bbfcb620bd3639ba4be6925",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.slowObserverUnsubscribedElsewhereLeavesProducerUninterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.interruptibleObserverUnsubscribedElsewhereLeavesProducerUninterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.concurrentUnsubscribeRacesNeverInterruptProducer\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.channelCloseDuringDeliveryLeavesProducerUninterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.producerInterruptedBeforePublishStaysInterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.producerInterruptedWhileWaitingReturnsPromptlyWithItsInterrupt\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.attachingThreadLeavesWithoutTheInterruptItsRetirementRaised\" --tests \"io.justsearch.app.observability.stream.SseStreamChannelPublisherInterruptTest.closingAPlainChannelDuringCallerDeliveryDoesNotInterruptThePublisher\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5560
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.HealthProducerInterruptTest.subscriberLeavingDuringDeliveryNeverInterruptsTheProducer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3859
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#slowObserverUnsubscribedElsewhereLeavesProducerUninterrupted",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "slowObserverUnsubscribedElsewhereLeavesProducerUninterrupted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#interruptibleObserverUnsubscribedElsewhereLeavesProducerUninterrupted",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptibleObserverUnsubscribedElsewhereLeavesProducerUninterrupted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#concurrentUnsubscribeRacesNeverInterruptProducer",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrentUnsubscribeRacesNeverInterruptProducer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#channelCloseDuringDeliveryLeavesProducerUninterrupted",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "channelCloseDuringDeliveryLeavesProducerUninterrupted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#producerInterruptedBeforePublishStaysInterrupted",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "producerInterruptedBeforePublishStaysInterrupted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#producerInterruptedWhileWaitingReturnsPromptlyWithItsInterrupt",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "producerInterruptedWhileWaitingReturnsPromptlyWithItsInterrupt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#attachingThreadLeavesWithoutTheInterruptItsRetirementRaised",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3f070d957c884bee3bb67142c31da198222a8b75cca3fa8eac2f57c1cb1ceb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "attachingThreadLeavesWithoutTheInterruptItsRetirementRaised()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/HealthProducerInterruptTest.java#subscriberLeavingDuringDeliveryNeverInterruptsTheProducer",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/HealthProducerInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b24df6626a5d01fb9aa95884e557e926e27bad5adac82da407bdd5759523b384",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): recovery-occurrence",
+          "status": "passed"
+        },
+        {
+          "name": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): boot-recovery",
+          "status": "passed"
+        },
+        {
+          "name": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): engine-containment",
+          "status": "passed"
+        },
+        {
+          "name": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): newer-data",
+          "status": "passed"
+        },
+        {
+          "name": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): agent-session",
+          "status": "passed"
+        },
+        {
+          "name": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): at-rest-tap",
+          "status": "passed"
+        },
+        {
+          "name": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): conversation-protection-tap",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelPublisherInterruptTest.java#closingAPlainChannelDuringCallerDeliveryDoesNotInterruptThePublisher",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelPublisherInterruptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca612e01bcedc94cab739dc2370dea663e88b92cbfe8a14f0b95623026561f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closingAPlainChannelDuringCallerDeliveryDoesNotInterruptThePublisher()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b639e82c5",
+    "revision": "b639e82c5422800b853ddf08e89a37f9fecc1aeb",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b77-health-interrupt-compat.patch",
+        "contentDigest": "sha256:349b5b2570b70ca5c9c27223ba20b461f401e95451e4a5d3baa6b97ab1edaec6"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.slowObserverUnsubscribedElsewhereLeavesProducerUninterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.interruptibleObserverUnsubscribedElsewhereLeavesProducerUninterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.concurrentUnsubscribeRacesNeverInterruptProducer\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.channelCloseDuringDeliveryLeavesProducerUninterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.producerInterruptedBeforePublishStaysInterrupted\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.producerInterruptedWhileWaitingReturnsPromptlyWithItsInterrupt\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder\" --tests \"io.justsearch.app.observability.health.HealthPublisherInterruptTest.attachingThreadLeavesWithoutTheInterruptItsRetirementRaised\" --tests \"io.justsearch.app.observability.stream.SseStreamChannelPublisherInterruptTest.closingAPlainChannelDuringCallerDeliveryDoesNotInterruptThePublisher\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 12217
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.HealthProducerInterruptTest.subscriberLeavingDuringDeliveryNeverInterruptsTheProducer\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5868
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#slowObserverUnsubscribedElsewhereLeavesProducerUninterrupted",
+        "classification": "assertion",
+        "detail": "slowObserverUnsubscribedElsewhereLeavesProducerUninterrupted(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: producer left interrupted after another thread unsubscribed ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#interruptibleObserverUnsubscribedElsewhereLeavesProducerUninterrupted",
+        "classification": "assertion",
+        "detail": "interruptibleObserverUnsubscribedElsewhereLeavesProducerUninterrupted(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: producer left interrupted after another thread unsubscribed ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#concurrentUnsubscribeRacesNeverInterruptProducer",
+        "classification": "assertion",
+        "detail": "concurrentUnsubscribeRacesNeverInterruptProducer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: races of 400 that left the producer interrupted ==> expected: <0> but was: <400>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#channelCloseDuringDeliveryLeavesProducerUninterrupted",
+        "classification": "assertion",
+        "detail": "channelCloseDuringDeliveryLeavesProducerUninterrupted(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: closing the Health channel must not interrupt a publisher ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#producerInterruptedBeforePublishStaysInterrupted",
+        "classification": "assertion",
+        "detail": "producerInterruptedBeforePublishStaysInterrupted(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a producer interrupted before broadcast keeps its own interrupt ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#producerInterruptedWhileWaitingReturnsPromptlyWithItsInterrupt",
+        "classification": "assertion",
+        "detail": "producerInterruptedWhileWaitingReturnsPromptlyWithItsInterrupt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an interrupted producer is not held by a blocked observer ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder",
+        "classification": "assertion",
+        "detail": "blockedObserverHoldsPublisherOnlyBrieflyAndOthersKeepOrder(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a blocked observer holds the publisher at most the bound ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthPublisherInterruptTest.java#attachingThreadLeavesWithoutTheInterruptItsRetirementRaised",
+        "classification": "assertion",
+        "detail": "attachingThreadLeavesWithoutTheInterruptItsRetirementRaised(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the interrupt that released the subscriber's own prefix must not outlive the attachment ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/HealthProducerInterruptTest.java#subscriberLeavingDuringDeliveryNeverInterruptsTheProducer",
+        "classification": "assertion",
+        "detail": "subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): recovery-occurrence: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: recovery-occurrence: producer left interrupted in races of 50 ==> expected: <0> but was: <50> | subscriberLeavingDuringDeliveryNeverInterruptsTheProducer(String): boot-recovery: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot-recovery: producer left interrupted in races of 50 ==> expected: <0> but was: <50> "
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelPublisherInterruptTest.java#closingAPlainChannelDuringCallerDeliveryDoesNotInterruptThePublisher",
+        "classification": "assertion",
+        "detail": "closingAPlainChannelDuringCallerDeliveryDoesNotInterruptThePublisher(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: channel close interrupted the thread that was publishing ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:9294e335b22cfc5361b140b647b8f99ee3ef8588f8875af41a006c06ed3d92de"
+}

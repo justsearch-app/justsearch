@@ -4,6 +4,7 @@ package io.justsearch.app.services.bootstrap;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
+import io.justsearch.app.services.chat.ChatServerControllerImpl;
 import io.justsearch.app.services.inference.InferenceMetricCatalog;
 import io.justsearch.app.services.inference.InferenceTelemetryAdapter;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -21,6 +22,41 @@ public final class BootstrapInferenceFactory {
   public interface GenerationLifetimeSource {
     /** Begin at producer entry; the returned single-use release belongs to actual producer exit. */
     java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime();
+
+    /**
+     * Spec E step E2: receives the chat server's generation signal once the manager exists, so
+     * chat generation can pace indexing through Switch A. Fixtures without a gate ignore it.
+     */
+    default void bindGenerationActivity(io.justsearch.app.api.chat.GenerationActivity activity) {}
+
+    /**
+     * Spec E step E3: receives the chat controller's pressure input once the controller exists, so
+     * the Engine's GPU residency sampler can report external memory pressure to it (section 3.4).
+     * Fixtures without a sampler ignore it.
+     */
+    default void bindPressureReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {}
+
+    /**
+     * Spec A step 10: the Engine's device-lost restart path (its exit ledger and requested
+     * restart), given to the chat controller. Without one every device loss fails closed.
+     */
+    default io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery() {
+      return io.justsearch.app.api.chat.DeviceLostRecovery.UNAVAILABLE;
+    }
+
+    /**
+     * Spec E §6.2 item 6: receives the chat controller's device-loss input once the controller
+     * exists, so an encoder that finds its CUDA device lost reports it. Fixtures ignore it.
+     */
+    default void bindDeviceLoss(io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss) {}
+
+    /**
+     * Spec E step E7b: receives the chat controller's profile input once the controller exists, so
+     * the device-memory plan's profile reaches chat co-residence. Fixtures without a plan ignore it.
+     */
+    default void bindProfileReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver) {}
   }
 
   /** Fixtures without an index half have no indexing pacing consumer. */
@@ -58,6 +94,47 @@ public final class BootstrapInferenceFactory {
       Telemetry telemetry,
       Logger log,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    java.util.Objects.requireNonNull(childRegistry, "childRegistry");
+    return create(aiEnabled, resolvedConfig, userDir, telemetry, log,
+        (config, events) -> new InferenceLifecycleManager(executors, config, events,
+            childRegistry, resolvedConfig, generationLifetime(executors), pinnedCudaUuid()),
+        executors);
+  }
+
+  /** Spec E step E6: llama-server sees only the pinned GPU, the one the encoders use. */
+  private static java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid() {
+    return () -> io.justsearch.app.services.gpu.DeviceFactsSource.process().facts().pinnedUuid();
+  }
+
+  /**
+   * The Engine's composition: every llama-server child, the self-test candidate included, is
+   * started and stopped through {@code childControl} (Spec B steps 5 and 6), which the caller owns
+   * and closes after the manager.
+   */
+  public static InferenceLifecycleManager createInferenceManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      boolean aiEnabled,
+      ResolvedConfig resolvedConfig,
+      String userDir,
+      Telemetry telemetry,
+      Logger log,
+      io.justsearch.app.api.runtime.child.ChildControl childControl) {
+    java.util.Objects.requireNonNull(childControl, "childControl");
+    return create(aiEnabled, resolvedConfig, userDir, telemetry, log,
+        (config, events) -> new InferenceLifecycleManager(executors, config, events,
+            childControl, resolvedConfig, generationLifetime(executors), pinnedCudaUuid()),
+        executors);
+  }
+
+  private static InferenceLifecycleManager create(
+      boolean aiEnabled,
+      ResolvedConfig resolvedConfig,
+      String userDir,
+      Telemetry telemetry,
+      Logger log,
+      java.util.function.BiFunction<InferenceConfig, InferenceTelemetryEvents,
+          InferenceLifecycleManager> managerOf,
+      io.justsearch.core.execution.EngineExecutorRegistry executors) {
     if (!aiEnabled) {
       log.info("AI features disabled via configuration");
       return null;
@@ -89,8 +166,35 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
-      return new InferenceLifecycleManager(executors, config, events, childRegistry, resolvedConfig,
-          generationLifetime(executors));
+      var manager = managerOf.apply(config, events);
+      // Spec A step 2: the chat controller owns every start, stop and relaunch from here on. The
+      // manager's close() shuts it down (terminal first), so it has no separate owner.
+      try {
+        var controller = new ChatServerControllerImpl(
+            executors, manager.chatActuator(), manager.selfTestLauncher(),
+            executors instanceof GenerationLifetimeSource source
+                ? source.deviceLostRecovery()
+                : io.justsearch.app.api.chat.DeviceLostRecovery.UNAVAILABLE);
+        manager.installActuationRouter(controller);
+        // Spec E step E2: chat generation reaches indexing pacing through the Engine's bulk gate.
+        if (executors instanceof GenerationLifetimeSource source) {
+          source.bindGenerationActivity(manager.generationActivity());
+          // Spec E step E3: the Engine's residency sampler reports GPU pressure to the controller.
+          source.bindPressureReceiver(controller::reportPressure);
+          // Spec E step E8: encoder device loss reaches the controller (Spec A §7.3 source 1).
+          source.bindDeviceLoss(controller);
+          // Spec E step E7b: the device-memory plan's profile reaches the controller.
+          source.bindProfileReceiver(controller::setProfile);
+        }
+      } catch (RuntimeException | Error failure) {
+        try {
+          manager.close();
+        } catch (RuntimeException cleanup) {
+          failure.addSuppressed(cleanup);
+        }
+        throw failure;
+      }
+      return manager;
 
     } catch (Exception e) {
       if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refusal) throw refusal;

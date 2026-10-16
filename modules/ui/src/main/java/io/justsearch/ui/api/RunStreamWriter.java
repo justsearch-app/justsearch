@@ -123,6 +123,7 @@ public final class RunStreamWriter {
     Objects.requireNonNull(heartbeatScheduler, "heartbeatScheduler");
     SseEnvelopeWriter.forceSseHeaders(client);
     RunStreamWriter writer = new RunStreamWriter(client, run, onClientClose);
+    var setup = SseAttachmentOwner.ownSetup(client.ctx());
     try {
     OptionalCursor cursor = writer.readCursor();
     if (cursor.rejected()) {
@@ -144,6 +145,8 @@ public final class RunStreamWriter {
     } catch (RuntimeException | Error failure) {
       writer.connection.terminateAfter(failure);
       throw failure;
+    } finally {
+      if (setup != null) setup.release();
     }
   }
 
@@ -260,7 +263,7 @@ public final class RunStreamWriter {
       // re-open Last-Event-ID as a second, unvalidated resume channel beside ?sinceSeq (§1.6).
       synchronized (client) {
         if (!connection.isClosed()) {
-          client.sendEvent(frame.event(), MAPPER.writeValueAsString(frame.data()));
+          client.sendEvent(frame.event(), MAPPER.writeValueAsString(StatusChangeHeaders.event(frame.data())));
         }
       }
     } catch (RuntimeException e) {

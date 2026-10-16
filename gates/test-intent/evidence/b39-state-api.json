@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-09T02:37:16.159Z",
+  "revision": "a600f71b616f9cd17ae2deefbecacd1427afd58c",
+  "tree": "58ac334a9d21d7124e7f50664827ddb4c252168b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.embed.EmbeddingProviderAvailabilityTest.placeholderStatesAreExplicitAndRetainLoadFailure\" --tests \"io.justsearch.indexerworker.embed.EmbeddingProviderAvailabilityTest.constructedBackendIsReadyAndClosedBackendIsAbsent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12547
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/EmbeddingProviderAvailabilityTest.java#placeholderStatesAreExplicitAndRetainLoadFailure",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/EmbeddingProviderAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6ab9c7339f27c77bd9ff2a1e63c8c5e400aa6f3af5353706f0b45cdb6e705657",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "placeholderStatesAreExplicitAndRetainLoadFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/EmbeddingProviderAvailabilityTest.java#constructedBackendIsReadyAndClosedBackendIsAbsent",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/EmbeddingProviderAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6ab9c7339f27c77bd9ff2a1e63c8c5e400aa6f3af5353706f0b45cdb6e705657",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "constructedBackendIsReadyAndClosedBackendIsAbsent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f590ef0973a6a06bbc8f07be61f01cbf65c2342eab6d55d9269dbbef5b06013d"
+}

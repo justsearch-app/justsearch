@@ -987,13 +987,16 @@ jobs:
     # the separate windows-native-tests lane. search-worker / platform-contracts stay
     # on Windows pending their own Linux validation.
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    # The app-ui shard reached its final UI task with clean completed suites, then exhausted
+    # the old 25-minute job cap. Keep every per-test budget and give that shard CI headroom.
+    timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - lane: app-ui
             os: ubuntu-latest
+            timeout_minutes: 35
             artifact: unit-test-attribution-app-ui
             runner_label: ubuntu-latest/app-ui
             fetch_depth: 1
@@ -1016,6 +1019,7 @@ jobs:
               :modules:ui:test
           - lane: search-worker
             os: ubuntu-latest
+            timeout_minutes: 25
             artifact: unit-test-attribution-search-worker
             runner_label: ubuntu-latest/search-worker
             fetch_depth: 1
@@ -1031,6 +1035,7 @@ jobs:
               :modules:worker-services:test
           - lane: platform-contracts
             os: ubuntu-latest
+            timeout_minutes: 25
             artifact: unit-test-attribution-platform-contracts
             runner_label: ubuntu-latest/platform-contracts
             # :modules:dead-code-audit:test carries the whole-program dead-class ratchet as an
@@ -1084,6 +1089,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      # The real frontend/HTTP integration probes bundle TypeScript with root esbuild and
+      # resolve UI imports such as zod. skipWebBuild skips the web build, not these dependencies.
+      - name: Setup Node for frontend HTTP probes
+        if: matrix.lane == 'app-ui'
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            modules/ui-web/package-lock.json
+
+      - name: Install frontend HTTP probe dependencies
+        if: matrix.lane == 'app-ui'
+        run: |
+          npm ci --audit=false
+          npm ci --prefix modules/ui-web --audit=false
+
       - name: Unit tests with model-dependent tests self-skipping
         id: gradle-test
         shell: bash
@@ -1131,12 +1154,18 @@ jobs:
 
   # Tempdoc 668 option B — runs ONLY the @Tag("windows") tests (single-instance lock,
   # job objects, power status) on Windows, preserving coverage of genuinely Windows-
-  # specific product behaviour that the Linux-migrated lanes (app-ui) skip. Small + fast
-  # (a handful of classes via -PwindowsOnly). Covers the modules moved to Linux so far.
+  # specific product behaviour that the Linux-migrated lanes skip. JVM selection uses
+  # -PwindowsOnly; the lane also runs the full dev-runner and release suites.
   windows-native-tests:
     name: Windows-native tests
     runs-on: windows-latest
-    timeout-minutes: 15
+    # This lane now auto-discovers 46 dev-runner files, including real identity-bound stop,
+    # census and recovery rounds, before compiling/running the native JVM tests. The old
+    # 15-minute budget cancelled run 38847760494 inside that suite, before Gradle started.
+    # stop-census alone measured 10m04s locally (81 cases, 5,250 generated ledgers/histories).
+    # Run 38871877988 took 31m30 before adding native UI compilation/coverage. Keep all
+    # test budgets and allow that module plus hosted cold-start variance to finish.
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1171,20 +1200,22 @@ jobs:
             ${{ env.JAVA_VERSION }}
 
       - name: Dev-runner suite (auto-discovered)
-        run: npm ci --audit=false && npm run test:dev-runner
+        run: npm ci --audit=false && npm run test:dev-runner -- --verbose
 
       # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
       # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
       # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
       # process handle closing — is a real constraint rather than a no-op.
       - name: Supervisor conformance (dev-runner adapter)
-        run: node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+        run: |
+          node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+          node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
       - name: Windows-only tests (@Tag windows) for the Linux-migrated modules
-        run: ./gradlew.bat :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test -PwindowsOnly=true --console=plain
+        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test -PwindowsOnly=true -PskipWebBuild=true --console=plain
 
       - name: Preserve Windows-native test results
         if: always()
@@ -1282,7 +1313,9 @@ jobs:
         run: cargo build --bin supervisor-conformance --locked
 
       - name: Supervisor conformance (Tauri adapter)
-        run: node scripts/supervisor-conformance/run.mjs --adapter tauri
+        run: |
+          node scripts/supervisor-conformance/run.mjs --adapter tauri
+          node scripts/supervisor-conformance/run.mjs --adapter tauri --case fileless-clean-local-restart-is-not-counted --repeat 50
 
   # `:modules:system-tests:integrationTest` ran in NO lane until now: ci.yml ran only
   # `:modules:system-tests:test`, and the module's `check` depends on `test` alone

@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:56:44.834Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "b3d4984f56a00766bb004040f508f3663c122035",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeCurrentStateTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 34091
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.unchangedAdmissionNeverInvokesTheSplitter\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.canonicalWriterDeclaresBothChunkedAndZeroChunkParents\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7691
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeCurrentStateTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeCurrentStateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d584d69e709a94fcbac8d96e3b36a6a44a51ea0dbbc6c6d324c53d438428236b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryBeforeSubscriptionReconcilesBothOwnedConditions()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryWithoutAReadyClearCannotRetainThePreviousInferenceFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#unchangedAdmissionNeverInvokesTheSplitter",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:562da9eeb28a4c6467fff7e7de86a276bc55f2104ff583aa6dd272447d832732",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unchangedAdmissionNeverInvokesTheSplitter()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#canonicalWriterDeclaresBothChunkedAndZeroChunkParents",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:562da9eeb28a4c6467fff7e7de86a276bc55f2104ff583aa6dd272447d832732",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalWriterDeclaresBothChunkedAndZeroChunkParents()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:562da9eeb28a4c6467fff7e7de86a276bc55f2104ff583aa6dd272447d832732",
+      "executed": false,
+      "skipped": false,
+      "outcome": "not-found",
+      "cases": []
+    }
+  ],
+  "failBefore": {
+    "ref": "04368bfca",
+    "revision": "04368bfca99cd243b4b68f75a9a05b345be284d0",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-batch1-root-compat.patch",
+        "contentDigest": "sha256:84a6e2d822514da9f312abb8e2c91353b1a0aaf0850d8a9fe85368ed71a3e9bc"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeCurrentStateTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 49088
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.unchangedAdmissionNeverInvokesTheSplitter\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.canonicalWriterDeclaresBothChunkedAndZeroChunkParents\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8136
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeCurrentStateTest.java",
+        "classification": "assertion",
+        "detail": "recoveryBeforeSubscriptionReconcilesBothOwnedConditions(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: subscription replay must remove a failure whose clear was never observed ==> expected: <false> but was: <true> | recoveryWithoutAReadyClearCannotRetainThePreviousInferenceFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: quiet PENDING recovery must not retain InferenceModelLoadFailed ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#unchangedAdmissionNeverInvokesTheSplitter",
+        "classification": "assertion",
+        "detail": "unchangedAdmissionNeverInvokesTheSplitter(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unchanged admission must not invoke any splitter entry point ==> Unexpected exception thrown: org.mockito.exceptions.verification.NoInteractionsWanted: &#10;No interactions wanted here:&#10;-> at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertD"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#canonicalWriterDeclaresBothChunkedAndZeroChunkParents",
+        "classification": "assertion",
+        "detail": "canonicalWriterDeclaresBothChunkedAndZeroChunkParents(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <null>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:11c84c2c16750447d77b14a20282fb86eb0c5eae0935bc8f48d77f454a52ae7c"
+}

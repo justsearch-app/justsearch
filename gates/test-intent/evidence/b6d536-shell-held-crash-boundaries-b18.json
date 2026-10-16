@@ -1,0 +1,109 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T14:35:48.650Z",
+  "revision": "99373ec68a8e1bcadc83ef82ed62c1409098b6af",
+  "tree": "8aa7c92458ba404e726c6d1a78286bc02821bc19",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::commit_delivery_tests::sent_commit_failure_keeps_receipt_rules_and_unsent_without_exit_is_refused\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7989
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::commit_delivery_tests::actor_without_terminal_observation_cannot_authorize_install\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 484
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1449
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 462
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::sent_commit_failure_keeps_receipt_rules_and_unsent_without_exit_is_refused",
+      "file": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45bb0eb1e1cd00fa1a249711198ed4a59ae27006314ad8f8f81f6d9383cde45c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::commit_delivery_tests::sent_commit_failure_keeps_receipt_rules_and_unsent_without_exit_is_refused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::actor_without_terminal_observation_cannot_authorize_install",
+      "file": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45bb0eb1e1cd00fa1a249711198ed4a59ae27006314ad8f8f81f6d9383cde45c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::commit_delivery_tests::actor_without_terminal_observation_cannot_authorize_install",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:3b484a480226d22c04d6a587cf83f5025620c89c09660a4186f28c4a816915f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:3b484a480226d22c04d6a587cf83f5025620c89c09660a4186f28c4a816915f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c41233d37041e4625b715d9ea79485374369b408fe37b6f7cc0111bea2ca83a3"
+}

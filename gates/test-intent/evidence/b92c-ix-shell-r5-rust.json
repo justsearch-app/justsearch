@@ -1,0 +1,98 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T18:25:06.985Z",
+  "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+  "tree": "aefb176baa4905590f10a910d6650add80defe19",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20039
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11903
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a3063df41",
+    "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 21941
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 12924
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim",
+        "classification": "assertion",
+        "detail": "exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim:  ---- exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim stdout ----\n\nthread 'exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim' (35772) panicked at src\\exit_ledger.rs:984:9:\nassertion `left == right` failed: the unreadable journal line is kept as it was: [\"{\\\"schemaVersion\\\":1,\\\"type\\\":\\\"ledger-gap\\\",\\\"seq\\\":1,\\\"at\\\":\\\"2026-10-07T10:00:00Z\\\",\\\"writer\\\":{\\\"role\\\":\\\"engine\\\",\\\"pid\\\":90,\\\""
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim",
+        "classification": "assertion",
+        "detail": "exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim:  ---- exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim stdout ----\n\nthread 'exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim' (19632) panicked at src\\exit_ledger.rs:1006:9:\nassertion `left == right` failed: compaction keeps the unreadable journal line\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    exit_ledger:"
+      }
+    ]
+  },
+  "digest": "sha256:d91930e1d7c3ac7b5395b36913ffebd11d812fab92f493ff9dff940e1f6b42dc"
+}

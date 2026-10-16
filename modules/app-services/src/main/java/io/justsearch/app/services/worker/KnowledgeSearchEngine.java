@@ -48,6 +48,7 @@ import io.justsearch.ipc.RerankResponse;
 import io.justsearch.reranker.RerankerConfig;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
+import io.justsearch.app.api.chat.GenerationUnavailableException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,6 +58,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -85,6 +87,21 @@ final class KnowledgeSearchEngine {
 
   /** Hard budget (ms) for LLM expansion before falling back to base search results. */
   private static final long EXPANSION_BUDGET_MS = 1500L;
+
+  /**
+   * Time (ms) the head keeps after the rerank stage, inside the request deadline {@code D}, to trim,
+   * map and return the response (Spec D §1.2). The rerank runs until {@code D - RERANK_MARGIN_MS}
+   * at the latest. 500 ms: the margin Spec D §0 provisions for respond and head merge
+   * ({@code marginMs}); calibration (Spec D step 11) replaces it.
+   */
+  private static final long RERANK_MARGIN_MS = 500L;
+
+  /**
+   * The least time (ms) before the rerank deadline for which the head still asks for a rerank: the
+   * configured rerank budget ({@code justsearch.rerank.deadline_ms}), but never more than its
+   * 200 ms default, so a budget pinned high for an evaluation does not turn every rerank away.
+   */
+  private static final long RERANK_MIN_BUDGET_MS = 200L;
 
   /** Compiled pattern for validating expansion tokens (alphabetic-only, no digits or punctuation). */
   private static final Pattern ALPHA_ONLY = Pattern.compile("[a-zA-Z]+");
@@ -148,6 +165,63 @@ final class KnowledgeSearchEngine {
         && !query.isBlank()
         && (cursor == null || cursor.isBlank())
         && aiAvailable;
+  }
+
+  /** The wire reason of a leg that missed its semantic sub-budget (Spec D §1.4). */
+  private static final String SEMANTIC_BUDGET_EXCEEDED = "SEMANTIC_BUDGET_EXCEEDED";
+
+  /**
+   * The request's deadline {@code D} (Spec D §1.2): {@code openedNs + requestDeadlineMs}, or the
+   * caller's narrower deadline when the search runs inside one. Empty when neither exists.
+   */
+  static OptionalLong headDeadline(long openedNs, long requestDeadlineMs, OptionalLong caller) {
+    if (requestDeadlineMs <= 0) return caller;
+    long own = openedNs + TimeUnit.MILLISECONDS.toNanos(requestDeadlineMs);
+    return OptionalLong.of(
+        caller.isPresent() ? HeadSearchDeadline.earlier(own, caller.getAsLong()) : own);
+  }
+
+  /** The expansion re-search's deadline: {@code min(now + EXPANSION_BUDGET_MS, D)} (§1.6). */
+  static long expansionDeadline(long nowNs, OptionalLong head) {
+    long own = nowNs + TimeUnit.MILLISECONDS.toNanos(EXPANSION_BUDGET_MS);
+    return head.isPresent() ? HeadSearchDeadline.earlier(own, head.getAsLong()) : own;
+  }
+
+  /** Whether {@code expanded} lost a semantic leg to its budget that {@code base} kept (§1.6). */
+  static boolean newSemanticBudgetMiss(SearchResponse base, SearchResponse expanded) {
+    var b = base.getSearchTrace().getDegradation();
+    var e = expanded.getSearchTrace().getDegradation();
+    boolean dense = SEMANTIC_BUDGET_EXCEEDED.equals(e.getHybridFallbackReason())
+        && !SEMANTIC_BUDGET_EXCEEDED.equals(b.getHybridFallbackReason());
+    boolean splade = SEMANTIC_BUDGET_EXCEEDED.equals(e.getSpladeSkipReason())
+        && !SEMANTIC_BUDGET_EXCEEDED.equals(b.getSpladeSkipReason());
+    return dense || splade;
+  }
+
+  /**
+   * The rerank stage's deadline (§1.2): {@code D - RERANK_MARGIN_MS}, so the head still answers
+   * inside {@code D} after it stops waiting for the reranker. Empty without a head deadline.
+   */
+  private static OptionalLong rerankDeadline(OptionalLong head) {
+    return head.isPresent()
+        ? OptionalLong.of(head.getAsLong() - TimeUnit.MILLISECONDS.toNanos(RERANK_MARGIN_MS))
+        : head;
+  }
+
+  /** Whether the time left before {@code rerankDeadline} covers a rerank of {@code budgetMs}. */
+  private static boolean rerankFits(long nowNs, OptionalLong rerankDeadline, long budgetMs) {
+    if (rerankDeadline.isEmpty()) return true;
+    long neededMs = Math.min(budgetMs, RERANK_MIN_BUDGET_MS);
+    return rerankDeadline.getAsLong() - nowNs >= TimeUnit.MILLISECONDS.toNanos(neededMs);
+  }
+
+  /** Whether {@code deadline} has passed at {@code nowNs}. */
+  private static boolean passed(long nowNs, OptionalLong deadline) {
+    return deadline.isPresent() && nowNs - deadline.getAsLong() >= 0;
+  }
+
+  private static <T> T withinHead(OptionalLong head, java.util.function.Supplier<T> body) {
+    return head.isPresent() ? HeadSearchDeadline.within(head.getAsLong(), body) : body.get();
   }
 
   /**
@@ -589,6 +663,8 @@ final class KnowledgeSearchEngine {
   KnowledgeHttpApiAdapter.SearchSession openSearch(
       KnowledgeSearchRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
+    // Spec D §1.2: the request's deadline D is fixed once, here, and spans every worker call.
+    long openedNs = System.nanoTime();
 
     // 250 Phase 5c: Root span for the entire search pipeline
     Span searchSpan =
@@ -603,7 +679,8 @@ final class KnowledgeSearchEngine {
       captured = captureSearch();
       SearchCapture active = captured;
       KnowledgeSearchResponse resp = active.lease().withClient(client ->
-          doSearch(req, searchSpan, engineContext, client, active.config()));
+          doSearch(req, searchSpan, engineContext, client, active.config(),
+              headDeadline(openedNs, client.requestDeadlineMs(), HeadSearchDeadline.current())));
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
       return new RetainedSearchSession(resp, captured);
@@ -671,7 +748,8 @@ final class KnowledgeSearchEngine {
 
   private KnowledgeSearchResponse doSearch(
       KnowledgeSearchRequest req, Span searchSpan, EngineContext engineContext,
-      KnowledgeClient client, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig) {
+      KnowledgeClient client, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig,
+      OptionalLong head) {
     long doSearchStartNs = System.nanoTime();
     RerankerConfig rerankConfig = RerankerConfig.fromEnv();
 
@@ -743,7 +821,13 @@ final class KnowledgeSearchEngine {
     if (isExpansionEligible(
         pipelineConfig, querySyntax, queryText, req.cursor(), onlineAiService.isAvailable(),
         effectiveQueryType)) {
-      expansionFuture = startExpansionAsync(queryText, engineContext);
+      try {
+        expansionFuture = startExpansionAsync(queryText, engineContext);
+      } catch (GenerationUnavailableException refused) {
+        // Chat is draining, starting or stopping: the same outcome as AI being off.
+        expansionSkipReason = "AI_UNAVAILABLE";
+        log.debug("LLM expansion skipped, generation unavailable: {}", refused.getMessage());
+      }
     } else if (effectiveQueryType == QueryType.NAVIGATIONAL || effectiveQueryType == QueryType.EXACT_MATCH) {
       expansionSkipReason = "QUERY_TYPE_" + effectiveQueryType.name();
     } else if (!pipelineConfig.expansionEnabled()) {
@@ -871,8 +955,8 @@ final class KnowledgeSearchEngine {
     SearchResponse resp;
     boolean perSourceRetrieval = false;
     if (structuredAnalysis.detectedSources().size() >= 2) {
-      resp = perSourceSearch.execute(
-          client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext);
+      resp = withinHead(head, () -> perSourceSearch.execute(
+          client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
       perSourceRetrieval = true;
     } else {
       // Single-source: inject detected sources as boost if no boost already set
@@ -881,9 +965,10 @@ final class KnowledgeSearchEngine {
         for (String src : structuredAnalysis.detectedSources()) {
           srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));
         }
-        resp = client.search(baseReq.toBuilder().setBoostFilters(srcBoost.build()).build(), engineContext);
+        SearchRequest boosted = baseReq.toBuilder().setBoostFilters(srcBoost.build()).build();
+        resp = withinHead(head, () -> client.search(boosted, engineContext));
       } else {
-        resp = client.search(baseReq, engineContext);
+        resp = withinHead(head, () -> client.search(baseReq, engineContext));
       }
     }
 
@@ -906,9 +991,25 @@ final class KnowledgeSearchEngine {
                     .setQuery(expandedQuery)
                     .setQuerySyntax(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE)
                     .build();
-            resp = client.search(expandedReq, engineContext);
-            expansionApplied = true;
-            log.debug("LLM expansion applied to query");
+            // Spec D §1.6: the re-search gets min(EXPANSION_BUDGET_MS, D - now), not a fresh
+            // category budget, so base search plus re-search stay inside D.
+            long reSearchDeadline = expansionDeadline(System.nanoTime(), head);
+            if (reSearchDeadline - System.nanoTime() <= 0) {
+              expansionSkipReason = "TIMEOUT";
+            } else {
+              SearchResponse expanded = HeadSearchDeadline.within(
+                  reSearchDeadline, () -> client.search(expandedReq, engineContext));
+              if (newSemanticBudgetMiss(resp, expanded)) {
+                // The shorter budget cost the re-search a semantic leg the base search had: the
+                // expansion did not fit, so the base results stand.
+                expansionSkipReason = "TIMEOUT";
+                log.debug("LLM expansion re-search missed its semantic budget; using base results");
+              } else {
+                resp = expanded;
+                expansionApplied = true;
+                log.debug("LLM expansion applied to query");
+              }
+            }
           }
         } catch (TimeoutException e) {
           expansionFuture.cancel(true);
@@ -920,7 +1021,8 @@ final class KnowledgeSearchEngine {
           expansionSkipReason = "FAILED";
         } catch (ExecutionException e) {
           io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
-          expansionSkipReason = "FAILED";
+          expansionSkipReason =
+              GenerationUnavailableException.causedBy(e) ? "AI_UNAVAILABLE" : "FAILED";
           log.debug("LLM expansion failed: {}", e.getCause().getMessage());
         } catch (RuntimeException e) {
           io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
@@ -1036,6 +1138,9 @@ final class KnowledgeSearchEngine {
       int topK = Math.min(configWindow > 0 ? configWindow : rerankConfig.topK(), results.size());
 
       RerankResponse reranked;
+      // Spec D §1.2: the rerank runs inside the request's one deadline D, ending early enough
+      // (RERANK_MARGIN_MS) that the search still answers inside D with its fused order.
+      OptionalLong rerankBy = rerankDeadline(head);
       // Tempdoc 643 (perf-skip): when arbitration + skip are both enabled and the leg-agreement
       // signal ALONE (no CE score exists yet — this runs before the RPC) is decisively confident
       // that fusion is already right, skip the CE RPC entirely instead of paying its latency only
@@ -1047,6 +1152,11 @@ final class KnowledgeSearchEngine {
       if (shouldSkipCrossEncoder(rerankConfig, results.subList(0, topK))) {
         crossEncoderSkipReason = CrossEncoderSkipReason.FUSION_CONFIDENT;
         reranked = null;
+      } else if (!rerankFits(System.nanoTime(), rerankBy, rerankConfig.deadlineBudgetMs())) {
+        // What is left of D cannot cover a rerank: answer with the fused order now.
+        log.debug("Rerank not started: too little of the search deadline is left");
+        crossEncoderSkipReason = CrossEncoderSkipReason.SEARCH_DEADLINE_EXCEEDED;
+        reranked = null;
       } else {
         List<String> docTexts = new ArrayList<>(topK);
         for (int i = 0; i < topK; i++) {
@@ -1056,8 +1166,10 @@ final class KnowledgeSearchEngine {
         Span ceSpan =
             tracer.spanBuilder("search/cross_encoder").setParent(Context.current()).startSpan();
         try (Scope ceScope = ceSpan.makeCurrent()) { // NOPMD - scope used for auto-close
-          reranked = client.rerank(
-              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext);
+          // The RPC's budget is min(its category budget, rerank deadline - now) (§1.2), so a
+          // rerank whose native run stalls releases the search at the rerank deadline.
+          reranked = withinHead(rerankBy, () -> client.rerank(
+              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext));
           // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored
           // output — the reranked docs (id + CE score + content), in the cross-encoder's chosen
           // order.
@@ -1067,8 +1179,14 @@ final class KnowledgeSearchEngine {
                     "cross-encoder", topK, SearchTraceMapper.ceOutputDocs(results, reranked)));
           }
         } catch (Exception e) {
-          log.warn("Remote rerank failed, using original order: {}", e.getMessage());
-          crossEncoderSkipReason = CrossEncoderSkipReason.RPC_FAILED;
+          if (passed(System.nanoTime(), rerankBy)) {
+            log.warn("Rerank did not return before the search deadline, using fused order: {}",
+                e.getMessage());
+            crossEncoderSkipReason = CrossEncoderSkipReason.SEARCH_DEADLINE_EXCEEDED;
+          } else {
+            log.warn("Remote rerank failed, using original order: {}", e.getMessage());
+            crossEncoderSkipReason = CrossEncoderSkipReason.RPC_FAILED;
+          }
           reranked = null;
         } finally {
           ceSpan.end();
@@ -1342,8 +1460,11 @@ final class KnowledgeSearchEngine {
         List.of(
             Map.of("role", "system", "content", EXPANSION_SYSTEM_PROMPT),
             Map.of("role", "user", "content", query));
-    return onlineAiService.chatCompletion(
-        messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext);
+    // Spec E step E2: query expansion is query assistance (ASSIST); it never slows indexing.
+    return io.justsearch.app.api.chat.DemandScope.call(
+        io.justsearch.app.api.chat.DemandKind.ASSIST,
+        () -> onlineAiService.chatCompletion(
+            messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext));
   }
 
   /**

@@ -22,6 +22,8 @@ final class SseConnection {
   }
 
   void start() {
+    var attachment = SseAttachmentOwner.own(client.ctx(), this::terminate);
+    if (attachment != null) own(attachment::release);
     client.onClose(this::terminate);
     if (client.terminated()) terminate();
     // Pre-created future also covers close during callback/future registration.

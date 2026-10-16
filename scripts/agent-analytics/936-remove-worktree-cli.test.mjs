@@ -26,6 +26,8 @@ const CLI_FILES = [
   'scripts/dev/lib/process-record.cjs',
   'scripts/dev/lib/agent-spawn-record.cjs',
   'scripts/dev/lib/agent-spawn-reaper.cjs',
+  'scripts/dev/lib/recorded-termination.cjs',
+  'scripts/dev/lib/terminate-process.ps1',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
   'scripts/dev/lib/agent-identity.cjs',
@@ -693,7 +695,7 @@ try {
       assert.equal(fs.existsSync(allowed), false);
     });
   } finally {
-    try { process.kill(liveChild.pid, 'SIGKILL'); } catch { /* already exited */ }
+    try { liveChild.kill('SIGKILL'); } catch { /* already exited */ }
   }
 
   await check('malformed runtime state and obstructed register paths fail closed', async () => {
@@ -836,7 +838,7 @@ try {
       assert.match(result.output, /API probe is TIMED_OUT/i);
       assert.equal(fs.existsSync(timeoutTarget), true);
     } finally {
-      try { process.kill(server.pid, 'SIGKILL'); } catch { /* already exited */ }
+      try { server.kill('SIGKILL'); } catch { /* already exited */ }
     }
   });
 
@@ -882,7 +884,7 @@ try {
       assert.equal(result.status, 0, result.output);
       assert.equal(fs.existsSync(target), false, 'mutant proves the live-runtime blocker prevents deletion');
     } finally {
-      try { process.kill(child.pid, 'SIGKILL'); } catch { /* already exited */ }
+      try { child.kill('SIGKILL'); } catch { /* already exited */ }
     }
   });
 

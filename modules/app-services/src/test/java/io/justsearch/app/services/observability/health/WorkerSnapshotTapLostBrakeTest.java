@@ -31,25 +31,42 @@ import org.junit.jupiter.api.Test;
 final class WorkerSnapshotTapLostBrakeTest {
 
   @Test
-  void aLostRebuildBrakeRoutesToTheIndexRebuild() {
-    ConditionStore conditions = new ConditionStore();
-    WorkerSnapshotTap tap =
-        new WorkerSnapshotTap(
-            conditions,
-            new OccurrenceLog(),
-            new HealthEventChangeRegistry(),
-            Source.forProcess("head", "instance-1", "1.0"),
-            Clock.fixed(Instant.parse("2026-10-13T12:00:00Z"), ZoneOffset.UTC));
+  void aLostRebuildBrakeRoutesToTheIndexRebuild() throws Exception {
+    try (var delivery = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      HealthEventChangeRegistry changes;
+      try {
+        changes = HealthEventChangeRegistry.class
+            .getConstructor(java.util.concurrent.ExecutorService.class).newInstance(delivery);
+      } catch (NoSuchMethodException beforeOwnerSuppliedDelivery) {
+        // The declared fail-before revision owns its delivery executor inside the registry.
+        changes = HealthEventChangeRegistry.class.getConstructor().newInstance();
+      }
+      try {
+        ConditionStore conditions = new ConditionStore();
+        WorkerSnapshotTap tap =
+            new WorkerSnapshotTap(
+                conditions,
+                new OccurrenceLog(),
+                changes,
+                Source.forProcess("head", "instance-1", "1.0"),
+                Clock.fixed(Instant.parse("2026-10-13T12:00:00Z"), ZoneOffset.UTC));
 
-    tap.accept(view(new CompatibilityStatusView(
-        "COMPATIBLE", "", "", "", "", "", "BLOCKED_REBUILD_BRAKE", true,
-        "rebuild_brake_state_lost")), false);
+        tap.accept(view(new CompatibilityStatusView(
+            "COMPATIBLE", "", "", "", "", "", "BLOCKED_REBUILD_BRAKE", true,
+            "rebuild_brake_state_lost")), false);
 
-    HealthEvent event = conditions.find("schema.reindex-required", "worker.schema").orElseThrow();
-    AssertedCondition condition = (AssertedCondition) event.body();
-    assertTrue(condition.recovery().isPresent(), "required reindex must expose a recovery");
-    assertEquals("core.rebuild-index", condition.recovery().get().target().value(),
-        "a held brake is released by a person's rebuild, not by a reindex");
+        HealthEvent event = conditions.find("schema.reindex-required", "worker.schema").orElseThrow();
+        AssertedCondition condition = (AssertedCondition) event.body();
+        assertTrue(condition.recovery().isPresent(), "required reindex must expose a recovery");
+        assertEquals("core.rebuild-index", condition.recovery().get().target().value(),
+            "a held brake is released by a person's rebuild, not by a reindex");
+      } finally {
+        Object channel = changes.channel();
+        if (channel instanceof AutoCloseable ownedChannel) {
+          ownedChannel.close();
+        }
+      }
+    }
   }
 
   private static WorkerOperationalView view(CompatibilityStatusView compat) {

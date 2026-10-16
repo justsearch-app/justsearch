@@ -78,6 +78,24 @@ final class WorkerStatusMapperTest {
   }
 
   @Test
+  // Spec D §4.2: cold query encoders after readiness reach the Head apart from embeddingReady
+  void toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness() throws Exception {
+    StatusResponse status = StatusResponse.newBuilder().setCore(CoreStatus.newBuilder()).build();
+    var coldField = HealthCheckResponse.getDescriptor().findFieldByName("query_encoders_cold");
+    org.junit.jupiter.api.Assertions.assertNotNull(coldField);
+    HealthCheckResponse cold = HealthCheckResponse.newBuilder()
+        .setAiReady(true).setEmbeddingReady(true).setField(coldField, true).build();
+
+    WorkerOperationalView out = WorkerStatusMapper.toUiStatusMap(status, cold);
+
+    assertTrue(out.embeddingReady());
+    var queryCold = WorkerOperationalView.class.getMethod("queryEncodersCold");
+    assertEquals(true, queryCold.invoke(out));
+    assertEquals(false, queryCold.invoke(WorkerStatusMapper.toUiStatusMap(status,
+        HealthCheckResponse.newBuilder().setEmbeddingReady(true).build())));
+  }
+
+  @Test
   void buildHealthNodeIncludesReadinessFields() {
     HealthCheckResponse health =
         HealthCheckResponse.newBuilder()

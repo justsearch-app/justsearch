@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:37:41.722Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "e59f48265db7061bf0513a4dd5eb04ccb557e048",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.AiInstallAcquisitionFreezeSeamTest.theAcquisitionWindowFreezesConvergenceAndTheEngineFollowsTheSpecOnceAfter\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9599
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallAcquisitionFreezeSeamTest.java#theAcquisitionWindowFreezesConvergenceAndTheEngineFollowsTheSpecOnceAfter",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallAcquisitionFreezeSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4af38dc3153f6bba9e44f7d747972db57a73566c52dbd00ded6b0b3511752eb7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theAcquisitionWindowFreezesConvergenceAndTheEngineFollowsTheSpecOnceAfter()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:caf899e688ec34a7082ea0e943b74ca9e33391fdc1731c466b61ea35b8f2c2c4"
+}

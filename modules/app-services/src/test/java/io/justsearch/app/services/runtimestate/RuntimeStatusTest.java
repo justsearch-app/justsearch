@@ -44,28 +44,27 @@ final class RuntimeStatusTest {
 
   @Test
   void leaseAxisDerivation() {
-    assertEquals("CHAT", RuntimeStatus.deriveLease(RuntimeGpuLease.Holder.CHAT, 0L, NOW).status());
-    assertEquals("INDEXING", RuntimeStatus.deriveLease(RuntimeGpuLease.Holder.INDEXING, 0L, NOW).status());
-    assertEquals("NONE", RuntimeStatus.deriveLease(RuntimeGpuLease.Holder.NONE, 0L, NOW).status());
+    assertEquals("CHAT", RuntimeStatus.deriveLease(RuntimeStatus.LEASE_CHAT, 0L, NOW).status());
+    assertEquals("INDEXING", RuntimeStatus.deriveLease(RuntimeStatus.LEASE_INDEXING, 0L, NOW).status());
+    assertEquals("NONE", RuntimeStatus.deriveLease(RuntimeStatus.LEASE_NONE, 0L, NOW).status());
     assertEquals("NONE", RuntimeStatus.deriveLease(null, 0L, NOW).status());
   }
 
   @Test
   void indexingLeaseSurvivesTransitionUntilModeCommits() {
-    RuntimeGpuLease lease = new RuntimeGpuLease();
-    lease.mirrorFromMode(Mode.INDEXING);
-    assertEquals(RuntimeGpuLease.Holder.INDEXING, lease.holder());
-    lease.mirrorFromMode(Mode.TRANSITIONING);
-    assertEquals("INDEXING", RuntimeStatus.deriveLease(lease.holder(), 0L, NOW).status());
-    lease.mirrorFromMode(Mode.ONLINE);
-    assertEquals(RuntimeGpuLease.Holder.CHAT, lease.holder());
-    lease.mirrorFromMode(Mode.OFFLINE);
-    assertEquals(RuntimeGpuLease.Holder.NONE, lease.holder());
+    String holder = RuntimeStatus.leaseHolderFor(Mode.INDEXING, RuntimeStatus.LEASE_NONE);
+    assertEquals("INDEXING", holder);
+    holder = RuntimeStatus.leaseHolderFor(Mode.TRANSITIONING, holder);
+    assertEquals("INDEXING", RuntimeStatus.deriveLease(holder, 0L, NOW).status());
+    holder = RuntimeStatus.leaseHolderFor(Mode.ONLINE, holder);
+    assertEquals("CHAT", holder);
+    holder = RuntimeStatus.leaseHolderFor(Mode.OFFLINE, holder);
+    assertEquals("NONE", holder);
   }
 
   @Test
   void fullDeriveHasAllThreeAxes() {
-    RuntimeStatus s = RuntimeStatus.derive(Mode.ONLINE, false, RuntimeGpuLease.Holder.CHAT, 7L, NOW);
+    RuntimeStatus s = RuntimeStatus.derive(Mode.ONLINE, false, RuntimeStatus.LEASE_CHAT, 7L, NOW);
     assertTrue(s.condition(RuntimeStatus.Axis.ENGINE).isPresent());
     assertTrue(s.condition(RuntimeStatus.Axis.ADOPTION).isPresent());
     assertTrue(s.condition(RuntimeStatus.Axis.LEASE).isPresent());

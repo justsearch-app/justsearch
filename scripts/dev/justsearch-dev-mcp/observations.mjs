@@ -178,6 +178,28 @@ export function classifyInferenceOrphan({
   return null;
 }
 
+/**
+ * Probe each recorded llama-server (`recordedLlamaServers`) on its own recorded port. llama-server
+ * has no fixed port (ADR-0051 decision 2), so a fixed-port probe would miss every orphan. The
+ * first answer wins and names the port and recorded pid; otherwise any failed probe makes the
+ * result unknown; all refused, or nothing recorded, is REFUSED with the ports looked at.
+ */
+export async function observeRecordedInference({
+  recorded = [],
+  probe = probeLoopbackHttpStatus,
+  timeoutMs = 2_000,
+} = {}) {
+  let unknown = null;
+  for (const { port, pid } of recorded) {
+    const observation = await probe(`http://127.0.0.1:${port}/health`, { timeoutMs });
+    if (observation.state === PROBE_OBSERVATION.REACHABLE) return { ...observation, port, pid };
+    if (observation.state !== PROBE_OBSERVATION.REFUSED && !unknown) {
+      unknown = { ...observation, port, pid };
+    }
+  }
+  return unknown ?? { state: PROBE_OBSERVATION.REFUSED, recordedPorts: recorded.map((r) => r.port) };
+}
+
 /** Adapter for the older foreign-run reader: unknown probes throw so it returns null, not []. */
 export async function probeStatusCodeOrThrow(urlStr, timeoutMs) {
   const result = await probeLoopbackHttpStatus(urlStr, { timeoutMs });

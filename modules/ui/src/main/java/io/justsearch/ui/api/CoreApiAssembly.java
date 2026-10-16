@@ -57,6 +57,7 @@ final class CoreApiAssembly {
       // interface.
       io.justsearch.app.services.ai.install.AiInstallService aiInstallService,
       OpenAiCompatController openAiCompatController,
+      ChatResidencyController chatResidencyController,
       PolicyController policyController,
       DiagnosticsController diagnosticsController,
       EffectiveConfigController effectiveConfigController,
@@ -95,28 +96,9 @@ final class CoreApiAssembly {
                 : DocumentService.unavailable()
             : DocumentService::unavailable;
     ChunkInfoController chunkInfoController = new ChunkInfoController(docSvcSupplier, telemetry);
-    // Foreground responsiveness: preview counts as user activity; recorded for the Head's own
-    // idle checks (VDU pacing). The Worker is not signalled — it paces on its own foreground gauge.
-    PreviewController previewController =
-        b.knowledgeServer == null
-            ? new PreviewController(
-                docSvcSupplier,
-                java.time.Duration.ofSeconds(5),
-                null,
-                telemetry,
-                apiCatalog)
-            : new PreviewController(
-                docSvcSupplier,
-                java.time.Duration.ofSeconds(5),
-                () -> {
-                  try {
-                    b.knowledgeServer.recordUserActivity();
-                  } catch (Exception ignored) {
-                    // best-effort
-                  }
-                },
-                telemetry,
-                apiCatalog);
+    // Activity is recorded by shared Engine admission before any controller dispatches.
+    PreviewController previewController = new PreviewController(
+        docSvcSupplier, java.time.Duration.ofSeconds(5), null, telemetry, apiCatalog);
     // Tempdoc 412 Phase 3: engineMonitorSupplier removed (Phase 0 finding 2: EngineMonitor was
     // dead code; setters never called in production). Inference status now flows through
     // HeadAssembly.inferenceSnapshot() in StatusLifecycleHandler.
@@ -193,6 +175,12 @@ final class CoreApiAssembly {
     if (b.indexComponent != null) {
       statusLifecycleHandler.setIndexComponent(b.componentRegistry, b.indexComponent);
     }
+    // ADR-0050: the one GPU memory reader feeds the operating block's gpu reading (diagnostic only).
+    // Spec E step E3: the Engine owns that reader and its residency sampler; status reads the
+    // sampler's latest reading and never opens a reader of its own. Without an Engine sampler the gpu
+    // block reads unknown.
+    statusLifecycleHandler.setGpuMemoryReader(
+        b.gpuResidency != null ? b.gpuResidency.statusReader() : null);
     // 419 C3 V1: wire head-side time-series + telemetry-health suppliers.
     if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry lt) {
       statusLifecycleHandler.setRrdStoreSupplier(lt::getRrdStore);
@@ -215,6 +203,9 @@ final class CoreApiAssembly {
       final HeadAssembly head = b.HeadAssembly;
       statusLifecycleHandler.setKnowledgeServerLifecycleSupplier(head::currentKnowledgeServer);
     }
+    // Spec E step E7b: the operating gpu profile is the Engine's device-memory plan.
+    statusLifecycleHandler.setDevicePlanSupplier(
+        io.justsearch.app.services.gpu.DevicePlanState.process()::current);
     // 419 C3 V2 P3: GPU saturation monitor + scheduled sampler. Sampler short-circuits when
     // NVML is unavailable; monitor stays null in that case and case GPU defaults to READY.
     io.justsearch.ui.observability.GpuSaturationMonitor gpuSaturationMonitor = new io.justsearch.ui.observability.GpuSaturationMonitor();
@@ -235,14 +226,21 @@ final class CoreApiAssembly {
                     ? headForVduSampler.headInfraRegistry().offlineCoordinator()
                     : null,
             () -> headForVduSampler != null ? headForVduSampler.currentKnowledgeServer() : null,
-            // Tempdoc 737 R4: keep this the REALIZED-state read — inferenceManager().isOnline() is
-            // the FSM phase (mode==ONLINE), never spec/chatEnabled. The VDU exclusivity mutex
-            // depends on realized state; feeding it spec would break self-interrupt-avoidance.
-            () ->
-                headForVduSampler != null
-                    && headForVduSampler.serviceOut() != null
-                    && headForVduSampler.serviceOut().inferenceManager() != null
-                    && headForVduSampler.serviceOut().inferenceManager().isOnline());
+            // Spec A step 6: the VDU trigger reads the chat controller. The chat is claimed unless
+            // the controller says a VDU batch may start (no server running, no hold or self-test
+            // open, no latched failure); never spec. Without a manager there is no chat to claim.
+            () -> {
+              if (headForVduSampler == null || headForVduSampler.serviceOut() == null) return false;
+              var manager = headForVduSampler.serviceOut().inferenceManager();
+              if (manager == null) return false;
+              var holds = manager.chatHolds();
+              return holds != null ? !holds.vduMayStart() : manager.isOnline();
+            },
+            () -> {
+              if (headForVduSampler == null || headForVduSampler.serviceOut() == null) return null;
+              var manager = headForVduSampler.serviceOut().inferenceManager();
+              return manager == null ? null : manager.chatHolds();
+            });
     // Tempdoc 430 Phase 4: wire the HealthEvent substrate tap so each /api/status call
     // feeds the readiness envelope into ConditionStore + HealthEventChangeRegistry.
     if (b.HeadAssembly != null) {
@@ -271,7 +269,7 @@ final class CoreApiAssembly {
                 }
               }));
       // Tempdoc 629 (FLOOR): wire the at-rest-protection condition tap + the shared disk-encryption
-      // probe (one PowerShell shell-property read of the data-dir volume, cached 5s, fed to both the
+      // probe (one PowerShell shell-property read per volume per ten minutes, shared, fed to both the
       // /api/status View and the at-rest.unprotected condition).
       var atRestProbe =
           new io.justsearch.app.services.atrest.DiskEncryptionProbe(b.indexBasePath);
@@ -363,9 +361,27 @@ final class CoreApiAssembly {
     // InferenceConfig.resolvePort(): when serverPort is unset, prefer 8081
     // unless the head's own apiPort already holds it (then 8082). Pre-alpha.13
     // both defaulted to 8080 and collided.
+    // Spec A §5.2: proxied exchanges take their lease from the lifecycle manager's generation
+    // tracker, so drains before a stop or relaunch wait for them and indexing pacing sees them.
+    io.justsearch.app.inference.InferenceLifecycleManager proxiedInference =
+        b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
+            ? b.HeadAssembly.serviceOut().inferenceManager()
+            : null;
+    OpenAiCompatController.ExchangeAdmission proxyAdmission = proxiedInference != null
+        ? proxiedInference::admitExchange
+        : OpenAiCompatController.standaloneAdmission(
+            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(
+                b.executors));
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry,
-            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(b.executors));
+        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry, proxyAdmission);
+    // Spec A step 9: the chat controller's residency surface, shared by every chat entry's gate,
+    // the load-anyway route and the dev pressure trigger. Read live: the controller is installed
+    // into the manager at composition.
+    ChatResidencyController chatResidencyController = new ChatResidencyController(
+        () -> proxiedInference == null ? null : proxiedInference.chatResidency(), telemetry);
+    statusLifecycleHandler.setChatResidency(
+        () -> proxiedInference == null ? null : proxiedInference.chatResidency());
+    openAiCompatController.setResidencyGate(chatResidencyController.gate());
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).
@@ -460,14 +476,14 @@ final class CoreApiAssembly {
       // Tempdoc 876 §B.2a: give the readiness-reconciliation trigger its thunk. This is the first
       // point at which the handler exists AND its taps are wired (the tap block above), so it is
       // also the earliest safe self-seed. Not a second envelope authority — the trigger only
-      // re-runs buildStatusSnapshot, which is buildStatusMap, which is the one place
-      // buildReadinessEnvelope is called.
+      // requests a new sampler observation, the one place buildReadinessEnvelope is called.
       if (b.HeadAssembly != null
           && b.HeadAssembly.substrate() != null
           && b.HeadAssembly.substrate().health() != null) {
         var readinessTrigger =
             b.HeadAssembly.substrate().health().readinessReconciliationTrigger();
         if (readinessTrigger != null) {
+          statusLifecycleHandler.setRefreshRequest(readinessTrigger::request);
           // Tempdoc 885 item 6: the trigger's thunk IS the health sampler — it performs the one
           // IndexStatus unary off the request thread and feeds every tap. attach() self-seeds one
           // reconcile, so the first sample lands here, not at the first monitor tick.
@@ -548,6 +564,7 @@ final class CoreApiAssembly {
         aiInstallController,
         aiInstallHelper,
         openAiCompatController,
+        chatResidencyController,
         policyController,
         diagnosticsController,
         effectiveConfigController,

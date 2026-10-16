@@ -128,7 +128,7 @@ final class McpAnswerRefusalTest {
     var clock = Clock.systemUTC();
     var surface = new McpToolSurface(List.of(OperationCatalog.of("core", List.of())),
         mock(OperationDispatcher.class), () -> knowledge, () -> facade, clock);
-    var admission = mock(EngineAdmissionService.class);
+    var admission = mock(EngineAdmissionService.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     var work = mock(EngineWorkHandle.class);
     when(work.context()).thenReturn(engineContext);
     when(admission.admit(any(EngineContext.class), eq(false))).thenReturn(work);

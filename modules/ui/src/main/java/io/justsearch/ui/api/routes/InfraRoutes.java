@@ -2,6 +2,7 @@
 package io.justsearch.ui.api.routes;
 
 import io.javalin.Javalin;
+import io.justsearch.ui.api.ActivityRole;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.observability.CapabilitiesService;
 import io.justsearch.app.services.HeadAssembly;
@@ -40,7 +41,7 @@ public final class InfraRoutes {
       HeadAssembly HeadAssembly,
       CapabilitiesStreamController capabilitiesStreamController) {
     if (capabilitiesStreamController != null) {
-      app.sse("/infra/capabilities/stream", capabilitiesStreamController::handle);
+      app.sse("/infra/capabilities/stream", capabilitiesStreamController::handle, ActivityRole.OBSERVATION);
     }
     if (HeadAssembly != null) {
       app.get(
@@ -79,7 +80,7 @@ public final class InfraRoutes {
                               e.getMessage() == null ? e.toString() : e.getMessage(),
                           "errorCode", ApiErrorCode.INTERNAL_ERROR.name()));
             }
-          });
+          }, ActivityRole.OBSERVATION);
     }
   }
 }

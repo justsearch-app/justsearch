@@ -1,9 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import identity from '../dev/lib/process-identity.cjs';
+import ledgerLib from '../dev/lib/exit-ledger.cjs';
+import census from '../dev/lib/stop-exit-census.cjs';
 
 const SESSION_HEADER = 'X-JustSearch-Session';
-const FAMILY = 'generative-recovery-1';
+// Spec A §4.2/§7.2: the component monitor admits no automatic generative attempt; the chat
+// controller decides relaunches from the classified exit, and a crash within ten minutes of READY
+// (T29) is not relaunched. The quiet window spans more than two monitor polls (10 s each), so an
+// automatic attempt would be observed inside it.
+const NO_AUTOMATIC_ATTEMPT_WINDOW_MS = 25000;
 
 export function stagePrivateGenerativeRuntime({ data, modelsRoot, env, requireThat }) {
   const source = path.join(path.dirname(modelsRoot), 'modules', 'ui', 'native-bin',
@@ -38,7 +44,6 @@ export function stagePrivateGenerativeRuntime({ data, modelsRoot, env, requireTh
   delete env.JUSTSEARCH_MMPROJ_MODEL;
   delete env.JUSTSEARCH_VLM_PROFILE;
   env.JUSTSEARCH_GPU_ENABLED = 'true';
-  env.JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER = '1';
   delete env.AI_OFFLINE;
   return { executable, model, mmproj, profile };
 }
@@ -46,16 +51,12 @@ export function stagePrivateGenerativeRuntime({ data, modelsRoot, env, requireTh
 export async function exerciseGenerativeRecovery(c) {
   const { scenario, work, data, first, manifest, apiPort, privateRuntime, readJson, waitFor,
     request, requireThat } = c;
-  const exhaustion = scenario === 'generative-recovery-exhaustion';
-  requireThat(exhaustion || scenario === 'generative-recovery-success',
+  requireThat(scenario === 'generative-recovery-success',
     `unknown generative recovery scenario: ${scenario}`);
   const runtime = path.join(data, 'runtime');
-  const reachedFile = path.join(runtime, `${FAMILY}-reached.json`);
-  const releaseFile = path.join(runtime, `${FAMILY}-release`);
   const heldExecutable = `${privateRuntime.executable}.held-absent`;
-  requireThat(!fs.existsSync(reachedFile) && !fs.existsSync(releaseFile)
-      && !fs.existsSync(heldExecutable),
-  'generative recovery fixture must start without barrier or held-runtime residue');
+  requireThat(!fs.existsSync(heldExecutable),
+    'generative recovery fixture must start without held-runtime residue');
 
   let executableHeld = false;
   try {
@@ -92,11 +93,7 @@ export async function exerciseGenerativeRecovery(c) {
     const table = identity.readProcessTable();
     requireThat(table.ok, `cannot verify managed generative child: ${table.reason}`);
     const observed = table.table.find(row => Number(row.ProcessId) === ready.child.pid);
-    const recordedStart = Date.parse(ready.child.startedAt);
-    const observedStart = fileTimeToEpochMs(observed?.CreationFileTimeUtc);
-    requireThat(observed && Number.isFinite(recordedStart) && Number.isFinite(observedStart)
-        && Math.abs(recordedStart - observedStart) <= 1000
-        && observed.CommandLine?.toLowerCase().includes(privateRuntime.executable.toLowerCase()),
+    requireThat(managedChildIs(ready.child, observed, privateRuntime.executable),
     `managed child identity does not match the live process table: ${JSON.stringify({
       child: ready.child, observed,
     })}`);
@@ -108,33 +105,44 @@ export async function exerciseGenerativeRecovery(c) {
       `refusing unverified generative child fault: ${verified.reason}`);
     process.kill(ready.child.pid, 'SIGKILL');
 
-    const reached = await waitFor('generative recovery pre-admission barrier', 30000,
-      () => readJson(reachedFile));
-    requireThat(reached.point === 'component-recovery-pre-admission'
-        && reached.component === 'generative' && reached.state === 'FAILED'
-        && reached.recoveryAttempts === 0 && reached.pid === first.pid
-        && reached.appliedVersion === ready.row.appliedVersion
-        && reached.desiredVersion === ready.row.desiredVersion,
-    `generative recovery barrier marker changed identity: ${JSON.stringify(reached)}`);
-    const held = await statusRow(apiPort, request, 'generative');
-    requireThat(held?.state === 'FAILED' && held.recoveryAttempts === 0
-        && held.stateSince === reached.stateSince && held.reasonCode === reached.reasonCode
-        && held.evidence === reached.evidence
-        && held.appliedVersion === reached.appliedVersion
-        && held.desiredVersion === reached.desiredVersion,
-    `barrier did not preserve the exact FAILED/count0 observation: ${JSON.stringify(held)}`);
-    const busy = await recover(apiPort, manifest, request);
-    requireThat(busy.status === 429 && busy.body?.errorCode === 'ADMISSION_ENGINE_LIMIT',
-      `manual recovery during held automatic attempt was not busy: ${JSON.stringify(busy)}`);
-
     await waitFor('crashed managed child exit', 15000, () => {
       const current = identity.readProcessTable();
       return current.ok && !current.table.some(row => Number(row.ProcessId) === ready.child.pid)
         ? { observedAt: new Date().toISOString() } : null;
     });
+    const crashed = await waitFor('generative FAILED after the crash', 30000, async () => {
+      const row = await statusRow(apiPort, request, 'generative');
+      return row?.state === 'FAILED' ? row : null;
+    });
+    requireThat(crashed.recoveryAttempts === 0
+        && crashed.appliedVersion === ready.row.appliedVersion
+        && crashed.desiredVersion === ready.row.desiredVersion,
+    `the crash did not leave the exact FAILED/count0 observation: ${JSON.stringify(crashed)}`);
+    // T29 plus §4.2: a crash this soon after READY is not relaunched by the chat controller, and
+    // the component monitor starts no attempt of its own.
+    const quietUntil = Date.now() + NO_AUTOMATIC_ATTEMPT_WINDOW_MS;
+    let quietObservations = 0;
+    while (Date.now() < quietUntil) {
+      const row = await statusRow(apiPort, request, 'generative');
+      const current = readJson(path.join(runtime, 'manifest.json'));
+      const relaunched = current?.children?.find(value => value.kind === 'LLAMA_SERVER'
+        && value.id !== ready.child.id);
+      requireThat(row?.state === 'FAILED' && row.recoveryAttempts === 0 && !relaunched,
+        `an automatic generative attempt ran after the crash: ${JSON.stringify({ row, relaunched })}`);
+      quietObservations++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    const quiet = { windowMs: NO_AUTOMATIC_ATTEMPT_WINDOW_MS, observations: quietObservations,
+      row: await statusRow(apiPort, request, 'generative') };
+    requireThat(quiet.row?.state === 'FAILED' && quiet.row.recoveryAttempts === 0,
+      `generative left FAILED/count0 without an operator retry: ${JSON.stringify(quiet)}`);
+
     fs.renameSync(privateRuntime.executable, heldExecutable);
     executableHeld = true;
-    fs.writeFileSync(releaseFile, new Date().toISOString());
+    const firstRetry = await recoverAfterSlotCleanup(apiPort, manifest, request, 15000);
+    requireThat(firstRetry.status === 202 && firstRetry.body?.component === 'generative'
+        && firstRetry.body?.recovery === 'ACCEPTED',
+    `the first operator retry was not accepted: ${JSON.stringify(firstRetry)}`);
 
     let failedOneLast = null;
     let failedOneLastMatching = null;
@@ -153,101 +161,65 @@ export async function exerciseGenerativeRecovery(c) {
         failedOneLastMatching, error);
       throw error;
     }
-    let accepted;
-    let terminal;
-    if (!exhaustion) {
-      fs.renameSync(heldExecutable, privateRuntime.executable);
-      executableHeld = false;
-      accepted = await recoverAfterSlotCleanup(apiPort, manifest, request, 15000);
-      requireThat(accepted.status === 202 && accepted.body?.component === 'generative'
-          && accepted.body?.recovery === 'ACCEPTED',
-      `manual generative recovery was not accepted: ${JSON.stringify(accepted)}`);
-      terminal = await waitFor('generative recovery attempt 2 success', 180000, async () => {
-        const row = await statusRow(apiPort, request, 'generative');
-        return row?.state === 'READY' && row.recoveryAttempts === 2 ? row : null;
-      });
-      const replacement = await waitFor('replacement managed generative child', 30000, () => {
-        const current = readJson(path.join(runtime, 'manifest.json'));
-        const child = current?.children?.find(value => value.kind === 'LLAMA_SERVER');
-        return child && child.id !== ready.child.id && child.pid !== ready.child.pid
-          && child.startedAt !== ready.child.startedAt ? child : null;
-      });
-      requireThat(samePath(replacement.executable, privateRuntime.executable)
-          && samePath(replacement.modelPath, privateRuntime.model),
-      `replacement child changed the captured runtime/model: ${JSON.stringify(replacement)}`);
-      const replacementTable = identity.readProcessTable();
-      requireThat(replacementTable.ok,
-        `cannot verify replacement managed child: ${replacementTable.reason}`);
-      const replacementObserved = replacementTable.table.find(
-        row => Number(row.ProcessId) === replacement.pid);
-      const replacementStart = Date.parse(replacement.startedAt);
-      const replacementObservedStart = fileTimeToEpochMs(replacementObserved?.CreationFileTimeUtc);
-      requireThat(replacementObserved && Number.isFinite(replacementStart)
-          && Number.isFinite(replacementObservedStart)
-          && Math.abs(replacementStart - replacementObservedStart) <= 1000
-          && replacementObserved.CommandLine?.toLowerCase()
-            .includes(privateRuntime.executable.toLowerCase()),
-      `replacement child identity does not match the live process table: ${JSON.stringify({
-        replacement, replacementObserved,
-      })}`);
-      const replacementVerified = identity.verifyProcessIdentity({
-        record: { pid: replacement.pid,
-          creationFileTimeUtc: replacementObserved.CreationFileTimeUtc,
-          cmdlineFingerprint: replacementObserved.CommandLine },
-        table: identity.readProcessTable(),
-      });
-      requireThat(identity.isVerifiedMatch(replacementVerified),
-        `replacement child failed exact live identity verification: ${replacementVerified.reason}`);
+    fs.renameSync(heldExecutable, privateRuntime.executable);
+    executableHeld = false;
+    const accepted = await recoverAfterSlotCleanup(apiPort, manifest, request, 15000);
+    requireThat(accepted.status === 202 && accepted.body?.component === 'generative'
+        && accepted.body?.recovery === 'ACCEPTED',
+    `manual generative recovery was not accepted: ${JSON.stringify(accepted)}`);
+    let terminal = await waitFor('generative recovery attempt 2 success', 180000, async () => {
+      const row = await statusRow(apiPort, request, 'generative');
+      return row?.state === 'READY' && row.recoveryAttempts === 2 ? row : null;
+    });
+    const replacement = await waitFor('replacement managed generative child', 30000, () => {
+      const current = readJson(path.join(runtime, 'manifest.json'));
+      const child = current?.children?.find(value => value.kind === 'LLAMA_SERVER');
+      return child && child.id !== ready.child.id && child.pid !== ready.child.pid
+        && child.startedAt !== ready.child.startedAt ? child : null;
+    });
+    requireThat(samePath(replacement.executable, privateRuntime.executable)
+        && samePath(replacement.modelPath, privateRuntime.model),
+    `replacement child changed the captured runtime/model: ${JSON.stringify(replacement)}`);
+    const replacementTable = identity.readProcessTable();
+    requireThat(replacementTable.ok,
+      `cannot verify replacement managed child: ${replacementTable.reason}`);
+    const replacementObserved = replacementTable.table.find(
+      row => Number(row.ProcessId) === replacement.pid);
+    requireThat(managedChildIs(replacement, replacementObserved, privateRuntime.executable),
+    `replacement child identity does not match the live process table: ${JSON.stringify({
+      replacement, replacementObserved,
+    })}`);
+    const replacementVerified = identity.verifyProcessIdentity({
+      record: { pid: replacement.pid,
+        creationFileTimeUtc: replacementObserved.CreationFileTimeUtc,
+        cmdlineFingerprint: replacementObserved.CommandLine },
+      table: identity.readProcessTable(),
+    });
+    requireThat(identity.isVerifiedMatch(replacementVerified),
+      `replacement child failed exact live identity verification: ${replacementVerified.reason}`);
 
-      const chatHeaders = { 'content-type': 'application/json', accept: 'text/event-stream' };
-      const token = manifest.head?.sessionToken;
-      if (typeof token === 'string' && token.length > 0) chatHeaders[SESSION_HEADER] = token;
-      const chatResponse = await request(apiPort, '/api/chat/agent', {
-        method: 'POST', headers: chatHeaders, body: JSON.stringify({
-          messages: [{ role: 'user',
-            content: 'Reply with exactly the word quokka and nothing else.' }],
-          maxIterations: 1,
-          sampling: { temperature: 0.0, top_p: 1.0, seed: 5475 },
-        }),
-      }, 180000);
-      const chatTerminal = doneEvent(chatResponse.text);
-      requireThat(chatResponse.status === 200 && chatTerminal
-          && typeof chatTerminal.finalResponse === 'string'
-          && chatTerminal.disposition === 'COMPLETED'
-          && chatTerminal.finalResponse.trim().toLowerCase() === 'quokka'
-          && Number.isSafeInteger(chatTerminal.totalTokensUsed)
-          && chatTerminal.totalTokensUsed > 0,
-      `recovered replacement child did not answer a real chat: HTTP ${chatResponse.status} ${chatResponse.text}`);
-      terminal = { row: terminal, replacement, replacementVerified, chat: {
-        status: chatResponse.status, terminal: chatTerminal,
-      } };
-    } else {
-      accepted = await recoverAfterSlotCleanup(apiPort, manifest, request, 15000);
-      requireThat(accepted.status === 202 && accepted.body?.component === 'generative'
-          && accepted.body?.recovery === 'ACCEPTED',
-      `second generative recovery attempt was not accepted: ${JSON.stringify(accepted)}`);
-      let failedTwoLast = null;
-      let failedTwoLastMatching = null;
-      try {
-        terminal = await waitFor('generative recovery attempt 2 failure', 60000, async () => {
-          const row = await statusRow(apiPort, request, 'generative');
-          failedTwoLast = { observedAt: new Date().toISOString(), row };
-          if (row?.state === 'FAILED' && row.recoveryAttempts === 2) {
-            failedTwoLastMatching = failedTwoLast;
-          }
-          return missingPrivateExecutableFailure(row, 2, privateRuntime.executable) ? row : null;
-        });
-      } catch (error) {
-        writeAttemptFailure(work, 2, privateRuntime.executable, failedTwoLast,
-          failedTwoLastMatching, error);
-        throw error;
-      }
-      const exhausted = await recoverAfterSlotCleanup(apiPort, manifest, request, 15000);
-      requireThat(exhausted.status === 503
-          && exhausted.body?.errorCode === 'WORKER_RECOVERY_EXHAUSTED',
-        `spent optional generative recovery budget was not terminal: ${JSON.stringify(exhausted)}`);
-      terminal = { ...terminal, exhausted };
-    }
+    const chatHeaders = { 'content-type': 'application/json', accept: 'text/event-stream' };
+    const token = manifest.head?.sessionToken;
+    if (typeof token === 'string' && token.length > 0) chatHeaders[SESSION_HEADER] = token;
+    const chatResponse = await request(apiPort, '/api/chat/agent', {
+      method: 'POST', headers: chatHeaders, body: JSON.stringify({
+        messages: [{ role: 'user',
+          content: 'Reply with exactly the word quokka and nothing else.' }],
+        maxIterations: 1,
+        sampling: { temperature: 0.0, top_p: 1.0, seed: 5475 },
+      }),
+    }, 180000);
+    const chatTerminal = doneEvent(chatResponse.text);
+    requireThat(chatResponse.status === 200 && chatTerminal
+        && typeof chatTerminal.finalResponse === 'string'
+        && chatTerminal.disposition === 'COMPLETED'
+        && chatTerminal.finalResponse.trim().toLowerCase() === 'quokka'
+        && Number.isSafeInteger(chatTerminal.totalTokensUsed)
+        && chatTerminal.totalTokensUsed > 0,
+    `recovered replacement child did not answer a real chat: HTTP ${chatResponse.status} ${chatResponse.text}`);
+    terminal = { row: terminal, replacement, replacementVerified, chat: {
+      status: chatResponse.status, terminal: chatTerminal,
+    } };
     const finalSupervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
     const finalManifest = readJson(path.join(runtime, 'manifest.json'));
     requireThat(finalSupervisor?.pid === first.pid && finalSupervisor.instanceId === first.instanceId
@@ -256,12 +228,10 @@ export async function exerciseGenerativeRecovery(c) {
     `optional generative recovery escalated the Engine: ${JSON.stringify({
       finalSupervisor, finalManifest,
     })}`);
-    console.log(exhaustion ? 'GENERATIVE_RECOVERY_EXHAUSTION_PASS'
-      : 'GENERATIVE_RECOVERY_SUCCESS_PASS', JSON.stringify({ first, child: ready.child, reached,
-      activation, initialGenerative: ready.row, profile: ready.manifest.chat, held, busy, failedOne,
-      accepted, terminal, finalSupervisor }));
+    console.log('GENERATIVE_RECOVERY_SUCCESS_PASS', JSON.stringify({ first, child: ready.child,
+      activation, initialGenerative: ready.row, profile: ready.manifest.chat, crashed, quiet,
+      firstRetry, failedOne, accepted, terminal, finalSupervisor }));
   } finally {
-    fs.writeFileSync(releaseFile, new Date().toISOString());
     if (executableHeld && fs.existsSync(heldExecutable)
         && !fs.existsSync(privateRuntime.executable)) {
       fs.renameSync(heldExecutable, privateRuntime.executable);
@@ -332,9 +302,17 @@ function writeAttemptFailure(work, attempts, executable, lastObservation,
       waitError: String(error?.stack ?? error) }, null, 2));
 }
 
-function fileTimeToEpochMs(value) {
-  try { return Number(BigInt(value) / 10000n - 11644473600000n); }
-  catch { return Number.NaN; }
+/**
+ * Whether a manifest child is the process-table row `observed`: same pid, the shared birth rule
+ * (exit-ledger.cjs `sameBirth`) at the millisecond, since the manifest's `startedAt` is the
+ * Engine's ProcessHandle startInstant (ManagedChild.fromProcess), and the private executable on
+ * its command line. A birth one tick away is another process, so no tolerance window.
+ */
+export function managedChildIs(child, observed, executable) {
+  return Boolean(observed) && Number(observed.ProcessId) === Number(child?.pid)
+    && ledgerLib.sameBirth(census.fileTimeFromInstant(child?.startedAt), String(observed.CreationFileTimeUtc ?? ''),
+      ledgerLib.BIRTH_TICKS.MILLISECOND)
+    && Boolean(observed.CommandLine?.toLowerCase().includes(String(executable).toLowerCase()));
 }
 
 function doneEvent(sse) {

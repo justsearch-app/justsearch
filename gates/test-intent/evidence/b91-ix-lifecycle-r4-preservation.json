@@ -1,0 +1,98 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T08:11:03.953Z",
+  "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+  "tree": "8d0ba90b7ea6572e73daded1928b9c9ee3116ba1",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineDeviceLossWitnessTest.anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 51804
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.withinTheLimitTheServerStopsNowAndTheEngineRestarts\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 55527
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDeviceLossWitnessTest.java#anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDeviceLossWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d15e9d180b5e1b27785181ea32fb8abe73ae0da87291cbd3dc56ee13b6da458f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#withinTheLimitTheServerStopsNowAndTheEngineRestarts",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc71327e4f58981d901dfaee541592f498a254f086c1028245f645da115edf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withinTheLimitTheServerStopsNowAndTheEngineRestarts()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c4f2405b4",
+    "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineDeviceLossWitnessTest.anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 165094
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest.withinTheLimitTheServerStopsNowAndTheEngineRestarts\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 61727
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDeviceLossWitnessTest.java#anEncoderDeviceLossRestartsTheEngineThroughTheBoundPath",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java#withinTheLimitTheServerStopsNowAndTheEngineRestarts",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:6bd7b58f21e87cdc7379303a8b57d8516b4f5c4cb0a3e71def871719998e1f70"
+}

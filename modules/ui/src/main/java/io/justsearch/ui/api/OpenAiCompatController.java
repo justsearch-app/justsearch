@@ -5,6 +5,8 @@ import io.javalin.http.Context;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.EngineWorkCancelledException;
 import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.chat.GenerationLease;
+import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.telemetry.Telemetry;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -50,6 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class OpenAiCompatController implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(OpenAiCompatController.class);
+  private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
 
   /**
    * Headers we explicitly do not forward upstream. {@code Host} and
@@ -92,20 +95,41 @@ public final class OpenAiCompatController implements AutoCloseable {
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration backgroundOwner;
   private final IntSupplier llamaServerPortSupplier;
   private final Telemetry telemetry;
-  private final java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime;
+  private final ExchangeAdmission admission;
+
+  /**
+   * Admits one proxied exchange before it reaches llama-server (Spec A §5.2): a GENERATE lease for
+   * {@code /v1/chat/completions}, an AUX lease for {@code /v1/models}. In the Engine this is the
+   * lifecycle manager's generation tracker, so a drain before a stop or relaunch waits for proxied
+   * replies too.
+   */
+  @FunctionalInterface
+  public interface ExchangeAdmission {
+    /**
+     * @param work the request's retained work handle, or {@code null}
+     * @throws IllegalStateException when admission is closed (draining, relaunching or fenced)
+     */
+    GenerationLease admit(GenerationTracker.Kind kind, EngineWorkHandle work);
+  }
+
+  /** Admission through a tracker of its own, for a proxy with no lifecycle manager behind it. */
+  public static ExchangeAdmission standaloneAdmission(
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
+    return new GenerationTracker(generationLifetime, Runnable::run)::admit;
+  }
 
   public OpenAiCompatController(
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
-    this(executors, llamaServerPortSupplier, telemetry,
-        io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(executors));
+    this(executors, llamaServerPortSupplier, telemetry, standaloneAdmission(
+        io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(executors)));
   }
 
   public OpenAiCompatController(
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       IntSupplier llamaServerPortSupplier, Telemetry telemetry,
-      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
-    this.generationLifetime = java.util.Objects.requireNonNull(generationLifetime, "generationLifetime");
+      ExchangeAdmission admission) {
+    this.admission = java.util.Objects.requireNonNull(admission, "admission");
     this.llamaServerPortSupplier = java.util.Objects.requireNonNull(llamaServerPortSupplier);
     this.telemetry = telemetry;
     var fg = httpOwner(executors, io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND);
@@ -148,10 +172,17 @@ public final class OpenAiCompatController implements AutoCloseable {
     this(httpClient, llamaServerPortSupplier, telemetry, ignored -> () -> {});
   }
 
+  /** Test seam: a tracker of its own entering {@code generationLifetime} for chat leases. */
   OpenAiCompatController(
       HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry,
       java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
-    this.generationLifetime = java.util.Objects.requireNonNull(generationLifetime, "generationLifetime");
+    this(httpClient, llamaServerPortSupplier, telemetry, standaloneAdmission(generationLifetime));
+  }
+
+  OpenAiCompatController(
+      HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry,
+      ExchangeAdmission admission) {
+    this.admission = java.util.Objects.requireNonNull(admission, "admission");
     foregroundHttp = httpClient;
     backgroundHttp = httpClient;
     foregroundOwner = null;
@@ -168,7 +199,18 @@ public final class OpenAiCompatController implements AutoCloseable {
     try { foregroundOwner.close(); } finally { backgroundOwner.close(); }
   }
 
+  /** The residency gate a proxied chat completion passes first (Spec A step 9, I7). */
+  private volatile ChatResidencyGate residencyGate = ChatResidencyGate.none();
+
+  /** Installs the residency gate; without one every exchange goes to llama-server. */
+  public void setResidencyGate(ChatResidencyGate gate) {
+    this.residencyGate = java.util.Objects.requireNonNull(gate, "gate");
+  }
+
   public void handleChatCompletions(Context ctx) {
+    // The proxy is an agent's door (Spec A §4.3): chat unloaded for another GPU user answers 503
+    // CHAT_UNAVAILABLE with its reason instead of a forced load or a connection error.
+    if (!residencyGate.admitAgent(ctx, ChatResidencyGate.AGENT_MAX_WAIT)) return;
     proxy(ctx, "/v1/chat/completions");
   }
 
@@ -218,7 +260,15 @@ public final class OpenAiCompatController implements AutoCloseable {
     boolean handedOff = false;
     try {
       exchange.checkCancelled();
-      if (path.equals("/v1/chat/completions")) exchange.startGeneration(generationLifetime);
+      // The lease is open before the exchange reaches llama-server and closes with the exchange.
+      GenerationTracker.Kind kind = path.equals("/v1/chat/completions")
+          ? GenerationTracker.Kind.GENERATE : GenerationTracker.Kind.AUX;
+      try {
+        exchange.lease(admission.admit(kind, exchange.work));
+      } catch (IllegalStateException unavailable) {
+        respondOffline(ctx, "llama-server unavailable: " + unavailable.getMessage());
+        return;
+      }
       HttpClient client = RequestEngineContext.get(ctx).urgency()
           == io.justsearch.core.context.EngineContext.Urgency.BACKGROUND
           ? backgroundHttp : foregroundHttp;
@@ -244,7 +294,10 @@ public final class OpenAiCompatController implements AutoCloseable {
       ctx.result(responseBody);
       handedOff = true;
     } catch (ConnectException ce) {
-      respondOffline(ctx, "llama-server connect refused on port " + port);
+      // The port is an internal detail that goes stale once the server stops; the client only
+      // needs to know chat is not serving right now (503, retryable).
+      log.debug("OpenAI-compat proxy: connection refused by 127.0.0.1:{}", port);
+      respondOffline(ctx, "Chat server is not running (connection refused)");
       return;
     } catch (IOException | InterruptedException ex) {
       if (ex instanceof InterruptedException) {
@@ -265,7 +318,7 @@ public final class OpenAiCompatController implements AutoCloseable {
     private Thread awaitingHeaders = Thread.currentThread();
     private InputStream upstream;
     private boolean closed;
-    private Runnable generationRelease = () -> {};
+    private GenerationLease lease;
 
     private ProxyExchange(EngineWorkHandle requestWork) {
       work = requestWork == null ? null : requestWork.retain();
@@ -283,10 +336,15 @@ public final class OpenAiCompatController implements AutoCloseable {
       });
     }
 
-    private void startGeneration(java.util.function.Function<EngineWorkHandle, Runnable> lifetime) {
-      if (work != null) {
-        generationRelease = java.util.Objects.requireNonNull(lifetime.apply(work), "generation release");
+    private void lease(GenerationLease admitted) {
+      java.util.Objects.requireNonNull(admitted, "lease");
+      synchronized (this) {
+        if (!closed) {
+          lease = admitted;
+          return;
+        }
       }
+      admitted.close();
     }
 
     private InputStream body(InputStream stream) {
@@ -295,7 +353,38 @@ public final class OpenAiCompatController implements AutoCloseable {
         awaitingHeaders = null;
       }
       checkCancelled();
+      GenerationLease observing = lease;
       return new FilterInputStream(stream) {
+        private final java.io.ByteArrayOutputStream line = new java.io.ByteArrayOutputStream();
+        private boolean oversized;
+        @Override public int read() throws IOException {
+          int next = in.read();
+          if (next >= 0) observe(next);
+          return next;
+        }
+        @Override public int read(byte[] bytes, int offset, int length) throws IOException {
+          int count = in.read(bytes, offset, length);
+          for (int i = 0; i < count; i++) observe(bytes[offset + i] & 0xff);
+          return count;
+        }
+        private void observe(int next) {
+          if (next != 10) {
+            if (!oversized && line.size() < 65536) line.write(next);
+            else oversized = true;
+            return;
+          }
+          if (!oversized) {
+            String text = line.toString(java.nio.charset.StandardCharsets.UTF_8);
+            if (text.startsWith("data: ")) {
+              try {
+                if (io.justsearch.app.inference.chat.CompletionTokenProgress.hasToken(JSON.readTree(text.substring(6)))) {
+                  observing.tokenProduced();
+                }
+              } catch (RuntimeException malformed) { /* A heartbeat or malformed chunk proves no token progress. */ }
+            }
+          }
+          line.reset(); oversized = false;
+        }
         @Override public void close() { ProxyExchange.this.close(); }
       };
     }
@@ -316,18 +405,21 @@ public final class OpenAiCompatController implements AutoCloseable {
 
     @Override public void close() {
       InputStream stream;
+      GenerationLease held;
       synchronized (this) {
         if (closed) return;
         closed = true;
         awaitingHeaders = null;
         stream = upstream;
         upstream = null;
+        held = lease;
+        lease = null;
       }
       try {
         if (cancellation != null) cancellation.close();
         closeBody(stream);
       } finally {
-        try { generationRelease.run(); }
+        try { if (held != null) held.close(); }
         finally { if (work != null) work.close(); }
       }
     }

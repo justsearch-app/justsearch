@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T01:50:09.897Z",
+  "revision": "64e04b891904dccff1442547b97dbb969f617fd4",
+  "tree": "40275d37c8d6a02ce46b3e5399e735a619f1c371",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerChildControlTest.everyControllerStepStopsForAKnownSpecificReason\" --tests \"io.justsearch.app.inference.LlamaServerChildControlTest.aRequestedStopIsRecordedWithItsReasonAndIsNotACrash\" --tests \"io.justsearch.app.inference.LlamaServerChildControlTest.anExitNobodyAskedForIsStillACrash\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6019
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java#everyControllerStepStopsForAKnownSpecificReason",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e4ff6ee7e4d1afd5a0196bda9ec9761fd93c411ce8b485a6e7ac0bb51bc5c06",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyControllerStepStopsForAKnownSpecificReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java#aRequestedStopIsRecordedWithItsReasonAndIsNotACrash",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e4ff6ee7e4d1afd5a0196bda9ec9761fd93c411ce8b485a6e7ac0bb51bc5c06",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestedStopIsRecordedWithItsReasonAndIsNotACrash()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java#anExitNobodyAskedForIsStillACrash",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e4ff6ee7e4d1afd5a0196bda9ec9761fd93c411ce8b485a6e7ac0bb51bc5c06",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExitNobodyAskedForIsStillACrash()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:26cce0ef0021031db14cf808f4755cd56ea9ffa9ff5b5f37f653a9a37889fba5"
+}

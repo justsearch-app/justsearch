@@ -22,6 +22,7 @@ export interface SettingsV2 {
   indexPaths?: string[] | null;
   llm?: {
     contextWindow?: number | null;
+    gameDetection?: string | null;
     gpuLayers?: number | null;
     llamaLibPath?: string | null;
     maxTokens?: number | null;
@@ -63,6 +64,7 @@ export const settingsV2Schema = z.strictObject({
   "indexPaths": z.array(z.string()).nullable().optional(),
   "llm": z.strictObject({
     "contextWindow": z.number().int().nullable().optional(),
+    "gameDetection": z.string().nullable().optional(),
     "gpuLayers": z.number().int().nullable().optional(),
     "llamaLibPath": z.string().nullable().optional(),
     "maxTokens": z.number().int().nullable().optional(),

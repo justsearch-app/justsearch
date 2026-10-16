@@ -1,3 +1,4 @@
+import './lib/test-fixture-processes.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

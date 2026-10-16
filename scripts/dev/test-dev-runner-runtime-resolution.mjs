@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Tempdoc 656 Move 1 + Move 2 regression test for the dev llama-server resolution.
  *

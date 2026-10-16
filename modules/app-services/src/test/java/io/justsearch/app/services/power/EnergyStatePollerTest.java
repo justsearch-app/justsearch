@@ -169,4 +169,25 @@ final class EnergyStatePollerTest {
   void cadenceIsUnchanged() {
     assertEquals(15_000L, EnergyStatePoller.POLL_INTERVAL_MS);
   }
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (Long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+      catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test
+  void energyStatusChangesAdvanceCounterButReadsAndRepeatedPollsDoNot() {
+    var state = new AtomicReference<>(full());
+    try (var poller = new EnergyStatePoller(processExecutors, new GpuSchedulingGauge(), state::get)) {
+      long before = statusCounter();
+      poller.poll();
+      assertEquals(before + 1, statusCounter(), "UNKNOWN to known power changes canonical status");
+      poller.energyState(); poller.poll();
+      assertEquals(before + 1, statusCounter(), "reads and identical observations are not publications");
+      state.set(reduced()); poller.poll();
+      assertEquals(before + 2, statusCounter(), "energy intent and source changed");
+    }
+  }
 }

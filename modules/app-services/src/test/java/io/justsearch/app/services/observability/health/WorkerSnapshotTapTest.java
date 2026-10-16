@@ -53,7 +53,7 @@ final class WorkerSnapshotTapTest {
   void setUp() {
     conditions = new ConditionStore();
     occurrences = new OccurrenceLog();
-    changes = new HealthEventChangeRegistry();
+    changes = newChanges();
     listener = new RecordingListener();
     changes.subscribeTyped(listener);
     clock = new MutableClock(T0);
@@ -61,6 +61,22 @@ final class WorkerSnapshotTapTest {
   }
 
   // ----- helpers -----
+
+  /** The before-state owns delivery internally; the candidate requires its owner to supply it. */
+  private static HealthEventChangeRegistry newChanges() {
+    ExecutorService delivery = Executors.newVirtualThreadPerTaskExecutor();
+    try {
+      try {
+        return HealthEventChangeRegistry.class.getConstructor(ExecutorService.class).newInstance(delivery);
+      } catch (NoSuchMethodException beforeOwnerSuppliedDelivery) {
+        delivery.close();
+        return HealthEventChangeRegistry.class.getConstructor().newInstance();
+      }
+    } catch (ReflectiveOperationException failure) {
+      delivery.close();
+      throw new AssertionError("health delivery fixture failed", failure);
+    }
+  }
 
   private static WorkerOperationalView view(
       CompatibilityStatusView compat, QueueDbStatusView queueDb, FailureTrackingView failure) {
@@ -912,7 +928,7 @@ final class WorkerSnapshotTapTest {
           new WorkerSnapshotTap(
               localConditions,
               new OccurrenceLog(),
-              new HealthEventChangeRegistry(),
+              newChanges(),
               HEAD_SRC,
               clock);
       localTap.accept(

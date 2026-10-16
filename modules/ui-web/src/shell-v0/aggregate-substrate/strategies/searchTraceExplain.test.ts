@@ -27,6 +27,7 @@ import {
   TRACE_FACET_ALTITUDE,
   DEGRADATION_REASON_WORDING,
   CROSS_ENCODER_SKIP_WORDING,
+  LEG_CAUSE_WORDING,
 } from './searchTraceExplain.js';
 import type { SearchTrace } from '../../../api/generated/index.js';
 // Tempdoc 564 Phase 3: SearchTrace is the generated Zod projection; build instances via parse().
@@ -185,12 +186,60 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     'EMBEDDING_EXCEPTION',
     'SKIPPED_SHORT_QUERY',
     'SKIPPED_NO_DISCRIMINATIVE_TERM',
+    'SEMANTIC_BUDGET_EXCEEDED',
   ];
 
   it('602 R6 — DEGRADATION_REASON_WORDING covers the user-tier reason vocabulary exactly', () => {
     expect(Object.keys(DEGRADATION_REASON_WORDING).sort()).toEqual(
       [...DEGRADATION_WORDED_CODES].sort(),
     );
+  });
+
+  // Spec D §6.3 (step 2b) — the per-leg cause of a semantic budget miss (`SearchReasonCode.LegCause`
+  // wire values, the same hand-kept-mirror caveat as above) is worded in both directions.
+  const LEG_CAUSES = ['contended', 'loading', 'stuck'];
+
+  it('Spec D U1 — LEG_CAUSE_WORDING covers the leg-cause vocabulary exactly', () => {
+    expect(Object.keys(LEG_CAUSE_WORDING).sort()).toEqual([...LEG_CAUSES].sort());
+  });
+
+  it('Spec D U1 — a semantic budget miss is worded with its cause on each leg', () => {
+    const trace: SearchTrace = searchTraceSchema.parse({
+      version: 1,
+      decisionKind: 'multi_leg',
+      effectiveMode: 'TEXT',
+      degradation: {
+        hybridFallback: true,
+        hybridFallbackReason: 'SEMANTIC_BUDGET_EXCEEDED',
+        hybridFallbackCause: 'contended',
+        spladeExecuted: false,
+        spladeSkipReason: 'SEMANTIC_BUDGET_EXCEEDED',
+        spladeSkipCause: 'loading',
+      },
+    });
+    const parts = userSummaryParts(trace);
+    expect(parts).toContain(
+      'fell back from hybrid — semantic search did not answer in time (encoder busy with other work)',
+    );
+    expect(parts).toContain(
+      'SPLADE skipped — semantic search did not answer in time (search models still loading)',
+    );
+    const line = parts.join(' · ');
+    expect(line).not.toContain('SEMANTIC_BUDGET_EXCEEDED');
+    expect(line).not.toContain('contended');
+  });
+
+  it('Spec D U1 — a fallback without a cause keeps its reason wording unchanged', () => {
+    const trace: SearchTrace = searchTraceSchema.parse({
+      version: 1,
+      effectiveMode: 'TEXT',
+      degradation: { hybridFallback: true, hybridFallbackReason: 'NO_EMBEDDING_SERVICE' },
+    });
+    const line = userSummaryParts(trace).join(' · ');
+    expect(line).toContain('fell back from hybrid — ');
+    for (const worded of Object.values(LEG_CAUSE_WORDING)) {
+      expect(line).not.toContain(worded);
+    }
   });
 
   it('planned dense omission is worded as a skip, not an embedding block', () => {
@@ -274,14 +323,32 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     expect(line).not.toContain('INFERENCE_FAILED');
   });
 
+  // Spec D (S1): a search whose rerank could not finish inside the search's own deadline answers
+  // on time with its fused order. The user line says the re-ranking did not fit the search's time,
+  // without the raw code.
+  it('Spec D — a rerank cut short by the search deadline is worded, without the raw code', () => {
+    const trace: SearchTrace = searchTraceSchema.parse({
+      version: 1,
+      effectiveMode: 'HYBRID',
+      stages: [{ id: 'cross-encoder', status: 'skipped', reason: 'SEARCH_DEADLINE_EXCEEDED' }],
+    });
+    const parts = userSummaryParts(trace);
+    expect(parts).toContain(
+      'Relevance re-ranking did not fit in the time this search had — results are ranked without it',
+    );
+    expect(parts.join(' · ')).not.toContain('SEARCH_DEADLINE_EXCEEDED');
+  });
+
   // The FE half of the cross-encoder vocabulary correspondence. The Java producer is
   // `CrossEncoderSkipReason`, whose exhaustive `isDrop()` switch is the exempt/worded split;
   // this list mirrors its drop members. The assertion below holds both directions (nothing
   // mirrored goes unworded, no worded key is dead).
   const CROSS_ENCODER_WORDED_CODES = [
     'DEADLINE_EXCEEDED',
+    'SEARCH_DEADLINE_EXCEEDED',
     'RPC_FAILED',
     'MODEL_NOT_LOADED',
+    'MODEL_LOADING',
     'INFERENCE_FAILED',
     'UNKNOWN',
   ];

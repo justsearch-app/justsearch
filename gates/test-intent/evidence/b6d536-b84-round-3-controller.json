@@ -1,0 +1,202 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T21:17:46.987Z",
+  "revision": "61210e340dcc377c89509a840f6c9a76351a202f",
+  "tree": "51813a47eda4f8c9151ff9b9c9238182be9a44cc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedGameIsNeverRememberedDuringTheReloadWait\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16789
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(P8, EXTERNAL_MEMORY, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(P12, EXTERNAL_MEMORY, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(P16_PLUS, EXTERNAL_MEMORY, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(NO_GPU, EXTERNAL_MEMORY, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(UNRESOLVED, EXTERNAL_MEMORY, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(P8, GAME, game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(P12, GAME, game_mode)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aClearedGameIsNeverRememberedDuringTheReloadWait",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aClearedGameIsNeverRememberedDuringTheReloadWait(P8, GAME, game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedGameIsNeverRememberedDuringTheReloadWait(P12, GAME, game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedGameIsNeverRememberedDuringTheReloadWait(P8, EXTERNAL_MEMORY, gpu_busy)",
+          "status": "passed"
+        },
+        {
+          "name": "aClearedGameIsNeverRememberedDuringTheReloadWait(P12, EXTERNAL_MEMORY, gpu_busy)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P8, P16_PLUS)",
+          "status": "passed"
+        },
+        {
+          "name": "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P8, NO_GPU)",
+          "status": "passed"
+        },
+        {
+          "name": "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P8, UNRESOLVED)",
+          "status": "passed"
+        },
+        {
+          "name": "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P12, P16_PLUS)",
+          "status": "passed"
+        },
+        {
+          "name": "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P12, NO_GPU)",
+          "status": "passed"
+        },
+        {
+          "name": "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P12, UNRESOLVED)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5f600de97",
+    "revision": "5f600de970f5bdc69b1bd03449b619ae3543ab47",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedGameIsNeverRememberedDuringTheReloadWait\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 97295
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode",
+        "classification": "assertion",
+        "detail": "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(P8, EXTERNAL_MEMORY, gpu_busy): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a cleared cause cannot hide another application's much later pressure episode ==> expected: <[unload:gpu_busy, unload:gpu_busy]> but was: <[unload:gpu_busy]> | aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(P12, EXTERNAL_MEMORY, gpu_busy): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a cleared cause cannot "
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aClearedGameIsNeverRememberedDuringTheReloadWait",
+        "classification": "assertion",
+        "detail": "aClearedGameIsNeverRememberedDuringTheReloadWait(P8, GAME, game_mode): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a game that cleared before the person's choice cannot cover a new game or memory user ==> expected: <[unload:game_mode, unload:game_mode]> but was: <[unload:game_mode]> | aClearedGameIsNeverRememberedDuringTheReloadWait(P12, GAME, game_mode): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a game that cleared before the person's "
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn",
+        "classification": "assertion",
+        "detail": "theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: pressure first seen at the 15-second boundary belongs to a new episode ==> expected: <[unload:gpu_busy, unload:gpu_busy, unload:gpu_busy]> but was: <[unload:gpu_busy, unload:gpu_busy]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride",
+        "classification": "assertion",
+        "detail": "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P8, P16_PLUS): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: changing a profile is not evidence that the sampled game ended ==> expected: <[unload:game_mode]> but was: <[unload:game_mode, unload:game_mode]> | ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(P8, NO_GPU): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: changing a profile is not evidence that the sampled "
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock",
+        "classification": "assertion",
+        "detail": "loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: load anyway records the effective game level present when the decision is made ==> expected: <[unload:gpu_busy]> but was: <[unload:gpu_busy, unload:game_mode]>"
+      }
+    ]
+  },
+  "digest": "sha256:15b75d98ec132961541d097a95ab83cd48662869329aa3b8e81b04a0ee2dd065"
+}

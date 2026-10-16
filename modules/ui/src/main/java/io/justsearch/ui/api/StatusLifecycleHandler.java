@@ -16,6 +16,7 @@ import io.justsearch.app.api.lifecycle.ReadinessDimension;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
 import io.justsearch.app.api.gpl.RerankerService;
+import io.justsearch.app.api.status.CoreIndexView;
 import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.api.status.ModelDistributionStatusView;
 import io.justsearch.app.api.status.ModelVariantView;
@@ -27,6 +28,7 @@ import io.justsearch.app.api.status.PowerStatusView;
 import io.justsearch.app.api.status.AtRestProtectionView;
 import io.justsearch.app.api.status.StatusMeta;
 import io.justsearch.app.api.status.StatusResponse;
+import io.justsearch.app.api.status.operating.OperatingStateView;
 import io.justsearch.app.api.status.TelemetryHealthView;
 import io.justsearch.app.api.status.VisualExtractionView;
 import io.justsearch.app.api.status.WorkerOperationalView;
@@ -68,6 +70,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private static final long GPU_CACHE_TTL_MS = 5_000;
   private volatile GpuStatusView cachedGpuStatus;
   private volatile long cachedGpuStatusAtMs;
+  private volatile io.justsearch.configuration.model.HardwareProfile sampledHardwareProfile;
 
   /** Tempdoc 629 (FLOOR): cache the at-rest probe (subprocess) to avoid a PowerShell call per poll. */
   private static final long AT_REST_CACHE_TTL_MS = 5_000;
@@ -94,20 +97,96 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private final OnlineAiService onlineAi;
   private final AgentService agentService;
   private final Supplier<InferenceRuntimeView> inferenceSnapshotSupplier;
-  private final io.justsearch.app.api.lifecycle.Capability workerCapability;
-  private final io.justsearch.app.api.lifecycle.Capability inferenceCapability;
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private volatile String knowledgeServerStartError;
   private EngineComponentRegistry componentRegistry;
   private ComponentHandle indexComponent;
+  private volatile StatusResponse initialStatus;
+  private final StatusPublicationBackstop statusPublication = new StatusPublicationBackstop();
+  /**
+   * Orders publication. The sampler and HTTP reads both build a response from the current
+   * observations and publish it; built concurrently, a response from older observations could
+   * publish after a newer one and alternate a value, advancing the counter twice. One build and
+   * publish at a time reads each lane no older than the last publication did. The build only reads
+   * published observations in memory: no producer, owner lock or I/O is held under it.
+   */
+  private final java.util.concurrent.locks.ReentrantLock publicationOrder =
+      new java.util.concurrent.locks.ReentrantLock();
+  private volatile Runnable refreshRequest;
+  private final java.util.concurrent.ConcurrentHashMap<String, StatusObservation<?>> observations =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  private final java.util.concurrent.atomic.AtomicBoolean refreshRequested =
+      new java.util.concurrent.atomic.AtomicBoolean();
+  private volatile Supplier<io.justsearch.app.services.gpu.GpuProfileResolver.Resolution> devicePlanSupplier;
+  private volatile long currentSamplingPeriodMs = SAMPLER_IDLE_PERIOD_MS;
+
+  @SuppressWarnings("unchecked")
+  private <T> StatusObservation<T> observation(String name) {
+    return (StatusObservation<T>) observations.computeIfAbsent(name, ignored -> new StatusObservation<>(() -> {
+      if (initialStatus != null) observeStatus();
+    }));
+  }
+
+  private <T> T value(String name, T fallback) {
+    return this.<T>observation(name).value(fallback);
+  }
+
+  private boolean stale(String name) {
+    return observation(name).stale(clockMs.getAsLong());
+  }
+
+  private <T> java.util.concurrent.CompletableFuture<Void> refresh(
+      String name, Supplier<T> producer, long period) {
+    return this.<T>observation(name).refresh(name, producer, clockMs, period, () -> {
+      if (name.equals("worker")) refresh("registry", this::projectCurrentComponents, period);
+      refreshProjections();
+    }, true);
+  }
+
+  /** For a producer that answers from its own cache: the lane carries the cache's probe time. */
+  private <T> java.util.concurrent.CompletableFuture<Void> refreshProbe(
+      String name, Supplier<StatusObservation.Probe<T>> producer, long period) {
+    return this.<T>observation(name).refreshProbe(name, producer, clockMs, period, () -> {
+      refreshProjections();
+    }, true);
+  }
+
+  /** Uses the Engine's already-owned, coalescing readiness sampler in production. */
+  void setRefreshRequest(Runnable request) {
+    this.refreshRequest = java.util.Objects.requireNonNull(request);
+  }
 
   /** Called once during composition, before the sampler is attached. */
   void setIndexComponent(EngineComponentRegistry registry, ComponentHandle handle) {
+    var previous = componentSubscription;
+    if (previous != null) previous.close();
     this.componentRegistry = java.util.Objects.requireNonNull(registry);
     this.indexComponent = java.util.Objects.requireNonNull(handle);
     if (!"index".equals(handle.spec().name())) {
       throw new IllegalArgumentException("readiness requires the index component owner");
     }
+    lastComponentSnapshot.set(null);
+    lastIndexObservationPublication = null;
+    componentSubscription = registry.subscribe(snapshot -> {
+      if (componentRegistry == registry) {
+        Long ownRevision = indexPublicationRevision.get();
+        if (ownRevision != null && snapshot.revision() == ownRevision) {
+          indexPublicationCapture.set(snapshot);
+        } else {
+          lastExternalComponentRevision.accumulateAndGet(snapshot.revision(), Math::max);
+        }
+        rememberComponents(snapshot);
+      }
+    });
+    var snapshot = rememberComponents(registry.snapshot());
+    lastExternalComponentRevision.accumulateAndGet(snapshot.revision(), Math::max);
+    initialStatus = StatusSnapshotCache.initial(
+        LifecycleProjection.project(snapshot, Instant.now()), indexBasePath, startTime);
+  }
+
+  private EngineComponentSnapshot rememberComponents(EngineComponentSnapshot snapshot) {
+    return lastComponentSnapshot.updateAndGet(previous -> previous == null
+        || snapshot.revision() > previous.revision() ? snapshot : previous);
   }
 
   /**
@@ -141,9 +220,48 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   /** How many sampling periods a sample may age before it is reported stale. */
   static final int SAMPLE_STALE_PERIODS = 3;
 
+  /**
+   * A value whose data was at most this many periods old when it was published (a slow probe, or a
+   * source reading aged by its own cadence and caches) is late, not hung: that age is added to the
+   * lane's period to form its effective cadence. An older value adds nothing and is stale, so a hung
+   * probe or a stale source still goes stale within a bounded time.
+   */
+  static final int PROBE_ALLOWANCE_PERIODS = 3;
+
+  /** How many of a lane's most recent data ages at publish its effective cadence considers. */
+  static final int RECENT_PROBES = 4;
+
+  /** How long a fresh read waits for its observations before answering with the current values. */
+  static final long FRESH_READ_DEADLINE_MS = 100L;
+
+  /** How long one sampler pass waits for its observations; a held lane publishes when it can. */
+  static final long SAMPLER_OBSERVATION_BUDGET_MS = 1_000L;
+
+  /** How often a waiting read or sampler pass looks at its observations. */
+  private static final long OBSERVATION_POLL_NANOS = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(2L);
+
   /** The sampler's last observation; {@code null} until the first one. */
   private volatile WorkerViewSample lastWorkerSample;
-  private final Object workerSamplingLock = new Object();
+  private final java.util.concurrent.atomic.AtomicReference<EngineComponentSnapshot> lastComponentSnapshot =
+      new java.util.concurrent.atomic.AtomicReference<>();
+  private final java.util.concurrent.atomic.AtomicLong lastExternalComponentRevision =
+      new java.util.concurrent.atomic.AtomicLong();
+  private volatile EngineComponentSnapshot lastIndexObservationPublication;
+  private final ThreadLocal<Long> indexPublicationRevision = new ThreadLocal<>();
+  private final ThreadLocal<EngineComponentSnapshot> indexPublicationCapture = new ThreadLocal<>();
+  private EngineComponentRegistry.Subscription componentSubscription;
+  // ADR-0050: keeps the operating block's seq and indexing since across passes.
+  private final OperatingStateAssembler operatingStateAssembler = new OperatingStateAssembler();
+  private record OperatingPublication(Object content, long seq) {}
+  private final java.util.concurrent.atomic.AtomicReference<OperatingPublication> servedOperating =
+      new java.util.concurrent.atomic.AtomicReference<>();
+
+  /** The live controller supplies the same reload bound used by chat demand refusals. */
+  void setChatResidency(Supplier<io.justsearch.app.inference.chat.ChatResidency> source) {
+    operatingStateAssembler.setChatResidency(source);
+  }
+  // ADR-0050: the operating block's GPU memory reading (diagnostic only); null without a reader.
+  private volatile GpuMemoryReaderHold gpuMemory;
 
   /**
    * Wall clock for sample stamping and age. Injectable so the age-based staleness rule is testable:
@@ -224,8 +342,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       Supplier<RerankerService> lambdamartRerankerSupplier,
       Supplier<GplStatusProvider> gplCoordinatorSupplier,
       Supplier<GpuCapabilitiesService> gpuCapabilitiesSupplier,
-      io.justsearch.app.api.lifecycle.Capability workerCapability,
-      io.justsearch.app.api.lifecycle.Capability inferenceCapability) {
+      // Preserve constructor compatibility for fixtures; status reads the component registry.
+      io.justsearch.app.api.lifecycle.Capability unusedWorkerCapability,
+      io.justsearch.app.api.lifecycle.Capability unusedInferenceCapability) {
     // Tempdoc 412 Phase 3: engineMonitorSupplier removed (Phase 0 finding 2: EngineMonitor was
     // dead code; setters never called in production, so the supplier was always null in
     // practice). Inference status is now sourced from {@link InferenceLifecycleManager}'s
@@ -233,8 +352,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.onlineAi = onlineAi;
     this.agentService = agentService;
     this.inferenceSnapshotSupplier = inferenceSnapshotSupplier;
-    this.workerCapability = workerCapability;
-    this.inferenceCapability = inferenceCapability;
     this.knowledgeServer = knowledgeServer;
     this.knowledgeServerStartError = knowledgeServerStartError;
     this.indexBasePath = indexBasePath;
@@ -244,6 +361,39 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.gplCoordinatorSupplier = gplCoordinatorSupplier;
     this.gpuCapabilitiesSupplier = gpuCapabilitiesSupplier;
   }
+
+  /**
+   * ADR-0050: wires the one GPU memory reader into the operating block. The handler owns it from
+   * here and closes it in {@link #closeGpuMemoryReader()}. Diagnostic only: no control decision
+   * reads the projection. The first (slow) sample is taken on a background thread; status reports
+   * gpu unknown until it exists.
+   */
+  void setGpuMemoryReader(io.justsearch.app.api.gpu.GpuMemoryReader reader) {
+    GpuMemoryReaderHold previous = gpuMemory;
+    OperatingGpuProjection projection =
+        reader == null
+            ? null
+            : new OperatingGpuProjection(
+                reader, OperatingGpuProjection::engineAndDescendants, java.time.Clock.systemUTC());
+    gpuMemory = projection == null ? null : new GpuMemoryReaderHold(reader, projection);
+    if (previous != null && previous.reader() != reader) previous.reader().close();
+    if (projection != null) {
+      Thread.ofPlatform()
+          .daemon()
+          .name("gpu-memory-first-sample")
+          .start(projection::sampleFirst);
+    }
+  }
+
+  /** Closes the GPU memory reader, if one was wired; later status passes report gpu unknown. */
+  void closeGpuMemoryReader() {
+    GpuMemoryReaderHold hold = gpuMemory;
+    gpuMemory = null;
+    if (hold != null) hold.reader().close();
+  }
+
+  private record GpuMemoryReaderHold(
+      io.justsearch.app.api.gpu.GpuMemoryReader reader, OperatingGpuProjection projection) {}
 
   /** Late-binds the Knowledge Server after async Worker startup. */
   void setKnowledgeServer(KnowledgeServerBootstrap ks, String startError) {
@@ -265,7 +415,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Tempdoc 419 C3 V2 P3 — wires the GPU saturation monitor. The handler composes the
    * activity gate from its own suppliers ({@code engineMonitorSupplier}, {@code
    * workerView.migration().processingJobsCount()}, {@code gplCoordinatorSupplier}, {@code
-   * onlineAi.isAvailable()}) on each {@code /api/status} call.
+   * onlineAi.isAvailable()}) on each sampler observation.
    */
   void setGpuSaturationMonitor(io.justsearch.ui.observability.GpuSaturationMonitor monitor) {
     this.gpuSaturationMonitor = monitor;
@@ -338,10 +488,19 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.vduProcessingSupplier = supplier;
   }
 
+  /** Spec E step E7b: the Engine's device-memory plan, for the operating gpu profile. */
+  void setDevicePlanSupplier(
+      Supplier<io.justsearch.app.services.gpu.GpuProfileResolver.Resolution> supplier) {
+    devicePlanSupplier = supplier;
+    operatingStateAssembler.setDevicePlan(() -> value("device-plan", null));
+  }
+
   /** Tempdoc 630: late-bind the connected knowledge-server bootstrap (energy + resume signals). */
   void setKnowledgeServerLifecycleSupplier(
       Supplier<KnowledgeServerBootstrap> supplier) {
     this.knowledgeServerLifecycleSupplier = supplier;
+    // Spec E step E1: the operating indexing block reads the same Engine's bulk-work gate.
+    operatingStateAssembler.setBulkWork(() -> value("bulk-gate", null));
   }
 
   /**
@@ -402,36 +561,207 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   void handleStatus(Context ctx) {
-    // Tempdoc 885 item 6: the request thread reads the internal sampler's last snapshot. The one
-    // debug escape hatch is ?fresh=true, which forces a synchronous sample.
-    boolean fresh = "true".equalsIgnoreCase(ctx.queryParam("fresh"));
-    ctx.json(fresh ? sampleAndBuildStatusSnapshot() : buildStatusMap(false));
+    if ("true".equalsIgnoreCase(ctx.queryParam("fresh"))) {
+      long due = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(FRESH_READ_DEADLINE_MS);
+      var answered = new java.util.concurrent.CompletableFuture<Void>();
+      // Dispatch independently of the periodic reconciliation queue: that queue may already be
+      // observing a hung owner. Coalescing and publication belong to each observation lane.
+      Thread.ofPlatform().daemon().name("status-fresh-dispatch").start(() -> {
+        try {
+          var pending = dispatchObservations();
+          var request = refreshRequest;
+          if (request != null) request.run();
+          // Waits without attaching to the lanes: when the deadline answers first, nothing of this
+          // read stays behind on a held lane, and its release replays none of this read's work.
+          if (awaitObservations(pending, due)) awaitObservations(refreshProjections(), due);
+        } catch (RuntimeException failure) {
+          // The response reports each lane's own last observation.
+        } finally {
+          answered.complete(null);
+        }
+      });
+      // A dedicated deadline cannot queue behind inference in the shared async pool.
+      Thread.ofPlatform().daemon().name("status-read-deadline").start(() -> {
+        long remaining;
+        while ((remaining = due - System.nanoTime()) > 0L) {
+          java.util.concurrent.locks.LockSupport.parkNanos(remaining);
+        }
+        answered.complete(null);
+      });
+      // The deadline ends this response's wait only. It is not evidence about any lane: a lane
+      // still observing keeps its last real value and ages by its own sampling period.
+      ctx.future(() -> answered.thenApply(ignored -> {
+        writeStatus(ctx);
+        return null;
+      }));
+      return;
+    }
+    writeStatus(ctx);
+  }
+
+  private void writeStatus(Context ctx) {
+    // Stamp before building the body. A lane that completes later can only make the body newer.
+    long reflected = observations.entrySet().stream()
+        .filter(e -> !e.getKey().equals("health-taps") && !e.getKey().equals("index-publication"))
+        .mapToLong(e -> e.getValue().statusCounter()).min().orElse(0L);
+    var response = buildStatusSnapshot();
+    StatusChangeHeaders.current(ctx);
+    ctx.header(StatusChangeHeaders.REFLECTED, Long.toString(reflected));
+    ctx.json(response);
   }
 
   @Override
   public StatusResponse buildStatusSnapshot() {
-    return buildStatusMap(false);
+    if (observations.isEmpty()) {
+      requestSample();
+      return statusPublication.publish(java.util.Objects.requireNonNull(initialStatus, "Status requires component attachment"));
+    }
+    return observeStatus();
+  }
+
+  private void requestSample() {
+    var request = refreshRequest;
+    if (request != null) {
+      request.run();
+      return;
+    }
+    if (!refreshRequested.compareAndSet(false, true)) return;
+    Thread.ofPlatform().daemon().name("status-observation").start(() -> {
+      try { sampleAndBuildStatusSnapshot(); }
+      finally { refreshRequested.set(false); }
+    });
+  }
+
+  /** Dispatch each owner independently. Only the background sampler waits, with a fixed budget. */
+  private List<java.util.concurrent.CompletableFuture<Void>> dispatchObservations() {
+    long period = currentSamplingPeriodMs;
+    var pending = new ArrayList<java.util.concurrent.CompletableFuture<Void>>();
+    pending.add(refresh("registry", this::projectCurrentComponents, period));
+    pending.add(this.<WorkerViewSample>observation("worker").refresh("worker",
+        () -> sampleWorkerIndependently(period), clockMs, period, () -> {
+          refresh("registry", this::projectCurrentComponents, period);
+          refreshProjections();
+        }, true));
+    pending.add(refresh("disk", () -> diskPressureSupplier == null ? null : diskPressureSupplier.get(), period));
+    pending.add(refresh("inference", this::buildInferenceView, period));
+    pending.add(refresh("power", this::buildPowerStatus, period));
+    pending.add(refresh("resume", this::computeCatchingUp, period));
+    // A cached producer is sampled at least as rarely as its cache lives; that is its own period.
+    pending.add(refreshProbe("gpu", this::buildGpuStatus, Math.max(period, GPU_CACHE_TTL_MS)));
+    // The reading carries its own timestamp (the GPU sampler's tick, then the projection's cache):
+    // the lane is observed when the reading was taken, so its cadence counts the reading's age.
+    pending.add(refreshProbe("gpu-memory", () -> {
+      long probedAt = clockMs.getAsLong();
+      var hold = gpuMemory;
+      var view = hold == null ? io.justsearch.app.api.status.operating.OperatingGpuView.unknown()
+          : hold.projection().view(observation("gpu-memory").staleAfterMs(period));
+      return new StatusObservation.Probe<>(view, view.sampledAt() == null ? probedAt
+          : Math.min(probedAt, Instant.parse(view.sampledAt()).toEpochMilli()));
+    }, period));
+    pending.add(refreshProbe("at-rest", this::buildAtRestProtection, Math.max(period, AT_REST_CACHE_TTL_MS)));
+    pending.add(refresh("conversation", this::buildConversationProtection, period));
+    pending.add(refreshProbe("models", this::buildModelDistributionStatus, Math.max(period, MODEL_DIST_CACHE_TTL_MS)));
+    pending.add(refresh("agent", () -> agentService.isAvailable()
+        ? new io.justsearch.app.api.status.AgentSessionView(agentService.activeSessionCount()) : null, period));
+    pending.add(refresh("telemetry", this::currentTelemetrySnapshot, period));
+    pending.add(refresh("device-plan", () -> devicePlanSupplier == null ? null : devicePlanSupplier.get(), period));
+    pending.add(refresh("bulk-gate", () -> {
+      var supplier = knowledgeServerLifecycleSupplier;
+      var server = supplier == null ? null : supplier.get();
+      return server == null ? null : server.bulkWork().snapshot();
+    }, period));
+    pending.add(refresh("vdu", () -> vduCapabilitySnapshotSupplier == null ? null : vduCapabilitySnapshotSupplier.get(), period));
+    pending.add(refresh("vdu-processing", () -> vduProcessingSupplier != null && Boolean.TRUE.equals(vduProcessingSupplier.get()), period));
+    pending.add(refresh("vision", this::visionCapable, period));
+    return pending;
+  }
+
+  StatusResponse sampleAndBuildStatusSnapshot() {
+    long period = currentSamplingPeriodMs;
+    var pending = dispatchObservations();
+    awaitObservations(pending);
+    var publication = this.<Boolean>observation("index-publication");
+    awaitObservations(List.of(publication.completion()));
+    awaitObservations(List.of(refresh("registry", this::projectCurrentComponents, period)));
+    currentSamplingPeriodMs = deriveSamplingPeriodMs();
+    awaitObservations(refreshProjections());
+    // Taps have separate ownership too: a subprocess or event consumer cannot hold publication.
+    var response = observeStatus();
+    awaitObservations(List.of(this.<Boolean>observation("health-taps").refresh("health-taps",
+        () -> { feedHealthTaps(response.readiness(), response.worker(), response.meta().workerRpcStale()); return true; },
+        clockMs, period, null, false)));
+    return response;
+  }
+
+  /** Source completion triggers these lanes directly; no unrelated producer batch gates them. */
+  private List<java.util.concurrent.CompletableFuture<Void>> refreshProjections() {
+    var pending = new ArrayList<java.util.concurrent.CompletableFuture<Void>>();
+    var projection = value("registry", (LifecycleProjection.Projection) null);
+    if (projection == null) return pending;
+    long period = currentSamplingPeriodMs;
+    for (ReadinessDimension dim : ReadinessDimension.values()) {
+      if (componentStateDimension(dim)) continue;
+      String name = "readiness-" + dim.key();
+      pending.add(this.<ReadinessComponentView>observation(name).refresh(name, () -> {
+        var current = value("registry", projection);
+        var worker = value("worker", fallbackWorker());
+        return computeComponent(dim, overlayVduCapability(worker.view()), current.lifecycle(),
+            Instant.now().toString());
+      }, clockMs, period, null, true));
+    }
+    pending.add(this.<OperatingStateView>observation("operating").refresh("operating", () -> {
+      var current = value("registry", projection);
+      var worker = value("worker", fallbackWorker());
+      return operatingStateAssembler.assemble(current.lifecycle(), value("inference", null),
+          value("power", PowerStatusView.unknown()), overlayVduCapability(worker.view()),
+          worker.sampledAtMs(), stale("worker") || worker.failed(), samplingPeriodMs(), Instant.now(),
+          value("gpu-memory", io.justsearch.app.api.status.operating.OperatingGpuView.unknown()));
+    }, clockMs, period, null, true));
+    return pending;
+  }
+
+  private static void awaitObservations(List<java.util.concurrent.CompletableFuture<Void>> pending) {
+    // Each lane publishes independently. A blocked lane owns no other lane's freshness.
+    awaitObservations(pending, System.nanoTime()
+        + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(SAMPLER_OBSERVATION_BUDGET_MS));
   }
 
   /**
-   * Tempdoc 885 item 6 — the internal Worker status sampler's entry point. Runs on the
-   * {@code readiness-reconcile} daemon thread, driven by {@code KnowledgeServerHealthMonitor}'s
-   * existing schedule (no new executor) and by every capability transition. This is the ONLY
-   * production path that performs the {@code IndexStatus} unary, and it is the path that feeds
-   * every health tap — the request thread reads what it left behind.
+   * Waits until every observation has completed or the deadline has passed, and reports which.
+   * It looks at the lanes instead of attaching a callback to them: a wait that ends at its
+   * deadline leaves nothing behind on a held lane, so a long hold collects no waiters from reads
+   * or sampler passes, and its release runs no obsolete work for them.
    */
-  StatusResponse sampleAndBuildStatusSnapshot() {
-    synchronized (workerSamplingLock) {
-      return buildStatusMap(true);
+  private static boolean awaitObservations(
+      List<java.util.concurrent.CompletableFuture<Void>> pending, long dueNanos) {
+    while (true) {
+      boolean done = true;
+      for (var lane : pending) {
+        if (!lane.isDone()) {
+          done = false;
+          break;
+        }
+      }
+      if (done) return true;
+      long remaining = dueNanos - System.nanoTime();
+      if (remaining <= 0L) return false;
+      java.util.concurrent.locks.LockSupport.parkNanos(Math.min(remaining, OBSERVATION_POLL_NANOS));
+      if (Thread.currentThread().isInterrupted()) return false;
     }
   }
+
+  private WorkerViewSample fallbackWorker() {
+    return new WorkerViewSample(WorkerOperationalView.fallback("UNAVAILABLE"), true, null, 0L);
+  }
+
+  long samplingPeriodMs() { return currentSamplingPeriodMs; }
 
   /**
    * The sampling period the health monitor should use before its next tick: fast while the Worker
    * has index work in flight or the inference runtime is coming up, idle otherwise. Derived from
    * the LAST sample, never from a fresh RPC — so this is safe to call from the monitor thread.
    */
-  long samplingPeriodMs() {
+  private long deriveSamplingPeriodMs() {
     WorkerViewSample sample = lastWorkerSample;
     if (sample == null || sample.failed()) {
       return SAMPLER_IDLE_PERIOD_MS;
@@ -441,24 +771,14 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     }
     // AI activation: the inference capability is mid-transition, so its readiness dimension is
     // exactly the one a watcher is waiting on.
-    var inference = inferenceCapability;
-    if (inference != null) {
-      var health = inference.health();
-      if (health == io.justsearch.app.api.lifecycle.CapabilityHealth.PENDING
-          || health == io.justsearch.app.api.lifecycle.CapabilityHealth.RECOVERING) {
+    var registry = value("registry", (LifecycleProjection.Projection) null);
+    if (registry != null) {
+      var state = registry.lifecycle().components().generative().state();
+      if (state == ComponentState.STARTING || state == ComponentState.RELOADING) {
         return SAMPLER_BUSY_PERIOD_MS;
       }
     }
-    var vdu = vduProcessingSupplier;
-    if (vdu != null) {
-      try {
-        if (Boolean.TRUE.equals(vdu.get())) {
-          return SAMPLER_BUSY_PERIOD_MS;
-        }
-      } catch (RuntimeException e) {
-        log.debug("VDU processing supplier failed while deriving the sampler period", e);
-      }
-    }
+    if (Boolean.TRUE.equals(value("vdu-processing", false))) return SAMPLER_BUSY_PERIOD_MS;
     return SAMPLER_IDLE_PERIOD_MS;
   }
 
@@ -473,7 +793,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     KnowledgeServerBootstrap server = knowledgeServer;
     if (server == null || !server.hasClient()) {
       return new WorkerViewSample(
-          WorkerOperationalView.fallback(workerCapability.health().name()), true, null, sampledAtMs);
+          WorkerOperationalView.fallback(cachedWorkerHealth()), true, null, sampledAtMs);
     }
     try (var lease = server.captureClient()) {
       WorkerOperationalView view = lease.withClient(client -> client.getWorkerOperationalView(
@@ -496,14 +816,22 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     }
   }
 
-  /**
-   * @param sampleWorker {@code true} on the sampler path (perform the {@code IndexStatus} unary and
-   *     reconcile every health tap); {@code false} on a read path (serve the cached sample and
-   *     touch no tap). The one exception: when no sample has ever been taken the read path takes
-   *     one synchronously, so a request arriving in the boot window before the sampler's self-seed
-   *     lands still reports the truth. That can happen at most once per process.
-   */
-  private StatusResponse buildStatusMap(boolean sampleWorker) {
+  private String cachedWorkerHealth() {
+    var registry = lastComponentSnapshot.get();
+    if (registry == null) return "OFFLINE";
+    return registry.components().stream().filter(component -> "index".equals(component.spec().name()))
+        .findFirst().map(component -> io.justsearch.app.services.lifecycle.RegistryBackedCapability
+            .healthOf(component.state()).name()).orElse("OFFLINE");
+  }
+
+  /** Observes all producers and reconciles taps off the HTTP path, then publishes one response. */
+  private StatusResponse observeStatus() {
+    publicationOrder.lock();
+    try { return buildAndPublishStatus(); }
+    finally { publicationOrder.unlock(); }
+  }
+
+  private StatusResponse buildAndPublishStatus() {
     long uptimeMs = System.currentTimeMillis() - startTime.toEpochMilli();
 
     // JVM Memory
@@ -514,36 +842,35 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     long maxMemory = runtime.maxMemory();
 
     // Disk pressure (from telemetry subsystem, when available)
-    String diskPressure = null;
-    if (diskPressureSupplier != null) {
-      diskPressure = diskPressureSupplier.get();
-    }
+    String diskPressure = stale("disk") ? null : value("disk", (String) null);
 
     // NOTE: Head MUST NOT touch Lucene index files. Index availability is reported by the Worker
     // when available.
     // Keep this field for UI backwards-compat, but treat it as "Worker-connected index available".
     // Tempdoc 885 item 6: the Worker observation is the sampler's, not this thread's.
-    WorkerViewSample sample = workerSample(sampleWorker);
+    WorkerViewSample sample = value("worker", fallbackWorker());
     // Sampling may publish index readiness. Capture all served component surfaces afterward,
     // once, so diagnostics, lifecycle and engineComponents share that observation.
-    LifecycleProjection.Projection projection = projectCurrentComponents();
+    if (value("registry", (LifecycleProjection.Projection) null) == null) return statusPublication.publish(initialStatus);
+    // Registry events publish immutable current state independently of the polling lane.
+    // Project that current state without asking the registry owner or taking its lock.
+    LifecycleProjection.Projection projection = LifecycleProjection.project(
+        lastComponentSnapshot.get(), Instant.now());
     LifecycleSnapshotV2 lifecycleSnapshot = projection.lifecycle();
 
-    boolean indexAvailable = !sample.failed();
+    boolean indexAvailable = !sample.failed() && !stale("worker");
     String indexStatusReason = sample.failureReason();
     // workerRpcAtMs is the SAMPLE's observation time (tempdoc 885 item 6 moved the observation off
     // the request thread); age = now - workerRpcAtMs. A sample is stale when it failed, or when it
-    // is older than SAMPLE_STALE_PERIODS sampling periods — which is how a wedged sampler surfaces
+    // is older than SAMPLE_STALE_PERIODS effective cadences — which is how a wedged sampler surfaces
     // as "contact lost" instead of as a silently-frozen snapshot served as fresh.
     long workerRpcAtMs = sample.sampledAtMs();
     boolean workerRpcStale =
-        sample.failed()
-            || (clockMs.getAsLong() - workerRpcAtMs)
-                > (long) SAMPLE_STALE_PERIODS * samplingPeriodMs();
+        sample.failed() || stale("worker");
     WorkerOperationalView workerView = overlayVduCapability(sample.view());
 
     // Tempdoc 412 Phase 3: single inference status surface (replaces LlmStatusView + OnlineAiView).
-    InferenceRuntimeView inference = buildInferenceView();
+    InferenceRuntimeView inference = value("inference", (InferenceRuntimeView) null);
 
     // 821 §3-C1: the per-dimension freshness fact, derived from the SAME worker-contact outcome
     // that StatusMeta reports below — one authority, two projections (envelope + _meta).
@@ -554,22 +881,41 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
             : WorkerContact.observed(workerRpcAtMs);
 
     ReadinessEnvelopeView readiness =
-        buildReadinessEnvelope(workerView, projection, workerContact);
+        buildReadinessEnvelope(workerView, projection, workerContact, true);
 
     // Tempdoc 885 item 6: the taps reconcile on the SAMPLER path only. Before this item they
     // reconciled on whichever thread happened to call buildStatusMap, which meant GET /api/status
     // paid for the index-drift tap's getWatchedRoots() RPC — the second Worker call this item
     // removes from the request thread. The sampler runs on every monitor tick and every capability
     // transition, so the substrate advances at least as often as it did under the browser poll.
-    if (sampleWorker) {
-      feedHealthTaps(readiness, workerView, workerRpcStale);
-    }
+
 
     // Legacy alias booleans remain exposed, but are derived from canonical typed readiness.
     boolean aiReady = readinessComponentReady(readiness, "ai");
     boolean embeddingReady = readinessComponentReady(readiness, "embedding");
 
-    return buildStatusResponse(
+    // ADR-0050: the operating block projects the values this pass already read (the component
+    // snapshot, the inference view, the power poll and the Worker sample), so it cannot disagree
+    // with the rest of the response.
+    PowerStatusView power = stale("power") ? PowerStatusView.unknown() : value("power", PowerStatusView.unknown());
+    OperatingStateView operating = value("operating", (OperatingStateView) null);
+    operating = StatusSnapshotCache.ageOperating(operating, clockMs.getAsLong(),
+        stale("operating") || stale("inference") || stale("registry"),
+        stale("operating") || workerRpcStale || stale("bulk-gate") || stale("power"),
+        stale("operating") || stale("gpu-memory") || stale("device-plan"), observation("gpu-memory").staleAfterMs());
+    operating = StatusSnapshotCache.projectOperating(operating, lifecycleSnapshot, inference);
+    if (operating != null) {
+      Object content = OperatingStateAssembler.content(operating);
+      var publication = servedOperating.updateAndGet(previous -> previous == null
+          ? new OperatingPublication(content, 1L)
+          : previous.content().equals(content) ? previous
+          : new OperatingPublication(content, previous.seq() + 1L));
+      operating = new OperatingStateView(operating.schemaVersion(), publication.seq(),
+          operating.assembledAt(), operating.chat(), operating.indexing(), operating.gpu(),
+          operating.degradations(), operating.freshness());
+    }
+
+    return statusPublication.publish(buildStatusResponse(
         lifecycleSnapshot,
         uptimeMs,
         usedMemory,
@@ -584,46 +930,46 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         aiReady,
         embeddingReady,
         workerRpcAtMs,
-        workerRpcStale);
+        workerRpcStale,
+        power,
+        operating));
+  }
+
+  private WorkerViewSample sampleWorkerIndependently(long period) {
+    var before = lastComponentSnapshot.get();
+    var sampled = observeWorker();
+    lastWorkerSample = sampled;
+    // Contact is published independently of the registry's apply/publication lock.
+    this.<Boolean>observation("index-publication").refresh("index-publication", () -> {
+      boolean contactStale = sampled.failed() || clockMs.getAsLong() - sampled.sampledAtMs()
+          > SAMPLE_STALE_PERIODS * period;
+      boolean accepted = io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger
+          .publishObservation(() -> publishIndexReadiness(before, sampled, contactStale, true));
+      refresh("registry", this::projectCurrentComponents, samplingPeriodMs());
+      return accepted;
+    }, clockMs, samplingPeriodMs(), null, true);
+    return sampled;
   }
 
   private WorkerViewSample workerSample(boolean fresh) {
-    WorkerViewSample cached = lastWorkerSample;
-    if (!fresh && cached != null) {
-      return cached;
-    }
-    // Only fresh observations share RPC ownership. Cached HTTP reads never acquire this lock.
-    synchronized (workerSamplingLock) {
-      cached = lastWorkerSample;
-      if (!fresh && cached != null) {
-        return cached;
-      }
-      EngineComponentSnapshot before = componentSnapshot();
-      return acceptWorkerSample(before, observeWorker(), true);
-    }
-  }
-
-  private EngineComponentSnapshot componentSnapshot() {
-    return componentRegistry == null ? null : componentRegistry.snapshot();
-  }
-
-  /** Serialize fresh cache/publication here; cached readers neither wait nor publish lifecycle. */
-  private synchronized WorkerViewSample acceptWorkerSample(
-      EngineComponentSnapshot before, WorkerViewSample sampled, boolean fresh) {
-    WorkerViewSample sample = !fresh && lastWorkerSample != null ? lastWorkerSample : sampled;
-    boolean stale = sample.failed() || clockMs.getAsLong() - sample.sampledAtMs()
-        > (long) SAMPLE_STALE_PERIODS * samplingPeriodMs();
-    if (!publishIndexReadiness(before, sample, stale, fresh)) {
-      return new WorkerViewSample(WorkerOperationalView.fallback("UNAVAILABLE"), true,
-          "Component observation superseded during sampling", sample.sampledAtMs());
-    }
-    if (fresh) lastWorkerSample = sample;
-    return sample;
+    if (fresh) return sampleWorkerIndependently(samplingPeriodMs());
+    var sample = lastWorkerSample;
+    if (sample != null) return sample;
+    requestSample();
+    return fallbackWorker();
   }
 
   private boolean publishIndexReadiness(
       EngineComponentSnapshot before, WorkerViewSample sample, boolean stale, boolean fresh) {
     if (before == null) return true;
+    var own = lastIndexObservationPublication;
+    if (own != null && own.equals(lastComponentSnapshot.get())
+        && own.revision() > before.revision()
+        && lastExternalComponentRevision.get() <= before.revision()) {
+      // The previous status observation may publish after this RPC starts. Advance across our
+      // own publications only; the whole-frame conditional update still fences external changes.
+      before = own;
+    }
     var index = before.components().stream()
         .filter(component -> "index".equals(component.spec().name())).findFirst().orElseThrow();
     boolean apiReady = before.components().stream()
@@ -633,17 +979,34 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         && workerControlAvailable(sample.view());
     if (ready && fresh && index.state() != ComponentState.ABSENT
         && index.state() != ComponentState.RELOADING) {
-      return indexComponent.transitionIfUnchanged(before, ComponentState.READY, null, null);
+      return publishOwnedIndexTransition(before, ComponentState.READY, null, null);
     } else if (!ready && index.state() == ComponentState.READY) {
       String reason = (sample.failed() || stale)
           ? LifecycleReasonCode.INDEX_FAILED.code() : LifecycleReasonCode.INDEX_UNAVAILABLE.code();
       String evidence = sample.failureReason() != null ? sample.failureReason()
           : "apiReady=" + apiReady + ", contactFresh=" + !stale
               + ", indexHealthy=" + (sample.view().core() != null && sample.view().core().indexHealthy());
-      return indexComponent.transitionIfUnchanged(before, ComponentState.UNAVAILABLE,
+      return publishOwnedIndexTransition(before, ComponentState.UNAVAILABLE,
           reason, evidence);
     }
     return before.equals(componentRegistry.snapshot());
+  }
+
+  private boolean publishOwnedIndexTransition(EngineComponentSnapshot before, ComponentState state,
+      String reason, String evidence) {
+    indexPublicationRevision.set(before.revision() + 1L);
+    try {
+      boolean accepted = indexComponent.transitionIfUnchanged(before, state, reason, evidence);
+      var captured = indexPublicationCapture.get();
+      if (captured != null) {
+        if (accepted) lastIndexObservationPublication = captured;
+        else lastExternalComponentRevision.accumulateAndGet(captured.revision(), Math::max);
+      }
+      return accepted;
+    } finally {
+      indexPublicationRevision.remove();
+      indexPublicationCapture.remove();
+    }
   }
 
   private static boolean workerControlAvailable(WorkerOperationalView view) {
@@ -655,6 +1018,24 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // Fatal loop failure has precedence and is reported as FAILED, which remains refused.
     return ("ERROR".equals(core.indexState()) || "INDEXING".equals(core.indexState()))
         && view.failure() != null && view.failure().failedJobs() > 0;
+  }
+
+  /**
+   * b100: the message a health condition carries for a readiness reason code. While automatic
+   * picture reading is paused, it says why and when the next try is; otherwise there is none.
+   */
+  private java.util.Optional<String> conditionMessage(String reasonCode) {
+    if (!LifecycleReasonCode.VDU_BREAKER_OPEN_REFUSED.code().equals(reasonCode)
+        && !LifecycleReasonCode.VDU_BREAKER_OPEN_ENTRY_FAILED.code().equals(reasonCode)) {
+      return java.util.Optional.empty();
+    }
+    io.justsearch.app.services.vdu.VduCapabilityState.Snapshot snapshot = value("vdu", null);
+    if (snapshot == null || !reasonCode.equals(snapshot.blockedReason())) {
+      return java.util.Optional.empty();
+    }
+    String detail = snapshot.detail();
+    return detail == null || detail.isBlank()
+        ? java.util.Optional.empty() : java.util.Optional.of(detail);
   }
 
   /**
@@ -671,7 +1052,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     var tap = lifecycleSnapshotTap;
     if (tap != null) {
       try {
-        tap.accept(readiness);
+        tap.accept(readiness, this::conditionMessage);
       } catch (RuntimeException e) {
         log.warn("LifecycleSnapshotTap failed during a readiness snapshot; substrate broadcast suppressed", e);
       }
@@ -756,7 +1137,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       boolean aiReady,
       boolean embeddingReady,
       long workerRpcAtMs,
-      boolean workerRpcStale) {
+      boolean workerRpcStale,
+      PowerStatusView power,
+      OperatingStateView operating) {
     return new StatusResponse(
         lifecycleSnapshot.schema_version(),
         lifecycleSnapshot.observed_at(),
@@ -775,8 +1158,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         knowledgeServerStartError,
         indexStatusReason,
         // 630: Head-side energy-intent + post-resume "catching up" transient.
-        buildPowerStatus(),
-        computeCatchingUp(),
+        power,
+        !stale("resume") && Boolean.TRUE.equals(value("resume", false)),
         inference,
         readiness,
         aiReady,
@@ -798,24 +1181,35 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
             ? io.justsearch.app.api.status.MigrationStatusGroup.from(workerView)
             : null,
         // 335 §9: GPU utilization and VRAM
-        buildGpuStatus(),
+        stale("gpu") ? GpuStatusView.unavailable() : value("gpu", GpuStatusView.unavailable()),
         // 629 (FLOOR): at-rest protection of the data-dir volume
-        buildAtRestProtection(),
+        stale("at-rest") ? AtRestProtectionView.unknown() : value("at-rest", AtRestProtectionView.unknown()),
         // 629 (#2): conversation encryption state (reactive single-authority status)
-        buildConversationProtection(),
+        stale("conversation") ? io.justsearch.app.api.status.ConversationProtectionView.unknown()
+            : value("conversation", io.justsearch.app.api.status.ConversationProtectionView.unknown()),
         // 381: Model distribution status
-        buildModelDistributionStatus(),
+        stale("models") ? ModelDistributionStatusView.unavailable() : value("models", ModelDistributionStatusView.unavailable()),
         // 415: Active agent session count (sourced from agent.session.active_count gauge).
         // Omitted via @JsonInclude(NON_NULL) on StatusResponse when agent capability is
         // unavailable, so field presence on /api/status signals "agent capability is live."
-        agentService.isAvailable()
-            ? new io.justsearch.app.api.status.AgentSessionView(
-                agentService.activeSessionCount())
-            : null,
+        stale("agent") ? null : value("agent", (io.justsearch.app.api.status.AgentSessionView) null),
         // 419 C3 V1: telemetry-subsystem health counters (populated in Step C).
-        buildTelemetryHealth(),
+        telemetryHealth(value("telemetry", (TelemetryHealthSnapshot) null)),
         // 333 §5: Freshness and provenance metadata
-        new StatusMeta(workerRpcAtMs, workerRpcStale));
+        new StatusMeta(workerRpcAtMs, workerRpcStale),
+        operating);
+  }
+
+  /**
+   * Whether the configured chat model can serve VDU (a vision projector is configured or reported),
+   * the "VDU-capable chat model is installed" half of Spec E §1.7's VDU availability. False without
+   * an inference runtime, which is the "AI never activated" case.
+   */
+  private boolean visionCapable() {
+    if (!(onlineAi instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection introspection)) {
+      return false;
+    }
+    return introspection.hasVisionCapability();
   }
 
   private WorkerOperationalView overlayVduCapability(WorkerOperationalView workerView) {
@@ -823,31 +1217,28 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       return null;
     }
     var supplier = vduCapabilitySnapshotSupplier;
-    io.justsearch.app.services.vdu.VduCapabilityState.Snapshot snapshot = null;
-    if (supplier != null) {
-      try {
-        snapshot = supplier.get();
-      } catch (RuntimeException e) {
-        log.debug("VDU capability snapshot supplier failed: {}", e.getMessage());
-      }
-    }
-    // Tempdoc 672 follow-up: "is a batch running right now" is read independently of the
-    // blocked-reason snapshot above — a healthy, actively-processing batch has no blocked reason
-    // at all, so the old blockedReason-only guard would have skipped this fact entirely.
-    var processingSupplier = vduProcessingSupplier;
-    boolean processing = false;
-    if (processingSupplier != null) {
-      try {
-        Boolean value = processingSupplier.get();
-        processing = value != null && value;
-      } catch (RuntimeException e) {
-        log.debug("VDU processing supplier failed: {}", e.getMessage());
-      }
-    }
+    io.justsearch.app.services.vdu.VduCapabilityState.Snapshot snapshot = value("vdu", null);
+    boolean processing = Boolean.TRUE.equals(value("vdu-processing", false));
     String blockedReason = snapshot != null ? snapshot.blockedReason() : null;
+    io.justsearch.app.services.gpu.GpuProfileResolver.Resolution plan = value("device-plan", null);
+    if (!Boolean.TRUE.equals(value("vision", false)) && plan != null
+        && plan.diagnosticReasons().contains("chat_identity_pending")) {
+      blockedReason = "chat_identity_pending";
+    }
     boolean blockedReasonPresent = blockedReason != null && !blockedReason.isBlank();
+    // Spec E step E1 (§1.7): only the Head knows whether a VDU backlog can drain, so it sets the
+    // availability the operating block's IDLE rule reads.
+    CoreIndexView core = workerView.core();
+    if (core != null) {
+      boolean vduAvailable = supplier != null && !blockedReasonPresent && Boolean.TRUE.equals(value("vision", false));
+      if (core.vduAvailable() != vduAvailable) {
+        core = core.withVduAvailable(vduAvailable);
+      }
+    }
     if (!blockedReasonPresent && !processing) {
-      return workerView;
+      return core == workerView.core()
+          ? workerView
+          : WorkerOperationalViewBuilder.builder(workerView).core(core).build();
     }
     VisualExtractionView visual =
         workerView.visualExtraction() == null
@@ -864,7 +1255,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
             blockedReasonPresent ? blockedReason : visual.vduBlockedReason(),
             processing);
     return WorkerOperationalViewBuilder.builder()
-        .core(workerView.core())
+        .core(core)
         .failure(workerView.failure())
         .migration(workerView.migration())
         .compatibility(workerView.compatibility())
@@ -878,6 +1269,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         .buildStamp(workerView.buildStamp())
         .aiReady(workerView.aiReady())
         .embeddingReady(workerView.embeddingReady())
+        .queryEncodersCold(workerView.queryEncodersCold())
+        .semanticStuckSinceMs(workerView.semanticStuckSinceMs())
+        .queryCpuRecourseAtMs(workerView.queryCpuRecourseAtMs())
         .build();
   }
 
@@ -887,33 +1281,22 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * <p>Returns {@link TelemetryHealthView#empty()} when the supplier isn't wired (tests / boot
    * paths without {@link io.justsearch.telemetry.LocalTelemetry}).
    */
-  private TelemetryHealthView buildTelemetryHealth() {
-    var snapshot = currentTelemetrySnapshot();
+  private static TelemetryHealthView telemetryHealth(TelemetryHealthSnapshot snapshot) {
     if (snapshot == null) return TelemetryHealthView.empty();
     return new TelemetryHealthView(snapshot.flushFailures(), snapshot.gaugeCallbackFailures());
   }
 
   /**
    * Tempdoc 419 C3 V2 P1: shared snapshot accessor. Returns {@code null} on missing supplier,
-   * supplier exception, null state, or snapshot exception. Both {@link #buildTelemetryHealth}
+   * supplier exception, null state, or snapshot exception. Both {@link #telemetryHealth}
    * and the readiness envelope's {@code TELEMETRY} dim consume this so the V1 view and V2
    * readiness can't drift.
    */
   private TelemetryHealthSnapshot currentTelemetrySnapshot() {
     Supplier<TelemetryHealthState> supp = telemetryHealthSupplier;
     if (supp == null) return null;
-    TelemetryHealthState state;
-    try {
-      state = supp.get();
-    } catch (RuntimeException e) {
-      return null;
-    }
-    if (state == null) return null;
-    try {
-      return state.snapshot();
-    } catch (RuntimeException e) {
-      return null;
-    }
+    TelemetryHealthState state = supp.get();
+    return state == null ? null : state.snapshot();
   }
 
   /**
@@ -944,18 +1327,19 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   /** 335 §9: Build GPU status from NVML probe (best-effort, Head-side, cached). */
-  private GpuStatusView buildGpuStatus() {
-    // Return cached value if fresh enough (avoid NVML init/shutdown per poll).
-    long now = System.currentTimeMillis();
+  private StatusObservation.Probe<GpuStatusView> buildGpuStatus() {
+    // Return cached value if fresh enough (avoid NVML init/shutdown per poll), with its probe time.
+    long now = clockMs.getAsLong();
+    long cachedAt = cachedGpuStatusAtMs;
     GpuStatusView cached = cachedGpuStatus;
-    if (cached != null && (now - cachedGpuStatusAtMs) < GPU_CACHE_TTL_MS) {
-      return cached;
+    if (cached != null && (now - cachedAt) < GPU_CACHE_TTL_MS) {
+      return new StatusObservation.Probe<>(cached, cachedAt);
     }
 
     GpuStatusView result = probeGpuStatus();
     cachedGpuStatus = result;
     cachedGpuStatusAtMs = now;
-    return result;
+    return new StatusObservation.Probe<>(result, now);
   }
 
   /**
@@ -963,11 +1347,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Coarse on/off fidelity only — {@code qualityKnown=false} always, since the configuration-quality
    * distinction needs admin elevation (629 §R1 / confidence-probe P1).
    */
-  private AtRestProtectionView buildAtRestProtection() {
-    long now = System.currentTimeMillis();
+  private StatusObservation.Probe<AtRestProtectionView> buildAtRestProtection() {
+    long now = clockMs.getAsLong();
+    long cachedAt = cachedAtRestAtMs;
     AtRestProtectionView cached = cachedAtRest;
-    if (cached != null && (now - cachedAtRestAtMs) < AT_REST_CACHE_TTL_MS) {
-      return cached;
+    if (cached != null && (now - cachedAt) < AT_REST_CACHE_TTL_MS) {
+      return new StatusObservation.Probe<>(cached, cachedAt);
     }
     AtRestProtectionView result;
     try {
@@ -977,22 +1362,27 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         probe = new io.justsearch.app.services.atrest.DiskEncryptionProbe(indexBasePath);
         diskEncryptionProbe = probe;
       }
-      io.justsearch.app.services.atrest.AtRestProtection p = probe.current();
-      result =
-          new AtRestProtectionView(p.state().name(), p.source(), p.confidence().name(), false);
+      // One reading per status build: its value and the time it was read come from the same
+      // immutable object, so an expiry between two calls cannot pair one reading's value with
+      // another's time (task b6d536 b101). A probe without readings (a test double) answers current().
+      var reading = probe.reading();
+      io.justsearch.app.services.atrest.AtRestProtection p =
+          reading != null ? reading.verdict() : probe.current();
+      result = new AtRestProtectionView(p.state().name(), p.source(), p.confidence().name(), false,
+          reading == null ? null : reading.probedAtMs());
     } catch (RuntimeException e) {
       log.debug("at-rest probe failed: {}", e.getMessage());
       result = AtRestProtectionView.unknown();
     }
     cachedAtRest = result;
     cachedAtRestAtMs = now;
-    return result;
+    return new StatusObservation.Probe<>(result, now);
   }
 
   /**
-   * Tempdoc 629 (#2): the reactive conversation-encryption status. A direct, cheap read of
-   * {@code DataKeyManager.state()} (synchronized, in-process — no probe, no cache needed), so the
-   * Health card + the locked-chat gate project one always-current authority off the /api/status poll.
+   * Tempdoc 629 (#2): the reactive conversation-encryption status. A sampler-owned read of
+   * {@code DataKeyManager.state()} (synchronized, in-process), so the
+   * Health card + the locked-chat gate project the sampled authority without taking its lock on HTTP.
    */
   private io.justsearch.app.api.status.ConversationProtectionView buildConversationProtection() {
     Supplier<String> supplier = conversationProtectionStateSupplier;
@@ -1022,6 +1412,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       GpuCapabilities caps =
           new io.justsearch.app.services.gpu.GpuCapabilityResolver(svc).snapshot();
       GpuCapabilities.Nvml nvml = caps.nvml();
+      var effective = caps.effective();
+      boolean cuda = effective != null && effective.cuda() != null && effective.cuda().functional();
+      long vram = nvml == null || nvml.totalVramBytes() == null ? -1L : nvml.totalVramBytes();
+      sampledHardwareProfile = new io.justsearch.configuration.model.HardwareProfile(
+          cuda || vram > 0, cuda, vram);
       if (nvml == null || !nvml.available()) {
         return GpuStatusView.unavailable();
       }
@@ -1058,16 +1453,22 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private volatile ModelDistributionStatusView cachedModelDist;
   private volatile long cachedModelDistAtMs;
 
-  private ModelDistributionStatusView buildModelDistributionStatus() {
-    long now = System.currentTimeMillis();
+  private volatile long cachedModelDistCounter = -1L;
+
+  private StatusObservation.Probe<ModelDistributionStatusView> buildModelDistributionStatus() {
+    long now = clockMs.getAsLong();
+    long cachedAt = cachedModelDistAtMs;
     ModelDistributionStatusView cached = cachedModelDist;
-    if (cached != null && (now - cachedModelDistAtMs) < MODEL_DIST_CACHE_TTL_MS) {
-      return cached;
+    if (cached != null && (now - cachedAt) < MODEL_DIST_CACHE_TTL_MS
+        && cachedModelDistCounter == io.justsearch.core.status.StatusChangeCounter.process().current()) {
+      return new StatusObservation.Probe<>(cached, cachedAt);
     }
+    long modelCounter = io.justsearch.core.status.StatusChangeCounter.process().current();
     ModelDistributionStatusView result = probeModelDistributionStatus();
+    cachedModelDistCounter = modelCounter;
     cachedModelDist = result;
     cachedModelDistAtMs = now;
-    return result;
+    return new StatusObservation.Probe<>(result, now);
   }
 
   private ModelDistributionStatusView probeModelDistributionStatus() {
@@ -1164,28 +1565,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   private io.justsearch.configuration.model.HardwareProfile buildCurrentHardwareProfile() {
-    boolean cudaFunctional =
-        io.justsearch.configuration.EnvRegistry.GPU_ENABLED
-            .get()
-            .map(Boolean::parseBoolean)
-            .orElse(false);
-    long vramBytes = -1;
-    if (gpuCapabilitiesSupplier != null) {
-      try {
-        var caps = gpuCapabilitiesSupplier.get();
-        if (caps != null) {
-          var snap = caps.snapshot();
-          if (snap.effective() != null) {
-            vramBytes = snap.effective().totalVramBytes();
-          }
-        }
-      } catch (Exception e) {
-        // best-effort
-      }
-    }
-    boolean gpuDetected = vramBytes > 0 || cudaFunctional;
-    return new io.justsearch.configuration.model.HardwareProfile(
-        gpuDetected, cudaFunctional, vramBytes);
+    var sampled = sampledHardwareProfile;
+    if (sampled != null) return sampled;
+    boolean cuda = io.justsearch.configuration.EnvRegistry.GPU_ENABLED.get()
+        .map(Boolean::parseBoolean).orElse(false);
+    return new io.justsearch.configuration.model.HardwareProfile(cuda, cuda, -1L);
   }
 
   private static String buildUpgradeGuidance(
@@ -1313,7 +1697,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private LifecycleProjection.Projection projectCurrentComponents() {
     EngineComponentRegistry registry = java.util.Objects.requireNonNull(
         componentRegistry, "Status requires the Engine component registry");
-    return LifecycleProjection.project(registry.snapshot(), Instant.now());
+    var snapshot = rememberComponents(registry.snapshot());
+    return LifecycleProjection.project(snapshot, Instant.now());
   }
 
   // Package-private for StatusLifecycleHandlerTest (tempdoc 600): lets the test drive a
@@ -1323,7 +1708,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   ReadinessEnvelopeView buildReadinessEnvelope(
       WorkerOperationalView workerView,
       LifecycleProjection.Projection projection,
-      WorkerContact workerContact) {
+      WorkerContact workerContact, boolean cached) {
     LifecycleSnapshotV2 lifecycleSnapshot = projection.lifecycle();
     String observedAt = lifecycleSnapshot.observed_at();
 
@@ -1333,9 +1718,20 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     Map<ReadinessDimension, ReadinessComponentView> computed =
         new EnumMap<>(ReadinessDimension.class);
     for (ReadinessDimension dim : ReadinessDimension.values()) {
-      ReadinessComponentView comp =
-          withContactProvenance(
-              dim, computeComponent(dim, workerView, lifecycleSnapshot, observedAt), workerContact);
+      String lane = "readiness-" + dim.key();
+      boolean independentProducer = !componentStateDimension(dim);
+      ReadinessComponentView raw = cached && independentProducer ? value(lane,
+          new ReadinessComponentView(READINESS_UNKNOWN, null, dim.source(), null, true, 0L))
+          : computeComponent(dim, workerView, lifecycleSnapshot, observedAt);
+      ReadinessComponentView comp = withContactProvenance(dim, raw, workerContact);
+      if (cached && ((independentProducer && stale(lane)) || (stale("registry") && (dim == ReadinessDimension.AI
+          || dim == ReadinessDimension.INDEX_CONTROL_PLANE || dim == ReadinessDimension.INDEX_SERVING))
+          || (dim == ReadinessDimension.TELEMETRY && stale("telemetry"))
+          || (dim == ReadinessDimension.VISUAL_DOCUMENT_UNDERSTANDING && (stale("vdu") || stale("vdu-processing") || stale("vision"))))) {
+        comp = new ReadinessComponentView(comp.state(), comp.reasonCode(), comp.source(),
+            comp.observedAt(), true, Math.max(comp.stalenessMs(),
+                observation(independentProducer ? lane : "registry").age(clockMs.getAsLong())));
+      }
       components.put(dim.key(), comp);
       computed.put(dim, comp);
     }
@@ -1359,6 +1755,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     }
 
     return new ReadinessEnvelopeView(2, observedAt, projection.engineComponents(), components, composites);
+  }
+
+  /** These dimensions project immutable current inputs; they call no producer or owner. */
+  private static boolean componentStateDimension(ReadinessDimension dimension) {
+    return dimension == ReadinessDimension.AI || dimension == ReadinessDimension.INDEX_CONTROL_PLANE
+        || dimension == ReadinessDimension.INDEX_SERVING;
   }
 
   /**
@@ -1428,6 +1830,27 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * <p>{@code BLOCKED_*} and {@code REBUILDING} are mutually exclusive states of the same
    * embedding-compat enum, so this never competes with {@link #compatBlockedReason}.
    */
+  /**
+   * Whether the worker's breaker has been open for at least {@code breakerStandingMs} at {@code
+   * nowMs} (Spec D §6.3). Shorter openings stay per request: each affected search reports its own
+   * skip with cause {@code stuck}.
+   */
+  static boolean semanticStuckStanding(WorkerOperationalView workerView, long nowMs) {
+    Long since = workerView.semanticStuckSinceMs();
+    return since != null
+        && nowMs - since >= io.justsearch.ort.DeviceGatePolicy.DEFAULTS.breakerStandingMs();
+  }
+
+  /**
+   * Whether a search turned away by a busy or stuck GPU had its query encoded on the warm CPU
+   * session within the last {@link io.justsearch.ort.QueryCpuRecourse#RECENT_MS} at {@code nowMs}:
+   * semantic search is being answered, from the CPU.
+   */
+  static boolean queryOnCpuRecently(WorkerOperationalView workerView, long nowMs) {
+    Long at = workerView.queryCpuRecourseAtMs();
+    return at != null && nowMs - at < io.justsearch.ort.QueryCpuRecourse.RECENT_MS;
+  }
+
   static String embeddingRebuildReason(WorkerOperationalView workerView) {
     var compat = workerView.compatibility();
     if (compat == null) {
@@ -1588,6 +2011,25 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // READY here would assert semantic retrieval the Worker is refusing to serve.
           state = READINESS_DEGRADED;
           reason = rebuildReason;
+        } else if (queryOnCpuRecently(workerView, clockMs.getAsLong())) {
+          // Searches the GPU turned away (no seat in time, or its breaker open) were answered
+          // semantically on the CPU: query embedding is ready, more slowly. A stuck GPU stays
+          // visible on the gpu component (encoders.health.semantic_stuck) beside this.
+          state = READINESS_READY;
+          reason = LifecycleReasonCode.ENCODERS_HEALTH_QUERY_ON_CPU.code();
+        } else if (semanticStuckStanding(workerView, clockMs.getAsLong())) {
+          // Spec D §6.3: a device's breaker has stayed open for breakerStandingMs because a GPU run
+          // is stuck. Searches answer with keyword results meanwhile (their semantic legs skip
+          // with cause stuck), so the embedding component is degraded with the standing code.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.ENCODERS_HEALTH_SEMANTIC_STUCK.code();
+        } else if (Boolean.TRUE.equals(workerView.queryEncodersCold())) {
+          // Spec D §4.2: the embedding was ready once and stays ready, but a query encoder has no
+          // warm session (a GPU release being re-warmed, or a prewarm that kept failing past its
+          // readiness bound). Searches fall back or run on CPU meanwhile, so only this component
+          // degrades, with the existing "models are reloading" reason.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.ENCODERS_RELOADING.code();
         } else {
           state = READINESS_READY;
           reason = null;
@@ -1668,6 +2110,18 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         // Tempdoc 419 C3 V2 P3: GPU saturation surfaces SATURATED when sustained > 80% with
         // no activity gate open. Defaults to READY when the monitor isn't wired (NVML
         // unavailable / headless) — saturation is opt-in evidence, not a blocking signal.
+        long gpuNowMs = clockMs.getAsLong();
+        if (semanticStuckStanding(workerView, gpuNowMs)
+            && queryOnCpuRecently(workerView, gpuNowMs)) {
+          // Spec D §6.3 with the CPU recourse: a GPU run is stuck, so work on that device (bulk
+          // embedding) waits, while searches are answered on the CPU (the embedding component's
+          // encoders.health.query_on_cpu). The stuck signal moves here rather than disappear.
+          yield readinessComponent(
+              READINESS_DEGRADED,
+              LifecycleReasonCode.ENCODERS_HEALTH_SEMANTIC_STUCK.code(),
+              dim.source(),
+              observedAt);
+        }
         var monitor = gpuSaturationMonitor;
         if (monitor == null) {
           yield readinessComponent(READINESS_READY, null, dim.source(), observedAt);
@@ -1677,8 +2131,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         try {
           gpuResult = monitor.compute(activityGate);
         } catch (RuntimeException e) {
-          log.debug("GPU saturation compute failed: {}", e.getMessage());
-          yield readinessComponent(READINESS_READY, null, dim.source(), observedAt);
+          throw e; // The lane retains its last verdict with a stale marker.
         }
         if (!io.justsearch.ui.observability.GpuSaturationMonitor.STATE_SATURATED.equals(
             gpuResult.state())) {
@@ -1695,7 +2148,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         // Tempdoc 419 C3 V2 P1: classify the live telemetry snapshot via the shared helper used
         // by GET /api/telemetry/health. Returns READY with null reason when the supplier isn't
         // wired (tests / boot paths without LocalTelemetry).
-        var snapshot = currentTelemetrySnapshot();
+        var snapshot = observations.isEmpty() ? currentTelemetrySnapshot()
+            : value("telemetry", (TelemetryHealthSnapshot) null);
         if (snapshot == null) {
           yield readinessComponent(READINESS_READY, null, dim.source(), observedAt);
         }
@@ -1753,7 +2207,10 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       case "vdu.ai_offline" -> LifecycleReasonCode.VDU_AI_OFFLINE.code();
       case "vdu.insufficient_vram" -> LifecycleReasonCode.VDU_INSUFFICIENT_VRAM.code();
       case "vdu.missing_mmproj" -> LifecycleReasonCode.VDU_MISSING_MMPROJ.code();
+      case "chat_identity_pending" -> "chat_identity_pending";
       case "vdu.circuit_open" -> LifecycleReasonCode.VDU_CIRCUIT_OPEN.code();
+      case "vdu.breaker_open.refused" -> LifecycleReasonCode.VDU_BREAKER_OPEN_REFUSED.code();
+      case "vdu.breaker_open.entry_failed" -> LifecycleReasonCode.VDU_BREAKER_OPEN_ENTRY_FAILED.code();
       default -> LifecycleReasonCode.OCR_ENGINE_MISSING.code();
     };
   }
@@ -1809,7 +2266,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * capability, or monitor state that is genuinely current at response-build time — a Worker
    * outage does not make them stale.
    */
-  private static boolean workerObserved(ReadinessDimension dim) {
+  static boolean workerObserved(ReadinessDimension dim) {
     return switch (dim) {
       case INDEX_SERVING, // source: worker_status
               EMBEDDING, // source: worker_health_check
@@ -1841,9 +2298,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Stamps a component with the Worker-contact freshness fact.
    *
    * <p>{@code observedAt} means "when the fact behind this component was last observed from its
-   * source". For head-local dimensions and for worker-observed ones while contact holds, that is
-   * this response's build time — they were observed just now — so the component passes through
-   * unchanged. For a worker-observed dimension after contact is lost, the response-build timestamp
+   * source". Independently produced dimensions retain their own publication's observation time;
+   * cheap component-state projections use this response's build time. For a worker-observed
+   * dimension after contact is lost, the response-build timestamp
    * would be a false freshness claim: the verdict shown is fallback-derived and the last real
    * observation is older. Those components therefore carry the epoch of the newest successful
    * Worker observation instead, with {@code stalenessMs} measuring the gap to now. When the Worker
@@ -1911,6 +2368,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       ReadinessEnvelopeView envelope, String componentKey) {
     if (envelope == null) return false;
     ReadinessComponentView comp = envelope.components().get(componentKey);
-    return comp != null && READINESS_READY.equals(comp.state());
+    return comp != null && !comp.stale() && READINESS_READY.equals(comp.state());
   }
 }

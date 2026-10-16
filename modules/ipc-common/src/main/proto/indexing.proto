@@ -181,6 +181,11 @@ message TraceDegradation {
   string hybrid_fallback_reason = 4;
   bool splade_executed = 5;
   string splade_skip_reason = 6;
+  // Spec D §6.1 (ADR-0050 decision 1): why a leg missed its semantic sub-budget, lower case
+  // ("contended", "loading" or "stuck"). Non-empty only when the matching reason is
+  // SEMANTIC_BUDGET_EXCEEDED.
+  string hybrid_fallback_cause = 7;
+  string splade_skip_cause = 8;
 }
 
 // One query-level stage node.
@@ -411,6 +416,13 @@ message RetrieveContextRequest {
   // Non-empty = a POSITIVE include of exactly those collections; EMPTY = the DEFAULT scope (the
   // MUST_NOT agent-history exclusion of tempdoc 585 D4b), never "match nothing".
   repeated string collection = 25;
+
+  // Spec D §5.1: an earlier step of the same answer (the head's open-retrieval pre-search), under
+  // the same request deadline, already used its semantic sub-budget waiting for models that were
+  // still loading. While they are still loading, the Worker does not wait for them again: it answers
+  // with BM25 at once, retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED and cause "loading". Once they
+  // are ready, the field changes nothing. False = today's behaviour.
+  bool semantic_loading_observed = 26;
 }
 
 // Tempdoc 610 §J.3 — a structured (parentDocId, chunkIndex) reference to one retrieved chunk.
@@ -483,6 +495,11 @@ message RetrieveContextResponse {
 
   // Quality signals for CRAG-style retrieval confidence assessment
   QualitySignals quality = 10;
+
+  // Spec D §5.1 (ADR-0050 decision 1): why the query embedding missed the retrieval's semantic
+  // sub-budget, lower case ("contended", "loading" or "stuck"). Non-empty only when
+  // retrieval_mode_reason is SEMANTIC_BUDGET_EXCEEDED.
+  string retrieval_mode_cause = 11;
 }
 
 // Retrieval quality signals enabling agents to assess confidence
@@ -895,7 +912,20 @@ message EnrichmentCoverage {
   // those siblings (FeatureCoverage.failed_count) and the app-api view, not the int32 the
   // neighbouring pending/completed_ner_count fields happen to use.
   int64 failed_ner_count = 19;
-  // Next available field number: 20
+  // Spec E step E0b (task b6d536, the S5 unit): whole documents that are BOTH embedded
+  // (embedding_status COMPLETED) and sparse-encoded (splade_status COMPLETED or COMPLETED_EMPTY,
+  // written by SPLADE and BGE-M3 alike), counted by ONE Lucene query. The sum or minimum of the
+  // per-stage counters above is not this number: a document can be done in one stage and not the
+  // other.
+  int64 embedded_and_sparse_count = 20;
+  // Spec E step E1 (§1.7): whether each stage can drain its backlog right now, by the same provider
+  // checks the backfill loop uses to start the stage. *_enabled above is wire-time provider
+  // presence; these are the live checks. Status reads a backlog in an unavailable stage as nothing
+  // to wait for, so a machine whose AI was never activated still reads IDLE.
+  bool embedding_available = 21;
+  bool splade_available = 22;
+  bool ner_available = 23;
+  // Next available field number: 24
 }
 
 // One enrichment stage's completeness audit (tempdoc 821 §3-C3).
@@ -1161,7 +1191,10 @@ message MarkVduProcessingResponse {
 // === Recover VDU Processing (Startup Recovery) ===
 // Resets documents stuck in PROCESSING state back to PENDING
 
-message RecoverVduProcessingRequest {}
+message RecoverVduProcessingRequest {
+  // Empty retains general recovery. Otherwise reset only this admitted procedure's claims.
+  string procedure_owner = 1;
+}
 
 message RecoverVduProcessingResponse {
   int32 recovered_count = 1;  // Number of docs reset from PROCESSING to PENDING
@@ -1650,4 +1683,16 @@ message HealthCheckResponse {
   // Effective config values for Head→Worker divergence detection (tempdoc 329).
   // Populated with a curated set of critical keys from ConfigStore.
   map<string, string> effective_config = 8;
+  // Spec D §4.2: a configured query encoder has no warm session, so a search may fall back
+  // (cause loading) or run on CPU until the prewarm re-warms it. embedding_ready stays true once
+  // it was reached; this flag is the component-level state. False when no encoder is available.
+  bool query_encoders_cold = 9;
+  // Spec D §2, §6.3: since when (epoch ms) a device's breaker has been open, because a GPU run
+  // (not its session's first) has held its seat past stuckAfterMs; 0 while every breaker is closed.
+  // While it is open, query legs on that device run on the warm CPU session (see field 11), and skip
+  // with SEMANTIC_BUDGET_EXCEEDED (cause stuck) only without one or when the CPU also misses.
+  int64 semantic_stuck_since_ms = 10;
+  // When (epoch ms) a turned-away foreground query leg (no seat in time, or the breaker open) was
+  // last encoded on the warm CPU session instead; 0 when that has not happened in this process.
+  int64 query_cpu_recourse_at_ms = 11;
 }

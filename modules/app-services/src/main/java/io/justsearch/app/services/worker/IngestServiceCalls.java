@@ -93,6 +93,12 @@ public interface IngestServiceCalls {
   /** {@code IngestService/MarkVduProcessing}. */
   io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request);
 
+  /**
+   * Returns a PROCESSING document the pass could not attempt to PENDING and gives back the attempt
+   * its mark counted; false when it is absent or no longer PROCESSING. In-process only.
+   */
+  boolean releaseVduProcessing(String docId);
+
   /** {@code IngestService/RecoverVduProcessing}. */
   io.justsearch.ipc.RecoverVduProcessingResponse recoverVduProcessing(io.justsearch.ipc.RecoverVduProcessingRequest request);
 

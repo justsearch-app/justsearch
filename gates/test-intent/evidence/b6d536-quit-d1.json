@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:79980b9d786249111daa45082da1dbf41f82b0e58ebec63b4028b6442edb9960"
+  },
+  "createdAt": "2026-10-15T21:06:22.004Z",
+  "revision": "087fb01ccca5e4594ef738aaebde0d417b6f01e4",
+  "tree": "38ec17f542b1d01c9784d717aae45d459a64932a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.aQuitDuringAUnitThatNeverYieldsAbandonsItToReplayOnceToComplete\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 28368
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#aQuitDuringAUnitThatNeverYieldsAbandonsItToReplayOnceToComplete",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f3413d3d3d0781a893c59646f16a39a05f3135db8b7394b3fdf649dd3a13a4c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQuitDuringAUnitThatNeverYieldsAbandonsItToReplayOnceToComplete()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e32abcce00aa7b36f0466a43485f6a46257c574d96992aba7c4a73ddde00d5d6"
+}

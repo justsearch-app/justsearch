@@ -419,7 +419,7 @@ public final class RemoteIndexingJobsBridge {
                     items.add(toView(view));
                   }
                   List<IndexingJobView> immutable = List.copyOf(items);
-                  cached.set(new CachedSnapshot(frame.getSeq(), immutable));
+                  replaceSnapshot(new CachedSnapshot(frame.getSeq(), immutable));
                   // Separate overload bursts must not exhaust a lifetime cap after recovery.
                   // Keep the delay backoff: snapshot-then-immediate-failure must not busy-loop.
                   recentAttempts.clear();
@@ -497,7 +497,8 @@ public final class RemoteIndexingJobsBridge {
    * original position). Atomic so concurrent {@link #latestSnapshot()} readers
    * always see a consistent immutable list.
    */
-  private void upsertSnapshot(IndexingJobView view, long seq) {
+  private synchronized void upsertSnapshot(IndexingJobView view, long seq) {
+    var before = cached.get();
     cached.updateAndGet(
         cur -> {
           var map = new java.util.LinkedHashMap<String, IndexingJobView>(cur.items().size() + 1);
@@ -507,10 +508,12 @@ public final class RemoteIndexingJobsBridge {
           map.put(view.pathHash(), view);
           return new CachedSnapshot(seq, List.copyOf(map.values()));
         });
+    statusChanged(before, cached.get());
   }
 
   /** Remove a row from the cached snapshot by primary key (tempdoc 550 §B.2). */
-  private void removeFromSnapshot(String pathHash, long seq) {
+  private synchronized void removeFromSnapshot(String pathHash, long seq) {
+    var before = cached.get();
     cached.updateAndGet(
         cur -> {
           boolean present = false;
@@ -532,6 +535,21 @@ public final class RemoteIndexingJobsBridge {
           }
           return new CachedSnapshot(seq, List.copyOf(out));
         });
+    statusChanged(before, cached.get());
+  }
+
+  private synchronized void replaceSnapshot(CachedSnapshot next) {
+    statusChanged(cached.getAndSet(next), next);
+  }
+
+  private static void statusChanged(CachedSnapshot before, CachedSnapshot after) {
+    io.justsearch.core.status.StatusChangeCounter.process().changed(jobStates(before), jobStates(after));
+  }
+
+  /** Which job states are present. How many jobs are in each is a measurement, not a publication. */
+  private static Object jobStates(CachedSnapshot snapshot) {
+    return snapshot.items().stream().map(IndexingJobView::state)
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 
   private void emit(Delta delta) {

@@ -47,7 +47,7 @@ public interface SessionHandle extends AutoCloseable {
    * session (GPU if available and not being released, else CPU), the per-session
    * {@link ai.onnxruntime.OrtSession.RunOptions} (null for CPU sessions), and a {@code release}
    * runnable. Callers must close the lease via try-with-resources or explicit
-   * {@code release.run()} to avoid holding the GPU serialisation semaphore.
+   * {@code release.run()} to avoid holding the GPU device gate's seat.
    */
   Lease acquire(SessionAcquisitionRequest request);
 
@@ -55,7 +55,7 @@ public interface SessionHandle extends AutoCloseable {
    * Acquires a CPU-only lease for explicit fallback-path inference (e.g., SPLADE's
    * {@code runHeapFallback} on BFCArena failure). The returned lease is always backed by the
    * CPU session; {@link Lease#runOptions()} is always null; {@link Lease#isCpu()} is always true.
-   * No GPU serialisation semaphore is held — CPU sessions are fully concurrent by ORT's own
+   * No GPU device gate seat is held — CPU sessions are fully concurrent by ORT's own
    * design.
    *
    * <p>Tempdoc 397 §14.5 W4. Intended for the pattern
@@ -83,6 +83,74 @@ public interface SessionHandle extends AutoCloseable {
 
   /** True if the GPU session is currently available (session created + not being released). */
   boolean isGpuAvailable();
+
+  /** Retained weights of the realized GPU artifact; empty when no byte witness was captured. */
+  default java.util.OptionalLong retainedGpuWeightsBytes() {
+    return java.util.OptionalLong.empty();
+  }
+
+  /**
+   * The device a query run would select now (Spec D §1.1): {@link QueryDevice#GPU} only when a
+   * GPU session is available for it and warm (§4.2), otherwise {@link QueryDevice#CPU}. A search
+   * reads this to choose its semantic sub-budget cap.
+   */
+  default QueryDevice queryDevice() {
+    return isGpuAvailable() ? QueryDevice.GPU : QueryDevice.CPU;
+  }
+
+  /**
+   * Whether a query, which may not create sessions, would run now on the session it selects
+   * (Spec D §4.2): a warm GPU session when the GPU is in use, otherwise an existing CPU session.
+   * Readiness reads this. Handles without native session state are always warm.
+   */
+  default boolean isQueryWarm() {
+    return true;
+  }
+
+  /** Whether lifecycle prewarm should retry the GPU while CPU queries remain ready. */
+  default boolean isGpuRetryDue() {
+    return false;
+  }
+
+  /**
+   * Makes the CPU session of a GPU handle warm (created and run once) so that a query the device
+   * cannot seat within its budget can run on it instead of falling back to keyword search. The
+   * query encoders' prewarm calls this after their GPU session is warm. Handles without a GPU, or
+   * without native session state, have nothing to warm and return false.
+   *
+   * @return whether the CPU session is warm for such queries afterwards
+   */
+  default boolean prewarmCpuForQueries(SessionAcquisitionRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
+    return false;
+  }
+
+  /**
+   * Registers a listener run after any of this handle's sessions is created, released or reported
+   * failed, which may change {@link #isQueryWarm()}. Listeners must only schedule work: they run
+   * on the thread that changed the session. Handles without native session state never notify.
+   */
+  default void addGenerationListener(Runnable listener) {
+    java.util.Objects.requireNonNull(listener, "listener");
+  }
+
+  /**
+   * The device-memory plan this handle's calls are packed against (Spec E revision 4 §2.2), read
+   * by the encoders on every call so that a new plan takes effect on the next call. Empty when no
+   * plan is applied, in which case every call keeps today's shape. Since step E7b a GPU handle on a
+   * planned profile returns its device's current plan (see {@link NativeSessionHandle}).
+   */
+  default java.util.Optional<GpuArenaPlan> arenaPlan() {
+    return java.util.Optional.empty();
+  }
+
+  /**
+   * Whether this handle may select a planned GPU session, even when its current CPU placement
+   * exposes no packing plan. Such a handle must not upgrade an unbounded CPU-shaped call to GPU.
+   */
+  default boolean requiresGpuPacking() {
+    return false;
+  }
 
   /** Observability view of GPU state (readiness, fallback cause, etc.). */
   OrtCudaStatus status();
@@ -125,9 +193,10 @@ public interface SessionHandle extends AutoCloseable {
    * them before the session closes. Tempdoc 397 §14.5 W5.
    *
    * <p>Calling twice replaces the previous callback (at-most-one). Pass {@code null} to clear.
-   * Contract matches {@link GpuLifecycleCallback}'s documentation: invocation is synchronous on
-   * the {@link #releaseGpu()} caller's thread while the handle holds the GPU inference
-   * semaphore, so no concurrent GPU inference can race with the cleanup.
+   * Contract matches {@link GpuLifecycleCallback}'s documentation: invocation happens once no GPU
+   * inference on the session is in flight, so none can race with the cleanup (on the {@link
+   * #releaseGpu()} caller's thread, or on the releasing thread of a run the session was retired
+   * to).
    */
   void setLifecycleCallback(GpuLifecycleCallback callback);
 
@@ -168,10 +237,10 @@ public interface SessionHandle extends AutoCloseable {
 
   /**
    * A lease on one exact ORT session instance. Closing it releases that instance's holder count
-   * and the GPU serialisation semaphore (if held). Release is idempotent; a lease never releases
+   * and the GPU device gate seat (if held). Release is idempotent; a lease never releases
    * or authorizes closure of a replacement session. Use with try-with-resources.
    *
-   * <p>The {@code release} runnable captures any internal cleanup logic (semaphore release,
+   * <p>The {@code release} runnable captures any internal cleanup logic (seat release,
    * state-re-check) from the underlying session manager.
    *
    * <p>Tempdoc 397 §14.5 W3: the {@code isCpu} flag is set by {@link
@@ -196,6 +265,9 @@ public interface SessionHandle extends AutoCloseable {
    * @param recorder recording hook bound via {@link SessionHandle#setOrtRunRecorder} at the time
    *     this lease was acquired; never null ({@link OrtRunRecorder#NOOP} by default)
    * @param acquisition authority checked before each native run; null only for compatibility leases
+   * @param cudaDevice the CUDA device ordinal a GPU lease's session runs on, or {@link #NO_DEVICE}
+   *     for a CPU lease or a lease whose device is not known; a run on a known device that fails
+   *     with a device-lost code latches that device's {@link DeviceHealth} (Spec E §6.2)
    */
   record Lease(
       OrtSession session,
@@ -203,17 +275,28 @@ public interface SessionHandle extends AutoCloseable {
       Runnable release,
       boolean isCpu,
       OrtRunRecorder recorder,
-      SessionAcquisitionRequest acquisition)
+      SessionAcquisitionRequest acquisition,
+      int cudaDevice)
       implements AutoCloseable {
+
+    /** The {@link #cudaDevice()} of a lease that runs on no known CUDA device. */
+    public static final int NO_DEVICE = -1;
 
     /** Compatibility constructor for leases without admitted request authority. */
     public Lease(OrtSession session, OrtSession.RunOptions runOptions, Runnable release,
         boolean isCpu, OrtRunRecorder recorder) {
-      this(session, runOptions, release, isCpu, recorder, null);
+      this(session, runOptions, release, isCpu, recorder, null, NO_DEVICE);
+    }
+
+    /** A lease on no known CUDA device. */
+    public Lease(OrtSession session, OrtSession.RunOptions runOptions, Runnable release,
+        boolean isCpu, OrtRunRecorder recorder, SessionAcquisitionRequest acquisition) {
+      this(session, runOptions, release, isCpu, recorder, acquisition, NO_DEVICE);
     }
 
     public Lease {
       recorder = recorder != null ? recorder : OrtRunRecorder.NOOP;
+      if (isCpu || cudaDevice < 0) cudaDevice = NO_DEVICE;
     }
 
     /**
@@ -224,16 +307,65 @@ public interface SessionHandle extends AutoCloseable {
      * {@link OrtException} is not recorded (see {@link OrtRunRecorder} semantics) — callers
      * retrying on a fallback lease record that attempt separately, once each.
      *
+     * <p>When the lease's acquisition asks to release the caller at its deadline (a query leg under
+     * a semantic sub-budget, {@link SessionAcquisitionRequest#releaseCallerAtDeadline()}), this is
+     * {@link #runWithin} with the acquisition's deadline (Spec D §1.5).
+     *
      * @param inputs named input tensors
      * @return the ORT result; caller owns its lifecycle (try-with-resources)
      */
     public OrtSession.Result run(Map<String, OnnxTensor> inputs) throws OrtException {
+      if (acquisition != null) {
+        acquisition.remainingNanos();
+        if (acquisition.releaseCallerAtDeadline()) {
+          return DetachableRun.runWithin(this, inputs, acquisition.deadlineNanos());
+        }
+      }
+      return runOnCallerThread(inputs);
+    }
+
+    /**
+     * Runs one ORT inference call and returns to the caller no later than {@code deadlineNanos}
+     * (Spec D §1.5). The native call runs on a platform run thread. If it has not returned by the
+     * deadline, this throws {@link SessionAcquireDeadlineExceededException} with phase {@code RUN}
+     * and the lease becomes detached: {@link #close()} is then a no-op, and the run thread releases
+     * the lease, exactly once, when the native call returns. The run is not cancelled, so its
+     * session (and GPU memory) stays held until then. Leases not issued by {@link
+     * NativeSessionHandle} run on the caller's thread as {@link #run} does.
+     *
+     * @param inputs named input tensors; the run uses its own copies, so the caller may close them
+     * @param deadlineNanos {@link System#nanoTime()} deadline for returning to the caller
+     * @return the ORT result; caller owns its lifecycle (try-with-resources)
+     */
+    public OrtSession.Result runWithin(Map<String, OnnxTensor> inputs, long deadlineNanos)
+        throws OrtException {
       if (acquisition != null) acquisition.remainingNanos();
+      return DetachableRun.runWithin(this, inputs, deadlineNanos);
+    }
+
+    /** The native call on the current thread, recorded at the choke point. */
+    OrtSession.Result runOnCallerThread(Map<String, OnnxTensor> inputs) throws OrtException {
       long start = System.nanoTime();
-      OrtSession.Result result =
-          runOptions != null ? session.run(inputs, runOptions) : session.run(inputs);
+      OrtSession.Result result;
+      try {
+        result = runOptions != null ? session.run(inputs, runOptions) : session.run(inputs);
+      } catch (OrtException failure) {
+        throw reportIfDeviceLost(failure);
+      }
       recorder.recordOrtRunNs(System.nanoTime() - start);
       return result;
+    }
+
+    /**
+     * Spec E §6.2 item 1: a GPU run that fails with a code of the closed device-lost list latches
+     * its device's {@link DeviceHealth}. The failure is returned unchanged, for the caller to throw.
+     */
+    private OrtException reportIfDeviceLost(OrtException failure) {
+      if (cudaDevice != NO_DEVICE) {
+        DeviceLostClassifier.classify(failure)
+            .ifPresent(code -> DeviceHealth.forDevice(cudaDevice).reportLost(code));
+      }
+      return failure;
     }
 
     /**
@@ -249,7 +381,11 @@ public interface SessionHandle extends AutoCloseable {
         throws OrtException {
       if (acquisition != null) acquisition.remainingNanos();
       long start = System.nanoTime();
-      session.run(inputs, Collections.emptySet(), pinnedOutputs, runOptions).close();
+      try {
+        session.run(inputs, Collections.emptySet(), pinnedOutputs, runOptions).close();
+      } catch (OrtException failure) {
+        throw reportIfDeviceLost(failure);
+      }
       recorder.recordOrtRunNs(System.nanoTime() - start);
     }
 

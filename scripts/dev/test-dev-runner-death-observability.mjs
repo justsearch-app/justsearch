@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Tempdoc 730 Increment 4 (B1/B2/B3) — death observability ratchet.
  *
@@ -145,7 +146,6 @@ function testBuildStopReportKillPath() {
     runId: 'run-kill-1',
     stoppedAt: '2026-07-14T16:10:00.000Z',
     disposition: 'normal_stop',
-    taskkillExitCode: 0,
     killedPids: [111, 222],
     pidLiveness: [
       { role: 'backend', pid: 111, aliveBeforeKill: true },
@@ -167,9 +167,11 @@ function testBuildStopReportKillPath() {
   assert.equal(report.pidLiveness[1].aliveBeforeKill, false);
   assert.deepEqual(report.pidLiveness[2], { role: 'worker', pid: null, aliveBeforeKill: null },
     'a named role with an invalid/missing pid must carry a null-shape entry, not be omitted');
-  // backendExitCode omitted entirely (not `null`) when not applicable — kill-driven stops carry
-  // taskkillExitCode instead.
+  // backendExitCode omitted entirely (not `null`) when not applicable — a kill-driven stop's exit is
+  // the census's and the ledger's.
   assert.ok(!('backendExitCode' in report), 'kill-driven stop-report should not carry backendExitCode');
+  // Spec B step 9: taskkill's own exit code and stderr are no longer part of the report.
+  assert.ok(!('taskkillExitCode' in report) && !('taskkillStderrTail' in report), JSON.stringify(report));
   console.log('test-dev-runner-death-observability: buildStopReport kill-path shape — PASS');
 }
 
@@ -336,12 +338,21 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identity
           return { status: 0, stdout: JSON.stringify({ alive: !terminated.has(inspectedPid), executable: process.execPath,
             startedAt: inspectedPid === 101 ? '2026-10-01T00:00:00.123Z' : '2026-10-01T00:00:00.124Z' }) };
         }
-        if (command === 'taskkill' && ['101', '102'].includes(args[1])) {
-          terminated.add(Number(args[1]));
-          fs.writeFileSync(${JSON.stringify(cleanupReceipt)}, JSON.stringify({ killedPid: Number(args[1]) }));
-          return { status: 0 };
-        }
         return spawnSync(command, args, options);
+      };
+      // The registered child's kill: terminate-process.ps1, which re-checks the birth on its handle.
+      const execFile = cp.execFile;
+      cp.execFile = function(command, args, options, callback) {
+        const killedPid = command === 'powershell.exe' && Array.isArray(args)
+          && args.some(a => /terminate-process\\.ps1$/.test(String(a))) ? Number(args[args.indexOf('-Pid') + 1]) : null;
+        if ([101, 102].includes(killedPid)) {
+          terminated.add(killedPid);
+          fs.writeFileSync(${JSON.stringify(cleanupReceipt)}, JSON.stringify({ killedPid }));
+          const done = typeof options === 'function' ? options : callback;
+          process.nextTick(() => done(null, JSON.stringify({ outcome: 'terminated', pid: killedPid }) + '\\n', ''));
+          return null;
+        }
+        return execFile.apply(this, arguments);
       };
     }
     const identity = require(${JSON.stringify(path.join(__dirname, 'lib/process-identity.cjs'))});

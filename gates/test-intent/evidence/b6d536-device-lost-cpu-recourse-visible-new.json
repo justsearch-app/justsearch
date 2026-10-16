@@ -1,0 +1,121 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:27:08.559Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ba2f3dba7c5e3d5ac5b492b52d8b59bd6bdb8264",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 33129
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6603
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.WorkerStatusMapperQueryOnCpuTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6124
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9956
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:01fabfbec98772764c97084e00ab2191ccda35bec5a864476da31ffa5cfe926e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aTurnedAwayLegIsRecordedForItsTraceAndForStatus()",
+          "status": "passed"
+        },
+        {
+          "name": "anObservationSeesOnlyTheLeasesOfItsOwnThreadAndScope()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bba97e06eba6177911fbd8d5aa6ae926b22dd81eefd37ae6ddc3e6671a282e79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperQueryOnCpuTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperQueryOnCpuTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f990b7c8bde99f14ebdff895ee9c2b89530e3d6cd9279f17b7a5b9d91576ec0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "toUiStatusMapCarriesTheTimeTheCpuRecourseLastTookAQueryLeg()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d10c1dee6e057371aec92ef1e311fa144454082534b33c3e5d5f8bc6bd8c795b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes()",
+          "status": "passed"
+        },
+        {
+          "name": "aStuckGpuStaysVisibleBesideSearchesAnsweredOnTheCpu()",
+          "status": "passed"
+        },
+        {
+          "name": "searchesAnsweredOnTheCpuKeepTheEmbeddingReadyWithTheQueryOnCpuCode()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:fb384f5ed5cd6425f4090f39190450a914e3c9101d6eea5991bc0da8d8e64740"
+}

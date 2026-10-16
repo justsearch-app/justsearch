@@ -86,6 +86,7 @@ import {
   type AiEngineVerdict,
 } from './aiVerdict.js';
 import type { NoticeTone } from '../utils/statusTone.js';
+import { chatFailureReason, chatUnloadedReason } from './chatResidency.js';
 
 // Re-export the raw snapshot types — the store is the single observed-state
 // authority, so consumers type `aiState.status` / `aiState.inference` from here.
@@ -264,6 +265,20 @@ export interface AiState {
    */
   snapshotLive: boolean;
   /**
+   * Spec A step 9 — the AI readiness reason when the Engine unloaded the chat model for another GPU
+   * user (`inference.unloaded_gpu_pressure` / `inference.unloaded_game_mode`), else null. Chat is
+   * then not offline: a person's chat request loads it again, and the chat window offers "Load
+   * anyway". Optional so hand-built fixtures without it read as "not unloaded".
+   */
+  chatUnloadedReason?: string | null;
+  /**
+   * Spec A step 7 (F1) — the AI readiness reason that says why chat failed, as the chat controller
+   * classified it (`inference.model_load_failed`, `inference.out_of_memory`, ...), else null. The
+   * controls and Health say that cause instead of a bare "offline". Optional so hand-built fixtures
+   * without it read as "no classified failure".
+   */
+  chatFailureReason?: string | null;
+  /**
    * The last-known raw poll snapshots (B7). Consumers that need fields beyond
    * the projection above (GPU, memory ceiling, uptime, index state, inference
    * queues) read these instead of running a SECOND status/inference poll — the
@@ -441,7 +456,10 @@ function computeCapabilities(): AiCapabilities {
   // has DISABLED chat (chatEnabledSpec=false) — chat is NOT available then, even though mode==='online'.
   // `chatEnabledSpec` undefined (older backend) leaves the legacy behaviour unchanged.
   const chatDisabledBySpec = status?.inference?.chatEnabledSpec === false;
-  const chat = inference?.mode === 'online' && inference?.available === true && !chatDisabledBySpec;
+  const chatState = status?.operating?.chat?.state;
+  const chat = !chatDisabledBySpec && (chatState !== undefined
+    ? chatState === 'READY'
+    : inference?.mode === 'online' && inference?.available === true);
   const docs = status?.worker?.core?.indexedDocuments ?? 0;
   return {
     chat,
@@ -949,6 +967,14 @@ function buildSnapshot(): AiState {
     runtimeStatus,
     packStatus: packStatusSig.get(),
     aiEngine,
+    chatUnloadedReason: chatUnloadedReason(
+      readiness.known ? readiness.value.reasonCodes : [],
+      status?.inference?.chatEnabledSpec,
+    ),
+    chatFailureReason: chatFailureReason(
+      readiness.known ? readiness.value.reasonCodes : [],
+      status?.inference?.chatEnabledSpec,
+    ),
   };
 }
 
@@ -1024,7 +1050,14 @@ function onInferenceUpdate(snap: InferenceSnapshot | null): void {
   }
 }
 
-function onStatusUpdate(snap: StatusSnapshot | null): void {
+function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void {
+  // A producer epoch change revokes everything the previous producer reported: its status body and
+  // its inference snapshot. Capabilities and runtime fall back to inference data when no status is
+  // held, so keeping it would show the previous process as Online. Only the new head's reads restore.
+  if (invalidated) {
+    statusSig.set(null);
+    ingestInferenceSnapshot(null);
+  }
   if (snap) {
     statusSig.set(snap);
     lastStatusSuccessSig.set(Date.now());
@@ -1170,6 +1203,8 @@ export function stopAiStateStore(): void {
     stalenessTimer = null;
   }
   started = false;
+  // The stopped poller has discarded its epoch and replay state.
+  statusSig.set(null);
 }
 
 export function subscribeAiState(listener: (s: AiState) => void): () => void {

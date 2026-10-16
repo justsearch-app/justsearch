@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Tempdoc 735 G6 — campaign-length lease hold.
  *

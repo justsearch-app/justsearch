@@ -126,7 +126,7 @@ function eligibleEntry(record = REC()) {
 /** A fake `taskkill` that counts invocations. Reaching it in an adverse test is the failure. */
 function countingExec() {
   const calls = [];
-  const exec = (file, args) => { calls.push([file, ...args].join(' ')); return { status: 0, stdout: '', stderr: '' }; };
+  const exec = (file, args) => { calls.push([file, ...args].join(' ')); return { status: 0, stdout: '{"outcome":"terminated"}', stderr: '' }; };
   return { exec, calls };
 }
 
@@ -270,7 +270,15 @@ await check('TOCTOU control: with a fresh snapshot the SAME entry proceeds — s
   assert.equal(res.refused, false);
   assert.equal(res.killed, true);
   assert.equal(res.confirmed, true, 'the confirmation read must see the pid gone');
-  assert.deepEqual(calls, [`taskkill.exe /PID ${PID} /F`], 'by pid, /F, and never /T');
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].startsWith('powershell.exe '));
+  assert.ok(calls[0].includes(`-Pid ${PID}`));
+  assert.ok(calls[0].includes(`-CreationFileTimeUtc ${record.creationFileTimeUtc}`));
+  assert.ok(calls[0].includes(`-Pid ${PID} -CreationFileTimeUtc ${record.creationFileTimeUtc} -Code 1`),
+    'termination rechecks the recorded birth on its handle');
+  assert.ok(calls[0].includes('terminate-process.ps1'), 'birth check and termination share one native handle');
+  assert.ok(!calls[0].includes('/T'));
+  assert.ok(!calls[0].includes('-Tree'), 'only the registered process, never its tree');
   assert.equal(reads, 2, 'executeReap reads the table twice: re-verify, then confirm');
   assert.equal(res.stamp.by.occasion, SWEEP_OCCASION);
   assert.equal(res.stamp.by.cell, CELLS.SAME_SESSION);

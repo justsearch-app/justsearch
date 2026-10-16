@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-10-03.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-10-16.
 
 Precedence note:
 1. `sysprop > env > YAML > default` where a YAML key and env/sysprop override both exist.
@@ -171,6 +171,8 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.EMBED_LATE_CHUNKING_ENABLED | permanent | - | JUSTSEARCH_EMBED_LATE_CHUNKING_ENABLED | justsearch.embed.late_chunking_enabled | EMBED_LATE_CHUNKING_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EMBED_ONNX_MODEL_PATH | permanent | - | JUSTSEARCH_EMBED_ONNX_MODEL_PATH | justsearch.embed.onnx.model_path | EMBED_ONNX_MODEL_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.ENGINE_ADMISSION_AGGREGATE_LIMIT | permanent | - | JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT | justsearch.engine.admission.aggregate_limit | ENGINE_ADMISSION_AGGREGATE_LIMIT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.ENGINE_INCARNATION | permanent | - | JUSTSEARCH_ENGINE_INCARNATION | justsearch.engine.incarnation | ENGINE_INCARNATION | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.EVAL_MODE | permanent | - | JUSTSEARCH_EVAL_MODE | justsearch.eval.mode | EVAL_MODE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_COMMAND | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND | justsearch.extraction.sandbox.command | EXTRACTION_SANDBOX_COMMAND | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_HEAP | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_HEAP | justsearch.extraction.sandbox.heap | EXTRACTION_SANDBOX_HEAP | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.EXTRACTION_SANDBOX_MAX_REQUESTS | permanent | - | JUSTSEARCH_EXTRACTION_SANDBOX_MAX_REQUESTS | justsearch.extraction.sandbox.max_requests | EXTRACTION_SANDBOX_MAX_REQUESTS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -179,9 +181,13 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.FIELD_CATALOG | permanent | - | JUSTSEARCH_FIELD_CATALOG | justsearch.fieldCatalog | FIELD_CATALOG | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.FILTER_NORM_ENABLED | experimental | - | JUSTSEARCH_FILTER_NORM_ENABLED | justsearch.filter_norm.enabled | FILTER_NORM_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.GPL_REEVAL_SIZE_FACTOR | permanent | - | JUSTSEARCH_GPL_REEVAL_SIZE_FACTOR | justsearch.gpl.reeval_size_factor | GPL_REEVAL_SIZE_FACTOR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.GPU_DEVICE_AVAILABLE | permanent | - | JUSTSEARCH_GPU_DEVICE_AVAILABLE | justsearch.gpu.device_available | GPU_DEVICE_AVAILABLE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB | permanent | - | JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB | justsearch.gpu.device_memory_ceiling_mb | GPU_DEVICE_MEMORY_CEILING_MB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.GPU_ENABLED | permanent | - | JUSTSEARCH_GPU_ENABLED | justsearch.gpu.enabled | GPU_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.GPU_GAME_DETECTION | permanent | - | JUSTSEARCH_GPU_GAME_DETECTION | justsearch.gpu.game_detection | GPU_GAME_DETECTION | modules/configuration (ResolvedConfigBuilder) | sysprop > env > settings.json > default |
 | EnvRegistry.GPU_LAYERS | permanent | - | JUSTSEARCH_GPU_LAYERS | justsearch.gpu.layers | GPU_LAYERS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.GPU_MEMORY_PLAN | permanent | - | JUSTSEARCH_GPU_MEMORY_PLAN | justsearch.gpu.memory_plan | GPU_MEMORY_PLAN | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.GPU_MEMORY_PLAN_UNPLANNED_ROLES | permanent | - | JUSTSEARCH_GPU_MEMORY_PLAN_UNPLANNED_ROLES | justsearch.gpu.memory_plan_unplanned_roles | GPU_MEMORY_PLAN_UNPLANNED_ROLES | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HEAD_BUILD_STAMP | permanent | - | JUSTSEARCH_HEAD_BUILD_STAMP | justsearch.head.stamp | HEAD_BUILD_STAMP | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HEAD_TRACING_LEVEL | permanent | - | JUSTSEARCH_HEAD_TRACING_LEVEL | justsearch.head.tracing_level | HEAD_TRACING_LEVEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.HOME | permanent | - | JUSTSEARCH_HOME | justsearch.home | HOME | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -190,6 +196,7 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.INDEX_TRACING_LEVEL | permanent | - | JUSTSEARCH_INDEX_TRACING_LEVEL | justsearch.index.tracing_level | INDEX_TRACING_LEVEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_COOLDOWN_MS | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_COOLDOWN_MS | justsearch.indexing.foreground_cooldown_ms | INDEXING_FOREGROUND_COOLDOWN_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_DUTY_PCT | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_DUTY_PCT | justsearch.indexing.foreground_duty_pct | INDEXING_FOREGROUND_DUTY_PCT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.INFERENCE_EXTERNAL_ENDPOINT | permanent | - | JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT | justsearch.inference.external_endpoint | INFERENCE_EXTERNAL_ENDPOINT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_DIRECTORY_NAMES | permanent | - | JUSTSEARCH_INGESTION_SKIP_DIRECTORY_NAMES | justsearch.ingestion.skip.directory_names | INGESTION_SKIP_DIRECTORY_NAMES | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_EXTENSIONS | permanent | - | JUSTSEARCH_INGESTION_SKIP_EXTENSIONS | justsearch.ingestion.skip.extensions | INGESTION_SKIP_EXTENSIONS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_PATTERNS | permanent | - | JUSTSEARCH_INGESTION_SKIP_PATTERNS | justsearch.ingestion.skip.patterns | INGESTION_SKIP_PATTERNS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
@@ -198,11 +205,13 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.LLM_ENABLED | permanent | justsearch.llm.enabled | JUSTSEARCH_LLM_ENABLED | justsearch.llm.enabled | LLM_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > YAML > default |
 | EnvRegistry.LLM_KV_TYPE | permanent | - | JUSTSEARCH_LLM_KV_TYPE | justsearch.llm.kv_type | LLM_KV_TYPE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.LLM_MODEL_PATH | permanent | justsearch.llm.model_path | JUSTSEARCH_LLM_MODEL_PATH | justsearch.llm.model_path | LLM_MODEL_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > YAML > default |
+| EnvRegistry.LLM_PROMPT_CACHE_MIB | permanent | - | JUSTSEARCH_LLM_PROMPT_CACHE_MIB | justsearch.llm.prompt_cache_mib | LLM_PROMPT_CACHE_MIB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.REASONING_BUDGET | permanent | - | JUSTSEARCH_REASONING_BUDGET | justsearch.llm.reasoning_budget | REASONING_BUDGET | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.LLM_SLOTS | permanent | - | JUSTSEARCH_LLM_SLOTS | justsearch.llm.slots | LLM_SLOTS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.USE_THINKING | permanent | - | JUSTSEARCH_USE_THINKING | justsearch.llm.use_thinking | USE_THINKING | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.MCP_HOST_CONFIG | permanent | - | JUSTSEARCH_MCP_HOST_CONFIG | justsearch.mcp.host.config | MCP_HOST_CONFIG | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.MMPROJ_MODEL | permanent | - | JUSTSEARCH_MMPROJ_MODEL | justsearch.mmproj.model | MMPROJ_MODEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.MMPROJ_OFFLOAD | permanent | - | JUSTSEARCH_MMPROJ_OFFLOAD | justsearch.mmproj.offload | MMPROJ_OFFLOAD | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.MODE | permanent | - | JUSTSEARCH_MODE | justsearch.mode | MODE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.CAPABILITY_CONTRACT_STRICT | experimental | - | JUSTSEARCH_MODELS_CAPABILITY_CONTRACT_STRICT | justsearch.models.capability_contract_strict | CAPABILITY_CONTRACT_STRICT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.MODELS_DIR | permanent | - | JUSTSEARCH_MODELS_DIR | justsearch.models.dir | MODELS_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

@@ -1,0 +1,46 @@
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+index 4348ccff8..8222415b0 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingProvider.java
+@@ -99,6 +99,25 @@ public interface EmbeddingProvider {
+   /** Returns true if the embedding model is loaded and ready for inference. */
+   boolean isAvailable();
+ 
++  /** Compatibility declaration for checks written against the later API; nothing here reads it. */
++  default Availability availability() {
++    return null;
++  }
++
++  /** Compatibility declaration for checks written against the later API; nothing here reads it. */
++  record Availability(State state, Throwable failure) {
++    public enum State {
++      READY,
++      STARTING,
++      ABSENT,
++      FAILED
++    }
++
++    public static final Availability READY = new Availability(State.READY, null);
++    public static final Availability STARTING = new Availability(State.STARTING, null);
++    public static final Availability ABSENT = new Availability(State.ABSENT, null);
++  }
++
+   /** Returns true if the embedding model is using GPU acceleration. */
+   boolean isUsingGpu();
+ 
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+index d771dbe8c..e883e5076 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/NoOpEmbeddingProvider.java
+@@ -14,6 +14,11 @@ public final class NoOpEmbeddingProvider implements EmbeddingProvider {
+ 
+   private NoOpEmbeddingProvider() {}
+ 
++  /** Compatibility declaration for checks written against the later API; nothing here reads it. */
++  public static EmbeddingProvider starting() {
++    return INSTANCE;
++  }
++
+   @Override
+   public float[] embedDocument(String text) {
+     return new float[0];

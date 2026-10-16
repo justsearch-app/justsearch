@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const files = dir => fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory()
   ? files(path.join(dir, e.name)) : [path.join(dir, e.name)]) : [];
+/** `atMs` null is an unknown time (the census applies the ledger's 2001 rule to OS exit times). */
 export function crashTiming(atMs, window) {
   if (Number.isFinite(atMs) && Number.isFinite(window?.teardownStartMs) && atMs >= window.teardownStartMs) return 'teardown';
   return !Number.isFinite(atMs) || !Number.isFinite(window?.endMs) ? 'unknown'
@@ -22,7 +23,10 @@ export function crashEvidence(dataDirs, window, stop = {}, exits = [], census) {
       timing: crashTiming(atMs, window), sources: [file], type: path.basename(file).startsWith('hs_err') ? 'native-jvm-crash' : 'crash-report' });
     sources.push(file);
   }
-  for (const exit of exits.filter(e => Number.isFinite(e.exitCode) && e.exitCode !== 0 && e.expectedTermination !== true)) events.push({
+  // Spec B T17: a crash is a ledger UNEXPECTED exit whose code the OS confirmed. A code alone is
+  // never classified; an exit with no record or a disagreeing one is a census gap (not complete).
+  for (const exit of exits.filter(e => e.ledgerClass === 'UNEXPECTED' && e.expectedTermination !== true
+    && !(stop.exitAccountingGaps ?? []).some(g => g.reason === 'ledger_os_disagree' && g.pid === e.pid))) events.push({
     ...exit, timing: crashTiming(exit.atMs, window), type: 'abnormal-owned-exit', sources: [exit.source] });
   const seen = new Map();
   for (const sample of census?.snapshots ?? []) {

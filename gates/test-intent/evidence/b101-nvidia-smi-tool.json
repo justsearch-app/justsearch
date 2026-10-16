@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T20:52:15.977Z",
+  "revision": "47981cfa61d91259cbe79d1fc87d751fb9cc2675",
+  "tree": "ab62acc035432b1150ead5d5ea9df995b400bb9a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NvidiaSmiToolAvailabilityTest.withoutAReadingTheInstalledToolDecidesAndNothingStarts\" --tests \"io.justsearch.gpu.NvidiaSmiToolAvailabilityTest.aTakenReadingDecides\" --tests \"io.justsearch.gpu.NvidiaSmiToolAvailabilityTest.theNvmlSectionDoesNotDecideTheToolsAvailability\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4174
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiToolAvailabilityTest.java#withoutAReadingTheInstalledToolDecidesAndNothingStarts",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiToolAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5700bdacab428617bd7266501516b26dfd52893ba0c227767d5dedd59dc2cec5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withoutAReadingTheInstalledToolDecidesAndNothingStarts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiToolAvailabilityTest.java#aTakenReadingDecides",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiToolAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5700bdacab428617bd7266501516b26dfd52893ba0c227767d5dedd59dc2cec5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aTakenReadingDecides()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiToolAvailabilityTest.java#theNvmlSectionDoesNotDecideTheToolsAvailability",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NvidiaSmiToolAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5700bdacab428617bd7266501516b26dfd52893ba0c227767d5dedd59dc2cec5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theNvmlSectionDoesNotDecideTheToolsAvailability()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4873edcdfe2144b005296124219ab5a4a50afe22ca4a9df1380fa0b427469ef1"
+}

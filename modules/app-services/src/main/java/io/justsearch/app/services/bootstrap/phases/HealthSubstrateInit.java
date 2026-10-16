@@ -69,7 +69,17 @@ public final class HealthSubstrateInit {
       ConditionRecoveryIndexChangeRegistry conditionRecoveryIndexChangeRegistry) {
     ConditionStore conditionStore = new ConditionStore();
     OccurrenceLog occurrenceLog = new OccurrenceLog(occurrenceBufferSize);
-    HealthEventChangeRegistry healthEventChangeRegistry = new HealthEventChangeRegistry();
+    var delivery = executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual(
+        "head.health-event-delivery", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1));
+    HealthEventChangeRegistry healthEventChangeRegistry;
+    try {
+      healthEventChangeRegistry = new HealthEventChangeRegistry(
+          new io.justsearch.app.observability.stream.SseStreamChannel(
+              HealthEventChangeRegistry.STREAM_ID, delivery.openVirtual(), delivery::close));
+    } catch (RuntimeException | Error failure) {
+      delivery.close();
+      throw failure;
+    }
     healthEventChangeRegistry.subscribe(
         envelope -> {
           ConditionRecoveryIndex index = ConditionRecoveryIndexBuilder.build(conditionStore);

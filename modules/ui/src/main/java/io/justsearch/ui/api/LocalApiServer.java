@@ -111,6 +111,7 @@ public class LocalApiServer {
   // `() -> this.apiModules` supplier (it needs the sibling modules for owningModule attribution) can
   // be created before the list literal is assigned in this same constructor; assigned exactly once.
   private java.util.List<ApiModule> apiModules;
+  private final boolean runtimeObservationRoutes;
   // Tempdoc 583 follow-up: the two largest controller cohorts are held as their assembly Result
   // records and read via accessors (core.statusLifecycleHandler(), convApi.agentController(), ...),
   // so adding a controller to either cohort touches only the assembly — not this file's field region.
@@ -128,6 +129,7 @@ public class LocalApiServer {
   private final Instant startTime = Instant.now();
   private final EventBuffer eventBuffer = new EventBuffer();
   private final AtomicInteger inflightRequests = new AtomicInteger(0);
+  private SseAttachmentOwner sseOwner;
   private final String sessionToken;
   private final boolean prodMode;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration slowRequestOwner;
@@ -257,6 +259,7 @@ public class LocalApiServer {
                 metaApiModule, resourceApiModule, upgradeApiModule, lifecycleApiModule)
             : java.util.List.of(metaApiModule, upgradeApiModule, lifecycleApiModule);
     this.HeadAssemblyRef = b.HeadAssembly;
+    this.runtimeObservationRoutes = b.HeadAssembly != null && b.runtimeManifestPublisher != null;
 
     // Tempdoc 583 Stage 1: message catalogs are constructed + bound in MessageCatalogRoutes (setupRoutes).
     // Slice 3a.1.9 §A.6a: classpath schema-serving controller.
@@ -296,6 +299,10 @@ public class LocalApiServer {
             this.apiCatalog,
             resourceApiModule != null,
             () -> this.knowledgeSearchController);
+    // Spec A step 9: every chat entry asks the chat controller's residency gate before it streams.
+    ChatResidencyGate residencyGate = core.chatResidencyController().gate();
+    this.convApi.chatController().setResidencyGate(residencyGate);
+    this.convApi.agentController().setResidencyGate(residencyGate);
     // Tempdoc 629 (#7): the encrypted-backup export controller (reads the 3 AUTHORED stores —
     // conversations, memories, agent-runs — once unlocked). Null on the test-only path with no HeadAssembly.
     this.conversationBackupController =
@@ -419,6 +426,8 @@ public class LocalApiServer {
     // arrived as the "a-circumflex euro" mojibake while SSE, which declares its charset, was
     // clean). One after-handler over the whole JSON plane; see JsonResponseCharset.
     JsonResponseCharset.install(app);
+    this.sseOwner = SseAttachmentOwner.install(app);
+    StatusChangeHeaders.install(app);
 
     // HttpResponseException handler — preserves handler-set body while
     // propagating the exception's HTTP status.
@@ -606,6 +615,8 @@ public class LocalApiServer {
         ? java.util.Optional.empty() : convApi.mcpProtocolHandler().clientIdentity(session));
     RouteLifecycleHeaders.install(this.app);
     setupRoutes();
+    ActivityRole.validate(this.app);
+    validateObservationJustifications();
     RouteContractPolicy.validateLifecycleRoutes(
         RouteManifestController.handlerMethodPaths(this.app), RouteContractPolicy.CONTRACTS);
 
@@ -679,23 +690,27 @@ public class LocalApiServer {
     // bound by MetaApiModule via the apiModules loop below — not inline here (dogfoods the seam).
     // Tempdoc 526 §4.2 — typed DocumentAddress → canonical-coordinate translator.
     if (convApi.resolveAddressController() != null) {
-      app.post("/api/document/{id}/resolve-address", convApi.resolveAddressController()::handle);
+      app.post("/api/document/{id}/resolve-address", convApi.resolveAddressController()::handle, ActivityRole.USER_ACTION);
     }
-    app.get(MCP_TOKEN_PATH, this::handleMcpToken);
+    app.get(MCP_TOKEN_PATH, this::handleMcpToken, ActivityRole.OBSERVATION);
     if (convApi.mcpProtocolHandler() != null) {
-      app.post(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handlePost);
-      app.delete(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handleDelete);
+      app.post(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handlePost, ActivityRole.PROTOCOL);
+      app.delete(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handleDelete, ActivityRole.PROTOCOL);
       // Streamable-HTTP conformance: the single endpoint must answer GET. Registered inside this
       // branch so the 405's `Allow` can never name POST/DELETE while they are unbound (its third
       // entry, OPTIONS, comes from the API-wide CORS preflight catch-all, not from here).
-      app.get(MCP_ENDPOINT_PATH, io.justsearch.ui.api.mcp.McpProtocolHandler::handleGet);
+      app.get(MCP_ENDPOINT_PATH, io.justsearch.ui.api.mcp.McpProtocolHandler::handleGet, ActivityRole.PROTOCOL);
     }
 
     // Tempdoc 374 alpha.17 R5: OpenAI-compatible surface. Proxies to the
     // running llama-server. POST is subject to the same session-token
     // enforcement as the rest of the non-GET API surface in prod mode.
-    app.post("/v1/chat/completions", core.openAiCompatController()::handleChatCompletions);
-    app.get("/v1/models", core.openAiCompatController()::handleModels);
+    app.post("/v1/chat/completions", core.openAiCompatController()::handleChatCompletions, ActivityRole.USER_ACTION);
+    app.get("/v1/models", core.openAiCompatController()::handleModels, ActivityRole.OBSERVATION);
+    // Spec A step 9: a person's "load anyway" over GPU pressure, and the dev-only pressure trigger
+    // (404 outside eval mode).
+    app.post("/api/chat/load-anyway", core.chatResidencyController()::handleLoadAnyway, ActivityRole.USER_ACTION);
+    app.post("/api/debug/chat-pressure", core.chatResidencyController()::handleDevPressure, ActivityRole.USER_ACTION);
 
     // Tempdoc 431 / 429 §E.17 / 430 / 518 / 565 §27.4: the nine i18n message catalogs
     // (errors + registry primitives + health-events + inference-failures + workflow). Tempdoc
@@ -703,7 +718,7 @@ public class LocalApiServer {
     // GET /api/messages/<namespace>/{locale} from /messages/<namespace>.en.properties.
     io.justsearch.ui.api.routes.MessageCatalogRoutes.register(app, this.telemetry);
     // Slice 3a.1.9 §A.6a: classpath schemas served same-origin.
-    app.get("/api/schemas/{name}", schemaController::handle);
+    app.get("/api/schemas/{name}", schemaController::handle, ActivityRole.OBSERVATION);
 
     // Tempdoc 583 Stage 3: every substrate-Resource cohort route (registry / operations /
     // infra-capabilities / runtime-manifest / metric / advisory / history / authorization /
@@ -713,35 +728,36 @@ public class LocalApiServer {
     }
     // Slice 477 H2.3 — plugin verification (stub for V1.5.1 alpha;
     // V1.5.2 replaces with sigstore-java chain verification).
-    app.post("/api/plugins/verify", pluginVerificationController::handleVerify);
+    app.post("/api/plugins/verify", pluginVerificationController::handleVerify, ActivityRole.USER_ACTION);
     // Tempdoc 560 §28 — operator-approval allowlist (the production-real trust ceremony for a
     // URL-loaded third-party plugin; loopback-only ⇒ inherently operator-local).
-    app.post("/api/plugins/allowlist", pluginVerificationController::handleApprove);
-    app.get("/api/plugins/allowlist", pluginVerificationController::handleList);
+    app.post("/api/plugins/allowlist", pluginVerificationController::handleApprove, ActivityRole.USER_ACTION);
+    app.get("/api/plugins/allowlist", pluginVerificationController::handleList, ActivityRole.OBSERVATION);
 
     // Tempdoc 629 (LAYER): at-rest encryption controls for the AUTHORED stores.
-    app.get("/api/conversations/encryption", conversationEncryptionController::handleStatus);
-    app.post("/api/conversations/encryption/setup", conversationEncryptionController::handleSetup);
-    app.post("/api/conversations/encryption/unlock", conversationEncryptionController::handleUnlock);
-    app.post("/api/conversations/encryption/lock", conversationEncryptionController::handleLock);
+    app.get("/api/conversations/encryption", conversationEncryptionController::handleStatus, ActivityRole.OBSERVATION);
+    app.post("/api/conversations/encryption/setup", conversationEncryptionController::handleSetup, ActivityRole.USER_ACTION);
+    app.post("/api/conversations/encryption/unlock", conversationEncryptionController::handleUnlock, ActivityRole.USER_ACTION);
+    app.post("/api/conversations/encryption/lock", conversationEncryptionController::handleLock, ActivityRole.USER_ACTION);
+    app.post("/api/conversations/encryption/auto-lock", conversationEncryptionController::handleLock, ActivityRole.OBSERVATION);
     app.post(
         "/api/conversations/encryption/regenerate-recovery",
-        conversationEncryptionController::handleRegenerateRecovery);
+        conversationEncryptionController::handleRegenerateRecovery, ActivityRole.USER_ACTION);
     if (conversationBackupController != null) {
       // Tempdoc 629 (Fix 1): POST, NOT GET — the export streams the encrypted vault (keystore + sealed
       // bundle), and ApiSecurityFilters only enforces the session token on POST/PUT/DELETE (GET is always
       // allowed). A GET here would expose the offline-brute-forceable container to any loopback caller.
       app.post(
-          "/api/conversations/encryption/export", conversationBackupController::handleExport);
+          "/api/conversations/encryption/export", conversationBackupController::handleExport, ActivityRole.USER_ACTION);
       // 629 (#E): import the read side — token-gated POST, decrypt + write-back via the store list.
       app.post(
-          "/api/conversations/encryption/import", conversationBackupController::handleImport);
+          "/api/conversations/encryption/import", conversationBackupController::handleImport, ActivityRole.USER_ACTION);
     }
-    app.post("/api/conversations/encryption/recover", conversationEncryptionController::handleRecover);
+    app.post("/api/conversations/encryption/recover", conversationEncryptionController::handleRecover, ActivityRole.USER_ACTION);
     app.post(
         "/api/conversations/encryption/change-passphrase",
-        conversationEncryptionController::handleChangePassphrase);
-    app.delete("/api/plugins/allowlist/{sha}", pluginVerificationController::handleRevoke);
+        conversationEncryptionController::handleChangePassphrase, ActivityRole.USER_ACTION);
+    app.delete("/api/plugins/allowlist/{sha}", pluginVerificationController::handleRevoke, ActivityRole.USER_ACTION);
 
     // Tempdoc 541 §4.2 — composition-substrate observability surface. GET /api/boot/phases
     // returns the immutable BootTrace snapshot. SSE intentionally omitted (HTTP comes up
@@ -750,12 +766,32 @@ public class LocalApiServer {
     io.justsearch.ui.api.routes.BootRoutes.register(app, HeadAssemblyRef);
   }
 
+  private void validateObservationJustifications() {
+    var groups = java.util.EnumSet.noneOf(ObservationJustifications.Group.class);
+    if (HeadAssemblyRef != null) groups.add(ObservationJustifications.Group.SUBSTRATE);
+    if (runtimeObservationRoutes) groups.add(ObservationJustifications.Group.RUNTIME);
+    if (knowledgeSearchController != null) groups.add(ObservationJustifications.Group.KNOWLEDGE);
+    if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry) groups.add(ObservationJustifications.Group.TELEMETRY);
+    if (groups.size() == ObservationJustifications.Group.values().length) {
+      ObservationJustifications.validate(app);
+    } else {
+      ObservationJustifications.validate(app, groups);
+    }
+  }
+
   /**
-   * Tempdoc 374 alpha.17 R5: resolve the running llama-server port from
-   * ConfigStore live, so an explicit operator override (env var or sysprop) is
-   * picked up without restart. Defaulting mirrors {@code InferenceConfig.from}.
+   * The port the running llama-server listens on, for the {@code /v1} proxy. A managed launch binds
+   * a fresh loopback port, never the configured one (ADR-0051 decision 2), so the live runtime's
+   * port wins; the configured port (tempdoc 374 alpha.17 R5, read live from ConfigStore) is the
+   * fallback while no runtime reports one. Defaulting mirrors {@code InferenceConfig.from}.
    */
   private int resolveLlamaServerPort() {
+    if (HeadAssemblyRef != null
+        && HeadAssemblyRef.inference().onlineAi()
+            instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection introspection) {
+      var runtime = introspection.runtimeInfo();
+      if (runtime != null && runtime.serverPort() > 0) return runtime.serverPort();
+    }
     ConfigStore cs = ConfigStore.globalOrNull();
     if (cs == null) return 0;
     var rc = cs.get();
@@ -784,7 +820,7 @@ public class LocalApiServer {
   }
 
   private void handleResetIndex(Context ctx) {
-    if (!Boolean.getBoolean("justsearch.eval.mode")) {
+    if (!EnvRegistry.EVAL_MODE.getBoolean(false)) {
       ctx.status(404).json(Map.of("error", "Not available outside eval mode"));
       return;
     }
@@ -918,6 +954,8 @@ public class LocalApiServer {
           : null;
       KnowledgeRoutes.register(this.app, ctrl, ragCtrl, log);
       this.knowledgeSearchController = ctrl;
+      ActivityRole.validate(this.app);
+      validateObservationJustifications();
     }
     // Status sampling can publish index READY. Install it last so READY implies that every
     // Worker-backed controller and route above is already visible to clients.
@@ -962,6 +1000,11 @@ public class LocalApiServer {
     }
   }
 
+  /** Ends retained stream requests before the Engine waits for admitted work to drain. */
+  public void closeSseAttachments() {
+    if (sseOwner != null) sseOwner.close();
+  }
+
   static void configureTransportShutdown(org.eclipse.jetty.server.Server server) {
     // Failed binds trigger Jetty cleanup before handlers start. Graceful.shutdown on those
     // handlers fails with STOPPED, masking the bind failure needed for ephemeral fallback.
@@ -996,7 +1039,7 @@ public class LocalApiServer {
       // Jetty 11 selectors await suspended pool threads without a timeout. Interrupt that
       // teardown and let the remaining owners close; this daemon owns only HTTP resources.
       stopping.cancel(true);
-      log.warn("HTTP transport stop exhausted its supervision budget; continuing ordered shutdown");
+      throw new IllegalStateException("HTTP transport stop exhausted its supervision budget", exhausted);
     } catch (InterruptedException interrupted) {
       stopping.cancel(true);
       Thread.currentThread().interrupt();
@@ -1009,18 +1052,7 @@ public class LocalApiServer {
   }
 
   private static void stopJetty(Javalin transport) {
-    try {
-      transport.stop();
-    } catch (RuntimeException failure) {
-      // Server.doStop tears down connectors/handlers/the pool even when its graceful future
-      // times out, then reports that timeout. Do not let a wedged request prevent index close.
-      Throwable cause = failure;
-      while (cause != null && !(cause instanceof java.util.concurrent.TimeoutException)) {
-        cause = cause.getCause();
-      }
-      if (cause == null) throw failure;
-      log.warn("HTTP graceful drain exhausted its supervision budget; continuing ordered shutdown");
-    }
+    transport.stop();
   }
 
   private void stopOwnedResources() {
@@ -1030,6 +1062,12 @@ public class LocalApiServer {
       core.gpuSaturationSampler().stop();
     } catch (RuntimeException e) {
       log.warn("GpuSaturationSampler.stop failed: {}", e.getMessage());
+    }
+    // ADR-0050: release the GPU memory reader's native queries.
+    try {
+      core.statusLifecycleHandler().closeGpuMemoryReader();
+    } catch (RuntimeException e) {
+      log.warn("GpuMemoryReader.close failed: {}", e.getMessage());
     }
     // Tempdoc 672 follow-up: stop the VDU offline-processing auto-trigger sampler thread.
     try {
@@ -1133,6 +1171,7 @@ public class LocalApiServer {
     // the inputs it needs for the extracted ConversationEngine/agent/chat/MCP wiring.
     final Path indexBasePath;
     KnowledgeServerBootstrap knowledgeServer;
+    io.justsearch.app.services.gpu.GpuResidencySampler gpuResidency;
     tools.jackson.databind.JsonNode configRoot;
     String knowledgeServerStartError;
     private Telemetry telemetry;
@@ -1316,6 +1355,15 @@ public class LocalApiServer {
 
     public Builder knowledgeServer(KnowledgeServerBootstrap knowledgeServer) {
       this.knowledgeServer = knowledgeServer;
+      return this;
+    }
+
+    /**
+     * Spec E step E3: the Engine's GPU residency sampler. Status reads the operating gpu block from
+     * it instead of opening a GPU memory reader of its own; without one that block reads unknown.
+     */
+    public Builder gpuResidency(io.justsearch.app.services.gpu.GpuResidencySampler sampler) {
+      this.gpuResidency = sampler;
       return this;
     }
 

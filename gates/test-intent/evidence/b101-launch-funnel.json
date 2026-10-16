@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:06:43.983Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "8286f2c91a992392b99fc9f10d93168240f9587b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:dead-code-audit:test --tests \"io.justsearch.deadcode.ProcessLaunchFunnelTest.only_allowlisted_classes_start_os_processes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17199
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/dead-code-audit/src/test/java/io/justsearch/deadcode/ProcessLaunchFunnelTest.java#only_allowlisted_classes_start_os_processes",
+      "file": "modules/dead-code-audit/src/test/java/io/justsearch/deadcode/ProcessLaunchFunnelTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:992a93edfbc1b1c1c752a3d0545d18a4e6c8c5730b7f5fe763cbd413e98c7c45",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "only_allowlisted_classes_start_os_processes()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:dead-code-audit:test --tests \"io.justsearch.deadcode.ProcessLaunchFunnelTest.only_allowlisted_classes_start_os_processes\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 36152
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/dead-code-audit/src/test/java/io/justsearch/deadcode/ProcessLaunchFunnelTest.java#only_allowlisted_classes_start_os_processes",
+        "classification": "assertion",
+        "detail": "only_allowlisted_classes_start_os_processes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Class(es) that start an OS process but are not on ProcessLaunchFunnelTest.ALLOWED (1):&#10;  io.justsearch.gpu.VramDetector via [io.justsearch.app.api.runtime.child.OwnedHelper#start]&#10;&#10;Route the work through an existing owner (OwnedHelper for helpers, Def"
+      }
+    ]
+  },
+  "digest": "sha256:1934ca46ea0d845fe8f22b734553fe48a14cae80eb9e2e141244fa8fb92d27f4"
+}

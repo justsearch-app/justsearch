@@ -71,12 +71,11 @@ function stubDispatch(): void {
   });
 }
 
-/** Every issuance body, minus the conversation store's own auto-titling throwaway turn. */
+/** Every issuance body (the store's auto-titling has its own `…/auto-title` route). */
 const askBodies = (): Array<Record<string, unknown>> =>
   fetchMock.mock.calls
     .filter((call) => String(call[0]).includes('/api/chat/dispatch'))
     .map((call) => JSON.parse(String((call[1] as { body?: unknown }).body ?? '{}')))
-    .filter((body: Record<string, unknown>) => !String(body.sessionId ?? '').includes('_title_'))
     .filter((body: Record<string, unknown>) => body.shapeId === 'core.rag-ask');
 
 beforeEach(() => {

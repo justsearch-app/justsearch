@@ -5,7 +5,8 @@
  *   node scripts/governance/gates/test-intent/run-evidence.mjs \
  *     --out gates/test-intent/evidence/<name>.json \
  *     --check <check id> [--check <check id> ...] \
- *     [--before <ref> [--overlay <path> ...]]
+ *     [--before <ref> [--overlay <path> ...] [--before-patch <compatibility.patch> ...]] \
+ *     [--copy-node-modules]
  *
  * It runs the named checks itself (Gradle → JUnit XML, vitest → JSON report, cargo → libtest
  * output), validates its own output (a fresh result file per run; a check that matched nothing is
@@ -18,6 +19,8 @@
  * transplanted) plus any `--overlay` paths, the same commands run there, and each check's failure is
  * classified: `assertion` (the only one that shows the old behaviour is wrong), `exception`,
  * `compile`, `environment`, `passed`, `skipped`.
+ * `--copy-node-modules`: copy candidate vitest dependencies into the before-worktree as ordinary
+ * files, dereferencing dependency links; by default the dependency directory is linked.
  *
  * Exit: 0 when every check executed and passed on the candidate (and, with --before, failed with an
  * assertion before); 1 otherwise; 2 usage/infrastructure error. Completed results are written
@@ -126,7 +129,7 @@ function runChecks(checks, root) {
     } else if (r === 'cargo') {
       if (!checkName(id)) throw new Error(`${id}: a Rust check needs '#<libtest name>' (e.g. updater::tests::rejects_bad_sig)`);
       const name = checkName(id);
-      const run = sh(`cargo test --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact ${JSON.stringify(name)}`, root);
+      const run = sh(`cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact ${JSON.stringify(name)}`, root);
       runs.push(run);
       results.set(id, { runner: 'cargo', cases: parseLibtest(run.output).filter((c) => c.name === name), buildOutput: run.output });
     } else {
@@ -204,10 +207,14 @@ function rustTestFiles() {
   return rustTestFileCache;
 }
 
-function linkNodeModules(worktree) {
+function prepareNodeModules(worktree, copyNodeModules = false) {
   const src = path.join(REPO_ROOT, 'modules', 'ui-web', 'node_modules');
   const dst = path.join(worktree, 'modules', 'ui-web', 'node_modules');
-  if (fs.existsSync(src) && !fs.existsSync(dst)) fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
+  if (!fs.existsSync(src) || fs.existsSync(dst)) return;
+  // Node 24's native directory copier recreates POSIX symlinks even with dereference enabled.
+  // An all-pass filter selects its stat-based copier, which follows each dependency link.
+  if (copyNodeModules) fs.cpSync(src, dst, { recursive: true, dereference: true, filter: () => true });
+  else fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
 }
 
 /** Detach links without visiting their targets, including dangling links and linked ancestors. */
@@ -238,7 +245,7 @@ function removeBeforeWorktree(worktree, created) {
 }
 
 function parseArgs(argv) {
-  const a = { checks: [], overlays: [] };
+  const a = { checks: [], overlays: [], beforePatches: [] };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     const v = () => {
@@ -248,11 +255,14 @@ function parseArgs(argv) {
     if (k === '--check') a.checks.push(v().replaceAll('\\', '/'));
     else if (k === '--out') a.out = v();
     else if (k === '--before') a.before = v();
+    else if (k === '--before-patch') a.beforePatches.push(v().replaceAll('\\', '/'));
     else if (k === '--before-root') a.beforeRoot = path.resolve(v());
     else if (k === '--overlay') a.overlays.push(v().replaceAll('\\', '/'));
+    else if (k === '--copy-node-modules') a.copyNodeModules = true;
     else throw new Error(`unknown argument ${k}`);
   }
-  if (!a.out || a.checks.length === 0) throw new Error('usage: --out <file> --check <id> [--check <id>...] [--before <ref> [--overlay <path>...]]');
+  if (!a.out || a.checks.length === 0) throw new Error('usage: --out <file> --check <id> [--check <id>...] [--before <ref> [--overlay <path>...]] [--copy-node-modules]');
+  if (a.beforePatches.length && !a.before) throw new Error('--before-patch requires --before');
   return a;
 }
 
@@ -299,13 +309,22 @@ function main() {
       // failed checkout cannot leave links behind without even attempting to detach them.
       gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
       created = true;
+      // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
+      // part of the evidence; repaired behavior must remain absent from this before-state patch.
+      const patches = args.beforePatches.map((rel) => {
+        const absolute = path.resolve(REPO_ROOT, rel);
+        const digest = contentDigest(fs.readFileSync(absolute, 'utf8'));
+        gitOut(['apply', absolute], wt);
+        return { path: rel, contentDigest: digest };
+      });
       overlayInto(wt, args.checks, args.overlays);
-      if (args.checks.some(id => runnerFor(id) === 'vitest')) linkNodeModules(wt);
+      if (args.checks.some(id => runnerFor(id) === 'vitest')) prepareNodeModules(wt, args.copyNodeModules);
       const fb = runChecks(args.checks, wt);
       failBefore = {
         ref: args.before,
         revision: gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT),
         overlays: args.overlays,
+        patches,
         runs: fb.runs.map(({ output, ...r }) => ({ ...r, cwd: '<before-worktree>', ...(r.exitCode !== 0 ? { output } : {}) })),
         checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
       };

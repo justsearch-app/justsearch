@@ -97,8 +97,71 @@ public interface EmbeddingProvider {
   int dimension();
 
   /** Returns true if the embedding model is loaded and ready for inference. */
-  boolean isAvailable();
+  default boolean isAvailable() {
+    return availability().state() == Availability.State.READY;
+  }
+
+  /** A snapshot of model presence and readiness, independent of index compatibility. */
+  Availability availability();
+
+  /** FAILED retains the original load failure; other states never carry a failure. */
+  record Availability(State state, Throwable failure) {
+    public enum State {
+      /** A published backend can accept inference. */
+      READY,
+      /** An installed model is being loaded or awaits provider publication. */
+      STARTING,
+      /** No model is owned by this provider; it will not load one. */
+      ABSENT,
+      /** Model loading failed; the snapshot carries the original cause. */
+      FAILED
+    }
+
+    public static final Availability READY = new Availability(State.READY, null);
+    public static final Availability STARTING = new Availability(State.STARTING, null);
+    public static final Availability ABSENT = new Availability(State.ABSENT, null);
+
+    public Availability {
+      java.util.Objects.requireNonNull(state, "state");
+      if ((state == State.FAILED) != (failure != null)) {
+        throw new IllegalArgumentException("Only FAILED must carry a load failure");
+      }
+    }
+  }
 
   /** Returns true if the embedding model is using GPU acceleration. */
   boolean isUsingGpu();
+
+  /**
+   * The device a query embed would select now (Spec D §1.1); chooses a search's semantic
+   * sub-budget cap. Providers without a native session report {@code CPU}.
+   */
+  default io.justsearch.ort.QueryDevice queryDevice() {
+    return io.justsearch.ort.QueryDevice.CPU;
+  }
+
+  /**
+   * Whether a query embed would run now without creating a session (Spec D §4.2); readiness reads
+   * this. Providers without a native session are always warm.
+   */
+  default boolean isQueryWarm() {
+    return true;
+  }
+
+  /** Whether lifecycle prewarm should retry the GPU while CPU queries remain ready. */
+  default boolean isGpuRetryDue() {
+    return false;
+  }
+
+  /**
+   * Warms the CPU session a query embed runs on when the GPU device turns it away (busy or stuck),
+   * so the dense leg is still answered within its budget. Providers without a GPU session have
+   * nothing to warm.
+   *
+   * @return whether that CPU session is warm afterwards
+   */
+  default boolean prewarmCpuForQueries(InferenceRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
+    return false;
+  }
 }

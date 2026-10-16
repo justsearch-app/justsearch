@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:07:07.812Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1bbb822867da06822c87fe2a85c89f35634abedc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:dead-code-audit:test --tests \"io.justsearch.deadcode.ProcessLaunchFunnelTest.the_scan_sees_each_kind_of_launch_and_folds_nested_code_onto_its_class\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15252
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/dead-code-audit/src/test/java/io/justsearch/deadcode/ProcessLaunchFunnelTest.java#the_scan_sees_each_kind_of_launch_and_folds_nested_code_onto_its_class",
+      "file": "modules/dead-code-audit/src/test/java/io/justsearch/deadcode/ProcessLaunchFunnelTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:992a93edfbc1b1c1c752a3d0545d18a4e6c8c5730b7f5fe763cbd413e98c7c45",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the_scan_sees_each_kind_of_launch_and_folds_nested_code_onto_its_class()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2572e828bbdbb41256f493558352b7642c4a581e1edc14c48c66b7f9f096f822"
+}

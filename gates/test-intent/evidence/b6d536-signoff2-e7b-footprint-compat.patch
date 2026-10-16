@@ -1,0 +1,67 @@
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/InferenceCompositionRoot.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/InferenceCompositionRoot.java
+@@ -1359,4 +1359,13 @@
+     Composition comp = new Composition(runtime, policy, artifacts);
+     return OrtSessionAssembler.buildManager(consumerName, comp, arbiter, events);
+   }
++
++  // Compatibility for generationBoundFp32CannotUseASiblingsMeasuredGpuPlan only.
++  // That case is not selected by the E-P7c before-run. The selected footprint
++  // check and the old estimateCandidateFootprintBytes implementation never call this.
++  static java.util.Map<io.justsearch.ort.EncoderRole, Double> gpuRoleWeightsMiB(
++      io.justsearch.configuration.resolved.ResolvedConfig cfg) {
++    throw new UnsupportedOperationException("compat-only unselected footprint fixture");
++  }
++
+ }
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java
+@@ -157,4 +157,11 @@
+       builder.putSettings(key, value);
+     }
+   }
++
++  // Compatibility for the unselected plannedP12ReplacementFromCpuSourceFitsFiveGiBFree fixture.
++  // The E-P7c check builds ResolvedConfig directly and never calls this method.
++  public static void rememberDevicePlanner(Object unused) {
++    throw new UnsupportedOperationException("compat-only unselected footprint fixture");
++  }
++
+ }
+--- a/modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfig.java
++++ b/modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfig.java
+@@ -224,6 +224,13 @@
+       // Spec E section 4.3: game detection, "auto" (default) or "off" (no game is ever detected);
+       // any other value resolves to "auto".
+       String gpuGameDetection) {
++
++    // Compatibility for the unselected generation-bound plan fixture only.
++    // Not a record component; the old configuration construction is unchanged.
++    public String gpuMemoryPlan() {
++      throw new UnsupportedOperationException("compat-only unselected footprint fixture");
++    }
++
+ 
+     /** Machine-wide regenerable ORT graphs; a null directory selects the platform default. */
+     public record OptimizedCache(Path directory, long maxMb) {
+--- a/modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java
++++ b/modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java
+@@ -1602,4 +1602,18 @@
+         // System.setProperty() on Head, causing expected divergence with Worker's env var.
+         // The Worker gets the correct value from the config snapshot.
+     );
++
++  // Compatibility only: deliberately a static helper, NOT an enum constant.
++  // values(), configuration keys and old configuration resolution are unchanged.
++  // The selected E-P7c check uses its literal key and never reads this field.
++  public static final BeforePlanKey GPU_MEMORY_PLAN = new BeforePlanKey();
++
++  public static final class BeforePlanKey {
++    private BeforePlanKey() {}
++
++    public String configKey() {
++      throw new UnsupportedOperationException("compat-only unselected footprint fixture");
++    }
++  }
++
+ }

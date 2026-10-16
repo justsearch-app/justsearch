@@ -143,6 +143,21 @@ public final class IndexingDocumentOps {
         docUid);
   }
 
+  /**
+   * {@code document} (built by {@link #buildDocument}) carrying {@code chunkPlan}'s chunk-set
+   * declaration, so {@link #indexDeclaredChunks} needs no separate parent rewrite. The plan must be
+   * {@link #chunkPlan} of the same content.
+   */
+  public static IndexDocument withChunkDeclaration(
+      IndexDocument document, ChunkDocumentWriter.ChunkPlan chunkPlan) {
+    if (!chunkPlan.revision().equals(document.fields().get(SchemaFields.CONTENT_SHA256))) {
+      throw new IllegalArgumentException("The chunk plan was not cut from this document's content");
+    }
+    var fields = new HashMap<>(document.fields());
+    ChunkDocumentWriter.declare(fields, chunkPlan);
+    return new IndexDocument(fields);
+  }
+
   private static IndexDocument buildDocumentInternal(
       Path filePath,
       ExtractionResult extraction,
@@ -177,9 +192,8 @@ public final class IndexingDocumentOps {
     // Tempdoc 931 §C.6 — the content revision, written wherever CONTENT is, from the SAME string
     // that is stored. Feedback captures (doc_uid, content_revision), so a label taken against one
     // revision of a document is recognisable as stale after the file is edited.
-    if (extraction.content() != null) {
-      fields.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(extraction.content()));
-    }
+    fields.put(SchemaFields.CONTENT_SHA256,
+        ChunkParentRevision.sha256Hex(extraction.content() == null ? "" : extraction.content()));
     fields.put(SchemaFields.CONTENT_PREVIEW, contentPreview(extraction.content(), isMarkdown));
     fields.put(SchemaFields.INDEXED_AT, System.currentTimeMillis());
     if (collection != null && !collection.isBlank()) {
@@ -253,13 +267,18 @@ public final class IndexingDocumentOps {
           precomputedEmbedding.length,
           filePath.getFileName());
     } else if (ep.isAvailable() && allowEmbeddingWrites) {
-      if (signalBus.isMainGpuActive()) {
-        log.debug("Skipping GPU embedding, Main GPU active: {}", filePath.getFileName());
+      // Spec E section 1.3 item 3: the bulk hold (external memory pressure, later a game) defers the
+      // vector to PENDING like a Main GPU claim. Energy saver never reaches here: held() excludes it.
+      if (signalBus.isMainGpuActive() || signalBus.isBulkHeld()) {
+        log.debug(
+            "Skipping GPU embedding, Main GPU active or bulk GPU work held: {}",
+            filePath.getFileName());
         fields.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
       } else {
         try {
           long embedStart = System.currentTimeMillis();
-          float[] vector = ep.embedDocument(extraction.content());
+          float[] vector = ep.embedDocument(
+              extraction.content(), io.justsearch.core.execution.InferenceRequest.background());
           stageRecorder.record("analyze", System.currentTimeMillis() - embedStart, null);
           if (vector != null && vector.length > 0) {
             fields.put(SchemaFields.VECTOR, vector);
@@ -447,7 +466,7 @@ public final class IndexingDocumentOps {
 
     if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
       ChunkDocumentWriter.regenerateChunks(
-          documentFieldOps, indexingCoordinator, parentDocId, "", null, chunkSpladeEnabled);
+          documentFieldOps, indexingCoordinator, parentDocId, content, null, chunkSpladeEnabled);
       return 0;
     }
 
@@ -463,6 +482,51 @@ public final class IndexingDocumentOps {
         content,
         metadata.toChunkMetadata(collection, parentDocUid),
         chunkSpladeEnabled);
+  }
+
+  /**
+   * The chunk set {@link #indexDeclaredChunks} writes for this extraction, split once per parent
+   * so the same plan can be declared on the parent ({@link #withChunkDeclaration}).
+   */
+  public static ChunkDocumentWriter.ChunkPlan chunkPlan(
+      Path filePath, ExtractionResult extraction, ParentIndexMetadata parentMetadata) {
+    String content = extraction.content();
+    if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
+      return ChunkDocumentWriter.plan(content, null, null);
+    }
+    ParentIndexMetadata metadata =
+        parentMetadata != null
+            ? parentMetadata
+            : deriveParentMetadata(filePath, extraction, null, null);
+    return ChunkDocumentWriter.plan(content, metadata.mimeBase(), metadata.fileKind());
+  }
+
+  /**
+   * Writes the chunks of a parent that was just indexed carrying the same {@code chunkPlan}'s
+   * chunk-set declaration ({@link #withChunkDeclaration}). Unlike
+   * {@link #indexChunks}, this never rewrites the parent: no blocking refresh, no read-back.
+   */
+  public static int indexDeclaredChunks(
+      Path filePath,
+      ExtractionResult extraction,
+      IndexingCoordinator indexingCoordinator,
+      ParentIndexMetadata parentMetadata,
+      String collection,
+      String parentDocUid,
+      boolean chunkSpladeEnabled,
+      ChunkDocumentWriter.ChunkPlan chunkPlan) {
+    String content = extraction.content();
+    String parentDocId = PathNormalizer.normalizeKey(filePath);
+    ChunkDocumentWriter.ParentChunkMetadata chunkMetadata = null;
+    if (chunkPlan.total() > 0) {
+      ParentIndexMetadata metadata =
+          parentMetadata != null
+              ? parentMetadata
+              : deriveParentMetadata(filePath, extraction, null, null);
+      chunkMetadata = metadata.toChunkMetadata(collection, parentDocUid);
+    }
+    return ChunkDocumentWriter.replaceDeclaredChunks(
+        indexingCoordinator, parentDocId, content, chunkMetadata, chunkPlan, chunkSpladeEnabled);
   }
 
   public static ParentIndexMetadata deriveParentMetadata(

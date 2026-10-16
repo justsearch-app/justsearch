@@ -72,6 +72,7 @@ halves share objects.
 - [API Contract Map](reference/api-contract-map.md): HTTP and in-process port contract sources, error sanitization.
 - [Architectural Risk Register](reference/architectural-risks.md): Living registry of consciously accepted trade-offs, monitored risks, and design tensions, each naming one instrument that can be checked.
 - [Module Dependencies (Gradle)](reference/architecture/module-deps.md): Generated Gradle dependency graph across all modules.
+- [Automatic picture reading while chat is loaded](reference/automatic-vdu.md): Automatic picture-reading eligibility, restoration, retries, and shutdown behavior.
 - [Benchmark Methodology](reference/benchmarks/methodology.md): How JustSearch measures retrieval quality: the reproducible single-config release, honest comparison classes, and how to reproduce it.
 - [Engine-quality scorecard](reference/benchmarks/scorecard.md): Generated delta-vs-guard scorecard co-locating all engine-quality axes (quality + perf + leak) for the canonical release.
 - [Runtime Configuration Lifecycle Policy](reference/configuration/config-lifecycle-policy.md): Source-declared lifecycle stages and review metadata for permanent, experimental, and deprecated runtime configuration.
@@ -97,6 +98,7 @@ halves share objects.
 - [Writing Docs for AI](reference/contributing/writing-docs-for-ai.md): How to keep docs agent-friendly.
 - [Project Glossary](reference/glossary.md): Authority index for overloaded JustSearch architecture, search, runtime, and interface terms.
 - [Troubleshooting: Reindex doesn't run (schema mismatch)](reference/index-schema-mismatch-reindex-noop.md): Diagnosing "reindex doesn't run" due to schema mismatch.
+- [Inference placement reasons](reference/inference-placement-reasons.md): Additive placement and refusal reasons for GPU planning and chat ownership.
 - [Inference Runtime Register](reference/inference-runtime-register.md): Shared decision register for GPU, ORT, VRAM, and inference runtime. Read before starting inference work. Update before finishing.
 - [jseval Pipeline Reference](reference/jseval-pipeline-reference.md): CLI reference for the jseval evaluation, pipeline profiling, and throughput benchmarking toolkit.
 - [AI Runtime Redistribution](reference/legal/ai-runtime-and-model-redistribution.md): llama.cpp and model licensing considerations.
@@ -149,6 +151,8 @@ halves share objects.
 - [ADR-0047: Context window is a derived resource](decisions/0047-context-window-is-a-derived-resource.md): The LLM context window is derived at activation from a ladder of explicit rungs (32k on GPU, 8k on CPU, stepped down on a launch abort) rather than configured as a user preference, and every prompt-side budget is a fraction of the live window rather than a constant.
 - [ADR-0048: Extraction isolation and indexing pacing](decisions/0048-extraction-isolation-and-indexing-pacing.md): Untrusted parsing runs in a persistent child process pool rather than in the Engine JVM; foreground contention is answered with a duty cycle rather than a pause; Engine health is sampled internally rather than on the request thread; ingestion failures walk a bounded retry ladder to a visible terminal state; and NRT/commit cadence is decided by measurement, which rejected the first candidate.
 - [ADR-0049: One Engine JVM, and the process boundaries that survive](decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md): The application half and the index half share one JVM and meet at catalogued ports; the boundaries that remain are llama-server and the extraction child pool, each justified by a differing runtime, failure domain or scarce resource.
+- [ADR-0050: GPU co-residence by prevention, measured profiles and explicit degradation](decisions/0050-gpu-co-residence-by-prevention.md): The chat model and the ONNX encoders share one consumer GPU by not overlapping bulk GPU work with chat generation or a foreground game, by fixed per-card profiles built from measured and capped footprints, and by unloading the chat model under external pressure; a search that cannot get semantic results in time returns keyword results with a reason instead of timing out.
+- [ADR-0051: Held process lifetimes and owner-recorded exits](decisions/0051-held-process-lifetimes-and-owner-exit-records.md): Every service process lives inside its owner's kill-on-close job, so nothing outlives the process that started it; the chat server is no longer adopted across Engine restarts; every stop is recorded by its owner with a reason before it happens, and instruments classify exits from those records instead of from exit codes.
 
 <!-- generated:end -->
 

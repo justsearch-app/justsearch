@@ -45,7 +45,7 @@ final class VduOfflineTriggerSamplerTest {
         .startOfflineProcessing(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
 
     var sampler =
-        new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> ks, () -> false);
+        new VduOfflineTriggerSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> coordinator, () -> ks, () -> false, () -> null, () -> Long.MAX_VALUE);
     sampler.checkOnce();
 
     assertTrue(triggered.await(5, TimeUnit.SECONDS), "startOfflineProcessing should have been dispatched");

@@ -1,0 +1,393 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T22:27:26.134Z",
+  "revision": "469d8f10f6dbbb4c1cb52801d12b033697c979e5",
+  "tree": "9b8eb016f0428b5cce2e5bb559a90fb15092dcc3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.pathLabelMalformedJsonPreservesInvocationClientError\" --tests \"io.justsearch.ui.api.PathLabelErrorContractTest.malformedAndInvalidInputMatchTheReplacedInvocationErrorShape\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8139
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/legacyTitleMount.test.ts\" \"src/activity/observationCallers.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-14204-1791757618242.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2785
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#pathLabelMalformedJsonPreservesInvocationClientError",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f81e94c1166024c79751280876130aceb3b00293efacc621c1afd817ba3eabb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pathLabelMalformedJsonPreservesInvocationClientError()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelErrorContractTest.java#malformedAndInvalidInputMatchTheReplacedInvocationErrorShape",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelErrorContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:147b559f98cbfefcf4b62ccde933a40de11f08b2eddfceb37d4ee9e155e7b52b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedAndInvalidInputMatchTheReplacedInvocationErrorShape()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts#automatic mount list hydration with retained legacy titles emits no user-action request",
+      "file": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f24715a846bc508e683f5398af80d23cf79acf8a7cc1bcf741c5f09cee3b321",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automatic mount list hydration with retained legacy titles emits no user-action request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/activity/observationCallers.test.ts",
+      "file": "modules/ui-web/src/activity/observationCallers.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a566fbd1faf155328fbaf160b8b7bf0d995aaeb3f4fc5e08fbdd86dda9538e53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "observation callers are executable evidence checks every table entry and never leaves an unchecked named caller in a purpose reason",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/action-ledger",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/action-ledger/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/advisory/authorization-pending/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/advisory/health-recoverable/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/advisory/operation-completed/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/ai/install/manifest",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/ai/install/plan-preview",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/authorizations/grants",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/chat/agent/tools",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/chat/conversations",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/chat/conversations/{sessionId}/history",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/condition-recovery-index/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/diagnostic-channels/engine-log/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/diagnostics/ingestion/summary",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/diagnostics/traces",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/feedback/capture",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/health/events/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/indexing-jobs/failed",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/indexing-jobs/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/indexing-roots/substrate",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/indexing/failed-jobs",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/indexing/roots",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/inference/transitions",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/mcp/token",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/memory",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/messages/errors/{locale}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/messages/health-events/{locale}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/messages/registry-operation/{locale}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/messages/registry-resource/{locale}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/messages/registry-surface/{locale}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/messages/registry-workflow/{locale}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/meta/routes",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/gpu.memory.utilization.percent",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/gpu.memory.utilization.percent/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/gpu.utilization.percent",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/gpu.utilization.percent/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/worker.documents.indexed.rate_per_sec",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/worker.documents.indexed.rate_per_sec/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/worker.job_queue.depth",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/metrics/worker.job_queue.depth/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/operation-history/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/registry/diagnostic-channels",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/registry/operations",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/registry/resources",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/registry/shapes",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/registry/surfaces",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/registry/workflows",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/schemas/{name}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/settings/v2",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/shell-events/stream",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence GET /api/thread/{id}",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence POST /api/action-ledger/events",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence POST /api/chat/agent/tool-result",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence POST /api/chat/agent/virtual-operations",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence POST /api/chat/runs/{runId}/observe",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence POST /api/conversations/encryption/auto-lock",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence POST /api/knowledge/collection-facet",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence POST /api/library/path-label",
+          "status": "passed"
+        },
+        {
+          "name": "observation callers are executable evidence rejects a plausible caller that only mentions memory in a comment",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries accepts actual unattended GET hydration",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries rejects route text with no executable request",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries rejects an exclusively attended click handler",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries does not confuse POST with GET",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries does not confuse a transport payload with its URL",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "469d8f10f",
+    "revision": "469d8f10f6dbbb4c1cb52801d12b033697c979e5",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.pathLabelMalformedJsonPreservesInvocationClientError\" --tests \"io.justsearch.ui.api.PathLabelErrorContractTest.malformedAndInvalidInputMatchTheReplacedInvocationErrorShape\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 17737
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/state/legacyTitleMount.test.ts\" \"src/activity/observationCallers.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-14204-1791757641759.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2389
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#pathLabelMalformedJsonPreservesInvocationClientError",
+        "classification": "assertion",
+        "detail": "pathLabelMalformedJsonPreservesInvocationClientError(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: { => {\"error\":\"Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #UNKNOWN])\\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` d"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelErrorContractTest.java#malformedAndInvalidInputMatchTheReplacedInvocationErrorShape",
+        "classification": "assertion",
+        "detail": "malformedAndInvalidInputMatchTheReplacedInvocationErrorShape(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: { => {\"body\":{\"error\":\"Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #UNKNOWN])\\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOC"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts#automatic mount list hydration with retained legacy titles emits no user-action request",
+        "classification": "assertion",
+        "detail": "automatic mount list hydration with retained legacy titles emits no user-action request:  AssertionError: [{\"url\":\"/api/chat/conversations?limit=20\",\"method\":\"GET\"},{\"url\":\"/api/chat/conversations/verify-six/title\",\"method\":\"POST\"}]: expected [ { …(2) } ] to deeply equal []\n    at F:/justsearch-public/.claude/worktrees/b69-evtmp/test-intent-before-VS4ygc/modules/ui-web/src/shell-v0/state"
+      },
+      {
+        "id": "modules/ui-web/src/activity/observationCallers.test.ts",
+        "classification": "assertion",
+        "detail": "observation callers are executable evidence GET /api/action-ledger:  AssertionError: GET /api/action-ledger: no GET request in ui-web/src/shell-v0/operations/ActionLedgerClient.ts is reached from an unattended trigger: expected [] to not deeply equal []\n    at checkCaller (F:/justsearch-public/.claude/worktrees/b69-evtmp/test-intent-before-VS4ygc/modules/ui-web/src/a | observation callers are executable evidence GET /api/action-ledger/stream:  AssertionError: GET /api/action-ledger/stream: no GE"
+      }
+    ]
+  },
+  "digest": "sha256:fd8b732eb7f16bd1f1c98b50f3f3d3df85374cd662efb4245757de3cca5eef8f"
+}

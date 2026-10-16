@@ -1,0 +1,71 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:53:53.827Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "8779215cfeed36dccd1e711e6e1df0723ec274d1",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6863
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:31df94434a61fc592afd8750307e170dd2f2cd0e03b4508ec5bd45690176ae3a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3d181a70c",
+    "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-search-budget-2-answer-compat.patch",
+        "contentDigest": "sha256:4fc02b05fc60fbf9ef1ea3cca8f89abe1d9cee783d41e5e47a4bef336001c919"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16586
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason",
+        "classification": "assertion",
+        "detail": "retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: execution timed out after 5000 ms"
+      }
+    ]
+  },
+  "digest": "sha256:02c7d2c463be37cbafbc0a9a32368b7c220632d1eb7a599e3904dfdff4f3670d"
+}

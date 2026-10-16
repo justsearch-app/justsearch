@@ -1,10 +1,26 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.ChildKind;
+import io.justsearch.app.api.runtime.child.ChildSpec;
+import io.justsearch.app.api.runtime.child.StopMode;
+import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.api.runtime.child.StopRequest;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /** Drives the production owner-guarded callback paths without test-only production wrappers. */
 final class LlamaServerTestAccess {
+  /** The stop a test makes when the reason is not what it checks. */
+  static final StopRequest TEST_STOP =
+      StopRequest.of(StopReason.DEACTIVATE, StopMode.NOW, "test");
+
   private LlamaServerTestAccess() {}
 
   static void crashCurrent(LlamaServerOps ops) throws Exception {
@@ -17,10 +33,49 @@ final class LlamaServerTestAccess {
 
   static void installLogicalOwner(LlamaServerOps ops, LlamaServerOps.StartResult start)
       throws Exception {
+    installActive(ops, start, null, start.context().inference().serverPort());
+  }
+
+  /**
+   * Starts {@code argv} through the {@link ChildControl} {@code ops} stops its servers with, as a
+   * {@link ChildKind#LLAMA_SERVER} that is not yet any server's owner. Its streams are pipes the
+   * test does not read, so {@code argv} must write little.
+   */
+  static ChildHandle startThroughControl(LlamaServerOps ops, List<String> argv) throws Exception {
+    var field = LlamaServerOps.class.getDeclaredField("childControl");
+    field.setAccessible(true);
+    ChildControl control = (ChildControl) field.get(ops);
+    return control.start(
+        new ChildSpec(ChildKind.LLAMA_SERVER, argv, null, Map.of(), new ChildSpec.Stdio.Pipes(),
+            false, OptionalLong.empty(), Optional.empty(), ChildSpec.CooperativeStop.NONE,
+            "llama-server"),
+        new ChildControl.ManifestEntry(null, null, null));
+  }
+
+  /** Makes {@code child} (may be null) the launched server of a newly installed owner. */
+  static void installChild(
+      LlamaServerOps ops, LlamaServerOps.StartResult start, ChildHandle child) throws Exception {
+    var field = LlamaServerOps.class.getDeclaredField("child");
+    field.setAccessible(true);
+    field.set(ops, child);
+    installActive(ops, start, child, start.context().inference().serverPort());
+  }
+
+  /** A java launch of {@code main} on the test classpath. */
+  static List<String> javaArgv(Class<?> main) {
+    return List.of(
+        Path.of(System.getProperty("java.home"), "bin",
+            System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString(),
+        "-cp", System.getProperty("java.class.path"), main.getName());
+  }
+
+  private static void installActive(
+      LlamaServerOps ops, LlamaServerOps.StartResult start, ChildHandle child, int port)
+      throws Exception {
     var install = LlamaServerOps.class.getDeclaredMethod(
-        "installActive", LlamaServerOps.StartResult.class, Process.class, ProcessHandle.class);
+        "installActive", LlamaServerOps.StartResult.class, ChildHandle.class, int.class);
     install.setAccessible(true);
-    install.invoke(ops, start, null, null);
+    install.invoke(ops, start, child, port);
   }
 
   private static void invokeCurrent(LlamaServerOps ops, String methodName) throws Exception {

@@ -1,0 +1,352 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-08T01:09:54.804Z",
+  "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
+  "tree": "4134ceb3f3cf4b21b9ecdde7dbc57f333cef4a91",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.QuitBudgetTest.theEngineBudgetIsTheDeadlineLessTheForceMarginLessNow\" --tests \"io.justsearch.app.engine.QuitBudgetTest.aWaitIsTheSmallerOfItsSubBudgetAndWhatIsLeft\" --tests \"io.justsearch.app.engine.QuitBudgetTest.aDeadlineAlreadyPastLeavesNothingToWait\" --tests \"io.justsearch.app.engine.QuitBudgetTest.extremeDeadlinesDoNotOverflow\" --tests \"io.justsearch.app.engine.QuitBudgetTest.unboundedKeepsTodaysWaits\" --tests \"io.justsearch.app.engine.QuitBudgetTest.aQuitWithoutADeadlineGetsTheContractDeadlineFromNow\" --tests \"io.justsearch.app.engine.QuitBudgetTest.theSubBudgetsFitTheEngineBudget\" --tests \"io.justsearch.app.engine.QuitBudgetTest.onlyAQuitHandsItsBudgetToTheSteps\" --tests \"io.justsearch.app.engine.QuitBudgetTest.aBudgetedQuitExitsThroughTheSameRunOnceSequence\" --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest.aRequestForThisIncarnationWithANonceIsItsOwn\" --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest.aRequestForAnotherIncarnationIsStale\" --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest.aRequestForThisIncarnationWithoutANonceIsStale\" --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest.anEngineWithoutAnIncarnationCannotOwnAnAddressedRequest\" --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest.aRequestNamingNoIncarnationIsStale\" --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest.theIncarnationAndNonceAreRead\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3733
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppQuitWindowTest.recordedProducersGetTheCooperativeWindowInAQuitAndTheirOwnDeadlineOtherwise\" --tests \"io.justsearch.ui.HeadlessAppQuitWindowTest.liveWorkSharesOneWindowCountedFromTheProducerDrain\" --tests \"io.justsearch.ui.HeadlessAppQuitWindowTest.aLifecycleQuitWithoutADeadlineGetsTheContractDeadline\" --tests \"io.justsearch.ui.HeadlessAppQuitWindowTest.anExhaustedChatStopStillAsksForOneMillisecondAndReportsFailures\" --tests \"io.justsearch.ui.api.LifecycleShutdownContractTest.aBodyNamingNothingStillQuits\" --tests \"io.justsearch.ui.HeadlessAppQuitBudgetTest.aRestartKeepsTodaysWaits\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8526
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#theEngineBudgetIsTheDeadlineLessTheForceMarginLessNow",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theEngineBudgetIsTheDeadlineLessTheForceMarginLessNow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#aWaitIsTheSmallerOfItsSubBudgetAndWhatIsLeft",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWaitIsTheSmallerOfItsSubBudgetAndWhatIsLeft()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#aDeadlineAlreadyPastLeavesNothingToWait",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDeadlineAlreadyPastLeavesNothingToWait()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#extremeDeadlinesDoNotOverflow",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "extremeDeadlinesDoNotOverflow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#unboundedKeepsTodaysWaits",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unboundedKeepsTodaysWaits()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#aQuitWithoutADeadlineGetsTheContractDeadlineFromNow",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQuitWithoutADeadlineGetsTheContractDeadlineFromNow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#theSubBudgetsFitTheEngineBudget",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theSubBudgetsFitTheEngineBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#onlyAQuitHandsItsBudgetToTheSteps",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlyAQuitHandsItsBudgetToTheSteps(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java#aBudgetedQuitExitsThroughTheSameRunOnceSequence",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74840bad14235bb10d93be69506f1328c4d90879e36f4162850ab923412deb54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBudgetedQuitExitsThroughTheSameRunOnceSequence(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestForThisIncarnationWithANonceIsItsOwn",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bddd56f070859ac2c161f12d0d67c5158f89c2b670075a8f6c64be1dd3ac2dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestForThisIncarnationWithANonceIsItsOwn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestForAnotherIncarnationIsStale",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bddd56f070859ac2c161f12d0d67c5158f89c2b670075a8f6c64be1dd3ac2dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestForAnotherIncarnationIsStale()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestForThisIncarnationWithoutANonceIsStale",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bddd56f070859ac2c161f12d0d67c5158f89c2b670075a8f6c64be1dd3ac2dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestForThisIncarnationWithoutANonceIsStale()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#anEngineWithoutAnIncarnationCannotOwnAnAddressedRequest",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bddd56f070859ac2c161f12d0d67c5158f89c2b670075a8f6c64be1dd3ac2dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEngineWithoutAnIncarnationCannotOwnAnAddressedRequest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestNamingNoIncarnationIsStale",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bddd56f070859ac2c161f12d0d67c5158f89c2b670075a8f6c64be1dd3ac2dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestNamingNoIncarnationIsStale()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#theIncarnationAndNonceAreRead",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bddd56f070859ac2c161f12d0d67c5158f89c2b670075a8f6c64be1dd3ac2dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theIncarnationAndNonceAreRead(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java#recordedProducersGetTheCooperativeWindowInAQuitAndTheirOwnDeadlineOtherwise",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a88b6e87fc35c3aabe2b0f1688bf5522735a03fb9f9b495263df187da0a7080f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordedProducersGetTheCooperativeWindowInAQuitAndTheirOwnDeadlineOtherwise(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java#liveWorkSharesOneWindowCountedFromTheProducerDrain",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a88b6e87fc35c3aabe2b0f1688bf5522735a03fb9f9b495263df187da0a7080f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "liveWorkSharesOneWindowCountedFromTheProducerDrain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java#aLifecycleQuitWithoutADeadlineGetsTheContractDeadline",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a88b6e87fc35c3aabe2b0f1688bf5522735a03fb9f9b495263df187da0a7080f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLifecycleQuitWithoutADeadlineGetsTheContractDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java#anExhaustedChatStopStillAsksForOneMillisecondAndReportsFailures",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a88b6e87fc35c3aabe2b0f1688bf5522735a03fb9f9b495263df187da0a7080f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExhaustedChatStopStillAsksForOneMillisecondAndReportsFailures()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/LifecycleShutdownContractTest.java#aBodyNamingNothingStillQuits",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/LifecycleShutdownContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c8cde5f447a617753497ab2de2a17b00c6b27bc78d1f156c463d321470c7c9b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBodyNamingNothingStillQuits(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java#aRestartKeepsTodaysWaits",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:376d9cc6a18c0b747b3a8425ced4e3ba2a33bd4b1ff94beff9711698dbf645b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRestartKeepsTodaysWaits(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:39ba2376a93a370d2f1ce62a7c8d4cdd583ddac694d2359199146c143cda734c"
+}

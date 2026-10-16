@@ -73,9 +73,16 @@ public final class EngineRoot implements WorkerHost {
   private final EngineResourcePolicy resources;
   private final EngineAdmissionController admission;
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
-  private final Object generationLock = new Object();
-  private final java.util.Set<GenerationLifetime> generations = new java.util.HashSet<>();
-  private ForegroundLoadGate foregroundLoadGate; // Guarded by generationLock.
+  /**
+   * Spec E (Switch A): the Engine's one bulk-work gate. Process-scoped and built before either half,
+   * so it sees a generation from its first edge, outlives index restarts, and the index half's
+   * pacing reads it as soon as that half is composed.
+   */
+  private final io.justsearch.core.scheduling.BulkWorkGate bulkWork =
+      new io.justsearch.core.scheduling.BulkWorkGate();
+  private final Object generationActivityLock = new Object();
+  private io.justsearch.app.api.chat.GenerationActivity generationActivity; // Guarded by the lock.
+  private AutoCloseable generationEdges; // Guarded by generationActivityLock.
   private final io.justsearch.core.component.EngineComponentRegistry components;
   private final io.justsearch.core.component.ComponentHandle indexComponent;
   private final io.justsearch.core.component.ComponentHandle encoderComponent;
@@ -97,6 +104,28 @@ public final class EngineRoot implements WorkerHost {
       return EngineRoot.this::beginGeneration;
     }
 
+    @Override public void bindGenerationActivity(io.justsearch.app.api.chat.GenerationActivity activity) {
+      EngineRoot.this.bindGenerationActivity(activity);
+    }
+
+    @Override public void bindPressureReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {
+      EngineRoot.this.bindPressureReceiver(receiver);
+    }
+
+    @Override public io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery() {
+      return EngineRoot.this.boundDeviceLostRecovery;
+    }
+
+    @Override public void bindDeviceLoss(io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss) {
+      EngineRoot.this.bindDeviceLoss(deviceLoss);
+    }
+
+    @Override public void bindProfileReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver) {
+      EngineRoot.this.bindProfileReceiver(receiver);
+    }
+
     @Override public Registration register(io.justsearch.core.execution.EngineExecutorSpec spec) {
       return delegate.register(spec);
     }
@@ -111,59 +140,365 @@ public final class EngineRoot implements WorkerHost {
     @Override public void close() { delegate.close(); }
   }
 
-  /** Track actual producers even while the API is serving before index composition. */
+  /**
+   * A generation's lifetime retains its work until actual producer exit. Spec E step E2: it no
+   * longer enters the search gauge; chat generation reaches indexing pacing through {@link
+   * #bulkWork}'s duty floor instead (see {@link #bindGenerationActivity}).
+   */
   private Runnable beginGeneration(io.justsearch.app.api.EngineWorkHandle work) {
-    var generation = new GenerationLifetime(work.retain());
+    var retained = work.retain();
+    var closed = new java.util.concurrent.atomic.AtomicBoolean();
+    return () -> {
+      if (closed.compareAndSet(false, true)) retained.close();
+    };
+  }
+
+  /**
+   * Spec E step E2: the chat server's generation edges drive the gate's generating input. The last
+   * bound activity wins (a replaced inference manager rebinds). Each edge re-reads the activity
+   * under one lock, so edges and the initial read cannot leave a stale value behind.
+   */
+  private void bindGenerationActivity(io.justsearch.app.api.chat.GenerationActivity activity) {
+    Objects.requireNonNull(activity, "activity");
+    synchronized (generationActivityLock) {
+      closeGenerationEdges();
+      generationActivity = activity;
+      generationEdges = activity.onEdge((generating, epoch) -> mirrorGeneration(activity));
+      bulkWork.setGenerating(activity.generating());
+    }
+  }
+
+  private void mirrorGeneration(io.justsearch.app.api.chat.GenerationActivity activity) {
+    synchronized (generationActivityLock) {
+      if (generationActivity == activity) bulkWork.setGenerating(activity.generating());
+    }
+  }
+
+  // Called under generationActivityLock.
+  private void closeGenerationEdges() {
+    AutoCloseable edges = generationEdges;
+    generationEdges = null;
+    if (edges == null) return;
     try {
-      synchronized (generationLock) {
-        generation.attach(foregroundLoadGate);
-        generations.add(generation);
+      edges.close();
+    } catch (Exception failure) {
+      log.warn("Generation edge subscription did not close", failure);
+    }
+  }
+
+  /** Spec E (Switch A): the Engine's one bulk-work gate, shared with the status surface. */
+  @Override
+  public io.justsearch.core.scheduling.BulkWorkGate bulkWork() {
+    return bulkWork;
+  }
+
+  // ---- device loss (Spec A step 10, Spec E step E8) ----
+
+  /** The restart path the composition root binds; fail closed until then. */
+  private volatile io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery =
+      io.justsearch.app.api.chat.DeviceLostRecovery.UNAVAILABLE;
+
+  /** What the chat controller holds: it reads {@link #deviceLostRecovery} when it acts. */
+  private final io.justsearch.app.api.chat.DeviceLostRecovery boundDeviceLostRecovery =
+      new io.justsearch.app.api.chat.DeviceLostRecovery() {
+        @Override
+        public java.util.List<java.time.Instant> priorRestarts() throws IOException {
+          return deviceLostRecovery.priorRestarts();
+        }
+
+        @Override
+        public void reserveRestart() throws IOException {
+          deviceLostRecovery.reserveRestart();
+        }
+
+        @Override
+        public void requestRestart() {
+          deviceLostRecovery.requestRestart();
+        }
+
+        @Override
+        public void requestRestart(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+          deviceLostRecovery.requestRestart(accepted, refused);
+        }
+      };
+
+  private final Object deviceLossLock = new Object();
+  // Guarded by deviceLossLock: the chat controller's device-loss input; the last bound wins.
+  private io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss;
+  // Guarded by deviceLossLock: started with the first binding, closed with the process.
+  private EncoderDeviceLossReporter encoderDeviceLoss;
+  // Guarded by deviceLossLock: the machine's suspends and resumes (Spec F §3.5), bound once.
+  private io.justsearch.app.api.runtime.power.SystemPowerEvents powerEvents;
+  // Guarded by deviceLossLock: the resume subscription, made once both inputs are bound.
+  private io.justsearch.app.api.runtime.power.SystemPowerEvents.Subscription resumeSubscription;
+
+  /**
+   * Spec A §7.4: the machine's power events, whose resumes reach the chat controller's {@code
+   * reportResume}. Bound once by the composition root, before or after the controller binds its
+   * input; the first binding wins. The subscription closes with the process resources.
+   */
+  public void bindPowerEvents(io.justsearch.app.api.runtime.power.SystemPowerEvents events) {
+    Objects.requireNonNull(events, "events");
+    synchronized (deviceLossLock) {
+      if (powerEvents != null) return;
+      powerEvents = events;
+      subscribeResumeLocked();
+    }
+  }
+
+  /** Subscribes once to resumes when both the power events and the controller's input are bound. */
+  private void subscribeResumeLocked() {
+    if (powerEvents == null || deviceLoss == null || resumeSubscription != null) return;
+    resumeSubscription = powerEvents.subscribe(event -> {
+      if (event.kind() != io.justsearch.app.api.runtime.power.PowerEvent.Kind.RESUME) return;
+      io.justsearch.app.api.chat.ChatDeviceLoss bound;
+      synchronized (deviceLossLock) {
+        bound = deviceLoss;
       }
-      return generation::close;
+      bound.reportResume();
+    });
+    processResources.closeWithProcess(resumeSubscription);
+  }
+
+  /**
+   * Spec A step 10: the Engine's device-lost restart path (its exit ledger and the requested
+   * restart that records a {@code DEVICE_LOST} self-intent). Bound once by the composition root,
+   * before the chat controller can act on a device loss.
+   */
+  public void bindDeviceLostRecovery(io.justsearch.app.api.chat.DeviceLostRecovery recovery) {
+    deviceLostRecovery = Objects.requireNonNull(recovery, "recovery");
+  }
+
+  /**
+   * Spec E §6.2 item 6: encoder device loss is reported to the chat controller's input, once per
+   * Engine incarnation. The reporter starts with the first binding and follows a rebinding (a
+   * replaced inference manager); it closes with the process resources.
+   */
+  private void bindDeviceLoss(io.justsearch.app.api.chat.ChatDeviceLoss target) {
+    Objects.requireNonNull(target, "target");
+    synchronized (deviceLossLock) {
+      deviceLoss = target;
+      subscribeResumeLocked();
+      if (encoderDeviceLoss != null) return;
+      encoderDeviceLoss = EncoderDeviceLossReporter.start(new io.justsearch.app.api.chat.ChatDeviceLoss() {
+        @Override
+        public void reportDeviceLost(io.justsearch.app.api.chat.DeviceLostEvidence evidence) {
+          io.justsearch.app.api.chat.ChatDeviceLoss bound;
+          synchronized (deviceLossLock) {
+            bound = deviceLoss;
+          }
+          bound.reportDeviceLost(evidence);
+        }
+
+        @Override
+        public void reportResume() {
+          io.justsearch.app.api.chat.ChatDeviceLoss bound;
+          synchronized (deviceLossLock) {
+            bound = deviceLoss;
+          }
+          bound.reportResume();
+        }
+      });
+      processResources.closeWithProcess(encoderDeviceLoss);
+    }
+  }
+
+  private final Object residencyLock = new Object();
+  private io.justsearch.app.services.gpu.GpuResidencySampler residency; // Guarded by residencyLock.
+  // Guarded by residencyLock: a receiver bound before the sampler starts.
+  private java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> pressureReceiver;
+
+  /**
+   * Spec E step E3 (section 3.2): opens the Engine's one GPU memory reader and starts the residency
+   * sampler on one Engine daemon thread with a 2 s fixed delay. The sampler raises and clears the
+   * bulk work gate's external pressure and reports it to the chat controller; both close with the
+   * process resources. Call once the GPU device is known. Idempotent.
+   *
+   * <p>Step E6: the reader opens after the device probe, with the pinned device (Spec E section 5:
+   * its LUID and CUDA ordinal), so on several NVIDIA adapters it reads the one chat and the encoders
+   * use. With nothing pinned, or a pinned device without a LUID, it opens with no device and maps a
+   * single adapter itself.
+   *
+   * <p>Step E4: the sampler also polls the user's foreground context for game detection (Spec E
+   * section 4), and takes its boot sample on this thread before it is scheduled, so a game already
+   * running is on the gate and reported to the chat controller before chat first starts (CH7). If the
+   * foreground reader cannot be opened, the sampler runs without game detection.
+   */
+  public void startGpuResidency() {
+    synchronized (residencyLock) {
+      if (residency != null) return;
+    }
+    var limits = executors.limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    var owner = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "engine.gpu-residency-sampler",
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+    java.util.concurrent.ScheduledExecutorService scheduler;
+    io.justsearch.app.api.gpu.GpuMemoryReader reader;
+    try {
+      scheduler = owner.openScheduled(
+          Thread.ofPlatform().daemon().name("gpu-residency-sampler").factory());
+      reader = io.justsearch.gpu.memory.WindowsGpuMemoryReader.open(
+          io.justsearch.app.services.gpu.DeviceFactsSource.process().facts().pinnedGpuDevice(),
+          java.time.Clock.systemUTC());
     } catch (RuntimeException | Error failure) {
-      generation.close();
+      try {
+        owner.close();
+      } catch (RuntimeException | Error cleanup) {
+        failure.addSuppressed(cleanup);
+      }
       throw failure;
     }
+    io.justsearch.app.api.gpu.UserContextReader userContext;
+    try {
+      userContext = io.justsearch.gpu.context.UserContextSignals.open();
+    } catch (RuntimeException failure) {
+      log.warn("The foreground reader did not open; game detection is off for this run", failure);
+      startGpuResidency(reader, scheduler, owner);
+      return;
+    }
+    startGpuResidency(reader, userContext, scheduler, owner);
   }
 
-  /** Publication and actual-exit removal cannot race to lose or resurrect foreground demand. */
-  private void publishForegroundLoadGate(ForegroundLoadGate gate) {
-    synchronized (generationLock) {
-      foregroundLoadGate = gate;
-      for (GenerationLifetime generation : generations) generation.attach(gate);
-    }
+  /**
+   * Starts the residency sampler over the given reader and scheduler, without game detection; the
+   * sampler owns the reader. {@code schedulerOwner} closes after the sampler, with the process
+   * resources.
+   */
+  void startGpuResidency(io.justsearch.app.api.gpu.GpuMemoryReader reader,
+      java.util.concurrent.ScheduledExecutorService scheduler, AutoCloseable schedulerOwner) {
+    startGpuResidency(reader, null, scheduler, schedulerOwner);
   }
 
-  private final class GenerationLifetime implements AutoCloseable {
-    private final io.justsearch.app.api.EngineWorkHandle work;
-    private Runnable gateRelease;
-    private boolean closed;
-
-    private GenerationLifetime(io.justsearch.app.api.EngineWorkHandle work) { this.work = work; }
-
-    // Called only under generationLock. The gate reads current urgency, including detachment
-    // before publication, and remains the only producer of the existing indexing gauge.
-    private void attach(ForegroundLoadGate gate) {
-      Runnable previous = gateRelease;
-      gateRelease = null;
-      if (previous != null) previous.run();
-      if (gate != null) gateRelease = gate.callOwned(work, lifetime -> lifetime.retain());
-    }
-
-    @Override public void close() {
-      Runnable release;
-      synchronized (generationLock) {
-        if (closed) return;
-        closed = true;
-        generations.remove(this);
-        release = gateRelease;
-        gateRelease = null;
+  /**
+   * Starts the residency sampler over the given readers and scheduler; the sampler owns both readers
+   * ({@code userContext} may be null: no game detection). The boot sample runs on this thread before
+   * the schedule starts. {@code schedulerOwner} closes after the sampler, with the process resources.
+   */
+  void startGpuResidency(io.justsearch.app.api.gpu.GpuMemoryReader reader,
+      io.justsearch.app.api.gpu.UserContextReader userContext,
+      java.util.concurrent.ScheduledExecutorService scheduler, AutoCloseable schedulerOwner) {
+    var sampler = new io.justsearch.app.services.gpu.GpuResidencySampler(reader, userContext,
+        this::gameDetectionEnabled,
+        io.justsearch.app.services.gpu.GpuResidencySampler::engineAndDescendants, bulkWork,
+        java.time.Clock.systemUTC(), scheduler);
+    synchronized (residencyLock) {
+      if (residency != null) {
+        // Lost a start race: this one never ran, so it releases what it was given.
+        sampler.close();
+        try {
+          schedulerOwner.close();
+        } catch (Exception failure) {
+          log.warn("GPU residency scheduler did not close", failure);
+        }
+        return;
       }
-      // Completion callbacks may call other root services; do not invoke them under our lock.
-      try { if (release != null) release.run(); }
-      finally { work.close(); }
+      residency = sampler;
+      processResources.closeWithProcess(schedulerOwner);
+      processResources.closeWithProcess(sampler);
+      if (pressureReceiver != null) sampler.bindPressureReceiver(pressureReceiver);
+      sampler.bootSample();
+      sampler.start();
     }
   }
+
+  /**
+   * {@code justsearch.gpu.game_detection} from the current configuration, read on every sampler tick
+   * (apply scope hot). Without a configuration (embedded tests), detection stays on.
+   */
+  private boolean gameDetectionEnabled() {
+    io.justsearch.configuration.resolved.ResolvedConfig config = serverFactory.captureConfiguration();
+    return config == null || config.ai() == null || !"off".equals(config.ai().gpuGameDetection());
+  }
+
+  /** Spec E step E3: the residency sampler, once {@link #startGpuResidency()} ran; else null. */
+  @Override
+  public io.justsearch.app.services.gpu.GpuResidencySampler gpuResidency() {
+    synchronized (residencyLock) {
+      return residency;
+    }
+  }
+
+  /** The chat controller's pressure input; the last bound wins (a replaced manager rebinds). */
+  private void bindPressureReceiver(
+      java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {
+    Objects.requireNonNull(receiver, "receiver");
+    synchronized (residencyLock) {
+      pressureReceiver = receiver;
+      if (residency != null) residency.bindPressureReceiver(receiver);
+    }
+  }
+
+  /**
+   * Spec E step E7b: installs the device-memory planner for {@code store}'s configurations, before
+   * the boot rebuild. Every prepared configuration then carries its plan at ordinal 150, and each
+   * published one publishes that plan to the process's {@link
+   * io.justsearch.app.services.gpu.DevicePlanState}. The planner reads the process's device probe and
+   * model files only; it initializes no ONNX Runtime class.
+   */
+  public static void installDevicePlanning(io.justsearch.configuration.resolved.ConfigStore store) {
+    installDevicePlanning(store,
+        io.justsearch.app.services.gpu.GpuProfileResolver.planner(
+            () -> io.justsearch.app.services.gpu.DeviceFactsSource.process().facts(),
+            io.justsearch.indexerworker.server.InferenceCompositionRoot::gpuRoleWeightsMiB),
+        io.justsearch.app.services.gpu.DevicePlanState.process());
+  }
+
+  /** {@link #installDevicePlanning(io.justsearch.configuration.resolved.ConfigStore)} over a given planner and state. */
+  static void installDevicePlanning(io.justsearch.configuration.resolved.ConfigStore store,
+      io.justsearch.app.services.config.ConfigStoreRebuilder.DevicePlanner planner,
+      io.justsearch.app.services.gpu.DevicePlanState state) {
+    Objects.requireNonNull(store, "store");
+    Objects.requireNonNull(planner, "planner");
+    Objects.requireNonNull(state, "state");
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rememberDevicePlanner(planner);
+    store.addListener(event -> state.publish(planOf(event.current())));
+  }
+
+  private static io.justsearch.app.services.gpu.GpuProfileResolver.Resolution planOf(
+      io.justsearch.configuration.resolved.ResolvedConfig config) {
+    try {
+      return io.justsearch.app.services.config.ConfigStoreRebuilder.planOf(config)
+          .orElse(io.justsearch.app.services.gpu.GpuProfileResolver.Resolution.unresolved());
+    } catch (RuntimeException failure) {
+      log.warn("The device-memory plan did not resolve; the profile stays unresolved", failure);
+      return io.justsearch.app.services.gpu.GpuProfileResolver.Resolution.unresolved();
+    }
+  }
+
+  /**
+   * Spec E step E7b: the bulk-work gate and the chat controller follow {@code state}'s profile from
+   * now on (the current one is delivered at once).
+   */
+  public void followDevicePlan(io.justsearch.app.services.gpu.DevicePlanState state) {
+    Objects.requireNonNull(state, "state");
+    state.subscribe(resolution -> {
+      java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver;
+      synchronized (profileLock) {
+        devicePlan = resolution;
+        receiver = profileReceiver;
+      }
+      bulkWork.setProfile(resolution.gateProfile());
+      if (receiver != null) receiver.accept(resolution.statusProfile());
+    });
+  }
+
+  /** The chat controller's profile input; the last bound wins (a replaced manager rebinds). */
+  private void bindProfileReceiver(
+      java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver) {
+    Objects.requireNonNull(receiver, "receiver");
+    io.justsearch.app.services.gpu.GpuProfileResolver.Resolution plan;
+    synchronized (profileLock) {
+      profileReceiver = receiver;
+      plan = devicePlan;
+    }
+    if (plan != null) receiver.accept(plan.statusProfile());
+  }
+
+  private final Object profileLock = new Object();
+  private io.justsearch.app.services.gpu.GpuProfileResolver.Resolution devicePlan; // Guarded.
+  private java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile>
+      profileReceiver; // Guarded by profileLock.
 
   /** Final process teardown is separate from this host's restartable index close. */
   public io.justsearch.app.api.EngineProcessResources processResources() { return processResources; }
@@ -202,6 +537,11 @@ public final class EngineRoot implements WorkerHost {
 
   /** The same owner is shared by the API front, library calls and ordered shutdown. */
   public io.justsearch.app.api.EngineAdmissionService admission() { return admission; }
+
+  @Override
+  public io.justsearch.core.scheduling.UserActivity userActivity() {
+    return admission.userActivity();
+  }
 
   /** Existing mutation leases and new work admission freeze under one lock. */
   public io.justsearch.app.api.OperationLeaseService operationLeases() { return admission; }
@@ -246,6 +586,22 @@ public final class EngineRoot implements WorkerHost {
         io.justsearch.core.component.ComponentHandle encoderComponent,
         io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration) {
       return create(gauge, executors, ingestion, indexComponent, encoderComponent);
+    }
+
+    /**
+     * Spec E step E3: the production factory composes the worker bus over the Engine's bulk work
+     * gate, so {@code isBulkHeld()} and the {@code shouldYieldGpuBackfill()} fold read it. Test
+     * factories that build their own index half ignore the gate.
+     */
+    default KnowledgeServer create(GpuSchedulingGauge gauge,
+        io.justsearch.core.scheduling.BulkWorkGate bulkWork,
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
+        io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+        io.justsearch.core.component.ComponentHandle indexComponent,
+        io.justsearch.core.component.ComponentHandle encoderComponent,
+        io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration) {
+      return create(gauge, executors, ingestion, indexComponent, encoderComponent,
+          exactConfiguration);
     }
   }
   private final ServerFactory serverFactory;
@@ -404,12 +760,26 @@ public final class EngineRoot implements WorkerHost {
       Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority,
       io.justsearch.configuration.resolved.ConfigStore configStore,
       DefaultEngineProcessResources processResources) {
+    return forProcess(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction,
+        unrecorded(childRegistry), requestedRestartAction, authority, configStore,
+        processResources);
+  }
+
+  /** The Engine's boot: helper children start and stop through its {@code childControl}. */
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize,
+      IntConsumer terminalWriterFaultAction,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.configuration.resolved.ConfigStore configStore,
+      DefaultEngineProcessResources processResources) {
+    Objects.requireNonNull(childControl, "childControl");
     Objects.requireNonNull(configStore, "configStore");
     Objects.requireNonNull(processResources, "processResources");
     if (configStore.publicationLock() != processResources.publicationLock()) {
       throw new IllegalArgumentException("ConfigStore and process resources must share publication lock");
     }
-    return new EngineRoot(operations, attempts, serverFactory(childRegistry, () -> configStore),
+    return new EngineRoot(operations, attempts, serverFactory(childControl, () -> configStore),
         deadlineMs, batchSize, terminalWriterFaultAction, requestedRestartAction, authority,
         processResources);
   }
@@ -449,8 +819,21 @@ public final class EngineRoot implements WorkerHost {
         requestedRestartAction, authority);
   }
 
+  /** Compositions without the Engine's boot: children are registered but not recorded. */
+  private static io.justsearch.app.api.runtime.child.ChildControl unrecorded(
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    return io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+        Objects.requireNonNull(childRegistry, "childRegistry"));
+  }
+
   private static ServerFactory serverFactory(
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      java.util.function.Supplier<io.justsearch.configuration.resolved.ConfigStore> authority) {
+    return serverFactory(unrecorded(childRegistry), authority);
+  }
+
+  private static ServerFactory serverFactory(
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
       java.util.function.Supplier<io.justsearch.configuration.resolved.ConfigStore> authority) {
     // Process boot supplies its explicit owner; embedded compatibility constructors resolve at start.
     var gpuCapabilities = new io.justsearch.gpu.GpuCapabilitiesService();
@@ -477,15 +860,33 @@ public final class EngineRoot implements WorkerHost {
           io.justsearch.core.component.ComponentHandle indexComponent,
           io.justsearch.core.component.ComponentHandle encoderComponent,
           io.justsearch.configuration.resolved.ResolvedConfig startupConfiguration) {
+        return create(gauge, null, executorRegistry, ingestion, indexComponent, encoderComponent,
+            startupConfiguration);
+      }
+
+      @Override
+      public KnowledgeServer create(GpuSchedulingGauge gauge,
+          io.justsearch.core.scheduling.BulkWorkGate bulkWork,
+          io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+          io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+          io.justsearch.core.component.ComponentHandle indexComponent,
+          io.justsearch.core.component.ComponentHandle encoderComponent,
+          io.justsearch.configuration.resolved.ResolvedConfig startupConfiguration) {
         var configStore = authority.get();
         WorkerConfig workerConfig = WorkerConfig.load(startupConfiguration);
-        // Dev reload signals arrive under this runtime directory from the owning dev tool.
+        // Dev reload signals arrive under this runtime directory from the owning dev tool. Spec E
+        // step E3: the bus reads the Engine's bulk work gate (Spec E section 1.3 item 1).
         return new KnowledgeServer(
             executorRegistry, workerConfig,
-            new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
-            childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
+            new InProcessWorkerSignalBus(
+                gauge, workerConfig.dataDir().resolve("runtime"), bulkWork),
+            childControl, ingestion, indexComponent, encoderComponent, startupConfiguration,
             configStore::get, configStore.publicationLock(), () -> {
-              var device = gpuCapabilities.snapshot().effective();
+              // Spec E step E6: admission stays a live NVML read, of the pinned device by its PCI
+              // bus id; with nothing pinned it reads device 0 as before (one GPU: the same device).
+              var device = gpuCapabilities.snapshotOn(
+                  io.justsearch.app.services.gpu.DeviceFactsSource.process().facts()
+                      .pinnedPciBusId().orElse(null)).effective();
               return new io.justsearch.core.component.DeviceMemoryLine(
                   device.totalVramBytes(), device.freeVramBytes());
             });
@@ -568,6 +969,8 @@ public final class EngineRoot implements WorkerHost {
     this.batchSize = batchSize;
     this.terminalWriterFaultAction =
         Objects.requireNonNull(terminalWriterFaultAction, "terminalWriterFaultAction");
+    processResources.closeWithProcess(io.justsearch.app.inference.ChatArtifactIdentity.start(
+        processResources.executors()));
   }
 
   @Override
@@ -601,10 +1004,11 @@ public final class EngineRoot implements WorkerHost {
         ? queryRoleBootSelection.get() : startContext.bootQuerySelection();
     KnowledgeServer started;
     try {
-      started = serverFactory.create(gpuScheduling, executors, recordedIngestion,
+      started = serverFactory.create(gpuScheduling, bulkWork, executors, recordedIngestion,
           indexComponent, encoderComponent, exactConfiguration);
       started.bindRetainedStatePolicy(resources.retained().cap("representation-generations"),
           resources.retained().cap("co-resident-encoders"));
+      started.bindBulkPacing(bulkWork);
     } catch (RuntimeException | Error constructorFailure) {
       // The exact pre-construction input remains available for a counted initial recovery.
       throw constructorFailure;
@@ -621,7 +1025,6 @@ public final class EngineRoot implements WorkerHost {
         failure -> acceptTerminalWriterFailure(started, failure));
     started.onMigrationRestart(() -> requestRestart(started));
     try {
-      publishForegroundLoadGate(gate);
       started.installProjectionSeedSources(projectionSeedSources);
       started.bindBootRootBindings(authority.roots().snapshotBindings());
       if (startContext != null) started.bindIndexStartContext(startContext);
@@ -642,7 +1045,6 @@ public final class EngineRoot implements WorkerHost {
         synchronized (terminalWriterFaultOwnerLock) {
           if (this.server == started) {
             this.server = null;
-            publishForegroundLoadGate(null);
           }
         }
       }
@@ -1097,7 +1499,6 @@ public final class EngineRoot implements WorkerHost {
       synchronized (terminalWriterFaultOwnerLock) {
         if (server == s) {
           server = null;
-          publishForegroundLoadGate(null);
         }
       }
     }
@@ -1105,8 +1506,16 @@ public final class EngineRoot implements WorkerHost {
 
   /** Stop attachment producers before the process drains admitted work and closes Head. */
   public void quiesceProducers() {
+    quiesceProducers(null);
+  }
+
+  /**
+   * {@link #quiesceProducers()} within {@code timeout} (Spec F §4.3 QB2); null is this root's own
+   * producer deadline. Producers that exit in time are handed off as before.
+   */
+  public void quiesceProducers(java.time.Duration timeout) {
     try {
-      recordedIngestion.stopProducers(deadlineMs);
+      recordedIngestion.stopProducers(timeout == null ? deadlineMs : timeout.toMillis());
     } catch (IOException incomplete) {
       throw new IllegalStateException("Recorded ingestion producer drain is incomplete", incomplete);
     }

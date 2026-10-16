@@ -222,6 +222,23 @@ class EnvRegistryTest {
     }
 
     @Test
+    void engineIncarnationEntryShape() {
+        // The supervisors (scripts/dev/lib/engine-actuator.cjs, the shell) set this variable name.
+        assertEquals("JUSTSEARCH_ENGINE_INCARNATION", EnvRegistry.ENGINE_INCARNATION.envVar());
+        assertEquals("justsearch.engine.incarnation", EnvRegistry.ENGINE_INCARNATION.sysProp());
+        assertEquals(null, EnvRegistry.ENGINE_INCARNATION.defaultValue());
+    }
+
+    @Test
+    void evalModeEntryShape() {
+        // The dev run passes -Djustsearch.eval.mode=true; the debug routes answer only under it.
+        assertEquals("justsearch.eval.mode", EnvRegistry.EVAL_MODE.sysProp());
+        assertEquals("JUSTSEARCH_EVAL_MODE", EnvRegistry.EVAL_MODE.envVar());
+        withSysProp(EnvRegistry.EVAL_MODE.sysProp(), "true",
+            () -> assertEquals(true, EnvRegistry.EVAL_MODE.getBoolean(false)));
+    }
+
+    @Test
     void chatProfileRespectsSysProp() {
         withSysProp(EnvRegistry.CHAT_PROFILE.sysProp(), "compact",
             () -> assertEquals("compact", EnvRegistry.CHAT_PROFILE.getString("standard")));

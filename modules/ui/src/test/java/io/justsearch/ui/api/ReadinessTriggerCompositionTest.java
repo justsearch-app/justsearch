@@ -37,6 +37,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -77,7 +78,7 @@ final class ReadinessTriggerCompositionTest {
     ConditionStore conditions = new ConditionStore();
     LifecycleSnapshotTap tap =
         new LifecycleSnapshotTap(
-            conditions, new HealthEventChangeRegistry(), HEAD_SRC, Clock.systemUTC());
+            conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD_SRC, Clock.systemUTC());
 
     var components = TestEngineComponents.fourComponents();
     components.handle("api").transition(ComponentState.STARTING, "api.starting", null);

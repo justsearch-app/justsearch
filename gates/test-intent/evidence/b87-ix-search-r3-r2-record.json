@@ -1,0 +1,98 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:12:00.393Z",
+  "revision": "8bde08e9a6d9f5d4d40c4315ad825efeecceb46b",
+  "tree": "ccabc1a7ba6a046689aeeb451717783b87023045",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.retrievalExplanationIsRecordedWithTheCompletedAnswer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16472
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.InteractionThreadControllerTest.recordedRetrievalExplanationReachesTheThreadResponse\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16334
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#retrievalExplanationIsRecordedWithTheCompletedAnswer",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b2f4fc7187acc843baedb0318d89f921d5d3fa0c952f7fd18a64f65957f6a298",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retrievalExplanationIsRecordedWithTheCompletedAnswer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedRetrievalExplanationReachesTheThreadResponse",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5da7e48811d1c41427642899686adf751a0591c3defb06a79acb3210e3701058",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordedRetrievalExplanationReachesTheThreadResponse()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ac6820757",
+    "revision": "ac682075794ea213b97de5b3ee7aae71f0e32be2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.retrievalExplanationIsRecordedWithTheCompletedAnswer\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16854
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.InteractionThreadControllerTest.recordedRetrievalExplanationReachesTheThreadResponse\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 24519
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#retrievalExplanationIsRecordedWithTheCompletedAnswer",
+        "classification": "assertion",
+        "detail": "retrievalExplanationIsRecordedWithTheCompletedAnswer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedRetrievalExplanationReachesTheThreadResponse",
+        "classification": "assertion",
+        "detail": "recordedRetrievalExplanationReachesTheThreadResponse(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the record's fallback explanation must reach reload ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:51c92bd0731b51d6d38e6c5e96af73635cb2b653b5c6c0422780e7084b19a395"
+}

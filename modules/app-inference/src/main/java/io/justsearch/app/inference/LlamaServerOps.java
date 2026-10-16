@@ -19,6 +19,15 @@ import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiRuntimeIntrospection;
 import io.justsearch.app.api.StartupCode;
 import io.justsearch.app.api.TransitionCode;
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.ChildKind;
+import io.justsearch.app.api.runtime.child.ChildRegistrationRefusedException;
+import io.justsearch.app.api.runtime.child.ChildSpec;
+import io.justsearch.app.api.runtime.child.DefaultChildControl;
+import io.justsearch.app.api.runtime.child.ExitClass;
+import io.justsearch.app.api.runtime.child.ExitOutcome;
+import io.justsearch.app.api.runtime.child.StopRequest;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
 import java.io.IOException;
 import java.util.Objects;
@@ -29,8 +38,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,6 +53,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,9 +61,14 @@ import org.slf4j.LoggerFactory;
 /**
  * Process management, health monitoring, and crash recovery for llama-server.
  *
- * <p>Encapsulates: process start/stop/adopt, health probing, periodic health monitoring, and crash
+ * <p>Encapsulates: process start/stop, health probing, periodic health monitoring, and crash
  * recovery. Delegates /props interpretation and external server diagnostics to {@link
  * ServerPropsOps}. Extracted to reduce the size of {@link InferenceLifecycleManager}.
+ *
+ * <p>ADR-0051 decision 2: this class never adopts a llama-server it did not start in this Engine.
+ * Every managed launch binds a fresh loopback port and ends with its Engine; a predecessor's server
+ * is ended at boot by the child reconciler. A user's own server is used only when named by {@code
+ * justsearch.inference.external_endpoint}, and is then reported and never stopped.
  */
 final class LlamaServerOps {
   private static final Logger LOG = LoggerFactory.getLogger(LlamaServerOps.class);
@@ -107,21 +124,39 @@ final class LlamaServerOps {
 
   // Process and probe timeouts
   private static final long PROCESS_KILL_TIMEOUT_SECS = 5;
-  private static final Duration ADOPTION_HEALTH_TIMEOUT = Duration.ofSeconds(2);
+  /** A stop's two terminate waits (5 s each, Spec B §2.2) and a margin for the exit record. */
+  private static final Duration STOP_WAIT = Duration.ofSeconds(12);
+  /** The GPU barrier's bound: one release poll's maximum (Spec B §2.6). */
+  private static final Duration GPU_RELEASE_WAIT = Duration.ofSeconds(5);
+  /** A confirmed root exit whose descendants could not be listed; never reported as survival. */
+  private static final String EXITED_UNVERIFIED =
+      "Managed llama-server exited, descendants unverified; retry cleanup";
+  /** Retries a survivor's stop; ChildControl keeps the survivor's first intent and reason. */
+  private static final StopRequest SURVIVOR_RETRY = StopRequest.of(
+      io.justsearch.app.api.runtime.child.StopReason.ROLLBACK,
+      io.justsearch.app.api.runtime.child.StopMode.NOW, "chat-controller");
+  private static final Duration STARTUP_HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(1);
   private static final Duration PROPS_PROBE_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration PERIODIC_HEALTH_TIMEOUT = Duration.ofSeconds(5);
 
   // ==================== Owned Fields ====================
 
-  private volatile Process process;
-  private volatile Process unregisteredRollbackProcess;
-  private Thread rollbackShutdownHook;
-  private volatile ProcessHandle adoptedManagedHandle;
-  private volatile String managedChildId;
+  /**
+   * The launched server (Spec B step 5): started and stopped only through {@link #childControl},
+   * so every stop is a recorded intent and every exit is classified in the exit ledger.
+   */
+  private volatile ChildHandle child;
+  /** A launched server whose exit was confirmed while its descendants could not be listed. */
+  private volatile ChildHandle unverifiedExit;
   private volatile CompletableFuture<?> crashMonitor;
+  /** The owner a planned stop is ending; its exit, whatever its class, is not a crash. */
+  private volatile ActiveServer stoppingOwner;
   private final Object ownershipMonitor = new Object();
-  private final LlamaServerProcessOwnership processOwnership = new LlamaServerProcessOwnership();
+  private final ChildControl childControl;
+  /** True for a control made by a registry constructor: {@link #shutdown} closes it. */
+  private final boolean ownsChildControl;
+  private final LlamaServerProcessOwnership processOwnership;
   private volatile ActiveServer activeServer;
   private volatile ActiveServer failureSignalledOwner;
   /** Exact last attempted managed start, retained across ordinary failed cleanup for recovery. */
@@ -138,7 +173,65 @@ final class LlamaServerOps {
       new AtomicReference<>(ThinkingSupport.UNKNOWN);
   private volatile boolean reasoningBudgetRequested;
   private volatile List<String> lastLaunchCommand = List.of();
+  private volatile LlamaDevicePlan launchDevicePlan;
   private volatile long lastLaunchLogOffset;
+  // CH3: a lost port bind is retried once per start on a fresh port, at the same rung.
+  private volatile boolean bindRetryUsed;
+
+  // Spec A §3.3: every supervision timer reads the monotonic clock. Tests replace it by
+  // reflection (ChatCrashRestartTest); production never does.
+  private volatile LongSupplier monotonicNanos = System::nanoTime;
+
+  /**
+   * Spec A §7.4: counts resumes from sleep. A start waiting for health restarts its deadline in
+   * full when this moves, so suspended time is never counted against it.
+   */
+  private final AtomicLong resumes =
+      new AtomicLong();
+
+  /**
+   * b100: counts this Engine's attempts to launch a managed llama-server process (an adopted
+   * external server is no launch). The automatic picture-reading breaker counts a failed entry only
+   * when the pass launched or relaunched the server.
+   */
+  private final AtomicLong launchAttempts = new AtomicLong();
+
+  /**
+   * T6/T27: the rung a RESOURCE step-down reached, for the configuration it was reached under. A
+   * later automatic launch of the same declared configuration starts there for the rest of this
+   * Engine's life instead of failing at the top rung again.
+   */
+  private record SteppedRung(String declaredConfigHash, int rung) {}
+
+  private volatile SteppedRung steppedRung;
+
+  /** When the owner became READY (runtime monitoring armed), on the monotonic clock. */
+  private record ReadyMark(ActiveServer owner, long atNanos) {}
+
+  private volatile ReadyMark readyMark;
+
+  /**
+   * An unexpected failure of a READY managed server, described for the chat crash policy (Spec A
+   * §3.2 T27-T30) before the failure is signalled.
+   *
+   * @param start the failed server's start identity
+   * @param classification the classified exit; class OTHER for a hang
+   * @param hang true when the process is alive but stopped answering health (T30)
+   * @param readyFor how long it had been READY, on the monotonic clock
+   * @param lowerRung the next rung below the failed one, absent for an override or the last rung
+   */
+  record ManagedFailure(
+      StartResult start,
+      LlamaServerExitClassifier.Classification classification,
+      boolean hang,
+      Duration readyFor,
+      OptionalInt lowerRung) {}
+
+  private volatile ManagedFailure lastManagedFailure;
+
+  // CH4: a healthy server answering on the configured port while no external endpoint is set. It
+  // is not adopted; the configured port it was found on is reported (0 = none seen).
+  private volatile int ignoredExternalServerPort;
 
   // Context window as a derived resource (tempdoc 883 decision 1). Null plan = nothing this class
   // launched: no server yet, or an adopted external one whose window we did not choose.
@@ -165,6 +258,7 @@ final class LlamaServerOps {
   // Tempdoc 374 alpha.27: VramDetector dependency removed; all VRAM probes route through
   // GpuCapabilitiesService (NVML-first) + VramRequirements (threshold helpers).
   private final GpuCapabilitiesService gpuCapabilitiesService;
+  private final Supplier<Optional<String>> pinnedCudaUuid;
   private final Supplier<Mode> currentMode;
 
   // Tempdoc 518 P2: LlamaServerOps now owns its own external-adoption flag. Previously this
@@ -182,22 +276,30 @@ final class LlamaServerOps {
   // Tempdoc 412 follow-up: typed observability events. Defaults to noop when no telemetry
   // is wired (e.g., tests, AI-disabled bootstrap). Set via the events-aware constructor.
   private final InferenceTelemetryEvents events;
-  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
-  private final ManagedHandleTermination managedHandleTermination;
 
-  @FunctionalInterface
-  interface ManagedHandleTermination {
-    boolean terminate(ProcessHandle handle);
-  }
-
+  /**
+   * Whether a start may use the user's own server (ADR-0051 decision 2, ruling CH4).
+   *
+   * <ul>
+   *   <li>{@link #LEGACY_ALLOW_EXTERNAL}: Online activation. Uses the server named by {@code
+   *       justsearch.inference.external_endpoint} when that is set; otherwise launches a managed
+   *       server. A healthy server on the configured port is never adopted.
+   *   <li>{@link #REQUIRE_MANAGED_CONFIG_WITNESS}: strict settings apply and its rollback. Needs a
+   *       managed server whose declared configuration it can witness, so it refuses while an
+   *       external endpoint is configured.
+   *   <li>{@link #MANAGED_DETACHED_FROM_EXTERNAL}: the user detached from their server for this
+   *       Engine's lifetime; always launches a managed server.
+   * </ul>
+   */
   enum AdoptionPolicy {
     LEGACY_ALLOW_EXTERNAL,
-    REQUIRE_MANAGED_CONFIG_WITNESS
+    REQUIRE_MANAGED_CONFIG_WITNESS,
+    MANAGED_DETACHED_FROM_EXTERNAL
   }
 
   enum StartDisposition {
     LAUNCHED_MANAGED,
-    ADOPTED_MANAGED,
+    /** The user's own server, named by {@code justsearch.inference.external_endpoint}. */
     ADOPTED_EXTERNAL
   }
 
@@ -208,9 +310,7 @@ final class LlamaServerOps {
     }
 
     int effectiveGpuLayers() {
-      return context.resolved().ai().gpuAccelerationAllowed()
-          ? context.inference().gpuLayers()
-          : 0;
+      return context.devicePlan().gpuLayers();
     }
   }
 
@@ -235,7 +335,12 @@ final class LlamaServerOps {
     }
   }
 
-  private record ActiveServer(StartResult start, Process process, ProcessHandle adoptedHandle) {}
+  /**
+   * The server a start produced. {@code port} is where it actually listens: the fresh loopback
+   * port of this managed launch, or the external endpoint's port. It is kept here rather than in
+   * {@link StartResult} so a same-configuration relaunch on a new port keeps its start identity.
+   */
+  private record ActiveServer(StartResult start, ChildHandle child, int port) {}
 
   // ==================== Constructor ====================
 
@@ -267,6 +372,7 @@ final class LlamaServerOps {
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
+  /** A server registered in {@code childRegistry} through an unrecorded control this owns. */
   @SuppressWarnings("ParameterNumber")
   LlamaServerOps(
       InferenceExecutorRegistrations executors,
@@ -281,10 +387,15 @@ final class LlamaServerOps {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this(
         executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
-        managedServerFailed, goOfflineFromExternalFailure, events, childRegistry,
-        LlamaServerOps::terminateManagedHandle);
+        managedServerFailed, goOfflineFromExternalFailure, events, childRegistry, Optional::empty);
   }
 
+  /**
+   * A server registered in {@code childRegistry} through an unrecorded control this owns.
+   *
+   * @param pinnedCudaUuid the pinned GPU's CUDA UUID (Spec E step E6), read at each launch; empty
+   *     when no device is pinned
+   */
   @SuppressWarnings("ParameterNumber")
   LlamaServerOps(
       InferenceExecutorRegistrations executors,
@@ -297,7 +408,57 @@ final class LlamaServerOps {
       BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
-      ManagedHandleTermination managedHandleTermination) {
+      Supplier<Optional<String>> pinnedCudaUuid) {
+    this(
+        executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
+        managedServerFailed, goOfflineFromExternalFailure, events,
+        DefaultChildControl.unrecorded(Objects.requireNonNull(childRegistry, "childRegistry")),
+        true, pinnedCudaUuid);
+  }
+
+  /** The Engine's composition: {@code childControl} is the caller's and outlives this. */
+  @SuppressWarnings("ParameterNumber")
+  LlamaServerOps(
+      InferenceExecutorRegistrations executors,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      Supplier<Mode> currentMode,
+      PropsObserver propsObserver,
+      Consumer<BooleanSupplier> managedServerFailed,
+      BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
+      InferenceTelemetryEvents events,
+      ChildControl childControl) {
+    this(
+        executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
+        managedServerFailed, goOfflineFromExternalFailure, events, childControl, false,
+        Optional::empty);
+  }
+
+  /**
+   * As above; {@code ownsChildControl} makes {@link #shutdown} close the control.
+   *
+   * @param pinnedCudaUuid the pinned GPU's CUDA UUID (Spec E step E6), read at each launch; empty
+   *     when no device is pinned
+   */
+  @SuppressWarnings("ParameterNumber")
+  LlamaServerOps(
+      InferenceExecutorRegistrations executors,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      Supplier<Mode> currentMode,
+      PropsObserver propsObserver,
+      Consumer<BooleanSupplier> managedServerFailed,
+      BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
+      InferenceTelemetryEvents events,
+      ChildControl childControl,
+      boolean ownsChildControl,
+      Supplier<Optional<String>> pinnedCudaUuid) {
+    this.pinnedCudaUuid = Objects.requireNonNull(pinnedCudaUuid, "pinnedCudaUuid");
+    this.childControl = Objects.requireNonNull(childControl, "childControl");
+    this.ownsChildControl = ownsChildControl;
+    this.processOwnership = new LlamaServerProcessOwnership(childControl);
     this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
     this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     this.gpuCapabilitiesService = gpuCapabilitiesService;
@@ -307,9 +468,6 @@ final class LlamaServerOps {
     this.goOfflineFromExternalFailure =
         Objects.requireNonNull(goOfflineFromExternalFailure, "goOfflineFromExternalFailure");
     this.events = Objects.requireNonNull(events, "events");
-    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
-    this.managedHandleTermination =
-        Objects.requireNonNull(managedHandleTermination, "managedHandleTermination");
     ScheduledExecutorService openedHealth = null;
     java.util.concurrent.ExecutorService openedExit = null;
     try {
@@ -328,18 +486,24 @@ final class LlamaServerOps {
 
   // ==================== Process Lifecycle ====================
 
+  /** Attempts so far to launch a managed llama-server process, for any reason. */
+  long launchAttempts() {
+    return launchAttempts.get();
+  }
+
   StartResult startLlamaServer(StartRequest request)
       throws IOException, ModeTransitionException {
     Objects.requireNonNull(request, "request");
     processOwnership.requireLaunchAllowed();
     retainedStartRequest = request;
-    // A failed configuration rollback may retry start; never overwrite its retained child.
-    closeUnregisteredChild();
+    // A server that survived its stop still holds its port and memory; never start over it.
+    retrySurvivor();
     LOG.info("Starting llama-server...");
 
-    // Nothing is launched yet, so no window has been chosen. Cleared before the adoption check so
-    // an adopted external server reports no context record rather than the previous launch's.
+    // Nothing is launched yet, so no window has been chosen. Cleared before the external check so
+    // the user's own server reports no context record rather than the previous launch's.
     clearContextWindowRecord();
+    bindRetryUsed = false;
 
     LlamaServerConfigContext context = request.context();
     InferenceConfig cfg = context.inference();
@@ -349,23 +513,11 @@ final class LlamaServerOps {
       LOG.warn("GPU acceleration disabled by policy; forcing -ngl 0");
     }
     String declaredConfigHash = ManagedLlamaConfigIdentity.declaredHash(cfg, rc, gpuLayers);
-    if (childRegistry.snapshot().stream()
-        .anyMatch(
-            child ->
-                child.kind()
-                    == io.justsearch.app.api.runtime.ManagedChild.Kind.LLAMA_SERVER)) {
-      StartResult adopted =
-          new StartResult(
-              context,
-              request.adoptionPolicy(),
-              StartDisposition.ADOPTED_MANAGED,
-              declaredConfigHash);
-      if (adoptManagedServerIfPresent(declaredConfigHash, adopted)) return adopted;
-    }
-    StartResult external = adoptExistingServerIfPresent(request);
+    StartResult external = useConfiguredExternalServer(request);
     if (external != null) return external;
 
     usingExternal = false;
+    launchAttempts.incrementAndGet();
 
     // Tempdoc 883 decision 1: the context window is a DERIVED resource, not a stored preference.
     // The rung comes from the ladder for this backend (or an operator's explicit value, as a
@@ -374,7 +526,8 @@ final class LlamaServerOps {
     GpuCapabilities gpuSnap = gpuLayers > 0 ? gpuCapabilitiesService.snapshot() : null;
     Long freeVramBytes =
         gpuSnap != null && gpuSnap.effective() != null ? gpuSnap.effective().freeVramBytes() : null;
-    ContextWindowPolicy.Plan plan = planContextWindow(rc, gpuLayers > 0, freeVramBytes);
+    ContextWindowPolicy.Plan plan = withSteppedRung(
+        planContextWindow(rc, gpuLayers > 0, freeVramBytes), declaredConfigHash);
     this.contextPlan = plan;
     this.contextRung = plan.topRung();
     this.contextRungReason = plan.reason();
@@ -382,7 +535,10 @@ final class LlamaServerOps {
     this.contextKvType = rc.ai().llmKvType();
     this.lastEffectiveVramFlags = memoryPlanFlags(contextSlots, contextKvType);
 
-    List<String> command = buildLaunchCommand(cfg, rc, gpuLayers, plan);
+    // Capture once: retries and the child environment use exactly this device decision.
+    launchDevicePlan = LlamaDevicePlan.resolve(rc, gpuLayers, pinnedDeviceEnvironment(pinnedCudaUuid.get()));
+    List<String> command = buildLaunchCommand(cfg, rc, launchDevicePlan, plan);
+    LOG.info("Host prompt cache limit: {} MiB", cfg.promptCacheMiB());
 
     boolean reasoningRequested = rc.ai().useThinking() && rc.ai().reasoningBudget() != 0;
     this.reasoningBudgetRequested = reasoningRequested;
@@ -437,15 +593,112 @@ final class LlamaServerOps {
         plan.ladder(),
         freeVramBytes);
 
-    LOG.debug("Starting server with command: {}", String.join(" ", command));
     StartResult launched =
         new StartResult(
             context,
             request.adoptionPolicy(),
             StartDisposition.LAUNCHED_MANAGED,
             declaredConfigHash);
-    launchManagedLlamaServer(command, launched);
+    // ADR-0051 decision 2: every managed launch binds a fresh loopback port, never the configured
+    // one, so nothing left on the configured port (a crashed Engine's unregistered server, or the
+    // user's own) can be mistaken for this launch.
+    launchOnFreshPort(command, launched);
     return launched;
+  }
+
+  /**
+   * T6/T27 stickiness: once a RESOURCE exit stepped this declared configuration down, a later
+   * derived plan for it starts at the rung that was reached, reported as stepped from the planned
+   * top. An operator override is never adjusted (it is a one-rung ladder that fails loud).
+   */
+  private ContextWindowPolicy.Plan withSteppedRung(
+      ContextWindowPolicy.Plan planned, String declaredConfigHash) {
+    SteppedRung stepped = steppedRung;
+    if (stepped == null
+        || !stepped.declaredConfigHash().equals(declaredConfigHash)
+        || !ContextWindowPolicy.REASON_TOP_RUNG.equals(planned.reason())
+        || stepped.rung() >= planned.topRung()) {
+      return planned;
+    }
+    List<Integer> remaining = planned.ladder().stream().filter(r -> r <= stepped.rung()).toList();
+    if (remaining.isEmpty()) return planned;
+    LOG.info(
+        "Context window: starting at rung {} — this configuration did not fit at {} earlier in this"
+            + " Engine's life",
+        remaining.get(0),
+        planned.topRung());
+    return new ContextWindowPolicy.Plan(
+        remaining, ContextWindowPolicy.steppedFrom(planned.topRung()), planned.freeVramBytes());
+  }
+
+  /** The planned top rung a window was stepped down from: the plan's own top until it steps. */
+  private static int plannedTopRung(ContextWindowPolicy.Plan plan) {
+    String reason = plan.reason();
+    if (reason.startsWith(ContextWindowPolicy.REASON_STEPPED_FROM_PREFIX)) {
+      try {
+        return Integer.parseInt(
+            reason.substring(ContextWindowPolicy.REASON_STEPPED_FROM_PREFIX.length()));
+      } catch (NumberFormatException ignored) {
+        return plan.topRung();
+      }
+    }
+    return plan.topRung();
+  }
+
+  /** T7: why a RESOURCE exit ends the start instead of stepping down. */
+  private void logNoLowerRung() {
+    ContextWindowPolicy.Plan plan = contextPlan;
+    if (plan != null && ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
+      LOG.error(
+          "llama-server did not start at the explicitly configured context size {}"
+              + " (justsearch.context.size). This is an operator override, so it is NOT reduced"
+              + " to a smaller window: set it lower, or set it to 0 to let the window be derived"
+              + " from the backend.",
+          contextRung);
+    } else {
+      LOG.warn(
+          "llama-server ran out of memory at context rung {} and the ladder {} is exhausted;"
+              + " reporting resource_exhausted rather than retrying.",
+          contextRung,
+          plan == null ? List.of() : plan.ladder());
+    }
+  }
+
+  /** The next rung below the running one, or empty for an override or the last rung. */
+  private OptionalInt lowerContextRung() {
+    ContextWindowPolicy.Plan plan = contextPlan;
+    if (plan == null || ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
+      return OptionalInt.empty();
+    }
+    return plan.nextRungBelow(contextRung);
+  }
+
+  /**
+   * T27: a READY server exited for lack of memory. Its configuration starts one rung lower from now
+   * on. Returns false when there is no lower rung (an override or the last rung).
+   */
+  boolean stepDownAfterFailure(ManagedFailure failure) {
+    Objects.requireNonNull(failure, "failure");
+    if (failure.lowerRung().isEmpty() || failure.start().declaredConfigHash() == null) return false;
+    steppedRung =
+        new SteppedRung(failure.start().declaredConfigHash(), failure.lowerRung().getAsInt());
+    LOG.warn(
+        "llama-server ran out of memory while serving; its window steps down to {} for the rest of"
+            + " this Engine's life ({})",
+        failure.lowerRung().getAsInt(),
+        failure.classification().evidence());
+    return true;
+  }
+
+  private static int allocateLaunchPort() throws ModeTransitionException {
+    try {
+      return LoopbackPorts.findFree();
+    } catch (IOException e) {
+      throw new ModeTransitionException(
+          ModeTransitionException.Reason.PORT_ALLOCATION_FAILED,
+          "Failed to allocate a free loopback port for llama-server",
+          e);
+    }
   }
 
   /** Captures an initial attempt before manager-side asset/VRAM validation can fail. */
@@ -459,11 +712,17 @@ final class LlamaServerOps {
    * {@link #memoryPlanFlags}), so asserting them individually is not the same as asserting the
    * launch line.
    *
-   * <p>Every launch-shaping decision this class makes is visible here; the caller keeps only the
-   * side effects (recording the plan, the thinking verdict, and the VRAM diagnostics).
+   * <p>This overload projects a pinned launch for command checks. Managed launches supply their
+   * captured device plan to the overload below, and keep its environment through every retry.
    */
   static List<String> buildLaunchCommand(
       InferenceConfig cfg, ResolvedConfig rc, int gpuLayers, ContextWindowPolicy.Plan plan) {
+    return buildLaunchCommand(cfg, rc,
+        LlamaDevicePlan.resolve(rc, gpuLayers, Optional.of("GPU-command-plan")), plan);
+  }
+
+  private static List<String> buildLaunchCommand(
+      InferenceConfig cfg, ResolvedConfig rc, LlamaDevicePlan devices, ContextWindowPolicy.Plan plan) {
     List<String> command = new ArrayList<>();
     command.add(cfg.serverExecutable().toString());
     command.add("-m");
@@ -472,15 +731,15 @@ final class LlamaServerOps {
     if (cfg.mmprojPath() != null) {
       command.add("--mmproj");
       command.add(cfg.mmprojPath().toString());
+      command.addAll(devices.projectorFlags());
     }
 
     // VDU mode: no prompt cache (it corrupts silently after ~7 pages and crashes the server).
     // The single-slot half of this rule rides the common -np below, which VDU pins to 1 —
     // multi-slot causes alternating HTTP 500 on vision requests.
-    if (cfg.vduMode()) {
-      command.add("--cache-ram");
-      command.add("0");
-    }
+    // Always name the host bound: omitting it enables llama.cpp's 8192 MiB default.
+    command.add("--cache-ram");
+    command.add(Integer.toString(cfg.promptCacheMiB()));
 
     // Enable Jinja2 template processing for tool-use chat templates (required for function calling).
     command.add("--jinja");
@@ -507,12 +766,37 @@ final class LlamaServerOps {
     // and the inference.queue.* / inference.generation.* status gauges stay at zero.
     command.add("--metrics");
 
+    // The configured port; a managed launch replaces it with its own fresh port (launchOnFreshPort).
     command.add("--port");
     command.add(String.valueOf(cfg.serverPort()));
 
-    command.addAll(windowFlags(plan.topRung(), gpuLayers));
+    command.addAll(windowFlags(plan.topRung(), devices.gpuLayers()));
+    command.addAll(devices.deviceFlags());
+    // -ngl 0 only keeps model weights on CPU; llama-server still offloads operations by default.
+    // The administrator's GPU veto covers every part of this owned launch, including vision:
+    // the device plan already selects zero layers, --device none and the CPU projector.
+    if (gpuPolicyDisabled(rc)) command.add(NO_OP_OFFLOAD_FLAG);
     command.addAll(memoryPlanFlags(slotsFor(cfg, rc), rc.ai().llmKvType()));
     return command;
+  }
+
+  /** The single-device flags of a GPU launch (Spec E section 5.3). */
+  static final List<String> PINNED_DEVICE_FLAGS = LlamaDevicePlan.PINNED_DEVICE_FLAGS;
+
+  /** The operation-offload veto of an administrator GPU-off launch. */
+  static final String NO_OP_OFFLOAD_FLAG = "--no-op-offload";
+
+  static boolean gpuPolicyDisabled(ResolvedConfig rc) {
+    return rc != null && rc.ai() != null && !rc.ai().gpuAccelerationAllowed();
+  }
+
+  /**
+   * The launch environment that makes the pinned device llama-server's only CUDA device, and so its
+   * {@code CUDA0}: {@code CUDA_VISIBLE_DEVICES=GPU-<uuid>} (Spec E section 5.3). Empty when no
+   * device is pinned; the launch then keeps the inherited device order.
+   */
+  static Map<String, String> pinnedDeviceEnvironment(Optional<String> pinnedCudaUuid) {
+    return LlamaDevicePlan.pinnedEnvironment(pinnedCudaUuid);
   }
 
   /** Slots for this launch: VDU pins 1 (multi-slot breaks vision), otherwise the configured count. */
@@ -524,7 +808,9 @@ final class LlamaServerOps {
    * The window flags: {@code -c <rung> -ngl <layers>}.
    */
   static List<String> windowFlags(int rung, int gpuLayers) {
-    return List.of("-c", String.valueOf(rung), "-ngl", String.valueOf(gpuLayers));
+    List<String> flags = new ArrayList<>(List.of("-c", String.valueOf(rung)));
+    flags.addAll(LlamaDevicePlan.layerFlags(gpuLayers));
+    return List.copyOf(flags);
   }
 
   /**
@@ -567,120 +853,223 @@ final class LlamaServerOps {
     this.contextKvType = null;
   }
 
-  void stopLlamaServer() {
-    if (!stopLlamaServerAndConfirm()) {
+  /**
+   * Stops the managed server through {@link ChildControl} with the caller's reason and waits for
+   * its recorded exit (Spec B §2.8). The user's external server is never stopped. Throws, keeping
+   * the handle and the ownership, when the server survived both terminate calls.
+   */
+  void stopLlamaServer(StopRequest request) {
+    Objects.requireNonNull(request, "request");
+    if (!stopLlamaServerAndConfirm(request)) {
       throw new IllegalStateException("Managed llama-server survived terminal cleanup");
     }
   }
 
-  /** Release physical children without waiting for a transition or closing in-use dependencies. */
-  void stopServerForTerminalShutdown(Duration timeout) {
-    Process launched = process;
-    Process rollback = unregisteredRollbackProcess;
-    processOwnership.capture(launched == null ? null : launched.toHandle());
-    processOwnership.capture(rollback == null ? null : rollback.toHandle());
-    processOwnership.capture(adoptedManagedHandle);
-    processOwnership.stopTerminal(timeout);
+  /**
+   * Release physical children without waiting for a transition or closing in-use dependencies:
+   * the terminal fence, then one recorded stop of every owned server with {@code request}.
+   */
+  void beginTerminalShutdown(StopRequest request) {
+    processOwnership.beginTerminalShutdown(request);
   }
 
-  private boolean stopLlamaServerAndConfirm() {
+  void stopServerForTerminalShutdown(StopRequest request, Duration timeout) {
+    processOwnership.stopTerminal(request, timeout);
+  }
+
+  /**
+   * The GPU barrier before a launch (Spec B §2.6): waits, at most 5 s, for the adapter memory of
+   * the server stopped last to show as released. It replaces the fixed 2 s VRAM flush sleep.
+   *
+   * @return true when no release poll was still pending
+   */
+  boolean awaitGpuRelease() throws InterruptedException {
+    return childControl.awaitGpuRelease(GPU_RELEASE_WAIT);
+  }
+
+  /**
+   * Retries the stop of a server whose stop failed and that may still be alive (it survived both
+   * terminate calls, or its stop outlived the wait), under its first intent: ChildControl keeps
+   * the original reason. Throws when it is still not confirmed gone.
+   */
+  private void retrySurvivor() {
+    ChildHandle held = child;
+    if (held == null) return;
+    ChildHandle.State state = held.state();
+    if (state == ChildHandle.State.EXITED) {
+      if (held == unverifiedExit) verifyExitedDescendants(held);
+      return;
+    }
+    if (state != ChildHandle.State.SURVIVED && state != ChildHandle.State.STOPPING) return;
+    LOG.warn("llama-server PID {} survived its stop; retrying before a new start", held.pid());
+    if (awaitStop(childControl.stop(held, SURVIVOR_RETRY), held) == null) {
+      throw new IllegalStateException("Managed llama-server survived terminal cleanup");
+    }
+    if (child == held) child = null;
+  }
+
+  /** Retries the descendant listing of a server whose exit was confirmed but not its scope. */
+  private void verifyExitedDescendants(ChildHandle held) {
+    List<ProcessHandle> started;
+    try {
+      started = io.justsearch.app.inference.chat.StartedProcesses.of(held);
+    } catch (RuntimeException unreadable) {
+      throw new IllegalStateException(EXITED_UNVERIFIED, unreadable);
+    }
+    endLeftRunning(held, started, SURVIVOR_RETRY);
+    if (unverifiedExit == held) unverifiedExit = null;
+    if (child == held) child = null;
+  }
+
+  private boolean stopLlamaServerAndConfirm(StopRequest request) {
     ActiveServer stopping = activeServer;
     stopPeriodicHealthCheck();
     // No server of ours is running after this, so the launched-window record stops being true.
     clearContextWindowRecord();
-    // Cancel crash monitor before killing process to prevent spurious recovery attempts (H4).
-    if (crashMonitor != null) {
-      crashMonitor.cancel(true);
-      crashMonitor = null;
-    }
-    Process rollback = unregisteredRollbackProcess;
-    if (rollback != null) {
-      if (!terminateAndWait(rollback)) return false;
-      unregisteredRollbackProcess = null;
-      removeRollbackShutdownHook();
-      if (process == rollback) process = null;
-    }
-    if (usingExternal && process == null) {
+    ChildHandle launched = child;
+    if (usingExternal && launched == null) {
       LOG.info(
-          "Not stopping llama-server: using existing external instance on port {} (no process"
-              + " handle).",
-          stopping != null
-              ? stopping.start().context().inference().serverPort()
-              : -1);
+          "Not stopping llama-server: the external instance on port {} is the user's own"
+              + " (justsearch.inference.external_endpoint) and is never stopped.",
+          stopping != null ? stopping.port() : -1);
       // We're no longer in Online mode, so clear the "using external" state to avoid sticky
       // behavior (e.g., blocking config apply while offline/indexing).
       usingExternal = false;
       clearActive(stopping);
       return true;
     }
-    ProcessHandle managedHandle = process != null ? process.toHandle() : adoptedManagedHandle;
-    if (managedHandle != null && managedHandle.isAlive()) {
-      long pid = managedHandle.pid();
-      LOG.info("Stopping llama-server (PID: {})...", pid);
-
-      managedHandle.destroy();
-
-      try {
-        managedHandle.onExit().get(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
-      } catch (java.util.concurrent.TimeoutException hung) {
-        LOG.warn("Server hung. Forcing process termination...");
-        managedHandle.destroyForcibly();
-        try {
-          managedHandle.onExit().get(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
-        } catch (Exception forcedFailure) {
-          if (forcedFailure instanceof InterruptedException) Thread.currentThread().interrupt();
-          LOG.error("Error waiting for forced server termination", forcedFailure);
-        }
-      } catch (Exception e) {
-        if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-        LOG.error("Error killing server", e);
-      }
-
-      if (!managedHandle.isAlive()) unregisterManagedChild(managedChildId);
-      if (managedHandle.isAlive()) {
-        LOG.error("llama-server PID {} remains alive; retaining its handle and ownership", pid);
-        return false;
-      }
-      process = null;
-      adoptedManagedHandle = null;
+    if (launched == null) {
       clearActive(stopping);
-      LOG.info("llama-server stopped");
+      return true;
     }
-    if (managedHandle != null && !managedHandle.isAlive()) {
-      unregisterManagedChild(managedChildId);
-      process = null;
-      adoptedManagedHandle = null;
+    // The crash monitor stays armed (Spec B T21): this stop's own exit is REQUESTED and ignored,
+    // while an exit the server makes on its own before the stop lands is still classified and
+    // recorded, as UNEXPECTED.
+    stoppingOwner = stopping;
+    boolean wasAlive = alive(launched);
+    if (wasAlive) {
+      LOG.info("Stopping llama-server (PID: {}, reason {})...", launched.pid(), request.reason());
+    }
+    List<ProcessHandle> started;
+    try {
+      started = io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    } catch (RuntimeException unreadable) {
+      started = null;
+      LOG.warn("Cannot verify llama-server descendants: {}", unreadable.getMessage());
+    }
+    ExitOutcome outcome = awaitStop(childControl.stop(launched, request), launched);
+    if (outcome == null) {
+      LOG.error("llama-server PID {} remains alive; retaining its handle and ownership",
+          launched.pid());
+      return false;
+    }
+    // The root may have forked during its stop: list its retained scope again after its exit. A
+    // listing that fails leaves the exit confirmed and the descendants unverified; the next stop or
+    // start retries the listing instead of reporting a survivor.
+    List<ProcessHandle> latest;
+    try {
+      latest = io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    } catch (RuntimeException unreadable) {
+      unverifiedExit = launched;
       clearActive(stopping);
+      throw new IllegalStateException(EXITED_UNVERIFIED, unreadable);
     }
-    if (managedHandle == null) clearActive(stopping);
+    if (started != null) {
+      latest = java.util.stream.Stream.concat(started.stream(), latest.stream()).distinct().toList();
+    }
+    endLeftRunning(launched, latest, request);
+    if (unverifiedExit == launched) unverifiedExit = null;
+    if (child == launched) child = null;
+    clearActive(stopping);
+    if (wasAlive) {
+      LOG.info("llama-server stopped ({}, code {})", outcome.exitClass(),
+          outcome.code().isPresent() ? outcome.code().getAsInt() : "unknown");
+    }
     return true;
   }
 
-  private synchronized void unregisterManagedChild(String id) {
-    if (id == null) return;
+  /**
+   * I6: what the exited server started (a wrapper's server, a crash reporter in its job) ends
+   * before the next launch. ChildControl ends the server's own job, recording each member as an
+   * intended cleanup with {@code request}'s reason, so a crash-recovery restart does not wait on
+   * it. Where nothing can be ended (off Windows) the processes are awaited, and ChildControl
+   * refuses the next chat start beside any still running.
+   */
+  private void endLeftRunning(
+      ChildHandle exited, List<ProcessHandle> started, StopRequest request) {
+    if (started.stream().noneMatch(ProcessHandle::isAlive)) return;
     try {
-      childRegistry.remove(id);
-      if (id.equals(managedChildId)) managedChildId = null;
-    } catch (IOException e) {
-      LOG.warn("Could not persist managed llama-server exit; retaining ownership record", e);
+      int ended = childControl.endRemaining(exited, request);
+      LOG.info("Ended {} process(es) llama-server PID {} left running ({})", ended, exited.pid(),
+          request.reason());
+      return;
+    } catch (IOException | RuntimeException notEnded) {
+      LOG.warn("Cannot end what llama-server PID {} left running: {}", exited.pid(),
+          notEnded.getMessage());
+    }
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
+      LOG.warn("A process llama-server PID {} started is still running", exited.pid());
     }
   }
 
   /**
-   * Waits for the freshly launched (or adopted) server to report healthy.
+   * Waits for a stop's recorded exit: at most both terminate waits and a margin. An interrupt does
+   * not end the wait, since a launch that follows must not overlap this server; it is restored.
+   * Null when the server survived.
+   */
+  private static ExitOutcome awaitStop(
+      java.util.concurrent.CompletionStage<ExitOutcome> stop, ChildHandle stopping) {
+    CompletableFuture<ExitOutcome> future = stop.toCompletableFuture();
+    long deadline = System.nanoTime() + STOP_WAIT.toNanos();
+    boolean interrupted = false;
+    try {
+      while (true) {
+        try {
+          return future.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        } catch (InterruptedException interrupt) {
+          interrupted = true;
+        } catch (java.util.concurrent.ExecutionException survived) {
+          LOG.error("Stopping llama-server PID {} failed: {}", stopping.pid(),
+              String.valueOf(survived.getCause()));
+          return null;
+        } catch (java.util.concurrent.TimeoutException survived) {
+          return null;
+        }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
+  private static boolean alive(ChildHandle handle) {
+    return handle != null && !handle.exit().toCompletableFuture().isDone();
+  }
+
+  /** The recorded exit code, or -1 while alive or when the OS gave none. */
+  private static int exitCode(ChildHandle handle) {
+    ExitOutcome outcome = handle.exit().toCompletableFuture().getNow(null);
+    return outcome == null || outcome.code().isEmpty() ? -1 : outcome.code().getAsInt();
+  }
+
+  /**
+   * Waits for the freshly launched server (or the user's configured external one) to report
+   * healthy.
    *
    * <p>Tempdoc 835 §9c.2: a build that cannot honour {@code --reasoning-budget} exits immediately
    * with a launch-argument rejection. That must cost thinking, not inference — so the rejection is
    * detected here, the server is relaunched once without the flag, and the verdict is recorded for
    * the runtime manifest.
    *
-   * <p>Tempdoc 883 decision 1: the same seam carries the context ladder. A rung the machine cannot
-   * fit is also a fast hard abort, so the window steps down one rung and relaunches instead of
-   * leaving the engine down. Any other startup failure propagates unchanged.
+   * <p>Every other exit is classified ({@link LlamaServerExitClassifier}) and decided by {@link
+   * ChatCrashPolicy#afterStartExit}: only a RESOURCE exit steps the window down one rung (tempdoc
+   * 883 decision 1, Spec A T6), and only below a derived window; a lost port bind (ruling CH3) is
+   * relaunched once on a fresh port at the SAME rung; everything else fails at once with its code,
+   * never retried with the same configuration (T7, T9, T10). A health-deadline timeout never steps
+   * down (T11).
    *
    * <p>The loop terminates: the reasoning relaunch can fire at most once (it sets
-   * {@link ThinkingSupport#UNSUPPORTED}, which its own guard then refuses), and each step-down
-   * consumes a rung from a finite ladder.
+   * {@link ThinkingSupport#UNSUPPORTED}, which its own guard then refuses), the bind relaunch at
+   * most once per start, and each step-down consumes a rung from a finite ladder.
    */
   void waitForServerHealth(StartResult expected) throws ModeTransitionException {
     Objects.requireNonNull(expected, "expected");
@@ -694,25 +1083,57 @@ final class LlamaServerOps {
         if (relaunchWithoutReasoningBudget(active, e)) {
           continue;
         }
-        if (relaunchAtLowerContextRung(active, e)) {
-          continue;
+        ModeTransitionException reported = e;
+        if (e instanceof LlamaServerExitException exit && active.child() != null) {
+          ChatCrashPolicy.Decision decision = ChatCrashPolicy.afterStartExit(
+              exit.classification(), lowerContextRung().isPresent(), bindRetryUsed);
+          LOG.info(
+              "llama-server exited during startup: class={} evidence={} -> {} ({})",
+              exit.classification().crashClass(),
+              exit.classification().evidence(),
+              decision.action(),
+              decision.rule());
+          switch (decision.action()) {
+            case STEP_DOWN -> {
+              if (relaunchAtLowerContextRung(active, exit)) continue;
+            }
+            case RESTART_SAME -> {
+              if (relaunchAfterLostBind(active)) continue;
+            }
+            case FAIL -> reported = exit.withOutcome(exit.getMessage(), decision.failedCode());
+          }
+          if (decision.action() == ChatCrashPolicy.Action.FAIL
+              && exit.classification().crashClass() == LlamaServerExitClassifier.CrashClass.RESOURCE) {
+            logNoLowerRung();
+          }
         }
         retireFailedPhysicalOwner(active);
-        throw e;
+        throw reported;
       }
     }
   }
 
-  /** One recovery health wait. Unlike initial composition, this never nests a launch ladder. */
+  /**
+   * One recovery health wait. Unlike initial composition, this never nests a launch ladder: no
+   * context step-down and no reasoning relaunch. A lost port bind is the exception (ruling CH3
+   * covers every managed launch): it is a port race, not a fault of the launch, so it is retried
+   * once on a fresh port at the same rung, exactly as in {@link #waitForServerHealth}.
+   */
   void waitForServerHealthOnce(StartResult expected) throws ModeTransitionException {
     Objects.requireNonNull(expected, "expected");
-    ActiveServer active = requireActive(expected);
-    try {
-      awaitServerHealth(active);
-      armRuntimeMonitoring(active);
-    } catch (ModeTransitionException failure) {
-      retireFailedPhysicalOwner(active);
-      throw failure;
+    while (true) {
+      ActiveServer active = requireActive(expected);
+      try {
+        awaitServerHealth(active);
+        armRuntimeMonitoring(active);
+        return;
+      } catch (ModeTransitionException failure) {
+        if (isLostBind(active, failure) && relaunchAfterLostBind(active)) {
+          continue;
+        }
+        retireFailedPhysicalOwner(active);
+        throw failure;
+      }
     }
   }
 
@@ -726,17 +1147,17 @@ final class LlamaServerOps {
   }
 
   /** Active serving A wins; otherwise recovery may retry the exact retained failed initial A. */
-  java.util.Optional<StartRequest> recoveryStartRequest() {
+  Optional<StartRequest> recoveryStartRequest() {
     synchronized (ownershipMonitor) {
       ActiveServer owner = activeServer;
       if (owner != null) {
         if (owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL) {
-          return java.util.Optional.empty();
+          return Optional.empty();
         }
-        return java.util.Optional.of(
+        return Optional.of(
             new StartRequest(owner.start().context(), owner.start().adoptionPolicy()));
       }
-      return java.util.Optional.ofNullable(retainedStartRequest);
+      return Optional.ofNullable(retainedStartRequest);
     }
   }
 
@@ -781,32 +1202,44 @@ final class LlamaServerOps {
 
   private void awaitServerHealth(ActiveServer expected) throws ModeTransitionException {
     LOG.info("Waiting for server health (timeout={}ms)...", HEALTH_CHECK_TIMEOUT_MS);
-    long startTime = System.currentTimeMillis();
-    long deadline = startTime + HEALTH_CHECK_TIMEOUT_MS;
-    long nextProgressLog = startTime + HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS;
+    // Spec A T11: the deadline is monotonic, so a wall-clock jump neither ends nor extends it.
+    LongSupplier clock = monotonicNanos;
+    long startTime = clock.getAsLong();
+    long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(HEALTH_CHECK_TIMEOUT_MS);
+    long progressNanos = TimeUnit.MILLISECONDS.toNanos(HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS);
+    long nextProgressLog = startTime + progressNanos;
+    long resumesSeen = resumes.get();
 
-    while (System.currentTimeMillis() < deadline) {
-      long now = System.currentTimeMillis();
-      if (now >= nextProgressLog) {
-        long elapsedSec = (now - startTime) / 1000;
-        long remainingSec = (deadline - now) / 1000;
-        LOG.info("Still waiting for model load... {}s elapsed, {}s remaining", elapsedSec, remainingSec);
-        nextProgressLog = now + HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS;
+    while (true) {
+      long now = clock.getAsLong();
+      // Spec A §7.4: after a resume the deadline restarts in full; suspended time never counts.
+      long resumed = resumes.get();
+      if (resumed != resumesSeen) {
+        resumesSeen = resumed;
+        startTime = now;
+        nextProgressLog = now + progressNanos;
+        LOG.info("The machine resumed; the start's health deadline restarts in full");
       }
-      Process expectedProcess = expected.process();
-      if (expectedProcess != null && !expectedProcess.isAlive()) {
-        int exitCode;
-        try {
-          exitCode = expectedProcess.exitValue();
-        } catch (Exception e) {
-          LOG.debug("Failed to get llama-server exit code: {}", e.getMessage());
-          exitCode = -1;
-        }
+      if (now - startTime >= timeoutNanos) break;
+      if (now - nextProgressLog >= 0) {
+        long elapsedSec = TimeUnit.NANOSECONDS.toSeconds(now - startTime);
+        long remainingSec = TimeUnit.NANOSECONDS.toSeconds(timeoutNanos - (now - startTime));
+        LOG.info("Still waiting for model load... {}s elapsed, {}s remaining", elapsedSec, remainingSec);
+        nextProgressLog = now + progressNanos;
+      }
+      ChildHandle expectedChild = expected.child();
+      if (expectedChild != null && !alive(expectedChild)) {
+        int exitCode = exitCode(expectedChild);
+        LlamaServerExitClassifier.Classification classification =
+            LlamaServerExitClassifier.classify(
+                exitCode, readLaunchOutputBestEffort(expected.start().context()),
+                expected.start().context().devicePlan().gpuLayers() > 0);
+        noteStartupExit(expectedChild, exitCode, classification);
         if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
           Path logFile = resolveLlamaServerLogFile(expected.start().context());
           Path executable = expected.start().context().inference().serverExecutable();
           Path exeDir = executable.getParent();
-          throw new ModeTransitionException(
+          throw new LlamaServerExitException(
               ModeTransitionException.Reason.MISSING_DLL,
               "llama-server failed to start (missing DLL dependencies, 0xC0000135). "
                   + "This usually means the llama-server folder is missing required native DLLs"
@@ -816,20 +1249,19 @@ final class LlamaServerOps {
                   + "llama-server dir="
                   + (exeDir != null ? exeDir : executable)
                   + ", log="
-                  + logFile);
+                  + logFile,
+              exitCode,
+              classification);
         }
         String diagnostic = diagnoseServerFailure(expected.start().context(), exitCode);
-        throw new ModeTransitionException(
-            ModeTransitionException.Reason.PROCESS_EXITED,
-            diagnostic);
+        if (classification.evidence() != null) {
+          diagnostic = diagnostic + " [" + classification.crashClass() + ": "
+              + classification.evidence() + "]";
+        }
+        throw new LlamaServerExitException(
+            ModeTransitionException.Reason.PROCESS_EXITED, diagnostic, exitCode, classification);
       }
-      ProcessHandle expectedAdoptedHandle = expected.adoptedHandle();
-      if (expectedAdoptedHandle != null && !expectedAdoptedHandle.isAlive()) {
-        throw new ModeTransitionException(
-            ModeTransitionException.Reason.PROCESS_EXITED,
-            "Adopted managed llama-server exited before startup health completed");
-      }
-      HealthProbe probe = probeHealth(expected, ADOPTION_HEALTH_TIMEOUT);
+      HealthProbe probe = probeHealth(expected, STARTUP_HEALTH_PROBE_TIMEOUT);
       if (probe.ok()) {
         if (!ownedPhysicalServerAlive(expected)) {
           throw new ModeTransitionException(
@@ -909,7 +1341,7 @@ final class LlamaServerOps {
         return false;
       }
       retireFailedPhysicalOwner(expected);
-      launchManagedLlamaServer(retry, expected.start());
+      launchOnFreshPort(retry, expected.start());
       return true;
     } catch (IOException | ModeTransitionException e) {
       LOG.error("Relaunch without --reasoning-budget failed: {}", e.getMessage());
@@ -917,44 +1349,75 @@ final class LlamaServerOps {
     }
   }
 
+  /** Whether this startup exit was llama-server failing to bind its HTTP port (ruling CH3). */
+  private static boolean isLostBind(ActiveServer expected, ModeTransitionException failure) {
+    return expected.child() != null
+        && failure instanceof LlamaServerExitException exit
+        && exit.classification().crashClass() == LlamaServerExitClassifier.CrashClass.PORT_LOST;
+  }
+
   /**
-   * Context-ladder recovery (tempdoc 883 decision 1): when the startup failure was the server
-   * refusing the requested window, relaunch at the next lower rung and record why.
+   * Port-race recovery (ruling CH3): the fresh port was taken between choosing it and llama-server
+   * binding it. Relaunch the same command, at the same context rung, on another fresh port. At most
+   * once per start; a second lost bind is reported as the launch failure, never as a window that
+   * does not fit.
+   */
+  private boolean relaunchAfterLostBind(ActiveServer expected) {
+    if (bindRetryUsed || lastLaunchCommand.isEmpty()) {
+      LOG.error(
+          "llama-server again could not bind its loopback port {}; reporting the launch failure"
+              + " (a lost bind is retried once, and never reduces the context window).",
+          expected.port());
+      return false;
+    }
+    bindRetryUsed = true;
+    LOG.warn(
+        "llama-server could not bind loopback port {}: another process took it after it was"
+            + " chosen. Relaunching once on a fresh port at the same context rung {}.",
+        expected.port(),
+        contextRung);
+    if (crashMonitor != null) {
+      crashMonitor.cancel(true);
+      crashMonitor = null;
+    }
+    try {
+      if (!isActive(expected)) {
+        return false;
+      }
+      retireFailedPhysicalOwner(expected);
+      launchOnFreshPort(lastLaunchCommand, expected.start());
+      return true;
+    } catch (IOException | ModeTransitionException e) {
+      LOG.error("Relaunch after a lost port bind failed: {}", e.getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Context-ladder recovery (tempdoc 883 decision 1, Spec A T6): when the startup exit was
+   * classified RESOURCE — the window or the model did not fit — relaunch at the next lower rung and
+   * record why. The rung reached is sticky for this declared configuration.
    *
-   * <p>Gated on {@code PROCESS_EXITED} because that is the shape an unfittable {@code -c} takes on
-   * the bundled b8571 build — a fast hard abort, not a slow degradation. A health-check timeout is
-   * deliberately NOT a step-down trigger: it says the model is loading slowly, not that the window
-   * does not fit, and stepping down on it would silently shrink the window for an unrelated cause.
+   * <p>Gated on the RESOURCE class, not on any exit: an unknown architecture, a missing file or a
+   * bare crash would fail at every rung, and walking the ladder for them only hides the cause
+   * behind three more launches (Spec A §7.2). A health-check timeout is not a step-down trigger
+   * either: it says the model is loading slowly, not that the window does not fit (T11).
    *
-   * <p>Returns false — leaving the original failure to propagate — for an adopted external server
+   * <p>Returns false — leaving the original failure to propagate — for the user's external server
    * (we did not choose its window), for an operator's explicit override (a one-rung ladder: honour
    * it or fail loud), and once the ladder is exhausted.
    */
   private boolean relaunchAtLowerContextRung(
-      ActiveServer expected, ModeTransitionException failure) {
+      ActiveServer expected, LlamaServerExitException failure) {
     ContextWindowPolicy.Plan plan = contextPlan;
-    if (failure.reason() != ModeTransitionException.Reason.PROCESS_EXITED
+    if (failure.classification().crashClass() != LlamaServerExitClassifier.CrashClass.RESOURCE
         || plan == null
         || usingExternal
         || lastLaunchCommand.isEmpty()) {
       return false;
     }
     OptionalInt lower = plan.nextRungBelow(contextRung);
-    if (lower.isEmpty()) {
-      if (ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
-        LOG.error(
-            "llama-server did not start at the explicitly configured context size {}"
-                + " (justsearch.context.size). This is an operator override, so it is NOT reduced"
-                + " to a smaller window: set it lower, or set it to 0 to let the window be derived"
-                + " from the backend.",
-            contextRung);
-      } else {
-        LOG.warn(
-            "llama-server exited at context rung {} and the ladder {} is exhausted; reporting the"
-                + " launch failure rather than retrying.",
-            contextRung,
-            plan.ladder());
-      }
+    if (lower.isEmpty() || ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
       return false;
     }
 
@@ -970,7 +1433,7 @@ final class LlamaServerOps {
             + " context, not inference.",
         contextRung,
         next,
-        plan.topRung(),
+        plannedTopRung(plan),
         plan.ladder());
 
     if (crashMonitor != null) {
@@ -982,13 +1445,15 @@ final class LlamaServerOps {
         return false;
       }
       retireFailedPhysicalOwner(expected);
-      launchManagedLlamaServer(retry, expected.start());
+      launchOnFreshPort(retry, expected.start());
     } catch (IOException | ModeTransitionException e) {
       LOG.error("Relaunch at context rung {} failed: {}", next, e.getMessage());
       return false;
     }
     this.contextRung = next;
-    this.contextRungReason = ContextWindowPolicy.steppedFrom(plan.topRung());
+    this.contextRungReason = ContextWindowPolicy.steppedFrom(plannedTopRung(plan));
+    String declaredHash = expected.start().declaredConfigHash();
+    if (declaredHash != null) steppedRung = new SteppedRung(declaredHash, next);
     return true;
   }
 
@@ -1017,10 +1482,20 @@ final class LlamaServerOps {
     // number from InferenceConfig would be two reads of one fact that can disagree (the config is
     // built once at activation; the resolution is live).
     ConfigResolution resolution = rc.resolution("justsearch.context.size");
-    if (resolution == null
-        || !resolution.isResolved()
-        || resolution.sourceOrdinal() <= ResolvedConfigBuilder.ORDINAL_AUTO_DETECT) {
+    if (resolution == null || !resolution.isResolved()) {
       return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+    }
+    if (resolution.sourceOrdinal() <= ResolvedConfigBuilder.ORDINAL_AUTO_DETECT) {
+      if (rc.ai() == null || rc.ai().gpuMemoryPlan().isBlank()) {
+        return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+      }
+      // Spec E step E7b: a planned profile's rung (ordinal 150) tops the derived ladder.
+      try {
+        return ContextWindowPolicy.auto(
+            gpuBacked, freeVramBytes, Integer.parseInt(resolution.value().trim()));
+      } catch (NumberFormatException | NullPointerException notARung) {
+        return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+      }
     }
     int tokens;
     try {
@@ -1090,48 +1565,84 @@ final class LlamaServerOps {
     return thinkingSupport.get().name();
   }
 
-  // ==================== External Server Adoption ====================
+  // ==================== External Server (explicit endpoint only) ====================
 
-  private StartResult adoptExistingServerIfPresent(StartRequest request)
+  /**
+   * ADR-0051 decision 2, ruling CH4: the user's own llama-server is used only when {@code
+   * justsearch.inference.external_endpoint} names it. Returns null when this start must launch a
+   * managed server instead.
+   *
+   * <p>Without the setting, a healthy server on the configured port is NOT adopted (that is how a
+   * crashed Engine's unregistered server used to be mistaken for the user's own). It is logged once
+   * and reported as {@code external_server_ignored}, so a user who relied on auto-adoption sees
+   * why, and the managed launch proceeds on a fresh port.
+   */
+  private StartResult useConfiguredExternalServer(StartRequest request)
       throws IOException, ModeTransitionException {
     LlamaServerConfigContext context = request.context();
-    if (!isServerHealthy(context, HEALTH_PROBE_TIMEOUT)) {
+    Optional<ExternalInferenceEndpoint> configured;
+    try {
+      configured = ExternalInferenceEndpoint.parse(externalEndpointSetting(context));
+    } catch (IllegalArgumentException refused) {
+      throw new ModeTransitionException(
+          ModeTransitionException.Reason.INVALID_CONFIG, refused.getMessage());
+    }
+    if (configured.isEmpty()) {
+      noteServerOnConfiguredPort(context.inference().serverPort());
+      return null;
+    }
+    ignoredExternalServerPort = 0;
+    ExternalInferenceEndpoint endpoint = configured.get();
+    if (request.adoptionPolicy() == AdoptionPolicy.MANAGED_DETACHED_FROM_EXTERNAL) {
       return null;
     }
     if (request.adoptionPolicy() == AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS) {
       throw new ModeTransitionException(
           ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT,
-          "A healthy unregistered llama-server is already using port "
-              + context.inference().serverPort()
-              + "; strict configuration apply requires a managed declared-config witness");
+          ExternalInferenceEndpoint.CONFIG_KEY
+              + " is set to "
+              + endpoint.url()
+              + "; strict configuration apply requires a managed declared-config witness. Clear"
+              + " the setting to let JustSearch run its own llama-server.");
     }
     if (policyDisallowExternalInferenceServers()) {
       throw new ModeTransitionException(
           ModeTransitionException.Reason.EXTERNAL_SERVER_POLICY_BLOCKED,
-          "External inference servers are disallowed by administrator policy. "
-              + "Stop the existing llama-server on port "
-              + context.inference().serverPort()
-              + " and retry Online mode.");
+          "External inference servers are disallowed by administrator policy. Clear "
+              + ExternalInferenceEndpoint.CONFIG_KEY
+              + " (currently "
+              + endpoint.url()
+              + ") and retry Online mode.");
+    }
+    if (!probeHealth(endpoint.port(), HEALTH_PROBE_TIMEOUT).ok()) {
+      throw new ModeTransitionException(
+          ModeTransitionException.Reason.ONLINE_START_FAILED,
+          "The llama-server configured by "
+              + ExternalInferenceEndpoint.CONFIG_KEY
+              + " ("
+              + endpoint.url()
+              + ") is not answering /health. Start it, or clear the setting to let JustSearch run"
+              + " its own.");
     }
 
-    // Validate the external server identity before adopting. This prevents accidentally adopting a
-    // random HTTP service that happens to return 200 for /health.
-    PropsProbe probe = probeServerProps(context, PROPS_PROBE_TIMEOUT);
+    // Validate the external server identity before using it. This prevents treating a random
+    // HTTP service that happens to return 200 for /health as a llama-server.
+    PropsProbe probe = probeServerProps(endpoint.port(), PROPS_PROBE_TIMEOUT);
     if (!probe.looksLikeLlamaServer()) {
       if (!allowHealthOnlyExternalAdoption()) {
         throw new IOException(
-            "Port "
-                + context.inference().serverPort()
-                + " is already serving HTTP 200 on /health, but it does not look like a"
-                + " llama-server (missing or invalid /props). Stop the process using that port,"
-                + " change JUSTSEARCH_SERVER_PORT, or (dev only) set -D"
+            endpoint.url()
+                + " is serving HTTP 200 on /health, but it does not look like a llama-server"
+                + " (missing or invalid /props). Point "
+                + ExternalInferenceEndpoint.CONFIG_KEY
+                + " at a llama-server, clear it, or (dev only) set -D"
                 + ALLOW_HEALTH_ONLY_EXTERNAL_ADOPTION_PROP
-                + "=true to force adoption.");
+                + "=true to use it anyway.");
       }
       LOG.warn(
-          "External server on port {} is healthy but /props is missing/unparseable. "
-              + "Proceeding with health-only adoption due to {}=true.",
-          context.inference().serverPort(),
+          "External server {} is healthy but /props is missing/unparseable. "
+              + "Proceeding with health-only use due to {}=true.",
+          endpoint.url(),
           ALLOW_HEALTH_ONLY_EXTERNAL_ADOPTION_PROP);
     }
 
@@ -1141,112 +1652,60 @@ final class LlamaServerOps {
             request.adoptionPolicy(),
             StartDisposition.ADOPTED_EXTERNAL,
             null);
-    adoptExternalServer(probe, result);
+    useExternalServer(probe, result, endpoint);
     return result;
   }
 
-  boolean adoptManagedServerIfPresent(String declaredConfigHash, StartResult result)
-      throws IOException {
-    for (io.justsearch.app.api.runtime.ManagedChild child : childRegistry.snapshot()) {
-      if (child.kind() != io.justsearch.app.api.runtime.ManagedChild.Kind.LLAMA_SERVER) continue;
-      java.util.Optional<ProcessHandle> handle = ProcessHandle.of(child.pid());
-      if (handle.isEmpty() || !handle.get().isAlive()) {
-        childRegistry.remove(child.id());
-        continue;
-      }
-      ProcessHandle live = handle.get();
-      io.justsearch.app.api.runtime.ManagedChild.IdentityMatch identity = child.identityOf(live);
-      if (identity == io.justsearch.app.api.runtime.ManagedChild.IdentityMatch.UNKNOWN) continue;
-      if (identity == io.justsearch.app.api.runtime.ManagedChild.IdentityMatch.MISMATCH) {
-        childRegistry.remove(child.id());
-        continue;
-      }
-      PropsProbe probe = probeServerProps(result.context(), PROPS_PROBE_TIMEOUT);
-      boolean valid =
-          declaredConfigHash.equals(child.declaredConfigHash())
-              && isServerHealthy(result.context(), HEALTH_PROBE_TIMEOUT)
-              && probe.looksLikeLlamaServer();
-      if (!valid) {
-        if (!managedHandleTermination.terminate(live)) {
-          throw new IOException(
-              "registered llama-server PID " + child.pid() + " could not be terminated");
-        }
-        childRegistry.remove(child.id());
-        continue;
-      }
+  private static String externalEndpointSetting(LlamaServerConfigContext context) {
+    ResolvedConfig resolved = context.resolved();
+    if (resolved == null || resolved.ai() == null) return null;
+    return resolved.ai().inferenceExternalEndpoint();
+  }
 
-      // Health probing is not identity evidence. Re-check immediately before claiming the handle.
-      if (!live.isAlive()) {
-        childRegistry.remove(child.id());
-        continue;
-      }
-      identity = child.identityOf(live);
-      if (identity == io.justsearch.app.api.runtime.ManagedChild.IdentityMatch.UNKNOWN) continue;
-      if (identity == io.justsearch.app.api.runtime.ManagedChild.IdentityMatch.MISMATCH) {
-        childRegistry.remove(child.id());
-        continue;
-      }
-      processOwnership.adoptManaged(live);
-      usingExternal = false;
-      process = null;
-      adoptedManagedHandle = live;
-      setManagedChildId(child.id());
-      installActive(result, null, live);
-      reasoningBudgetRequested = false;
-      thinkingSupport.set(ThinkingSupport.UNKNOWN);
-      propsOps.resetExternalAdoptionState(true, null);
-      LOG.info("Adopted registered llama-server PID {} with matching applied configuration", child.pid());
-      return true;
+  /** CH4: a healthy server on the configured port is reported, never adopted. */
+  private void noteServerOnConfiguredPort(int configuredPort) {
+    if (configuredPort <= 0 || !probeHealth(configuredPort, HEALTH_PROBE_TIMEOUT).ok()) {
+      ignoredExternalServerPort = 0;
+      return;
     }
-    return false;
-  }
-
-  private void monitorAdoptedManagedChild(String childId, ProcessHandle handle, ActiveServer owner) {
-    crashMonitor =
-        handle.onExit().thenRunAsync(
-            () -> {
-              boolean wasCurrent;
-              synchronized (this) {
-                wasCurrent = childId.equals(managedChildId);
-                if (wasCurrent) adoptedManagedHandle = null;
-              }
-              unregisterManagedChild(childId);
-              if (wasCurrent && isActive(owner)) {
-                LOG.error("adopted managed llama-server PID {} exited", handle.pid());
-                handleManagedCrash(owner);
-              }
-            }, exitExecutor);
-  }
-
-  private static boolean terminateManagedHandle(ProcessHandle handle) {
-    handle.destroy();
-    try {
-      if (handle.isAlive()) handle.onExit().get(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
-      if (handle.isAlive()) {
-        handle.destroyForcibly();
-        handle.onExit().get(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
-      }
-    } catch (Exception e) {
-      if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+    if (ignoredExternalServerPort != configuredPort) {
+      LOG.warn(
+          "A server is answering on the configured llama-server port {}. JustSearch no longer"
+              + " adopts a server it did not start (ADR-0051): it runs its own llama-server on a"
+              + " fresh loopback port and leaves this one alone. To use your own server, set {}"
+              + " (JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT) to http://127.0.0.1:{}.",
+          configuredPort,
+          ExternalInferenceEndpoint.CONFIG_KEY,
+          configuredPort);
     }
-    return !handle.isAlive();
+    ignoredExternalServerPort = configuredPort;
   }
 
-  private void adoptExternalServer(PropsProbe probe, StartResult result) throws IOException {
+  /**
+   * Status note while a healthy server on the configured port is being ignored, else null. The
+   * value is the wire code {@code external_server_ignored}.
+   */
+  String externalServerNote() {
+    return ignoredExternalServerPort > 0 ? EXTERNAL_SERVER_IGNORED_NOTE : null;
+  }
+
+  static final String EXTERNAL_SERVER_IGNORED_NOTE = "external_server_ignored";
+
+  private void useExternalServer(
+      PropsProbe probe, StartResult result, ExternalInferenceEndpoint endpoint) throws IOException {
     processOwnership.requireLaunchAllowed();
     usingExternal = true;
-    process = null;
-    ActiveServer owner = installActive(result, null, null);
+    child = null;
+    ActiveServer owner = installActive(result, null, endpoint.port());
     // We launched nothing, so launch-argument acceptance says nothing about this server.
     reasoningBudgetRequested = false;
     thinkingSupport.set(ThinkingSupport.UNKNOWN);
     propsOps.resetExternalAdoptionState(
         probe.looksLikeLlamaServer(), probe.looksLikeLlamaServer() ? null : probe.error());
-    LOG.warn(
-        "llama-server already responding on port {}. Using existing instance (no process handle). "
-            + "If you want JustSearch to fully manage llama-server, stop the existing process"
-            + " first.",
-        result.context().inference().serverPort());
+    LOG.info(
+        "Using the user's own llama-server at {} ({}). JustSearch reports it and never stops it.",
+        endpoint.url(),
+        ExternalInferenceEndpoint.CONFIG_KEY);
     try {
       // Best-effort: capture model/context details for diagnostics and request routing.
       if (probe.propsRoot() != null) {
@@ -1262,7 +1721,21 @@ final class LlamaServerOps {
 
   // ==================== Process Launch Helpers ====================
 
-  private void launchManagedLlamaServer(List<String> command, StartResult result)
+  /**
+   * Relaunches {@code command} on a fresh loopback port (ADR-0051 decision 2): every managed
+   * launch, including a same-configuration retry, gets its own port.
+   */
+  private void launchOnFreshPort(List<String> command, StartResult result)
+      throws IOException, ModeTransitionException {
+    int port = allocateLaunchPort();
+    List<String> argv = withFlagValue(command, "--port", String.valueOf(port));
+    if (argv == null) {
+      throw new IOException("llama-server launch command has no --port value to replace");
+    }
+    launchManagedLlamaServer(argv, result, port);
+  }
+
+  private void launchManagedLlamaServer(List<String> command, StartResult result, int port)
       throws IOException, ModeTransitionException {
     // Tempdoc 656 Task 3: a missing llama-server.exe previously failed inside ProcessBuilder.start()
     // below with a raw IOException (Windows error 2), which propagates past every typed handler and
@@ -1281,69 +1754,80 @@ final class LlamaServerOps {
               + ". Try 'Repair AI' or reinstall the AI runtime, then retry Online Mode.");
     }
     lastLaunchCommand = List.copyOf(command);
-    ProcessBuilder pb = new ProcessBuilder(command);
     // Ensure the DLL search path includes the llama-server directory and the bundled runtime/bin
     // directory (which often contains the VC++ runtime DLLs inside our packaged headless runtime
     // image).
     Path serverExeDir = context.inference().serverExecutable().getParent();
-    configureProcessWorkingDirectory(pb, serverExeDir);
-    adjustPathForRuntimeDlls(pb, serverExeDir, context);
-    Path logFile = configureServerLogRedirection(pb, resolveLlamaServerLogFile(context));
-    startManagedProcess(pb, logFile, command, result);
+    Path logFile = prepareServerLog(resolveLlamaServerLogFile(context));
+    ChildSpec spec = new ChildSpec(
+        ChildKind.LLAMA_SERVER,
+        command,
+        serverExeDir != null && Files.isDirectory(serverExeDir) ? serverExeDir : null,
+        launchEnvironment(),
+        new ChildSpec.Stdio.AppendToLog(logFile),
+        gpuLayersOf(command) > 0,
+        java.util.OptionalLong.empty(),
+        Optional.empty(),
+        ChildSpec.CooperativeStop.NONE,
+        "llama-server",
+        runtimeDllPath(serverExeDir, context));
+    LOG.debug("Starting server with command: {}", String.join(" ", command));
+    startManagedChild(spec, logFile, result, port);
   }
 
-  private void configureProcessWorkingDirectory(ProcessBuilder pb, Path serverExeDir) {
-    if (serverExeDir != null && Files.isDirectory(serverExeDir)) {
-      pb.directory(serverExeDir.toFile());
-    }
-  }
-
-  private void adjustPathForRuntimeDlls(
-      ProcessBuilder pb, Path serverExeDir, LlamaServerConfigContext context) {
+  /** The {@code -ngl} value of a launch command; 0 when absent or unreadable. */
+  static int gpuLayersOf(List<String> command) {
+    int index = command.indexOf("-ngl");
+    if (index < 0 || index + 1 >= command.size()) return 0;
     try {
-      Map<String, String> env = pb.environment();
-      String pathKey =
-          env.containsKey("Path") ? "Path" : (env.containsKey("PATH") ? "PATH" : "Path");
-      String existingPath = env.getOrDefault(pathKey, "");
-
-      List<String> prefixes = new ArrayList<>();
-      if (serverExeDir != null) {
-        prefixes.add(serverExeDir.toAbsolutePath().normalize().toString());
-      }
-      Path runtimeBin = resolveBundledRuntimeBinDirBestEffort(context);
-      if (runtimeBin != null) {
-        prefixes.add(runtimeBin.toAbsolutePath().normalize().toString());
-      }
-
-      if (!prefixes.isEmpty()) {
-        String prepend = String.join(";", prefixes);
-        String next =
-            existingPath == null || existingPath.isBlank()
-                ? prepend
-                : (prepend + ";" + existingPath);
-        env.put(pathKey, next);
-      }
-    } catch (Exception e) {
-      // Best-effort: do not fail startup on PATH adjustments.
-      LOG.debug("Failed to adjust PATH for llama-server: {}", e.getMessage());
+      return Integer.parseInt(command.get(index + 1).trim());
+    } catch (NumberFormatException unreadable) {
+      return 0;
     }
   }
 
   /**
-   * Persist llama-server output to {@code <home|dataDir>/logs/llama-server.log}, retaining a bounded
-   * number of generations. Package-private (and taking the resolved path) so the retention policy is
-   * testable through the SAME method the launch path calls, rather than through a helper a future
-   * edit could stop calling.
+   * The child's environment changes: the captured device plan. Spec E step E6: a pinned GPU
+   * launch sees only the pinned device; CPU launches override inherited CUDA visibility; retries
+   * retain the initial device namespace. The DLL search path is the spec's PATH prefix ({@link
+   * #runtimeDllPath}), which child control joins to the inherited value.
    */
-  Path configureServerLogRedirection(ProcessBuilder pb, Path logFile) throws IOException {
+  private Map<String, String> launchEnvironment() {
+    return Objects.requireNonNull(launchDevicePlan, "launch device plan").environment();
+  }
+
+  /**
+   * The DLL directories a launch puts in front of the child's inherited {@code PATH}: the server's
+   * own directory, then the bundled runtime {@code bin} (VC++ runtime DLLs in the packaged image).
+   * Child control joins them to the inherited value, so this reads no process environment.
+   */
+  private List<Path> runtimeDllPath(Path serverExeDir, LlamaServerConfigContext context) {
+    try {
+      List<Path> prefixes = new ArrayList<>();
+      if (serverExeDir != null) prefixes.add(serverExeDir.toAbsolutePath().normalize());
+      Path runtimeBin = resolveBundledRuntimeBinDirBestEffort(context);
+      if (runtimeBin != null) prefixes.add(runtimeBin.toAbsolutePath().normalize());
+      return List.copyOf(prefixes);
+    } catch (Exception e) {
+      // Best-effort: do not fail startup on PATH adjustments.
+      LOG.debug("Failed to adjust PATH for llama-server: {}", e.getMessage());
+      return List.of();
+    }
+  }
+
+  /**
+   * Prepares {@code <home|dataDir>/logs/llama-server.log}, which the launch appends both output
+   * streams to, retaining a bounded number of generations. Package-private (and taking the
+   * resolved path) so the retention policy is testable through the SAME method the launch path
+   * calls, rather than through a helper a future edit could stop calling.
+   */
+  Path prepareServerLog(Path logFile) throws IOException {
     Files.createDirectories(logFile.getParent());
     rotateServerLogGenerations(logFile);
     // Remember where this launch starts writing, so launch-argument rejections are read from THIS
     // run's output rather than a previous run's tail. Read AFTER rotation: rotation moves the
     // previous log aside, so this launch starts at offset 0 of a fresh file.
     lastLaunchLogOffset = Files.exists(logFile) ? Files.size(logFile) : 0L;
-    pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-    pb.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
     return logFile;
   }
 
@@ -1415,32 +1899,35 @@ final class LlamaServerOps {
     return logFile.resolveSibling(logFile.getFileName() + "." + generation);
   }
 
-  private void startManagedProcess(
-      ProcessBuilder pb, Path logFile, List<String> command, StartResult result)
+  /**
+   * Starts the server through {@link ChildControl}, which records the spawn, registers the
+   * manifest entry and, when registration is refused, stops the child ({@code ROLLBACK}) before
+   * throwing. Nothing here kills a process. Every launch (first start and relaunch alike) first
+   * retries a server whose stop failed, and refuses while it may still be alive. A rolled-back
+   * server whose stop did not confirm its exit stays held, as one that survived a stop does: the
+   * next stop retries it and fails while it lives, and no start launches beside it.
+   */
+  private void startManagedChild(ChildSpec spec, Path logFile, StartResult result, int port)
       throws IOException {
-    process = processOwnership.launch(pb::start);
-    Process started = process; // capture for crash monitor lambda (H2: avoid stale this.process)
-
-    io.justsearch.app.api.runtime.ManagedChild child;
+    retrySurvivor();
+    InferenceConfig cfg = result.context().inference();
+    ChildControl.ManifestEntry entry = new ChildControl.ManifestEntry(
+        "http://127.0.0.1:" + port, cfg.modelPath().toString(), result.declaredConfigHash());
+    ChildHandle started;
     try {
-      InferenceConfig cfg = result.context().inference();
-      child =
-          io.justsearch.app.api.runtime.ManagedChild.fromProcess(
-              started,
-              io.justsearch.app.api.runtime.ManagedChild.Kind.LLAMA_SERVER,
-              "http://127.0.0.1:" + cfg.serverPort(),
-              cfg.modelPath().toString(),
-              result.declaredConfigHash(),
-              ManagedLlamaConfigIdentity.realizedArgvHash(command));
-      childRegistry.register(child);
-      setManagedChildId(child.id());
-    } catch (IOException | RuntimeException persistenceFailure) {
-      throw rollbackFailedRegistration(started, persistenceFailure);
+      started = processOwnership.launch(() -> childControl.start(spec, entry));
+    } catch (ChildRegistrationRefusedException refused) {
+      refused.survivor().ifPresent(survivor -> {
+        child = survivor;
+        LOG.error("Unregistered llama-server PID {} survived registration rollback; retaining"
+            + " its handle", survivor.pid());
+      });
+      throw refused;
     }
-
+    child = started;
     LOG.info("llama-server logs: {}", logFile);
-    LOG.info("llama-server started, PID: {}", started.pid());
-    installActive(result, started, null);
+    LOG.info("llama-server started, PID: {}, port: {}", started.pid(), port);
+    installActive(result, started, port);
   }
 
   private void armRuntimeMonitoring(ActiveServer owner)
@@ -1457,107 +1944,63 @@ final class LlamaServerOps {
       crashMonitor.cancel(true);
       crashMonitor = null;
     }
+    readyMark = new ReadyMark(owner, monotonicNanos.getAsLong());
     schedulePeriodicHealthCheck(owner);
-    Process started = owner.process();
+    ChildHandle started = owner.child();
     if (started != null) {
-      monitorLaunchedManagedChild(managedChildId, started, owner);
-    } else if (owner.adoptedHandle() != null) {
-      monitorAdoptedManagedChild(managedChildId, owner.adoptedHandle(), owner);
+      monitorLaunchedManagedChild(started, owner);
     }
   }
 
   private static boolean ownedPhysicalServerAlive(ActiveServer owner) {
     if (owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL) return true;
-    if (owner.process() != null) return owner.process().isAlive();
-    return owner.adoptedHandle() != null && owner.adoptedHandle().isAlive();
+    return alive(owner.child());
   }
 
-  private void monitorLaunchedManagedChild(String childId, Process started, ActiveServer owner) {
+  /**
+   * The one exit watcher (Spec B §2.2, C3): it sees every exit with its recorded class. A
+   * REQUESTED exit is a stop someone asked for and is never a crash. An exit of the owner a
+   * planned stop is ending is the stop's business, whatever its class. Anything else while the
+   * owner is active is a crash.
+   */
+  private void monitorLaunchedManagedChild(ChildHandle started, ActiveServer owner) {
     crashMonitor =
-        io.justsearch.core.execution.EngineFutures.supplyAsync(
-            () -> {
-              try {
-                int exitCode = started.waitFor();
-                unregisterManagedChild(childId);
-                if (isActive(owner)) {
-                  LOG.error("llama-server exited unexpectedly with code {}", exitCode);
-                  handleManagedCrash(owner);
-                }
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // restore interrupt flag
+        started.exit().toCompletableFuture().whenCompleteAsync(
+            (outcome, failure) -> {
+              if (outcome == null || outcome.exitClass() == ExitClass.REQUESTED) return;
+              int code = outcome.code().isPresent() ? outcome.code().getAsInt() : -1;
+              if (stoppingOwner == owner || !isActive(owner)) {
+                LOG.warn("llama-server PID {} exited on its own ({}, code {}) while being stopped",
+                    started.pid(), outcome.exitClass(), code);
+                return;
               }
-              return null;
+              LOG.error("llama-server exited unexpectedly with code {} ({})", code,
+                  outcome.exitClass());
+              handleManagedCrash(owner);
             }, exitExecutor);
   }
 
   private void retireFailedPhysicalOwner(ActiveServer expected) {
     if (!isActive(expected) || ownedPhysicalServerAlive(expected)) return;
-    Process failed = expected.process();
-    unregisterManagedChild(managedChildId);
-    if (process == failed) process = null;
-    if (adoptedManagedHandle == expected.adoptedHandle()) adoptedManagedHandle = null;
+    if (child == expected.child()) child = null;
   }
 
-  IOException rollbackFailedRegistration(Process started, Throwable persistenceFailure) {
-    started.destroyForcibly();
-    boolean dead = false;
-    try {
-      dead = started.waitFor(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS) && !started.isAlive();
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-    }
-    if (dead) {
-      process = null;
+  /** The owner's diagnosis of a startup exit, as a bounded {@code child-note} token. */
+  private void noteStartupExit(
+      ChildHandle exited, int exitCode, LlamaServerExitClassifier.Classification classification) {
+    String token;
+    if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
+      token = "dll_not_found";
+    } else if (classification.crashClass() == LlamaServerExitClassifier.CrashClass.RESOURCE) {
+      token = "oom";
     } else {
-      process = started;
-      unregisteredRollbackProcess = started;
-      if (rollbackShutdownHook == null) {
-        rollbackShutdownHook = new Thread(() -> terminateAndWait(started), "llama-registration-rollback");
-        Runtime.getRuntime().addShutdownHook(rollbackShutdownHook);
-      }
-      LOG.error(
-          "Unregistered llama-server PID {} survived registration rollback; retaining handle",
-          started.pid());
+      token = "startup_failed";
     }
-    return persistenceFailure instanceof IOException io
-        ? io
-        : new IOException("could not register managed llama-server", persistenceFailure);
-  }
-
-  private void removeRollbackShutdownHook() {
-    if (rollbackShutdownHook == null) return;
     try {
-      Runtime.getRuntime().removeShutdownHook(rollbackShutdownHook);
-      rollbackShutdownHook = null;
-    } catch (IllegalStateException shuttingDown) {
-      // The JVM now owns the callback; keep the exact process captured until it finishes.
+      childControl.note(exited, token);
+    } catch (RuntimeException unrecorded) {
+      LOG.debug("Could not record the llama-server startup note: {}", unrecorded.getMessage());
     }
-  }
-
-  /** Unregistered children cannot be adopted, even when a registered server should survive restart. */
-  void closeUnregisteredChild() {
-    Process rollback = unregisteredRollbackProcess;
-    if (rollback == null) return;
-    if (!terminateAndWait(rollback)) {
-      throw new IllegalStateException("Unregistered llama-server survived terminal cleanup");
-    }
-    unregisteredRollbackProcess = null;
-    if (process == rollback) process = null;
-    removeRollbackShutdownHook();
-  }
-
-  private static boolean terminateAndWait(Process process) {
-    process.destroyForcibly();
-    try {
-      return process.waitFor(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS) && !process.isAlive();
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      return false;
-    }
-  }
-
-  private synchronized void setManagedChildId(String id) {
-    managedChildId = id;
   }
 
   // ==================== Health Probing ====================
@@ -1573,14 +2016,13 @@ final class LlamaServerOps {
 
   private HealthProbe probeHealth(ActiveServer expected, Duration timeout) {
     if (!isActive(expected)) return staleHealthProbe();
-    HealthProbe probe = probeHealth(expected.start().context(), timeout);
+    HealthProbe probe = probeHealth(expected.port(), timeout);
     return isActive(expected) ? probe : staleHealthProbe();
   }
 
-  private HealthProbe probeHealth(LlamaServerConfigContext context, Duration timeout) {
+  private HealthProbe probeHealth(int port, Duration timeout) {
     try {
-      HttpRequest request =
-          buildGetRequest(context.inference().serverPort(), PATH_HEALTH, timeout);
+      HttpRequest request = buildGetRequest(port, PATH_HEALTH, timeout);
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
       boolean ok = response.statusCode() == 200;
@@ -1596,20 +2038,15 @@ final class LlamaServerOps {
     return new HealthProbe(false, -1, "stale llama-server owner", null);
   }
 
-  boolean isServerHealthy(LlamaServerConfigContext context, Duration timeout) {
-    return probeHealth(context, timeout).ok();
-  }
-
   private PropsProbe probeServerProps(ActiveServer expected, Duration timeout) {
     if (!isActive(expected)) return stalePropsProbe();
-    PropsProbe probe = probeServerProps(expected.start().context(), timeout);
+    PropsProbe probe = probeServerProps(expected.port(), timeout);
     return isActive(expected) ? probe : stalePropsProbe();
   }
 
-  private PropsProbe probeServerProps(LlamaServerConfigContext context, Duration timeout) {
+  private PropsProbe probeServerProps(int port, Duration timeout) {
     try {
-      HttpRequest request =
-          buildGetRequest(context.inference().serverPort(), PATH_PROPS, timeout);
+      HttpRequest request = buildGetRequest(port, PATH_PROPS, timeout);
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() != 200) {
@@ -1673,9 +2110,13 @@ final class LlamaServerOps {
   /**
    * Schedules periodic health checks for the running llama-server.
    *
-   * <p>If 3 consecutive health checks fail, treats the server as crashed and triggers the crash
-   * recovery flow. This detects hung processes that are still alive but not responding to HTTP
-   * requests.
+   * <p>If 3 consecutive health checks fail, treats the server as hung (Spec A T30): the failure is
+   * signalled and the chat crash policy decides, a hang counting as an OTHER exit. This detects
+   * processes that are still alive but not responding to HTTP requests.
+   *
+   * <p>Fixed delay, not fixed rate (Spec A §3.3): after a sleep or a stalled probe the next probe
+   * waits a full interval instead of firing the overdue ones back to back, which would count three
+   * failures in a burst against a server that is merely waking up.
    */
   private void schedulePeriodicHealthCheck(ActiveServer owner) {
     synchronized (ownershipMonitor) {
@@ -1683,7 +2124,7 @@ final class LlamaServerOps {
       stopPeriodicHealthCheckLocked();
       resetHealthDiagnosticsLocked();
       periodicHealthTask =
-          healthScheduler.scheduleAtFixedRate(
+          healthScheduler.scheduleWithFixedDelay(
               () -> runPeriodicHealthCheck(owner),
               PERIODIC_HEALTH_INTERVAL_MS,
               PERIODIC_HEALTH_INTERVAL_MS,
@@ -1725,9 +2166,7 @@ final class LlamaServerOps {
   }
 
   boolean hasLiveManagedProcess() {
-    Process launched = process;
-    ProcessHandle adopted = adoptedManagedHandle;
-    return (launched != null && launched.isAlive()) || (adopted != null && adopted.isAlive());
+    return alive(child);
   }
 
   void handlePeriodicHealthFailure(String reason, boolean external) {
@@ -1825,6 +2264,13 @@ final class LlamaServerOps {
       if (activeServer != owner || failureSignalledOwner == owner) return;
       failureSignalledOwner = owner;
     }
+    ManagedFailure described = describeFailure(owner, processExited);
+    lastManagedFailure = described;
+    LOG.error(
+        "llama-server failed while serving: class={} evidence={} readyFor={}s",
+        described.classification().crashClass(),
+        described.classification().evidence(),
+        described.readyFor().toSeconds());
     if (!processExited) {
       managedServerFailed.accept(() -> isActive(owner));
       return;
@@ -1848,11 +2294,42 @@ final class LlamaServerOps {
     managedServerFailed.accept(() -> isActive(owner));
   }
 
+  /** Classifies a READY server's failure and measures how long it served (Spec A T27-T30). */
+  private ManagedFailure describeFailure(ActiveServer owner, boolean processExited) {
+    LlamaServerExitClassifier.Classification classification;
+    if (processExited) {
+      ChildHandle exited = owner.child();
+      int exitCode = exited != null && !alive(exited) ? exitCode(exited) : -1;
+      classification = LlamaServerExitClassifier.classify(
+          exitCode, readLaunchOutputBestEffort(owner.start().context()),
+          owner.start().context().devicePlan().gpuLayers() > 0);
+    } else {
+      classification = new LlamaServerExitClassifier.Classification(
+          LlamaServerExitClassifier.CrashClass.OTHER,
+          io.justsearch.app.api.chat.FailedCode.CRASH_LOOP,
+          "no /health answer in " + CONSECUTIVE_FAILURES_BEFORE_RESTART + " consecutive probes");
+    }
+    ReadyMark ready = readyMark;
+    Duration readyFor = ready != null && ready.owner() == owner
+        ? Duration.ofNanos(Math.max(0L, monotonicNanos.getAsLong() - ready.atNanos()))
+        : Duration.ZERO;
+    return new ManagedFailure(
+        owner.start(), classification, !processExited, readyFor, lowerContextRung());
+  }
+
+  /** The last READY failure signalled for {@code start}, if it is the failure of that start. */
+  Optional<ManagedFailure> managedFailureOf(StartResult start) {
+    ManagedFailure failure = lastManagedFailure;
+    return failure != null && failure.start() == start
+        ? Optional.of(failure)
+        : Optional.empty();
+  }
+
   // ==================== State Accessors ====================
 
-  java.util.Optional<StartResult> activeStartResult() {
+  Optional<StartResult> activeStartResult() {
     ActiveServer owner = activeServer;
-    return owner == null ? java.util.Optional.empty() : java.util.Optional.of(owner.start());
+    return owner == null ? Optional.empty() : Optional.of(owner.start());
   }
 
   boolean activeManagedCandidateAlive(StartResult expected) {
@@ -1860,9 +2337,14 @@ final class LlamaServerOps {
     return owner != null && owner.start() == expected && ownedPhysicalServerAlive(owner);
   }
 
-  private ActiveServer installActive(
-      StartResult start, Process launchedProcess, ProcessHandle adoptedHandle) {
-    ActiveServer owner = new ActiveServer(start, launchedProcess, adoptedHandle);
+  /** Where the active server listens: this launch's fresh port, or the external endpoint's. */
+  OptionalInt activePort() {
+    ActiveServer owner = activeServer;
+    return owner == null ? OptionalInt.empty() : OptionalInt.of(owner.port());
+  }
+
+  private ActiveServer installActive(StartResult start, ChildHandle launched, int port) {
+    ActiveServer owner = new ActiveServer(start, launched, port);
     synchronized (ownershipMonitor) {
       activeServer = owner;
       failureSignalledOwner = null;
@@ -1903,11 +2385,11 @@ final class LlamaServerOps {
   }
 
   boolean isExternalServerActive() {
-    return usingExternal && process == null;
+    return usingExternal && child == null;
   }
 
   /**
-   * Raw {@code usingExternal} field value (no {@code process == null} guard). Used by ILM /
+   * Raw {@code usingExternal} field value (no {@code child == null} guard). Used by ILM /
    * the runner to learn whether adoption happened during the just-completed transition body,
    * even before the field is paired with the runtime invariant that an adopted server has no
    * owned process. Tempdoc 518 P2.
@@ -1959,13 +2441,92 @@ final class LlamaServerOps {
     }
   }
 
+  // ==================== Resume (Spec A §7.4) ====================
+
+  /** How long the resume probe waits for {@code /health} and for one token. */
+  static final Duration RESUME_HEALTH_TIMEOUT = Duration.ofSeconds(5);
+
+  static final Duration RESUME_TOKEN_TIMEOUT = Duration.ofSeconds(10);
+
+  /**
+   * The machine resumed: the health streak restarts at zero, the periodic health check is
+   * scheduled again a full fixed delay from now, and a start waiting for health restarts its
+   * deadline in full. Lock-free for the caller apart from the ownership monitor; it never waits
+   * for a step in progress.
+   */
+  void noteResume() {
+    resumes.incrementAndGet();
+    ActiveServer owner;
+    boolean scheduled;
+    synchronized (ownershipMonitor) {
+      consecutiveHealthFailures.set(0);
+      owner = activeServer;
+      scheduled = periodicHealthTask != null;
+    }
+    if (owner != null && scheduled) schedulePeriodicHealthCheck(owner);
+  }
+
+  /** How a resume probe of the active server ended, before any action on it. */
+  enum ResumeProbeResult { NOT_SERVING, PASSED, EXITED, DEVICE_LOST, FAILED }
+
+  /**
+   * A resume probe's finding.
+   *
+   * @param deviceLostCode the code the server's output names, for {@link
+   *     ResumeProbeResult#DEVICE_LOST}
+   * @param reason what failed, for the log
+   */
+  record ResumeProbeFinding(
+      ResumeProbeResult result, StartResult probed, String deviceLostCode, String reason) {}
+
+  /**
+   * Probes the active server this Engine started after a resume (Spec A §7.4): {@code /health}
+   * within 5 s, then one token within 10 s through {@code oneToken}. A failed probe with the
+   * process gone is EXITED (its crash path acts); with device-lost text in this launch's output it
+   * is DEVICE_LOST; otherwise FAILED. An external server is never probed here.
+   */
+  ResumeProbeFinding probeAfterResume(java.util.function.Predicate<Duration> oneToken) {
+    ActiveServer owner = activeServer;
+    if (owner == null || owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL
+        || owner.child() == null) {
+      return new ResumeProbeFinding(ResumeProbeResult.NOT_SERVING, null, null, null);
+    }
+    if (!alive(owner.child())) {
+      return new ResumeProbeFinding(ResumeProbeResult.EXITED, owner.start(), null, "exited");
+    }
+    HealthProbe health = probeHealth(owner, RESUME_HEALTH_TIMEOUT);
+    String failure;
+    if (!health.ok()) {
+      failure = "/health: " + (health.error() != null ? health.error() : "failed");
+    } else if (!oneToken.test(RESUME_TOKEN_TIMEOUT)) {
+      failure = "one-token completion failed";
+    } else {
+      return new ResumeProbeFinding(ResumeProbeResult.PASSED, owner.start(), null, null);
+    }
+    if (!isActive(owner)) {
+      return new ResumeProbeFinding(ResumeProbeResult.NOT_SERVING, null, null, failure);
+    }
+    if (!alive(owner.child())) {
+      return new ResumeProbeFinding(ResumeProbeResult.EXITED, owner.start(), null, failure);
+    }
+    var code = LlamaServerExitClassifier.deviceLostCode(
+        readLaunchOutputBestEffort(owner.start().context()));
+    if (code.isPresent()) {
+      return new ResumeProbeFinding(
+          ResumeProbeResult.DEVICE_LOST, owner.start(), code.get(), failure);
+    }
+    return new ResumeProbeFinding(ResumeProbeResult.FAILED, owner.start(), null, failure);
+  }
+
   InferenceLifecycleManager.ExternalServerDiagnostics buildExternalDiagnostics(
       boolean usingExternal) {
-    return propsOps.buildExternalDiagnostics(
-        usingExternal,
-        lastPeriodicHealthOkAtMs.get(),
-        lastPeriodicHealthError.get(),
-        consecutiveHealthFailures.get());
+    return propsOps
+        .buildExternalDiagnostics(
+            usingExternal,
+            lastPeriodicHealthOkAtMs.get(),
+            lastPeriodicHealthError.get(),
+            consecutiveHealthFailures.get())
+        .withNote(externalServerNote());
   }
 
   /** Returns true if the last /props response indicated vision support (runtime signal). */
@@ -1994,6 +2555,8 @@ final class LlamaServerOps {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    // A control this made for itself ends with it; it stops what it still holds (QUIT).
+    if (ownsChildControl) childControl.close();
   }
 
   private static java.util.concurrent.ThreadFactory daemonFactory(String name) {
@@ -2068,7 +2631,8 @@ final class LlamaServerOps {
       }
 
       // Pattern: port conflict
-      if (logTail.contains("address already in use")) {
+      if (logTail.contains("address already in use")
+          || LlamaServerBindFailure.isBindFailure(logTail)) {
         return base + ". Server port is already in use — another llama-server or "
             + "application may be occupying the port. "
             + "Check " + logFile + " for details.";

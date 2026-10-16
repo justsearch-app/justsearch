@@ -1,3 +1,4 @@
+import './lib/test-fixture-processes.cjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -76,18 +77,30 @@ test('stopRun after failed Engine quit persists verified llama cleanup and retur
   const { dir, child } = manifest(t);
   let alive = true;
   const runPath = path.join(dir, 'run.json');
+  const birth = '134000000000000000';
+  let backendAlive = true;
   const run = { runId: path.basename(dir), dataDir: dir, apiPortActual: 0, uiPortActual: 0,
-    pids: { runnerPid: process.pid, frontendRootPid: null, backendRootPid: 123 } };
+    pids: { runnerPid: process.pid, frontendRootPid: null, backendRootPid: 123 },
+    identities: { backend: { pid: 123, creationFileTimeUtc: birth } } };
+  let censusFinished = false;
   const result = await api.stopRun({}, {
     resolveTarget: async () => ({ run, runPath }),
-    gracefulShutdown: async () => ({ outcome: 'exited', exitCode: 1 }),
-    census: async () => ({ finish: async killed => {
-      assert.deepEqual(killed, [child.pid]); return {};
+    // The backend as it is, and the registered llama child as itself (its manifest start, to the
+    // millisecond) while it runs: a row naming another birth at its PID would say it had ended.
+    lookupIdentities: async pids => new Map(pids.map(pid => [pid, pid === child.pid
+      ? { present: alive, creationFileTime: String(BigInt(Date.parse(child.startedAt)) * 10000n + 116444736000000000n) }
+      : { present: backendAlive, creationFileTime: birth }])),
+    gracefulShutdown: async () => { backendAlive = false; return { outcome: 'exited', exitCode: 1 }; },
+    // Spec B step 9: the census reads the ledger; the stop's own kills are not handed to it.
+    census: async () => ({ finish: async options => {
+      assert.ok(!Array.isArray(options) && !JSON.stringify(options ?? {}).includes(String(child.pid)), JSON.stringify(options));
+      censusFinished = true; return {};
     } }),
     inspectChild: () => alive ? { ...child, alive } : { alive: false },
     terminateChild: pid => { assert.equal(pid, child.pid); alive = false; return true; },
   });
   assert.equal(alive, false);
+  assert.equal(censusFinished, true);
   assert.deepEqual(result.killedPids, [child.pid]);
   assert.equal(result.childCleanup[0].outcome, 'terminated');
   const report = JSON.parse(fs.readFileSync(path.join(dir, 'stop-report.json'), 'utf8'));

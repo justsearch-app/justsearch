@@ -1,0 +1,73 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:21:19.218Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "8d2dde0c6b04a92a5ed727e900bb53c7bfb7e704",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.exitWhileRegisteringRemovesTheEntry\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2659
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#exitWhileRegisteringRemovesTheEntry",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exitWhileRegisteringRemovesTheEntry()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "56b1c91e3",
+    "revision": "56b1c91e33870dd77b6fd9fea318eeff7d7ab102",
+    "overlays": [
+      "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-llama-child-registration-compat.patch",
+        "contentDigest": "sha256:b0db29ac3729f110dd32df595d015cf03d03ae8933bd96aba5d072cbeac8d9a8"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.exitWhileRegisteringRemovesTheEntry\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5111
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#exitWhileRegisteringRemovesTheEntry",
+        "classification": "assertion",
+        "detail": "exitWhileRegisteringRemovesTheEntry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the manifest keeps no entry for a child that is gone: [ManagedChild[id=80a368f6-1e5d-47dc-83a7-0e6e88e9c9ea, kind=EXTRACTION, pid=18804, startedAt=2026-10-15T09:21:17.807Z, executable=f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe, endpoint=stdio, modelPath"
+      }
+    ]
+  },
+  "digest": "sha256:2487eeabe5bc26a79b2e531e36cbb55e639d9c1c95547ffdb53473297c1655c2"
+}

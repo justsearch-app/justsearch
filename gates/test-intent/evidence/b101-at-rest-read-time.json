@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:57:57.354Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "f624d341a93a4861ddd11059976792832e8c993d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusAtRestReadTimeHttpTest.statusSaysWhenTheDiskEncryptionValueWasRead\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8646
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusAtRestReadTimeHttpTest.java#statusSaysWhenTheDiskEncryptionValueWasRead",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusAtRestReadTimeHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5f483db818071e7f7c8d748788a1657321d5f423dd88bd69985036d66f8dd5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "statusSaysWhenTheDiskEncryptionValueWasRead()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b599d4d7e",
+    "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusAtRestReadTimeHttpTest.statusSaysWhenTheDiskEncryptionValueWasRead\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 20101
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusAtRestReadTimeHttpTest.java#statusSaysWhenTheDiskEncryptionValueWasRead",
+        "classification": "assertion",
+        "detail": "statusSaysWhenTheDiskEncryptionValueWasRead(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the value carries when it was read: {\"diskEncryption\":\"NOT_ENCRYPTED\",\"source\":\"shell-property\",\"confidence\":\"MEDIUM\",\"qualityKnown\":false} ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:7a5fa85ac19d1a2a478315f3273d5fd681122580b8904005c70b4dac6250a974"
+}

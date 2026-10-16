@@ -170,6 +170,66 @@ class SupervisionContractTest {
         pol.get("healthCheckTimeoutMs").longValue());
   }
 
+  /**
+   * Spec A C9 / §7: the brain row declares the chat controller's crash policy, not a component
+   * monitor retry budget. The numbers must equal {@link BrainSupervisionPolicy}, and no fault mode
+   * may promise the retired two-attempt same-configuration loop or monitor admission again.
+   */
+  @Test
+  void brainRowDeclaresTheChatCrashPolicy() throws IOException {
+    JsonNode brain = process(register(), "brain");
+    JsonNode pol = brain.get("policy");
+    List<String> failures = new ArrayList<>();
+    // Read reflectively so a policy record without these declarations fails as an assertion here.
+    for (String[] pair : new String[][] {
+        {"DEFAULT_STABILITY_WINDOW_MS", "stabilityWindowMs"},
+        {"SAME_CONFIG_RESTARTS_PER_STABLE_WINDOW", "sameConfigRestartsPerStableWindow"},
+        {"STARTING_SAME_CONFIG_RETRIES", "startingSameConfigRetries"},
+        {"PERIODIC_HEALTH_SCHEDULING", "periodicHealthScheduling"}}) {
+      Object code = declaredPolicyConstant(pair[0]);
+      JsonNode declared = pol.get(pair[1]);
+      if (code == null) {
+        failures.add("BrainSupervisionPolicy declares no " + pair[0]);
+      } else if (declared == null || !String.valueOf(code).equals(declared.asText())) {
+        failures.add("policy." + pair[1] + " is " + declared + " but BrainSupervisionPolicy."
+            + pair[0] + " is " + code);
+      }
+    }
+
+    for (JsonNode fm : brain.get("faultModes")) {
+      String mode = fm.get("mode").asText();
+      String text = (fm.path("detection").asText() + " " + fm.path("recovery").asText() + " "
+          + fm.path("terminalState").asText()).toLowerCase(java.util.Locale.ROOT);
+      for (String retired : List.of("two same-applied", "up to two attempts",
+          "monitor budget", "component budget", "common component monitor")) {
+        if (text.contains(retired)) {
+          failures.add(mode + ": still declares the retired monitor retry loop (\"" + retired + "\")");
+        }
+      }
+    }
+    for (String decided : List.of("clean-exit", "hang", "oom", "partial-boot")) {
+      JsonNode fm = null;
+      for (JsonNode candidate : brain.get("faultModes")) {
+        if (decided.equals(candidate.get("mode").asText())) fm = candidate;
+      }
+      if (fm == null || !fm.path("recovery").asText().contains("ChatCrashPolicy")
+          && !fm.path("recovery").asText().contains("RESOURCE")) {
+        failures.add(decided + ": recovery does not name the chat controller's crash policy");
+      }
+    }
+    if (!failures.isEmpty()) {
+      fail("brain row out of step with Spec A §7:\n  " + String.join("\n  ", failures));
+    }
+  }
+
+  private static Object declaredPolicyConstant(String name) {
+    try {
+      return BrainSupervisionPolicy.class.getField(name).get(null);
+    } catch (NoSuchFieldException | IllegalAccessException absent) {
+      return null;
+    }
+  }
+
   // --- (2) matrix completeness ----------------------------------------------------------------
 
   @Test

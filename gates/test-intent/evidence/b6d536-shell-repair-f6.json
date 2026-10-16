@@ -1,0 +1,138 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T13:19:00.424Z",
+  "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+  "tree": "3c3aae22b1a59e66f8ddb2f5eddcf71f1dafbb6c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::cancelled_session_end_still_requests_shell_exit_once\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3860
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::early_session_query_is_closed_when_tauri_is_ready\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 492
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::held_crash_before_commit_still_launches_installer\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 561
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+      "file": "modules/shell/src-tauri/src/quit.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:16affcd32eda87997b008b3c7d1325868744b667b4f8a5886b1ae5fd28333463",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+      "file": "modules/shell/src-tauri/src/quit.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:16affcd32eda87997b008b3c7d1325868744b667b4f8a5886b1ae5fd28333463",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+      "file": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:21c058a7212aead1479bf442b9393c089b8c13b1d06a73962d06178dd6c674bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6b5b019a",
+    "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder",
+      "modules/shell/src-tauri/src/updater_p5_oracle.rs"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/b6d536-shell-repair-before.patch",
+        "contentDigest": "sha256:56ec227f46790766309eebfad3dc78645b50abbd45d8d5679563ef593cbbcd3e"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::cancelled_session_end_still_requests_shell_exit_once\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 13960
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::early_session_query_is_closed_when_tauri_is_ready\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3135
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::held_crash_before_commit_still_launches_installer\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3336
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:79c9dc5a2464ce70c8ce535528b7530f1c786a33d6927c7a274f5c3f9e161116"
+}

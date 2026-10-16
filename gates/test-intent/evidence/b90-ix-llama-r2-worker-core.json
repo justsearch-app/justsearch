@@ -1,0 +1,69 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:18:53.288Z",
+  "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+  "tree": "aa5a5e1910fa216992fd680047118c0c466b13e0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.splade.SpladeCpuPackingTest.one512TokenTextReturnsCpuOutputUnderAnInfeasibleGpuCap\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 19233
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeCpuPackingTest.java#one512TokenTextReturnsCpuOutputUnderAnInfeasibleGpuCap",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeCpuPackingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bc49c9ca4d66b7c27a864c12436f8a0ff7c93cd5011c244fffa265603355176e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "one512TokenTextReturnsCpuOutputUnderAnInfeasibleGpuCap()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7de3976a1",
+    "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+    "overlays": [
+      "modules/worker-core/build.gradle.kts",
+      "modules/worker-core/gradle.lockfile"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.splade.SpladeCpuPackingTest.one512TokenTextReturnsCpuOutputUnderAnInfeasibleGpuCap\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 20525
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeCpuPackingTest.java#one512TokenTextReturnsCpuOutputUnderAnInfeasibleGpuCap",
+        "classification": "assertion",
+        "detail": "one512TokenTextReturnsCpuOutputUnderAnInfeasibleGpuCap(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU inference must not throw because its unused GPU cap is too small ==> Unexpected exception thrown: java.lang.IllegalArgumentException: encoder_memory: SPLADE cannot fit one padded item in its GPU packing budget"
+      }
+    ]
+  },
+  "digest": "sha256:4dde3e7d121c94c596f1a8d512a4e15685f71ac383b48c08c8fbdaf3f44bff92"
+}

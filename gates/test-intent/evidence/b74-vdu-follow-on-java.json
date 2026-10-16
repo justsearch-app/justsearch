@@ -1,0 +1,282 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:27:09.280Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ac366fd6064488930ad63160c9f6369f5e57f199",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatControllerAutoTitleTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9451
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.BackgroundDemandYieldTest\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6077
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerAutoTitleTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerAutoTitleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d01aa45d315b582dc4e4932738fdaa2b8f93c972f83395e0171d058c98ab31ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "namesAnUntitledConversationFromItsStoredFirstExchangeAsBackgroundInference()",
+          "status": "passed"
+        },
+        {
+          "name": "quotesAroundTheModelsReplyAreNotPartOfTheName()",
+          "status": "passed"
+        },
+        {
+          "name": "aNamedConversationKeepsItsNameAndNoModelIsAsked()",
+          "status": "passed"
+        },
+        {
+          "name": "aBusyLaneRefusesWithItsTypedReasonAndATimeToAskAgain()",
+          "status": "passed"
+        },
+        {
+          "name": "itsOnlyInputIsTheConversationId()",
+          "status": "passed"
+        },
+        {
+          "name": "refusalsWaitingCannotChange()",
+          "status": "passed"
+        },
+        {
+          "name": "aConditionalTitleWriteNeverReplacesAName()",
+          "status": "passed"
+        },
+        {
+          "name": "aRenameThatLandsWhileTheModelIsNamingItWins()",
+          "status": "passed"
+        },
+        {
+          "name": "aModelThatCannotAnswerNowIsATransientRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/BackgroundDemandYieldTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/BackgroundDemandYieldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9dc2d211f4018c1fddcf440d7e186ad473bafacc71e35719ed272ee03b075ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSelfTestIsNeverAgedPast()",
+          "status": "passed"
+        },
+        {
+          "name": "aReplyGeneratingOrWaitingRanksAboveIt()",
+          "status": "passed"
+        },
+        {
+          "name": "aFreeLaneAdmitsBackgroundInferenceAtOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "pictureReadingOwnsTheServerUntilTheAgingBoundThenOneRequestIsLetThrough()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1aeb6940abd7bfcd076aed0400ac2d271e36d114077e64d196a72777f4ee69a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loadHistory synthesizes id + hash for legacy messages without them",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: naming an unknown session creates NOTHING — no ghost row in the list",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: an over-long title is capped at 200 characters, trimmed first",
+          "status": "passed"
+        },
+        {
+          "name": "appendMessage synthesizes id + hash on every write",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-3: deleteSession of a leaf session succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "listSessions exposes parent pointers for branched sessions",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 516 FIX-T4: deleteSession bypasses the branches check for THROWAWAY_SESSION_PREFIX",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: with no floor, loadEffectiveContext equals loadHistory",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: the title is SEALED — hidden while locked, back after unlock",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: empty-prefix branch inherits NOTHING from parent",
+          "status": "passed"
+        },
+        {
+          "name": "branchFrom creates a child session whose loadHistory prepends parent prefix",
+          "status": "passed"
+        },
+        {
+          "name": "new metadata writes declare schema v1",
+          "status": "passed"
+        },
+        {
+          "name": "629 LAYER — meta content is sealed; the list survives a locked store (not deleted-looking)",
+          "status": "passed"
+        },
+        {
+          "name": "629 LAYER regression (tempdoc 727) — loadHistory on a LOCKED store degrades per-message (keeps the position, hides the content) instead of throwing / 500ing the whole session",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-7: getSessionMeta returns SessionSummary for known session",
+          "status": "passed"
+        },
+        {
+          "name": "malformed message content is not reinterpreted as empty history",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: an unrecognised provenance is stored as the reader's, never verbatim",
+          "status": "passed"
+        },
+        {
+          "name": "A late name (automatic, or a browser's legacy copy) is stored only while there is none",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: a title round-trips, with its provenance, and DELETE clears both",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-3: deleteSession blocks when child branches exist",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-9: branch's prefix is bounded by branch-point — parent appends after branch are NOT inherited",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-9: branchFrom works with synthesized idx-N id from legacy data",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: a v1 meta written before the field reads as no title, no upcaster",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: context floor trims loadEffectiveContext but not loadHistory",
+          "status": "passed"
+        },
+        {
+          "name": "future metadata is refused without overwrite",
+          "status": "passed"
+        },
+        {
+          "name": "629 LAYER regression (tempdoc 727) — an UNLOCKED live cipher decrypts sealed messages back to plaintext, proving a disabled() cipher (the pre-fix ResourceApiModule bug) could never do this",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: an appended message does not strip or re-seal the stored title",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-2: branchFrom rejects non-existent parent session",
+          "status": "passed"
+        },
+        {
+          "name": "863 A-10.1/F5: shapeId is first-wins, and a BLANK inherited value is not a declaration",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: loadEffectiveContext fails safe to full history for an unknown floor id",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-2: branchFrom rejects non-existent branch point",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 §J.3: excludeSource round-trips independently of excludeMessage",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 §E.3: per-message exclusion applies BEFORE the floor trim",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 §E.3: excludeMessage drops a turn from effective context, not the transcript",
+          "status": "passed"
+        },
+        {
+          "name": "malformed metadata is not skipped from session listings",
+          "status": "passed"
+        },
+        {
+          "name": "A sealed name counts as a name: a late write does not replace it",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: branchFrom accepts the empty-prefix sentinel without an existence check",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: compactContext prepends the summary to effective context, clears on rewind",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-7: getSessionMeta returns empty for unknown session",
+          "status": "passed"
+        },
+        {
+          "name": "parent cycle is detected and truncates the prefix walk",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b9d6748d6f6abc910a5a0de3d31ebb6f18ed4caf023a11fe5b95a2242c3e63d1"
+}
