@@ -588,3 +588,14 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
   "note": "The current dispatch fixture is add-only and reproduces the native-entry assertion failures on 61ff9b955; changed semantic/RAG checks and the explicit-vector control also match. All current listed candidate checks and remaining declared before groups reproduce their outcomes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:65ed31d54aa61cb987bab148c36a94339fc25c18e764c9f25082084637d2dd0e",
+  "note": "Reran all 51 listed candidate selectors (53 cases), every declared before group and preservation control, matching the evidence. PMD bindings and monotonic expiry retain all assertions; the add-only dispatch overload executes the old native body without adding repaired behavior."
+}
+```

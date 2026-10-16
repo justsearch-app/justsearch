@@ -76,3 +76,14 @@ Complete legacy parents now keep unchanged admission and acquire declarations fr
   "note": "Reran all four corrected entry-2 cases on the candidate and 65daf680a: the candidate passes all, while the old complete-legacy admission fails the declared assertion and the other three cases pass. No patch or stub supplies the failure; retained entries and evidence are unchanged since 6f85a257a."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:48ca9855a13329b10a774e7e8e0fc75742bd98ea470758fc3adf3a57db0f26f0",
+  "note": "Reran all four candidate legacy/preservation classes (15 cases) and unpatched 65daf680a: three intended assertion failures and three preservation passes. Fixed segments retain every child, vector, extraction, declaration and reopening assertion; the candidate-only race rationale matches the absent old APIs."
+}
+```

@@ -107,3 +107,14 @@ vitest dependencies (`--copy-node-modules`). This refresh records execution, not
   "note": "Re-reviewed the completion-stream expectations against current frontend checks; candidate and declared before runs reproduce the recorded repair failures."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:46b8797ea23d0807bb023d8a54ff1c3344af96c2273ab001fce87bbb8e2ab1c9",
+  "note": "Reran all 23 candidate cases and the original unpatched 3e64a384b before-state, matching its declared completion assertions and controls. The curried registration edit preserves every parameter row, callback and assertion."
+}
+```
