@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
   },
-  "createdAt": "2026-10-14T15:46:39.380Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
+  "createdAt": "2026-10-16T07:37:20.125Z",
+  "revision": "ad6ce2ef14ac474623c86c19a1ed2ee39d709d39",
+  "tree": "5157194efbe78a45d9161fb7876eefe6431fc025",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/api/statusCompletion.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-28116-1791992783023.json\"",
+      "command": "npx vitest run \"src/api/statusCompletion.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-39096-1792136222778.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4943
+      "durationMs": 2489
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/api/statusCompletion.test.ts",
       "file": "modules/ui-web/src/api/statusCompletion.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6533657d46dea297c2bd23794ef020ce8779f974c2c4186c4585abf6ec3b305e",
+      "contentDigest": "sha256:a197b74db1e25161cee3d0f894f14fe959caad32d0d3043fb785b7f4e1f4dc77",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -136,19 +136,20 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/api/statusCompletion.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-28116-1791992792970.json\"",
+        "command": "npx vitest run \"src/api/statusCompletion.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-39096-1792136233362.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2817
+        "durationMs": 2534,
+        "output": "JSON report written to C:/Users/Elias/AppData/Local/Temp/test-intent-vitest-39096-1792136233362.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/api/statusCompletion.test.ts",
         "classification": "assertion",
-        "detail": "approved server execution publishes canonical OFF before the client returns:  AssertionError: successful approved execution must publish without a scheduled timer: expected 'READY' to be 'OFF' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-9Z57Zd/modules/ui-web/src/api/statusCompletion.test.ts:52:91\n    at file:///F:/justsearch-pub | mounted authorization host and real pending bridge refresh after the typed approval:  AssertionError: the real approval"
+        "detail": "approved server execution publishes canonical OFF before the client returns:  AssertionError: successful approved execution must publish without a scheduled timer: expected 'READY' to be 'OFF' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/ci759/round4/status-asi/before/test-intent-before-K40taR/modules/ui-web/src/api/statusCompletion.test.ts:52:91\n    at file:// | mounted authorization host and real pending bridge refresh after the typed approval:  AssertionError: the real approval"
       }
     ]
   },
-  "digest": "sha256:a368287bb50e5b552cd68b03aaa3e601643efc8a5c9a4d5928523b2c06d1336d"
+  "digest": "sha256:9ea26fd17596a36f806e50865e0642889169d602df0173edea8e183c411b771c"
 }

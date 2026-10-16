@@ -42,8 +42,7 @@ function chatState() { return latest?.operating?.chat?.state; }
 
 it.each(['core.set-chat-enabled', 'core.activate-runtime-variant', 'core.deactivate-runtime-variant',
   'core.activate-installed-models', 'core.reconfigure', 'core.recover-component', 'core.add-watched-root',
-  'core.remove-watched-root', 'core.reindex', 'core.cancel-reindex', 'core.accept-gaps', 'core.reset-settings'])
-  ('%s publishes canonical state from its actual operation receipt', async operationId => {
+  'core.remove-watched-root', 'core.reindex', 'core.cancel-reindex', 'core.accept-gaps', 'core.reset-settings'])('%s publishes canonical state from its actual operation receipt', async operationId => {
     await client.invoke(operationId);
     expect(latest?.operating?.chat?.state).toBe('OFF'); expect(freshReads()).toHaveLength(1);
   });
