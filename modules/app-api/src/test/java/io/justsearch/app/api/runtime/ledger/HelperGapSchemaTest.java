@@ -32,6 +32,8 @@ final class HelperGapSchemaTest {
         for (int i = 0; i < 2050; i++) try (var ignored = OwnedHelper.window("helper.exe", "probe", java.time.Duration.ZERO)) {}
       } else {
         Process nonexistent = new Process() {
+          // Fail admission on every OS; POSIX can retain a JDK Process without OpenProcess.
+          @Override public ProcessHandle.Info info() { throw new SecurityException("fixture admission failure"); }
           @Override public long pid() { return Integer.MAX_VALUE; }
           @Override public ProcessHandle toHandle() { return ProcessHandle.current(); }
           @Override public InputStream getInputStream() { return InputStream.nullInputStream(); }

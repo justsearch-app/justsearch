@@ -297,6 +297,9 @@ export async function exerciseIndexLockRecovery(c) {
     const next = readJson(path.join(runtime, 'manifest.json'));
     return supervisor?.runId === first.runId && supervisor?.incarnation === first.incarnation + 1
       && next?.instanceId && next.instanceId !== manifest.instanceId
+      // The successor publishes its identity before Head binds. Capture a usable address,
+      // otherwise the ready loop retains this early manifest and polls port undefined forever.
+      && Number.isInteger(next?.head?.apiPort) && next.head.apiPort > 0
       && next.pid === supervisor.pid ? { supervisor, manifest: next } : null;
   });
   const ready = await waitFor('successor index READY after escalated restart', 120000,

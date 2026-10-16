@@ -714,7 +714,7 @@ author-session: b101-probe-churn
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterDurabilityGapTest.java"
       ],
       "class": "New",
-      "behaviour": "A group force that fails on the real ledger (made read-only) keeps the records pending and the next flush forces them again; the ledger names the durability gap (FORCE_FAILED, schema-valid) and its clearing after the successful force, and the writer is unhealthy until then. 0d9b84e2a: one force attempt only; the writer reported healthy. Before-state not reproducible on b599d4d7e: new API (failed-force retry did not exist, nor did unforced writes and their separate force).",
+      "behaviour": "A group force that fails on the real ledger (made read-only) keeps the records pending and the next flush forces them again; the ledger names the durability gap (FORCE_FAILED, schema-valid) and its clearing after the successful force, and the writer is unhealthy until then. 0d9b84e2a: one force attempt only; the writer reported healthy. Before-state not reproducible on b599d4d7e: new API (failed-force retry did not exist, nor did unforced writes and their separate force). CI portability repair: the real DOS read-only force-failure prerequisite is declared with EnabledOnOs(WINDOWS) and the windows tag; the Windows-native job now runs app-api. The fault injection, retries and durability-gap assertions are retained.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -737,7 +737,7 @@ author-session: b101-probe-churn
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LateWindowExitTest.java"
       ],
       "class": "New",
-      "behaviour": "Real Tesseract started inside a held shared window exits; its owner waits only 2.6 s later. Exactly one helper-exit record is written, REQUESTED. 0d9b84e2a: UNEXPECTED.",
+      "behaviour": "Real Tesseract started inside a held shared window exits; its owner waits only 2.6 s later. Exactly one helper-exit record is written, REQUESTED. 0d9b84e2a: UNEXPECTED. CI portability repair: declare the native Windows creation-identity prerequisite and route this test to Windows-native CI. Launch the current real JVM with --version inside its matching image window instead of a machine-specific Tesseract path. The late wait, exactly one exit receipt and REQUESTED class assertions are retained.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -750,7 +750,7 @@ author-session: b101-probe-churn
       ],
       "evidence": "gates/test-intent/evidence/b101-late-window-exit.json",
       "newChecks": [
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LateWindowExitTest.java#realTesseractInsideAWindowNeverBecomesUnexpectedBeforeALateOwnerWait"
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LateWindowExitTest.java#realHelperInsideAWindowNeverBecomesUnexpectedBeforeALateOwnerWait"
       ],
       "repaired": true
     },
@@ -759,7 +759,7 @@ author-session: b101-probe-churn
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AvailabilityWindowTest.java"
       ],
       "class": "New",
-      "behaviour": "The recorded Tesseract runtime's availability check: an executable that fails to spawn writes no record at all; a real successful check forces only its window start, its helper receipts and window end being written unforced. 0d9b84e2a: a window start and end for the failed spawn; the end forced on success.",
+      "behaviour": "The recorded Tesseract runtime's availability check: an executable that fails to spawn writes no record at all; a real successful check forces only its window start, its helper receipts and window end being written unforced. 0d9b84e2a: a window start and end for the failed spawn; the end forced on success. CI portability repair: use the current real JVM executable, accepting --version on Linux and Windows, instead of a machine-specific Tesseract path. The real successful launch, failed-spawn control and exact forced helper-window-start assertion remain.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -782,7 +782,7 @@ author-session: b101-probe-churn
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WitnessWindowRaceTest.java"
       ],
       "class": "New",
-      "behaviour": "Inside a real Engine job with a real ledger writer, real Tesseract started under a held shared window, its native creator being the window's owner, exits with code 0 while publication of its helper-exit receipt is delayed 4.5 s: the Engine job witness records it REQUESTED with the window's reason without waiting for the receipt, and the owner's receipt is REQUESTED. 2d06eaf7e: the witness fixed UNEXPECTED (owner recorded no exit and no stop intent) after its 2 s owner wait.",
+      "behaviour": "Inside a real Engine job with a real ledger writer, real Tesseract started under a held shared window, its native creator being the window's owner, exits with code 0 while publication of its helper-exit receipt is delayed 4.5 s: the Engine job witness records it REQUESTED with the window's reason without waiting for the receipt, and the owner's receipt is REQUESTED. 2d06eaf7e: the witness fixed UNEXPECTED (owner recorded no exit and no stop intent) after its 2 s owner wait. CI portability repair: declare the Windows job-witness/native-creator prerequisite and route this test to Windows-native CI. The finite helper is the current real JVM with --version instead of a machine-specific Tesseract path; the 4.5-second receipt delay, native creator equality, window precedence and both REQUESTED assertions remain.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -804,7 +804,7 @@ author-session: b101-probe-churn
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/CrashConsoleFollowsClientTest.java"
       ],
       "class": "New",
-      "behaviour": "Inside a real Engine job with a real ledger writer, a Java helper started under a held shared window, its native creator being the window's owner, exits with a crash code (0xC0000005) while publication of the owner's exit receipt is delayed 4.5 s. The helper's receipt, the witness's record and the record of its real console host (native parent: that helper) are all UNEXPECTED; the console resolution read from the witness is UNEXPECTED too. Passes on b599d4d7e.",
+      "behaviour": "Inside a real Engine job with a real ledger writer, a Java helper started under a held shared window, its native creator being the window's owner, exits with a crash code (0xC0000005) while publication of the owner's exit receipt is delayed 4.5 s. The helper's receipt, the witness's record and the record of its real console host (native parent: that helper) are all UNEXPECTED; the console resolution read from the witness is UNEXPECTED too. Passes on b599d4d7e. CI portability repair: declare the Windows job-witness and real console-host prerequisites and route this test to Windows-native CI. The real crash code, delayed receipt, exact native identities and all helper/witness/console UNEXPECTED assertions remain.",
       "sources": [
         {
           "kind": "delegated-choice",

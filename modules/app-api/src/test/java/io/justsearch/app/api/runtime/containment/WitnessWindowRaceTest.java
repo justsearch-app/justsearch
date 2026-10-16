@@ -10,6 +10,9 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -17,6 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
  * creator, is REQUESTED with the window's reason at once. The witness never waits on the owner's
  * exit receipt, here delayed 4.5 s in publication, and never fixes the exit as UNEXPECTED meanwhile.
  */
+@Tag("windows")
+@EnabledOnOs(value = OS.WINDOWS, disabledReason = "Requires a Windows job witness and native creator identity")
 final class WitnessWindowRaceTest {
   @TempDir Path dir;
 
@@ -41,6 +46,8 @@ final class WitnessWindowRaceTest {
       var job = EngineContainment.installAtBoot();
       if (job.status() != EngineContainment.Status.CONTAINED) throw new AssertionError(job);
       ProcessHandle self = ProcessHandle.current();
+      String java = self.info().command().orElseThrow();
+      String image = Path.of(java).getFileName().toString();
       var os = ProcessTerminator.forCurrentOs();
       var writer = ExitLedgerWriter.rotating(Path.of(args[0]), LedgerFamily.CHILDREN,
           LedgerWriterId.currentProcess(LedgerWriterId.Role.ENGINE, self.info().startInstant().orElseThrow()),
@@ -63,15 +70,15 @@ final class WitnessWindowRaceTest {
       AutoCloseable lease;
       try {
         Object window = OwnedHelper.class.getMethod("sharedWindow", String.class, String.class, Duration.class)
-            .invoke(null, "tesseract.exe", "OCR valid live window", Duration.ofMinutes(1));
+            .invoke(null, image, "OCR valid live window", Duration.ofMinutes(1));
         shared = (AutoCloseable) window;
         lease = (AutoCloseable) window.getClass().getMethod("acquire").invoke(window);
       } catch (NoSuchMethodException beforeApi) {
-        shared = OwnedHelper.window("tesseract.exe", "OCR valid live window", Duration.ofMinutes(1));
+        shared = OwnedHelper.window(image, "OCR valid live window", Duration.ofMinutes(1));
         lease = () -> {};
       }
       try (var ignored = shared; var unused = lease) {
-        Process helper = OwnedHelper.start(new ProcessBuilder("F:/scoop/apps/tesseract/current/tesseract.exe", "--version")
+        Process helper = OwnedHelper.start(new ProcessBuilder(java, "--version")
             .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD), "OCR");
         long helperPid = helper.pid();
         String helperBirth = os.creationFileTime(helperPid).orElseThrow();
