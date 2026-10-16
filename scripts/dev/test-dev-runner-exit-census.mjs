@@ -10,6 +10,14 @@ import census from './lib/stop-exit-census.cjs';
 import ledgerLib from './lib/exit-ledger.cjs';
 import actuator from './lib/engine-actuator.cjs';
 import runner from './dev-runner.cjs';
+// Keep synthetic executable identities absolute on the host while preserving image and directory distinctions.
+const fixtureExecutable = windowsPath => path.resolve('tmp', 'census-fixtures', ...windowsPath.slice(2).split(/\\+/).filter(Boolean));
+
+// Replay the same recorded identities on either host; only absolute executable spelling changes.
+const readReplayFixture = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''),
+  (key, value) => key === 'executable' && typeof value === 'string' && path.win32.isAbsolute(value)
+    ? fixtureExecutable(value) : value);
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 fs.mkdirSync(path.join(root, 'tmp'), { recursive: true }); // a fresh checkout has no tmp/
 const start = '2026-10-01T00:00:00.1234567Z', birth = census.fileTimeFromInstant(start);
@@ -100,7 +108,7 @@ const at = Date.UTC(2026, 9, 1, 1);
 const exitAll = (codeOf, extra = {}) => targets => targets.map(t => ({ pid: t.pid, creationFileTimeUtc: t.creationFileTimeUtc,
   executable: t.executable, exitCode: codeOf(t), atMs: at, ...extra }));
 const llamaRow = { pid: 11, creationFileTimeUtc: llamaBirth, executable: exe, role: 'llama-server' };
-const conhostExe = 'C:\\Windows\\System32\\conhost.exe';
+const conhostExe = fixtureExecutable('C:\\Windows\\System32\\conhost.exe');
 
 test('Spec F §6.1: targets are the run\'s Engine incarnations and the children they own, read from the exit ledger', async t => {
   const { targets, result } = await observe(t, {
@@ -627,7 +635,7 @@ test('Spec B §2.9 / §5.1: tier C names and contained ancestry cannot prove ind
   const probe = { pid: 30, name: 'powershell.exe', role: 'other', parentPid: 10, creationFileTimeUtc: helperBirth };
   const probeHost = { pid: 31, name: 'conhost.exe', role: 'console-host', parentPid: 30, creationFileTimeUtc: plus(helperBirth, 30) };
   const smi = { pid: 32, name: 'nvidia-smi.exe', role: 'other', parentPid: 10, creationFileTimeUtc: plus(helperBirth, 100) };
-  const tesseract = { pid: 33, executable: 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe', role: 'other', parentPid: 12,
+  const tesseract = { pid: 33, executable: fixtureExecutable('C:\\Program Files\\Tesseract-OCR\\tesseract.exe'), role: 'other', parentPid: 12,
     creationFileTimeUtc: plus(extractionBirth, 100) };
   const stranger = { pid: 34, name: 'node.exe', role: 'other', parentPid: 10, creationFileTimeUtc: plus(helperBirth, 200) };
   const extraction = { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, role: 'extraction-child', parentPid: 10 };
@@ -709,12 +717,12 @@ test('S15 census repair O2 verbatim: helper PID reused by an unrelated cmd: its 
   const run = { runId: 'own-census', pids: { backendRootPid: 100 } };
   const manifest = { pid: 100, containment: { status: 'CONTAINED' }, incarnation: { session: run.runId } };
   const ledger = { engine: { present: true, records: [rec('engine-start', { incarnation: { session: run.runId, n: 1 },
-    pid: 100, creationFileTime: b(0), executable: 'C:\\verify\\java.exe' })] }, children: { present: true, records: [
+    pid: 100, creationFileTime: b(0), executable: fixtureExecutable('C:\\verify\\java.exe') })] }, children: { present: true, records: [
     rec('child-spawn', { childId: 'x', kind: 'EXTRACTION', owner: { pid: 100, creationFileTime: b(0) } }),
-    rec('child-start', { childId: 'x', pid: 101, creationFileTime: b(1), executable: 'C:\\verify\\java.exe', contained: true }),
+    rec('child-start', { childId: 'x', pid: 101, creationFileTime: b(1), executable: fixtureExecutable('C:\\verify\\java.exe'), contained: true }),
     rec('child-exit', { childId: 'x', exitClass: 'REQUESTED', reason: 'RECYCLE', code: 0, exitedAt: '2026-10-07T10:00:20.000Z' })] } };
   const row = (pid, parentPid, t, name = 'tesseract.exe', seen = t) => ({ pid, parentPid, creationFileTimeUtc: b(t), name,
-    executable: `C:\\verify\\${name}`, firstSeenAtMs: Date.parse(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`),
+    executable: fixtureExecutable(`C:\\verify\\${name}`), firstSeenAtMs: Date.parse(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`),
     lastSeenAtMs: Date.parse(`2026-10-07T10:00:${String(seen).padStart(2, '0')}.000Z`) });
   const rows = [row(102, 101, 2), row(102, 100, 7, 'cmd.exe'), row(103, 102, 8)];
   const r = census.exitTargets(run, manifest, rows, ledger);
@@ -732,7 +740,7 @@ test('S15 census repair: console targets cannot use a superseded parent identity
 });
 
 test('S15 census repair L5: preserve five-incarnation evidence and report unproven helper membership honestly', t => {
-  const fixture = JSON.parse(fs.readFileSync(path.join(root, 'scripts/dev/fixtures/exit-census-l5.json'), 'utf8'));
+  const fixture = readReplayFixture(path.join(root, 'scripts/dev/fixtures/exit-census-l5.json'));
   const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-l5-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const ledgerDir = ledgerLib.ledgerDirectory(dir);
@@ -781,10 +789,12 @@ test('S15 census repair L5: preserve five-incarnation evidence and report unprov
 
 test('S15 replay (verifier b56 run2): owner-recorded exits stay accounted, unproven helpers remain gaps', async t => {
   const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/exit-census-run2');
-  const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'ledger.json'), 'utf8'));
-  const observerOutput = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'process-exits.json'), 'utf8').replace(/^\uFEFF/, ''));
+  const fixture = readReplayFixture(path.join(fixtureDir, 'ledger.json'));
+  const observerOutput = readReplayFixture(path.join(fixtureDir, 'process-exits.json'));
   const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-run2-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const scopeFile = path.join(dir, 'scope.json');
+  fs.writeFileSync(scopeFile, JSON.stringify(readReplayFixture(path.join(fixtureDir, 'scope.json'))));
   fs.mkdirSync(path.join(dir, 'runtime'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify(fixture.manifest));
   const ledgerDir = ledgerLib.ledgerDirectory(dir);
@@ -802,7 +812,7 @@ test('S15 replay (verifier b56 run2): owner-recorded exits stay accounted, unpro
   let clock = 0, args, stopped = false;
   const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => {};
   const flag = f => args[args.indexOf(f) + 1];
-  const observer = await census.startStopExitCensus(fixture.run, dir, dir, path.join(fixtureDir, 'scope.json'), {
+  const observer = await census.startStopExitCensus(fixture.run, dir, dir, scopeFile, {
     launch: a => { args = a; fs.writeFileSync(flag('-ReadyFile'), '{}'); return proc; }, now: () => clock,
     pause: async ms => {
       clock += ms;

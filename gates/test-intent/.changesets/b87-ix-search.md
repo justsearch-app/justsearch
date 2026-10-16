@@ -277,7 +277,7 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java"
       ],
       "class": "New",
-      "behaviour": "A native rerank slower than its 200ms pre-inference budget keeps its scores inside the search deadline. Acquisition is bounded by its budget and the caller response deadline; the wire skip reason names the bound that actually expired.",
+      "behaviour": "A native rerank slower than its 200ms pre-inference budget keeps its scores inside the search deadline. Acquisition is bounded by its budget and the caller response deadline; the wire skip reason names the bound that actually expired. The expiry fixture waits against the monotonic deadline in a loop because LockSupport.parkNanos may return early; a seeded unpark permit deterministically exercises that case. The same 200ms budget, response deadlines, native-entry path, scores and skip/reason assertions are retained. Fail-before remains ac6820757 without compatibility overlays.",
       "sources": [
         {
           "kind": "delegated-choice",

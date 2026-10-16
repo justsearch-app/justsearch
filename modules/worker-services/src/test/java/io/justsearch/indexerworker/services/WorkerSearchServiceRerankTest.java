@@ -182,8 +182,7 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
     when(sessions.environment()).thenReturn(ai.onnxruntime.OrtEnvironment.getEnvironment());
     when(sessions.acquire(any())).thenAnswer(invocation -> {
       var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
-      java.util.concurrent.locks.LockSupport.parkNanos(Math.max(0, authority.deadlineNanos() - System.nanoTime())
-          + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1));
+      awaitAcquisitionExpiry(authority);
       throw new io.justsearch.ort.SessionAcquireDeadlineExceededException("fixture acquisition expired",
           io.justsearch.ort.SessionAcquireDeadlineExceededException.Phase.GATE);
     });
@@ -209,8 +208,9 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
     when(sessions.environment()).thenReturn(ai.onnxruntime.OrtEnvironment.getEnvironment());
     when(sessions.acquire(any())).thenAnswer(invocation -> {
       var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
-      java.util.concurrent.locks.LockSupport.parkNanos(Math.max(0, authority.deadlineNanos() - System.nanoTime())
-          + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1));
+      // An already available permit must not turn this fixture's expiry into native entry.
+      java.util.concurrent.locks.LockSupport.unpark(Thread.currentThread());
+      awaitAcquisitionExpiry(authority);
       return mock(io.justsearch.ort.SessionHandle.Lease.class);
     });
     service.setSearchReranker(new CrossEncoderReranker(sessions,
@@ -221,6 +221,17 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
     assertEquals("DEADLINE_EXCEEDED", response.getSkipReason(),
         "the acquisition budget expired before inference, while the search still had time");
     assertTrue(response.getSkipped());
+  }
+
+  private static void awaitAcquisitionExpiry(
+      io.justsearch.ort.SessionAcquisitionRequest authority) {
+    long expiredAt = authority.deadlineNanos() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1);
+    long remaining;
+    // A park may consume an existing permit or wake spuriously. Only the monotonic clock proves
+    // the fixture reached expiry; returning a lease early would accidentally exercise inference.
+    while ((remaining = expiredAt - System.nanoTime()) > 0) {
+      java.util.concurrent.locks.LockSupport.parkNanos(remaining);
+    }
   }
 
   private static io.justsearch.reranker.RerankerTokenizer fixedTokenizer(int size) {

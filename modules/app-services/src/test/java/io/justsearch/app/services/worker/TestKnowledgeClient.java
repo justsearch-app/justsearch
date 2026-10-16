@@ -94,6 +94,13 @@ class TestKnowledgeClient extends KnowledgeClient {
   }
 
   @Override
+  public int recoverVduProcessingForRetainedOwner(io.justsearch.app.api.EngineWorkHandle owner) {
+    try (var retained = owner.retain()) {
+      return recoverVduProcessingForOwner(retained.context());
+    }
+  }
+
+  @Override
   protected <T> T executeHealthRpc(
       String operation, long callDeadlineMs, Function<HealthServiceCalls, T> rpc,
       EngineContext engineContext) {

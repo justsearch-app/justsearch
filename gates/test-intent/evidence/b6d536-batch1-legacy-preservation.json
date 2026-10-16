@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-14T16:14:36.412Z",
-  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
-  "tree": "5cce499d7f8f95e9d764e051f0e62534753263c5",
+  "createdAt": "2026-10-16T09:20:49.133Z",
+  "revision": "d98924cd93e0556897d54d43b13d64609428296c",
+  "tree": "e4dd177a56b9734c14afbccd52319550849537d6",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13796
+      "durationMs": 22125
     },
     {
       "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6758
+      "durationMs": 16087
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 105679
+      "durationMs": 84406
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d1f95d7288e5c60bb680b09a8aa70b58aeaf454b4228aa01a01447077b05c137",
+      "contentDigest": "sha256:13304427e8db21e607e4da8d7e6673fb924b20b7d395d1d4315a1bd920f213e3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -130,7 +130,7 @@
       "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:80ee4c56e3b70809c4596fd8b346ded201127d8d48c372f48568a57b85c66069",
+      "contentDigest": "sha256:5988a06625fa00092a626c508ab29706c539a04818975296a643d8152e229162",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -143,5 +143,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:f2a3de3d2c25be6025c28ae0694d1771427f88b134e48324951ac4185ac51586"
+  "digest": "sha256:751953419d352fde523fb9ca19169966e0624ca5458f8d9ea831759b5e0c700d"
 }

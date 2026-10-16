@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
@@ -23,7 +24,17 @@ const dataRoot = fs.mkdtempSync(path.join(repo, 'tmp', 'engine-job-data-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = path.join(root, 'unit-state');
 const actuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
-const api = require('./dev-runner.cjs').__test;
+// The synthetic ordering case injects every stop boundary. Select that boundary's Windows
+// contract explicitly; native CLI cases below still use the host OS and their real prerequisite.
+const runnerFile = path.join(repo, 'scripts/dev/dev-runner.cjs');
+const runnerModule = { exports: {} };
+vm.runInNewContext(fs.readFileSync(runnerFile, 'utf8'), {
+  require: createRequire(runnerFile), module: runnerModule, exports: runnerModule.exports,
+  __dirname: path.dirname(runnerFile), __filename: runnerFile,
+  process: { ...process, platform: 'win32' }, console, Buffer, URL, performance,
+  setTimeout, clearTimeout, setInterval, clearInterval,
+}, { filename: runnerFile });
+const api = runnerModule.exports.__test;
 const { identityExecutable } = require('./lib/test-fixture-processes.cjs');
 const tests = [], owned = [], decoys = [];
 const test = (name, fn, prerequisite = null) => tests.push([name, fn, prerequisite]);

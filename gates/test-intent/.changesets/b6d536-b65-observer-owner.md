@@ -97,7 +97,7 @@ Evidence for b6d536-b65-observer-owner.json was regenerated on b599d4d7e (phase 
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionRefreshRetentionTest.java"
       ],
       "class": "New",
-      "behaviour": "Twelve committed refresh cycles over 100000 chunks do not retain another chunk-sized membership heap beyond the settled initial scan.",
+      "behaviour": "Twelve committed refresh cycles over 100000 chunks do not retain another chunk-sized membership heap beyond the settled initial scan. Heap samples follow completion of ConcurrentMergeScheduler work, so transient codec merge buffers are excluded from the retained-heap observation. All complete-parent scans, twelve refreshes and the original 5000000-byte bound remain unchanged. Fail-before remains 8eb24a870 with no compatibility overlay.",
       "sources": [
         {
           "kind": "delegated-choice",

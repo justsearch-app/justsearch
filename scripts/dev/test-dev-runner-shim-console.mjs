@@ -13,15 +13,17 @@ const incarnation = { session: 'shim-console', n: 1 };
 const owner = { pid: 100, creationFileTime: birth(0), instanceId: 'owner' };
 // Each writer as the ledger records it: its role, PID and start instant (its birth to the millisecond).
 const rec = (type, line) => ({ type, line, writer: { role: 'engine', pid: 100, startedAt: at(0) } });
+// Synthetic records use the host's absolute-path spelling and retain each image's identity.
+const fixtureExecutable = image => path.resolve('shim-console-fixture', image);
 const start = (pid, born, parent, parentBorn, image = 'wrapper.exe') => rec('job-process-start', {
   witnessId: `j-${pid}`, owner, incarnation, pid, creationFileTime: birth(born),
-  parentPid: parent, parentCreationFileTime: birth(parentBorn), executable: `C:\\test\\${image}`, contained: true });
+  parentPid: parent, parentCreationFileTime: birth(parentBorn), executable: fixtureExecutable(image), contained: true });
 const exit = (pid, born, end, code = 0) => rec('job-process-exit', { witnessId: `j-${pid}`, owner,
   incarnation, pid, creationFileTime: birth(born), exitedAt: at(end), observedAt: at(end),
   exitClass: 'UNEXPECTED', code, forced: false });
 function fixture() {
   return { engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100,
-    creationFileTime: birth(0), executable: 'C:\\test\\java.exe' })] }, children: { present: true, records: [
+    creationFileTime: birth(0), executable: fixtureExecutable('java.exe') })] }, children: { present: true, records: [
     // Reverse child/parent order is deliberate.
     start(102, 2, 101, 1, 'child.exe'), exit(102, 2, 3), start(101, 1, 100, 0), exit(101, 1, 4),
     rec('helper-start', { helperId: 'h-1', owner, incarnation, pid: 101, creationFileTime: birth(1),
@@ -94,7 +96,7 @@ test('the surviving dev owner writes an Engine-console crash consequence after a
       const [seen,expected,engineClass='UNEXPECTED'] = cases[i], fixtureDir=path.join(data,String(i));
       const ledgerDir = ledger.ledgerDirectory(fixtureDir), writer = {role:'engine',pid:100,startedAt:Date.parse(at(0))};
       const engines = ledger.createLedgerWriter({ledgerDir,family:'engine',writer:{...writer,role:'dev-runner'}});
-      engines.append('engine-start',{incarnation,pid:100,creationFileTime:birth(0),executable:'C:\\test\\java.exe'});
+      engines.append('engine-start',{incarnation,pid:100,creationFileTime:birth(0),executable:fixtureExecutable('java.exe')});
       engines.append('engine-exit',{incarnation,exitClass:engineClass,reason:'QUIT',code:engineClass==='REQUESTED'?0:1,observedAt:at(10)});
       const children = ledger.createLedgerWriter({ledgerDir,family:'children',writer});
       const host = start(103,1,100,0,'conhost.exe');

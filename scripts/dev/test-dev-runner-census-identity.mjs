@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import census from './lib/stop-exit-census.cjs';
 
 // Task b6d536 b101: a helper receipt names a witnessed process only on native identity. The
@@ -12,21 +13,23 @@ const incarnation = { session: 'census-identity', n: 1 };
 const engine = { pid: 100, creationFileTime: birth(0), instanceId: 'engine' };
 const parser = { pid: 202, creationFileTime: birth(2), instanceId: 'parser' };
 const rec = (type, line, pid = 100) => ({ type, line, writer: { role: 'engine', pid } });
+// Synthetic records use the host's absolute-path spelling and retain each image's identity.
+const fixtureExecutable = image => path.resolve('census-identity-fixture', image);
 
 /** The extraction child's receipt for Tesseract 303 and the Engine job witness's record of it. */
 function receiptLedger({ creator = parser, helperBirth = birth(4), receiptBirth = birth(4), withCreatorFields = true } = {}) {
   const receipt = { helperId: 'helper', owner: parser, incarnation, pid: 303, creationFileTime: receiptBirth };
   if (withCreatorFields) Object.assign(receipt, { creatorPid: parser.pid, creatorCreationFileTime: parser.creationFileTime });
   return {
-    engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100, creationFileTime: birth(0), executable: 'C:\\test\\java.exe' })] },
+    engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100, creationFileTime: birth(0), executable: fixtureExecutable('java.exe') })] },
     children: { present: true, records: [
       rec('child-spawn', { childId: 'parser', owner: engine, kind: 'EXTRACTION' }),
-      rec('child-start', { childId: 'parser', pid: 202, creationFileTime: birth(2), executable: 'C:\\test\\java.exe' }),
+      rec('child-start', { childId: 'parser', pid: 202, creationFileTime: birth(2), executable: fixtureExecutable('java.exe') }),
       rec('helper-start', receipt, 202),
       rec('helper-exit', { ...receipt, code: 0, exitClass: 'REQUESTED', reason: 'receipt reason', forced: false,
         exitedAt: at(5), observedAt: at(5) }, 202),
       rec('job-process-start', { witnessId: 'member', owner: engine, incarnation, pid: 303, creationFileTime: helperBirth,
-        executable: 'C:\\test\\tesseract.exe', contained: true, parentPid: creator.pid,
+        executable: fixtureExecutable('tesseract.exe'), contained: true, parentPid: creator.pid,
         parentCreationFileTime: creator.creationFileTime, awaited: false }),
       rec('job-process-exit', { witnessId: 'member', owner: engine, incarnation, pid: 303, creationFileTime: helperBirth,
         code: 0, exitClass: 'UNEXPECTED', reason: 'no recorded intent', forced: false, exitedAt: at(5), observedAt: at(5) }),
@@ -67,7 +70,7 @@ function cutoffLedger(born, exited) {
     creatorCreationFileTime: ft(start) };
   return {
     engine: { present: true, records: [
-      r('engine-start', { incarnation, pid: 100, creationFileTime: ft(start), executable: 'C:\\test\\java.exe' }),
+      r('engine-start', { incarnation, pid: 100, creationFileTime: ft(start), executable: fixtureExecutable('java.exe') }),
       r('engine-exit', { incarnation, code: 0, exitClass: 'REQUESTED', reason: 'QUIT', exitedAt: engineEnd, observedAt: engineEnd }),
     ] },
     children: { present: true, records: [
@@ -75,7 +78,7 @@ function cutoffLedger(born, exited) {
       r('helper-exit', { ...helper, code: 0, exitClass: 'REQUESTED', reason: 'awaited completion', exitedAt: exited,
         observedAt: exited, forced: false }),
       r('job-process-start', { witnessId: 'j', owner, incarnation, pid: 303, creationFileTime: ft(born),
-        executable: 'C:\\test\\tesseract.exe', contained: true, parentPid: 100, parentCreationFileTime: ft(start), awaited: false }),
+        executable: fixtureExecutable('tesseract.exe'), contained: true, parentPid: 100, parentCreationFileTime: ft(start), awaited: false }),
       r('job-process-exit', { witnessId: 'j', owner, incarnation, pid: 303, creationFileTime: ft(born), code: 0,
         exitClass: 'UNEXPECTED', reason: 'no recorded intent', exitedAt: exited, observedAt: exited, forced: false }),
     ] },
@@ -84,7 +87,7 @@ function cutoffLedger(born, exited) {
 function accounted(born, exited) {
   const ft = census.fileTimeFromInstant(born);
   const result = census.exitTargets({ runId: incarnation.session, startedAt: start, pids: { backendRootPid: 100 } }, null,
-    [{ pid: 303, creationFileTimeUtc: ft, executable: 'C:\\test\\tesseract.exe', parentPid: 100, lastSeenAtMs: Date.parse(born) }],
+    [{ pid: 303, creationFileTimeUtc: ft, executable: fixtureExecutable('tesseract.exe'), parentPid: 100, lastSeenAtMs: Date.parse(born) }],
     cutoffLedger(born, exited));
   return result.accountedProcesses.some(p => p.pid === 303 && p.ledgerClass === 'REQUESTED');
 }
@@ -134,14 +137,14 @@ test('an unsampled member exiting 100 ns after the Engine\'s grace cutoff does n
 // the tick: the parser's exact birth (task b6d536, the merge with b102).
 function consoleHost(parentOffset) {
   const data = {
-    engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100, creationFileTime: birth(0), executable: 'C:\\test\\java.exe' })] },
+    engine: { present: true, records: [rec('engine-start', { incarnation, pid: 100, creationFileTime: birth(0), executable: fixtureExecutable('java.exe') })] },
     children: { present: true, records: [
       rec('child-spawn', { childId: 'parser', owner: engine, kind: 'EXTRACTION' }),
-      rec('child-start', { childId: 'parser', pid: 202, creationFileTime: birth(2), executable: 'C:\\test\\java.exe', contained: true }),
+      rec('child-start', { childId: 'parser', pid: 202, creationFileTime: birth(2), executable: fixtureExecutable('java.exe'), contained: true }),
       rec('child-exit', { childId: 'parser', owner: engine, pid: 202, creationFileTime: birth(2), code: 1246953473,
         exitClass: 'REQUESTED', reason: 'QUIT', forced: true, exitedAt: at(6), observedAt: at(6) }),
       rec('job-process-start', { witnessId: 'console', owner: engine, incarnation, pid: 303, creationFileTime: birth(3),
-        executable: 'C:\\Windows\\System32\\conhost.exe', contained: true, parentPid: 202,
+        executable: fixtureExecutable('conhost.exe'), contained: true, parentPid: 202,
         parentCreationFileTime: String(BigInt(birth(2)) + BigInt(parentOffset)), awaited: false }),
       rec('job-process-exit', { witnessId: 'console', owner: engine, incarnation, pid: 303, creationFileTime: birth(3),
         code: 0, exitClass: 'UNEXPECTED', reason: 'no recorded intent', forced: false, exitedAt: at(7), observedAt: at(7) }),
@@ -174,7 +177,7 @@ const selfAt = n => `2026-10-15T10:00:${String(n).padStart(2, '0')}.000Z`;
 const engineNative = String(BigInt(census.fileTimeFromInstant(selfAt(0))) + 1234567n);
 const cimOf = ft => String(BigInt(ft) / 10n * 10n);
 const selfOwner = { pid: 100, creationFileTime: engineNative, instanceId: 'engine' };
-const SELF_EXE = 'C:\\test\\java.exe';
+const SELF_EXE = fixtureExecutable('java.exe');
 const DEV_RUNNER = { role: 'dev-runner', pid: 4000, startedAt: '2026-10-15T09:59:00.000Z' };
 const SHELL = { role: 'shell', pid: 4000, startedAt: '2026-10-15T09:59:00.000Z' };
 // The Engine's own writer names its start to the millisecond.

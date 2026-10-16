@@ -473,7 +473,7 @@ with run-evidence; its general fail-before exit policy returns 1 for preservatio
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Retain all ten round-2 behaviour oracles. The mock index endpoint forwards the additive shutdown-scoped recovery operation to its existing live-admission recovery fixture. A controlled controller clock advances restoration pressure time without forty seconds of sleeping. All current methods compile unchanged under the declared add-only compatibility scaffolding; no test method is removed or projected out for replay.",
+      "whatMoved": "Retain all round-2 and later behaviour oracles, including the quit budget, pending document and pre-claim retry count. The mock index endpoint now receives and retains the procedure's existing EngineWorkHandle for owner-scoped shutdown recovery, matching the real transport instead of reopening admission from a context. The quit case waits for admission.isClosing before cleanup to force the ordering observed in hosted run 38863072435. It still requires a clean drain, the same document status/retry count, no general recovery and the original time bound. A controlled controller clock advances restoration pressure time without forty seconds of sleeping. Historical compatibility patches add only an unreached retained-owner method needed to compile the current fixture; the selected historical scenarios and their declared before-states are unchanged. No test method is removed or projected out for replay.",
       "sources": [
         {
           "kind": "delegated-choice",

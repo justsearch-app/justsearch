@@ -178,7 +178,7 @@ public final class OfflineCoordinator implements AutoCloseable {
             boolean interrupted = Thread.interrupted();
             try {
               KnowledgeClient client = knowledgeClientSupplier.get();
-              if (client != null) client.recoverVduProcessingForOwner(work.context());
+              if (client != null) client.recoverVduProcessingForRetainedOwner(work);
             } catch (RuntimeException | Error recovery) {
               recoveryFailure.set(recovery);
               if (failure != recovery) failure.addSuppressed(recovery);

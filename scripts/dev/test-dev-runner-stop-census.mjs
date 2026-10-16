@@ -14,6 +14,9 @@ import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
+// Keep synthetic executable identities absolute on the host while preserving image and directory distinctions.
+const fixtureExecutable = windowsPath => path.resolve('tmp', 'census-fixtures', ...windowsPath.slice(2).split(/\\+/).filter(Boolean));
+
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'stop-census-'));
@@ -49,24 +52,77 @@ const noProcess = (pid, creationFileTimeUtc) => {
 };
 
 /**
- * The System process is the stable access-denied case in OpenProcess's contract. Ordinary process
- * births may all be readable to an elevated Windows CI runner, so discovering an unreadable PID
- * among them would make these checks depend on the runner's access rights and background services.
- * Use the stop's own read-only probe with a birth no process has: Survivors must retain PID 4
- * because its birth cannot be read. No termination targets this process; only the nonexistent
- * recorded job host is passed to EndHost.
- * https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess
+ * A real, owned live process, with only its GetProcessTimes result made unavailable in the native
+ * job probe. Elevated hosted runners can read even the System process's birth; neither an ambient
+ * PID nor a process DACL guarantees this condition when debug privileges are available. Compile a
+ * test copy of job-run.cs with that one native boundary wrapped, then run the real stop-job-run.ps1
+ * unchanged. OpenProcess, the survivor decision, ledger filtering, EndHost and waits remain real.
+ * The wrapper traces birth reads and every termination attempt. Cleanup proves the process still
+ * has its captured birth and was never targeted before asking it to exit over its own IPC channel.
  */
-function unreadablePid() {
-  const script = [
-    `Add-Type -Path '${path.join(root, 'scripts/dev/lib/job-run.cs').replaceAll("'", "''")}'`,
-    '[JustSearchJobRun]::Survivors([int[]]@(4), [long[]]@(1), 10, 0) | Select-Object -First 1',
-  ].join('\n');
-  const out = cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
-    { encoding: 'utf8', windowsHide: true, timeout: 60000 });
-  const pid = Number(JSON.parse(String(out.stdout).trim() || 'null')?.pid);
-  assert.equal(pid, 4, `the System process's birth cannot be read: ${out.stdout} ${out.stderr}`);
-  return pid;
+async function unreadableProcess(t) {
+  const child = await liveChild();
+  const dir = freshDir('unreadable-birth');
+  const trace = path.join(dir, 'native-calls.txt');
+  const sourcePath = path.join(dir, 'job-run.cs');
+  const quote = (s) => `'${String(s).replaceAll("'", "''")}'`;
+  const csString = (s) => JSON.stringify(s);
+  t.after(async () => {
+    try {
+      const observed = (await actuator.lookupProcessIdentities([child.pid])).get(child.pid);
+      assert.equal(observed?.present, true, 'a stop never ends the unrelated live process');
+      // The lookup reports CIM precision, one microsecond, while liveChild captures native ticks.
+      assert.equal(BigInt(observed.creationFileTime) / 10n, BigInt(child.creationFileTimeUtc) / 10n,
+        'the unrelated process still has the captured birth');
+      const calls = fs.existsSync(trace) ? fs.readFileSync(trace, 'utf8').trim().split('\n') : [];
+      assert.ok(calls.includes('birth-unreadable'), 'the native unavailable-birth seam was exercised');
+      assert.ok(!calls.includes(`terminate:${child.pid}`), 'the unrelated process was never a termination target');
+    } finally {
+      await child.end();
+    }
+  });
+  const replaceOnce = (source, before, after) => {
+    assert.equal(source.split(before).length, 2, 'the native seam has exactly one insertion point');
+    return source.replace(before, after);
+  };
+  let source = fs.readFileSync(path.join(root, 'scripts/dev/lib/job-run.cs'), 'utf8').replaceAll('\r\n', '\n');
+  source = replaceOnce(source,
+    '[DllImport("kernel32.dll", SetLastError = true)]\n  static extern bool GetProcessTimes(IntPtr process, out long creation, out long exit, out long kernel, out long user);',
+    `[DllImport("kernel32.dll", EntryPoint = "GetProcessTimes", SetLastError = true)]
+  static extern bool NativeGetProcessTimes(IntPtr process, out long creation, out long exit, out long kernel, out long user);
+  [DllImport("kernel32.dll")]
+  static extern int GetProcessId(IntPtr process);
+  static bool GetProcessTimes(IntPtr process, out long creation, out long exit, out long kernel, out long user) {
+    if (GetProcessId(process) == ${child.pid}) {
+      File.AppendAllText(${csString(trace)}, "birth-unreadable\\n");
+      creation = exit = kernel = user = 0;
+      return false;
+    }
+    return NativeGetProcessTimes(process, out creation, out exit, out kernel, out user);
+  }`);
+  source = replaceOnce(source,
+    '[DllImport("kernel32.dll", SetLastError = true)]\n  static extern bool TerminateProcess(IntPtr process, uint code);',
+    `[DllImport("kernel32.dll", EntryPoint = "TerminateProcess", SetLastError = true)]
+  static extern bool NativeTerminateProcess(IntPtr process, uint code);
+  static bool TerminateProcess(IntPtr process, uint code) {
+    File.AppendAllText(${csString(trace)}, "terminate:" + GetProcessId(process) + "\\n");
+    return NativeTerminateProcess(process, code);
+  }`);
+  fs.writeFileSync(sourcePath, source);
+  const exec = (command, args, options) => {
+    assert.equal(command, 'powershell.exe');
+    const at = args.indexOf('-File');
+    assert.equal(args[at + 1], jobRun.STOP_SCRIPT, 'the real job-stop script runs');
+    const parameters = args.slice(at + 2).map((value, i) => i % 2 ? quote(value) : value).join(' ');
+    const script = `$ErrorActionPreference='Stop'\nAdd-Type -Path ${quote(sourcePath)}\n& ${quote(args[at + 1])} ${parameters}\nexit $LASTEXITCODE`;
+    return cp.spawnSync(command, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], options);
+  };
+  const probe = cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `$ErrorActionPreference='Stop'\nAdd-Type -Path ${quote(sourcePath)}\n[JustSearchJobRun]::Survivors([int[]]@(${child.pid}), [long[]]@(1), 10, 0)`],
+  { encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  assert.equal(probe.status, 0, `the native seam compiled: ${probe.stderr}`);
+  assert.equal(JSON.parse(probe.stdout.trim()).pid, child.pid, 'the existing PID with an unreadable birth is unresolved');
+  return { pid: child.pid, stop: (run, options = {}) => jobRun.stopJobRunSync(run, { ...options, exec }) };
 }
 
 /** The run's ledger as its writers write it: the dev runner (engine family), the Engine (children). */
@@ -93,7 +149,7 @@ function runLedger(dataDir, runId, engine, executable) {
     child(childId, p, exited) {
       engineWriter.append('child-spawn', { childId, kind: 'EXTRACTION', owner, incarnation });
       engineWriter.append('child-start', { childId, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
-        executable: 'C:\\fixture\\parser.exe', contained: true });
+        executable: fixtureExecutable('C:\\fixture\\parser.exe'), contained: true });
       if (exited) {
         engineWriter.append('child-exit', { childId, exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false,
           exitedAt: iso7(BigInt(p.creationFileTimeUtc) + 450000n) });
@@ -102,7 +158,7 @@ function runLedger(dataDir, runId, engine, executable) {
     /** A process the Engine's job witness held (its start only). */
     jobProcessStart(p, witnessId) {
       const common = { witnessId, pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner, incarnation };
-      engineWriter.append('job-process-start', { ...common, executable: 'C:\\Windows\\System32\\conhost.exe',
+      engineWriter.append('job-process-start', { ...common, executable: fixtureExecutable('C:\\Windows\\System32\\conhost.exe'),
         parentPid: engine.pid, parentCreationFileTime: engine.creationFileTimeUtc, contained: true,
         observedAt: new Date(startedAt + 2000), awaited: false, expectedCode: null, reason: null });
     },
@@ -116,9 +172,10 @@ function runLedger(dataDir, runId, engine, executable) {
   };
 }
 
-test('a job member whose PID now names a process whose birth cannot be read is gone when the ledger records its exit', { skip: !windows && 'Windows job records' }, async () => {
+test('a job member whose PID now names a process whose birth cannot be read is gone when the ledger records its exit', { skip: !windows && 'Windows job records' }, async (t) => {
   const host = noProcess(970401, '134364632930208358');
-  const reused = unreadablePid();
+  const unreadable = await unreadableProcess(t);
+  const reused = unreadable.pid;
   // The member's recorded birth is long past: its PID has since been given to another process.
   const member = { pid: reused, creationFileTimeUtc: '134000000000000005' };
   const dir = freshDir('job');
@@ -130,13 +187,13 @@ test('a job member whose PID now names a process whose birth cannot be read is g
   const run = { recordPath, host };
 
   // What the stop met: the member's PID cannot be read, so on its own it is not proven gone.
-  const unproven = jobRun.stopJobRunSync(run, { waitMs: 0 });
+  const unproven = unreadable.stop(run, { waitMs: 0 });
   assert.equal(unproven.outcome, 'incomplete', JSON.stringify(unproven));
   assert.deepEqual(unproven.survivors?.map((p) => Number(p.pid)), [reused]);
 
   // The Engine's ledger records the member's exit (same PID and birth): it is gone and not probed.
   writeRecord();
-  const result = jobRun.stopJobRunSync(run, { waitMs: 0, endedIdentities: [member] });
+  const result = unreadable.stop(run, { waitMs: 0, endedIdentities: [member] });
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(result.outcome, 'gone');
   assert.deepEqual(result.survivors ?? [], []);
@@ -163,13 +220,14 @@ function stopFixture({ runId, dataDir, engine, engineJob = null }) {
   } };
 }
 
-test('a stop after the Engine has gone completes when the ledger records the exit of a job member whose PID cannot be read', { skip: !windows && 'Windows job records' }, async () => {
+test('a stop after the Engine has gone completes when the ledger records the exit of a job member whose PID cannot be read', { skip: !windows && 'Windows job records' }, async (t) => {
   const runId = 'stop-census-reused-pid';
   const engine = noProcess(970501, '134364632933610725');
   const host = noProcess(970502 + 1, '134364632930208358');
   // A console host the Engine's job held, whose PID Windows has since given to a process whose
   // birth this user cannot read (pid 24536 and svchost.exe in run 8f60c4e7).
-  const member = { pid: unreadablePid(), creationFileTimeUtc: '134364634153991105' };
+  const unreadable = await unreadableProcess(t);
+  const member = { pid: unreadable.pid, creationFileTimeUtc: '134364634153991105' };
   const dataDir = freshDir('reused-data');
   const ledger = runLedger(dataDir, runId, engine, process.execPath);
   ledger.engineStart();
@@ -183,7 +241,9 @@ test('a stop after the Engine has gone completes when the ledger records the exi
   const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
   fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, engineJob: { incarnation: 1, recordPath, host } }));
 
-  const out = await api.stopRun({}, fixture.io);
+  // Exercise the same native seam through stopRun's existing job-stop dependency.
+  const out = await api.stopRun({}, { ...fixture.io, stopEngineJob: (job, { ended = [] } = {}) =>
+    unreadable.stop({ recordPath: job.recordPath, host: job.host }, { waitMs: 0, endedIdentities: ended }) });
   assert.equal(out.outcome, 'STOPPED', JSON.stringify({ errors: out.errors, engineJob: out.engineJob, unresolved: out.unresolvedProcesses }));
   assert.equal(out.engineJob?.outcome, 'gone');
   assert.deepEqual(out.engineJob?.survivors, []);
@@ -349,7 +409,7 @@ test('a stop that finds the Engine already gone completes from the ledger when e
   ledgerLib.createLedgerWriter({ ledgerDir: ledgerLib.ledgerDirectory(open), family: 'children',
     writer: { role: 'engine', pid: engine.pid, startedAt: Number((BigInt(engine.creationFileTimeUtc) - EPOCH) / 10000n) } })
     .append('job-process-start', { witnessId: 'j-open', pid: 970203, creationFileTime: '134364634153991105',
-      executable: 'C:\\Windows\\System32\\conhost.exe', parentPid: engine.pid, parentCreationFileTime: engine.creationFileTimeUtc,
+      executable: fixtureExecutable('C:\\Windows\\System32\\conhost.exe'), parentPid: engine.pid, parentCreationFileTime: engine.creationFileTimeUtc,
       contained: true, observedAt: new Date(), awaited: false, expectedCode: null, reason: null,
       owner: { pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, instanceId: 'inst-1' }, incarnation: { session: runId, n: 1 } });
   const incomplete = await (await arm(run, open, [])).observer.finish();
@@ -592,7 +652,7 @@ const engineOwnerDied = (osCheck, fields = {}) => rec('engine', by.runner, 'engi
   basis: 'OPEN_START', ...(osCheck ? { osCheck } : {}), exitClass: osCheck === 'GONE' ? 'OWNER_DIED' : 'UNKNOWN',
   pid: proofEngine.pid, ...fields });
 const childStart = (p = proofChild) => rec('children', by.engine, 'child-start', { childId: 'c1', pid: p.pid,
-  creationFileTime: p.creationFileTimeUtc, executable: 'C:\\fixture\\parser.exe', contained: true });
+  creationFileTime: p.creationFileTimeUtc, executable: fixtureExecutable('C:\\fixture\\parser.exe'), contained: true });
 const childExit = (fields = {}) => rec('children', by.engine, 'child-exit', { childId: 'c1', exitClass: 'REQUESTED',
   reason: 'QUIT', code: 0, forced: false, exitedAt: iso7(BigInt(proofChild.creationFileTimeUtc) + 450000n), ...fields });
 const ownerDied = (osCheck, fields = {}) => rec('children', by.later, 'owner-died', { childId: 'c1', previousOwner: proofOwner,
@@ -603,7 +663,7 @@ const fullChildExit = (x = proofChild, fields = {}) => childExit({ pid: x.pid, c
   owner: proofOwner, incarnation: proofInc, ...fields });
 const witnessed = { witnessId: 'w1', pid: proofWitness.pid, creationFileTime: proofWitness.creationFileTimeUtc,
   owner: proofOwner, incarnation: proofInc };
-const witnessStart = rec('children', by.engine, 'job-process-start', { ...witnessed, executable: 'C:\\fixture\\helper.exe',
+const witnessStart = rec('children', by.engine, 'job-process-start', { ...witnessed, executable: fixtureExecutable('C:\\fixture\\helper.exe'),
   parentPid: proofEngine.pid, parentCreationFileTime: proofEngine.creationFileTimeUtc, contained: true,
   observedAt: proofStartedAt, awaited: false, expectedCode: null, reason: null });
 const witnessExit = (fields = {}, writer = by.engine) => rec('children', writer, 'job-process-exit', { ...witnessed, code: 0,
@@ -761,7 +821,7 @@ test('a manifest helper is matched to its ledger exit at the millisecond its sta
   ledger.child('c-ended', ended, true);
   ledger.child('c-other', other, true);
   ledger.engineExit();
-  const exe = 'C:\\fixture\\parser.exe';
+  const exe = fixtureExecutable('C:\\fixture\\parser.exe');
   fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ pid: engine.pid, children: [
     { id: 'c-ended', pid: ended.pid, kind: 'EXTRACTION', startedAt: isoMs(ended.creationFileTimeUtc), executable: exe },
     // One millisecond after its ledger birth: another process under the same PID.
@@ -860,7 +920,7 @@ test('an identity whose records do not prove its exit is looked up, and keeps th
   assert.deepEqual(wrong, []);
 });
 
-test('an exact ledger birth matches only the same birth: a native identity one tick apart is looked up and blocks the stop', async () => {
+test('an exact ledger birth matches only the same birth: a native identity one tick apart is looked up and blocks the stop', async (t) => {
   const dataDir = freshDir('exact-neighbour');
   writeLedger(dataDir, [...PROOF_TABLE.child.setup, childExit()]);
   const fixture = freshProofRun(dataDir, proofEngine);
@@ -878,24 +938,25 @@ test('an exact ledger birth matches only the same birth: a native identity one t
   assert.deepEqual([...new Set(out.unresolvedProcesses.map((p) => p.pid))], [neighbour.pid]);
   if (!windows) return;
   // The Engine job's stop compares each ledger-ended identity at its own precision too.
-  const member = { pid: unreadablePid(), creationFileTimeUtc: '134000000000000006' };
+  const unreadable = await unreadableProcess(t);
+  const member = { pid: unreadable.pid, creationFileTimeUtc: '134000000000000006' };
   const dir = freshDir('job-exact');
   const recordPath = path.join(dir, 'engine-1.json');
   fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1', pid: 971029, creationFileTimeUtc: '134364632930208358',
     root: member, members: [member], state: 'ended', rootExitCode: 0 }));
-  const result = jobRun.stopJobRunSync({ recordPath, host: noProcess(971029, '134364632930208358') }, { waitMs: 0,
+  const result = unreadable.stop({ recordPath, host: noProcess(971029, '134364632930208358') }, { waitMs: 0,
     endedIdentities: [{ pid: member.pid, creationFileTimeUtc: '134000000000000005', birthTick: '1' }] });
   assert.equal(result.outcome, 'incomplete', JSON.stringify(result));
   assert.deepEqual(result.survivors?.map((p) => Number(p.pid)), [member.pid]);
 });
 
-test('preserved: a ledger birth matches at the coarser precision of the two records, no coarser', async () => {
+test('preserved: a ledger birth matches at the coarser precision of the two records, no coarser', async (t) => {
   const dataDir = freshDir('precision');
   const other = noProcess(971033, '134364634153997105');
   writeLedger(dataDir, [...PROOF_TABLE.child.setup, childExit(),
     rec('children', by.engine, 'child-spawn', { childId: 'c2', kind: 'EXTRACTION', owner: proofOwner, incarnation: proofInc }),
     rec('children', by.engine, 'child-start', { childId: 'c2', pid: other.pid, creationFileTime: other.creationFileTimeUtc,
-      executable: 'C:\\fixture\\parser.exe', contained: true }),
+      executable: fixtureExecutable('C:\\fixture\\parser.exe'), contained: true }),
     rec('children', by.engine, 'child-exit', { childId: 'c2', exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false })]);
   const fixture = freshProofRun(dataDir, proofEngine);
   // Exact and equal; a CIM read (no birthTick: the microsecond) of the other child's microsecond; and
@@ -913,12 +974,13 @@ test('preserved: a ledger birth matches at the coarser precision of the two reco
   assert.deepEqual(looked.filter((pid) => [proofChild.pid, other.pid, proofEngine.pid].includes(pid)), [], 'all three are proven ended');
   assert.equal(out.outcome, 'STOPPED', JSON.stringify(out.errors));
   if (!windows) return;
-  const member = { pid: unreadablePid(), creationFileTimeUtc: '134000000000000006' };
+  const unreadable = await unreadableProcess(t);
+  const member = { pid: unreadable.pid, creationFileTimeUtc: '134000000000000006' };
   const dir = freshDir('job-micro');
   const recordPath = path.join(dir, 'engine-1.json');
   fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1', pid: 971029, creationFileTimeUtc: '134364632930208358',
     root: member, members: [member], state: 'ended', rootExitCode: 0 }));
-  const result = jobRun.stopJobRunSync({ recordPath, host: noProcess(971029, '134364632930208358') }, { waitMs: 0,
+  const result = unreadable.stop({ recordPath, host: noProcess(971029, '134364632930208358') }, { waitMs: 0,
     endedIdentities: [{ pid: member.pid, creationFileTimeUtc: '134000000000000005', birthTick: '10' }] });
   assert.equal(result.outcome, 'gone', JSON.stringify(result));
 });
@@ -926,7 +988,7 @@ test('preserved: a ledger birth matches at the coarser precision of the two reco
 /** One ledger line of a child the Engine started: generation `n` of the current file. */
 const generation = (n, tag = '') => JSON.stringify({ schemaVersion: 1, type: 'child-start', seq: n + 1, at: '2026-10-14T10:00:00Z',
   writer: { role: 'engine', pid: 971101, startedAt: '2026-10-14T10:00:00Z' }, childId: `generation-${n}${tag}`, pid: 971103 + 4 * n,
-  creationFileTime: String(134364634150000000n + BigInt(n) * 1000n), executable: 'C:\\fixture\\child.exe' }) + '\n';
+  creationFileTime: String(134364634150000000n + BigInt(n) * 1000n), executable: fixtureExecutable('C:\\fixture\\child.exe') }) + '\n';
 
 /**
  * What a writer or a rotation can do to the current file while a read is under way. `keepsFirst`:
@@ -1457,7 +1519,7 @@ test('a reconciliation naming another owner instance than the child was spawned 
   const out = await api.stopRun({}, { ...fixture.io, lookupIdentities: async (ids) => {
     looked.push(...ids);
     return new Map(ids.map((pid) => [pid, pid === proofChild.pid ? { present: true, creationFileTime: proofChild.creationFileTimeUtc,
-      name: 'parser.exe', executable: 'C:\\fixture\\parser.exe' } : { present: false }]));
+      name: 'parser.exe', executable: fixtureExecutable('C:\\fixture\\parser.exe') } : { present: false }]));
   } });
   assert.ok(looked.includes(proofChild.pid), `the child is looked up: ${JSON.stringify(looked)}`);
   assert.equal(out.outcome, 'STOP_INCOMPLETE', JSON.stringify(out.resolvedByLedger));
@@ -1655,7 +1717,7 @@ function syntheticLedger(dataDir, runId, engine, executable, minBytes) {
     const born = base + 10000000n + BigInt(i) * 3000000n;
     const pid = 200000 + i;
     const helper = i % 2 === 0;
-    const executable = helper ? 'C:\\Windows\\System32\\nvidia-smi.exe' : 'C:\\Windows\\System32\\conhost.exe';
+    const executable = helper ? fixtureExecutable('C:\\Windows\\System32\\nvidia-smi.exe') : fixtureExecutable('C:\\Windows\\System32\\conhost.exe');
     const witnessId = `j-${String(i).padStart(8, '0')}-6b90-4870-81e0-9761e1a508b8`;
     const common = { witnessId, pid, creationFileTime: String(born), owner, incarnation };
     lines.push(line('job-process-start', { ...common, executable, parentPid: engine.pid, parentCreationFileTime: engine.creationFileTimeUtc,
@@ -1796,7 +1858,7 @@ function childrenLedger(dataDir, runId, engine, childWriterStartedAt = null) {
     const born = String(BigInt(engine.creationFileTimeUtc) + 10000n * BigInt(++children));
     const chunk = line('engine', 'child-spawn', { childId, owner, kind: 'EXTRACTION' })
       + line('engine', 'child-start', { childId, pid: 100001 + 4 * children, creationFileTime: born,
-        executable: 'C:\\fixture\\parser.exe', contained: true })
+        executable: fixtureExecutable('C:\\fixture\\parser.exe'), contained: true })
       + line('engine', 'child-exit', { childId, exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false, exitedAt: startedAt });
     chunks.push(chunk);
     bytes += Buffer.byteLength(chunk);
@@ -3373,7 +3435,7 @@ function identityCaseRecords(c, withExits) {
   for (const item of c.records) {
     if (item.start) {
       records.push(rec('children', GEN_WRITERS.owner, 'child-start', { childId: 'c1', pid: item.start.pid, creationFileTime: item.start.birth,
-        executable: 'C:\\fixture\\parser.exe', contained: true, ...meta(item.start) }));
+        executable: fixtureExecutable('C:\\fixture\\parser.exe'), contained: true, ...meta(item.start) }));
       continue;
     }
     if (item.spawn) {
@@ -3752,7 +3814,7 @@ test(`a stop carries forward exactly what earlier stops found, over ${GEN_EVIDEN
     const scopeFile = path.join(dataDir, 'scope.json');
     for (const [k, s] of stops.entries()) {
       fs.writeFileSync(scopeFile, JSON.stringify(s.contradiction ? { atMs: Date.now() + 60000, processes: [{ pid: kept.pid,
-        creationFileTimeUtc: kept.creationFileTimeUtc, executable: 'C:\\fixture\\parser.exe', role: 'extraction-child' }] }
+        creationFileTimeUtc: kept.creationFileTimeUtc, executable: fixtureExecutable('C:\\fixture\\parser.exe'), role: 'extraction-child' }] }
         : { processes: [] }));
       const out = await api.stopRun({}, { ...fixture.io,
         census: (run, d, rd, _s, runtime) => standInCensus(run, d, rd, _s, runtime, scopeFile),
@@ -3818,7 +3880,7 @@ const R9_OWNERS = { same: { pid: R9_E0.pid, creationFileTime: R9_E0.birth, insta
 const R9_PROCS = [{ pid: 974101, birth: genFar(1) }, { pid: 974101, birth: sameMicrosecondNeighbour(genFar(1)) },
   { pid: 974105, birth: genFar(2) }];
 const r9Inc = (n) => ({ session: R9_RUN, n });
-const R9_EXE = 'C:\\fixture\\proc.exe';
+const R9_EXE = fixtureExecutable('C:\\fixture\\proc.exe');
 const r9Writers = {
   runner: { role: 'dev-runner', pid: 4001, startedAt: isoMs(R9_E0.birth) }, cli: { role: 'dev-cli', pid: 4005, startedAt: isoMs(R9_E0.birth) },
   shell: { role: 'shell', pid: 4009, startedAt: isoMs(R9_E0.birth) },

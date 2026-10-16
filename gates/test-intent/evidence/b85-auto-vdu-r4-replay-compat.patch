@@ -236,3 +236,16 @@ index 621e3ec78..af319dcad 100644
    /**
     * The Engine's reconciler: every boot, spec and procedure request becomes one {@code
     * setActivation} on the chat controller.
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+@@ -1784,3 +1784,9 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
++    /** Compat (fail-before only): retained-owner cleanup is outside the selected old paths. */
++    public int recoverVduProcessingForRetainedOwner(
++            io.justsearch.app.api.EngineWorkHandle owner) {
++        return 0;
++    }
++
+     public int recoverVduProcessing(EngineContext engineContext) {
+         return vduOps.recoverVduProcessing(engineContext);
+     }

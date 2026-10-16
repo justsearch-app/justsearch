@@ -72,6 +72,7 @@ halves share objects.
 - [API Contract Map](reference/api-contract-map.md): HTTP and in-process port contract sources, error sanitization.
 - [Architectural Risk Register](reference/architectural-risks.md): Living registry of consciously accepted trade-offs, monitored risks, and design tensions, each naming one instrument that can be checked.
 - [Module Dependencies (Gradle)](reference/architecture/module-deps.md): Generated Gradle dependency graph across all modules.
+- [Automatic picture reading while chat is loaded](reference/automatic-vdu.md): Automatic picture-reading eligibility, restoration, retries, and shutdown behavior.
 - [Benchmark Methodology](reference/benchmarks/methodology.md): How JustSearch measures retrieval quality: the reproducible single-config release, honest comparison classes, and how to reproduce it.
 - [Engine-quality scorecard](reference/benchmarks/scorecard.md): Generated delta-vs-guard scorecard co-locating all engine-quality axes (quality + perf + leak) for the canonical release.
 - [Runtime Configuration Lifecycle Policy](reference/configuration/config-lifecycle-policy.md): Source-declared lifecycle stages and review metadata for permanent, experimental, and deprecated runtime configuration.
@@ -97,6 +98,7 @@ halves share objects.
 - [Writing Docs for AI](reference/contributing/writing-docs-for-ai.md): How to keep docs agent-friendly.
 - [Project Glossary](reference/glossary.md): Authority index for overloaded JustSearch architecture, search, runtime, and interface terms.
 - [Troubleshooting: Reindex doesn't run (schema mismatch)](reference/index-schema-mismatch-reindex-noop.md): Diagnosing "reindex doesn't run" due to schema mismatch.
+- [Inference placement reasons](reference/inference-placement-reasons.md): Additive placement and refusal reasons for GPU planning and chat ownership.
 - [Inference Runtime Register](reference/inference-runtime-register.md): Shared decision register for GPU, ORT, VRAM, and inference runtime. Read before starting inference work. Update before finishing.
 - [jseval Pipeline Reference](reference/jseval-pipeline-reference.md): CLI reference for the jseval evaluation, pipeline profiling, and throughput benchmarking toolkit.
 - [AI Runtime Redistribution](reference/legal/ai-runtime-and-model-redistribution.md): llama.cpp and model licensing considerations.

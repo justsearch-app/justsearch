@@ -180,11 +180,12 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
 }
 
 /** Capture before yielding: libuv still holds the spawned child's handle and reserves its PID. */
-function captureSpawnedIdentity(child, { exec = spawnSync, platform = process.platform } = {}) {
-  if (platform !== 'win32' || !child?.pid || child.exitCode !== null || child.signalCode !== null) return null;
+function captureSpawnedIdentity(child, { exec = spawnSync, platform = process.platform, timeoutMs = 5000 } = {}) {
+  if (platform !== 'win32' || !child?.pid || child.exitCode !== null || child.signalCode !== null
+      || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return null;
   const result = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
     path.join(__dirname, 'read-process-birth.ps1'), '-Pid', String(child.pid)],
-  { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+  { encoding: 'utf8', windowsHide: true, timeout: Math.ceil(timeoutMs) });
   const birth = String(result.stdout ?? '').trim();
   return result.status === 0 && /^[1-9]\d{0,19}$/.test(birth)
     ? { pid: child.pid, creationFileTimeUtc: birth } : null;
@@ -301,7 +302,7 @@ function openEngineStarts(records) {
  * @param {string} options.dataDir
  * @param {string} options.runId the ledger session of this supervisor's incarnations
  * @param {object} options.policy the loaded supervision policy (exit table for codeName)
- * @param {(n: number, apiPort: number, env: object) => import('child_process').ChildProcess} options.spawnChild
+ * @param {(n: number, apiPort: number, env: object, startup: object) => import('child_process').ChildProcess} options.spawnChild
  */
 function createEngineActuator({
   dataDir,
@@ -407,10 +408,10 @@ function createEngineActuator({
      * Spawn incarnation `n`. The exit listener is installed here, at spawn, so no exit can be missed;
      * it only stores the observation and wakes the loop. `pollExit` is its one consumer.
      */
-    spawnEngine({ n, cause, apiPort }) {
+    spawnEngine({ n, cause, apiPort, startupTimeoutMs }) {
       try { fs.unlinkSync(path.join(dataDir, "runtime", "shutdown-request.v1.json")); } catch (err) { if (err.code !== "ENOENT") log(`stale shutdown request cleanup failed: ${err.message}`); }
       const env = { [INCARNATION_ENV]: `${runId}/${n}` };
-      const child = spawnChild(n, apiPort, env);
+      const child = spawnChild(n, apiPort, env, { startupTimeoutMs });
       const spawnedAt = clock();
       const state = {
         n, cause, child, pid: child.pid ?? null, spawnedAt,

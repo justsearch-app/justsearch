@@ -112,7 +112,16 @@ test('start ignores an active pointer for an explicitly forgotten run', async ()
   const target = fixture('forgotten-start');
   fs.writeFileSync(path.join(path.dirname(target.runPath), 'forgotten-unresolved.json'), '{}');
   let stops = 0;
-  const result = await acquireAdmission({ sessionId: 'forgotten-start', stop: async () => { stops++; return { outcome: 'STOP_INCOMPLETE' }; } });
+  const lookedUp = [];
+  const result = await acquireAdmission({ sessionId: 'forgotten-start',
+    // The synthetic forgotten process has ended. Use the identity boundary rather than requiring
+    // this host's native process API to establish absence for a deliberately fictitious PID.
+    lookupIdentities: async ids => {
+      lookedUp.push(...ids);
+      return new Map(ids.map(p => [p, { present: false }]));
+    },
+    stop: async () => { stops++; return { outcome: 'STOP_INCOMPLETE' }; } });
+  assert.deepEqual(lookedUp, [pid], 'start rechecks the forgotten identity before retiring its pointer');
   assert.equal(result.action, 'proceed', 'a retired tracking pointer cannot block the next start');
   assert.equal(stops, 0, 'start does not stop any explicitly forgotten process');
 });

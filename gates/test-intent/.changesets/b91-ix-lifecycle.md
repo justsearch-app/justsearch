@@ -370,7 +370,7 @@ This is unchanged behavior, not a new health guarantee.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Failure to fence witness recording inside main finally remains an unclean exit with its reason and retained instance lock, and reaches the normal fatal startup exit. The disposable probe launches the current JVM executable on every OS; PID/birth ownership, bounded exit, the normal-exit shutdown-hook marker and visible failure-reason assertions are unchanged.",
+      "behaviour": "Failure to fence witness recording inside main finally remains an unclean exit with its reason and retained instance lock, and reaches the normal fatal startup exit. The disposable probe launches the current JVM executable on every OS and records its PID with native FILETIME on Windows or its JDK child start instant on POSIX, rechecking the same identity before held-handle cleanup. Bounded exit, the normal-exit shutdown-hook marker and visible failure-reason assertions are unchanged. The original four-selector evidence is regenerated against 32d00dda8 with the same witness-probe overlay and no patches.",
       "sources": [
         {
           "kind": "delegated-choice",

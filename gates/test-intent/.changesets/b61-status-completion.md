@@ -15,8 +15,14 @@ operation-classified completion mechanism this entry describes with the server-o
 and -7 rejected on counter noise, metadata loss and back-off after refused fresh reads, which
 verify-status8 reports passing on 2fd48e172. This repair changed only the source (orchestrator wording
 no longer cited as owner words), so every earlier record is stale and the disagreement is not decided
-here. The next acceptor reviews the current content against the current check; the evidence file is
-invalid because statusCompletion.test.ts changed after its run.
+here. At that repair, the evidence file was invalid because statusCompletion.test.ts had changed
+after its run. The next acceptor reviews the current content against the current check.
+
+CI759 round 4 joins the curried `it.each` registration onto one line to satisfy the frontend
+lint gate. This preserves all parameter rows, callbacks and assertions: the file passes all 23
+cases before and after the formatting repair. Its execution evidence is regenerated against the
+current file with the declared before-state `3e64a384b`, no overlay or patch, and ordinary copied
+vitest dependencies (`--copy-node-modules`). This refresh records execution, not acceptance.
 
 ```json
 {
@@ -25,7 +31,7 @@ invalid because statusCompletion.test.ts changed after its run.
       "items": ["modules/ui-web/src/api/statusCompletion.test.ts"],
       "class": "New",
       "repaired": true,
-      "behaviour": "A successful server-executed pending approval, state-changing streamed tool completion or raw plugin operation request refreshes the production canonical observation before completion is delivered. Unknown operation identity after reconnect is observed conservatively. Failed, skipped and known read-only completions do not refresh; receipts remain readable and concurrent completions coalesce. Existing invocation, consented retry and virtual-command paths retain canonical completion.",
+      "behaviour": "A successful server-executed pending approval, state-changing streamed tool completion or raw plugin operation request refreshes the production canonical observation before completion is delivered. Unknown operation identity after reconnect is observed conservatively. Failed, skipped and known read-only completions do not refresh; receipts remain readable and concurrent completions coalesce. Existing invocation, consented retry and virtual-command paths retain canonical completion. CI759 round 4 preserves the curried it.each call while joining its continuation to remove lint ambiguity; every parameter row, callback and assertion remains unchanged.",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "Every path by which an action that changes status-surface state completes successfully in or through this UI must reach the same completion mechanism", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b61 builder role contract, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b61-status-completion.json",
       "newChecks": ["modules/ui-web/src/api/statusCompletion.test.ts"]

@@ -53,8 +53,7 @@ it('approved server execution publishes canonical OFF before the client returns'
   expect(fresh()).toHaveLength(1);
 });
 
-it.each([{ executed: false, executeSuccess: true }, { executed: true, executeSuccess: false }, { executed: true }])
-  ('does not refresh for skipped, failed or unconfirmed approval %j', async result => {
+it.each([{ executed: false, executeSuccess: true }, { executed: true, executeSuccess: false }, { executed: true }])('does not refresh for skipped, failed or unconfirmed approval %j', async result => {
     const client = new OperationClient({ apiBase: '', fetchImpl: async () => json(result) });
     await client.approveAndExecutePending('pending'); expect(fresh()).toHaveLength(0); expect(state()).toBe('READY');
   });

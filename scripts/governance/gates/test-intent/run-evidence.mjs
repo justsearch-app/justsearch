@@ -211,7 +211,9 @@ function prepareNodeModules(worktree, copyNodeModules = false) {
   const src = path.join(REPO_ROOT, 'modules', 'ui-web', 'node_modules');
   const dst = path.join(worktree, 'modules', 'ui-web', 'node_modules');
   if (!fs.existsSync(src) || fs.existsSync(dst)) return;
-  if (copyNodeModules) fs.cpSync(src, dst, { recursive: true, dereference: true });
+  // Node 24's native directory copier recreates POSIX symlinks even with dereference enabled.
+  // An all-pass filter selects its stat-based copier, which follows each dependency link.
+  if (copyNodeModules) fs.cpSync(src, dst, { recursive: true, dereference: true, filter: () => true });
   else fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
 }
 

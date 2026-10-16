@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import census from './lib/stop-exit-census.cjs';
+
+// Keep synthetic executable identities absolute on the host while preserving image and directory distinctions.
+const fixtureExecutable = windowsPath => path.resolve('tmp', 'census-fixtures', ...windowsPath.slice(2).split(/\\+/).filter(Boolean));
 
 const b = t => census.fileTimeFromInstant(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`);
 const at = t => Date.parse(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`);
@@ -15,14 +19,14 @@ const run = { runId: 'own-census', pids: { backendRootPid: 100 } };
 const manifest = { pid: 100, containment: { status: 'CONTAINED' }, incarnation: { session: run.runId } };
 const owner = { pid: 100, creationFileTime: b(0) };
 const engineStart = rec('engine-start', { incarnation: { session: run.runId, n: 1 },
-  pid: 100, creationFileTime: b(0), executable: 'C:\\verify\\java.exe' });
+  pid: 100, creationFileTime: b(0), executable: fixtureExecutable('C:\\verify\\java.exe') });
 const engineExit = rec('engine-exit', { incarnation: { session: run.runId, n: 1 },
   exitClass: 'REQUESTED', reason: 'QUIT', code: 0, exitedAt: '2026-10-07T10:00:20.000Z' });
 const row = (pid, parentPid, t, name = 'tesseract.exe', seen = t) => ({ pid, parentPid,
-  creationFileTimeUtc: b(t), name, executable: `C:\\verify\\${name}`, firstSeenAtMs: at(t), lastSeenAtMs: at(seen) });
+  creationFileTimeUtc: b(t), name, executable: fixtureExecutable(`C:\\verify\\${name}`), firstSeenAtMs: at(t), lastSeenAtMs: at(seen) });
 const ledger = { engine: { present: true, records: [engineStart] }, children: { present: true, records: [
   rec('child-spawn', { childId: 'x', kind: 'EXTRACTION', owner }),
-  rec('child-start', { childId: 'x', pid: 101, creationFileTime: b(1), executable: 'C:\\verify\\java.exe', contained: true }),
+  rec('child-start', { childId: 'x', pid: 101, creationFileTime: b(1), executable: fixtureExecutable('C:\\verify\\java.exe'), contained: true }),
   rec('child-exit', { childId: 'x', exitClass: 'REQUESTED', reason: 'RECYCLE', code: 0, exitedAt: '2026-10-07T10:00:20.000Z' }),
 ] } };
 

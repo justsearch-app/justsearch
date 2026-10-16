@@ -28,7 +28,7 @@ F:\agent-sandbox\design-b6d536\codex\b16-census-repair\report.md.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The real boot fallback writes CRASH_RECOVERY stop intent before terminating a surviving uncontained predecessor, then writes its observed final child exit under the original ledger child identity. The next boot adds nothing. A failed kill retains a live survivor, an already-gone process records UNKNOWN code/time, and a different actor ending it during the intended stop remains UNEXPECTED.",
+      "behaviour": "The real boot fallback writes CRASH_RECOVERY stop intent before terminating a surviving uncontained predecessor, then writes its observed final child exit under the original ledger child identity. The next boot adds nothing. The original successful native REQUESTED/code assertions execute under an explicit Windows prerequisite in the Windows-native UI task. An unconditional real-stop seam withholds FILETIME and unavailable exit code/time, proves the real captured JDK identity was checked, and asserts UNKNOWN facts, preserved intent linkage, a cleared registry and an idempotent next boot. Scripted predecessor cases forward the actual held JDK identity and executable checks, preserving the ownership fence on POSIX as well as Windows. A failed kill retains a live survivor, an already-gone process records UNKNOWN code/time, and a different actor ending it during the intended stop remains UNEXPECTED. All original assertions remain; five-check evidence uses the original before-state 46c74f725 without overlays or compatibility patches.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -63,7 +63,8 @@ F:\agent-sandbox\design-b6d536\codex\b16-census-repair\report.md.
         "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing",
         "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime",
         "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit",
-        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown"
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown",
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackWithoutExitFactsRecordsUnknownAndNextBootAddsNothing"
       ]
     }
   ]

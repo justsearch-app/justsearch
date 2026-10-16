@@ -7,6 +7,13 @@ author-session: b59-status-after-action
 
 The actual Brain handlers use the production canonical status poller. All four repaired cases fail by assertion on 1939ad02c. The operation spy retains execution, unlike a stubbed successful operation. Transport tests cover completion receipts, concurrent batching and real admission waiting. Independent acceptance is pending.
 
+CI759 round 4 joins the curried `it.each` registration in statusInvalidation.test.ts onto one
+line to satisfy frontend lint. All 32 cases pass both before and after this formatting change;
+parameter rows, callbacks and assertions are unchanged. Only its directly covering evidence
+`b59-status-after-action-new.json` is regenerated, with the declared before-state `1939ad02c`, no
+overlay or patch, and ordinary copied vitest dependencies (`--copy-node-modules`). The Brain
+check and its evidence are unchanged. This refresh records execution, not acceptance.
+
 Review history (records repair, 2026-10-14). On the previous content (digest sha256:a969f2e8...),
 verify-status5, -6 and -7 rejected and verify-status8 accepted; the gate reported that as a
 disagreement needing a tie-break. The rejections concerned product behaviour on earlier candidates
@@ -44,7 +51,7 @@ Records phase B (batch 3), verifier repair. The phase B verifier rejected entry 
       "items": ["modules/ui-web/src/api/statusInvalidation.test.ts"],
       "class": "New",
       "repaired": false,
-      "behaviour": "The shared invalidation mechanism observes operation and undo receipts, validated settings COMPLETE, and direct runtime/indexing/lifecycle writes through production transports and canonical polling. Concurrent completions coalesce, 429 keeps the fresh read inside admission, and failed or read-only actions do not invalidate status. Before-state 1939ad02c (parent of 5e877caed, which added this check): 31 of the 32 cases fail by assertion (canonical status still READY where the action published OFF; and the admission case fails its expected-false assertion); the preservation case 'failed operations and read-only operations do not request fresh status' passes there and here.",
+      "behaviour": "The shared invalidation mechanism observes operation and undo receipts, validated settings COMPLETE, and direct runtime/indexing/lifecycle writes through production transports and canonical polling. Concurrent completions coalesce, 429 keeps the fresh read inside admission, and failed or read-only actions do not invalidate status. Before-state 1939ad02c (parent of 5e877caed, which added this check): 31 of the 32 cases fail by assertion (canonical status still READY where the action published OFF; and the admission case fails its expected-false assertion); the preservation case 'failed operations and read-only operations do not request fresh status' passes there and here. CI759 round 4 preserves the curried it.each call while joining its continuation to remove lint ambiguity; every parameter row, callback and assertion remains unchanged.",
       "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "a fresh read must not bypass admission or produce a storm (coalesce concurrent fresh requests)", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b59 builder role contract, preservation constraint)'; the text does not appear in the owner's turns of session 886833dd"}],
       "evidence": "gates/test-intent/evidence/b59-status-after-action-new.json",
       "newChecks": ["modules/ui-web/src/api/statusInvalidation.test.ts"]
