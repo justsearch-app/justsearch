@@ -8,11 +8,23 @@ author-session: codex-b16-census-repair-20261007
 # Test-intent entries
 
 S15 census/boot-accounting repair. CRASH_RECOVERY is already in the vocabulary; no token or schema change.
-The four Java regression checks execute against native Windows processes or injected stop outcomes.
+The five Java regression checks execute against native Windows processes or injected stop outcomes.
 Each fails by assertion on 46c74f725 for absent fallback intent/final accounting and passes on the candidate.
 The test class probes the actual boot factory when available and the baseline factory otherwise,
 so baseline failures are assertions about missing records, not missing APIs or compilation.
 Existing reconciler tests are unchanged.
+
+The unknown-facts next-boot check counts exactly five records for its seeded predecessor's childId
+before and after the next boot. Opening the Engine writer also drains OwnedHelper's JVM-wide
+pre-writer buffer: VerifierStatus4Test's disk-encryption probe leaves two unrelated helper receipts.
+Counting the entire ledger made the paired run fail with five expected and seven observed.
+The fixture now selects its own predecessor records; product code and all outcome assertions stay intact.
+
+Order-isolation verification on Windows (2026-10-16): the unchanged 5eff47f50 paired run failed
+with five expected and seven observed; the class alone passed all five checks. After isolation,
+the paired run passed all 19 checks, the class alone passed all five, and the full UI task passed
+(2014 cases, 1 skipped, no failures or errors). The before-fix broad-run failure is recorded
+in VS8a's rejection below; that broad before-run was not repeated here.
 
 The script census self-tests are out of scope for this gate. Their three-generation fixture fails
 on 46c74f725 with a nested tesseract gap and orphan console host, then passes on the candidate,
@@ -28,7 +40,7 @@ F:\agent-sandbox\design-b6d536\codex\b16-census-repair\report.md.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The real boot fallback writes CRASH_RECOVERY stop intent before terminating a surviving uncontained predecessor, then writes its observed final child exit under the original ledger child identity. The next boot adds nothing. The original successful native REQUESTED/code assertions execute under an explicit Windows prerequisite in the Windows-native UI task. An unconditional real-stop seam withholds FILETIME and unavailable exit code/time, proves the real captured JDK identity was checked, and asserts UNKNOWN facts, preserved intent linkage, a cleared registry and an idempotent next boot. Scripted predecessor cases forward the actual held JDK identity and executable checks, preserving the ownership fence on POSIX as well as Windows. A failed kill retains a live survivor, an already-gone process records UNKNOWN code/time, and a different actor ending it during the intended stop remains UNEXPECTED. All original assertions remain; five-check evidence uses the original before-state 46c74f725 without overlays or compatibility patches.",
+      "behaviour": "The real boot fallback writes CRASH_RECOVERY stop intent before terminating a surviving uncontained predecessor, then writes its observed final child exit under the original ledger child identity. The next boot adds nothing. The original successful native REQUESTED/code assertions execute under an explicit Windows prerequisite in the Windows-native UI task. An unconditional real-stop seam withholds FILETIME and unavailable exit code/time, proves the real captured JDK identity was checked, and asserts UNKNOWN facts, preserved intent linkage, a cleared registry and an idempotent next boot with exactly five records scoped to the seeded predecessor, even when earlier tests leave unrelated helper receipts in the JVM-wide boot buffer. Scripted predecessor cases forward the actual held JDK identity and executable checks, preserving the ownership fence on POSIX as well as Windows. A failed kill retains a live survivor, an already-gone process records UNKNOWN code/time, and a different actor ending it during the intended stop remains UNEXPECTED. All original outcome assertions remain; five-check evidence uses the original before-state 46c74f725 without overlays or compatibility patches.",
       "sources": [
         {
           "kind": "delegated-choice",

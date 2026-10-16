@@ -144,12 +144,13 @@ final class ManagedChildBootFallbackTest {
         assertTrue(registry.snapshot().isEmpty());
         assertEquals(1, identityChecks.get(), "the held JDK identity authorizes the stop without FILETIME");
       }
-      int count = ExitLedgerReader.read(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records().size();
+      // Opening the next Engine writer also drains JVM-wide helper receipts from other fixtures.
+      assertEquals(5, predecessorRecords().size());
       try (var next = DefaultChildControl.openForEngine(dataDir, "next-boot", registry,
           VramProbe.none(), EngineContainment.current())) {
         recordedBootReconciler(registry, next).reconcile();
       }
-      assertEquals(count, ExitLedgerReader.read(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records().size());
+      assertEquals(5, predecessorRecords().size(), "a subsequent boot adds no predecessor records");
     } finally {
       child.destroyForcibly();
       child.waitFor(Duration.ofSeconds(5));
@@ -190,8 +191,13 @@ final class ManagedChildBootFallbackTest {
 
   private List<io.justsearch.app.api.runtime.ledger.LedgerRecord> childRecords(LedgerRecordType type)
       throws java.io.IOException {
+    return predecessorRecords().stream().filter(r -> r.type() == type).toList();
+  }
+
+  private List<io.justsearch.app.api.runtime.ledger.LedgerRecord> predecessorRecords()
+      throws java.io.IOException {
     return ExitLedgerReader.read(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records()
-        .stream().filter(r -> r.type() == type && r.text("childId").filter("c-orphan"::equals).isPresent()).toList();
+        .stream().filter(r -> r.text("childId").filter("c-orphan"::equals).isPresent()).toList();
   }
 
   @Test
