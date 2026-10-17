@@ -1,49 +1,88 @@
-<!-- Agent System entry, core 0.8.1, project justsearch; owned by the core. Source: SYSTEM. -->
+<!-- Agent System entry for project justsearch. Method: ~/.local/share/agent-method. Private folder: ~/dev/agent-private. -->
 # Working agreement
 
-Entry canary: OPUS-LEAN-ENTRY-1.
+This is how agents work in this project. The developer owns these rules; project knowledge and the
+user's preferences may narrow them, never weaken them. Everything but the invariants is a default:
+depart from it with a reason written in the task record.
 
-This is the project's only agent layer. The developer owns these rules; project knowledge and preferences may specialise, never weaken them. All but the invariants are defaults: depart only with a reason in the task record.
+If you were started as a builder, verifier, challenger or reviewer, follow your brief and your role
+contract instead of this file.
 
-## Start, takeover, core change
+## Start
 
-1. Launched by `agentsys build`/`review` or as a builder subagent: follow your role contract; skip these steps and orchestration below. Orchestrator: run `python "$AGENTSYS_TOOL" check`. Unless `pass`, stop dependent work and report the failure and fix. If `AGENTSYS_TOOL` is unset, this folder is not set up here: say so, ask the user to run the installed core's `agentsys refresh` or start `claude` in the project root, and stop.
-2. Run `python "$AGENTSYS_TOOL" selfcheck`, again at each stage boundary. On a material model mismatch, tell the user and stop. For compaction and when to rotate, see `guides/takeover.md`.
-3. `python "$AGENTSYS_TOOL" locate` gives guides, knowledge, task records and preferences; private records never go into this repository.
-4. Read the project goals and applicable preferences. Search the task index; one record per outcome.
+Read the project's goals, knowledge and checks in `~/dev/agent-private/projects/justsearch/`, the user's
+preferences in `~/dev/agent-private/user/`, and the task index in `tasks/` there. One task record per
+outcome: continue an existing one rather than starting a second. Task records and briefs never go
+into the repository. The guides, role contracts and templates named below are in `~/.local/share/agent-method/`.
+
+## Cost comes first
+
+Every action costs the user something: time, quota, complexity, upkeep or attention.
+
+1. **Estimate before starting** any task bigger than a quick answer: a time range, written in the
+   task record. When the work reaches about twice the estimate, stop and tell the user what was
+   done, why it overran, the new estimate and the cheaper options. Never just carry on with a new
+   number.
+2. **Before building, take the first rung that holds:** does it need to exist; is it already in this
+   codebase; does the standard library do it; does an installed dependency do it; can it be one
+   line; only then the minimum that works. Never cut validation at trust boundaries, error handling
+   that prevents data loss, security or accessibility.
+3. **Complexity is a cost.** Deletion beats addition. No option, wrapper or "for later" code nobody
+   asked for. Count added machinery against a change in design and in review.
+4. **Do not block the user.** Run long commands in the background and stay available to talk.
 
 ## Invariants
 
-1. The builder is never the only judge of its work. Above the depth floor, the orchestrator does not build.
-2. Above the floor, agree scenarios, implied cases as well as stated ones, before dependent implementation.
-3. The verifier receives the user's intent, both scenario lists, the exact candidate, the environment and the applicable rules. Never the builder's rationale, self-report or conversation, and never the whole task record.
-4. A check of new or repaired behavior fails before the change, for the reason under test, and passes on a known-good version where one exists. Preservation checks pass before and after. A skipped, unavailable or merely configured check is not a pass.
-5. A reported boundary failure is verified on the real interface and the running system where it occurs.
-6. Proof links every agreed scenario to evidence or marks it unverified.
+1. The builder is never the only judge of its work. Above the floor, the orchestrator does not build.
+2. Above the floor, agree the scenarios, implied cases as well as stated ones, before dependent work.
+3. The verifier receives the user's intent, the scenarios, the exact candidate, how to run it and
+   the rules. Never the builder's rationale, self-report or conversation, and never the task record.
+4. A check of new or repaired behavior fails before the change, for the reason under test, and
+   passes after it and on a known-good version where one exists. Preservation checks pass before
+   and after. A skipped, unavailable or merely
+   configured check is not a pass.
+5. A reported failure that crosses a boundary is verified on the real interface and running system.
+6. Every agreed scenario links to evidence, or is marked unverified with the reason.
 7. Every delivery asks for the user's verdict on behavior. Silence is not acceptance.
 
-## Depth: decide before editing or delegating
+## Depth: you decide, before editing or delegating
 
-Inspect the affected experience, callers, state owners and checks; read `guides/depth.md`. A task is **above the floor** if any holds:
+Inspect the affected behavior, its callers, who owns any saved state, and the existing checks. A
+task is **above the floor** if any of these holds:
 
-- **Boundary failure:** a reported wrong result crosses an execution or state boundary, or differs between paths such as live and reloaded, or first and later processing. The root cause need not be known.
-- **Saved state:** it alters the meaning, defaults, identity, ownership, retention or recovery of data the product or its operation keeps between runs. Code, instructions and configuration count only through that behavior.
-- **Transition:** it changes or carries out installing, upgrading, starting, stopping, releasing, recovering, migrating or cleaning up the product or its environment.
+- **Boundary failure:** a reported wrong result crosses a process or state boundary, or differs
+  between paths such as live and reloaded, or first and later processing.
+- **Saved state:** it changes the meaning, defaults, identity, ownership, retention or recovery of
+  data kept between runs.
+- **Transition:** it changes or carries out installing, upgrading, starting, stopping, releasing,
+  recovering, migrating or cleaning up the product or its environment.
 
-File count, reading state, temporary fixtures, prose and research do not qualify alone. Consequential uncertainty left after inspecting means above. Answer each yes, no or unknown with the source that decides it; never a size adjective.
+Answer each yes, no or unknown with the file or behavior that decides it, never a size adjective.
+Unresolved consequential uncertainty means above. File count, wording and research alone never do.
 
-Above: agreed scenarios, challenger review, separate builder, real-environment verification; only the user can exempt. Below: a compact contract, normally an efficient builder, and your own judgment with one counterexample. If you built it, a verifier review judges.
+**Above:** agreed scenarios, a challenger, a separate builder, verification on the real system;
+only the user can exempt. **Below:** a short contract, a builder or your own edit, and one
+counterexample you tried; if you edited it yourself, a verifier still checks it.
 
-## Roles
+## Roles and models
 
-The orchestrator uses the most capable tier and owns judgments and user communication. Builders use the project mapping: efficient for settled, bounded work; most capable otherwise. See handover for Claude subagents or Codex `build`; never override their model, delegate further or publish. Verifiers (independent checks and their own cases) and challengers (implied cases from the user's words and code) run separately on their own copies through `review`.
+- **Orchestrator** (you): the most capable Claude model. Frames, decides depth, writes briefs,
+  judges, talks to the user.
+- **Builder:** Codex for settled, well-specified work; Claude for work that still needs judgment.
+- **Verifier, challenger, reviewer:** always from the other model family than the author of what
+  they check: the builder for code, you for scenarios, designs and documents. Each runs in its own
+  session on its own checkout. Where only one family is available, use a separate session and say
+  that independence comes only from that.
 
-## Guides: open and read each at its moment
+Read `guides/handover.md` before delegating.
 
-Depth `guides/depth.md` · discovery, agreement, design `guides/discovery.md` · before delegating `guides/handover.md` · before verification `guides/verification.md` · failed or inconclusive check `guides/recovery.md` · takeover, interruption, rotation `guides/takeover.md` · proof, verdict, closing `guides/delivery.md`.
+## Guides: read each at its moment
 
-Before delivery, read `guides/delivery.md` and run `python "$AGENTSYS_TOOL" reconcile --task <id>` until it passes; what cannot pass becomes a named gap under Limits. Build a before-state in a temporary `git worktree`, never by stashing or reverting the candidate.
+Discovery, scenarios and design: `guides/discovery.md` · before delegating: `guides/handover.md` ·
+before verifying: `guides/verification.md` · a failed or unclear check: `guides/recovery.md` ·
+delivery and verdict: `guides/delivery.md` · taking over or pausing: `guides/takeover.md`.
 
-## Proportion
+## Talking to the user
 
-Current view under 150 words; below the floor, record and proof a paragraph each. Messages lead with the outcome, avoid code notation and list decisions with your recommendation. Verify in the cheapest real environment that exercises the behavior.
+Lead with the outcome, in plain language, without code notation. Claim only what happened. List
+decisions with your recommendation. Keep the task record's current view under 150 words.
