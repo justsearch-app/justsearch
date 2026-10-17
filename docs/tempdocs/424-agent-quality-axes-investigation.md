@@ -333,26 +333,26 @@ This is a **research-and-tempdoc-write** pattern — heavy task tracking, web re
 
 ---
 
-## Axis 8: Context7 and adjacent MCPs
+## Axis 8: Library-docs MCP servers
 
-**Sources:** [Context7 docs](https://github.com/upstash/context7), [ClaudeFast review](https://claudefa.st/blog/tools/mcp-extensions/context7-mcp), [ContextCrush vulnerability disclosure (Feb 2026)](https://chatforest.com/reviews/context7-mcp-server/).
+**Sources:** the vendor's documentation, a third-party review and a vulnerability disclosure (links removed).
 
-### What Context7 is
+### What a library-docs MCP server is
 
-MCP server by Upstash (open source, free) that fetches **version-specific library documentation** and injects it into prompts. Supports JavaScript, TypeScript, Python, Go, Rust, Java, C#, PHP, Ruby + hundreds of frameworks.
+An open-source, free MCP server that fetches **version-specific library documentation** and injects it into prompts. Supports JavaScript, TypeScript, Python, Go, Rust, Java, C#, PHP, Ruby + hundreds of frameworks.
 
 ### Why it fits JustSearch
 
-JustSearch uses Java + Kotlin (build) + TypeScript (UI) + Python (jseval) + Rust (Tauri). Five language ecosystems. Without Context7, agents rely on:
+JustSearch uses Java + Kotlin (build) + TypeScript (UI) + Python (jseval) + Rust (Tauri). Five language ecosystems. Without such a server, agents rely on:
 - Their training cutoff (Jan 2026) for library docs
 - WebFetch on docs sites (slow, unstructured)
 - WebSearch (generic, low-precision)
 
-With Context7, asking "use Lucene 9.x's MultiFieldQueryParser" gets the actual current API as part of the prompt.
+With such a server, asking "use Lucene 9.x's MultiFieldQueryParser" gets the actual current API as part of the prompt.
 
 ### Why **not** to adopt
 
-1. **ContextCrush vulnerability (Feb 2026):** Context7's "Custom Rules" let library publishers inject "AI Instructions" the agent treated as trusted instructions — including tool-using ones. Patched, but exemplifies the supply-chain risk.
+1. **Prompt-injection vulnerability (Feb 2026):** the server's "Custom Rules" let library publishers inject "AI Instructions" the agent treated as trusted instructions — including tool-using ones. Patched, but exemplifies the supply-chain risk.
 2. **Free tier cut 83-92% in January 2026.** Heavy use needs a paid tier.
 3. **Always-on overhead** — even with Skills-based intelligent activation (98% trigger rate), it adds context cost when libraries are mentioned.
 4. **JustSearch already has good in-repo docs.** `docs/explanation/`, `docs/reference/`, the agent-guide, the skills system. Often the agent doesn't need external library docs because the project's own docs cover the relevant patterns.
@@ -474,7 +474,7 @@ Filtering across all 10 axes for highest-leverage actionable items:
 
 Items NOT recommended:
 
-- Context7 MCP (Axis 8): security risk + already-good docs
+- The library-docs MCP server (Axis 8): security risk + already-good docs
 - Multi-agent coordination MCP (Axis 6): not at scale
 - Tighter inversion-tension fixes (Axis 9 Tensions 1, 3, 4, 5): trade-offs, not defects
 
@@ -486,8 +486,7 @@ Items NOT recommended:
 - [Anthropic effort docs](https://platform.claude.com/docs/en/build-with-claude/effort)
 - [Adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking)
 - [Opus 4.7 xhigh + task budgets](https://www.verdent.ai/guides/claude-opus-4-7-xhigh-ultrareview-task-budgets)
-- [Context7 GitHub](https://github.com/upstash/context7)
-- [Context7 review](https://claudefa.st/blog/tools/mcp-extensions/context7-mcp)
-- [ContextCrush disclosure](https://chatforest.com/reviews/context7-mcp-server/)
+- Third-party review of a library-docs MCP server (link removed)
+- Prompt-injection vulnerability disclosure, Feb 2026 (link removed)
 - [Claude Code interactive mode](https://code.claude.com/docs/en/interactive-mode)
 - Local: this session's transcript JSONL, `analyze-session.mjs` output, `cost-session.mjs` output, file-history blobs, `~/.claude.json` skillUsage
