@@ -12,8 +12,11 @@ contract instead of this file.
 
 Read the project's goals, knowledge and checks in `~/dev/agent-private/projects/justsearch/`, the user's
 preferences in `~/dev/agent-private/user/`, and the task index in `tasks/` there. One task record per
-outcome: continue an existing one rather than starting a second. Task records and briefs never go
-into the repository. The guides, role contracts and templates named below are in `~/.local/share/agent-method/`.
+outcome: continue an existing one rather than starting a second. Task records, briefs and review
+outputs never go into the repository; a project may also keep public task documents there, as its
+knowledge says. The guides, role contracts and templates named below are in `~/.local/share/agent-method/`. If
+these folders do not exist, you are not working for this project's maintainer: say so and follow the
+repository's own contributor documents instead.
 
 ## Cost comes first
 
@@ -84,5 +87,7 @@ delivery and verdict: `guides/delivery.md` · taking over or pausing: `guides/ta
 
 ## Talking to the user
 
-Lead with the outcome, in plain language, without code notation. Claim only what happened. List
-decisions with your recommendation. Keep the task record's current view under 150 words.
+Lead with the outcome, in plain language, without code notation. Claim only what happened.
+When the user granted autonomy, never end a turn on an offer: act, or name the exact blocker and who
+must clear it. List decisions with your recommendation. Keep the task record's current view under
+150 words.
