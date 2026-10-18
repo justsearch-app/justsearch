@@ -46,6 +46,9 @@ import org.junit.jupiter.api.Test;
 final class WorkerSearchServiceQueuedUnavailableTest
     extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
   private static final Duration REQUEST_BUDGET = Duration.ofSeconds(20);
+  private static final Duration QUEUED = Duration.ofMillis(8500);
+  private static final Duration VECTOR_BUDGET = Duration.ofMillis(2000);
+  private static final Duration VECTOR_QUEUED = Duration.ofMillis(1600);
   private final Map<String, String> previousProperties = new HashMap<>();
   private RunningRuntime lifecycle;
   private final ObservedLatch loading = new ObservedLatch(1);
@@ -156,8 +159,7 @@ final class WorkerSearchServiceQueuedUnavailableTest
   void queuedUnavailableVectorKeepsTypedDeadline() throws Exception {
     lifecycle = openSearchIndex();
     var service = service(transientProvider());
-    var call = foreground(Duration.ofMillis(2000));
-    TimeUnit.MILLISECONDS.sleep(1600);
+    var call = queuedVectorCall();
     var failure = assertThrows(WorkerServiceException.class,
         () -> service.search(query(pipeline().setDenseEnabled(true)), call));
     assertEquals(WorkerServiceException.Status.DEADLINE_EXCEEDED, failure.status());
@@ -249,8 +251,7 @@ final class WorkerSearchServiceQueuedUnavailableTest
   void queuedColdPlaceholderVectorKeepsTypedDeadline() throws Exception {
     lifecycle = openSearchIndex();
     var service = coldService(true);
-    var call = foreground(Duration.ofMillis(2000));
-    TimeUnit.MILLISECONDS.sleep(1600);
+    var call = queuedVectorCall();
     var failure = assertThrows(WorkerServiceException.class,
         () -> service.search(query(pipeline().setDenseEnabled(true)), call));
     assertEquals(WorkerServiceException.Status.DEADLINE_EXCEEDED, failure.status());
@@ -309,11 +310,34 @@ final class WorkerSearchServiceQueuedUnavailableTest
     return provider;
   }
 
-  private static CallContext queuedCall() throws InterruptedException {
-    var call = foreground(REQUEST_BUDGET);
-    // The real CPU cap is 8000 ms; the whole deadline is still live at service entry.
-    TimeUnit.MILLISECONDS.sleep(8500);
-    return call;
+  private static CallContext queuedCall() {
+    // Queued past the real 8000 ms CPU cap; the whole 20 s deadline still has 11.5 s at service
+    // entry, beyond the lexical reserve and margin, so the semantic cap expires, not the request.
+    assertTrue(QUEUED.toMillis() > SearchBudgetPolicy.DEFAULT.semanticCapCpuMs());
+    assertTrue(REQUEST_BUDGET.minus(QUEUED).toMillis()
+        > SearchBudgetPolicy.DEFAULT.lexicalReserveMs() + SearchBudgetPolicy.DEFAULT.marginMs());
+    return queuedFor(REQUEST_BUDGET, QUEUED);
+  }
+
+  private static CallContext queuedVectorCall() {
+    // Queued 1600 ms of a 2000 ms deadline: 400 ms remain at service entry, so the request is
+    // still live but its VECTOR-only budget (deadline minus the 500 ms margin) has expired.
+    assertTrue(VECTOR_BUDGET.minus(VECTOR_QUEUED).toMillis() > 0);
+    assertTrue(VECTOR_BUDGET.minus(VECTOR_QUEUED).toMillis()
+        < SearchBudgetPolicy.DEFAULT.marginMs());
+    return queuedFor(VECTOR_BUDGET, VECTOR_QUEUED);
+  }
+
+  /**
+   * A foreground call with request budget {@code budget} whose caller started it {@code queued}
+   * before service entry: what the same call would be after waiting {@code queued} for a worker
+   * thread, with its start and deadline back-dated on the same clock instead of sleeping.
+   */
+  static CallContext queuedFor(Duration budget, Duration queued) {
+    var call = foreground(budget);
+    long start = System.nanoTime() - queued.toNanos();
+    return new CallContext(call.traceId(), call.requestId(), call.cancel(), call.engineContext(),
+        call.provenance(), call.childLifetime(), start + budget.toNanos(), start);
   }
 
   private void assertUnused() {
