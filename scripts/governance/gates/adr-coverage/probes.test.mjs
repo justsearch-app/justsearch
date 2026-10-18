@@ -195,6 +195,19 @@ await run('grep: a reused global regex counts every file independently', async (
 
 // --------------------------------------------------------------------------- kind: json-path
 
+await run('per-user installer premise follows the Windows config and still rejects elevation', async () => {
+  const probe = loadProbeRegister(process.cwd()).byId.get('adr-0024-per-user-install');
+  const base = 'modules/shell/src-tauri/tauri.conf.json';
+  const windows = 'modules/shell/src-tauri/tauri.windows.conf.json';
+  const root = scaffold({ [base]: '{}',
+    [windows]: JSON.stringify({ bundle: { windows: { nsis: { installMode: 'currentUser' } } } }),
+  });
+  assert.equal(evaluateProbe(probe, root).ok, true);
+  fs.writeFileSync(path.join(root, windows),
+    JSON.stringify({ bundle: { windows: { nsis: { installMode: 'perMachine' } } } }));
+  assert.equal(evaluateProbe(probe, root).ok, false);
+});
+
 const DOC = JSON.stringify({ categories: [{ id: 'wire' }], bundle: { windows: { nsis: { installMode: 'currentUser' } } } });
 
 await run('json-path count: matches → pass', async () => {

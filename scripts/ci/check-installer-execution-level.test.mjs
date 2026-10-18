@@ -23,6 +23,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { checkInstallerExecutionLevel, findRequestedExecutionLevel, checkInstallerArtifact } from './check-installer-execution-level.mjs';
+import { readTauriConfig } from './lib/tauri-config.mjs';
 
 const failures = [];
 let passed = 0;
@@ -48,6 +49,43 @@ function repoWithConfig(conf) {
 }
 
 // -------------------- config half --------------------
+
+test('platform config merges objects, replaces arrays and removes null fields', () => {
+  const files = {
+    'modules/shell/src-tauri/tauri.conf.json': JSON.stringify({
+      bundle: { icon: ['base.ico'], resources: ['base'], windows: { nsis: { installMode: 'currentUser' } } },
+      plugins: { updater: { active: true } },
+    }),
+    'modules/shell/src-tauri/tauri.windows.conf.json': JSON.stringify({
+      bundle: { resources: ['windows'], windows: { nsis: { installerHooks: 'hooks.nsh' } } },
+      plugins: { updater: null },
+    }),
+  };
+  assert.deepEqual(readTauriConfig('', 'windows', file => files[file]), {
+    bundle: { icon: ['base.ico'], resources: ['windows'],
+      windows: { nsis: { installMode: 'currentUser', installerHooks: 'hooks.nsh' } } },
+    plugins: {},
+  });
+});
+
+test('the Windows overlay supplies per-user mode on either host', () => {
+  const root = repoWithConfig(JSON.stringify({ bundle: { targets: ['deb'] } }));
+  fs.writeFileSync(path.join(root, 'modules/shell/src-tauri/tauri.windows.conf.json'),
+    JSON.stringify({ bundle: { windows: { nsis: { installMode: 'currentUser' } } } }));
+  assert.equal(checkInstallerExecutionLevel(root).ok, true);
+});
+
+for (const overlay of [
+  JSON.stringify({ bundle: { windows: { nsis: { installMode: 'perMachine' } } } }),
+  JSON.stringify({ bundle: { windows: { nsis: { installMode: null } } } }),
+  '{ not json',
+]) {
+  test(`the Windows overlay cannot bypass elevation checks: ${overlay}`, () => {
+    const root = repoWithConfig(JSON.stringify({ bundle: { windows: { nsis: { installMode: 'currentUser' } } } }));
+    fs.writeFileSync(path.join(root, 'modules/shell/src-tauri/tauri.windows.conf.json'), overlay);
+    assert.equal(checkInstallerExecutionLevel(root).ok, false);
+  });
+}
 
 test('currentUser install mode passes', () => {
   const root = repoWithConfig(JSON.stringify({ bundle: { windows: { nsis: { installMode: 'currentUser' } } } }));

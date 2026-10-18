@@ -31,6 +31,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { readTauriConfig } from './lib/tauri-config.mjs';
 
 /**
  * sha256 of the stock Tauri `icon.ico` as it stood at 1a716e08, the last commit before the
@@ -311,7 +312,9 @@ export function runCheck(
     }
   },
 ) {
-  const conf = read('modules/shell/src-tauri/tauri.conf.json');
+  let conf;
+  try { conf = JSON.stringify(readTauriConfig(root, 'windows', read)); }
+  catch (error) { return [error.message]; }
   // Collect every src-tauri-relative asset path the config names, then read each once.
   let declared = [];
   try {

@@ -50,6 +50,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { readTauriConfig } from './lib/tauri-config.mjs';
 
 function repoRootFromCwd() {
   const markers = ['settings.gradle.kts', 'build.gradle.kts', '.git'];
@@ -85,9 +86,9 @@ export function checkInstallerExecutionLevel(repoRoot) {
 
   let config;
   try {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config = readTauriConfig(repoRoot, 'windows');
   } catch (err) {
-    return { ok: false, message: `${CONFIG_REL} is not valid JSON: ${err.message}` };
+    return { ok: false, message: err.message };
   }
 
   const installMode = config?.bundle?.windows?.nsis?.installMode;
@@ -95,7 +96,7 @@ export function checkInstallerExecutionLevel(repoRoot) {
     return {
       ok: false,
       message:
-        `${CONFIG_REL}: bundle.windows.nsis.installMode is ${JSON.stringify(installMode)}, ` +
+        `${CONFIG_REL} (including the Windows overlay): bundle.windows.nsis.installMode is ${JSON.stringify(installMode)}, ` +
         `expected ${JSON.stringify(EXPECTED_INSTALL_MODE)}. A non-"currentUser" install mode ` +
         '(e.g. "perMachine") makes the NSIS installer request Windows elevation (a UAC prompt) ' +
         'on every install — per ADR-0024 the installer must be per-user.',
@@ -104,7 +105,7 @@ export function checkInstallerExecutionLevel(repoRoot) {
 
   return {
     ok: true,
-    message: `${CONFIG_REL}: bundle.windows.nsis.installMode is "currentUser" — the installer does not request elevation.`,
+    message: `${CONFIG_REL} (including the Windows overlay): bundle.windows.nsis.installMode is "currentUser" — the installer does not request elevation.`,
   };
 }
 

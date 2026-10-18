@@ -24,6 +24,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { readTauriConfig } from './lib/tauri-config.mjs';
 
 /** File shapes that mean "model weights", not config/tokenizer JSON. */
 const MODEL_WEIGHT = /\.onnx\b|\.gguf\b|\.safetensors\b|\bmodel-weights\b/i;
@@ -100,8 +101,11 @@ export function checkNsisHooks(nsh) {
 }
 
 export function runCheck(root, read = (p) => readFileSync(resolve(root, p), 'utf8')) {
+  let conf;
+  try { conf = JSON.stringify(readTauriConfig(root, 'windows', read)); }
+  catch (error) { return [error.message]; }
   return [
-    ...checkBundleResources(read('modules/shell/src-tauri/tauri.conf.json')),
+    ...checkBundleResources(conf),
     ...checkSidecarStaging(read('modules/ui/build.gradle.kts')),
     ...checkNsisHooks(read('modules/shell/src-tauri/nsis/installer-hooks.nsh')),
   ];
