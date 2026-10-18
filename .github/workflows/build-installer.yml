@@ -170,6 +170,10 @@ jobs:
             modules/shell/package-lock.json
             modules/ui-web/package-lock.json
 
+      # This bootstrap path also runs from prepare-worktree before root npm ci exists.
+      - name: Check dependency-free tool invocation before npm install
+        run: node scripts/lib/tool-invoker.test.mjs
+
       - name: Validate release changelog before building
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
