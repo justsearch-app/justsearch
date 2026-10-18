@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.gpu;
 
+import io.justsearch.configuration.NativeTargets;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -54,24 +55,7 @@ public final class NvmlService {
    * one GPU both are the same device.
    */
   public GpuCapabilities.Nvml probe(String pciBusId) {
-    if (!isWindows()) {
-      return new GpuCapabilities.Nvml(
-          false,
-          null,
-          null,
-          "NVML probe is only supported on Windows in v3.",
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null);
-    }
-
-    Path preferred = preferredNvmlPath();
+    Path preferred = isWindows() ? preferredNvmlPath() : null;
     String attemptedPath = preferred != null ? preferred.toString() : null;
     String loadedPath = null;
 
@@ -81,8 +65,13 @@ public final class NvmlService {
         loadedPath = preferred.toString();
       } else {
         // Best-effort fallback: rely on DLL search path.
-        System.loadLibrary("nvml");
-        loadedPath = "nvml";
+        if (isWindows()) {
+          System.loadLibrary("nvml");
+          loadedPath = "nvml";
+        } else {
+          loadedPath = NativeTargets.current().libraryName("nvml");
+          // libraryLookup accepts the SONAME; System.loadLibrary would add lib/.so again.
+        }
       }
     } catch (Throwable t) {
       return new GpuCapabilities.Nvml(
@@ -326,7 +315,7 @@ public final class NvmlService {
       if (root == null || root.isBlank()) {
         root = "C:\\Windows";
       }
-      return Path.of(root).resolve("System32").resolve("nvml.dll");
+      return Path.of(root).resolve("System32").resolve(NativeTargets.current().libraryName("nvml"));
     } catch (Exception e) {
       return null;
     }

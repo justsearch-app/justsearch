@@ -297,6 +297,7 @@
     },
     {
       "id": "cuda-runtime",
+      "nativeTarget": "windows-x86_64",
       "necessity": "infrastructure",
       "label": "GPU runtime libraries",
       "description": "GPU acceleration",

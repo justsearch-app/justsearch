@@ -33,3 +33,7 @@ tasks.withType<Test>().configureEach {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   workingDir = rootProject.projectDir
 }
+
+tasks.named<Test>("test") {
+  inputs.property("linuxGpuCheck", providers.environmentVariable("JUSTSEARCH_LINUX_GPU_CHECK").orElse(""))
+}

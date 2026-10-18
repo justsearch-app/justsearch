@@ -41,6 +41,20 @@ import org.mockito.Mockito;
  * declines to launch it, so no process starts.
  */
 final class RuntimeActivationSelfTestPromptCacheTest {
+  private String nativeFixtureOs;
+
+  @org.junit.jupiter.api.BeforeEach
+  void selectWindowsNativeFixture() {
+    nativeFixtureOs = System.getProperty("os.name");
+    System.setProperty("os.name", "Windows 11");
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void restoreNativeFixtureOs() {
+    if (nativeFixtureOs == null) System.clearProperty("os.name");
+    else System.setProperty("os.name", nativeFixtureOs);
+  }
+
 
   private static final long GIB = 1024L * 1024 * 1024;
 

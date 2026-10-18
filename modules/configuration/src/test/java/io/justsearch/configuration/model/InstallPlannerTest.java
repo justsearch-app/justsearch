@@ -11,6 +11,21 @@ import org.junit.jupiter.api.io.TempDir;
 
 class InstallPlannerTest {
 
+  private String targetFixtureOs;
+
+  @org.junit.jupiter.api.BeforeEach
+  void selectDeclaredRuntimeTarget(org.junit.jupiter.api.TestInfo info) {
+    targetFixtureOs = System.getProperty("os.name");
+    if (info.getTestMethod().orElseThrow().getName().equals("noPackageSelectsACudaVariant_unlessCudaRuntimeIsInThePlan")) {
+      System.setProperty("os.name", "Windows 11");
+    }
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void restoreDeclaredRuntimeTarget() {
+    System.setProperty("os.name", targetFixtureOs);
+  }
+
   @TempDir Path tempDir;
 
   @Test

@@ -70,6 +70,20 @@ import org.junit.jupiter.api.io.TempDir;
  * whose stop fails with {@link ChildSurvivedException}); its endpoints are a loopback server.
  */
 final class RuntimeActivationSelfTestStopFailureTest {
+  private String nativeFixtureOs;
+
+  @org.junit.jupiter.api.BeforeEach
+  void selectWindowsNativeFixture() {
+    nativeFixtureOs = System.getProperty("os.name");
+    System.setProperty("os.name", "Windows 11");
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void restoreNativeFixtureOs() {
+    if (nativeFixtureOs == null) System.clearProperty("os.name");
+    else System.setProperty("os.name", nativeFixtureOs);
+  }
+
 
   private static final long MIB = 1024L * 1024;
 

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.pack;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.app.api.ApiErrorCode;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -123,6 +124,10 @@ public final class AiPackValidator {
     if (!"runtime".equalsIgnoreCase(safe(m.kind))) {
       return new ValidationResult(false, ApiErrorCode.PACK_KIND_UNSUPPORTED, "Unsupported pack kind for runtime validation.");
     }
+    if (!isWindows()) {
+      return new ValidationResult(false, ApiErrorCode.PACK_KIND_UNSUPPORTED,
+          "Runtime packs are Windows-only; configure JUSTSEARCH_SERVER_EXE on Linux.");
+    }
     if (isBlank(m.variantId) || !isValidVariantId(m.variantId)) {
       return new ValidationResult(false, ApiErrorCode.PACK_RUNTIME_VARIANT_INVALID, "variantId is required for runtime packs.");
     }
@@ -198,7 +203,7 @@ public final class AiPackValidator {
       if ("runtime.llamaServer".equalsIgnoreCase(role)) {
         hasExe = true;
         String filename = filenameFromPathInPack(byId.get(fileId).pathInPack);
-        if (!"llama-server.exe".equalsIgnoreCase(filename)) {
+        if (!NativeTargets.current().executableName("llama-server").equalsIgnoreCase(filename)) {
           return new ValidationResult(
               false,
               ApiErrorCode.PACK_RUNTIME_EXE_INVALID,
@@ -311,7 +316,7 @@ public final class AiPackValidator {
     String f = filename.trim();
     if (f.isBlank()) return false;
     String lower = f.toLowerCase(Locale.ROOT);
-    if ("llama-server.exe".equals(lower)) return true;
+    if (NativeTargets.current().executableName("llama-server").equals(lower)) return true;
     if (lower.endsWith(".dll")) return true;
     if (lower.equals("runtime-version.txt")) return true;
     if (lower.startsWith("license")) return true;
