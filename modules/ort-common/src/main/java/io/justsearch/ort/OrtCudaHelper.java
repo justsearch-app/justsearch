@@ -44,11 +44,11 @@ public final class OrtCudaHelper {
    * CUDA dependency DLLs in load order. cuBLAS depends on cuBLASLt, so cuBLASLt must come first.
    * Version-pinned to CUDA 12 / cuDNN 9 / cuFFT 11. Update this list when upgrading CUDA toolkit.
    */
-  static final List<String> CUDA_DEPENDENCY_DLL_ORDER =
-      List.of("cudart", "cublasLt", "cublas", "cufft", "curand", "cusparse", "cusolver",
+  static List<String> cudaDependencyDllOrder() {
+    return nativeLibraryNames("cudart", "cublasLt", "cublas", "cufft", "curand", "cusparse", "cusolver",
           "nvJitLink", "cudnn", "cudnn_graph", "cudnn_heuristic", "cudnn_ops", "cudnn_cnn",
-          "cudnn_adv", "cudnn_engines_runtime_compiled", "cudnn_engines_precompiled")
-          .stream().map(NativeTargets.current()::libraryName).toList();
+          "cudnn_adv", "cudnn_engines_runtime_compiled", "cudnn_engines_precompiled");
+  }
 
   private static final Set<String> PRELOADED_NATIVE_DLLS = ConcurrentHashMap.newKeySet();
   private static volatile boolean legacyKeyWarningLogged;
@@ -218,11 +218,12 @@ public final class OrtCudaHelper {
    * contain. Setting the property reroutes ALL ORT natives to that dir (tempdoc 772 §J probe:
    * externalizing only the EP DLL fails init because the core libs are then sought there too).
    */
-  static final List<String> ORT_NATIVE_DLL_SET =
-      nativeLibraryNames("ort", "ort-jni", "ort-shared", "ort-cuda");
+  static List<String> ortNativeDllSet() {
+    return nativeLibraryNames("ort", "ort-jni", "ort-shared", "ort-cuda");
+  }
 
   private static List<String> nativeLibraryNames(String... ids) {
-    return java.util.Arrays.stream(ids).map(NativeTargets.current()::libraryName).toList();
+    return NativeTargets.currentIfSupported().map(target -> java.util.Arrays.stream(ids).map(target::libraryName).toList()).orElseGet(List::of);
   }
 
   /** Outcome of {@link #evaluateOrtNativePack(Path, String)}. */
@@ -233,7 +234,7 @@ public final class OrtCudaHelper {
     ALREADY_SET_EXTERNALLY,
     /** The pack dir is null or not a directory (pack not installed — CPU path). */
     DIR_ABSENT,
-    /** The pack dir exists but is missing one or more of {@link #ORT_NATIVE_DLL_SET}. */
+    /** The pack dir exists but is missing one or more of {@link #ortNativeDllSet()}. */
     INCOMPLETE,
     /** The pack dir is complete but its version marker does not match {@link #EXPECTED_ORT_NATIVE_VERSION}. */
     VERSION_MISMATCH
@@ -267,11 +268,14 @@ public final class OrtCudaHelper {
     if (existingProperty != null && !existingProperty.isBlank()) {
       return new OrtNativePackDecision(OrtNativePackStatus.ALREADY_SET_EXTERNALLY, existingProperty);
     }
+    if (NativeTargets.currentIfSupported().isEmpty()) {
+      return new OrtNativePackDecision(OrtNativePackStatus.DIR_ABSENT, "GPU unavailable: unsupported native target");
+    }
     if (packDir == null || !Files.isDirectory(packDir)) {
       return new OrtNativePackDecision(OrtNativePackStatus.DIR_ABSENT, String.valueOf(packDir));
     }
     List<String> missing = new ArrayList<>();
-    for (String dll : ORT_NATIVE_DLL_SET) {
+    for (String dll : ortNativeDllSet()) {
       if (!Files.exists(packDir.resolve(dll))) {
         missing.add(dll);
       }
@@ -386,7 +390,7 @@ public final class OrtCudaHelper {
       return List.of();
     }
     List<Path> dlls = new ArrayList<>();
-    for (String dllName : CUDA_DEPENDENCY_DLL_ORDER) {
+    for (String dllName : cudaDependencyDllOrder()) {
       Path dllPath = searchPath.resolve(dllName);
       if (Files.exists(dllPath)) {
         dlls.add(dllPath.toAbsolutePath().normalize());
@@ -432,8 +436,7 @@ public final class OrtCudaHelper {
     if (searchPath == null || !Files.isDirectory(searchPath)) {
       return;
     }
-    String osName = ConfigPrecedence.envOrProperty(null, "os.name", "");
-    if (!osName.toLowerCase(Locale.ROOT).contains("win")) {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() || NativeTargets.currentIfSupported().isEmpty()) {
       return;
     }
 

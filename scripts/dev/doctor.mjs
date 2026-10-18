@@ -29,19 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
 const asJson = process.argv.includes('--json');
 
-/** Resolve the MAIN checkout root (worktrees carry a `.git` FILE pointing at the real gitdir). */
-function resolveMainRepoRoot() {
-  try {
-    const dotGit = path.join(repoRoot, '.git');
-    const st = fs.statSync(dotGit);
-    if (st.isFile()) {
-      const m = fs.readFileSync(dotGit, 'utf8').trim().match(/^gitdir:\s*(.+)$/);
-      if (m) return path.resolve(repoRoot, m[1], '..', '..', '..');
-    }
-  } catch { /* not a worktree */ }
-  return repoRoot;
-}
-const mainRepoRoot = resolveMainRepoRoot();
+const mainRepoRoot = runtime.resolveMainRepoRoot(repoRoot);
 
 /** The models dir the runtime resolves (env override, else main checkout, else this checkout). */
 function resolveModelsDir() {

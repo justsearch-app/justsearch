@@ -1,3 +1,5 @@
+import conventions.HostPlatform
+import groovy.json.JsonSlurper
 plugins {
   `java-library`
   id("jvm-test-suite")
@@ -131,13 +133,17 @@ publishing {
 }
 
 // One native Linux lifetime/identity seam, shared by every JVM consumer and distribution.
-val linuxBoundExec = layout.buildDirectory.file("native/linux-x86_64/justsearch-bound-exec")
+val nativeTargets = JsonSlurper().parseText(providers.fileContents(
+    rootProject.layout.projectDirectory.file("contracts/native-targets/spec.v1.json")).asText.get()) as Map<*, *>
+val linuxTarget = (nativeTargets["targets"] as Map<*, *>)["linux-x86_64"] as Map<*, *>
+val boundExecRelative = (linuxTarget["paths"] as Map<*, *>)["bound-exec"] as String
+val linuxBoundExec = layout.buildDirectory.file(boundExecRelative)
 val buildLinuxBoundExec by tasks.registering(Exec::class) {
   val source = rootProject.layout.projectDirectory.file("native/bound-exec/bound-exec.c")
   val binary = linuxBoundExec
   inputs.file(source)
   outputs.file(binary)
-  onlyIf { System.getProperty("os.name").lowercase().startsWith("linux") }
+  onlyIf { HostPlatform.isLinux }
   doFirst { binary.get().asFile.parentFile.mkdirs() }
   commandLine("cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
       source.asFile.absolutePath, "-o", binary.get().asFile.absolutePath)

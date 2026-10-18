@@ -4,9 +4,18 @@ from unittest.mock import MagicMock, patch
 import os
 import subprocess
 import sys
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 from jseval.backend import _install_distribution, _boot_and_wait
+
+
+@pytest.fixture(autouse=True)
+def stage_native_contract(tmp_path):
+    source = Path(__file__).resolve().parents[3] / "contracts/native-targets/spec.v1.json"
+    target = tmp_path / "contracts/native-targets/spec.v1.json"
+    target.parent.mkdir(parents=True)
+    shutil.copyfile(source, target)
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux parent-death binding is thread-specific")
@@ -42,10 +51,12 @@ def test_failed_build_prevents_runner_launch(tmp_path):
     popen.assert_not_called()
 
 
-def test_build_precedes_bound_runner_and_registration(tmp_path):
+@pytest.mark.parametrize("platform_name", sorted({sys.platform, "darwin"}))
+def test_build_precedes_bound_runner_and_registration(tmp_path, platform_name):
     calls = []
     proc = MagicMock()
-    with patch("jseval.backend._install_distribution", side_effect=lambda *_: calls.append("build")), \
+    with patch("jseval.backend.sys.platform", platform_name), \
+            patch("jseval.backend._install_distribution", side_effect=lambda *_: calls.append("build")), \
             patch("jseval.backend.subprocess.Popen", side_effect=lambda *_a, **_k: (calls.append("spawn"), proc)[1]) as popen, \
             patch("jseval.backend.run_register.register_backend", side_effect=lambda **_: calls.append("register")), \
             patch("jseval.backend._wait_for_health", return_value=True):
@@ -53,7 +64,7 @@ def test_build_precedes_bound_runner_and_registration(tmp_path):
                        env={}, port=33221, llm=False, health_timeout_sec=1)
     assert calls == ["build", "spawn", "register"]
     command = popen.call_args.args[0]
-    if os.name != "nt":
+    if platform_name == "linux":
         assert command[:5] == [str(tmp_path / "modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec"),
                                "exec", str(os.getpid()), "--", "node"]
     else:

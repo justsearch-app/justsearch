@@ -31,7 +31,7 @@ final class LateWindowExitTest {
     try (var ignored=open; var unused=active) {
       Process p=OwnedHelper.start(new ProcessBuilder(javaExecutable,"--version")
           .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD),"late OCR owner");
-      System.out.println("real helper identity="+p.pid()+"/"+ (BoundChildProcess.isLinux() ? LinuxProcessIdentity.read(p.pid()) : ProcessTerminator.forCurrentOs().creationFileTime(p.pid())));
+      System.out.println("real helper identity="+p.pid()+"/"+ (io.justsearch.configuration.PlatformPaths.isLinux() ? LinuxProcessIdentity.read(p.pid()) : ProcessTerminator.forCurrentOs().creationFileTime(p.pid())));
       p.toHandle().onExit().get(10,TimeUnit.SECONDS);
       Thread.sleep(2_600); // the open owner window is still live throughout
       assertTrue(p.waitFor(10,TimeUnit.SECONDS));

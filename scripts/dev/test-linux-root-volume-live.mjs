@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Run: flock /tmp/js-linux-port/devstack.lock node scripts/dev/test-linux-root-volume-live.mjs --disposable-mounts
+// Caller holds the campaign live-stack and Gradle locks; pass --disposable-mounts.
 // Uses the real Engine index half and KnowledgeClient root/search interfaces, as the Windows
 // EngineRootVolumeSwapTest does. No HTTP trust policy or ingest approval is bypassed or modified.
 import assert from 'node:assert/strict';
@@ -101,6 +101,7 @@ async function mount(stage) {
       await sudo('mount', loops.get(stage).device, point);
     }
     mounted = true;
+    if (stage === 'A') await sudo('chown', `${process.getuid()}:${process.getgid()}`, point);
     // mkfs creates an empty root-owned lost+found. Remove that fixture-only directory so an
     // unrelated unreadable subfolder cannot determine the root's walk status.
     const recoveryDirectory = path.join(point, 'lost+found');
@@ -119,8 +120,13 @@ try {
   for (const name of ['A', 'B']) {
     const image = path.join(campaign, `${name}.img`);
     fs.closeSync(fs.openSync(image, 'wx'));
-    fs.truncateSync(image, 48 * 1024 * 1024);
-    await run('mkfs.ext4', ['-q', '-F', '-E', `root_owner=${process.getuid()}:${process.getgid()}`, image]);
+    fs.truncateSync(image, (name === 'A' ? 256 : 48) * 1024 * 1024);
+    if (name === 'A') {
+      // Exercise the source-device UUID path: btrfs subvolume st_dev differs from mountinfo.
+      await run('mkfs.btrfs', ['-q', '-f', image]);
+    } else {
+      await run('mkfs.ext4', ['-q', '-F', '-E', `root_owner=${process.getuid()}:${process.getgid()}`, image]);
+    }
     const device = await sudo('losetup', '--find', '--show', image);
     loops.set(name, { device, image });
     record('loop-created', { name, device, image });
@@ -128,8 +134,9 @@ try {
   await run('udevadm', ['settle']);
   await mount('A');
   const log = fs.openSync(path.join(campaign, 'gradle.log'), 'w');
-  testProcess = spawn('flock', ['/tmp/js-linux-port/gradle.lock', './gradlew',
-    ':modules:app-engine:test', '--tests', '*EngineLinuxRootVolumeLiveTest', '-PskipWebBuild=true', '--rerun'], {
+  testProcess = spawn('./gradlew', [
+    ':modules:app-engine:test', '--tests', '*EngineLinuxRootVolumeLiveTest', '-PskipWebBuild=true', '--rerun',
+    '--no-daemon', '--no-configuration-cache'], {
     cwd: repo, stdio: ['ignore', log, log],
     env: { ...process.env, JUSTSEARCH_LINUX_ROOT_VOLUME_CAMPAIGN_DIR: campaign },
   });

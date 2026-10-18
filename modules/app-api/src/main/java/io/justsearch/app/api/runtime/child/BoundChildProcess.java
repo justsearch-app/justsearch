@@ -19,9 +19,6 @@ import java.util.concurrent.TimeUnit;
 public final class BoundChildProcess {
   private BoundChildProcess() {}
 
-  public static boolean isLinux() {
-    return SystemAccess.sysProp("os.name", "").toLowerCase(Locale.ROOT).startsWith("linux");
-  }
 
   private static final class Spawner {
     static final LinkedBlockingQueue<FutureTask<Process>> QUEUE = new LinkedBlockingQueue<>();
@@ -43,12 +40,12 @@ public final class BoundChildProcess {
           .getLocation().toURI()).toAbsolutePath();
       if (Files.isRegularFile(location)) {
         Path lib = location.getParent();
-        Path helper = lib.getParent().resolve("native/linux-x86_64/justsearch-bound-exec");
+        Path helper = lib.getParent().resolve(io.justsearch.configuration.NativeTargets.current().relativePath("bound-exec"));
         if (Files.isRegularFile(helper) && Files.isExecutable(helper)) return helper.toRealPath();
       } else {
         // Gradle classes: the native output belongs to this app-api build, never another checkout.
         for (Path dir = location; dir != null; dir = dir.getParent()) {
-          Path helper = dir.resolve("native/linux-x86_64/justsearch-bound-exec");
+          Path helper = dir.resolve(io.justsearch.configuration.NativeTargets.current().relativePath("bound-exec"));
           if (Files.isRegularFile(helper) && Files.isExecutable(helper)) return helper.toRealPath();
           if (Files.exists(dir.resolve("settings.gradle.kts"))) break;
         }
@@ -61,7 +58,7 @@ public final class BoundChildProcess {
 
   /** Boot probes the actual helper; absence or an unusable backend refuses child-capable work. */
   public static void initialize() throws IOException {
-    if (!isLinux()) return;
+    if (!io.justsearch.configuration.PlatformPaths.isLinux()) return;
     Process probe = start(new ProcessBuilder("/bin/true").redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .redirectError(ProcessBuilder.Redirect.DISCARD));
     boolean interrupted = false;
@@ -80,7 +77,7 @@ public final class BoundChildProcess {
   }
 
   public static Process start(ProcessBuilder original) throws IOException {
-    if (!isLinux()) return original.start();
+    if (!io.justsearch.configuration.PlatformPaths.isLinux()) return original.start();
     Path executable = helper();
     var command = java.util.List.copyOf(original.command());
     var argv = new ArrayList<String>();

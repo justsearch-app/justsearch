@@ -55,7 +55,7 @@ public final class NvmlService {
    * one GPU both are the same device.
    */
   public GpuCapabilities.Nvml probe(String pciBusId) {
-    Path preferred = isWindows() ? preferredNvmlPath() : null;
+    Path preferred = io.justsearch.configuration.PlatformPaths.isWindows() ? preferredNvmlPath() : null;
     String attemptedPath = preferred != null ? preferred.toString() : null;
     String loadedPath = null;
 
@@ -65,7 +65,7 @@ public final class NvmlService {
         loadedPath = preferred.toString();
       } else {
         // Best-effort fallback: rely on DLL search path.
-        if (isWindows()) {
+        if (io.justsearch.configuration.PlatformPaths.isWindows()) {
           System.loadLibrary("nvml");
           loadedPath = "nvml";
         } else {
@@ -304,10 +304,6 @@ public final class NvmlService {
     }
   }
 
-  private static boolean isWindows() {
-    String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-    return os.contains("win");
-  }
 
   private static Path preferredNvmlPath() {
     try {

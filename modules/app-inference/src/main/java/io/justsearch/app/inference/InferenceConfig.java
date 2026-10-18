@@ -528,14 +528,11 @@ public record InferenceConfig(
     if (envPath != null && !envPath.isBlank()) {
       Path p = Path.of(envPath);
       log.debug("  JUSTSEARCH_SERVER_EXE set to: {}", envPath);
-      if (io.justsearch.configuration.PlatformPaths.isWindows() ? Files.exists(p) : Files.isRegularFile(p) && Files.isExecutable(p)) {
+      if (Files.isRegularFile(p) && (io.justsearch.configuration.PlatformPaths.isWindows() || Files.isExecutable(p))) {
         log.debug("  Found via environment variable: {}", p);
         return p;
       } else {
-        if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
-          throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + p);
-        }
-        log.warn("  JUSTSEARCH_SERVER_EXE path does not exist: {}", p);
+        throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + p);
       }
     } else {
       log.debug("  JUSTSEARCH_SERVER_EXE not set");

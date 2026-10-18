@@ -1,7 +1,9 @@
 # Native names and the Linux runtime
 
-`spec.v1.json` supplies executable, library and ORT resource names for each supported
-OS/architecture. Java packages these exact bytes; Node reads the repository file;
+`spec.v1.json` supplies executable, library and ORT resource names, distribution
+helper paths, and runtime-pack/CPU-baseline capabilities for each supported target.
+`windows.pre-port.golden.json` independently pins the Windows literals from
+37e0957c9; change it only when intentionally changing that Windows contract. Java packages these exact bytes; Node reads the repository file;
 the desktop shell embeds the same file. A registry package with `nativeTarget`
 contains artifacts for that descriptor target. An absent target means portable
 model data. Windows runtime archives are excluded from Linux install plans.
@@ -39,9 +41,10 @@ The installed application includes the ORT Linux native resources.
 Start JustSearch with that environment and the downloaded/imported models. Activate
 variant `default` with chat profile `compact` or `standard` through the AI runtime
 API or its UI. An omitted/default selection uses the exact configured executable;
-`cuda12` remains a Windows pack selection and is refused on Linux. A missing,
-directory or non-executable override is refused rather than replaced with another
-runtime. Development inference must stay on the GPU.
+`cuda12` remains a Windows pack selection and is refused on Linux. On both
+supported targets a nonempty `JUSTSEARCH_SERVER_EXE` must name a regular file; an
+invalid path fails visibly without falling back. Linux also requires its execute
+bit. Development inference must stay on the GPU.
 
 Deactivation disables chat when no CPU baseline exists. It preserves the runtime
 path and GPU settings, so activate `default` again to resume. The saved profile and

@@ -4,7 +4,6 @@ package io.justsearch.app.api.runtime;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.justsearch.app.api.runtime.child.BoundChildProcess;
 import io.justsearch.app.api.runtime.child.LinuxProcessIdentity;
-import java.io.File;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Locale;
@@ -68,7 +67,7 @@ public record ManagedChild(
       String modelPath,
       String declaredConfigHash,
       String realizedArgvHash) {
-    var linux = BoundChildProcess.isLinux() ? LinuxProcessIdentity.observe(process.pid()) : null;
+    var linux = io.justsearch.configuration.PlatformPaths.isLinux() ? LinuxProcessIdentity.observe(process.pid()) : null;
     ProcessHandle.Info observed = process.info();
     Instant start =
         observed.startInstant().orElseThrow(
@@ -94,7 +93,7 @@ public record ManagedChild(
   /** Windows paths compare case-insensitively; other platforms retain case. */
   public static String normalizePath(Path path) {
     String normalized = path.toAbsolutePath().normalize().toString();
-    return File.separatorChar == '\\'
+    return io.justsearch.configuration.PlatformPaths.isWindows()
         ? normalized.toLowerCase(Locale.ROOT)
         : normalized;
   }
@@ -102,7 +101,7 @@ public record ManagedChild(
   /** Compare identity axes. Legacy records remain readable; Linux stop authority additionally
    * requires a saved native tuple in the terminator, never the legacy wall-clock match. */
   public IdentityMatch identityOf(ProcessHandle handle) {
-    if (BoundChildProcess.isLinux() && processIdentity != null) {
+    if (io.justsearch.configuration.PlatformPaths.isLinux() && processIdentity != null) {
       if (processIdentity.pid() != pid || handle.pid() != pid)
         return IdentityMatch.UNKNOWN;
       var live = LinuxProcessIdentity.observe(pid);

@@ -46,7 +46,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     if (PlatformPaths.isWindows()) {
       return WindowsRootIdentityLease.open(normalized);
     }
-    return isLinux() ? LinuxRootIdentityLease.open(normalized) : PortableRootIdentityLease.open(normalized);
+    return PlatformPaths.isLinux() && LinuxRootIdentityLease.supportedArchitecture() ? LinuxRootIdentityLease.open(normalized) : PortableRootIdentityLease.open(normalized);
   }
 
   void requireCurrent(Path root) throws IOException {
@@ -98,9 +98,6 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     return new RootIdentity(realPath(root), new ProviderFileIdentity(fileKey));
   }
 
-  static boolean isLinux() {
-    return io.justsearch.configuration.SystemAccess.sysProp("os.name", "").toLowerCase(Locale.ROOT).contains("linux");
-  }
 
   /**
    * Test seam (task t-20261013-ef3c41, round 9): while set, {@link #volume()} answers as on a

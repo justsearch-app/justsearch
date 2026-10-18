@@ -547,7 +547,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     let java_bin = headless_dir
         .join("runtime")
         .join("bin")
-        .join(if cfg!(windows) { "javaw.exe" } else { "java" });
+        .join(native_targets::executable_name("java-gui"));
     let ui_jar = headless_dir.join("ui-headless.jar");
     let lib_glob = headless_dir.join("lib").join("*");
 

@@ -53,6 +53,11 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
     }
   }
 
+  static boolean supportedArchitecture() {
+    String arch = io.justsearch.configuration.SystemAccess.sysProp("os.arch", "");
+    return java.util.Set.of("amd64", "x86_64", "x64").contains(arch.toLowerCase(Locale.ROOT));
+  }
+
   @Override
   public RootIdentity identity() {
     return identity;
@@ -90,12 +95,10 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
     Path real = root.toRealPath();
     requireHeld(root, fileKey, device, real);
     Mount mount = selectMount(before, real);
-    String volume = mount != null && mount.device().equals(deviceNumber(device))
-        ? volume(mount, UUIDS, device) : null;
+    String volume = mount != null ? volume(mount, UUIDS, device) : null;
     // A replaced mount, a retargeted UUID symlink or a renamed/replaced directory must not
     // publish mixed evidence. The held fd prevents inode reuse throughout this observation.
-    String after = mount != null && mount.device().equals(deviceNumber(device))
-        ? volume(mount, UUIDS, device) : null;
+    String after = mount != null ? volume(mount, UUIDS, device) : null;
     if (!Objects.equals(volume, after)) {
       throw new IOException("Linux root UUID changed while reading its identity: " + root);
     }
@@ -119,7 +122,7 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
 
   /** Mount IDs are only observation evidence, never persistent identity. */
   record Mount(String id, String parent, String device, Path filesystemRoot, Path point,
-      String type) {}
+      String type, String source) {}
 
   private static List<Mount> readMounts() throws IOException {
     return parseMounts(Files.readAllLines(MOUNTINFO));
@@ -142,7 +145,7 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
         throw new IOException("Nonabsolute Linux mountinfo path");
       }
       mounts.add(new Mount(fields[0], fields[1], fields[2], filesystemRoot, point,
-          fields[separator + 1]));
+          fields[separator + 1], unescape(fields[separator + 2])));
     }
     return mounts;
   }
@@ -185,7 +188,20 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
   }
 
   static String volume(Mount mount, Path uuidDirectory, long device) throws IOException {
-    String uuid = uuidForDevice(uuidDirectory, device);
+    Long sourceDevice = null;
+    Path source = Path.of(mount.source());
+    if (source.isAbsolute()) {
+      try {
+        Map<String, Object> attributes = Files.readAttributes(source, "unix:rdev,mode");
+        if ((((Number) attributes.get("mode")).intValue() & 0170000) == BLOCK_DEVICE) {
+          sourceDevice = ((Number) attributes.get("rdev")).longValue();
+        }
+      } catch (IOException unavailable) { return null; }
+    }
+    // btrfs directory st_dev identifies its subvolume, not mountinfo's superblock device.
+    // A resolved source block device supplies the UUID; only the st_dev fallback needs equality.
+    if (sourceDevice == null && !mount.device().equals(deviceNumber(device))) return null;
+    String uuid = uuidForDevice(uuidDirectory, sourceDevice == null ? device : sourceDevice);
     return uuid == null ? null : encodeVolume(uuid, mount.type(), mount.filesystemRoot());
   }
 

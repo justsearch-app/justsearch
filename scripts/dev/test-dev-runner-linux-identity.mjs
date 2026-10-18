@@ -122,3 +122,22 @@ test('Linux signals use only the pidfd helper and reject incomplete/mismatched t
   assert.equal(signalLinuxProcess({ ...id, startTicks: 1234 }, 'SIGKILL', options).ok, false);
   assert.equal(calls.length, 0);
 });
+
+
+test('Linux canonical identities admit tick zero/u64 and reject malformed tuples; all ended states agree', () => {
+  const { linuxIdentity } = require('./lib/process-identity.cjs');
+  const identity = { kind: 'linux-proc-v1', pid: 42, bootId, startTicks: '0' };
+  for (const ticks of ['0', '18446744073709551615']) {
+    assert.deepEqual(linuxIdentity({ ...identity, startTicks: ticks }), { ...identity, startTicks: ticks });
+  }
+  for (const ticks of ['00', '-1', '18446744073709551616', '999999999999999999999']) {
+    assert.equal(linuxIdentity({ ...identity, startTicks: ticks }), null);
+  }
+  assert.equal(linuxIdentity({ ...identity, pid: 2147483648 }), null);
+  assert.equal(linuxIdentity({ ...identity, bootId: bootId.toUpperCase() }), null);
+  const options = { readFile: file => file.endsWith('/stat') ? stat('S', '0') : bootId, readlink: () => '/bin/sleep' };
+  assert.equal(readLinuxProcess(42, options).processIdentity.startTicks, '0');
+  for (const state of ['Z', 'X', 'x']) {
+    assert.deepEqual(readLinuxProcess(42, { ...options, readFile: () => stat(state) }), { present: false });
+  }
+});

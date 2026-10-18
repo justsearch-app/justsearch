@@ -39,7 +39,7 @@ public final class AiPackValidator {
       return new ValidationResult(false, ApiErrorCode.PACK_MANIFEST_INVALID, "Pack manifest has no assets.");
     }
 
-    boolean windows = isWindows();
+    boolean windows = io.justsearch.configuration.PlatformPaths.isWindows();
     Set<String> fileIds = new HashSet<>();
     Set<String> paths = new HashSet<>();
     Map<String, AiPackManifestV1.FileEntry> byId = new HashMap<>();
@@ -124,7 +124,7 @@ public final class AiPackValidator {
     if (!"runtime".equalsIgnoreCase(safe(m.kind))) {
       return new ValidationResult(false, ApiErrorCode.PACK_KIND_UNSUPPORTED, "Unsupported pack kind for runtime validation.");
     }
-    if (!isWindows()) {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
       return new ValidationResult(false, ApiErrorCode.PACK_KIND_UNSUPPORTED,
           "Runtime packs are Windows-only; configure JUSTSEARCH_SERVER_EXE on Linux.");
     }
@@ -138,7 +138,7 @@ public final class AiPackValidator {
       return new ValidationResult(false, ApiErrorCode.PACK_MANIFEST_INVALID, "Pack manifest has no assets.");
     }
 
-    boolean windows = isWindows();
+    boolean windows = io.justsearch.configuration.PlatformPaths.isWindows();
     Set<String> fileIds = new HashSet<>();
     Set<String> paths = new HashSet<>();
     Map<String, AiPackManifestV1.FileEntry> byId = new HashMap<>();
@@ -279,10 +279,6 @@ public final class AiPackValidator {
     return s == null ? "" : s;
   }
 
-  private static boolean isWindows() {
-    String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-    return os.contains("win");
-  }
 
   private static boolean isValidVariantId(String raw) {
     if (raw == null) return false;

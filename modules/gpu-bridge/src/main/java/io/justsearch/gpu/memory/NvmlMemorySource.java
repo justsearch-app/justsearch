@@ -50,7 +50,7 @@ final class NvmlMemorySource implements NvmlSource {
   private void initialize() throws Throwable {
     Arena loaded = Arena.ofShared();
     try {
-      SymbolLookup nvml = NativeCalls.systemLibrary("nvml.dll", loaded);
+      SymbolLookup nvml = NativeCalls.systemLibrary(io.justsearch.configuration.NativeTargets.current().libraryName("nvml"), loaded);
       MethodHandle init = NativeCalls.downcall(nvml, "nvmlInit_v2", FunctionDescriptor.of(JAVA_INT));
       MethodHandle nvmlShutdown = NativeCalls.downcall(nvml, "nvmlShutdown", FunctionDescriptor.of(JAVA_INT));
       MethodHandle count =

@@ -198,7 +198,7 @@ final class NvidiaSmiReadings {
 
   /** Whether an nvidia-smi executable is where {@code new ProcessBuilder("nvidia-smi")} finds it. */
   private static boolean onSearchPath() {
-    boolean windows = java.io.File.separatorChar == '\\';
+    boolean windows = io.justsearch.configuration.PlatformPaths.isWindows();
     String name = io.justsearch.configuration.NativeTargets.current().executableName("nvidia-smi");
     java.util.List<String> directories = new java.util.ArrayList<>();
     String root = SystemAccess.envVar("SystemRoot");

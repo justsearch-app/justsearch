@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.runtime.child;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -51,12 +50,12 @@ public interface ProcessTerminator {
 
   /** FFM {@code TerminateProcess} on Windows; the JDK's forcible destroy elsewhere. */
   static ProcessTerminator forCurrentOs() {
-    if (File.separatorChar == '\\') {
+    if (io.justsearch.configuration.PlatformPaths.isWindows()) {
       ProcessTerminator windows = WindowsProcessTerminator.load();
       if (windows != null) return windows;
       return new PosixProcessTerminator(1); // FFM unavailable: the JDK destroy, code 1
     }
-    if (BoundChildProcess.isLinux()) return new LinuxProcessTerminator();
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) return new LinuxProcessTerminator();
     return new PosixProcessTerminator(PosixProcessTerminator.SIGKILL_CODE);
   }
 

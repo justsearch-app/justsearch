@@ -40,6 +40,15 @@ public final class NativeTargets {
     return targetId;
   }
 
+  public static java.util.Optional<NativeTargets> currentIfSupported() {
+    try { return java.util.Optional.of(current()); }
+    catch (IllegalArgumentException unsupported) { return java.util.Optional.empty(); }
+  }
+
+  public boolean supportsRuntimePacks() { return names.path("capabilities").path("runtimePacks").asBoolean(false); }
+  public boolean hasCpuBaselineRuntime() { return names.path("capabilities").path("cpuBaselineRuntime").asBoolean(false); }
+  public String relativePath(String id) { return name("paths", id); }
+
   public String executableName(String id) {
     return name("executables", id);
   }

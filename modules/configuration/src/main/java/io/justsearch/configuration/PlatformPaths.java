@@ -121,6 +121,10 @@ public final class PlatformPaths {
         return os.contains("win");
     }
 
+    public static boolean isLinux() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("linux");
+    }
+
     public static boolean isMac() {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         return os.contains("mac");

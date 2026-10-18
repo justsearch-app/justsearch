@@ -36,7 +36,7 @@ public record LinuxProcessIdentity(String kind, long pid, String bootId, String 
   }
 
   public static Observation observe(long pid) {
-    if (!BoundChildProcess.isLinux() || pid <= 0 || pid > Integer.MAX_VALUE) return unknown();
+    if (!io.justsearch.configuration.PlatformPaths.isLinux() || pid <= 0 || pid > Integer.MAX_VALUE) return unknown();
     Path directory = Path.of("/proc", Long.toString(pid));
     try {
       String boot = Files.readString(BOOT_FILE).strip();
@@ -91,18 +91,26 @@ public record LinuxProcessIdentity(String kind, long pid, String bootId, String 
 
   /** Only a tuple acquired before the helper opens a pidfd can authorize a recorded-process stop. */
   int signal(String name) throws IOException, InterruptedException {
-    Process signal = BoundChildProcess.start(new ProcessBuilder(BoundChildProcess.helper().toString(),
+    Process signal = new ProcessBuilder(BoundChildProcess.helper().toString(),
         "signal", Long.toString(pid), bootId, startTicks, name)
-        .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD));
+        .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
     boolean interrupted = false;
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
     try {
       for (;;) {
         try {
-          if (signal.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) return signal.exitValue();
-          signal.destroyForcibly();
+          long remaining = deadline - System.nanoTime();
+          if (remaining > 0 && signal.waitFor(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)) return signal.exitValue();
           throw new IOException("Linux pidfd signal helper timed out");
         } catch (InterruptedException cancelled) { interrupted = true; }
       }
-    } finally { if (interrupted) Thread.currentThread().interrupt(); }
+    } finally {
+      if (signal.isAlive()) signal.destroyForcibly();
+      for (;;) {
+        try { signal.waitFor(); break; }
+        catch (InterruptedException cancelled) { interrupted = true; }
+      }
+      if (interrupted) Thread.currentThread().interrupt();
+    }
   }
 }

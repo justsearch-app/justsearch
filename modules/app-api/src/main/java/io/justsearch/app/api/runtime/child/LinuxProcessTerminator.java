@@ -61,7 +61,7 @@ final class LinuxProcessTerminator implements ProcessTerminator {
         for (;;) {
           var live = LinuxProcessIdentity.observe(identity.pid());
           if (live.presence() == IdentityPresence.GONE) return true;
-          if (live.identity().isPresent() && !live.identity().get().equals(identity)) return false;
+          if (live.identity().isPresent() && !live.identity().get().equals(identity)) return true;
           if (System.nanoTime() >= deadline) return false; // unreadable remains unknown, never ended
           TimeUnit.MILLISECONDS.sleep(10);
         }

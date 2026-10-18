@@ -295,7 +295,7 @@ final class ManagedChildBootFallbackTest {
     fields.put("pid", child.pid());
     fields.put("processStartedAt", child.info().startInstant().orElseThrow());
     fields.put("creationFileTime", nativeBirth ? ProcessTerminator.forCurrentOs().creationFileTime(child.pid()) : Optional.empty());
-    if (nativeBirth && io.justsearch.app.api.runtime.child.BoundChildProcess.isLinux()) {
+    if (nativeBirth && io.justsearch.configuration.PlatformPaths.isLinux()) {
       fields.put("processIdentity", io.justsearch.app.api.runtime.child.LinuxProcessIdentity.read(child.pid()).orElseThrow());
     }
     fields.put("executable", child.info().command().orElseThrow());
@@ -329,7 +329,7 @@ final class ManagedChildBootFallbackTest {
     return new ManagedChild(
         "child-" + process.pid(), ManagedChild.Kind.EXTRACTION, process.pid(), start.toString(),
         executable, "stdio", null, null, "argv",
-        io.justsearch.app.api.runtime.child.BoundChildProcess.isLinux()
+        io.justsearch.configuration.PlatformPaths.isLinux()
             ? io.justsearch.app.api.runtime.child.LinuxProcessIdentity.read(process.pid()).orElseThrow() : null);
   }
 

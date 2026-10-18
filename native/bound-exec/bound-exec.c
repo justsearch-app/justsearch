@@ -16,7 +16,7 @@ static int fail(int status, const char *reason) {
 }
 
 static int decimal(const char *text, unsigned long long *value) {
-  if (!text || !*text) return 0;
+  if (!text || !*text || (text[0] == '0' && text[1])) return 0;
   for (const char *p = text; *p; p++) if (*p < '0' || *p > '9') return 0;
   errno = 0;
   char *end;

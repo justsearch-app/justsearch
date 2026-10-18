@@ -49,6 +49,9 @@ mod exit_ledger;
 #[cfg(target_os = "linux")]
 #[path = "../linux_process.rs"]
 mod linux_process;
+#[path = "../native_targets.rs"]
+#[allow(dead_code)]
+mod native_targets;
 #[path = "../quit.rs"]
 mod quit;
 #[path = "../session_window.rs"]

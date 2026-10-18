@@ -47,7 +47,7 @@ public final class ExtractionSandboxChild {
     PrintStream protocolOut = System.out;
     System.setOut(new PrintStream(System.err, true, StandardCharsets.UTF_8));
     initializeProcessBoundary(args);
-    io.justsearch.app.api.runtime.child.OwnedHelper.recordChild(args, java.io.File.separatorChar == '\\');
+    io.justsearch.app.api.runtime.child.OwnedHelper.recordChild(args, io.justsearch.configuration.PlatformPaths.isWindows());
     serve(System.in, protocolOut);
   }
 
@@ -152,7 +152,7 @@ public final class ExtractionSandboxChild {
   @SuppressWarnings("PMD.DoNotTerminateVM")
   public static void initializeProcessBoundary(String[] args) {
     WindowsParserContainment.install();
-    if (io.justsearch.app.api.runtime.child.BoundChildProcess.isLinux()) {
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) {
       try { io.justsearch.app.api.runtime.child.BoundChildProcess.initialize(); }
       catch (IOException unavailable) {
         throw new IllegalStateException("Cannot establish Linux parser child lifetime", unavailable);

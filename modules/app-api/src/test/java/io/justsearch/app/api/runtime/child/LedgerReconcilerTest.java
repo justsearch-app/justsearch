@@ -171,7 +171,7 @@ final class LedgerReconcilerTest {
     writer.append(LedgerRecordType.CHILD_START, fields("childId", childId, "pid", pid,
         "processStartedAt", startedAt, "creationFileTime", creationFileTime,
         "executable", executable, "argvHash", "a".repeat(64), "contained", null,
-        "gpuDevice", null, "processIdentity", startedAt != null && BoundChildProcess.isLinux()
+        "gpuDevice", null, "processIdentity", startedAt != null && io.justsearch.configuration.PlatformPaths.isLinux()
             ? LinuxProcessIdentity.read(pid) : Optional.empty()));
   }
 

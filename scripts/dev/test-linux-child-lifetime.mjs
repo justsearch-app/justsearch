@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Real installed Java seams and native programs, with identity-safe fixture cleanup.
 import assert from 'node:assert/strict';
+import { nativeTarget } from '../lib/native-targets.cjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, copyFileSync, symlinkSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,19 +15,12 @@ if (process.platform !== 'linux') {
   console.log('Linux child-lifetime check is not applicable on this platform.');
   process.exit(0);
 }
-if (!process.argv.includes('--lock-held')) {
-  const locked = spawn('flock', ['/tmp/js-linux-port/devstack.lock', process.execPath,
-    fileURLToPath(import.meta.url), '--lock-held', ...process.argv.slice(2)], { stdio: 'inherit' });
-  locked.on('exit', (code) => process.exit(code ?? 1));
-  await new Promise((resolve, reject) => { locked.on('exit', resolve); locked.on('error', reject); });
-} else {
-  await campaign();
-}
+await campaign();
 
 async function campaign() {
   const distribution = process.env.JUSTSEARCH_TEST_DISTRIBUTION
     ?? path.join(root, 'modules/ui/build/install/ui');
-  const helper = path.join(distribution, 'native/linux-x86_64/justsearch-bound-exec');
+  const helper = path.join(distribution, nativeTarget().paths['bound-exec']);
   assert.ok(existsSync(helper), `Build :modules:ui:installDist first; missing ${helper}`);
   const scratch = mkdtempSync(path.join(tmpdir(), 'justsearch-child-lifetime-'));
   const java = process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, 'bin/java') : 'java';

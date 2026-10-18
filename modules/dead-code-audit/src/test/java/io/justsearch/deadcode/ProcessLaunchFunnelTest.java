@@ -43,12 +43,17 @@ class ProcessLaunchFunnelTest {
       Map.of(
           "java.lang.ProcessBuilder", Set.of("start", "startPipeline"),
           "java.lang.Runtime", Set.of("exec"),
+          "io.justsearch.app.api.runtime.child.BoundChildProcess", Set.of("start"),
           "io.justsearch.app.api.runtime.child.OwnedHelper", Set.of("start", "own"),
           "io.justsearch.app.api.runtime.containment.WindowsEngineJob", Set.of("createChat"));
 
   /** Top-level class -> why it may start a process. */
   static final Map<String, String> ALLOWED =
       Map.ofEntries(
+          Map.entry("io.justsearch.app.api.runtime.child.LinuxProcessIdentity",
+              "One pidfd signal helper per recorded-process signal; two-second deadline."),
+          Map.entry("io.justsearch.app.api.runtime.child.BoundChildProcess",
+              "the shared platform spawn backend; once per owned launch and one boot probe"),
           Map.entry("io.justsearch.app.api.runtime.child.DefaultChildControl",
               "the one owner of long-lived children: spawn, stop intent and exit record"),
           Map.entry("io.justsearch.app.api.runtime.child.OwnedHelper",
@@ -99,10 +104,10 @@ class ProcessLaunchFunnelTest {
   void the_scan_sees_each_kind_of_launch_and_folds_nested_code_onto_its_class() {
     var classes = new ClassFileImporter().importClasses(
         Fixtures.Builder.class, Fixtures.Pipeline.class, Fixtures.Exec.class, Fixtures.Owned.class,
-        Fixtures.Lambda.class, Fixtures.Quiet.class);
+        Fixtures.Lambda.class, Fixtures.Quiet.class, Fixtures.Bound.class);
     Map<String, Set<String>> observed = launchers(classes);
     String base = Fixtures.class.getName() + "$";
-    assertEquals(Set.of(base + "Builder", base + "Pipeline", base + "Exec", base + "Owned", base + "Lambda"),
+    assertEquals(Set.of(base + "Builder", base + "Pipeline", base + "Exec", base + "Owned", base + "Lambda", base + "Bound"),
         observed.keySet(), observed.toString());
     assertEquals(Set.of("java.lang.ProcessBuilder#start"), observed.get(base + "Lambda"));
   }
@@ -156,6 +161,12 @@ class ProcessLaunchFunnelTest {
 
     static final class Lambda {
       java.util.concurrent.Callable<Process> run() { return () -> new ProcessBuilder("x").start(); }
+    }
+
+    static final class Bound {
+      Process run() throws Exception {
+        return io.justsearch.app.api.runtime.child.BoundChildProcess.start(new ProcessBuilder("x"));
+      }
     }
 
     static final class Quiet {

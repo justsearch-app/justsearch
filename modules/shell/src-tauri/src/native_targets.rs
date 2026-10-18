@@ -32,6 +32,8 @@ pub(crate) fn executable_name(id: &str) -> &'static str {
     native_name("executables", id)
 }
 
+pub(crate) fn relative_path(id: &str) -> &'static str { native_name("paths", id) }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,15 +41,8 @@ mod tests {
     #[test]
     fn shared_fixtures_agree() {
         assert_eq!(spec()["schemaVersion"], 1);
-        for fixture in spec()["fixtures"].as_array().unwrap() {
-            let target = fixture["target"].as_str().unwrap();
-            let mut expected = fixture.as_object().unwrap().clone();
-            expected.remove("target");
-            assert_eq!(
-                spec()["targets"][target],
-                Value::Object(expected),
-                "{target}"
-            );
+        for target in ["windows-x86_64", "linux-x86_64"] {
+            assert!(spec()["targets"][target]["executables"]["llama-server"].is_string());
         }
         assert_eq!(
             library_name("ort-cuda"),

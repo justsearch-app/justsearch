@@ -51,7 +51,8 @@ public final class GpuAutoDetection {
    * @return map of config keys to auto-detected values, or empty map if no CUDA capability found
    */
   public static Map<String, String> probe(Path repoRoot) {
-    if (!isWindows() && !io.justsearch.configuration.SystemAccess.sysProp("os.name", "").equalsIgnoreCase("Linux")) return Map.of();
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() && !io.justsearch.configuration.PlatformPaths.isLinux()) return Map.of();
+    if (NativeTargets.currentIfSupported().isEmpty()) return Map.of();
     Map<String, String> result = new LinkedHashMap<>();
 
     // Check if ORT native path is already explicitly configured.
@@ -73,7 +74,7 @@ public final class GpuAutoDetection {
       }
       // Windows preserves its self-contained-directory check. Linux operator paths may hold
       // only CUDA dependencies; ORT's JNI/providers still come from the bundled jar.
-      if (isWindows()) return Map.of();
+      if (io.justsearch.configuration.PlatformPaths.isWindows()) return Map.of();
     }
 
     // Search conventional locations.
@@ -128,7 +129,7 @@ public final class GpuAutoDetection {
    * </ol>
    */
   private static Path searchConventionalPaths(Path repoRoot) {
-    if (!isWindows() || repoRoot == null) return null;
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() || repoRoot == null) return null;
 
     // Direct check under provided repo root.
     Path candidate = repoRoot.resolve(CUDA_DIR_RELATIVE);
@@ -176,7 +177,4 @@ public final class GpuAutoDetection {
     return dir != null && Files.isDirectory(dir) && Files.exists(dir.resolve(NativeTargets.current().libraryName("ort-cuda")));
   }
 
-  private static boolean isWindows() {
-    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
-  }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Run under flock /tmp/js-linux-port/devstack.lock. All state and corpora belong to this run.
+// Caller holds the campaign live-stack and Gradle locks. All state and corpora belong to this run.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -138,7 +138,7 @@ async function command(command, args, options = {}) {
   return output;
 }
 async function gradle(args) {
-  return command('flock', ['/tmp/js-linux-port/gradle.lock', './gradlew', ...args]);
+  return command('./gradlew', args);
 }
 const transport = new StdioClientTransport({ command: process.execPath, args: [path.join(root, 'scripts/dev/justsearch-dev-mcp.mjs')], cwd: root, env, stderr: 'pipe' });
 const client = new Client({ name: 'linux-workflow-verifier', version: '1.0.0' });
@@ -232,7 +232,7 @@ try {
   fs.writeFileSync(path.join(datasetDir, 'corpus.jsonl'), '{"_id":"d1","text":"Linux workflow fixture"}\n');
   const evalEnv = { ...env, PYTHONPATH: path.join(root, 'scripts/jseval'), JUSTSEARCH_API_PORT: String(evalPort),
     JUSTSEARCH_DATA_DIR: path.join(scratch, 'eval data'), JUSTSEARCH_REPO_ROOT: root };
-  const campaign = await command('flock', ['/tmp/js-linux-port/gradle.lock', python, '-m', 'jseval', 'run',
+  const campaign = await command(python, ['-m', 'jseval', 'run',
     '--dataset', datasetName, '--modes', 'lexical', '--max-queries', '2', '--skip-ingest', '--start-backend',
     '--output-dir', path.join(scratch, 'campaign'), '--base-url', `http://127.0.0.1:${evalPort}`, '--json'],
     { cwd: path.join(root, 'scripts/jseval'), env: evalEnv });
@@ -240,9 +240,9 @@ try {
   assert.equal(await listening(evalPort), false);
   // Separate real Python lifetime owner, killed only by its recorded Linux birth tuple.
   const ownerProgram = 'from jseval.backend import start_backend\nimport json,time,os\nb=start_backend(port=int(os.environ["JUSTSEARCH_API_PORT"]),health_timeout_sec=180)\nprint(json.dumps({"ready":True,"runner":b.proc.pid}),flush=True)\ntime.sleep(600)';
-  ownerChild = spawn(helper, ['exec', String(process.pid), '--', 'flock', '-F', '/tmp/js-linux-port/gradle.lock', python, '-u', '-c', ownerProgram],
+  ownerChild = spawn(helper, ['exec', String(process.pid), '--', python, '-u', '-c', ownerProgram],
     { cwd: path.join(root, 'scripts/jseval'), env: { ...evalEnv, JUSTSEARCH_DATA_DIR: path.join(scratch, 'owner kill data') }, stdio: ['ignore', 'pipe', 'pipe'] });
-  // -F keeps the recorded PID as the Python lifetime owner by execing without a fork.
+  // The shared helper execs Python, so its recorded PID remains the lifetime owner.
   const ownerExit = once(ownerChild, 'exit');
   ownerIdentity = identity.readLinuxProcess(ownerChild.pid)?.processIdentity;
   let ownerOutput = ''; ownerChild.stdout.on('data', data => { ownerOutput += data; }); ownerChild.stderr.on('data', data => { ownerOutput += data; });

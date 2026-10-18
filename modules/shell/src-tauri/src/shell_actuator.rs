@@ -551,7 +551,10 @@ fn identity_check(record: &Value) -> &'static str {
         let Some(executable) = record["executable"].as_str().filter(|exe| Path::new(exe).is_absolute())
             else { return "IDENTITY_UNKNOWN"; };
         match crate::linux_process::capture(pid) {
-            Ok((seen, exe)) if Some(&seen) == identity.as_ref() && exe == Path::new(executable) => "ALIVE_MATCH",
+            Ok((seen, exe)) if Some(&seen) == identity.as_ref() => {
+                if exe != Path::new(executable) { eprintln!("Managed child {pid} executable changed: {executable:?} -> {exe:?}; birth identity still matches"); }
+                "ALIVE_MATCH"
+            },
             Ok(_) => "GONE",
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => "GONE",
             Err(_) => "IDENTITY_UNKNOWN",
@@ -694,4 +697,31 @@ mod linux_identity_tests {
         assert_eq!(identity_check(&legacy), "IDENTITY_UNKNOWN");
         assert!(!same_engine_identity(&legacy, &legacy));
     }
+    #[test]
+    fn deleted_executable_is_still_the_same_live_process_and_is_terminated() {
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("replaceable-sleep");
+        std::fs::copy("/bin/sleep", &executable).unwrap();
+        let mut child = std::process::Command::new(&executable).arg("30").spawn().unwrap();
+        let record = process_record(child.id());
+        let identity = serde_json::from_value(record["processIdentity"].clone()).unwrap();
+        std::fs::remove_file(&executable).unwrap();
+        let observed = crate::linux_process::capture(child.id()).unwrap().1;
+        assert!(observed.to_string_lossy().ends_with(" (deleted)"));
+        // Always reap our original child, including when a before-change assertion fails.
+        let verdict = identity_check(&record);
+        let termination = crate::linux_process::terminate(&identity, &executable);
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        let ended = loop {
+            if child.try_wait().unwrap().is_some() { break true; }
+            if std::time::Instant::now() >= deadline { break false; }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        if !ended { child.kill().unwrap(); }
+        child.wait().unwrap();
+        assert_eq!(verdict, "ALIVE_MATCH", "a deleted image does not end its birth identity");
+        termination.unwrap();
+        assert!(ended, "identity-matched deleted image must be signalled, not skipped");
+    }
+
 }

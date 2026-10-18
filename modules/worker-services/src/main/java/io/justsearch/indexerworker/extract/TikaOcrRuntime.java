@@ -373,7 +373,7 @@ public final class TikaOcrRuntime {
   }
 
   private static List<String> executableNames() {
-    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
+    return io.justsearch.configuration.PlatformPaths.isWindows()
         ? List.of(io.justsearch.configuration.NativeTargets.current().executableName("tesseract"), "tesseract.bat", "tesseract.cmd", "tesseract")
         : List.of(io.justsearch.configuration.NativeTargets.current().executableName("tesseract"));
   }

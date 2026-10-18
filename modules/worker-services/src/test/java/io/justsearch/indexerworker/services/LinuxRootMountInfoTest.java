@@ -84,6 +84,12 @@ final class LinuxRootMountInfoTest {
     assertNotNull(matching, "this explicit disk-backed fixture must expose a filesystem UUID");
     Files.createSymbolicLink(aliases.resolve("aaaa-1111"), matching);
     assertNotNull(LinuxRootIdentityLease.volume(mount, aliases, device));
+    // btrfs mountinfo has an anonymous st_dev; its source block device remains authoritative.
+    var anonymous = LinuxRootIdentityLease.parseMounts(List.of(
+        "20 1 0:123 / / rw - btrfs " + matching + " rw")).getFirst();
+    assertEquals(LinuxRootIdentityLease.encodeVolume("aaaa-1111", "btrfs", Path.of("/")),
+        LinuxRootIdentityLease.volume(anonymous, aliases, 0));
+
     Files.createSymbolicLink(aliases.resolve("bbbb-2222"), matching);
     assertNull(LinuxRootIdentityLease.volume(mount, aliases, device));
     Files.delete(aliases.resolve("bbbb-2222"));

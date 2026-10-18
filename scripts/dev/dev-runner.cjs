@@ -32,31 +32,10 @@ const processIdentity = require('./lib/process-identity.cjs');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const uiWebDir = path.resolve(repoRoot, 'modules', 'ui-web');
-const { runToolSync } = require('../lib/tool-invoker.cjs');
-const gradleCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-const gradlePath = path.resolve(repoRoot, gradleCmd);
+const { runToolSync, toolInvocation } = require('../lib/tool-invoker.cjs');
+const gradlePath = toolInvocation('gradle', [], { repoRoot }).command;
 
-/**
- * Resolve the main repo root, even when running inside a git worktree.
- * In worktrees, `.git` is a file containing `gitdir: <path>` where path
- * points to `<mainRepo>/.git/worktrees/<name>`. We walk up 3 levels to
- * find the main repo. Falls back to `repoRoot` if detection fails.
- */
-function resolveMainRepoRoot() {
-  const gitPath = path.join(repoRoot, '.git');
-  try {
-    const stat = fs.statSync(gitPath);
-    if (stat.isFile()) {
-      const content = fs.readFileSync(gitPath, 'utf8').trim();
-      const match = content.match(/^gitdir:\s*(.+)$/);
-      if (match) {
-        const gitDir = path.resolve(repoRoot, match[1]);
-        return path.resolve(gitDir, '..', '..', '..');
-      }
-    }
-  } catch { /* not a worktree or no .git — fall through */ }
-  return repoRoot;
-}
+const resolveMainRepoRoot = () => require('./lib/dev-runtime.cjs').resolveMainRepoRoot(repoRoot);
 
 const mainRepoRoot = resolveMainRepoRoot();
 // State root defaults to the SHARED main-repo location so all worktrees coordinate on one
@@ -2794,7 +2773,7 @@ async function runAdmittedStart(opts, ctx) {
   // Fail fast if the Head dist doesn't exist (e.g. --skip-build without prior installDist).
   // Without this check, spawn() fails silently and the only feedback is a 60s timeout.
   if (!harnessEngineCommand && !fs.existsSync(startScript)) {
-    const gradleCmd = process.platform === 'win32' ? './gradlew.bat' : './gradlew';
+    const gradleCmd = `./${path.basename(gradlePath)}`;
     const remedy = `node scripts/dev/prepare-worktree.cjs (or: ${gradleCmd} :modules:ui:installDist)`;
     // Tempdoc 844 B2: a fully-understood, recoverable condition with a printed remedy is NOT an
     // unhandled exception. It surfaced as error code UNHANDLED on 16 of 20 observed `start` errors,

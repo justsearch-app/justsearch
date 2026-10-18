@@ -31,7 +31,7 @@ class OrtNativePackDetectionTest {
   private Path completePackDir(String markerVersion) throws IOException {
     Path dir = tmp.resolve("cuda12-" + System.nanoTime());
     Files.createDirectories(dir);
-    for (String dll : OrtCudaHelper.ORT_NATIVE_DLL_SET) {
+    for (String dll : OrtCudaHelper.ortNativeDllSet()) {
       Files.writeString(dir.resolve(dll), "stub-native");
     }
     if (markerVersion != null) {

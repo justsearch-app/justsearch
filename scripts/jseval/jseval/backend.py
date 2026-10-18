@@ -170,7 +170,7 @@ def start_backend(
     if data_dir is not None and not data_dir.is_absolute():
         data_dir = (resolved_root / data_dir).resolve()
     resolved_data = data_dir or (resolved_root / "tmp" / "headless-eval-data")
-    gradlew_name = "gradlew.bat" if os.name == "nt" else "gradlew"
+    gradlew_name = "gradlew.bat" if sys.platform == "win32" else "gradlew"
     gradlew = resolved_root / gradlew_name
 
     if not gradlew.is_file():
@@ -266,8 +266,12 @@ def _boot_and_wait(
         raise RuntimeError("Linux eval backends must be launched from the process-lifetime main thread")
     _install_distribution(resolved_root, env)
     cmd = ["node", str(resolved_root / "scripts" / "dev" / "eval-runner.cjs")]
-    if os.name != "nt":
-        helper = resolved_root / "modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec"
+    if sys.platform == "linux":
+        import json
+        import platform
+        architecture = {"amd64": "x86_64", "x64": "x86_64"}.get(platform.machine().lower(), platform.machine().lower())
+        spec = json.loads((resolved_root / "contracts/native-targets/spec.v1.json").read_text())
+        helper = resolved_root / "modules/ui/build/install/ui" / spec["targets"][f"linux-{architecture}"]["paths"]["bound-exec"]
         cmd = [str(helper), "exec", str(os.getpid()), "--", *cmd]
 
     log.info("Starting backend: %s (port=%d, data=%s)", " ".join(cmd), port, resolved_data)
@@ -279,7 +283,7 @@ def _boot_and_wait(
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
     )
 
     # Drain continuously during health polling (and afterwards); a full pipe must not freeze boot.

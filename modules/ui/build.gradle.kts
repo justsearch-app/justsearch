@@ -1,3 +1,4 @@
+import conventions.HostPlatform
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.io.File
 import java.net.URI
@@ -375,16 +376,13 @@ val tauriHeadlessResourcesDir =
 // ============================================================================
 // v1 Simple Mode: bundle llama-server.exe (CPU-only) into the sidecar payload
 // ============================================================================
-val isWindowsHost = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+val isWindowsHost = HostPlatform.isWindows
+val isLinuxHost = HostPlatform.isLinux
 val nativeTargetsSpec = ObjectMapper().readTree(providers.fileContents(
     rootProject.layout.projectDirectory.file("contracts/native-targets/spec.v1.json")).asText.get())
-val nativeTargetOs = if (isWindowsHost) "windows" else System.getProperty("os.name").lowercase(Locale.ROOT)
-val nativeTargetArch = when (val arch = System.getProperty("os.arch").lowercase(Locale.ROOT)) {
-  "amd64", "x64" -> "x86_64"
-  else -> arch
-}
-val nativeTarget = nativeTargetsSpec["targets"]["$nativeTargetOs-$nativeTargetArch"]
-    ?: throw GradleException("Unsupported native target: $nativeTargetOs-$nativeTargetArch")
+val nativeTarget = nativeTargetsSpec["targets"][HostPlatform.targetId]
+    ?: throw GradleException("Unsupported native target: ${HostPlatform.targetId}")
+val boundExecRelative = nativeTargetsSpec["targets"]["linux-x86_64"]["paths"]["bound-exec"].asText()
 val llamaServerName = nativeTarget["executables"]["llama-server"].asText()
 val windowsNativeTarget = nativeTargetsSpec["targets"]["windows-x86_64"]
 val windowsLlamaServerName = windowsNativeTarget["executables"]["llama-server"].asText()
@@ -973,7 +971,7 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
   val jlinkExecutable =
       javaHome.resolve("bin")
           .resolve(
-              if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows"))
+              if (HostPlatform.isWindows)
                   "jlink.exe"
               else "jlink")
   val outDir = headlessRuntimeImageDir.get().asFile
@@ -1030,7 +1028,7 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
 val copyJavawToRuntime by tasks.registering {
   group = "distribution"
   description = "Copy javaw.exe to the jlink runtime (Windows only)"
-  val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+  val isWindows = HostPlatform.isWindows
   onlyIf { isWindows }
   dependsOn(createHeadlessRuntime)
 
@@ -1084,7 +1082,7 @@ val generateHeadAotCache by tasks.registering {
   outputs.dir(aotDir)
 
   doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+    val isWindows = HostPlatform.isWindows
     val java = runtimeDir.get().resolve("bin").resolve(if (isWindows) "java.exe" else "java").absolutePath
     val headDist = headDistDirProp.get()
     val aot = aotDir.get()
@@ -1149,7 +1147,7 @@ val generateDevHeadAotCache by tasks.registering {
   outputs.dir(aotDir.map { it.resolve("head") })
 
   doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+    val isWindows = HostPlatform.isWindows
     val java = org.gradle.internal.jvm.Jvm.current().javaHome
         .resolve("bin").resolve(if (isWindows) "java.exe" else "java").absolutePath
     val dist = installDir.get().asFile
@@ -1589,7 +1587,7 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
     from(stageTrimmedOnnxRuntimeGpu.map { it.archiveFile }) {
       into("lib")
     }
-  } else if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("linux")) {
+  } else if (isLinuxHost) {
     // installDist owns compilation/staging of the shared lifetime helper (also used by Java).
     val installed = tasks.named<Sync>("installDist")
     dependsOn(installed)
@@ -1597,7 +1595,7 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
       into("native")
     }
     doLast {
-      check(destinationDir.resolve("native/linux-x86_64/justsearch-bound-exec").canExecute()) {
+      check(destinationDir.resolve(boundExecRelative).canExecute()) {
         "Linux sidecar is missing its executable bound-exec helper from installDist"
       }
     }
@@ -1689,7 +1687,7 @@ tasks.register("smokeSidecarBundle") {
   dependsOn(bundleSidecarResources)
 
   doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+    val isWindows = HostPlatform.isWindows
     val headlessDir = project.layout.projectDirectory.dir("../shell/src-tauri/resources/headless").asFile
     val javaBin = headlessDir.resolve("runtime").resolve("bin").resolve(if (isWindows) "java.exe" else "java")
     val uiJar = headlessDir.resolve("ui-headless.jar")

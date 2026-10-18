@@ -3,6 +3,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { nativeTarget } = require('../../lib/native-targets.cjs');
 
+function resolveMainRepoRoot(repoRoot) {
+  const gitPath = path.join(repoRoot, '.git');
+  try {
+    const stat = fs.statSync(gitPath);
+    if (stat.isFile()) {
+      const content = fs.readFileSync(gitPath, 'utf8').trim();
+      const match = content.match(/^gitdir:\s*(.+)$/);
+      if (match) {
+        const gitDir = path.resolve(repoRoot, match[1]);
+        return path.resolve(gitDir, '..', '..', '..');
+      }
+    }
+  } catch { /* not a worktree or no .git — fall through */ }
+  return repoRoot;
+}
+
+
 function executableFile(file, platform = process.platform) {
   try {
     if (!fs.statSync(file).isFile()) return false;
@@ -26,4 +43,4 @@ function resolveDevRuntime(repoRoot, mainRepoRoot, env = process.env, platform =
   const candidate = resolveCuda12ServerExe(repoRoot, mainRepoRoot, nativeTarget(platform).executables['llama-server']);
   return { path: candidate ?? null, valid: Boolean(candidate), source: candidate ? 'cuda12' : 'missing' };
 }
-module.exports = { executableFile, resolveDevRuntime, resolveCuda12ServerExe };
+module.exports = { resolveMainRepoRoot, executableFile, resolveDevRuntime, resolveCuda12ServerExe };

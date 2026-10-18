@@ -80,8 +80,7 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
       // be tested on Windows, so excluding them there would silently drop their local coverage
       // (and make `--tests "*WindowsFooTest*"` fail with "no tests found").
       val windowsOnly = project.findProperty("windowsOnly")?.toString()?.toBoolean() ?: false
-      val isWindowsHost =
-          System.getProperty("os.name").lowercase(java.util.Locale.ROOT).contains("windows")
+      val isWindowsHost = HostPlatform.isWindows
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
         useJUnitPlatform {
@@ -254,14 +253,17 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         )
 
     project.pluginManager.withPlugin("application") {
-      if (System.getProperty("os.name").lowercase(java.util.Locale.ROOT).startsWith("linux")) {
-        val helper = project.project(":modules:app-api").layout.buildDirectory.file(
-            "native/linux-x86_64/justsearch-bound-exec")
+      if (HostPlatform.isLinux) {
+        val nativeSpec = groovy.json.JsonSlurper().parseText(project.providers.fileContents(
+            project.rootProject.layout.projectDirectory.file("contracts/native-targets/spec.v1.json")).asText.get()) as Map<*, *>
+        val target = (nativeSpec["targets"] as Map<*, *>)["linux-x86_64"] as Map<*, *>
+        val relative = (target["paths"] as Map<*, *>)["bound-exec"] as String
+        val helper = project.project(":modules:app-api").layout.buildDirectory.file(relative)
         project.extensions.configure(DistributionContainer::class.java) {
           named("main") {
             contents {
               from(project.files(helper).builtBy(":modules:app-api:buildLinuxBoundExec")) {
-                into("native/linux-x86_64")
+                into(java.io.File(relative).parent)
                 filePermissions { unix("rwxr-xr-x") }
               }
             }

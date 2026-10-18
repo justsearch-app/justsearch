@@ -822,7 +822,7 @@ public final class RuntimeActivationService
   public Attempt startActivate(String variantId, String chatProfile) {
     String v = variantId == null ? "" : variantId.trim();
     if (v.isBlank()) {
-      if (PlatformPaths.isWindows()) {
+      if (NativeTargets.current().supportsRuntimePacks()) {
         throw new IllegalArgumentException("variantId is required");
       }
       v = "default";
@@ -1041,10 +1041,10 @@ public final class RuntimeActivationService
 
   private void runDeactivate(AttemptPublication publication) {
     UiSettingsStore.Snapshot base = settingsStore.inspect();
-    Path baselineExe = PlatformPaths.isWindows() ? resolveCpuBaselineExe(aiHome) : null;
+    Path baselineExe = NativeTargets.current().hasCpuBaselineRuntime() ? resolveCpuBaselineExe(aiHome) : null;
     UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(base.settings()), UiSettings.class);
     if (baselineExe == null || !Files.isRegularFile(baselineExe)) {
-      if (PlatformPaths.isWindows()) {
+      if (NativeTargets.current().hasCpuBaselineRuntime()) {
         fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null,
             publication);
         return;
@@ -1088,7 +1088,7 @@ public final class RuntimeActivationService
     }
     boolean cpu = activating && selfTestDevicePlan(next).gpuLayers() == 0;
     String message = activating ? (cpu ? "CPU runtime activated." : "GPU runtime activated.")
-        : (PlatformPaths.isWindows() || next.getChatEnabled()
+        : (NativeTargets.current().hasCpuBaselineRuntime() || next.getChatEnabled()
             ? "GPU runtime deactivated (CPU baseline)."
             : "Chat unavailable: deactivated; no fallback runtime is installed.");
     return () -> updateState("completed", "done", message, null);
@@ -1151,9 +1151,9 @@ public final class RuntimeActivationService
 
   /** Resolve one candidate, preserving the operator's exact Linux runtime path. */
   static Path activationExecutable(Path root, String variantId, Path operatorExe) {
-    boolean windows = PlatformPaths.isWindows();
+    boolean runtimePacks = NativeTargets.current().supportsRuntimePacks();
     boolean defaultVariant = variantId == null || variantId.isBlank() || "default".equals(variantId);
-    if (!windows) {
+    if (!runtimePacks) {
       if (!defaultVariant) {
         throw new IllegalStateException("Runtime packs are Windows-only; use the default variant with JUSTSEARCH_SERVER_EXE.");
       }
@@ -1180,7 +1180,7 @@ public final class RuntimeActivationService
     ConfigStore config = ConfigStore.globalOrNull();
     var resolution = config == null ? null : config.get().resolution(SERVER_EXE_KEY);
     if (resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400
-        && !(PlatformPaths.isWindows() ? Path.of(resolution.value()) : config.get().ai().serverExe())
+        && !(NativeTargets.current().supportsRuntimePacks() ? Path.of(resolution.value()) : config.get().ai().serverExe())
             .toAbsolutePath().normalize().equals(requested.toAbsolutePath().normalize())) {
       throw new IllegalStateException("Server executable override is locked by operator config");
     }
@@ -1607,7 +1607,7 @@ public final class RuntimeActivationService
 
   private List<AiRuntimeStatusResponse.InstalledVariant> listInstalledVariants() {
     List<AiRuntimeStatusResponse.InstalledVariant> out = new ArrayList<>();
-    if (!PlatformPaths.isWindows()) {
+    if (!NativeTargets.current().supportsRuntimePacks()) {
       Path operator = operatorServerExeOrNull();
       if (operator != null && Files.isRegularFile(operator) && Files.isExecutable(operator)) {
         out.add(new AiRuntimeStatusResponse.InstalledVariant("default", operator.toString()));

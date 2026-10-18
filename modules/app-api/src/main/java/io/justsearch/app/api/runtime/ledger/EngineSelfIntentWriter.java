@@ -73,7 +73,7 @@ public final class EngineSelfIntentWriter {
     engineFields.put("pid", engine.pid());
     engineFields.put("creationFileTime", engine.creationFileTime());
     engineFields.put("instanceId", engine.instanceId());
-    if (BoundChildProcess.isLinux() && engine.creationFileTime().isEmpty()
+    if (io.justsearch.configuration.PlatformPaths.isLinux() && engine.creationFileTime().isEmpty()
         && engine.pid() == ProcessHandle.current().pid()) {
       engineFields.put("processIdentity", LinuxProcessIdentity.read(engine.pid()));
     }

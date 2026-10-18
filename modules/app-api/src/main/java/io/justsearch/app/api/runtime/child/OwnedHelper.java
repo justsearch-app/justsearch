@@ -28,7 +28,7 @@ public final class OwnedHelper extends Process {
       ownerFields.put("pid", owner.pid());
       ownerFields.put("creationFileTime", owner.creationFileTime());
       ownerFields.put("instanceId", owner.instanceId());
-      if (BoundChildProcess.isLinux()) ownerFields.put("processIdentity", LinuxProcessIdentity.read(owner.pid()));
+      if (io.justsearch.configuration.PlatformPaths.isLinux()) ownerFields.put("processIdentity", LinuxProcessIdentity.read(owner.pid()));
       fields.put("owner", ownerFields);
       if (nestedContainment) fields.put("ownerContainment", "KILL_ON_CLOSE");
       fields.put("incarnation", RuntimeManifest.IncarnationInfo.parse(
@@ -122,8 +122,8 @@ public final class OwnedHelper extends Process {
   }
 
   public static Process start(ProcessBuilder builder, String purpose) throws IOException {
-    return acquire(BoundChildProcess.start(builder), purpose, BoundChildProcess.isLinux() ? builder.command().getFirst() : null,
-        BoundChildProcess.isLinux() ? DefaultChildControl.argvHash(builder.command()) : null);
+    return acquire(BoundChildProcess.start(builder), purpose, io.justsearch.configuration.PlatformPaths.isLinux() ? builder.command().getFirst() : null,
+        io.justsearch.configuration.PlatformPaths.isLinux() ? DefaultChildControl.argvHash(builder.command()) : null);
   }
 
   /** Also usable at a caller-owned spawn seam; never accepts a PID or a ProcessHandle. */
@@ -205,7 +205,7 @@ public final class OwnedHelper extends Process {
     held = terminator.open(process);
     try {
       birth = held.creationFileTime().orElse(null);
-      identityKey = BoundChildProcess.isLinux()
+      identityKey = io.justsearch.configuration.PlatformPaths.isLinux()
           ? held.processIdentity().map(LinuxProcessIdentity::key).orElse(null) : birth;
       creatorBirth = SelfIdentity.BIRTH;
       if (grouped) Intent.launched(command); // a launch window's forced start precedes the receipts
@@ -289,7 +289,7 @@ public final class OwnedHelper extends Process {
     // that covers its launch and exit makes the exit intended; when the owner awaits does not
     // matter. A cooperative stop also needs the child's clean code. A crash code is never intended.
     String window = stopReason != null || awaited || crashCode(code) ? null
-        : ProcessIntents.windowReason(command, bornAt(), exitTime.orElse(BoundChildProcess.isLinux() ? Instant.now() : null), SelfIdentity.PID, creatorBirth)
+        : ProcessIntents.windowReason(command, bornAt(), exitTime.orElse(io.justsearch.configuration.PlatformPaths.isLinux() ? Instant.now() : null), SelfIdentity.PID, creatorBirth)
             .orElse(null);
     boolean intended = !crashCode(code)
         && (stopReason == null ? awaited || window != null : !cooperative || code == 0);
@@ -323,14 +323,14 @@ public final class OwnedHelper extends Process {
     fields.put("helperId", id);
     fields.put("pid", process.pid());
     fields.put("creationFileTime", birth);
-    if (BoundChildProcess.isLinux()) {
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) {
       fields.put("processIdentity", held.processIdentity());
       fields.put("executable", held.executable().orElse(command));
       fields.put("argvHash", argvHash);
     }
     fields.put("creatorPid", ProcessHandle.current().pid());
-    fields.put("creatorCreationFileTime", BoundChildProcess.isLinux() ? null : creatorBirth);
-    if (BoundChildProcess.isLinux()) fields.put("creatorProcessIdentity", SelfIdentity.LINUX);
+    fields.put("creatorCreationFileTime", io.justsearch.configuration.PlatformPaths.isLinux() ? null : creatorBirth);
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) fields.put("creatorProcessIdentity", SelfIdentity.LINUX);
     return fields;
   }
 
@@ -345,9 +345,9 @@ public final class OwnedHelper extends Process {
   /** This process's identity, the owner of the windows it opens and the creator of its helpers. */
   private static final class SelfIdentity {
     static final long PID = ProcessHandle.current().pid();
-    static final Optional<LinuxProcessIdentity> LINUX = BoundChildProcess.isLinux()
+    static final Optional<LinuxProcessIdentity> LINUX = io.justsearch.configuration.PlatformPaths.isLinux()
         ? LinuxProcessIdentity.read(PID) : Optional.empty();
-    static final String BIRTH = BoundChildProcess.isLinux() ? LINUX.map(LinuxProcessIdentity::key).orElse(null)
+    static final String BIRTH = io.justsearch.configuration.PlatformPaths.isLinux() ? LINUX.map(LinuxProcessIdentity::key).orElse(null)
         : ProcessTerminator.forCurrentOs().creationFileTime(PID).orElse(null);
   }
 

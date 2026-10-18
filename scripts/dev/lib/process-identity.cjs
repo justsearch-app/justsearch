@@ -60,9 +60,9 @@ const path = require('node:path');
 function linuxIdentity(value) {
   const v = value?.processIdentity ?? value;
   if (value?.processIdentity && value.pid != null && value.pid !== v.pid) return null;
-  return v?.kind === 'linux-proc-v1' && Number.isSafeInteger(v.pid) && v.pid > 0
-    && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(v.bootId ?? '')
-    && typeof v.startTicks === 'string' && /^[1-9][0-9]*$/.test(v.startTicks)
+  return v?.kind === 'linux-proc-v1' && Number.isSafeInteger(v.pid) && v.pid > 0 && v.pid <= 2147483647
+    && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(v.bootId ?? '')
+    && typeof v.startTicks === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(v.startTicks) && BigInt(v.startTicks) <= 18446744073709551615n
     ? { kind: v.kind, pid: v.pid, bootId: v.bootId, startTicks: v.startTicks } : null;
 }
 
@@ -76,11 +76,11 @@ function parseLinuxStat(text) {
 
 /** Bracket executable/argv reads with birth reads; unreadable is unknown, zombies ended. */
 function readLinuxProcess(pid, { procRoot = '/proc', readFile = fs.readFileSync, readlink = fs.readlinkSync } = {}) {
-  if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+  if (!Number.isSafeInteger(pid) || pid <= 0 || pid > 2147483647) return null;
   const dir = path.join(procRoot, String(pid));
   try {
     const before = parseLinuxStat(readFile(path.join(dir, 'stat'), 'utf8'));
-    if (before.state === 'Z' || before.state === 'X') return { present: false };
+    if (['Z', 'X', 'x'].includes(before.state)) return { present: false };
     const bootId = readFile(path.join(procRoot, 'sys/kernel/random/boot_id'), 'utf8').trim();
     const processIdentity = linuxIdentity({ kind: 'linux-proc-v1', pid, bootId, startTicks: before.startTicks });
     if (!processIdentity) return null;
@@ -90,7 +90,7 @@ function readLinuxProcess(pid, { procRoot = '/proc', readFile = fs.readFileSync,
     try { commandLine = readFile(path.join(dir, 'cmdline'), 'utf8').replace(/\0/g, ' ').trim(); } catch {}
     const after = parseLinuxStat(readFile(path.join(dir, 'stat'), 'utf8'));
     const afterBoot = readFile(path.join(procRoot, 'sys/kernel/random/boot_id'), 'utf8').trim();
-    if (after.state === 'Z' || after.state === 'X') return { present: false };
+    if (['Z', 'X', 'x'].includes(after.state)) return { present: false };
     if (before.startTicks !== after.startTicks || bootId !== afterBoot || before.parentPid !== after.parentPid) return null;
     return { present: true, processIdentity, executable, commandLine, name: before.name, parentPid: before.parentPid };
   } catch (error) {
@@ -139,7 +139,7 @@ function readLinuxTable({ now = Date.now } = {}) {
 }
 
 function boundExecPath() {
-  return path.resolve(__dirname, '../../../modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec');
+  return path.resolve(__dirname, '../../../modules/ui/build/install/ui', require('../../lib/native-targets.cjs').nativeTarget().paths['bound-exec']);
 }
 
 /** The helper opens a pidfd BEFORE checking the birth; no check-then-kill by PID. */

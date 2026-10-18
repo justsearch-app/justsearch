@@ -17,6 +17,7 @@ impl Identity {
     pub(crate) fn valid(&self, pid: u32) -> bool {
         self.kind == "linux-proc-v1"
             && pid > 0
+            && pid <= i32::MAX as u32
             && self.pid == pid
             && uuid::Uuid::parse_str(&self.boot_id)
                 .is_ok_and(|boot| boot.hyphenated().to_string() == self.boot_id)
@@ -106,7 +107,7 @@ pub(crate) fn check(pid: u32, expected: Option<&Identity>) -> &'static str {
 // Resolved by the same bundle-discovery path used for the Engine, never from PATH or a data dir.
 static BOUND_EXEC: OnceLock<PathBuf> = OnceLock::new();
 pub(crate) fn set_bundle_dir(headless: &Path) {
-    let _ = BOUND_EXEC.set(headless.join("native/linux-x86_64/justsearch-bound-exec"));
+    let _ = BOUND_EXEC.set(headless.join(crate::native_targets::relative_path("bound-exec")));
 }
 
 pub(crate) fn bound_exec() -> io::Result<&'static Path> {
@@ -125,7 +126,8 @@ pub(crate) fn terminate(identity: &Identity, executable: &Path) -> Result<(), St
         return Err("Incomplete Linux managed child identity".into());
     }
     match capture(identity.pid) {
-        Ok((seen, exe)) if seen != *identity || exe != executable => return Ok(()),
+        Ok((seen, _)) if seen != *identity => return Ok(()),
+        Ok((_, exe)) if exe != executable => eprintln!("Managed child {} executable changed: {:?} -> {:?}; birth identity still matches", identity.pid, executable, exe),
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(e) => return Err(format!("Managed child identity unknown: {e}")),
         _ => {}
@@ -202,6 +204,24 @@ mod tests {
             .to_string();
         assert_eq!(check(pid, Some(&changed)), "IDENTITY_UNKNOWN");
     }
+    #[test]
+    fn canonical_identity_encoding_agrees_with_the_other_readers() {
+        let (identity, _) = capture(std::process::id()).unwrap();
+        for ticks in ["0", "18446744073709551615"] {
+            let mut candidate = identity.clone();
+            candidate.start_ticks = ticks.into();
+            assert!(candidate.valid(candidate.pid));
+        }
+        for ticks in ["00", "-1", "18446744073709551616"] {
+            let mut candidate = identity.clone();
+            candidate.start_ticks = ticks.into();
+            assert!(!candidate.valid(candidate.pid));
+        }
+        let mut candidate = identity;
+        candidate.pid = u32::MAX;
+        assert!(!candidate.valid(candidate.pid));
+    }
+
     #[test]
     fn zombie_is_ended_without_requiring_executable_readability() {
         let mut child = std::process::Command::new("sleep")
