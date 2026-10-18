@@ -129,3 +129,17 @@ publishing {
     }
   }
 }
+
+// One native Linux lifetime/identity seam, shared by every JVM consumer and distribution.
+val linuxBoundExec = layout.buildDirectory.file("native/linux-x86_64/justsearch-bound-exec")
+val buildLinuxBoundExec by tasks.registering(Exec::class) {
+  val source = rootProject.layout.projectDirectory.file("native/bound-exec/bound-exec.c")
+  val binary = linuxBoundExec
+  inputs.file(source)
+  outputs.file(binary)
+  onlyIf { System.getProperty("os.name").lowercase().startsWith("linux") }
+  doFirst { binary.get().asFile.parentFile.mkdirs() }
+  commandLine("cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+      source.asFile.absolutePath, "-o", binary.get().asFile.absolutePath)
+}
+tasks.named("processResources") { dependsOn(buildLinuxBoundExec) }

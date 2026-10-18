@@ -2,6 +2,8 @@
 package io.justsearch.app.api.runtime;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.justsearch.app.api.runtime.child.BoundChildProcess;
+import io.justsearch.app.api.runtime.child.LinuxProcessIdentity;
 import java.io.File;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -26,7 +28,14 @@ public record ManagedChild(
     String endpoint,
     String modelPath,
     String declaredConfigHash,
-    String realizedArgvHash) {
+    String realizedArgvHash,
+    LinuxProcessIdentity processIdentity) {
+
+  /** Existing Windows and legacy records retain their fields and constructor semantics. */
+  public ManagedChild(String id, Kind kind, long pid, String startedAt, String executable,
+      String endpoint, String modelPath, String declaredConfigHash, String realizedArgvHash) {
+    this(id, kind, pid, startedAt, executable, endpoint, modelPath, declaredConfigHash, realizedArgvHash, null);
+  }
 
   public enum Kind {
     LLAMA_SERVER,
@@ -59,22 +68,27 @@ public record ManagedChild(
       String modelPath,
       String declaredConfigHash,
       String realizedArgvHash) {
+    var linux = BoundChildProcess.isLinux() ? LinuxProcessIdentity.observe(process.pid()) : null;
     ProcessHandle.Info observed = process.info();
     Instant start =
         observed.startInstant().orElseThrow(
             () -> new IllegalStateException("started child has no process start instant"));
     String executable = observed.command().filter(command -> !command.isBlank()).orElseThrow(
         () -> new IllegalStateException("started child has no observed executable"));
+    if (linux != null && (linux.identity().isEmpty() || linux.executable().isEmpty()
+        || !linux.identity().equals(LinuxProcessIdentity.read(process.pid()))))
+      throw new IllegalStateException("Linux child identity changed or unavailable during capture");
     return new ManagedChild(
         UUID.randomUUID().toString(),
         kind,
         process.pid(),
         start.toString(),
-        normalizePath(Path.of(executable)),
+        normalizePath(Path.of(linux != null ? linux.executable().orElseThrow() : executable)),
         endpoint,
         modelPath == null ? null : normalizePath(Path.of(modelPath)),
         declaredConfigHash,
-        realizedArgvHash);
+        realizedArgvHash,
+        linux != null ? linux.identity().orElseThrow() : null);
   }
 
   /** Windows paths compare case-insensitively; other platforms retain case. */
@@ -85,8 +99,18 @@ public record ManagedChild(
         : normalized;
   }
 
-  /** Compare every destructive-action identity axis, preserving unknown live identities. */
+  /** Compare identity axes. Legacy records remain readable; Linux stop authority additionally
+   * requires a saved native tuple in the terminator, never the legacy wall-clock match. */
   public IdentityMatch identityOf(ProcessHandle handle) {
+    if (BoundChildProcess.isLinux() && processIdentity != null) {
+      if (processIdentity.pid() != pid || handle.pid() != pid)
+        return IdentityMatch.UNKNOWN;
+      var live = LinuxProcessIdentity.observe(pid);
+      if (live.identity().isEmpty() || live.executable().isEmpty()) return IdentityMatch.UNKNOWN;
+      return live.identity().get().equals(processIdentity)
+          && normalizePath(Path.of(live.executable().get())).equals(executable)
+          ? IdentityMatch.MATCH : IdentityMatch.MISMATCH;
+    }
     ProcessHandle.Info observed = handle.info();
     Optional<Instant> liveStart = observed.startInstant();
     Optional<String> liveCommand = observed.command();

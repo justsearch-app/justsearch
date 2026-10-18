@@ -49,7 +49,13 @@ public final class LedgerReconciler {
       long pid,
       Optional<String> creationFileTime,
       Optional<Instant> processStartedAt,
-      String executable) {}
+      String executable,
+      Optional<LinuxProcessIdentity> processIdentity) {
+    public RecordedIdentity(long pid, Optional<String> creationFileTime,
+        Optional<Instant> processStartedAt, String executable) {
+      this(pid, creationFileTime, processStartedAt, executable, Optional.empty());
+    }
+  }
 
   /** The live-process side of the check; a seam for tests. */
   @FunctionalInterface
@@ -217,7 +223,7 @@ public final class LedgerReconciler {
     RecordedIdentity recorded = new RecordedIdentity(pid,
         start.text("creationFileTime").filter(value -> value.matches("[1-9][0-9]{0,19}")),
         start.text("processStartedAt").flatMap(LedgerTimestamps::known),
-        start.text("executable").orElse(""));
+        start.text("executable").orElse(""), LinuxProcessIdentity.fromJson(start.field("processIdentity")));
     try {
       return Objects.requireNonNull(os.check(recorded), "check");
     } catch (RuntimeException unreadable) {
@@ -237,6 +243,7 @@ public final class LedgerReconciler {
         JsonNode creation = owner.path("creationFileTime");
         fields.put("creationFileTime", creation.isString() ? creation.asString() : null);
         fields.put("instanceId", instance.asString());
+        if (owner.has("processIdentity")) fields.put("processIdentity", owner.path("processIdentity"));
         return fields;
       }
     }
@@ -257,6 +264,15 @@ public final class LedgerReconciler {
   public static OsIdentity osIdentity(ProcessTerminator terminator) {
     Objects.requireNonNull(terminator, "terminator");
     return recorded -> {
+      if (terminator instanceof LinuxProcessTerminator) {
+        var live = LinuxProcessIdentity.observe(recorded.pid());
+        if (live.presence() == ProcessTerminator.IdentityPresence.GONE) return OsCheck.GONE;
+        if (live.identity().isEmpty() || recorded.processIdentity().isEmpty()) return OsCheck.IDENTITY_UNKNOWN;
+        if (!live.identity().equals(recorded.processIdentity())) return OsCheck.GONE;
+        if (live.executable().isEmpty() || recorded.executable().isBlank()) return OsCheck.IDENTITY_UNKNOWN;
+        return ManagedChild.normalizePath(Path.of(live.executable().get()))
+            .equals(ManagedChild.normalizePath(Path.of(recorded.executable()))) ? OsCheck.ALIVE_MATCH : OsCheck.GONE;
+      }
       ProcessTerminator.IdentityPresence presence = terminator.identityPresence(recorded.pid());
       if (presence == ProcessTerminator.IdentityPresence.UNKNOWN) return OsCheck.IDENTITY_UNKNOWN;
       if (presence == ProcessTerminator.IdentityPresence.GONE) return OsCheck.GONE;

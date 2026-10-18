@@ -96,6 +96,12 @@ final class EngineWrittenChildrenFixtureTest {
 
   private static void normalize(ObjectNode node, Map<String, String> ids) {
     for (String name : List.copyOf(node.propertyNames())) {
+      if (name.equals("processIdentity")) {
+        // The Windows golden file keeps its exact shape; Linux tuple contents are separately
+        // checked by LinuxChildLifetimeTest, including the real child-start ledger record.
+        node.remove(name);
+        continue;
+      }
       JsonNode value = node.get(name);
       if (value.isObject()) {
         normalize((ObjectNode) value, ids);

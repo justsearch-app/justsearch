@@ -1044,10 +1044,6 @@ final class EngineSupervisedRecoveryE2ETest {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");
     }
-    if (processingFamily || operationFault) {
-      assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
-          "the repository's process identity collector currently supports Windows only");
-    }
     Path repo = repositoryRoot();
     if (semanticIndexLockScenario || nativeProjectionScenario) {
       assumeTrue(hasRetainedStandardEmbedding(repo),

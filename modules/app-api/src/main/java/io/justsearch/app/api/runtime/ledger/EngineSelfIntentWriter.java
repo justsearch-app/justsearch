@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.runtime.ledger;
 
+import io.justsearch.app.api.runtime.child.BoundChildProcess;
+import io.justsearch.app.api.runtime.child.LinuxProcessIdentity;
 import io.justsearch.app.api.runtime.child.StopDetail;
 import io.justsearch.app.api.runtime.child.StopReason;
 import java.nio.file.Path;
@@ -71,6 +73,10 @@ public final class EngineSelfIntentWriter {
     engineFields.put("pid", engine.pid());
     engineFields.put("creationFileTime", engine.creationFileTime());
     engineFields.put("instanceId", engine.instanceId());
+    if (BoundChildProcess.isLinux() && engine.creationFileTime().isEmpty()
+        && engine.pid() == ProcessHandle.current().pid()) {
+      engineFields.put("processIdentity", LinuxProcessIdentity.read(engine.pid()));
+    }
     Map<String, Object> fields = new LinkedHashMap<>();
     fields.put("engine", engineFields);
     fields.put("reason", reason);

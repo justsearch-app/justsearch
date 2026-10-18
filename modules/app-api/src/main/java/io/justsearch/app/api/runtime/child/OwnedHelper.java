@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -23,8 +24,12 @@ public final class OwnedHelper extends Process {
     }
 
     boolean append(LedgerRecordType type, Map<String, Object> fields, boolean force) {
-      fields.put("owner", Map.of("pid", owner.pid(), "creationFileTime", owner.creationFileTime(),
-          "instanceId", owner.instanceId()));
+      Map<String, Object> ownerFields = new LinkedHashMap<>();
+      ownerFields.put("pid", owner.pid());
+      ownerFields.put("creationFileTime", owner.creationFileTime());
+      ownerFields.put("instanceId", owner.instanceId());
+      if (BoundChildProcess.isLinux()) ownerFields.put("processIdentity", LinuxProcessIdentity.read(owner.pid()));
+      fields.put("owner", ownerFields);
       if (nestedContainment) fields.put("ownerContainment", "KILL_ON_CLOSE");
       fields.put("incarnation", RuntimeManifest.IncarnationInfo.parse(
           SystemAccess.rawEnvVar(RuntimeManifest.IncarnationInfo.ENVIRONMENT)));
@@ -44,8 +49,10 @@ public final class OwnedHelper extends Process {
   private final String id = "h-" + UUID.randomUUID();
   private final String purpose;
   private final String birth;
+  private final String identityKey;
   private final String creatorBirth;
   private final String command;
+  private final String argvHash;
   private final Instant launchedAt = Instant.now();
   private final boolean grouped;
   private String stopReason;
@@ -115,7 +122,8 @@ public final class OwnedHelper extends Process {
   }
 
   public static Process start(ProcessBuilder builder, String purpose) throws IOException {
-    return acquire(builder.start(), purpose);
+    return acquire(BoundChildProcess.start(builder), purpose, BoundChildProcess.isLinux() ? builder.command().getFirst() : null,
+        BoundChildProcess.isLinux() ? DefaultChildControl.argvHash(builder.command()) : null);
   }
 
   /** Also usable at a caller-owned spawn seam; never accepts a PID or a ProcessHandle. */
@@ -131,7 +139,11 @@ public final class OwnedHelper extends Process {
 
   /** Failed admission retains the spawn object until its death is confirmed. */
   private static Process acquire(Process process, String purpose) throws IOException {
-    try { return new OwnedHelper(process, purpose); }
+    return acquire(process, purpose, null, null);
+  }
+
+  private static Process acquire(Process process, String purpose, String declaredExecutable, String argvHash) throws IOException {
+    try { return new OwnedHelper(process, purpose, declaredExecutable, argvHash); }
     catch (IOException | RuntimeException failure) {
       Instant failureAt = Instant.now();
       boolean interrupted = Thread.interrupted();
@@ -180,24 +192,27 @@ public final class OwnedHelper extends Process {
     public java.util.Optional<Process> survivor() { return java.util.Optional.ofNullable(survivor); }
   }
 
-  private OwnedHelper(Process process, String purpose) throws IOException {
+  private OwnedHelper(Process process, String purpose, String declaredExecutable, String argvHash) throws IOException {
     this.process = process;
     this.purpose = purpose;
+    this.argvHash = argvHash;
     records = recorder;
     terminator = ProcessTerminator.forCurrentOs();
     // A launch inside an open window of this process for its image: the forced window start
     // already attributes it, so its receipts are written unforced and forced as a group.
-    command = process.info().command().orElse(null);
+    command = process.info().command().orElse(declaredExecutable);
     grouped = ProcessIntents.openWindowFor(command, Instant.now());
     held = terminator.open(process);
     try {
       birth = held.creationFileTime().orElse(null);
+      identityKey = BoundChildProcess.isLinux()
+          ? held.processIdentity().map(LinuxProcessIdentity::key).orElse(null) : birth;
       creatorBirth = SelfIdentity.BIRTH;
       if (grouped) Intent.launched(command); // a launch window's forced start precedes the receipts
       Map<String, Object> fields = identity();
       fields.put("purpose", purpose);
       append(LedgerRecordType.HELPER_START, fields);
-      ProcessIntents.owned(process.pid(), birth);
+      ProcessIntents.owned(process.pid(), identityKey);
       process.onExit().thenRun(this::exitObserved);
     } catch (RuntimeException failure) { held.close(); throw failure; }
   }
@@ -219,7 +234,7 @@ public final class OwnedHelper extends Process {
     if (stopReason != null || !process.isAlive()) return;
     stopReason = purpose + ": " + reason;
     cooperative = inputClose;
-    ProcessIntents.intent(process.pid(), birth, stopReason);
+    ProcessIntents.intent(process.pid(), identityKey, stopReason);
     Map<String, Object> fields = identity();
     fields.put("reason", stopReason);
     fields.put("requestedAt", Instant.now());
@@ -274,7 +289,7 @@ public final class OwnedHelper extends Process {
     // that covers its launch and exit makes the exit intended; when the owner awaits does not
     // matter. A cooperative stop also needs the child's clean code. A crash code is never intended.
     String window = stopReason != null || awaited || crashCode(code) ? null
-        : ProcessIntents.windowReason(command, bornAt(), exitTime.orElse(null), SelfIdentity.PID, creatorBirth)
+        : ProcessIntents.windowReason(command, bornAt(), exitTime.orElse(BoundChildProcess.isLinux() ? Instant.now() : null), SelfIdentity.PID, creatorBirth)
             .orElse(null);
     boolean intended = !crashCode(code)
         && (stopReason == null ? awaited || window != null : !cooperative || code == 0);
@@ -292,7 +307,7 @@ public final class OwnedHelper extends Process {
     fields.put("forced", forced);
     append(LedgerRecordType.HELPER_EXIT, fields);
     recorded = true;
-    ProcessIntents.outcome(process.pid(), birth, intended ? "REQUESTED" : "UNEXPECTED", reason);
+    ProcessIntents.outcome(process.pid(), identityKey, intended ? "REQUESTED" : "UNEXPECTED", reason);
     held.close();
   }
 
@@ -308,8 +323,14 @@ public final class OwnedHelper extends Process {
     fields.put("helperId", id);
     fields.put("pid", process.pid());
     fields.put("creationFileTime", birth);
+    if (BoundChildProcess.isLinux()) {
+      fields.put("processIdentity", held.processIdentity());
+      fields.put("executable", held.executable().orElse(command));
+      fields.put("argvHash", argvHash);
+    }
     fields.put("creatorPid", ProcessHandle.current().pid());
-    fields.put("creatorCreationFileTime", creatorBirth);
+    fields.put("creatorCreationFileTime", BoundChildProcess.isLinux() ? null : creatorBirth);
+    if (BoundChildProcess.isLinux()) fields.put("creatorProcessIdentity", SelfIdentity.LINUX);
     return fields;
   }
 
@@ -324,7 +345,10 @@ public final class OwnedHelper extends Process {
   /** This process's identity, the owner of the windows it opens and the creator of its helpers. */
   private static final class SelfIdentity {
     static final long PID = ProcessHandle.current().pid();
-    static final String BIRTH = ProcessTerminator.forCurrentOs().creationFileTime(PID).orElse(null);
+    static final Optional<LinuxProcessIdentity> LINUX = BoundChildProcess.isLinux()
+        ? LinuxProcessIdentity.read(PID) : Optional.empty();
+    static final String BIRTH = BoundChildProcess.isLinux() ? LINUX.map(LinuxProcessIdentity::key).orElse(null)
+        : ProcessTerminator.forCurrentOs().creationFileTime(PID).orElse(null);
   }
 
   /** The longest an unforced record waits before it is forced to disk with the others pending. */
