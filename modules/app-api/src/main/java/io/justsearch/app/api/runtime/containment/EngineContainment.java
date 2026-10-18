@@ -4,7 +4,11 @@ package io.justsearch.app.api.runtime.containment;
 import java.util.Optional;
 
 /**
- * Whether every process the Engine starts ends with the Engine, however the Engine ends.
+ * The platform backend binding launched children to the Engine's lifetime.
+ *
+ * <p>Linux uses PR_SET_PDEATHSIG through one permanent spawn thread. Every bound direct child
+ * dies with this JVM; parser JVMs bind their own Tesseract children through the same seam.
+ * Uninstrumented forks do not inherit this guarantee. This is not Windows job membership.
  *
  * <p>On Windows the Engine creates a kill-on-close job and joins it as the first statement of its
  * entry point, before anything can start a process ({@link WindowsEngineJob}). Every later child,
@@ -18,30 +22,30 @@ import java.util.Optional;
  * reason {@code engine.containment_unavailable}; boot continues (the shell's job still contains the
  * Engine's helpers in production).
  */
-public sealed interface EngineContainment permits WindowsEngineJob, NoEngineContainment {
+public sealed interface EngineContainment permits WindowsEngineJob, NoEngineContainment, LinuxEngineContainment {
 
   /** The containment this process has. */
   enum Status {
-    /** The Engine is in its own kill-on-close job; every process it starts is contained. */
+    /** The platform lifetime backend is active (Windows job or Linux bound launch seam). */
     CONTAINED,
     /** Containment applies on this platform but could not be established. */
     UNAVAILABLE,
-    /** Not Windows: there is no job object to join. */
+    /** No lifetime backend applies on this platform. */
     NOT_APPLICABLE
   }
 
   Status status();
 
   /**
-   * Why containment is {@link Status#UNAVAILABLE}, as {@code <call>:<error>} (for example {@code
-   * AssignProcessToJobObject:5}); empty otherwise.
+   * Why containment is {@link Status#UNAVAILABLE}. Windows reports {@code <call>:<error>};
+   * Linux identifies the failed bound-exec backend. Empty otherwise.
    */
   Optional<String> unavailableReason();
 
   /**
-   * Whether {@code child} is inside the Engine's job ({@code IsProcessInJob}). Empty when the
-   * status is not {@link Status#CONTAINED} or the query fails. Spec F §1.2: {@code ChildControl}
-   * records the answer as {@code contained} on every {@code child-start}. Never throws.
+   * Whether {@code child} belongs to the Windows job, or has an identity-matched Linux bound
+   * launch receipt. Linux has no inherited job membership. Empty when containment or identity is
+   * unavailable. {@code ChildControl} records this as {@code contained} on child-start. Never throws.
    */
   Optional<Boolean> contains(ProcessHandle child);
 
@@ -53,8 +57,8 @@ public sealed interface EngineContainment permits WindowsEngineJob, NoEngineCont
   default void finishProcessRecording(java.time.Duration max) {}
 
   /**
-   * Creates and joins the Engine job. Idempotent: the first call decides and later calls return
-   * the same value. Must be the first statement of the Engine's entry point. Never throws.
+   * Installs the platform backend (Windows job or Linux spawn thread/helper). Idempotent: the
+   * first call decides. Must precede helper launches at the Engine entry point. Never throws.
    */
   static EngineContainment installAtBoot() {
     return BootContainment.install();

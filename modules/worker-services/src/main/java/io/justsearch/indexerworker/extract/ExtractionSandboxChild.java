@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>Process lifetime.</b> Windows bootstrap first installs a kill-on-close Job Object
  *       around this JVM and all its native descendants. The parent-PID watchdog halts this JVM
  *       when the Engine dies; Windows then kills the entire job, also on forced parser recycling.
- *       Other platforms retain only the parent watchdog, without native-descendant containment.
+ *       Linux uses the bound-child seam for Tesseract; other platforms retain the parent watchdog.
  * </ul>
  */
 public final class ExtractionSandboxChild {
@@ -141,7 +141,7 @@ public final class ExtractionSandboxChild {
   }
 
   /**
-   * Installs Windows descendant containment, then the parent-liveness gate for a child launched with {@code --parent-pid=<pid>}.
+   * Installs the platform child lifetime backend, then the parent-liveness gate for a child launched with {@code --parent-pid=<pid>}.
    *
    * <p>Public because the chaos harness's stub parser is a real out-of-tree child of this pool and
    * must run <b>this</b> orphan-prevention code, not a copy of it — a copied watchdog would make
@@ -152,6 +152,12 @@ public final class ExtractionSandboxChild {
   @SuppressWarnings("PMD.DoNotTerminateVM")
   public static void initializeProcessBoundary(String[] args) {
     WindowsParserContainment.install();
+    if (io.justsearch.app.api.runtime.child.BoundChildProcess.isLinux()) {
+      try { io.justsearch.app.api.runtime.child.BoundChildProcess.initialize(); }
+      catch (java.io.IOException unavailable) {
+        throw new IllegalStateException("Cannot establish Linux parser child lifetime", unavailable);
+      }
+    }
     long parentPid = parentPid(args);
     if (parentPid <= 0) {
       return;

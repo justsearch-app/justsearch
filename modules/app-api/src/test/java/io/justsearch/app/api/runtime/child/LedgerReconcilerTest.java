@@ -123,10 +123,12 @@ final class LedgerReconcilerTest {
     Instant start = live.info().startInstant().orElseThrow();
 
     assertEquals(LedgerReconciler.OsCheck.GONE, os.check(new LedgerReconciler.RecordedIdentity(
-        live.pid(), Optional.empty(), Optional.of(start.minusSeconds(60)), executable(live))));
+        live.pid(), Optional.empty(), Optional.of(start.minusSeconds(60)), executable(live),
+        LinuxProcessIdentity.read(live.pid()).map(identity -> new LinuxProcessIdentity(identity.kind(), identity.pid(), identity.bootId(),
+            new java.math.BigInteger(identity.startTicks()).add(java.math.BigInteger.ONE).toString())))));
     assertEquals(LedgerReconciler.OsCheck.ALIVE_MATCH, os.check(
         new LedgerReconciler.RecordedIdentity(
-            live.pid(), Optional.empty(), Optional.of(start), executable(live))));
+            live.pid(), Optional.empty(), Optional.of(start), executable(live), LinuxProcessIdentity.read(live.pid()))));
     if (java.io.File.separatorChar == '\\') {
       // On Windows the creation FILETIME decides, ahead of the JDK start time.
       assertEquals(LedgerReconciler.OsCheck.GONE, os.check(
@@ -169,7 +171,8 @@ final class LedgerReconcilerTest {
     writer.append(LedgerRecordType.CHILD_START, fields("childId", childId, "pid", pid,
         "processStartedAt", startedAt, "creationFileTime", creationFileTime,
         "executable", executable, "argvHash", "a".repeat(64), "contained", null,
-        "gpuDevice", null));
+        "gpuDevice", null, "processIdentity", startedAt != null && BoundChildProcess.isLinux()
+            ? LinuxProcessIdentity.read(pid) : Optional.empty()));
   }
 
   private static Map<String, Object> spawn(String childId) {

@@ -1207,6 +1207,19 @@ val generateBuildStamp by tasks.registering {
   }
 }
 
+// Linux child lifetime helper lives beside lib/ in each installed distribution.
+if (System.getProperty("os.name").lowercase().startsWith("linux")) {
+  distributions.named("main") {
+    contents {
+      from(files(project(":modules:app-api").layout.buildDirectory.file(
+          "native/linux-x86_64/justsearch-bound-exec")).builtBy(":modules:app-api:buildLinuxBoundExec")) {
+        into("native/linux-x86_64")
+        filePermissions { unix("rwxr-xr-x") }
+      }
+    }
+  }
+}
+
 // Ensure the stamp is generated whenever installDist runs — covers runHeadless, the dev-runner's
 // launch path, and any other task that triggers installDist directly.
 tasks.named("installDist") {

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.condition.OS;
  * the stop reason, after exit records became write-once. Real Windows processes; this also passes
  * on b599d4d7e.
  */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class OwnedHelperStopRecordTest {
   private final List<Map<String, Object>> records = new CopyOnWriteArrayList<>();
 
@@ -31,8 +31,9 @@ final class OwnedHelperStopRecordTest {
       return true;
     }, new EngineIdentity(ProcessHandle.current().pid(),
         ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()), "exit-once"));
-    return OwnedHelper.start(new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive",
-        "-Command", command).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+    return OwnedHelper.start(new ProcessBuilder(java.io.File.separatorChar != '\\'
+        ? FakeChild.argv(command.startsWith("exit") ? "exit:0:0" : "sleep")
+        : List.of("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command)).redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .redirectError(ProcessBuilder.Redirect.DISCARD), purpose);
   }
 
