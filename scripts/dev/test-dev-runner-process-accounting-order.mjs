@@ -165,7 +165,12 @@ for (const compacted of [false, true]) {
     const losses = records.filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST').map(r => r.line);
     assert.ok(losses.some(l => l.evidenceRangeComplete !== true), 'fixture holds a loss with an unknown range');
     const view = { engine: { present: true, records }, children: { present: true, records: [] } };
-    const evicted = Math.max(...losses.map(l => ledger.knownTimestamp(l.at)));
+    // Later evictions can be fully scoped to `old`. A slow disk may put them more than a
+    // second after the torn archive was evicted; they do not bound its unknown evidence.
+    const unknownLosses = losses.filter(l => !l.incarnation?.session && l.scopeComplete !== true
+      && l.evidenceRangeComplete !== true);
+    assert.ok(unknownLosses.length > 0, 'fixture holds an unscoped loss with an unknown range');
+    const evicted = Math.max(...unknownLosses.map(l => ledger.knownTimestamp(l.at)));
     const current = census.exitTargets({ runId: 'new', startedAt: ledger.formatTimestamp(evicted + 1000), pids: {} },
       null, [], view);
     assert.equal(current.gaps.some(g => g.reason === 'evidence_lost'), false,
