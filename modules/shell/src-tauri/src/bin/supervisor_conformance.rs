@@ -197,6 +197,17 @@ fn main() {
                 if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
                     let _ = std::fs::remove_file(control_dir.join("shell-control.json"));
                     match value["action"].as_str() {
+                        Some("session-query") => {
+                            trigger_coordinator.begin(quit::QuitCause::SessionEnd {
+                                close_app: false,
+                            });
+                        }
+                        Some("session-end") => {
+                            let ticket = trigger_coordinator.begin(quit::QuitCause::SessionEnd {
+                                close_app: false,
+                            });
+                            let _ = trigger_coordinator.wait(ticket);
+                        }
                         Some("triggers") => {
                             trigger_coordinator.begin(quit::QuitCause::TrayQuit);
                             trigger_coordinator.begin(quit::QuitCause::Drop);

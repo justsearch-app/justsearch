@@ -1930,7 +1930,12 @@ mod tests {
 
     #[test]
     fn test_validate_path_rejects_traversal() {
-        let result = validate_user_path("C:\\Users\\..\\etc\\passwd", false);
+        let input = if cfg!(windows) {
+            "C:\\Users\\..\\etc\\passwd"
+        } else {
+            "/home/../etc/passwd"
+        };
+        let result = validate_user_path(input, false);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("traversal"));
     }

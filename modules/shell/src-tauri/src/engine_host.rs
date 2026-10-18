@@ -2241,10 +2241,16 @@ mod hold_api_tests {
     #[test]
     fn hold_api_preserves_live_engine_supervision() {
         let host = Arc::new(EngineHost::default());
-        let mut command = Command::new("ping.exe");
-        command
-            .args(["-n", "60", "127.0.0.1"])
-            .stdout(std::process::Stdio::null());
+        let mut command = if cfg!(windows) {
+            let mut command = Command::new("ping.exe");
+            command.args(["-n", "60", "127.0.0.1"]);
+            command
+        } else {
+            let mut command = crate::containment::engine_command("sleep").unwrap();
+            command.arg("60");
+            command
+        };
+        command.stdout(std::process::Stdio::null());
         host.admit(PreparedCommand { command }).unwrap();
         let running = Arc::new(AtomicBool::new(true));
         let actor_host = host.clone();
