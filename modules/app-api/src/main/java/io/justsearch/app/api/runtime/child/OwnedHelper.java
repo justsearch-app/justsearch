@@ -61,7 +61,7 @@ public final class OwnedHelper extends Process {
   private boolean recorded;
   private boolean awaited;
   private int waiters;
-  private java.util.Optional<Instant> exitTime = java.util.Optional.empty();
+  private Optional<Instant> exitTime = Optional.empty();
 
   public static void recordTo(LedgerSink sink, EngineIdentity owner) {
     recordTo(sink, owner, null);
@@ -189,7 +189,7 @@ public final class OwnedHelper extends Process {
           + (survivor == null ? "confirmed exit" : "did not confirm exit"), cause);
       this.survivor = survivor;
     }
-    public java.util.Optional<Process> survivor() { return java.util.Optional.ofNullable(survivor); }
+    public Optional<Process> survivor() { return Optional.ofNullable(survivor); }
   }
 
   private OwnedHelper(Process process, String purpose, String declaredExecutable, String argvHash) throws IOException {

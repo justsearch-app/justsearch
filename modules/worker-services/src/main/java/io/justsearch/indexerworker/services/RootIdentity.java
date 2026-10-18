@@ -99,7 +99,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
   }
 
   static boolean isLinux() {
-    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux");
+    return io.justsearch.configuration.SystemAccess.sysProp("os.name", "").toLowerCase(Locale.ROOT).contains("linux");
   }
 
   /**

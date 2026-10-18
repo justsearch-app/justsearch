@@ -176,6 +176,9 @@ final class AppliedConfigurationRevisionTest {
   @Test
   void gpuPolicyAtSuccessorBootPublishesAndRecoversVerifiedIdentity() throws Exception {
     Path executable = Files.writeString(directory.resolve("llama-server.exe"), "server");
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      assertTrue(executable.toFile().setExecutable(true));
+    }
     Path model = Files.writeString(directory.resolve("chat.gguf"), "model");
     var enabled = launchConfiguration(Map.of("justsearch.gpu.layers", "12",
         "policy.gpu_acceleration_enabled", "true"), executable, model);
@@ -240,6 +243,9 @@ final class AppliedConfigurationRevisionTest {
   private void exerciseRefresh(String key, String value, String rejected, boolean deferred)
       throws Exception {
     Path executable = Files.writeString(directory.resolve("llama-server.exe"), "server");
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      assertTrue(executable.toFile().setExecutable(true));
+    }
     Path model = Files.writeString(directory.resolve("chat.gguf"), "model");
     var controls = new LinkedHashMap<>(Map.of(
         "justsearch.llm.slots", "2", "justsearch.llm.kv_type", "q8_0",

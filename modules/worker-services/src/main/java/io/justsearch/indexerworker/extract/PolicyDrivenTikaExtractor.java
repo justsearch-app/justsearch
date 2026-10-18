@@ -38,7 +38,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
    * by every extractor: opened by the first such parse, ended 30 s after the last, and at close.
    */
   static final OwnedHelper.SharedWindow TESSERACT_WINDOW = OwnedHelper.sharedWindow(
-      "tesseract.exe", "Tesseract OCR during extraction", java.time.Duration.ofMinutes(5));
+      io.justsearch.configuration.NativeTargets.current().executableName("tesseract"), "Tesseract OCR during extraction", java.time.Duration.ofMinutes(5));
   private static final String OCR_FALLBACK_DIRECT_TESSERACT = "direct_tesseract";
   private static final String OCR_FALLBACK_RENDERED_PDF = "rendered_pdf";
 

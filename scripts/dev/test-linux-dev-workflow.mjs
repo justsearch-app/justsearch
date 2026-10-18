@@ -19,8 +19,6 @@ const scratch = fs.mkdtempSync(path.join(root, 'tmp/linux-dev-workflow-'));
 const state = path.join(scratch, 'state');
 const helper = identity.boundExecPath();
 fs.accessSync(helper, fs.constants.X_OK);
-const helperFixture = path.join(scratch, 'bound-exec-fixture');
-fs.copyFileSync(helper, helperFixture);
 const env = { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state, JUSTSEARCH_JOB_RECORD_DIR: path.join(scratch, 'jobs'),
   JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', JUSTSEARCH_AI_AUTOSTART_ENABLED: 'false',
   LD_LIBRARY_PATH: ['/opt/nvidia/ort-cuda12/current/lib', process.env.LD_LIBRARY_PATH].filter(Boolean).join(':') };
@@ -142,12 +140,6 @@ async function command(command, args, options = {}) {
 async function gradle(args) {
   return command('flock', ['/tmp/js-linux-port/gradle.lock', './gradlew', ...args]);
 }
-// A's staged binary is a prerequisite. Until its distribution staging is integrated, retain the
-// explicitly supplied installed helper fixture across installDist (no binary enters source control).
-function restoreHelperFixture() {
-  if (!fs.existsSync(helper)) { fs.mkdirSync(path.dirname(helper), { recursive: true }); fs.copyFileSync(helperFixture, helper); fs.chmodSync(helper, 0o755);
-    evidence.helperFixtureRestaged = true; }
-}
 const transport = new StdioClientTransport({ command: process.execPath, args: [path.join(root, 'scripts/dev/justsearch-dev-mcp.mjs')], cwd: root, env, stderr: 'pipe' });
 const client = new Client({ name: 'linux-workflow-verifier', version: '1.0.0' });
 let mcpBirth, runId, sourceChanged = false, classesNeedRepair = false;
@@ -167,7 +159,7 @@ try {
   // An unchanged jar can retain its old timestamp after an incremental source restoration.
   // Build/install the fixture's pair together; never bypass the runner's stale-pair refusal.
   await gradle(['spotlessApply', ':modules:ui:installDist', '--rerun-tasks', '-PskipWebBuild=true']);
-  restoreHelperFixture();
+  fs.accessSync(helper, fs.constants.X_OK);
   await client.connect(transport);
   mcpBirth = identity.readLinuxProcess(transport.pid)?.processIdentity;
   assert.ok(mcpBirth, 'MCP process birth is readable');
@@ -231,7 +223,7 @@ try {
   assert.equal(await listening(apiPort), false); assert.equal(await listening(uiPort), false);
   evidence.scenarios.S4_repeat = { runId, snapshot: secondSnapshot, stop: secondStop };
   runId = null;
-  await gradle(['spotlessApply', ':modules:ui:installDist', '-PskipWebBuild=true']); restoreHelperFixture(); classesNeedRepair = false;
+  await gradle(['spotlessApply', ':modules:ui:installDist', '-PskipWebBuild=true']); fs.accessSync(helper, fs.constants.X_OK); classesNeedRepair = false;
   const python = process.env.VIRTUAL_ENV ? path.join(process.env.VIRTUAL_ENV, 'bin/python3') : 'python3';
   const evalPort = await freePort();
   fs.mkdirSync(path.join(datasetDir, 'qrels'), { recursive: true });
@@ -288,7 +280,7 @@ try {
   try { await poll('owned fixture cleanup', () => cleanupIdentities.every(record => !identity.linuxIdentity(record) || ended(record)), 2000); }
   catch (error) { evidence.cleanupError = error.message; }
   if (repairClasses) {
-    try { await gradle(['spotlessApply', ':modules:ui:installDist', '-PskipWebBuild=true']); restoreHelperFixture(); }
+    try { await gradle(['spotlessApply', ':modules:ui:installDist', '-PskipWebBuild=true']); fs.accessSync(helper, fs.constants.X_OK); }
     catch (error) { evidence.classRepairError = error.message; }
   }
 

@@ -154,7 +154,7 @@ public final class ExtractionSandboxChild {
     WindowsParserContainment.install();
     if (io.justsearch.app.api.runtime.child.BoundChildProcess.isLinux()) {
       try { io.justsearch.app.api.runtime.child.BoundChildProcess.initialize(); }
-      catch (java.io.IOException unavailable) {
+      catch (IOException unavailable) {
         throw new IllegalStateException("Cannot establish Linux parser child lifetime", unavailable);
       }
     }

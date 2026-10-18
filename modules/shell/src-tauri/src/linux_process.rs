@@ -109,6 +109,17 @@ pub(crate) fn set_bundle_dir(headless: &Path) {
     let _ = BOUND_EXEC.set(headless.join("native/linux-x86_64/justsearch-bound-exec"));
 }
 
+pub(crate) fn bound_exec() -> io::Result<&'static Path> {
+    #[cfg(test)]
+    set_bundle_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/build/install/ui"));
+    BOUND_EXEC.get().map(PathBuf::as_path).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "Linux bound-exec bundle path is unavailable",
+        )
+    })
+}
+
 pub(crate) fn terminate(identity: &Identity, executable: &Path) -> Result<(), String> {
     if !identity.valid(identity.pid) || !executable.is_absolute() {
         return Err("Incomplete Linux managed child identity".into());
@@ -119,9 +130,7 @@ pub(crate) fn terminate(identity: &Identity, executable: &Path) -> Result<(), St
         Err(e) => return Err(format!("Managed child identity unknown: {e}")),
         _ => {}
     }
-    let helper = BOUND_EXEC
-        .get()
-        .ok_or("Linux bound-exec bundle path is unavailable")?;
+    let helper = bound_exec().map_err(|e| e.to_string())?;
     // The helper opens a pidfd BEFORE rechecking the birth tuple and signals that object.
     let status = std::process::Command::new(helper)
         .args([

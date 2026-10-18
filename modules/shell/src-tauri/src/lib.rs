@@ -7,6 +7,7 @@ mod engine_probe;
 #[allow(dead_code)]
 mod exit_ledger;
 mod platform_paths;
+mod native_targets;
 #[cfg(target_os = "linux")]
 mod linux_process;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
@@ -725,7 +726,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("pipeline-stage-plugins.v1.json");
 
     let crash_dir = app_data_dir.join("crashes");
-    let mut cmd = Command::new(&java_bin);
+    let mut cmd = containment::engine_command(&java_bin).map_err(|e| e.to_string())?;
     // Use AOT cache if present (JEP 514 — built at compile time, bundled in aot/).
     let aot_cache = headless_dir.join("aot").join("head.aot");
     cmd.current_dir(&headless_dir)
@@ -836,7 +837,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("native-bin")
         .join("onnxruntime")
         .join("cuda12");
-    if ort_cuda_dir.join("onnxruntime_providers_cuda.dll").exists() {
+    if ort_cuda_dir.join(native_targets::library_name("ort-cuda")).exists() {
         cmd.env("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", &ort_cuda_dir);
         cmd.env("JUSTSEARCH_GPU_ENABLED", "true");
     }
@@ -844,11 +845,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     // OCR baseline: make app-owned Tesseract discoverable to Tika's external-process parser.
     // Tika 3.x carries executable/tessdata paths on the parser instance built from process
     // configuration, so the packaged app must project the restored runtime through env.
-    let tesseract_exe = native_tesseract_dir.join(if cfg!(windows) {
-        "tesseract.exe"
-    } else {
-        "tesseract"
-    });
+    let tesseract_exe = native_tesseract_dir.join(native_targets::executable_name("tesseract"));
     let tessdata_dir = native_tesseract_dir.join("tessdata");
     if tesseract_exe.exists() && tessdata_dir.is_dir() {
         cmd.env("TESSDATA_PREFIX", &tessdata_dir);

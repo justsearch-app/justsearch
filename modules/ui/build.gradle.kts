@@ -376,8 +376,27 @@ val tauriHeadlessResourcesDir =
 // v1 Simple Mode: bundle llama-server.exe (CPU-only) into the sidecar payload
 // ============================================================================
 val isWindowsHost = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+val nativeTargetsSpec = ObjectMapper().readTree(providers.fileContents(
+    rootProject.layout.projectDirectory.file("contracts/native-targets/spec.v1.json")).asText.get())
+val nativeTargetOs = if (isWindowsHost) "windows" else System.getProperty("os.name").lowercase(Locale.ROOT)
+val nativeTargetArch = when (val arch = System.getProperty("os.arch").lowercase(Locale.ROOT)) {
+  "amd64", "x64" -> "x86_64"
+  else -> arch
+}
+val nativeTarget = nativeTargetsSpec["targets"]["$nativeTargetOs-$nativeTargetArch"]
+    ?: throw GradleException("Unsupported native target: $nativeTargetOs-$nativeTargetArch")
+val llamaServerName = nativeTarget["executables"]["llama-server"].asText()
+val windowsNativeTarget = nativeTargetsSpec["targets"]["windows-x86_64"]
+val windowsLlamaServerName = windowsNativeTarget["executables"]["llama-server"].asText()
+val windowsTesseractName = windowsNativeTarget["executables"]["tesseract"].asText()
+val windowsOrtCudaName = windowsNativeTarget["libraries"]["ort-cuda"].asText()
+val windowsOrtRequiredNames = listOf("ort-cuda", "ort-shared", "cudart", "cublas", "cublasLt")
+    .map { windowsNativeTarget["libraries"][it].asText() }
+val linuxOrtResourceDir = nativeTargetsSpec["targets"]["linux-x86_64"]["ortResources"]["ort"].asText().substringBeforeLast('/')
+val windowsOrtCudaResource = nativeTargetsSpec["targets"]["windows-x86_64"]["ortResources"]["ort-cuda"].asText()
+
 val llamaStageDir = layout.buildDirectory.dir("llama-server/stage")
-val stagedLlamaServerExe = llamaStageDir.map { it.file(if (isWindowsHost) "llama-server.exe" else "llama-server") }
+val stagedLlamaServerExe = llamaStageDir.map { it.file(llamaServerName) }
 
 // Runtime source: the pinned upstream llama.cpp Windows build is downloaded at build time. The vendored
 // third_party/llama.cpp source tree and its `-PllamaRuntime=source` developer override were removed
@@ -734,7 +753,7 @@ val stageLlamaCudaVariant by tasks.registering(Sync::class) {
 
   // Runtime files (llama-server.exe + ggml-cuda.dll + backends)
   from(zipTree(cudaZipFile)) {
-    include("**/llama-server.exe")
+    include("**/$windowsLlamaServerName")
     include("**/*.dll")
     include("**/LICENSE*")
     // See stageLlamaServerFromPrebuilt: ggml-rpc.dll is the unused, unsigned distributed-inference
@@ -753,7 +772,7 @@ val stageLlamaCudaVariant by tasks.registering(Sync::class) {
   }
   onlyIf { cudaZipFile.exists() && cudartZipFile.exists() }
   doLast {
-    val serverExe = variantDir.resolve("llama-server.exe")
+    val serverExe = variantDir.resolve(windowsLlamaServerName)
     if (!serverExe.exists()) {
       logger.warn("CUDA variant staging failed - llama-server.exe not found")
       return@doLast
@@ -817,18 +836,17 @@ val stageOrtCudaVariant by tasks.registering(Sync::class) {
   description = "Stage ORT CUDA DLLs for GPU-accelerated ONNX inference"
   enabled = includeOrtCuda
   val srcDir = ortCudaConventionalDir.asFile
+  val stageDir = ortCudaStageDir
+  val cudaName = windowsOrtCudaName
+  val requiredNames = windowsOrtRequiredNames
   into(ortCudaStageDir)
   from(srcDir) {
     include("*.dll")
   }
-  onlyIf { srcDir.exists() && srcDir.resolve("onnxruntime_providers_cuda.dll").exists() }
+  onlyIf { srcDir.exists() && srcDir.resolve(cudaName).exists() }
   doLast {
-    val stageRoot = ortCudaStageDir.get().asFile
-    val requiredDlls = listOf(
-      "onnxruntime_providers_cuda.dll", "onnxruntime_providers_shared.dll",
-      "cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll"
-    )
-    val missing = requiredDlls.filter { !stageRoot.resolve(it).exists() }
+    val stageRoot = stageDir.get().asFile
+    val missing = requiredNames.filter { !stageRoot.resolve(it).exists() }
     if (missing.isNotEmpty()) {
       logger.warn("ORT CUDA variant incomplete — missing: $missing")
       return@doLast
@@ -850,7 +868,7 @@ val stageOrtCudaVariant by tasks.registering(Sync::class) {
         """.trimMargin()
       )
     }
-    logger.lifecycle("ORT CUDA variant staged at: ${stageRoot.absolutePath} (${requiredDlls.size} required DLLs present)")
+    logger.lifecycle("ORT CUDA variant staged at: ${stageRoot.absolutePath} (${requiredNames.size} required DLLs present)")
   }
 }
 
@@ -872,7 +890,7 @@ val stageLlamaServerFromPrebuilt by tasks.registering(Sync::class) {
     include("variants/**")
   }
   from(zipTree(zipFile)) {
-    include("**/llama-server.exe")
+    include("**/$windowsLlamaServerName")
     include("**/*.dll")
     include("**/LICENSE*")
     // ggml-rpc.dll is llama.cpp's distributed/multi-machine inference backend. JustSearch only ever
@@ -887,7 +905,7 @@ val stageLlamaServerFromPrebuilt by tasks.registering(Sync::class) {
     relativePath = org.gradle.api.file.RelativePath(true, name)
   }
   doLast {
-    val serverExe = stageRoot.resolve("llama-server.exe")
+    val serverExe = stageRoot.resolve(windowsLlamaServerName)
     if (!serverExe.exists()) {
       throw GradleException("Staged llama-server.exe not found after prebuilt extract: ${serverExe.absolutePath}")
     }
@@ -984,6 +1002,8 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
       // - java.xml: XML parsing (config files, Tika metadata)
       // - java.desktop: AWT/Swing (image handling, clipboard in UI scenarios)
       // - jdk.httpserver: Lightweight HTTP server for local API
+      // - jdk.unsupported: Methvin recursive file watching and native-buffer cleanup
+      // - jdk.zipfs: Read rules and metadata packaged inside application jars
       listOf(
               "java.base",
               "java.logging",
@@ -995,7 +1015,9 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
               "java.security.sasl",
               "java.xml",
               "java.desktop",
-              "jdk.httpserver")
+              "jdk.httpserver",
+              "jdk.unsupported",
+              "jdk.zipfs")
           .joinToString(","),
       "--output",
       outDir.absolutePath)
@@ -1207,19 +1229,6 @@ val generateBuildStamp by tasks.registering {
   }
 }
 
-// Linux child lifetime helper lives beside lib/ in each installed distribution.
-if (System.getProperty("os.name").lowercase().startsWith("linux")) {
-  distributions.named("main") {
-    contents {
-      from(files(project(":modules:app-api").layout.buildDirectory.file(
-          "native/linux-x86_64/justsearch-bound-exec")).builtBy(":modules:app-api:buildLinuxBoundExec")) {
-        into("native/linux-x86_64")
-        filePermissions { unix("rwxr-xr-x") }
-      }
-    }
-  }
-}
-
 // Ensure the stamp is generated whenever installDist runs — covers runHeadless, the dev-runner's
 // launch path, and any other task that triggers installDist directly.
 tasks.named("installDist") {
@@ -1406,6 +1415,7 @@ val verifyTesseractRuntime by tasks.registering {
       rootProject.layout.projectDirectory.file("packaging/runtime/tesseract-windows.v1.json").asFile
   val runtimeDir = layout.buildDirectory.dir("runtime/tesseract-windows").get().asFile
   val isWindowsForTask = isWindowsHost
+  val executableName = windowsTesseractName
   val overrideActive = tesseractOverrideActive
   inputs.file(manifestFile)
   inputs.property("overrideActive", overrideActive)
@@ -1463,7 +1473,7 @@ val verifyTesseractRuntime by tasks.registering {
       }
     }
 
-    val tesseract = runtimeDir.resolve("tesseract.exe")
+    val tesseract = runtimeDir.resolve(executableName)
     val tessdata = runtimeDir.resolve("tessdata")
     val process =
         ProcessBuilder(tesseract.absolutePath, "--list-langs")
@@ -1536,9 +1546,9 @@ val stageTrimmedOnnxRuntimeGpu by tasks.registering(Jar::class) {
   val originalJar =
       headlessDistDir.get().asFile.resolve("lib").resolve(onnxGpuJarName)
   from(zipTree(originalJar)) {
-    exclude("ai/onnxruntime/native/linux-x64/**")
+    exclude("$linuxOrtResourceDir/**")
     // §J item 2: the win-x64 CUDA EP DLL moves to the cuda-runtime pack (see comment above).
-    exclude("ai/onnxruntime/native/win-x64/onnxruntime_providers_cuda.dll")
+    exclude(windowsOrtCudaResource)
   }
   destinationDirectory.set(trimmedOnnxRuntimeGpuDir)
   // Fixed output name (not the version-stamped original): the Engine loads it via `-cp lib/*`, so
@@ -1693,7 +1703,7 @@ tasks.register("smokeSidecarBundle") {
       // Tauri shell uses javaw.exe to spawn backend without console window
       val javawBin = headlessDir.resolve("runtime").resolve("bin").resolve("javaw.exe")
       if (!javawBin.exists()) throw GradleException("Missing javaw.exe in bundled runtime: ${javawBin.absolutePath}")
-      val serverExe = headlessDir.resolve("native-bin").resolve("llama-server").resolve("llama-server.exe")
+      val serverExe = headlessDir.resolve("native-bin").resolve("llama-server").resolve(windowsLlamaServerName)
       if (!serverExe.exists()) {
         throw GradleException("Missing bundled llama-server.exe: ${serverExe.absolutePath}")
       }
@@ -2025,9 +2035,10 @@ tasks.withType<CreateStartScripts>().configureEach {
  * If the project root is a git worktree, also checks the main repo root. Returns the absolute
  * path to the detected directory, or null if not found.
  */
-fun detectOrtCudaPath(projectRoot: File): String? {
+fun detectOrtCudaPath(projectRoot: File, cudaDllName: String): String? {
+  // This directory contains the Windows backend; Linux uses the shared driver probe.
+  if (!isWindowsHost) return null
   val cudaDirName = "tmp/ort-variant-test/cuda-12.4-v1.24.3"
-  val cudaDllName = "onnxruntime_providers_cuda.dll"
   val candidates = mutableListOf(projectRoot)
   // In a git worktree, .git is a file (not a directory) containing "gitdir: <path>".
   // Resolve the main repo root from it so we can find shared tmp/ resources.
@@ -2185,7 +2196,7 @@ tasks.register<JavaExec>("runHeadless") {
   var cudaDetected = false
   val ortEnv = providers.environmentVariable("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH").orNull
   if (ortEnv == null) {
-    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile)
+    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile, windowsOrtCudaName)
     if (detected != null) {
       environment("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", detected)
       cudaDetected = true
@@ -2238,7 +2249,7 @@ tasks.register<JavaExec>("runHeadlessWithProfiling") {
   // Auto-detect ORT CUDA DLLs when not explicitly set
   var cudaDetected = false
   if (System.getenv("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH") == null) {
-    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile)
+    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile, windowsOrtCudaName)
     if (detected != null) {
       environment("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", detected)
       cudaDetected = true

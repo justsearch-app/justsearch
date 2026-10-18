@@ -132,6 +132,9 @@ function classifyHarnessRow(row) {
   const name = String(row?.Name ?? '').trim().toLowerCase();
   if (name === 'claude' || name === 'claude.exe') return 'claude';
   if (name === 'codex' || name === 'codex.exe') return 'codex';
+  // The native Claude installer names its executable by version, not by the CLI symlink.
+  const executable = String(row?.ExecutablePath ?? '').replace(/\\/g, '/');
+  if (/(?:^|\/)claude\/versions\/\d+\.\d+\.\d+$/.test(executable)) return 'claude';
   if (name === 'node' || name === 'node.exe') {
     const cmd = String(row?.CommandLine ?? '');
     if (/@anthropic-ai[\\/]+claude-code/i.test(cmd)) return 'claude';

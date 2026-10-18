@@ -386,7 +386,7 @@ type SkipCauseWire = NonNullable<NonNullable<AiInstallStatus['packages']>[number
 
 /**
  * The causes that carry a classification — the wire set minus `''`, the deliberate "unknown, never
- * a guess" form. These are exactly the keys the copy maps below must cover, so a fifth backend
+ * a guess" form. These are exactly the keys the copy maps below must cover, so an additional backend
  * cause fails the `satisfies` check at compile time instead of silently rendering the neutral
  * fallback in the UI.
  */
@@ -404,6 +404,7 @@ type ClassifiedSkipCause = Exclude<SkipCauseWire, ''>;
  */
 const SKIP_BADGE: Readonly<Record<string, string>> = {
   hardware: 'Unsupported here',
+  platform: 'Different operating system',
   intent: 'Not in this mode',
   'user-declined': 'Declined',
   'dev-only': 'Development only',
@@ -416,6 +417,7 @@ const SKIP_BADGE: Readonly<Record<string, string>> = {
  */
 const SKIP_FALLBACK_DETAIL: Readonly<Record<string, string>> = {
   hardware: 'This component was skipped because this machine cannot run it.',
+  platform: 'This component is not available for this operating system.',
   intent: 'This component is not part of the install mode you chose.',
   'user-declined': 'You chose not to install this component.',
   'dev-only': 'This component ships for development stacks only and is never part of an install.',

@@ -43,7 +43,8 @@ import tools.jackson.databind.JsonNode;
 class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTestBase {
 
   private static final String SESSION_TOKEN = "integration-test-session-token";
-  private static final String VARIANT_ID = "cuda12";
+  private static final String VARIANT_ID =
+      io.justsearch.configuration.PlatformPaths.isWindows() ? "cuda12" : "default";
 
   private ConfigStore previousConfigStore;
   private Path chatModel;
@@ -64,6 +65,7 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
     // The prod trust boundary itself is read from the resolved config, so build one the way the
     // launcher does (it picks up justsearch.prod from the sysprop set above).
     previousConfigStore = ConfigStore.globalOrNull();
+    new io.justsearch.app.services.policy.EnterprisePolicyServiceImpl().snapshot();
     ResolvedConfigBuilder rc = ResolvedConfig.builder();
     rc.contributeBaseSources();
     ConfigStore.setGlobal(new ConfigStore(rc.build()));
@@ -219,6 +221,13 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
     Path variantDir =
         aiHome.resolve("native-bin").resolve("llama-server").resolve("variants").resolve(VARIANT_ID);
     Files.createDirectories(variantDir);
-    Files.writeString(variantDir.resolve("llama-server.exe"), "not-a-real-exe", StandardCharsets.UTF_8);
+    Path executable = variantDir.resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
+    if (io.justsearch.configuration.PlatformPaths.isWindows()) {
+      Files.writeString(executable, "not-a-real-exe", StandardCharsets.UTF_8);
+    } else {
+      Files.writeString(executable, "#!/bin/sh\nexit 1\n", StandardCharsets.UTF_8);
+      assertTrue(executable.toFile().setExecutable(true));
+      setPropForTest("justsearch.server.exe", executable.toString());
+    }
   }
 }

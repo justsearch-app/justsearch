@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 
 import io.justsearch.ort.OrtCudaHelper;
+import io.justsearch.configuration.NativeTargets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -40,15 +41,15 @@ class SpladeEncoderNativePathTest {
   @Test
   void candidateCudaDependencyDlls_returnsOnlyExistingDllsInStableOrder() throws Exception {
     Path configured = Files.createDirectories(tempDir.resolve("cuda12"));
-    Files.createFile(configured.resolve("cudnn64_9.dll"));
-    Files.createFile(configured.resolve("cudart64_12.dll"));
-    Files.createFile(configured.resolve("cublasLt64_12.dll"));
+    Files.createFile(configured.resolve(NativeTargets.current().libraryName("cudnn")));
+    Files.createFile(configured.resolve(NativeTargets.current().libraryName("cudart")));
+    Files.createFile(configured.resolve(NativeTargets.current().libraryName("cublasLt")));
 
     assertIterableEquals(
         List.of(
-            configured.resolve("cudart64_12.dll").toAbsolutePath().normalize(),
-            configured.resolve("cublasLt64_12.dll").toAbsolutePath().normalize(),
-            configured.resolve("cudnn64_9.dll").toAbsolutePath().normalize()),
+            configured.resolve(NativeTargets.current().libraryName("cudart")).toAbsolutePath().normalize(),
+            configured.resolve(NativeTargets.current().libraryName("cublasLt")).toAbsolutePath().normalize(),
+            configured.resolve(NativeTargets.current().libraryName("cudnn")).toAbsolutePath().normalize()),
         OrtCudaHelper.candidateCudaDependencyDlls(configured));
   }
 

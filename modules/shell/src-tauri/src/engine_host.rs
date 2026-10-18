@@ -931,7 +931,7 @@ mod tests {
             c.args(["-n", "30", "127.0.0.1"]);
             c
         } else {
-            let mut c = Command::new("sleep");
+            let mut c = crate::containment::engine_command("sleep").unwrap();
             c.arg("30");
             c
         };

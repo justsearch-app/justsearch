@@ -589,7 +589,7 @@ function stageSharedCuda12(sharedNativeBin, cudaStageCandidates, exeName) {
  */
 function ensureSharedCuda12Staged() {
   if (process.platform !== 'win32') return; // prebuilt llama-server staging is Windows-only in dev
-  const exeName = 'llama-server.exe';
+  const exeName = require('../lib/native-targets.cjs').executableName('llama-server');
   // The ONE shared runtime location every worktree references (main checkout, gitignored).
   const sharedNativeBin = path.join(mainRepoRoot, 'modules', 'ui', 'native-bin', 'llama-server');
   // Source: a Gradle-built cuda12 stage (main checkout preferred; worktree accepted as a fallback).

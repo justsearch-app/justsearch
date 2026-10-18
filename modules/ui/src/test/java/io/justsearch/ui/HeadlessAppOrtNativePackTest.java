@@ -72,14 +72,8 @@ final class HeadlessAppOrtNativePackTest {
   /** A directory that passes every check in {@code evaluateOrtNativePack}. */
   private Path completePack(String name) throws Exception {
     Path pack = Files.createDirectories(tempDir.resolve(name));
-    for (String dll :
-        new String[] {
-          "onnxruntime.dll",
-          "onnxruntime4j_jni.dll",
-          "onnxruntime_providers_shared.dll",
-          "onnxruntime_providers_cuda.dll"
-        }) {
-      Files.createFile(pack.resolve(dll));
+    for (String id : new String[] {"ort", "ort-jni", "ort-shared", "ort-cuda"}) {
+      Files.createFile(pack.resolve(io.justsearch.configuration.NativeTargets.current().libraryName(id)));
     }
     Files.writeString(
         pack.resolve(OrtCudaHelper.ORT_NATIVE_VERSION_MARKER),
@@ -160,7 +154,7 @@ final class HeadlessAppOrtNativePackTest {
   @DisplayName("an incomplete pack is refused rather than half-applied")
   void incompletePackIsRefused() throws Exception {
     Path pack = Files.createDirectories(tempDir.resolve("cuda12-partial"));
-    Files.createFile(pack.resolve("onnxruntime.dll"));
+    Files.createFile(pack.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("ort")));
 
     var decision = HeadlessApp.applyOrtNativePack(storeWithPack(pack).get());
 

@@ -67,6 +67,7 @@ function copyCheckout(dest) {
     'scripts/dev/justsearch-dev-mcp',
     'scripts/dev/lib',
     'scripts/lib',
+    'contracts/native-targets/spec.v1.json',
     'governance/supervision-contract.v1.json',
   ];
   for (const rel of items) {

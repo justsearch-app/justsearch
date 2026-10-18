@@ -207,6 +207,13 @@ else:
       }).find((record) => record.type === 'helper-start' && record.purpose === 'Tesseract page OCR');
     }, 30_000, `Actual parser did not spawn page OCR: ${parser.stderr()}`);
     const tesseract = receipt(helperRecord.processIdentity);
+    const ocrWindow = readFileSync(path.join(parser.data, 'runtime/exit-ledger/children.v1.jsonl'), 'utf8')
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line))
+      .find((row) => row.type === 'helper-window-start'
+        && row.reason === 'Tesseract OCR during extraction' && row.owner?.pid === parserIdentity.pid);
+    assert.ok(ocrWindow, 'actual OCR parse opened its owner window');
+    assert.equal(ocrWindow.image, path.basename(helperRecord.executable),
+      'OCR owner window names the executable actually launched');
     assert.ok(alive(tesseract), 'Tesseract is running at crash injection');
     assert.equal(helperRecord.owner?.pid, parserIdentity.pid, 'parser wrote its own OCR receipt');
     assert.equal(identity(tesseract.pid).parentPid, parserIdentity.pid, 'real parser spawned Tesseract');

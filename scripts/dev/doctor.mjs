@@ -19,6 +19,7 @@
 'use strict';
 import fs from 'node:fs';
 import runtime from './lib/dev-runtime.cjs';
+import nativeTargets from '../lib/native-targets.cjs';
 import processRecords from './lib/process-record.cjs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -73,7 +74,7 @@ function cuda12Resolvable() {
  */
 function gpuPresenceCheck() {
   try {
-    const out = execFileSync('nvidia-smi', ['--query-gpu=memory.total', '--format=csv,noheader'], {
+    const out = execFileSync(nativeTargets.executableName('nvidia-smi'), ['--query-gpu=memory.total', '--format=csv,noheader'], {
       timeout: 3000,
       stdio: ['ignore', 'pipe', 'ignore'],
     }).toString().trim();

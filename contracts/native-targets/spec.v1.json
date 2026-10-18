@@ -4,7 +4,9 @@
     "windows-x86_64": {
       "executables": {
         "llama-server": "llama-server.exe",
-        "curl": "curl.exe"
+        "curl": "curl.exe",
+        "tesseract": "tesseract.exe",
+        "nvidia-smi": "nvidia-smi.exe"
       },
       "libraries": {
         "cuda": "nvcuda.dll",
@@ -28,7 +30,8 @@
         "cudnn_cnn": "cudnn_cnn64_9.dll",
         "cudnn_adv": "cudnn_adv64_9.dll",
         "cudnn_engines_runtime_compiled": "cudnn_engines_runtime_compiled64_9.dll",
-        "cudnn_engines_precompiled": "cudnn_engines_precompiled64_9.dll"
+        "cudnn_engines_precompiled": "cudnn_engines_precompiled64_9.dll",
+        "ggml-cuda": "ggml-cuda.dll"
       },
       "ortResources": {
         "ort": "ai/onnxruntime/native/win-x64/onnxruntime.dll",
@@ -40,7 +43,9 @@
     "linux-x86_64": {
       "executables": {
         "llama-server": "llama-server",
-        "curl": "curl"
+        "curl": "curl",
+        "tesseract": "tesseract",
+        "nvidia-smi": "nvidia-smi"
       },
       "libraries": {
         "cuda": "libcuda.so.1",
@@ -64,7 +69,8 @@
         "cudnn_cnn": "libcudnn_cnn.so.9",
         "cudnn_adv": "libcudnn_adv.so.9",
         "cudnn_engines_runtime_compiled": "libcudnn_engines_runtime_compiled.so.9",
-        "cudnn_engines_precompiled": "libcudnn_engines_precompiled.so.9"
+        "cudnn_engines_precompiled": "libcudnn_engines_precompiled.so.9",
+        "ggml-cuda": "libggml-cuda.so"
       },
       "ortResources": {
         "ort": "ai/onnxruntime/native/linux-x64/libonnxruntime.so",
@@ -79,7 +85,9 @@
       "target": "windows-x86_64",
       "executables": {
         "llama-server": "llama-server.exe",
-        "curl": "curl.exe"
+        "curl": "curl.exe",
+        "tesseract": "tesseract.exe",
+        "nvidia-smi": "nvidia-smi.exe"
       },
       "libraries": {
         "cuda": "nvcuda.dll",
@@ -103,7 +111,8 @@
         "cudnn_cnn": "cudnn_cnn64_9.dll",
         "cudnn_adv": "cudnn_adv64_9.dll",
         "cudnn_engines_runtime_compiled": "cudnn_engines_runtime_compiled64_9.dll",
-        "cudnn_engines_precompiled": "cudnn_engines_precompiled64_9.dll"
+        "cudnn_engines_precompiled": "cudnn_engines_precompiled64_9.dll",
+        "ggml-cuda": "ggml-cuda.dll"
       },
       "ortResources": {
         "ort": "ai/onnxruntime/native/win-x64/onnxruntime.dll",
@@ -116,7 +125,9 @@
       "target": "linux-x86_64",
       "executables": {
         "llama-server": "llama-server",
-        "curl": "curl"
+        "curl": "curl",
+        "tesseract": "tesseract",
+        "nvidia-smi": "nvidia-smi"
       },
       "libraries": {
         "cuda": "libcuda.so.1",
@@ -140,7 +151,8 @@
         "cudnn_cnn": "libcudnn_cnn.so.9",
         "cudnn_adv": "libcudnn_adv.so.9",
         "cudnn_engines_runtime_compiled": "libcudnn_engines_runtime_compiled.so.9",
-        "cudnn_engines_precompiled": "libcudnn_engines_precompiled.so.9"
+        "cudnn_engines_precompiled": "libcudnn_engines_precompiled.so.9",
+        "ggml-cuda": "libggml-cuda.so"
       },
       "ortResources": {
         "ort": "ai/onnxruntime/native/linux-x64/libonnxruntime.so",

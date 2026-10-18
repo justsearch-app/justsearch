@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+const { nativeTarget } = require('../../lib/native-targets.cjs');
 
 function executableFile(file, platform = process.platform) {
   try {
@@ -22,7 +23,7 @@ function resolveDevRuntime(repoRoot, mainRepoRoot, env = process.env, platform =
     valid: executableFile(env.JUSTSEARCH_SERVER_EXE, platform), source: 'override' };
   // cuda12 is the existing Windows runtime variant, never a Linux or CPU fallback.
   if (platform !== 'win32') return { path: null, valid: false, source: 'missing' };
-  const candidate = resolveCuda12ServerExe(repoRoot, mainRepoRoot, 'llama-server.exe');
+  const candidate = resolveCuda12ServerExe(repoRoot, mainRepoRoot, nativeTarget(platform).executables['llama-server']);
   return { path: candidate ?? null, valid: Boolean(candidate), source: candidate ? 'cuda12' : 'missing' };
 }
 module.exports = { executableFile, resolveDevRuntime, resolveCuda12ServerExe };

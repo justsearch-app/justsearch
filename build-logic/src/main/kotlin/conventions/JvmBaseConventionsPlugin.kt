@@ -4,6 +4,7 @@ import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.distribution.DistributionContainer
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.plugins.quality.Pmd
 import org.gradle.api.plugins.quality.PmdExtension
@@ -253,6 +254,20 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         )
 
     project.pluginManager.withPlugin("application") {
+      if (System.getProperty("os.name").lowercase(java.util.Locale.ROOT).startsWith("linux")) {
+        val helper = project.project(":modules:app-api").layout.buildDirectory.file(
+            "native/linux-x86_64/justsearch-bound-exec")
+        project.extensions.configure(DistributionContainer::class.java) {
+          named("main") {
+            contents {
+              from(project.files(helper).builtBy(":modules:app-api:buildLinuxBoundExec")) {
+                into("native/linux-x86_64")
+                filePermissions { unix("rwxr-xr-x") }
+              }
+            }
+          }
+        }
+      }
       project.tasks.named("distTar") {
         enabled = false
       }

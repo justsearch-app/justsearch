@@ -799,8 +799,10 @@ function uniqueProcesses(rows) {
  * membership plus this executable allowlist (§5.1). An image and an ancestor's job status
  * do not prove membership of an individual process. DiskEncryptionProbe runs PowerShell.
  */
-const TIER_C_EXECUTABLES = new Set(['tesseract.exe', 'nvidia-smi.exe', 'curl.exe', 'powershell.exe', 'taskkill.exe',
-  'tesseract', 'nvidia-smi', 'curl']);
+const { nativeTarget } = require('../../lib/native-targets.cjs');
+const TIER_C_EXECUTABLES = new Set(['powershell.exe', 'taskkill.exe',
+  ...['win32', 'linux'].flatMap(platform => ['tesseract', 'nvidia-smi', 'curl']
+    .map(id => nativeTarget(platform, 'x64').executables[id]))]);
 const imageNameOf = (row) => path.win32.basename(exeOf(row) ?? row?.name ?? row?.Name ?? '').toLowerCase();
 
 /** A console host row, from the e456 collector (`role`, `name`) or a raw process-table row (`Name`). */

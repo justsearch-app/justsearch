@@ -102,7 +102,6 @@ io.justsearch.indexerworker.server.DevReloadManager#updateBuildStampFromReloadFi
 io.justsearch.indexerworker.services.WorkerHealthService#parseLongEnv
 io.justsearch.indexerworker.services.IndexStatusOps#buildStamp
 io.justsearch.ort.GpuAutoDetection#isWindows
-io.justsearch.ort.GpuDriverApiProbe#probe
 io.justsearch.ort.OrtCudaHelper#applyOrtNativePackProperty
 io.justsearch.ort.OrtNativeTempReaper#reapStale
 io.justsearch.ssot.tools.DocsTempdocStatusCheck#main

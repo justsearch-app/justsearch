@@ -14,6 +14,7 @@ import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,13 +53,13 @@ import org.junit.jupiter.api.io.TempDir;
 class RuntimeActivationServiceVariantsRootTest {
   private String nativeFixtureOs;
 
-  @org.junit.jupiter.api.BeforeEach
+  @BeforeEach
   void selectWindowsNativeFixture() {
     nativeFixtureOs = System.getProperty("os.name");
     System.setProperty("os.name", "Windows 11");
   }
 
-  @org.junit.jupiter.api.AfterEach
+  @AfterEach
   void restoreNativeFixtureOs() {
     if (nativeFixtureOs == null) System.clearProperty("os.name");
     else System.setProperty("os.name", nativeFixtureOs);

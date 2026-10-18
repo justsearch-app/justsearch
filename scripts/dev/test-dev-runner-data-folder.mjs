@@ -54,7 +54,7 @@ function fakeRepository(name) {
   for (const dir of ['scripts/dev/lib', 'scripts/lib', 'modules/ui-web/scripts']) {
     fs.cpSync(path.join(repo, dir), path.join(fake, dir), { recursive: true });
   }
-  for (const file of ['governance/store-recoverability.v1.json', 'governance/supervision-contract.v1.json']) {
+  for (const file of ['contracts/native-targets/spec.v1.json', 'governance/store-recoverability.v1.json', 'governance/supervision-contract.v1.json']) {
     if (!fs.existsSync(path.join(repo, file))) continue;
     fs.mkdirSync(path.dirname(path.join(fake, file)), { recursive: true });
     fs.copyFileSync(path.join(repo, file), path.join(fake, file));

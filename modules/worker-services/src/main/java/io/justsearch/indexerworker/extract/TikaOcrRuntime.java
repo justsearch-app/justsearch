@@ -374,8 +374,8 @@ public final class TikaOcrRuntime {
 
   private static List<String> executableNames() {
     return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
-        ? List.of("tesseract.exe", "tesseract.bat", "tesseract.cmd", "tesseract")
-        : List.of("tesseract");
+        ? List.of(io.justsearch.configuration.NativeTargets.current().executableName("tesseract"), "tesseract.bat", "tesseract.cmd", "tesseract")
+        : List.of(io.justsearch.configuration.NativeTargets.current().executableName("tesseract"));
   }
 
   private static Path findTessdataDirectory(Path executableDirectory) {

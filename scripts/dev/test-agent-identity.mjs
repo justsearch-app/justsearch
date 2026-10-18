@@ -60,6 +60,30 @@ test('Claude via its node CLI (@anthropic-ai/claude-code) is a Claude harness', 
   assert.equal(r.owner.key, `claude-101-${CT(10)}`);
 });
 
+test('native Claude versioned executable is the nearest Linux harness; unrelated versioned files are not', () => {
+  const bootId = '00000000-0000-4000-8000-000000000001';
+  const linux = (pid, ppid, name, ticks, executable) => ({
+    ProcessId: pid, ParentProcessId: ppid, Name: name, ExecutablePath: executable,
+    CreationFileTimeUtc: null,
+    processIdentity: { kind: 'linux-proc-v1', pid, bootId, startTicks: String(ticks) },
+  });
+  const native = linux(201, 101, '2.1.302', 20, '/home/alice/.local/share/claude/versions/2.1.302');
+  assert.equal(id.classifyHarnessRow(native), 'claude');
+  const rows = [linux(101, 1, 'codex', 10, '/opt/codex'), native,
+    linux(301, 201, 'bash', 30, '/usr/bin/bash'), linux(401, 301, 'node', 40, '/usr/bin/node')];
+  const found = resolve(rows, 401);
+  assert.equal(found.harness, 'claude');
+  assert.equal(found.owner.pid, 201);
+  assert.deepEqual(found.owner.processIdentity, native.processIdentity);
+  assert.equal(found.source, 'process-ancestry');
+  for (const executable of ['/home/alice/.local/share/other-tool/versions/2.1.302',
+    '/home/alice/.local/share/claude/versions/notes.txt']) {
+    const foreign = { ...native, ExecutablePath: executable };
+    assert.equal(id.classifyHarnessRow(foreign), null);
+    assert.equal(resolve([rows[0], foreign, ...rows.slice(2)], 401).harness, 'codex');
+  }
+});
+
 test('Claude MCP server with a stale CLAUDE_PID: the walk decides, CLAUDE_PID is ignored', () => {
   // The MCP server's parent is the live session 101; CLAUDE_PID names an older, different session.
   const rows = [SYSTEM, row(55, 4, 'claude.exe', 5), row(101, 4, 'claude.exe', 10), row(301, 101, 'node.exe', 30, 'node server.mjs')];

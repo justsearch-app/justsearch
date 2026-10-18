@@ -107,6 +107,23 @@ impl fmt::Debug for IncarnationJob {
     }
 }
 
+/// Build the Engine command before callers configure its environment, cwd and stdio.
+/// Linux executes the same distribution helper as the Node and Java launchers.
+pub(crate) fn engine_command(program: impl AsRef<std::ffi::OsStr>) -> std::io::Result<Command> {
+    #[cfg(target_os = "linux")]
+    {
+        let mut command = Command::new(crate::linux_process::bound_exec()?);
+        command
+            .args(["exec", &std::process::id().to_string(), "--"])
+            .arg(program);
+        Ok(command)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Ok(Command::new(program))
+    }
+}
+
 /// Start `cmd` with no job, the shell's fallback when [`IncarnationJob::create`] fails. It keeps the
 /// one creation flag every Engine spawn carries, so the fallback differs only in containment.
 pub(crate) fn spawn_uncontained(cmd: &mut Command) -> std::io::Result<Child> {
@@ -126,8 +143,14 @@ pub(crate) fn spawn_uncontained(cmd: &mut Command) -> std::io::Result<Child> {
 #[cfg(target_os = "linux")]
 fn linux_spawn(cmd: &mut Command) -> std::io::Result<Child> {
     use std::io;
-    use std::os::unix::process::CommandExt;
     use std::sync::{mpsc, OnceLock};
+
+    let helper = crate::linux_process::bound_exec()?.canonicalize()?;
+    if std::path::Path::new(cmd.get_program()).canonicalize()? != helper {
+        return Err(io::Error::other(
+            "Engine command must use the shared Linux child helper",
+        ));
+    }
 
     type Request = (Command, mpsc::SyncSender<io::Result<Child>>);
     static SPAWNER: OnceLock<Result<mpsc::Sender<Request>, String>> = OnceLock::new();
@@ -137,11 +160,39 @@ fn linux_spawn(cmd: &mut Command) -> std::io::Result<Child> {
             .name("engine-spawn".into())
             .spawn(move || {
                 for (mut command, reply) in recv {
-                    let expected_parent = std::process::id() as i32;
-                    unsafe {
-                        command.pre_exec(move || bind_parent(expected_parent));
-                    }
-                    let result = command.spawn();
+                    let result = (|| {
+                        let helper = crate::linux_process::bound_exec()?.canonicalize()?;
+                        let mut child = command.spawn()?;
+                        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+                        loop {
+                            let observed = match child.try_wait() {
+                                Ok(status) => status,
+                                Err(error) => {
+                                    let _ = child.kill();
+                                    let _ = child.wait();
+                                    return Err(error);
+                                }
+                            };
+                            if let Some(status) = observed {
+                                if status.code() == Some(125) {
+                                    return Err(io::Error::other(
+                                        "Linux child helper refused launch (exit 125)",
+                                    ));
+                                }
+                                return Ok(child);
+                            }
+                            let image = std::fs::read_link(format!("/proc/{}/exe", child.id()));
+                            if image.is_ok_and(|image| image != helper) {
+                                return Ok(child);
+                            }
+                            if std::time::Instant::now() >= deadline {
+                                let _ = child.kill();
+                                let _ = child.wait();
+                                return Err(io::Error::other("Linux child helper did not exec"));
+                            }
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                    })();
                     if let Err(undelivered) = reply.send(result) {
                         // A cancelled caller cannot surrender responsibility for a spawned child.
                         if let Ok(mut child) = undelivered.0 {
@@ -164,7 +215,7 @@ fn linux_spawn(cmd: &mut Command) -> std::io::Result<Child> {
         .map_err(|_| io::Error::other("Engine spawn reply lost"))?
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(test, target_os = "linux"))]
 unsafe fn bind_parent(expected_parent: i32) -> std::io::Result<()> {
     unsafe extern "C" {
         fn prctl(option: i32, ...) -> i32;
@@ -457,8 +508,12 @@ mod tests {
             IncarnationJob::create(1),
             Err(ContainmentError::Unsupported)
         ));
-        let mut child =
-            spawn_uncontained(Command::new("true").stdout(std::process::Stdio::null())).unwrap();
+        let mut child = spawn_uncontained(
+            engine_command("true")
+                .unwrap()
+                .stdout(std::process::Stdio::null()),
+        )
+        .unwrap();
         assert!(child.wait().unwrap().success());
     }
 
@@ -662,11 +717,85 @@ mod linux_tests {
     use super::*;
 
     #[test]
+    fn missing_shared_helper_refuses_workload() {
+        const FIXTURE: &str = "JUSTSEARCH_MISSING_BOUND_EXEC_TEST";
+        if let Some(path) = std::env::var_os(FIXTURE) {
+            let marker = std::path::PathBuf::from(path);
+            crate::linux_process::set_bundle_dir(&marker.with_extension("missing-bundle"));
+            let mut command = engine_command("touch").unwrap();
+            command.arg(&marker);
+            let result = spawn_uncontained(&mut command);
+            if let Ok(mut child) = result {
+                let _ = child.wait();
+                panic!("workload launched without the shared helper");
+            }
+            assert!(!marker.exists());
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let marker = dir.path().join("must-not-execute");
+        let result = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "containment::linux_tests::missing_shared_helper_refuses_workload",
+            ])
+            .env(FIXTURE, &marker)
+            .status()
+            .unwrap();
+        assert!(result.success(), "missing helper must refuse the launch");
+        assert!(!marker.exists());
+    }
+
+    #[test]
+    fn shared_helper_preserves_command_and_refuses_parent_mismatch() {
+        let dir = tempfile::tempdir().unwrap();
+        let argument = "literal ; $() 検索";
+        let mut command = engine_command("sh").unwrap();
+        command
+            .args([
+                "-c",
+                "printf '%s\\n' \"$PWD\" \"$JS_BOUND_FIXTURE\" \"$1\"; printf error >&2",
+                "fixture",
+                argument,
+            ])
+            .current_dir(dir.path())
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("JS_BOUND_FIXTURE", "owned environment")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        let output = spawn_uncontained(&mut command)
+            .unwrap()
+            .wait_with_output()
+            .unwrap();
+        assert!(output.status.success());
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            format!("{}\nowned environment\n{argument}\n", dir.path().display())
+        );
+        assert_eq!(output.stderr, b"error");
+
+        let marker = dir.path().join("must-not-execute");
+        let status = Command::new(crate::linux_process::bound_exec().unwrap())
+            .args(["exec", "1", "--", "touch"])
+            .arg(&marker)
+            .status()
+            .unwrap();
+        assert_eq!(status.code(), Some(125));
+        assert!(!marker.exists());
+        let mut bypass = Command::new("/bin/touch");
+        bypass.arg(&marker);
+        assert!(spawn_uncontained(&mut bypass).unwrap_err().to_string()
+            .contains("shared Linux child helper"));
+        assert!(!marker.exists());
+    }
+
+    #[test]
     fn child_survives_caller_thread_exit_but_not_owner_death() {
         const FIXTURE: &str = "JUSTSEARCH_LINUX_CONTAINMENT_TEST_PID";
         if let Some(path) = std::env::var_os(FIXTURE) {
             let mut child = std::thread::spawn(|| {
-                let mut command = Command::new("sh");
+                let mut command = engine_command("sh").unwrap();
                 command.args(["-c", "trap '' TERM; exec sleep 30"]);
                 spawn_uncontained(&mut command).unwrap()
             })

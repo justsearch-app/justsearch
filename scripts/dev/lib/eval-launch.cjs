@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+const { libraryName } = require('../../lib/native-targets.cjs');
 
 /** The shared runHeadlessEval/installed eval launch contract. Caller overrides retain precedence,
  * except the eval-only and IN_MEMORY settings that define this entry point. */
@@ -26,7 +27,7 @@ function evalLaunch(repoRoot, env = process.env) {
       if (git) roots.push(path.resolve(repoRoot, git[1], '../../..'));
     } catch {}
     const ort = roots.map(r => path.join(r, 'tmp/ort-variant-test/cuda-12.4-v1.24.3'))
-      .find(p => fs.existsSync(path.join(p, 'onnxruntime_providers_cuda.dll')));
+      .find(p => fs.existsSync(path.join(p, libraryName('ort-cuda'))));
     if (ort) environment.JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH = ort;
   }
   if (environment.JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH && !environment.JUSTSEARCH_GPU_ENABLED) environment.JUSTSEARCH_GPU_ENABLED = 'true';

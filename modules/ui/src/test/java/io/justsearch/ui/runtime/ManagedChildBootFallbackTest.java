@@ -295,6 +295,9 @@ final class ManagedChildBootFallbackTest {
     fields.put("pid", child.pid());
     fields.put("processStartedAt", child.info().startInstant().orElseThrow());
     fields.put("creationFileTime", nativeBirth ? ProcessTerminator.forCurrentOs().creationFileTime(child.pid()) : Optional.empty());
+    if (nativeBirth && io.justsearch.app.api.runtime.child.BoundChildProcess.isLinux()) {
+      fields.put("processIdentity", io.justsearch.app.api.runtime.child.LinuxProcessIdentity.read(child.pid()).orElseThrow());
+    }
     fields.put("executable", child.info().command().orElseThrow());
     fields.put("argvHash", "a".repeat(64));
     fields.put("contained", false);
@@ -325,7 +328,9 @@ final class ManagedChildBootFallbackTest {
   private static ManagedChild record(Process process, String executable, Instant start) {
     return new ManagedChild(
         "child-" + process.pid(), ManagedChild.Kind.EXTRACTION, process.pid(), start.toString(),
-        executable, "stdio", null, null, "argv");
+        executable, "stdio", null, null, "argv",
+        io.justsearch.app.api.runtime.child.BoundChildProcess.isLinux()
+            ? io.justsearch.app.api.runtime.child.LinuxProcessIdentity.read(process.pid()).orElseThrow() : null);
   }
 
   private static Process sleepingJava() throws Exception {

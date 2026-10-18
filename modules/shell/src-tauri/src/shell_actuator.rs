@@ -637,7 +637,7 @@ mod linux_identity_tests {
         let host = Arc::new(EngineHost::default());
         let spawn_host = host.clone();
         let mut actuator = ShellActuator::new(host.clone(), dir.path().into(), move || {
-            let mut command = std::process::Command::new("sleep");
+            let mut command = crate::containment::engine_command("sleep").unwrap();
             command.arg("30");
             spawn_host.admit(crate::engine_host::PreparedCommand { command }).map(|c| c.pid)
         }, |_| {});

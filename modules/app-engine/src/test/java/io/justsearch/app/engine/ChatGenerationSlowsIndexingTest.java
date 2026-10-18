@@ -145,6 +145,9 @@ final class ChatGenerationSlowsIndexingTest {
     config.putDefault("justsearch.home", tempDir.toString());
     config.putDefault("justsearch.server.exe",
         Files.writeString(tempDir.resolve("llama-server.exe"), "fixture").toString());
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      assertTrue(tempDir.resolve("llama-server.exe").toFile().setExecutable(true));
+    }
     config.put("justsearch.llm.model_path", 400, "env_var", "test",
         Files.writeString(tempDir.resolve("model.gguf"), "fixture").toString());
     // The stand-in llama-server is the user's own server, named explicitly (ADR-0051 CH4).

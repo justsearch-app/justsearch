@@ -51,7 +51,7 @@ public final class GpuAutoDetection {
    * @return map of config keys to auto-detected values, or empty map if no CUDA capability found
    */
   public static Map<String, String> probe(Path repoRoot) {
-    if (!isWindows() && !System.getProperty("os.name", "").equalsIgnoreCase("Linux")) return Map.of();
+    if (!isWindows() && !io.justsearch.configuration.SystemAccess.sysProp("os.name", "").equalsIgnoreCase("Linux")) return Map.of();
     Map<String, String> result = new LinkedHashMap<>();
 
     // Check if ORT native path is already explicitly configured.

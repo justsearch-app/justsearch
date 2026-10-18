@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -43,13 +44,13 @@ import org.mockito.Mockito;
 final class RuntimeActivationSelfTestPromptCacheTest {
   private String nativeFixtureOs;
 
-  @org.junit.jupiter.api.BeforeEach
+  @BeforeEach
   void selectWindowsNativeFixture() {
     nativeFixtureOs = System.getProperty("os.name");
     System.setProperty("os.name", "Windows 11");
   }
 
-  @org.junit.jupiter.api.AfterEach
+  @AfterEach
   void restoreNativeFixtureOs() {
     if (nativeFixtureOs == null) System.clearProperty("os.name");
     else System.setProperty("os.name", nativeFixtureOs);
