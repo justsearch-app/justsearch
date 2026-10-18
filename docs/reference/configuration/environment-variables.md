@@ -26,7 +26,7 @@ Scope:
 | Env Variable | System Property | Type | Description |
 | :--- | :--- | :--- | :--- |
 | **Paths & Discovery** | | | |
-| `JUSTSEARCH_DATA_DIR` | `justsearch.data.dir` | Path | Root directory for logs, index, and durable state (e.g., `jobs.db`). |
+| `JUSTSEARCH_DATA_DIR` | `justsearch.data.dir` | Path | Headless/dev root directory for logs, index, and durable state (e.g., `jobs.db`). The desktop shell retains its platform app-data directory and passes that path to the Engine; this variable does not move desktop data or its delete-data target. |
 | `JUSTSEARCH_HOME` | `justsearch.home` | Path | JustSearch “home” directory (desktop: AI Home root used for models/packs/runtime restore state). |
 | `JUSTSEARCH_MODE` | `justsearch.mode` | Enum | Install/runtime intent (tempdoc 657): `full-desktop` (default), `headless`, or `mcp-lite`. Set at launch by whichever launcher starts the backend (the desktop shell declares `full-desktop`; the headless launcher declares `headless`/`mcp-lite`). Drives which model tiers "Install AI" fetches (`mcp-lite` skips the LLM + CUDA-runtime tiers) and is reported on the runtime manifest under `mode.intent`. Unrecognized ⇒ `full-desktop`. |
 | `JUSTSEARCH_SSOT_PATH` | `justsearch.ssot.path` | Path | Overrides auto-discovery of the `SSOT/` directory. |
@@ -331,7 +331,7 @@ powershell -ExecutionPolicy Bypass -File scripts/bench/run-claim-b-suite-win.ps1
 ```powershell
 $env:JUSTSEARCH_LLM_MODEL_PATH = "C:\\AI\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf"
 $env:JUSTSEARCH_GPU_LAYERS = "99"
-./gradlew.bat --no-daemon :modules:app-launcher:run
+node scripts/lib/tool-invoker.cjs gradle --no-daemon :modules:app-launcher:run
 ```
 
 Notes:

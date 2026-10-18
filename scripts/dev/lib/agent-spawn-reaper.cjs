@@ -72,7 +72,7 @@
 'use strict';
 
 const { spawnSync } = require('node:child_process');
-const { terminateWithCodeSync } = require('./recorded-termination.cjs');
+const { terminateWithCodeSync, formatTerminationCommand } = require('./recorded-termination.cjs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
@@ -344,11 +344,8 @@ function ownerActivityFromLiveness(owner, { table, now = Date.now(), maxTableAge
 
 /* ── Entry construction ────────────────────────────────────────────────────────────────────── */
 
-function killLineFor(pid, creationFileTimeUtc) {
-  if (!Number.isInteger(pid) || pid <= 0 || !/^[1-9]\d{0,19}$/.test(String(creationFileTimeUtc ?? ''))) {
-    return 'identity unavailable; no safe termination command';
-  }
-  return `powershell.exe -NoProfile -File scripts/dev/lib/terminate-process.ps1 -Pid ${pid} -CreationFileTimeUtc ${creationFileTimeUtc} -Code 1`;
+function killLineFor(pid, creationFileTimeUtc, processIdentity = null) {
+  return formatTerminationCommand({ pid, creationFileTimeUtc, ...(processIdentity ? { processIdentity } : {}) });
 }
 
 /**
@@ -411,7 +408,7 @@ function makeEntry({
       && Boolean(identity?.verdict),
     // Present on every entry, including the reapable ones: a report that names the process but
     // makes the human reconstruct the command is a report that gets ignored.
-    ...(effectivePid !== null ? { killLine: killLineFor(effectivePid, record?.creationFileTimeUtc) } : {}),
+    ...(effectivePid !== null ? { killLine: killLineFor(effectivePid, record?.creationFileTimeUtc, record?.processIdentity) } : {}),
     // What `remove-worktree` needs from the conflict column (861 §6.4): *"refuses to proceed while
     // an unreapable holder remains"*, rather than proceeding into the half-deleted, `.git`-less
     // worktree shell §2-bis (c) documents. So the condition is exactly "a REGISTERED holder this

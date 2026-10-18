@@ -32,8 +32,6 @@ import org.junit.jupiter.api.condition.OS;
  * <p>The class is reached by name so this test compiles against a build without it, where the
  * failure is an assertion.
  */
-@Tag("windows")
-@EnabledOnOs(OS.WINDOWS)
 @Timeout(60)
 final class WindowsPowerNotificationsTest {
   private static final int ERROR_SUCCESS = 0;
@@ -43,7 +41,7 @@ final class WindowsPowerNotificationsTest {
   private static final FunctionDescriptor CALLBACK = FunctionDescriptor.of(ValueLayout.JAVA_INT,
       ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
 
-  @Test
+  @Test @Tag("windows") @EnabledOnOs(OS.WINDOWS)
   void registersWithWindowsAndUnregisters() throws Throwable {
     Object registration = register();
     try {
@@ -56,7 +54,7 @@ final class WindowsPowerNotificationsTest {
     }
   }
 
-  @Test
+  @Test @Tag("windows") @EnabledOnOs(OS.WINDOWS)
   void theUpcallStubEnqueuesTheSuspendAndNeverThrows() throws Throwable {
     Object registration = register();
     try {

@@ -26,7 +26,7 @@ test('eval launch has immutable eval settings and preserves explicit spaced path
 
 test('an invalid runtime override never falls through to a default or CPU runtime', () => {
   const runtime = resolveDevRuntime('/absent', '/absent', { JUSTSEARCH_SERVER_EXE: '/missing/cuda-server' }, 'linux');
-  assert.deepEqual(runtime, { path: '/missing/cuda-server', valid: false, source: 'override' });
+  assert.deepEqual(runtime, { path: '/missing/cuda-server', valid: false, source: 'missing', reason: 'Configured server executable is missing: /missing/cuda-server' });
   assert.equal(resolveDevRuntime('/absent', '/absent', {}, 'linux').path, null);
 });
 

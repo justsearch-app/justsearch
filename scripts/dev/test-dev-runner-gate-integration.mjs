@@ -99,6 +99,10 @@ function spawnAliveProc() {
  */
 function recordedIdentity(pid) {
   // Refusal-only gate checks need liveness, not the Windows stop's native process identity.
+  if (process.platform === 'linux') {
+    const seen = require('./lib/process-identity.cjs').readLinuxProcess(pid);
+    return seen?.present ? { pid, processIdentity: seen.processIdentity, executable: seen.executable } : null;
+  }
   if (!windows) return null;
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
@@ -391,7 +395,7 @@ function writeOpLeases(entries) {
 
 let pass = 0, fail = 0, skipped = 0;
 for (const [name, fn, windowsOnly] of tests) {
-  if (windowsOnly && !windows) {
+  if (windowsOnly && !windows && process.platform !== 'linux') {
     console.log(`  SKIP  ${name}: Windows native identity-bound predecessor stop`);
     skipped++;
     continue;

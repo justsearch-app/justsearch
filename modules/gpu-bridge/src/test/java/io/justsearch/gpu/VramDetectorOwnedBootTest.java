@@ -15,14 +15,23 @@ import org.junit.jupiter.api.condition.OS;
 import org.mockito.Mockito;
 
 /** Executes the production early probe with a held harmless process seam; no GPU access. */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 class VramDetectorOwnedBootTest {
+  @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
   @Test void earlyNvidiaSmiProbeKeepsItsOwnerReceiptUntilLedgerAttaches() throws Exception {
-    Process fixture = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),
+    var fixtureBuilder = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),
         "--enable-native-access=ALL-UNNAMED", "-cp", System.getProperty("java.class.path"),
-        Probe.class.getName()).redirectErrorStream(true).start();
+        Probe.class.getName()).redirectErrorStream(true);
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) {
+      var executable = directory.resolve(io.justsearch.configuration.NativeTargets.current().executableName("nvidia-smi"));
+      java.nio.file.Files.writeString(executable, "#!/bin/sh\nprintf '12345\\n'\n");
+      java.nio.file.Files.setPosixFilePermissions(executable, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+      fixtureBuilder.environment().put("PATH", directory.toString());
+    }
+    Process fixture = fixtureBuilder.start();
     var held = ProcessTerminator.forCurrentOs().open(fixture);
-    String birth = held.creationFileTime().orElseThrow();
+    Object birth = io.justsearch.configuration.PlatformPaths.isLinux()
+        ? held.processIdentity() : held.creationFileTime().orElseThrow();
     try {
       assertTrue(fixture.waitFor(30, TimeUnit.SECONDS), "fixture " + fixture.pid() + "/" + birth);
       String output = new String(fixture.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -35,11 +44,15 @@ class VramDetectorOwnedBootTest {
   }
   public static class Probe {
     public static void main(String[] args) throws Exception {
-      Process finite = new ProcessBuilder("cmd.exe", "/c", "echo 12345").start();
-      try (var _ = Mockito.mockConstruction(ProcessBuilder.class, (builder, context) ->
-          Mockito.when(builder.start()).thenReturn(finite))) {
+      if (io.justsearch.configuration.PlatformPaths.isWindows()) {
+        Process finite = new ProcessBuilder("cmd.exe", "/c", "echo 12345").start();
+        try (var _ = Mockito.mockConstruction(ProcessBuilder.class, (builder, context) ->
+            Mockito.when(builder.start()).thenReturn(finite))) {
+          assertEquals(12345L * 1024 * 1024, new VramDetector().getTotalVramBytes());
+        } finally { if (finite.isAlive()) finite.destroyForcibly(); }
+      } else {
         assertEquals(12345L * 1024 * 1024, new VramDetector().getTotalVramBytes());
-      } finally { if (finite.isAlive()) finite.destroyForcibly(); }
+      }
       var records = new ArrayList<Map<String, Object>>();
       OwnedHelper.recordTo((type, fields) -> { Map<String, Object> record = new java.util.LinkedHashMap<>(fields);
         record.put("type", type.token()); records.add(record); return true; },

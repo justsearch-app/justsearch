@@ -166,7 +166,8 @@ test('manual reaper and worktree remedies carry birth or withhold an unsafe comm
     const source = fs.readFileSync(path.join(here, file), 'utf8');
     const declaration = source.match(new RegExp(`function ${name}\\([^]*?\\n\\}`))?.[0];
     assert.ok(declaration);
-    const fn = vm.runInNewContext(`(${declaration})`);
+    const fn = vm.runInNewContext(`(${declaration})`, {
+      formatTerminationCommand: require('./lib/recorded-termination.cjs').formatTerminationCommand });
     const text = String(fn(...args));
     assert.doesNotMatch(text, /taskkill/i, `${name} must not suggest PID-only termination`);
     assert.ok(text.includes(`-CreationFileTimeUtc ${birth}`));
@@ -219,6 +220,20 @@ test('worktree frontend kill uses its spawn-time identity and rejects a reused P
   calls.length = 0;
   assert.equal(serve.killSpawnTree({ pid }).ok, false);
   assert.equal(calls.length, 0);
+});
+
+test('Linux manual termination remedies carry boot and birth, and malformed tuples withhold a command', () => {
+  const { formatTerminationCommand } = require('./lib/recorded-termination.cjs');
+  const processIdentity = { kind: 'linux-proc-v1', pid,
+    bootId: '333fd9cf-f547-4117-a537-fc8be3c44466', startTicks: '42' };
+  const command = formatTerminationCommand({ pid, processIdentity });
+  assert.equal(command, `modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec signal ${pid} ${processIdentity.bootId} 42 SIGKILL`);
+  assert.doesNotMatch(command, /taskkill|\bkill -9\b/);
+  for (const invalid of [{ ...processIdentity, startTicks: 'unknown' },
+    { ...processIdentity, bootId: 'other; echo unsafe' }]) {
+    assert.match(formatTerminationCommand({ pid, processIdentity: invalid }), /no safe termination command/);
+  }
+  assert.match(formatTerminationCommand({ pid: pid + 1, processIdentity }), /no safe termination command/);
 });
 
 let failed = 0;

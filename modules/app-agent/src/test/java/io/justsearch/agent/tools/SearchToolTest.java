@@ -14,13 +14,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-// Windows-specific path-form assertions (see BrowseToolTest) — runs on the
-// windows-native lane (tempdoc 668 option B).
-@Tag("windows")
+// Search request, formatting and pasted path-query semantics are portable.
 class SearchToolTest {
+  private static String nativeText(String windows, String linux) {
+    return io.justsearch.configuration.PlatformPaths.isWindows() ? windows : linux;
+  }
+
 
   private AtomicReference<KnowledgeSearchRequest> capturedRequest;
   private KnowledgeSearchResponse stubbedResponse;
@@ -503,8 +504,8 @@ class SearchToolTest {
             search,
             context ->
                 List.of(
-                    new BrowseTool.RootInfo("D:\\data\\docs", "docs"),
-                    new BrowseTool.RootInfo("D:\\data\\notes", "notes")));
+                    new BrowseTool.RootInfo(nativeText("D:\\data\\docs", "/fixture/d/data/docs"), "docs"),
+                    new BrowseTool.RootInfo(nativeText("D:\\data\\notes", "/fixture/d/data/notes"), "notes")));
 
     OperationResult result =
         toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"nowhere/at/all\"}", EngineContextTestFixtures.AGENT_LOOP);
@@ -514,7 +515,7 @@ class SearchToolTest {
         result.message().contains("nowhere/at/all"),
         "Should echo the offending prefix: " + result.message());
     assertTrue(
-        result.message().contains("D:\\data\\docs") && result.message().contains("D:\\data\\notes"),
+        result.message().contains(nativeText("D:\\data\\docs", "/fixture/d/data/docs")) && result.message().contains(nativeText("D:\\data\\notes", "/fixture/d/data/notes")),
         "Should name the indexed roots: " + result.message());
   }
 
@@ -529,13 +530,13 @@ class SearchToolTest {
           return emptyResponse();
         };
     var toolWithRoots =
-        new SearchTool(search, context -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
+        new SearchTool(search, context -> List.of(new BrowseTool.RootInfo(nativeText("D:\\data\\docs", "/fixture/d/data/docs"), "docs")));
 
     OperationResult result =
         toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
-    assertEquals("D:\\data\\docs\\how-to", captured.get().filters().pathPrefix());
+    assertEquals(nativeText("D:\\data\\docs\\how-to", "/fixture/d/data/docs/how-to"), captured.get().filters().pathPrefix());
   }
 
   @Test
@@ -543,7 +544,7 @@ class SearchToolTest {
     stubbedResponse = emptyResponse();
 
     OperationResult result =
-        tool.execute("{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\stuff\"}", EngineContextTestFixtures.AGENT_LOOP);
+        tool.execute(nativeText("{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\stuff\"}", "{\"query\":\"test\",\"path_prefix\":\"/fixture/d/Documents/stuff\"}"), EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertTrue(
@@ -567,8 +568,8 @@ class SearchToolTest {
             },
             context ->
                 List.of(
-                    new BrowseTool.RootInfo("D:\\docs", "docs"),
-                    new BrowseTool.RootInfo("D:\\Projects", "Projects")));
+                    new BrowseTool.RootInfo(nativeText("D:\\docs", "/fixture/d/docs"), "docs"),
+                    new BrowseTool.RootInfo(nativeText("D:\\Projects", "/fixture/d/Projects"), "Projects")));
 
     OperationResult result =
         toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"docs/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
@@ -576,7 +577,7 @@ class SearchToolTest {
     assertTrue(result.success(), "Relative path matching root should resolve: " + result.message());
     assertNotNull(capturedRequest.get(), "Search should have been executed");
     assertEquals(
-        "D:\\docs\\how-to",
+        nativeText("D:\\docs\\how-to", "/fixture/d/docs/how-to"),
         capturedRequest.get().filters().pathPrefix(),
         "Relative path should resolve to absolute");
   }
@@ -588,8 +589,8 @@ class SearchToolTest {
             (req, context) -> stubbedResponse,
             context ->
                 List.of(
-                    new BrowseTool.RootInfo("D:\\Documents", "Documents"),
-                    new BrowseTool.RootInfo("D:\\Projects", "Projects")));
+                    new BrowseTool.RootInfo(nativeText("D:\\Documents", "/fixture/d/Documents"), "Documents"),
+                    new BrowseTool.RootInfo(nativeText("D:\\Projects", "/fixture/d/Projects"), "Projects")));
 
     OperationResult result =
         toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"unknown/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
@@ -603,13 +604,13 @@ class SearchToolTest {
     var toolWithRoots =
         new SearchTool(
             (req, context) -> stubbedResponse,
-            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            context -> List.of(new BrowseTool.RootInfo(nativeText("D:\\Documents", "/fixture/d/Documents"), "Documents")));
 
     OperationResult result =
         toolWithRoots.execute("{\"query\": \"test\", \"path_prefix\": \"/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
 
-    assertFalse(result.success(), "Unix-style /path should be rejected on Windows: " + result.message());
-    assertTrue(result.message().contains("not an absolute path"), result.message());
+    assertFalse(result.success(), "Path outside the indexed roots should be rejected: " + result.message());
+    assertTrue(result.message().contains(nativeText("not an absolute path", "not under any indexed root")), result.message());
   }
 
   @Test
@@ -623,12 +624,12 @@ class SearchToolTest {
             },
             context ->
                 List.of(
-                    new BrowseTool.RootInfo("D:\\Documents", "Documents"),
-                    new BrowseTool.RootInfo("D:\\Projects", "Projects")));
+                    new BrowseTool.RootInfo(nativeText("D:\\Documents", "/fixture/d/Documents"), "Documents"),
+                    new BrowseTool.RootInfo(nativeText("D:\\Projects", "/fixture/d/Projects"), "Projects")));
 
     OperationResult result =
         toolWithRoots.execute(
-            "{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
+            nativeText("{\"query\": \"test\", \"path_prefix\": \"D:\\\\Documents\\\\how-to\"}", "{\"query\":\"test\",\"path_prefix\":\"/fixture/d/Documents/how-to\"}"), EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), "Valid rooted path should be accepted: " + result.message());
     assertNotNull(capturedRequest.get(), "Search should have been executed");
@@ -639,15 +640,15 @@ class SearchToolTest {
     var toolWithRoots =
         new SearchTool(
             (req, context) -> stubbedResponse,
-            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            context -> List.of(new BrowseTool.RootInfo(nativeText("D:\\Documents", "/fixture/d/Documents"), "Documents")));
 
     OperationResult result =
         toolWithRoots.execute(
-            "{\"query\": \"test\", \"path_prefix\": \"C:\\\\other\\\\path\"}", EngineContextTestFixtures.AGENT_LOOP);
+            nativeText("{\"query\": \"test\", \"path_prefix\": \"C:\\\\other\\\\path\"}", "{\"query\":\"test\",\"path_prefix\":\"/fixture/c/other/path\"}"), EngineContextTestFixtures.AGENT_LOOP);
 
     assertFalse(result.success(), "Out-of-root path should be rejected: " + result.message());
     assertTrue(result.message().contains("not under any indexed root"), result.message());
-    assertTrue(result.message().contains("D:\\Documents"), result.message());
+    assertTrue(result.message().contains(nativeText("D:\\Documents", "/fixture/d/Documents")), result.message());
   }
 
   @Test
@@ -659,7 +660,7 @@ class SearchToolTest {
               capturedRequest.set(req);
               return stubbedResponse;
             },
-            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            context -> List.of(new BrowseTool.RootInfo(nativeText("D:\\Documents", "/fixture/d/Documents"), "Documents")));
 
     OperationResult result = toolWithRoots.execute("{\"query\": \"test\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "No path_prefix should be accepted: " + result.message());

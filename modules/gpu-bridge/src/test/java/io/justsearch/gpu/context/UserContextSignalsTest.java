@@ -21,11 +21,11 @@ import org.junit.jupiter.api.condition.OS;
  * changes nothing on the machine. Whether a game runs is the rule's business (E-U4); this proves the
  * readings arrive, are well formed, and stop after close.
  */
-@EnabledOnOs(OS.WINDOWS)
 final class UserContextSignalsTest {
 
   // the real APIs answer: a notification state, the power mode within 5 s, a live foreground owner
   @Test
+  @EnabledOnOs(OS.WINDOWS)
   void readsTheRealUserContext() throws InterruptedException {
     try (UserContextSignals reader = UserContextSignals.open()) {
       UserContextSample sample = reader.sampleNow();

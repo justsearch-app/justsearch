@@ -32,6 +32,8 @@ const require = createRequire(import.meta.url);
 
 /** Staged into every fixture checkout: the CLI, its deletion primitive, and their libraries. */
 const CLI_FILES = [
+  'scripts/lib/native-targets.cjs',
+  'contracts/native-targets/spec.v1.json',
   'scripts/lib/path-identity.cjs',
   'scripts/lib/tool-invoker.cjs',
   'scripts/dev/worktree-lifecycle.cjs',
@@ -49,6 +51,7 @@ const CLI_FILES = [
   'scripts/dev/lib/agent-identity.cjs',
   'scripts/dev/lib/owner-presence.cjs',
   'scripts/dev/lib/worktree-archive.cjs',
+  'scripts/dev/lib/worktree-resource-id.cjs',
   'scripts/dev/lib/worktree-register.cjs',
   'scripts/dev/lib/landing-receipt.cjs',
   'scripts/dev/justsearch-dev-mcp/observations.mjs',
@@ -364,6 +367,22 @@ try {
     assert.equal(parsed.harness, 'codex');
     assert.equal(parsed.session, 'session-c2');
     assert.equal(Number.isInteger(parsed.pid) && parsed.pid > 0, true, `lock reason carries no pid: ${locked}`);
+  });
+
+  await check('register and release a folder containing spaces, Unicode and metacharacters', async () => {
+    const fx = await makeFixture('space-name');
+    const dest = path.join(fx.sanctioned, 'prep tree ü &');
+    git(fx.checkout, 'worktree', 'add', '-b', 'worktree-space-name', dest, 'origin/main');
+    const registered = runCli(fx, ['register', dest, '--session-id', 'space-owner']);
+    assert.equal(registered.status, 0, registered.out);
+    assert.equal(cfg(fx.checkout, 'branch.worktree-space-name.justsearch-resource'), 'prep tree ü &');
+    const head = commitIn(dest, 'unmerged.txt', 'preserve this unmerged commit\n', 'fixture unmerged commit');
+    const released = runCli(fx, ['release', dest, '--session-id', 'space-owner', '--no-fetch']);
+    assert.equal(released.status, 0, released.out);
+    assert.equal(fs.existsSync(dest), false);
+    assert.equal(entryFor(fx.checkout, dest), null);
+    assert.ok(listRefs(fx.checkout, 'refs/archive').length >= 2, 'tip and working-state archive remain');
+    assert.equal(refSha(fx.checkout, 'refs/heads/worktree-space-name'), head, 'unknown receipt preserves the unmerged branch');
   });
 
   await check('register writes markers on a hand-made worktree and prints nothing on success', () => {

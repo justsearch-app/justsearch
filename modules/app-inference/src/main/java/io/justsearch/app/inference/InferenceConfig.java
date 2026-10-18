@@ -531,9 +531,14 @@ public record InferenceConfig(
       if (Files.isRegularFile(p) && (io.justsearch.configuration.PlatformPaths.isWindows() || Files.isExecutable(p))) {
         log.debug("  Found via environment variable: {}", p);
         return p;
-      } else {
-        throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + p);
       }
+      if (!Files.notExists(p)) {
+        throw new IllegalStateException("Configured server executable must name a regular executable file: " + p);
+      }
+      // A saved runtime may have been removed. Preserve the target's bundled fallback policy;
+      // targets without one keep the missing path so availability reports the actual missing file.
+      if (!NativeTargets.current().hasCpuBaselineRuntime()) return p;
+      log.debug("  Configured executable is missing; trying bundled runtime: {}", p);
     } else {
       log.debug("  JUSTSEARCH_SERVER_EXE not set");
     }

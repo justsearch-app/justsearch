@@ -60,7 +60,7 @@ const incarnationOf = (inc) => (inc && typeof inc === 'object'
 const derived = new WeakMap();
 const ownerField = (x) => x.owner ?? x.previousOwner;
 const sourceOf = (x) => [x.processIdentity, x.processIdentity?.kind, x.processIdentity?.pid, x.processIdentity?.bootId, x.processIdentity?.startTicks, x.pid, x.ProcessId, x.creationFileTimeUtc, x.creationFileTime, x.CreationFileTimeUtc, x.birthTick,
-  x.creationTimeSource, x.childId, x.witnessId, x.instanceId, x.owner, x.previousOwner, x.incarnation, x.incarnation?.session,
+  x.creationTimeSource, x.childId, x.helperId, x.witnessId, x.instanceId, x.owner, x.previousOwner, x.incarnation, x.incarnation?.session,
   x.incarnation?.n];
 const unchanged = (hit, x) => {
   const now = sourceOf(x);
@@ -76,24 +76,24 @@ const unchanged = (hit, x) => {
  * `defaultTick` (the microsecond, CIM's, for a birth whose clock is not named).
  */
 function identityOf(x, { tick = null, source = null, kind = null, defaultTick = TICK.MICROSECOND, owner, incarnation,
-  childId, witnessId } = {}) {
+  childId, helperId, witnessId } = {}) {
   if (x?.[IDENTITY]) return x;
   if (x?.identity?.[IDENTITY]) return x.identity;
   if (!x || typeof x !== 'object') return null;
   const plain = tick === null && source === null && kind === null && owner === undefined && incarnation === undefined
-    && childId === undefined && witnessId === undefined;
+    && childId === undefined && helperId === undefined && witnessId === undefined;
   if (plain) {
     const hit = derived.get(x)?.get(String(defaultTick));
     if (hit && unchanged(hit, x)) return hit.value;
   }
-  const value = build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, witnessId });  if (plain) {
+  const value = build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, helperId, witnessId });  if (plain) {
     if (!derived.has(x)) derived.set(x, new Map());
     derived.get(x).set(String(defaultTick), { value, source: sourceOf(x) });
   }
   return value;
 }
 
-function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, witnessId }) {
+function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, helperId, witnessId }) {
   const linux = linuxIdentity(x);
   const birth = x.processIdentity && !linux ? null : birthField(x);
   // A reconciliation names the owner it found dead as `previousOwner`.
@@ -111,6 +111,7 @@ function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId
     source: source ?? x.creationTimeSource ?? null,
     kind: kind ?? null,
     childId: (childId !== undefined ? childId : x.childId) ?? null,
+    helperId: (helperId !== undefined ? helperId : x.helperId) ?? null,
     witnessId: (witnessId !== undefined ? witnessId : x.witnessId) ?? null,
     instanceId: x.instanceId ?? null,
     owner: ownerValue && typeof ownerValue === 'object' ? identityOf(ownerValue, { defaultTick: TICK.EXACT }) : null,
@@ -128,7 +129,7 @@ function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId
 function startIdentity(fields) {
   return identityOf(fields, { tick: fields.tick ?? TICK.EXACT, source: fields.source ?? 'ledger', kind: fields.kind ?? null,
     owner: fields.owner ?? null, incarnation: fields.incarnation ?? null, childId: fields.childId ?? null,
-    witnessId: fields.witnessId ?? null });
+    helperId: fields.helperId ?? null, witnessId: fields.witnessId ?? null });
 }
 
 /** Records later metadata that disagrees with a start's identity, without changing the identity. */
@@ -150,7 +151,7 @@ const both = (a, b, f) => a[f] != null && b[f] != null;
 /** Two values name one process (rule 'same'). */
 function same(A, B) {
   if (!A || !B || A.pid === null || B.pid === null || A.pid !== B.pid || !birthsAgree(A, B)) return false;
-  for (const f of ['childId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return false;
+  for (const f of ['childId', 'helperId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return false;
   if (both(A, B, 'owner') && !same(A.owner, B.owner)) return false;
   if (both(A, B, 'incarnation') && !sameIncarnation(A.incarnation, B.incarnation)) return false;
   return true;
@@ -161,7 +162,7 @@ function contradicts(A, B) {
   if (!A || !B) return false;
   if (both(A, B, 'pid') && A.pid !== B.pid) return true;
   if (A.rawBirth != null && B.birth !== null && !birthsAgree(A, B)) return true;
-  for (const f of ['childId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return true;
+  for (const f of ['childId', 'helperId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return true;
   if (both(A, B, 'owner') && contradicts(A.owner, B.owner)) return true;
   if (both(A, B, 'incarnation') && !sameIncarnation(A.incarnation, B.incarnation)) return true;
   return false;
@@ -190,6 +191,7 @@ function writerIsOwner(writer, owner, { unknownBirth = false } = {}) {
   const O = identityOf(owner, { defaultTick: TICK.EXACT });
   if (!writer || writer.role !== 'engine' || !O || O.pid === null) return false;
   if (validPid(writer.pid) !== O.pid) return false;
+  if (O.processIdentity) return compareIdentity(writer, O, 'native');
   const startedMs = Number.isFinite(writer.startedAt) ? writer.startedAt : knownTimestamp(writer.startedAt);
   if (startedMs == null) return unknownBirth;
   return O.birth !== null && birthMs(O) === startedMs;
@@ -202,7 +204,8 @@ const writerOfThisProcess = (w) => validPid(w?.pid) === process.pid;
 /** The same writer: one role, one PID, one start instant, all recorded. */
 const sameWriter = (a, b) => Boolean(a && b) && typeof a.role === 'string' && a.role === b.role
   && validPid(a.pid) !== null && validPid(a.pid) === validPid(b.pid)
-  && writerStartedMs(a) !== null && writerStartedMs(a) === writerStartedMs(b);
+  && writerStartedMs(a) !== null && writerStartedMs(a) === writerStartedMs(b)
+  && (!(a.processIdentity || b.processIdentity) || compareIdentity(a, b, 'native'));
 
 /**
  * Ledger record line `line` (its writer `writer`) proves start `S` (rule 'proves'). `startWriters`:
@@ -236,7 +239,7 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
     return writerIsOwner(writer, S.owner);
   }
   if (S.pid === null || R.pid !== S.pid || S.birth === null || !birthsAgree(R, S)) return false;
-  for (const f of ['childId', 'witnessId']) if (S[f] != null && R[f] !== S[f]) return false;
+  for (const f of ['childId', 'helperId', 'witnessId']) if (S[f] != null && R[f] !== S[f]) return false;
   if (S.owner && !ownerCarries(R.owner, S.owner)) return false;
   if (S.incarnation && !(R.incarnation && sameIncarnation(R.incarnation, S.incarnation))) return false;
   return true;
@@ -255,7 +258,7 @@ function native(A, B) {
 /** One start: the same fields, each equal, births to the tick (rule 'exact'). */
 function exact(A, B) {
   if (!A || !B || A.pid !== B.pid || A.rawBirth !== B.rawBirth) return false;
-  for (const f of ['childId', 'witnessId', 'instanceId']) if ((A[f] ?? null) !== (B[f] ?? null)) return false;
+  for (const f of ['childId', 'helperId', 'witnessId', 'instanceId']) if ((A[f] ?? null) !== (B[f] ?? null)) return false;
   if (Boolean(A.owner) !== Boolean(B.owner) || (A.owner && !exact(A.owner, B.owner))) return false;
   if (Boolean(A.incarnation) !== Boolean(B.incarnation)
     || (A.incarnation && !sameIncarnation(A.incarnation, B.incarnation))) return false;

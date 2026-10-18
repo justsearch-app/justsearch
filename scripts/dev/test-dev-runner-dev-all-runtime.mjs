@@ -22,12 +22,16 @@ try {
     touch(flat);
     assert.equal(resolve().JUSTSEARCH_SERVER_EXE, undefined, `${platform}: no CPU baseline fallback`);
     env.JUSTSEARCH_SERVER_EXE = path.join(dir, 'missing');
-    assert.throws(resolve, /regular executable file/, `${platform}: invalid override is visible`);
+    assert.equal(resolve().JUSTSEARCH_SERVER_EXE, undefined, `${platform}: missing override never selects a CPU fallback`);
+    env.JUSTSEARCH_SERVER_EXE = rootDir;
+    assert.throws(resolve, /regular executable file/, `${platform}: a directory is never a runtime`);
     delete env.JUSTSEARCH_SERVER_EXE;
     if (platform === 'win32') {
       const cuda = path.join(main, 'modules/ui/native-bin/llama-server/variants/cuda12/llama-server.exe');
       touch(cuda);
       assert.equal(resolve().JUSTSEARCH_SERVER_EXE, cuda, 'worktree resolves shared Windows GPU runtime');
+      env.JUSTSEARCH_SERVER_EXE = path.join(dir, 'missing');
+      assert.equal(resolve().JUSTSEARCH_SERVER_EXE, cuda, 'a missing saved override falls back to the bundled GPU runtime');
     }
   }
   console.log('PASS dev:all uses the shared GPU-only runtime resolver for both selected targets');

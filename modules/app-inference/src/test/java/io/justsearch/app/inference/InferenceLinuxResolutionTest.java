@@ -42,9 +42,13 @@ class InferenceLinuxResolutionTest {
     assertEquals(exe, resolve(Map.of("justsearch.server.exe", exe.toString())));
   }
 
-  @Test void missingOverrideIsRefused() {
-    assertThrows(IllegalStateException.class,
-        () -> resolve(Map.of("justsearch.server.exe", root.resolve("missing").toString())));
+  @Test void missingOverrideKeepsChatUnavailableWithTheConfiguredPath() throws Exception {
+    Path missing = root.resolve("missing");
+    Path selected = resolve(Map.of("justsearch.server.exe", missing.toString()));
+    assertEquals(missing, selected, "no bundled CPU fallback on this target");
+    var unavailable = InferenceConfig.builder().serverExecutable(selected).modelPath(root.resolve("fixture.gguf")).build();
+    var failure = assertThrows(IllegalStateException.class, unavailable::validate);
+    assertEquals("llama-server executable not found: " + missing, failure.getMessage());
   }
 
   @Test void nonExecutableOverrideIsRefused() throws Exception {

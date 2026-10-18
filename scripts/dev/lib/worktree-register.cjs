@@ -55,6 +55,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { worktreeResourceId: finalizationRecordId } = require('./worktree-resource-id.cjs');
 
 const {
   resolveRegisterDir,
@@ -63,7 +64,6 @@ const {
   pidAlive,
 } = require('./process-record.cjs');
 const {
-  assertSafeRecordId,
   leaseState,
   realpathNearest,
   normalizePathForCompare,
@@ -515,7 +515,19 @@ function finalizationDir(mainRepoRoot, env = process.env) {
 }
 
 function finalizationRecordPath(dir, resource) {
-  return path.join(dir, `${assertSafeRecordId(resource)}.json`);
+  const id = finalizationRecordId(resource);
+  // Existing legacy records (including names now encoded for Windows/Git) remain addressable.
+  if (id !== resource && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(resource) && !resource.includes('..')) {
+    const legacy = path.join(dir, `${resource}.json`);
+    try {
+      const stat = fs.lstatSync(legacy);
+      if (!stat.isFile() || stat.size > WORKTREES_MAX_BYTES) throw new Error('unsafe legacy finalization record');
+      const record = JSON.parse(fs.readFileSync(legacy, 'utf8'));
+      if (record.resource !== resource || !validateFinalizationRecord(record).ok) throw new Error('unreadable legacy finalization record');
+      return legacy;
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  return path.join(dir, `${id}.json`);
 }
 
 function isIsoTimestamp(value) {
@@ -535,7 +547,7 @@ function validateFinalizationRecord(record) {
     };
   }
   try {
-    assertSafeRecordId(record.resource);
+    finalizationRecordId(record.resource);
   } catch (err) {
     return { ok: false, reason: String(err?.message || err) };
   }
@@ -1012,7 +1024,7 @@ async function census({
       startedAt: entry.record.startedAt,
       by: entry.record.by,
       lease: leaseState(entry.record, now),
-      recordFile: `${WORKTREES_REGISTER_RELPOSIX}/${entry.record.resource}.json`,
+      recordFile: `${WORKTREES_REGISTER_RELPOSIX}/${entry.recordId}.json`,
     });
   }
 

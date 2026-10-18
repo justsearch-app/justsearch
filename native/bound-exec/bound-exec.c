@@ -108,5 +108,7 @@ int main(int argc, char **argv) {
   if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0L, 0L, 0L)) return fail(125, "prctl failed");
   if (getppid() != (pid_t) parent) return fail(125, "parent identity mismatch");
   execvp(argv[4], argv + 4);
-  return fail(125, "execvp failed");
+  int error = errno;
+  fprintf(stderr, "justsearch-bound-exec: execvp failed (errno=%d): %s\n", error, strerror(error));
+  return 125;
 }

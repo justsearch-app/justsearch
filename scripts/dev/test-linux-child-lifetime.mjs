@@ -29,7 +29,7 @@ async function campaign() {
   const boot = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
   const owned = new Map();
   const output = [];
-  let cleanupError;
+  let cleanupError, campaignError;
 
   function identity(pid) {
     const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
@@ -241,7 +241,7 @@ else:
     assert.match(llama.stderr(), /offloaded [1-9][0-9]*\/\d+ layers to GPU/, 'real GPU offload, no CPU fallback');
     await assertDeath(llama, [llamaIdentity], 'GPU-llama-server');
     for (const row of output) console.log(JSON.stringify(row));
-  } finally {
+  } catch (error) { campaignError = error; } finally {
     for (const record of [...owned.values()].reverse()) {
       try {
         if (alive(record)) signal(record, 'KILL');
@@ -250,8 +250,9 @@ else:
     }
     if (!cleanupError) rmSync(scratch, { recursive: true, force: true });
     else console.error(`Fixture cleanup unresolved; retained evidence: ${scratch}`);
-    if (cleanupError) throw cleanupError;
   }
+  const failures = [campaignError, cleanupError].filter(Boolean);
+  if (failures.length) throw new AggregateError(failures, 'Linux child-lifetime campaign failed');
 }
 
 function javaProbe() { return String.raw`

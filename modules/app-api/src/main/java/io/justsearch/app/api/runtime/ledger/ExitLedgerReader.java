@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.runtime.ledger;
 
+import io.justsearch.app.api.runtime.child.LinuxProcessIdentity;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -135,7 +136,13 @@ public final class ExitLedgerReader {
     Optional<LedgerWriterId.Role> parsedRole = LedgerWriterId.Role.fromToken(role.asString());
     Optional<java.time.Instant> started = LedgerTimestamps.known(startedAt.asString());
     if (parsedRole.isEmpty() || started.isEmpty()) return Optional.empty();
-    return Optional.of(new LedgerWriterId(parsedRole.get(), pid.longValue(), started.get()));
+    LinuxProcessIdentity identity = null;
+    JsonNode nativeId = node.get("processIdentity");
+    if (nativeId != null && !nativeId.isNull()) {
+      identity = LinuxProcessIdentity.fromJson(nativeId).orElse(null);
+      if (identity == null || identity.pid() != pid.longValue()) return Optional.empty();
+    }
+    return Optional.of(new LedgerWriterId(parsedRole.get(), pid.longValue(), started.get(), identity));
   }
 
   private static final class Tally {

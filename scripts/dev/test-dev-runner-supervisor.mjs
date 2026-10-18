@@ -169,7 +169,10 @@ try {
 }
 
 async function testWindowsReadHandlePublication() {
-  if (process.platform !== 'win32') return;
+  if (process.platform !== 'win32') {
+    console.log('SKIP Windows FILE_SHARE_DELETE rename refusal; Linux atomic publication is covered by testOverlappingStatePublicationsStayInTransitionOrder');
+    return;
+  }
   const root = tempRoot('reader-rename');
   const target = path.join(root, 'state.json');
   const oldState = { state: 'running', incarnation: 1 };

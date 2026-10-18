@@ -84,7 +84,10 @@ function startInJob({ command, args = [], cwd, env = process.env, stdio, label =
     const dir = recordDir ?? recordDirectory(env);
     fs.mkdirSync(dir, { recursive: true });
     const recordPath = path.join(dir, `${label}-${process.pid}-${crypto.randomUUID()}.json`);
-    const child = spawnBoundChild(command, args, { cwd, env, stdio, spawnImpl });
+    // Keep console events on the owner when requested, as the Windows backend does. A
+    // new POSIX session keeps PDEATHSIG: the helper still binds to this creating process.
+    const child = spawnBoundChild(command, args, { cwd, env, stdio, spawnImpl,
+      ...(newProcessGroup ? { detached: true } : {}) });
     const host = capture(child);
     const record = { backend: 'linux-bound-child-v1', pid: child.pid, root: host, state: 'running', members: host ? [host] : [] };
     const write = () => {

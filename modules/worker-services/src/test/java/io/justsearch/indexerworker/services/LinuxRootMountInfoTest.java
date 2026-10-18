@@ -36,6 +36,30 @@ final class LinuxRootMountInfoTest {
   }
 
   @Test
+  void namespaceObjectMountDoesNotInvalidateUnrelatedFilesystemRoots() throws Exception {
+    var mounts = LinuxRootIdentityLease.parseMounts(List.of(
+        "33 2 259:2 / / rw - ext4 /dev/nvme0n1p2 rw",
+        "2620 720 0:5 mnt:[4026533644] /run/snapd/ns/firefox.mnt rw - nsfs nsfs rw"));
+    assertEquals("33", LinuxRootIdentityLease.selectMount(mounts, Path.of("/home/user/documents")).id());
+    var namespace = LinuxRootIdentityLease.selectMount(mounts, Path.of("/run/snapd/ns/firefox.mnt"));
+    assertEquals("2620", namespace.id(), "the opaque mount remains in the topology");
+    assertEquals(Path.of("mnt:[4026533644]"), namespace.filesystemRoot());
+    assertNull(LinuxRootIdentityLease.volume(namespace, temp, 0),
+        "a namespace object never supplies a filesystem identity");
+  }
+
+  @Test
+  void nonabsoluteMountPointsAndUnrecognizedRootsStillRefuseIdentity() {
+    for (String line : List.of(
+        "1 0 8:1 relative / rw - ext4 /dev/sda rw",
+        "1 0 0:5 mnt:[123] relative rw - nsfs nsfs rw",
+        "1 0 0:5 mnt:invalid /run/ns rw - nsfs nsfs rw",
+        "1 0 8:1 mnt:[123] / rw - ext4 /dev/sda rw")) {
+      assertThrows(IOException.class, () -> LinuxRootIdentityLease.parseMounts(List.of(line)), line);
+    }
+  }
+
+  @Test
   void malformedMountEvidenceIsNeverGuessed() {
     for (String line : List.of("", "1 0 8:1 / / rw", "1 0 8:1 / /bad\\041 rw - ext4 /dev/sda rw")) {
       assertThrows(IOException.class, () -> LinuxRootIdentityLease.parseMounts(List.of(line)));

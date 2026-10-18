@@ -1218,7 +1218,7 @@ The frontend-vs-enum sync test (`ApiErrorCodeContractTest` tests #1 and #2) was 
 - Search fixture → TypeScript `SearchResponseSchema` — `KnowledgeSearchResponse` serialized with populated hits, provenance, metadata, facets, pipeline execution, and entity variants. TypeScript test maps through `mapKnowledgeSearchResponse()` (production path) and validates against the Zod schema.
 - Controller HashMap contract test — verifies that every `KnowledgeSearchResponse` record component has a corresponding key in the controller's manually-built `HashMap`. Catches silently omitted fields on addition (370 P1).
 
-All cross-language contract tests use `ORDER_MAP_ENTRIES_BY_KEYS` for deterministic JSON output. Fixtures represent the sorted wire format. Regenerate with `./gradlew.bat :modules:app-api:updateSchemas`.
+All cross-language contract tests use `ORDER_MAP_ENTRIES_BY_KEYS` for deterministic JSON output. Fixtures represent the sorted wire format. Regenerate with `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:updateSchemas`.
 
 ### Debug APIs
 

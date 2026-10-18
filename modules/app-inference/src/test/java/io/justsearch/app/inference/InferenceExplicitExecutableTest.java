@@ -27,24 +27,34 @@ class InferenceExplicitExecutableTest {
     }
   }
 
-  @Test void invalidExplicitOverrideNeverFallsBackOnEitherTarget() throws Exception {
+  @Test void windowsMissingConfiguredExecutableUsesTheBundledRuntime() throws Exception {
+    assertMissingPath("Windows 11", true);
+  }
+
+  @Test void linuxMissingConfiguredExecutableStaysUnavailableWithoutCpuFallback() throws Exception {
+    assertMissingPath("Linux", false);
+  }
+
+  private void assertMissingPath(String platform, boolean fallbackExpected) throws Exception {
     String os = System.getProperty("os.name");
     String arch = System.getProperty("os.arch");
     try {
       System.setProperty("os.arch", "amd64");
-      for (String platform : java.util.List.of("Windows 11", "Linux")) {
-        System.setProperty("os.name", platform);
-        Path bin = Files.createDirectories(root.resolve("native-bin/llama-server"));
-        Path fallback = bin.resolve(platform.startsWith("Windows") ? "llama-server.exe" : "llama-server");
-        Files.writeString(fallback, "fixture baseline");
-        assertThrows(IllegalStateException.class,
-            () -> resolve(Map.of("justsearch.server.exe", root.resolve("missing").toString())), platform);
-        assertThrows(IllegalStateException.class,
-            () -> resolve(Map.of("justsearch.server.exe", root.toString())), platform);
-      }
+      System.setProperty("os.name", platform);
+      Path bin = Files.createDirectories(root.resolve("native-bin/llama-server"));
+      Path fallback = bin.resolve(platform.startsWith("Windows") ? "llama-server.exe" : "llama-server");
+      Files.writeString(fallback, "fixture baseline");
+      Path missing = root.resolve("missing");
+      assertEquals(fallbackExpected ? fallback : missing,
+          resolve(Map.of("justsearch.server.exe", missing.toString())), platform);
     } finally {
       System.setProperty("os.name", os);
       System.setProperty("os.arch", arch);
     }
+  }
+
+  @Test void existingDirectoryIsNeverAcceptedAsAnExecutable() throws Exception {
+    assertThrows(IllegalStateException.class,
+        () -> resolve(Map.of("justsearch.server.exe", root.toString())));
   }
 }

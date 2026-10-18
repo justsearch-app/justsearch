@@ -27,6 +27,18 @@ This is distinct from `queue-db.check-failed`, which reports a soft failure of t
 
 ## Diagnostics
 
+The PowerShell examples below apply to Windows. On Linux, take the actual data
+folder from the runtime manifest (`dataDir`); the desktop shell uses its platform
+app-data folder under `XDG_DATA_HOME`, while headless launches can select a data
+folder explicitly. With that path assigned to `data_dir` in Bash:
+
+```sh
+df -h "$data_dir"
+find "$data_dir" -type f \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' \) -ls
+tail -n 500 "$data_dir/logs/engine.log"
+```
+
+
 1. Check disk free space on the volume hosting the Worker data directory:
 
    ```powershell

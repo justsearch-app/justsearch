@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.bgem3;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
@@ -13,14 +12,14 @@ import org.junit.jupiter.api.Test;
  */
 class BgeM3VocabLoadTest {
 
-  private static final Path TOKENIZER_JSON =
-      Path.of("D:/code/JustSearch/tmp/bge-m3-onnx-int8/tokenizer.json");
-
   @Test
   void loadRealVocabulary() throws Exception {
-    assumeTrue(Files.exists(TOKENIZER_JSON), "BGE-M3 tokenizer.json not available");
+    var discovery = io.justsearch.ort.testing.ModelDirTestResolver.discover(
+        "models/bge-m3/BAAI-bge-m3", "JUSTSEARCH_BGE_M3_MODEL_PATH", "tokenizer.json");
+    assumeTrue(discovery.modelDir() != null, discovery.missDescription());
+    Path tokenizerJson = discovery.modelDir().resolve("tokenizer.json");
 
-    String[] vocab = BgeM3Encoder.loadVocabularyFromTokenizerJson(TOKENIZER_JSON);
+    String[] vocab = BgeM3Encoder.loadVocabularyFromTokenizerJson(tokenizerJson);
 
     // XLM-RoBERTa has 250002 tokens
     assertEquals(250002, vocab.length, "vocab size");

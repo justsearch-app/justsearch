@@ -70,7 +70,7 @@ To test the full desktop experience (with native window chrome, drag regions, et
 **Prereq (stage the bundled backend into the Tauri resources folder):**
 
 ```powershell
-.\gradlew.bat --no-daemon -PskipWebBuild=true :modules:ui:bundleSidecar
+node scripts/lib/tool-invoker.cjs gradle --no-daemon -PskipWebBuild=true :modules:ui:bundleSidecar
 ```
 
 Then run:
@@ -100,7 +100,7 @@ Artifacts are produced under `modules/shell/src-tauri/target/release/bundle/` (p
 ### Sidecar bundle smoke test (no GUI)
 
 ```powershell
-.\gradlew.bat --no-daemon -PskipWebBuild=true :modules:ui:smokeSidecarBundle
+node scripts/lib/tool-invoker.cjs gradle --no-daemon -PskipWebBuild=true :modules:ui:smokeSidecarBundle
 ```
 
 This launches the staged headless bundle and asserts basic readiness (`/api/status` and `/api/health` with Worker READY).
@@ -259,7 +259,7 @@ After modifying Java code:
 1. Stop the dev stack:
    - If you used `npm --prefix modules/ui-web run dev:all`, press **Ctrl+C** in that terminal.
    - If you used `run-headless-api.ps1`, press **Ctrl+C** in that terminal.
-2. Rebuild (Java-only, skips web bundle): `.\gradlew.bat :modules:ui:installDist -PskipWebBuild=true --no-daemon`
+2. Rebuild (Java-only, skips web bundle): `node scripts/lib/tool-invoker.cjs gradle :modules:ui:installDist -PskipWebBuild=true --no-daemon`
 3. Restart: `.\scripts\dev\run-headless-api.ps1 -SkipBuild`
 
 **One distribution:** lane F stage A item A13 deleted the Worker distribution. `:modules:ui:installDist` builds the only tree the backend launches from, and the index half is in its `lib/` — there is no second artifact that can drift out of sync.

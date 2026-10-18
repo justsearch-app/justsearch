@@ -402,7 +402,7 @@ test('missing observer readiness is bounded and cannot prove clean native exits'
   assert.ok(result.exitAccountingGaps.some(g => /failed before shutdown/.test(g.reason)));
 });
 
-test('the PowerShell observer holds a real process handle and reports its code and OS exit time, and nothing of the stop\'s kills', { skip: process.platform !== 'win32' && 'Windows process handles' }, async t => {
+test('the PowerShell observer holds a real process handle and reports its code and OS exit time, and nothing of the stop\'s kills', { skip: process.platform !== 'win32' && 'Windows held-handle exit code/time; Linux: test-dev-runner-linux-bound-child and native stop-census identity-edge cases' }, async t => {
   const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-ps1-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const go = path.join(dir, 'go');
@@ -494,7 +494,7 @@ function exactBirthOf(pid) {
   return value;
 }
 
-test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exact birth is not CIM\'s, and refuses a reused pid', { skip: process.platform !== 'win32' && 'Windows process handles' }, async t => {
+test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exact birth is not CIM\'s, and refuses a reused pid', { skip: process.platform !== 'win32' && 'Windows held-handle exit code/time; Linux: test-dev-runner-linux-bound-child and native stop-census identity-edge cases' }, async t => {
   const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-birth-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.join(dir, 'runtime'), { recursive: true });

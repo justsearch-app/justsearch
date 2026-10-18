@@ -39,6 +39,7 @@
  * ends up permanently in someone's `.git/`.
  */
 'use strict';
+const { worktreeResourceId } = require('./worktree-resource-id.cjs');
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -301,6 +302,7 @@ function archiveWorktree({
   now = Date.now(),
 }) {
   const active = policy || loadPolicy(mainRepoRoot);
+  const resourceId = worktreeResourceId(resource);
   const classified = classifyIgnored({ worktreePath, policy: active, git });
   if (classified.refused) return classified;
 
@@ -334,7 +336,7 @@ function archiveWorktree({
 
   // (1) tip ref — conditional create. An existing ref with the same value is success, not a
   // conflict: archiving twice must be idempotent, because the reconciler retries.
-  const tipRef = `${active.refPrefix}/${resource}/${shortSha}`;
+  const tipRef = `${active.refPrefix}/${resourceId}/${shortSha}`;
   let tipRefCreated = false;
   try {
     git(['update-ref', tipRef, head, ''], { cwd: mainRepoRoot });
@@ -417,7 +419,7 @@ function archiveWorktree({
     try { fs.unlinkSync(pathspecFile); } catch { /* idem */ }
   }
 
-  const stateRef = `${active.refPrefix}/${resource}/state-${stamp}`;
+  const stateRef = `${active.refPrefix}/${resourceId}/state-${stamp}`;
   let changed;
   let untracked;
   try {
@@ -474,7 +476,7 @@ function archiveWorktree({
     caches: { files: classified.caches.length, bytes: classified.caches.reduce((sum, e) => sum + e.size, 0) },
   };
 
-  const manifestPath = path.join(mainRepoRoot, ...active.localDir.split('/'), resource, `${stamp}.json`);
+  const manifestPath = path.join(mainRepoRoot, ...active.localDir.split('/'), resourceId, `${stamp}.json`);
   try {
     fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');

@@ -18,14 +18,22 @@ final class LinuxProcessTerminator implements ProcessTerminator {
   @Override public Optional<String> creationFileTime(long pid) { return Optional.empty(); }
 
   @Override public OsProcess open(Process process) throws IOException {
-    var observed = LinuxProcessIdentity.observe(process.pid());
-    if (observed.presence() != IdentityPresence.PRESENT && process.isAlive())
-      throw new IOException("Cannot acquire Linux child birth identity");
+    var captured = BoundChildProcess.birthOf(process);
+    if (captured.isEmpty()) captured = LinuxProcessIdentity.captureSpawned(process);
+    if (captured.isEmpty() && process.isAlive()) throw new IOException("Cannot acquire Linux child birth identity");
+    // A reaped original spawn still owns its exit code. Missing birth stays unknown in receipts;
+    // it never grants recorded-process stop authority or borrows a later PID occupant's identity.
+    var identity = captured;
+    var executable = identity.flatMap(original -> {
+      var observed = LinuxProcessIdentity.observe(process.pid());
+      return observed.identity().filter(original::equals).isPresent()
+          ? observed.executable() : Optional.<String>empty();
+    });
     OsProcess held = children.open(process);
     return new OsProcess() {
       @Override public Optional<String> creationFileTime() { return Optional.empty(); }
-      @Override public Optional<LinuxProcessIdentity> processIdentity() { return observed.identity(); }
-      @Override public Optional<String> executable() { return observed.executable(); }
+      @Override public Optional<LinuxProcessIdentity> processIdentity() { return identity; }
+      @Override public Optional<String> executable() { return executable; }
       @Override public TerminateResult terminate(int code) { return held.terminate(code); }
       @Override public boolean awaitExit(Duration max) throws InterruptedException { return held.awaitExit(max); }
       @Override public OptionalInt exitCode() { return held.exitCode(); }

@@ -22,7 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
  * unhealthy and the ledger records a {@code FORCE_FAILED} gap, open until a later force succeeds and
  * a forced record of the same gap carries {@code clearedAt}.
  */
-@EnabledOnOs(OS.WINDOWS) // a DOS read-only ledger file makes the real force fail
+@EnabledOnOs({OS.WINDOWS, OS.LINUX}) // native read-only attributes make the real force fail
 final class ExitLedgerWriterDurabilityGapTest {
   @TempDir Path dir;
 
@@ -31,11 +31,21 @@ final class ExitLedgerWriterDurabilityGapTest {
         ExitLedgerWriterTest.ENGINE, ExitLedgerWriterTest.CLOCK);
     Path current = LedgerFamily.CHILDREN.current(dir);
     assertTrue(writer.appendUnforced(LedgerRecordType.HELPER_WINDOW_END, window()));
-    Files.setAttribute(current, "dos:readonly", true);
+    var permissions = io.justsearch.configuration.PlatformPaths.isLinux()
+        ? Files.getPosixFilePermissions(current) : null;
+    if (permissions == null) Files.setAttribute(current, "dos:readonly", true);
+    else {
+      var readOnly = java.util.EnumSet.copyOf(permissions);
+      readOnly.removeAll(java.util.Set.of(java.nio.file.attribute.PosixFilePermission.OWNER_WRITE,
+          java.nio.file.attribute.PosixFilePermission.GROUP_WRITE,
+          java.nio.file.attribute.PosixFilePermission.OTHERS_WRITE));
+      Files.setPosixFilePermissions(current, readOnly);
+    }
     try {
       assertFalse(writer.flush(), "a read-only ledger file cannot be forced");
     } finally {
-      Files.setAttribute(current, "dos:readonly", false);
+      if (permissions == null) Files.setAttribute(current, "dos:readonly", false);
+      else Files.setPosixFilePermissions(current, permissions);
     }
     assertFalse(writer.healthy(), "an unforced record may not be durable: the writer reports the gap");
 

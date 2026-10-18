@@ -61,15 +61,15 @@ final class LostRootVolumeRecordTest {
       "ROOT_NOT_DIRECTORY: drive not confirmed after upgrade";
   private static final String NOT_WRITABLE_YET = "Index runtime not available";
 
-  @TempDir Path tempDir;
+  @TempDir(factory = io.justsearch.indexerworker.services.VolumeIdentityTempDirFactory.class) Path tempDir;
   private KnowledgeServer server;
   private WorkerBootFixture.Layout layout;
 
   @BeforeEach
-  void requireVolumeIdentity() {
-    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
-    // (NoVolumeIdentityExtension, round 9).
-    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+  void requireVolumeIdentity() throws Exception {
+    // Native volume identity is required; the no-volume-identity campaign covers its absence.
+    assumeTrue((WINDOWS || io.justsearch.indexerworker.services.VolumeIdentityTempDirFactory.hasLinuxVolumeIdentity(tempDir))
+        && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
         "the volume record exists only where the platform exposes a volume identity");
   }
 
@@ -247,7 +247,8 @@ final class LostRootVolumeRecordTest {
    * not a record name none.
    */
   private List<String> recordedVolumesUnder(Path folder) throws IOException {
-    String key = folder.toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
+    String nativeKey = folder.toAbsolutePath().normalize().toString();
+    String key = WINDOWS ? nativeKey.toLowerCase(Locale.ROOT) : nativeKey;
     List<String> recorded = new ArrayList<>();
     try (Stream<Path> files = Files.walk(layout.dataDir())) {
       for (Path file : files.filter(p -> p.getFileName().toString().equals(RECORD)).toList()) {
@@ -256,9 +257,9 @@ final class LostRootVolumeRecordTest {
           entries.load(in);
         }
         for (String name : entries.stringPropertyNames()) {
-          String lower = name.toLowerCase(Locale.ROOT);
-          if ((lower.equals(key) || lower.startsWith(key + "\\"))
-              && entries.getProperty(name).startsWith("windows-volume:")) {
+          String lower = WINDOWS ? name.toLowerCase(Locale.ROOT) : name;
+          if ((lower.equals(key) || lower.startsWith(key + (WINDOWS ? "\\" : "/")))
+              && entries.getProperty(name).startsWith(WINDOWS ? "windows-volume:" : "linux-volume-v1:")) {
             recorded.add(name);
           }
         }

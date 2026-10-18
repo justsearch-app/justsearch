@@ -35,7 +35,9 @@ public record LinuxProcessIdentity(String kind, long pid, String bootId, String 
     return new Stat(fields[0].charAt(0), fields[19]);
   }
 
-  public static Observation observe(long pid) {
+  public static Observation observe(long pid) { return observe(pid, false); }
+
+  private static Observation observe(long pid, boolean retainEndedBirth) {
     if (!io.justsearch.configuration.PlatformPaths.isLinux() || pid <= 0 || pid > Integer.MAX_VALUE) return unknown();
     Path directory = Path.of("/proc", Long.toString(pid));
     try {
@@ -46,7 +48,7 @@ public record LinuxProcessIdentity(String kind, long pid, String bootId, String 
       catch (NoSuchFileException gone) {
         return new Observation(ProcessTerminator.IdentityPresence.GONE, Optional.empty(), Optional.empty());
       }
-      if (ended(before))
+      if (ended(before) && !retainEndedBirth)
         return new Observation(ProcessTerminator.IdentityPresence.GONE, Optional.empty(), Optional.empty());
       String image = null;
       try { image = Files.readSymbolicLink(directory.resolve("exe")).toString(); }
@@ -54,9 +56,10 @@ public record LinuxProcessIdentity(String kind, long pid, String bootId, String 
       Stat after = parseStat(Files.readString(directory.resolve("stat")));
       String afterBoot = Files.readString(BOOT_FILE).strip();
       if (!before.ticks().equals(after.ticks()) || !boot.equals(afterBoot)) return unknown();
-      if (ended(after))
+      if (ended(after) && !retainEndedBirth)
         return new Observation(ProcessTerminator.IdentityPresence.GONE, Optional.empty(), Optional.empty());
-      return new Observation(ProcessTerminator.IdentityPresence.PRESENT,
+      return new Observation(ended(after) ? ProcessTerminator.IdentityPresence.GONE
+          : ProcessTerminator.IdentityPresence.PRESENT,
           Optional.of(new LinuxProcessIdentity(KIND, pid, boot, before.ticks())), Optional.ofNullable(image));
     } catch (IOException | RuntimeException unreadable) { return unknown(); }
   }
@@ -71,6 +74,16 @@ public record LinuxProcessIdentity(String kind, long pid, String bootId, String 
 
   public static Optional<LinuxProcessIdentity> read(long pid) { return observe(pid).identity(); }
 
+  /** Capture only through the original spawn's JDK handle, whose Info rejects a reused PID. */
+  static Optional<LinuxProcessIdentity> captureSpawned(Process process) {
+    try {
+      ProcessHandle handle = process.toHandle();
+      if (handle.pid() != process.pid() || handle.info().startInstant().isEmpty()) return Optional.empty();
+      var observed = observe(process.pid(), true);
+      return handle.info().startInstant().isPresent() ? observed.identity() : Optional.empty();
+    } catch (RuntimeException unavailable) { return Optional.empty(); }
+  }
+
   static Optional<String> currentBootId() {
     try { return Optional.of(Files.readString(BOOT_FILE).strip()).filter(value -> value.matches(UUID_PATTERN)); }
     catch (IOException | RuntimeException unreadable) { return Optional.empty(); }
@@ -79,7 +92,8 @@ public record LinuxProcessIdentity(String kind, long pid, String bootId, String 
   /** In-memory intent/window key; serialized process identities remain structured records. */
   String key() { return KIND + ":" + bootId + ":" + startTicks; }
 
-  static Optional<LinuxProcessIdentity> fromJson(tools.jackson.databind.JsonNode node) {
+  /** Parses a serialized identity without observing or assigning a current process birth. */
+  public static Optional<LinuxProcessIdentity> fromJson(tools.jackson.databind.JsonNode node) {
     try {
       if (!node.path("kind").isString() || !node.path("pid").isIntegralNumber()
           || !node.path("pid").canConvertToInt() || !node.path("bootId").isString()

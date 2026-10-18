@@ -390,9 +390,6 @@ fn resolve_headless_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<
 }
 
 fn resolve_app_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
-    if let Some(path) = platform_paths::explicit_data_dir() {
-        return Ok(path);
-    }
     app.path()
         .app_data_dir()
         .map_err(|e| format!("app_data_dir() failed: {e}"))

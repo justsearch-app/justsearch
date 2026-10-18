@@ -110,7 +110,7 @@ function resolveAiDevEnv() {
   if (runtime.source === "override" && !runtime.valid) {
     throw new Error("JUSTSEARCH_SERVER_EXE must name a regular executable file");
   }
-  if (!process.env.JUSTSEARCH_SERVER_EXE && runtime.valid) env.JUSTSEARCH_SERVER_EXE = runtime.path;
+  if (runtime.valid) env.JUSTSEARCH_SERVER_EXE = runtime.path;
   if (!process.env.JUSTSEARCH_MODELS_DIR) {
     const mainModels = path.join(mainRoot, "models");
     const localModels = path.join(rootDir, "models");
@@ -168,11 +168,11 @@ function startOwnedChild(command, args, options) {
 function terminateChild(proc) {
   if (!proc) return null;
 
-  if (process.platform === "win32") {
+  const run = childRuns.get(proc);
+  if (run?.recordPath) {
     // The recorded run: its host (PID plus creation time) and, through the host's job, every
     // process started below it. Never a tree through parent links. A run that already ended is
     // verified and its record removed.
-    const run = childRuns.get(proc);
     const options = { code: jobRun.NON_DISTINCTIVE_KILL_CODE };
     const result = proc.exitCode != null || proc.signalCode != null
       ? jobRun.settleRunRecord(run, options) : jobRun.stopJobRunSync(run, options);

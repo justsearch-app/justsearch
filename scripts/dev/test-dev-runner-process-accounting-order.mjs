@@ -178,3 +178,23 @@ for (const compacted of [false, true]) {
     assert.ok(during.gaps.some(g => g.reason === 'evidence_lost'), 'a run older than the eviction stays incomplete');
   });
 }
+
+test('this stop binds its writer to the checked Linux tuple; malformed, foreign and reused identities prove nothing', t => {
+  const dataDir = tmp(t), incarnation = { session: 'linux-stop-binding', n: 1 };
+  const processIdentity = { kind: 'linux-proc-v1', pid: 4242,
+    bootId: '333fd9cf-f547-4117-a537-fc8be3c44466', startTicks: '42' };
+  ledger.createLedgerWriter({ ledgerDir: ledger.ledgerDirectory(dataDir), family: 'engine',
+    writer: { role: 'dev-runner', pid: 100, startedAt: Date.parse(stamp) } })
+    .append('engine-start', { incarnation, pid: 4242, processIdentity, executable: process.execPath });
+  const recorder = actuatorLib.createCliEngineRecorder({ dataDir, incarnation });
+  recorder.intent({ mode: 'NOW', channel: 'TERMINATE' });
+  recorder.exit({ endedBy: 'terminate', terminateCalledAt: Date.now() });
+  const writer = recorder.writerIdentity();
+  const records = census.readRunLedger(dataDir);
+  const binding = { writer, incarnation, checked: { pid: 4242, processIdentity } };
+  const view = b => census.ledgerView(records, incarnation.session, { stopBindings: [b] });
+  assert.equal(view(binding).engines[0].exit?.exitClass, 'UNKNOWN', 'the checked stop owns its truthful unknown-code exit');
+  assert.equal(view({ ...binding, checked: { pid: 4242, processIdentity: { ...processIdentity, startTicks: '43' } } }).engines[0].exit, null);
+  assert.equal(census.stopWriterBinding({ ...binding, checked: { pid: 4242, processIdentity: { ...processIdentity, startTicks: 'unknown' } } }), null);
+  assert.equal(census.stopWriterBinding({ ...binding, writer: { ...writer, pid: process.pid + 1 } }), null);
+});

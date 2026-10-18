@@ -32,7 +32,7 @@ import org.junit.jupiter.api.io.TempDir;
  * record; each real Tesseract still has its start and exit receipts, REQUESTED with a reason,
  * written unforced and forced as a group, at the latest when the window closes.
  */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class OcrReceiptForcingTest {
   @TempDir Path temp;
 

@@ -6,13 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-// Windows-specific: exercises the single-instance lock's process-liveness semantics
-// (and spawns cmd.exe). Runs only on the dedicated Windows lane (tempdoc 668 option B).
-@Tag("windows")
+// The single-instance lease and stale-process recovery use the native host process backend.
 class AppInstanceLockTest {
 
   @TempDir Path tempDir;
@@ -70,7 +67,9 @@ class AppInstanceLockTest {
     Files.createDirectories(dataDir);
 
     // Spawn a real process and wait for it to exit
-    Process p = new ProcessBuilder("cmd.exe", "/c", "exit", "0").start();
+    Process p = (io.justsearch.configuration.PlatformPaths.isWindows()
+        ? new ProcessBuilder("cmd.exe", "/c", "exit", "0")
+        : new ProcessBuilder("/bin/sh", "-c", "exit 0")).start();
     p.waitFor();
     long deadPid = p.pid();
 

@@ -143,11 +143,13 @@ function boundExecPath() {
 }
 
 /** The helper opens a pidfd BEFORE checking the birth; no check-then-kill by PID. */
-function signalLinuxProcess(identity, signal = 'SIGKILL', { exec = spawnSync, helperPath = boundExecPath() } = {}) {
+function signalLinuxProcess(identity, signal = 'SIGKILL', { exec = spawnSync, helperPath = null } = {}) {
   const id = linuxIdentity(identity);
   if (!id) return { ok: false, outcome: 'unknown-identity', status: null };
-  const result = exec(helperPath, ['signal', String(id.pid), id.bootId, id.startTicks, signal],
-    { encoding: 'utf8', timeout: 5000, shell: false });
+  let result;
+  try { result = exec(helperPath ?? boundExecPath(), ['signal', String(id.pid), id.bootId, id.startTicks, signal],
+    { encoding: 'utf8', timeout: 5000, shell: false }); }
+  catch (error) { return { ok: false, outcome: 'failed', status: null, reason: error.message }; }
   return { ok: result.status === 0, outcome: result.status === 0 ? 'terminated' : result.status === 3 ? 'mismatch' : 'failed',
     status: result.status, reason: String(result.stderr ?? result.error?.message ?? '').trim() };
 }

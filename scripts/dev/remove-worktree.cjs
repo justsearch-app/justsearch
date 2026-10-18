@@ -39,6 +39,7 @@
  *      finish, not merely "safe" in the no-data-loss sense.
  */
 'use strict';
+const { formatTerminationCommand } = require('./lib/recorded-termination.cjs');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -148,6 +149,10 @@ function longPathDelete(p) {
  * `readProcessTable` in `process-identity.cjs` is the tri-state an identity check uses instead.
  */
 function getProcessTable() {
+  if (process.platform === 'linux') {
+    const result = readProcessTable();
+    return result.ok ? result.table : [];
+  }
   if (process.platform !== 'win32') return [];
   const psCmd = PROCESS_TABLE_PS_COMMAND;
   const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psCmd], {
@@ -229,9 +234,8 @@ function filterHolders(table, targetPath, ownPid) {
 function formatHolderLines(entry) {
   const pid = Number(entry.ProcessId);
   const birth = String(entry.CreationFileTimeUtc ?? '');
-  const command = Number.isInteger(pid) && pid > 0 && /^[1-9]\d{0,19}$/.test(birth)
-    ? `powershell.exe -NoProfile -File scripts/dev/lib/terminate-process.ps1 -Pid ${pid} -CreationFileTimeUtc ${birth} -Code 1`
-    : 'identity unavailable; no safe termination command';
+  const command = formatTerminationCommand({ pid, creationFileTimeUtc: birth,
+    ...(entry.processIdentity ? { processIdentity: entry.processIdentity } : {}) });
   return [
     `PID ${entry.ProcessId}: ${entry.Name} — ${entry.CommandLine}`,
     `  kill: ${command}`,

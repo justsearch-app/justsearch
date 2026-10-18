@@ -3,6 +3,13 @@ const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 /** Only for fixture-emitted PID/birth identities recorded when that fixture started. */
 function stopRecordedProcess(identity) {
+  if (process.platform === 'linux') {
+    const { linuxIdentity, signalLinuxProcess } = require('../dev/lib/process-identity.cjs');
+    if (!linuxIdentity(identity)) throw new Error('fixture start identity unavailable');
+    const result = signalLinuxProcess(identity);
+    if (!result.ok && result.status !== 3) throw new Error(`fixture stop failed: ${JSON.stringify(result)}`);
+    return;
+  }
   if (!Number.isSafeInteger(identity?.pid) || !/^[1-9][0-9]+$/.test(identity?.creationFileTimeUtc ?? '')) {
     throw new Error('fixture start identity unavailable');
   }

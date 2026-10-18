@@ -42,9 +42,11 @@ Start JustSearch with that environment and the downloaded/imported models. Activ
 variant `default` with chat profile `compact` or `standard` through the AI runtime
 API or its UI. An omitted/default selection uses the exact configured executable;
 `cuda12` remains a Windows pack selection and is refused on Linux. On both
-supported targets a nonempty `JUSTSEARCH_SERVER_EXE` must name a regular file; an
-invalid path fails visibly without falling back. Linux also requires its execute
-bit. Development inference must stay on the GPU.
+supported targets an existing configured executable must be a regular file; Linux
+also requires its execute bit. If a saved or environment-configured path is missing,
+a target with a bundled runtime falls back to that runtime (Windows). Linux has no
+bundled CPU runtime and reports chat unavailable with the missing path. Development
+uses only a bundled GPU variant when falling back. Development inference must stay on the GPU.
 
 Deactivation disables chat when no CPU baseline exists. It preserves the runtime
 path and GPU settings, so activate `default` again to resume. The saved profile and

@@ -21,6 +21,8 @@ const { readProcessTable } = require(path.join(SOURCE_ROOT, 'scripts', 'dev', 'l
 const FIXTURE_PROCESS_TABLE_ENV = 'JUSTSEARCH_936_FIXTURE_PROCESS_TABLE_PIDS';
 const PROCESS_IDENTITY_REL = 'scripts/dev/lib/process-identity.cjs';
 const CLI_FILES = [
+  'scripts/lib/native-targets.cjs',
+  'contracts/native-targets/spec.v1.json',
   'scripts/lib/path-identity.cjs',
   'scripts/dev/remove-worktree.cjs',
   'scripts/dev/lib/process-identity.cjs',
@@ -34,6 +36,7 @@ const CLI_FILES = [
   'scripts/dev/lib/agent-identity.cjs',
   'scripts/dev/lib/owner-presence.cjs',
   'scripts/dev/lib/worktree-archive.cjs',
+  'scripts/dev/lib/worktree-resource-id.cjs',
   'scripts/dev/justsearch-dev-mcp/observations.mjs',
   'scripts/dev/justsearch-dev-mcp/files.mjs',
   'scripts/dev/justsearch-dev-mcp/paths.mjs',
@@ -857,6 +860,9 @@ try {
     const mutant = await makeRepo('mutant-membership');
     fixtures.push(mutant);
     await fsp.rm(path.join(mutant.repo, 'scripts'), { recursive: true, force: true });
+    // The copied native descriptor is fixture scaffolding too; it must not make this
+    // deliberately unguarded main checkout dirty before the destructive canary runs.
+    await fsp.rm(path.join(mutant.repo, 'contracts'), { recursive: true, force: true });
     const linked = addWorktree(mutant, 'mutant owner', 'codex/mutant-owner');
     const cli = await installProductionCli(linked);
     const linkedFixture = { root: mutant.root, repo: linked, cli };

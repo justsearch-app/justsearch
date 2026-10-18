@@ -31,7 +31,7 @@ import org.junit.jupiter.api.condition.OS;
  * never refuse because the poll ended a little after the start's own wait, and never spawn before
  * the poll's record.
  */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class GpuSwitchBarrierTest {
   private static final int ROUNDS = 20;
 
@@ -89,8 +89,8 @@ final class GpuSwitchBarrierTest {
   }
 
   private static ChildSpec serverSpec() {
-    List<String> idle = List.of(
-        Path.of(System.getenv("SystemRoot"), "System32", "ping.exe").toString(), "-t", "127.0.0.1");
+    List<String> idle = io.justsearch.configuration.PlatformPaths.isWindows() ? List.of(
+        Path.of(System.getenv("SystemRoot"), "System32", "ping.exe").toString(), "-t", "127.0.0.1") : List.of("/bin/sleep", "300");
     return new ChildSpec(ChildKind.LLAMA_SERVER, idle, null, Map.of(), new ChildSpec.Stdio.Pipes(),
         true, OptionalLong.empty(), Optional.empty(), ChildSpec.CooperativeStop.NONE,
         "gpu-switch-check");

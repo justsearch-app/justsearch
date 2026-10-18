@@ -600,7 +600,7 @@ function resolveAiDevEnv() {
   ensureSharedCuda12Staged();
   const runtime = require('./lib/dev-runtime.cjs').resolveDevRuntime(repoRoot, mainRepoRoot);
   if (runtime.source === 'override' && !runtime.valid) throw new Error('JUSTSEARCH_SERVER_EXE must name a regular executable file');
-  if (!process.env.JUSTSEARCH_SERVER_EXE && runtime.valid) env.JUSTSEARCH_SERVER_EXE = runtime.path;
+  if (runtime.valid) env.JUSTSEARCH_SERVER_EXE = runtime.path;
   if (!process.env.JUSTSEARCH_MODELS_DIR) {
     // Tempdoc 618 §2: prefer the MAIN checkout's models (holds the LFS binaries) over a
     // worktree's models/ (tracked manifests only), so a worktree dev stack finds real models.
@@ -1316,9 +1316,7 @@ async function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectPr
       continue;
     }
     if (child.processIdentity) {
-      const expectedImage = normalizeExecutable(child.executable), actualImage = normalizeExecutable(identity.executable);
-      if (!expectedImage || !actualImage) { outcomes.push({ ...record, outcome: 'unknown-identity' }); continue; }
-      if (expectedImage !== actualImage) { outcomes.push({ ...record, outcome: 'identity-mismatch' }); continue; }
+      if (!processIdentity.linuxIdentity(child)) { outcomes.push({ ...record, outcome: 'unknown-identity' }); continue; }
       if (!compareIdentity(child, { pid: child.pid, processIdentity: identity.processIdentity }, 'same')) {
         outcomes.push({ ...record, outcome: identity.processIdentity ? 'identity-mismatch' : 'unknown-identity' }); continue;
       }
@@ -1401,7 +1399,8 @@ function inspectProcessIdentity(pid, { platform = process.platform, spawnSync: q
   if (!Number.isInteger(Number(pid)) || Number(pid) <= 0 || Number(pid) > 2147483647) return null;
   if (platform === 'linux') {
     const seen = processIdentity.readLinuxProcess(Number(pid));
-    return seen ? { alive: seen.present, processIdentity: seen.processIdentity ?? null, executable: seen.executable ?? null } : null;
+    return !seen ? null : !seen.present ? { alive: false }
+      : { alive: true, processIdentity: seen.processIdentity ?? null, executable: seen.executable ?? null };
   }
   if (platform !== 'win32') return null;
   const script = [
@@ -1930,27 +1929,6 @@ function validatePid(pid) {
   return pid;
 }
 
-async function getPortOwnerWindows(port) {
-  validatePort(port);
-  const cmd = `Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1`;
-  const res = await execPowerShell(cmd);
-  if (!res.ok || !res.stdout.trim()) return null;
-
-  // Parse via ConvertTo-Json to avoid formatting issues.
-  const res2 = await execPowerShell(
-    `Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | ` +
-    `Select-Object -First 1 LocalAddress,LocalPort,OwningProcess | ConvertTo-Json -Compress`,
-  );
-  if (!res2.ok || !res2.stdout.trim()) return null;
-  try {
-    const obj = JSON.parse(res2.stdout.trim());
-    const pid = Number(obj?.OwningProcess);
-    const addr = obj?.LocalAddress ? String(obj.LocalAddress) : null;
-    return { pid: Number.isFinite(pid) && pid > 0 ? pid : null, address: addr };
-  } catch {
-    return null;
-  }
-}
 
 async function getCommandLineWindows(pid) {
   validatePid(pid);
@@ -3826,6 +3804,11 @@ function trackedIdentities() {
   };
 }
 
+/** A native helper's unreadable birth never becomes PID-only stop authority. */
+function unidentifiedHelper(record) {
+  return record?.role === 'native-helper' && !identityOf(record)?.birth;
+}
+
 /**
  * One recorded process against an OS lookup (`lookupProcessIdentities` row, or null when the lookup
  * failed): 'match' (alive, the recorded birth), 'gone', 'reused' (the pid now names another process)
@@ -3833,10 +3816,11 @@ function trackedIdentities() {
  */
 function checkRecordedProcess(recorded, seen) {
   if (!recorded?.pid) return 'gone';
+  if (unidentifiedHelper(recorded)) return 'unknown';
   if (!seen) return 'unknown';
   if (!seen.present) return 'gone';
   if (recorded.processIdentity) {
-    if (!processIdentity.linuxIdentity(seen)) return 'unknown';
+    if (!processIdentity.linuxIdentity(recorded) || !processIdentity.linuxIdentity(seen)) return 'unknown';
     return compareIdentity(recorded, { pid: recorded.pid, processIdentity: seen.processIdentity }, 'same') ? 'match' : 'reused';
   }
   if (!seen.creationFileTime) return 'unknown';
@@ -3904,10 +3888,11 @@ function isRunProcess(pid, processes, rows) {
 async function portOwnerOf(port, processes, { table = () => processIdentity.readProcessTableAsync() } = {}) {
   const listening = port > 0 ? await isTcpListening(port, 500) : false;
   if (!listening) return { port, closed: true };
-  if (process.platform !== 'win32') return { port, closed: false, portOwner: { pid: null, commandLine: null, ownedByRun: null } };
-  const owner = await getPortOwnerWindows(port);
+  const resolved = require('./lib/port-owner.cjs').resolveListenerPid(port);
+  const owner = resolved.ok ? resolved : null;
   const ownerPid = owner?.pid ?? null;
-  const commandLine = ownerPid ? await getCommandLineWindows(ownerPid) : null;
+  const commandLine = ownerPid ? process.platform === 'linux'
+    ? processIdentity.readLinuxProcess(ownerPid)?.commandLine ?? null : await getCommandLineWindows(ownerPid) : null;
   let ownedByRun = null;
   if (ownerPid) {
     const snapshot = await table().catch(() => null);
@@ -4122,7 +4107,7 @@ async function stopRun(opts, {
       return 'gone';
     }
     const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
-    if (!p.creationFileTimeUtc && !p.processIdentity && row?.present && !Number.isFinite(p.bornNotAfterMs)) {
+    if (!unidentifiedHelper(p) && !p.creationFileTimeUtc && !p.processIdentity && row?.present && !Number.isFinite(p.bornNotAfterMs)) {
       p.bornNotAfterMs = Date.now();
       p.basis = 'first-observed-alive';
     }
@@ -4267,7 +4252,7 @@ async function stopRun(opts, {
           childCleanup.push({ ...record, outcome: state === 'gone' ? 'dead' : 'identity-mismatch' }); continue;
         }
         if (p.processIdentity) {
-          if (state !== 'match' || !normalizeExecutable(child.executable) || normalizeExecutable(child.executable) !== normalizeExecutable(row?.executable)) {
+          if (state !== 'match') {
             childCleanup.push({ ...record, outcome: state === 'unknown' ? 'unknown-identity' : 'identity-mismatch' }); continue;
           }
           let accepted = false;
@@ -4472,7 +4457,8 @@ async function stopRun(opts, {
     const byRunner = runnerAnswer.registeredHelpers.filter((c) => c?.pid);
     childCleanup = childCleanup.map((c) => {
       const earlier = c.outcome === 'dead' && byRunner.find((r) => Number(r.pid) === Number(c.pid)
-        && (r.startedAt ?? null) === (c.startedAt ?? null));
+        && (c.processIdentity ? compareIdentity(r, c, 'same') === true
+          : (r.startedAt ?? null) === (c.startedAt ?? null)));
       return earlier ? { ...c, outcome: earlier.outcome, killAccepted: earlier.killAccepted ?? null, stoppedBy: 'runner' } : c;
     });
     for (const r of byRunner) {
@@ -4597,7 +4583,7 @@ async function stopRun(opts, {
     ...helpersUnresolved.map(c => ({ ...c, role: 'registered helper', state: c.outcome.includes('unknown') ? 'unknown' : 'match' })),
     ...jobUnresolved]
     .map(p => describeUnresolved(p, p.state));
-  const nextStep = `Check each listed PID and start time in Task Manager; retry stop after it exits. `
+  const nextStep = `Check each listed PID and recorded birth identity; retry stop after it exits. `
     + forgetGuidance(runId);
 
   // Tempdoc 730 B1, re-homed at item A16: snapshot the engine log into this run's own dir, so a
@@ -4618,8 +4604,8 @@ async function stopRun(opts, {
   const lookUpLate = async (unproven) => {
     if (lateLookedUp || opts.forgetUnresolved) return [];
     lateLookedUp = true;
-    const late = (unproven ?? []).filter((u) => u?.pid && !isThisProcess(u)
-      && (u.creationFileTimeUtc || u.processIdentity || Number.isFinite(u.bornNotAfterMs)) && !provenEnded(u) && !knownAlready(u))
+    const late = (unproven ?? []).filter((u) => u?.pid && (!isThisProcess(u) || unidentifiedHelper(u))
+      && (u.creationFileTimeUtc || u.processIdentity || Number.isFinite(u.bornNotAfterMs) || unidentifiedHelper(u)) && !provenEnded(u) && !knownAlready(u))
       .map((u) => ({ ...u, role: u.role ?? 'recorded identity', name: u.role ?? 'unknown' }));
     if (!late.length) return [];
     const askedAtMs = Date.now();

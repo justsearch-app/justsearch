@@ -41,7 +41,7 @@ const { spawnSync } = require('child_process');
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
 
-const { resolveListenerPidWindows } = require('./lib/port-owner.cjs');
+const { resolveListenerPid } = require('./lib/port-owner.cjs');
 const { readProcessTable, normalizeCreationTime } = require('./lib/process-identity.cjs');
 const { resolveAgentIdentity } = require('./lib/agent-identity.cjs');
 const { ownerBlockFor } = require('./lib/owner-presence.cjs');
@@ -156,11 +156,12 @@ async function waitForPortListening(port, { timeoutMs = 30_000, intervalMs = 250
 function killSpawnTree(child, identity) {
   if (!child || !child.pid) return { ok: false, reason: 'no child process to kill' };
   try {
+    if (identity?.recordPath) {
+      if (identity.host?.pid !== child.pid) return { ok: false, reason: 'no recorded child identity' };
+      const res = jobRun.stopJobRunSync(identity, { code: jobRun.NON_DISTINCTIVE_KILL_CODE });
+      return { ...res, ...(!res.ok ? { reason: `recorded run stop ${res.outcome}` } : {}) };
+    }
     if (process.platform === 'win32') {
-      if (identity?.recordPath && identity.host?.pid === child.pid) {
-        const res = jobRun.stopJobRunSync(identity, { code: jobRun.NON_DISTINCTIVE_KILL_CODE });
-        return { ...res, ...(!res.ok ? { reason: `job stop ${res.outcome}` } : {}) };
-      }
       if (identity?.pid !== child.pid) return { ok: false, reason: 'no recorded child identity' };
       const res = engineActuator.terminateWithCodeSync(child.pid, identity.creationFileTimeUtc,
         engineActuator.NON_DISTINCTIVE_KILL_CODE);
@@ -181,7 +182,7 @@ function killSpawnTree(child, identity) {
  *
  * Returns `{ ok: true, pid, creationFileTimeUtc, cmdlineFingerprint } | { ok: false, reason }`.
  */
-function resolveListenerIdentity(port, { resolvePid = resolveListenerPidWindows, table = readProcessTable } = {}) {
+function resolveListenerIdentity(port, { resolvePid = resolveListenerPid, table = readProcessTable } = {}) {
   const owner = resolvePid(port);
   if (!owner.ok) return { ok: false, reason: `could not resolve the listener on port ${port}: ${owner.reason}` };
   const snapshot = table();
@@ -189,7 +190,8 @@ function resolveListenerIdentity(port, { resolvePid = resolveListenerPidWindows,
   const row = snapshot.table.find((r) => Number(r?.ProcessId) === owner.pid);
   if (!row) return { ok: false, reason: `listener pid ${owner.pid} vanished before its identity could be read` };
   const creationFileTimeUtc = normalizeCreationTime(row.CreationFileTimeUtc);
-  if (creationFileTimeUtc === null) {
+  const processIdentity = row.processIdentity ?? null;
+  if (creationFileTimeUtc === null && !processIdentity) {
     return { ok: false, reason: `listener pid ${owner.pid} has no readable creation time` };
   }
   const cmdline = typeof row.CommandLine === 'string' ? row.CommandLine : '';
@@ -200,7 +202,7 @@ function resolveListenerIdentity(port, { resolvePid = resolveListenerPidWindows,
   if (!cmdline.includes(cmdlineFingerprint)) {
     return { ok: false, reason: `listener pid ${owner.pid}'s command line does not contain ${JSON.stringify(cmdlineFingerprint)}; refusing to record an unverified identity` };
   }
-  return { ok: true, pid: owner.pid, creationFileTimeUtc, cmdlineFingerprint };
+  return { ok: true, pid: owner.pid, creationFileTimeUtc, ...(processIdentity ? { processIdentity } : {}), cmdlineFingerprint };
 }
 
 /**
@@ -264,7 +266,16 @@ async function registerServedVite({
       console.error(`[serve-worktree-fe] could not establish the listener's identity, not registering: ${identity.reason}`);
       return null;
     }
-    if (explicitPort) {
+    if (explicitPort && identity.processIdentity) {
+      const own = (await childIdentity)?.host?.processIdentity;
+      // Linux's direct Vite child must itself hold this listener; a stranger never becomes ours
+      // through a wall-clock approximation of its monotonic birth ticks.
+      if (!own || identity.pid !== own.pid || identity.processIdentity.bootId !== own.bootId
+          || identity.processIdentity.startTicks !== own.startTicks) {
+        console.error('[serve-worktree-fe] listener does not match the spawned Vite identity; not registering');
+        return null;
+      }
+    } else if (explicitPort) {
       const listenerStartedMs = fileTimeToEpochMs(identity.creationFileTimeUtc);
       if (listenerStartedMs < spawnStartTime) {
         console.error(
@@ -287,6 +298,7 @@ async function registerServedVite({
       producer: 'serve-worktree-fe',
       pid: identity.pid,
       creationFileTimeUtc: identity.creationFileTimeUtc,
+      ...(identity.processIdentity ? { processIdentity: identity.processIdentity } : {}),
       cmdlineFingerprint: identity.cmdlineFingerprint,
       port,
       leaseDurationSec: AGENT_SPAWN_LEASE_DURATION_SEC,
@@ -345,12 +357,10 @@ async function main(argv = process.argv) {
   const run = jobRun.startInJob({ command: process.execPath, args: [viteEntry, '--port', String(port), '--strictPort'],
     cwd: uiWebDir, env, stdio: 'inherit', label: 'serve-worktree-fe' });
   const { child } = run;
-  const childIdentity = isWin ? Promise.resolve(run.contained ? run : null) : null;
+  const childIdentity = Promise.resolve(isWin && !run.contained ? null : run);
 
   // Fire-and-track, never block the serve on registration (861 [A3]/W3).
-  const registered = isWin
-    ? registerServedVite({ port, explicitPort: !!explicitPortArg, spawnStartTime, child, childIdentity })
-    : Promise.resolve(null);
+  const registered = registerServedVite({ port, explicitPort: !!explicitPortArg, spawnStartTime, child, childIdentity });
 
   // Bounded wait for a registration already in flight (e.g. a quick Vite boot) so the clean-exit
   // retirement actually runs — but a human hitting Ctrl-C must never be held hostage by the
@@ -366,7 +376,7 @@ async function main(argv = process.argv) {
   // The job run's record goes once its processes have verifiably ended: a host that closed its job
   // as `ended` leaves nothing to verify; any other host (e.g. one Ctrl+C reached first) is settled
   // by the stop, which verifies every recorded identity before removing the record.
-  const settleRun = () => (isWin && run.contained ? jobRun.settleRunRecord(run, { code: jobRun.NON_DISTINCTIVE_KILL_CODE }) : { ok: true });
+  const settleRun = () => (run.recordPath ? jobRun.settleRunRecord(run, { code: jobRun.NON_DISTINCTIVE_KILL_CODE }) : { ok: true });
   let stopping = false;
   const stopOnSignal = async () => {
     if (stopping) return;

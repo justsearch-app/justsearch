@@ -18,7 +18,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 /** W3 on real Tika/Tesseract inside a disposable job; no application stack or GPU. */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class TikaProbeOwnerIntentTest {
   // b6d536 b101 adaptation: the first-pass OCR configuration is a TesseractOCRConfig bean; it
   // launches nothing, so it writes no window (a window per parse was the main ledger cost).
@@ -52,6 +52,9 @@ final class TikaProbeOwnerIntentTest {
       method.setAccessible(true);
       for (int i = 0; i < 20; i++) method.invoke(null);
       job.finishProcessRecording(Duration.ofSeconds(3));
+      if (io.justsearch.configuration.PlatformPaths.isLinux())
+        assertEquals(0, records.stream().filter(r -> "helper-start".equals(r.get("type"))).count(),
+            "first-pass configuration starts no bound native helper");
       System.out.println("configuration.windows=" + records.stream()
           .filter(r -> String.valueOf(r.get("type")).startsWith("helper-window")).count());
       System.out.println("configuration.launches=" + records.stream()
@@ -60,7 +63,7 @@ final class TikaProbeOwnerIntentTest {
     }
   }
 
-  @Test void normalTesseractAvailabilityIsCoveredByClosedOwnerIntent() throws Exception {
+  @Test @EnabledOnOs(OS.WINDOWS) void normalTesseractAvailabilityIsCoveredByClosedOwnerIntent() throws Exception {
     var runtime = TikaOcrRuntime.resolve();
     org.junit.jupiter.api.Assumptions.assumeTrue(runtime.available(), "real Tesseract unavailable");
     Process probe = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),

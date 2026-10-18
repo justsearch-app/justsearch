@@ -36,10 +36,22 @@ function resolveCuda12ServerExe(worktreeRoot, sharedRoot, exeName) {
 }
 
 function resolveDevRuntime(repoRoot, mainRepoRoot, env = process.env, platform = process.platform) {
-  if (env.JUSTSEARCH_SERVER_EXE) return { path: env.JUSTSEARCH_SERVER_EXE,
-    valid: executableFile(env.JUSTSEARCH_SERVER_EXE, platform), source: 'override' };
+  const configured = env.JUSTSEARCH_SERVER_EXE;
+  if (configured && executableFile(configured, platform)) return { path: configured, valid: true, source: 'override' };
+  if (configured) {
+    try {
+      fs.statSync(configured);
+      return { path: configured, valid: false, source: 'override', reason: 'Configured server executable must name a regular executable file' };
+    } catch (error) {
+      if (!['ENOENT', 'ENOTDIR'].includes(error.code)) return { path: configured, valid: false, source: 'override',
+        reason: `Configured server executable could not be inspected: ${configured}` };
+    }
+  }
+  if (configured && !nativeTarget(platform).capabilities.cpuBaselineRuntime) return {
+    path: configured, valid: false, source: 'missing', reason: `Configured server executable is missing: ${configured}` };
+
   // cuda12 is the existing Windows runtime variant, never a Linux or CPU fallback.
-  if (platform !== 'win32') return { path: null, valid: false, source: 'missing' };
+  if (!nativeTarget(platform).capabilities.runtimePacks) return { path: null, valid: false, source: 'missing' };
   const candidate = resolveCuda12ServerExe(repoRoot, mainRepoRoot, nativeTarget(platform).executables['llama-server']);
   return { path: candidate ?? null, valid: Boolean(candidate), source: candidate ? 'cuda12' : 'missing' };
 }

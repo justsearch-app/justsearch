@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -155,9 +154,7 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
    * production-owned read lease without acquiring a test-owned barrier lock.
    */
   @Test
-  // Windows-native exercises the real Lucene directory and waits for production admission before
-  // drain begins, so the earlier write and its read lease are observable.
-  @Tag("windows")
+  // The real directory and production admission expose the writer read lease on either host.
   void drainAndCloseWaitsForInFlightWriter() throws Exception {
     Path indexPath = tempDir.resolve("drain-inflight");
     Files.createDirectories(indexPath);

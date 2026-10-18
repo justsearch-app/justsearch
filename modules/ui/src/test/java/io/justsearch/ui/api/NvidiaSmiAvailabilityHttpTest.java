@@ -73,7 +73,7 @@ final class NvidiaSmiAvailabilityHttpTest {
     boolean installed = path != null && java.util.Arrays.stream(path.split(java.io.File.pathSeparator))
         .filter(directory -> !directory.isBlank()).anyMatch(directory -> {
           try {
-            return Files.isRegularFile(Path.of(directory.strip()).resolve("nvidia-smi.exe"));
+            return Files.isRegularFile(Path.of(directory.strip()).resolve(io.justsearch.configuration.NativeTargets.current().executableName("nvidia-smi")));
           } catch (RuntimeException invalid) {
             return false;
           }

@@ -208,8 +208,22 @@ function captureSpawnedIdentity(child, { exec = spawnSync, platform = process.pl
  */
 function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeoutMs = 10000,
   birthTick = ledgerLib.BIRTH_TICKS.MICROSECOND } = {}) {
-  if (linuxIdentity(creationFileTime)) return Promise.resolve(creationFileTime.pid === pid
-    ? signalLinuxProcess(creationFileTime) : { ok: false, outcome: 'unknown-identity', status: null });
+  const linux = linuxIdentity(creationFileTime);
+  if (linux) return (async () => {
+    if (linux.pid !== pid) return { ok: false, outcome: 'unknown-identity', status: null };
+    const result = signalLinuxProcess(linux);
+    if (!result.ok) return result;
+    // Sending SIGKILL is asynchronous. As with the Windows handle backend, don't report a
+    // completed termination until this exact identity has ended; an unreadable birth stays unknown.
+    const deadline = performance.now() + timeoutMs;
+    do {
+      const seen = readLinuxProcess(pid);
+      if (seen?.present === false || (seen?.processIdentity &&
+          (seen.processIdentity.bootId !== linux.bootId || seen.processIdentity.startTicks !== linux.startTicks))) return result;
+      await new Promise(resolve => setTimeout(resolve, 5));
+    } while (performance.now() < deadline);
+    return { ...result, ok: false, outcome: 'timeout', reason: 'Recorded process exit was not confirmed' };
+  })();
   return new Promise((resolve) => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', TERMINATE_SCRIPT,
       '-Pid', String(pid), '-CreationFileTimeUtc', String(creationFileTime), '-Code', String(code >>> 0),
@@ -729,7 +743,8 @@ function createCliEngineRecorder({
 
   return {
     /** The writer identity this recorder writes as (role, PID, start instant), once it has written; else null. */
-    writerIdentity: () => (writerIdentity ? { ...writerIdentity } : null),
+    writerIdentity: () => (writerIdentity ? { ...writerIdentity,
+      ...(writer.writer.processIdentity ? { processIdentity: { ...writer.writer.processIdentity } } : {}) } : null),
 
     /** Before acting: `COOPERATIVE` over `HTTP_SHUTDOWN`, or `NOW` over `TERMINATE`. */
     intent({ reason = 'QUIT', detail = null, mode, channel, deadlineAt = null }) {

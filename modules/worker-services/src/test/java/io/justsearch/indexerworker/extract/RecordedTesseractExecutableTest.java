@@ -15,32 +15,34 @@ import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Isolated process environments exercise actual PATH precedence and actual native launches. */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 class RecordedTesseractExecutableTest {
   @TempDir Path data;
 
-  @Test void scoopPathLaunchesRealExecutable() throws Exception { run("shim"); }
-  @Test void commandOnPathIsNeverLaunched() throws Exception { run("cmd"); }
+  @Test @EnabledOnOs(OS.WINDOWS) void scoopPathLaunchesRealExecutable() throws Exception { run("shim"); }
+  @Test @EnabledOnOs(OS.WINDOWS) void commandOnPathIsNeverLaunched() throws Exception { run("cmd"); }
   @Test void repeatedLaunchesReuseRecordedResolution() throws Exception { run("cache"); }
   @Test void statusReportsExecutableSource() throws Exception { run("status"); }
   @Test void configuredWinsAndInvalidConfiguredDoesNotFallBack() throws Exception { run("configured"); }
   @Test void appOwnedWinsOverPath() throws Exception { run("app-owned"); }
   @Test void runtimeRestoreInvalidatesTheRecord() throws Exception { run("restore"); }
-  @Test void transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock() throws Exception { run("wrappers"); }
+  @Test @EnabledOnOs(OS.WINDOWS) void transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock() throws Exception { run("wrappers"); }
 
   private void run(String scenario) throws Exception {
     Path real = NativeTesseractFixture.write(data.resolve("real"), "REAL", true);
     Path shimDirectory = Files.createDirectories(data.resolve("path"));
-    Path shim = shimDirectory.resolve("tesseract.exe");
-    Files.copy(NativeTesseractFixture.write(data.resolve("launcher"), "LAUNCHER", true), shim);
-    Files.writeString(shimDirectory.resolve("tesseract.shim"), "path = \"" + real + "\"\n", StandardCharsets.UTF_8);
+    Path shim = shimDirectory.resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract"));
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) Files.createSymbolicLink(shim, real);
+    else Files.copy(NativeTesseractFixture.write(data.resolve("launcher"), "LAUNCHER", true), shim);
+    if (io.justsearch.configuration.PlatformPaths.isWindows())
+      Files.writeString(shimDirectory.resolve("tesseract.shim"), "path = \"" + real + "\"\n", StandardCharsets.UTF_8);
     Path home = Files.createDirectories(data.resolve("home"));
-    Path owned = home.resolve("native-bin/tesseract/tesseract.exe");
+    Path owned = home.resolve("native-bin/tesseract").resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract"));
     if (scenario.equals("app-owned") || scenario.equals("configured")) {
       Files.createDirectories(owned.getParent()); Files.copy(real, owned);
     }
     if (scenario.equals("restore")) {
-      Files.delete(shimDirectory.resolve("tesseract.shim"));
+      if (io.justsearch.configuration.PlatformPaths.isWindows()) Files.delete(shimDirectory.resolve("tesseract.shim"));
       Files.copy(real, shim, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
     if (scenario.equals("cmd")) {
@@ -58,7 +60,7 @@ class RecordedTesseractExecutableTest {
     env.put("LOCALAPPDATA", data.resolve("localappdata").toString());
     Process process = builder.start();
     var held = ProcessTerminator.forCurrentOs().open(process);
-    String birth = held.creationFileTime().orElseThrow();
+    Object birth = io.justsearch.configuration.PlatformPaths.isLinux() ? held.processIdentity() : held.creationFileTime().orElseThrow();
     try {
       assertTrue(process.waitFor(60, TimeUnit.SECONDS), "probe timeout " + process.pid() + "/" + birth);
       assertEquals(0, process.exitValue(), Files.readString(data.resolve("probe.log"), StandardCharsets.UTF_8));
@@ -69,15 +71,15 @@ class RecordedTesseractExecutableTest {
   public static class Probe {
     public static void main(String[] args) throws Exception {
       String scenario = args[0]; Path data = Path.of(args[1]);
-      Path real = data.resolve("real/tesseract.exe").toRealPath();
-      Path owned = data.resolve("home/native-bin/tesseract/tesseract.exe");
+      Path real = data.resolve("real").resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract")).toRealPath();
+      Path owned = data.resolve("home/native-bin/tesseract").resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract"));
       OcrRoutingConfig config = new OcrRoutingConfig(true, List.of("eng"), 5000, 1, 4096, 40000000, 72, 0);
       switch (scenario) {
         case "shim" -> {
           assertLaunches(real, data, config);
           var chosen = TikaOcrRuntime.resolve();
           assertEquals(real, chosen.executable(), "PATH shim must record the real executable");
-          assertEquals(data.resolve("path/tesseract.exe"), chosen.getClass().getMethod("launcher").invoke(chosen));
+          assertEquals(data.resolve("path").resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract")), chosen.getClass().getMethod("launcher").invoke(chosen));
           assertEquals("PATH", chosen.getClass().getMethod("source").invoke(chosen));
           var at = (java.time.Instant) chosen.getClass().getMethod("resolvedAt").invoke(chosen);
           assertNotNull(at); assertFalse(at.isAfter(java.time.Instant.now()), "recorded resolution time");
@@ -131,7 +133,7 @@ class RecordedTesseractExecutableTest {
         }
         case "app-owned" -> { assertEquals(owned.toRealPath(), TikaOcrRuntime.resolve().executable()); }
         case "restore" -> {
-          Path pathExecutable = data.resolve("path/tesseract.exe").toRealPath();
+          Path pathExecutable = data.resolve("path").resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract")).toRealPath();
           assertEquals(pathExecutable, TikaOcrRuntime.resolve().executable());
           Files.createDirectories(owned.getParent()); Files.copy(real, owned);
           assertEquals(owned.toRealPath(), TikaOcrRuntime.resolve().executable(), "runtime installation invalidates PATH selection");
@@ -147,8 +149,8 @@ class RecordedTesseractExecutableTest {
           Files.writeString(ambiguous, "@echo off\n@\"" + real + "\" %*\necho side-effect\n");
           System.setProperty("justsearch.tesseract.path", ambiguous.toString());
           assertFalse(TikaOcrRuntime.resolve().available(), "ambiguous batch is unavailable");
-          System.setProperty("justsearch.tesseract.path", data.resolve("path/tesseract.exe").toString());
-          Files.writeString(data.resolve("path/tesseract.shim"), "path = \"" + data.resolve("path/tesseract.exe") + "\"\n");
+          System.setProperty("justsearch.tesseract.path", data.resolve("path").resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract")).toString());
+          Files.writeString(data.resolve("path/tesseract.shim"), "path = \"" + data.resolve("path").resolve(io.justsearch.configuration.NativeTargets.current().executableName("tesseract")) + "\"\n");
           assertFalse(TikaOcrRuntime.resolve().available(), "shim cycle is unavailable");
         }
         default -> throw new AssertionError(scenario);

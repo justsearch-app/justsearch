@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class OwnedHelperRollbackTest {
   @Test void failedRollbackReturnsTheExactSurvivor() throws Exception {
     var exited = new java.util.concurrent.CompletableFuture<Process>();
@@ -37,13 +37,14 @@ final class OwnedHelperRollbackTest {
   }
 
   @Test void failedHandleAcquisitionRollsBackSpawn() throws Exception {
-    Process raw = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive",
-        "-Command", "Start-Sleep -Seconds 30").redirectOutput(ProcessBuilder.Redirect.DISCARD)
+    Process raw = new ProcessBuilder(io.justsearch.configuration.PlatformPaths.isWindows()
+        ? java.util.List.of("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 30")
+        : FakeChild.argv("sleep")).redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .redirectError(ProcessBuilder.Redirect.DISCARD).start();
     var os = ProcessTerminator.forCurrentOs();
-    String birth = os.creationFileTime(raw.pid()).orElseThrow();
     var cleanup = os.open(raw);
-    assertEquals(birth, cleanup.creationFileTime().orElseThrow());
+    Object birth = io.justsearch.configuration.PlatformPaths.isLinux()
+        ? cleanup.processIdentity().orElseThrow() : cleanup.creationFileTime().orElseThrow();
     System.out.println("fixture-start=" + raw.pid() + "/" + birth);
     // Only handle acquisition sees an invalid PID. Rollback retains the original spawn object.
     Process failedOpen = new Process() {
@@ -60,7 +61,8 @@ final class OwnedHelperRollbackTest {
       @Override public int exitValue() { return raw.exitValue(); }
       @Override public void destroy() { destroyForcibly(); }
       @Override public Process destroyForcibly() {
-        assertEquals(birth, cleanup.creationFileTime().orElseThrow());
+        assertEquals(birth, io.justsearch.configuration.PlatformPaths.isLinux()
+            ? cleanup.processIdentity().orElseThrow() : cleanup.creationFileTime().orElseThrow());
         cleanup.terminate(os.ourCode()); return this;
       }
     };
@@ -69,7 +71,8 @@ final class OwnedHelperRollbackTest {
       assertFalse(raw.isAlive(), "failed registration must roll back the exact spawn before returning");
     } finally {
       if (raw.isAlive()) {
-        assertEquals(birth, cleanup.creationFileTime().orElseThrow());
+        assertEquals(birth, io.justsearch.configuration.PlatformPaths.isLinux()
+            ? cleanup.processIdentity().orElseThrow() : cleanup.creationFileTime().orElseThrow());
         cleanup.terminate(os.ourCode());
       }
       assertTrue(cleanup.awaitExit(Duration.ofSeconds(5)));

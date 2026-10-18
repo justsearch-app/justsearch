@@ -58,7 +58,7 @@ pub fn resolve_data_dir() -> PathBuf {
     explicit_data_dir().unwrap_or_else(platform_default)
 }
 
-/// The shell uses only the explicit contract override, preserving its historical Tauri default.
+/// Non-shell tools honor this override. The desktop shell keeps Tauri's platform app-data directory.
 pub fn explicit_data_dir() -> Option<PathBuf> {
     if let Ok(env_val) = env::var("JUSTSEARCH_DATA_DIR") {
         let trimmed = env_val.trim();

@@ -141,11 +141,16 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
       }
       Path filesystemRoot = Path.of(unescape(fields[3]));
       Path point = Path.of(unescape(fields[4]));
-      if (!filesystemRoot.isAbsolute() || !point.isAbsolute()) {
+      String type = fields[separator + 1];
+      // nsfs binds namespace objects, not filesystem directories (e.g. mnt:[4026533644]).
+      // Preserve that mount in the topology without granting it a filesystem identity.
+      boolean namespaceObject = "nsfs".equals(type)
+          && filesystemRoot.toString().matches("[a-z][a-z0-9_]*:\\[[0-9]+\\]");
+      if (!point.isAbsolute() || (!filesystemRoot.isAbsolute() && !namespaceObject)) {
         throw new IOException("Nonabsolute Linux mountinfo path");
       }
       mounts.add(new Mount(fields[0], fields[1], fields[2], filesystemRoot, point,
-          fields[separator + 1], unescape(fields[separator + 2])));
+          type, unescape(fields[separator + 2])));
     }
     return mounts;
   }
@@ -188,6 +193,7 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
   }
 
   static String volume(Mount mount, Path uuidDirectory, long device) throws IOException {
+    if (!mount.filesystemRoot().isAbsolute()) return null;
     Long sourceDevice = null;
     Path source = Path.of(mount.source());
     if (source.isAbsolute()) {

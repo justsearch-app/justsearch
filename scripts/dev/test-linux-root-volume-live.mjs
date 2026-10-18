@@ -114,6 +114,7 @@ async function mount(stage) {
   record('mounted', { stage, device: fs.statSync(point).dev });
 }
 
+const failures = [];
 try {
   // The outer devstack lock is the admission lease; quick_health also exercises the read surface.
   await quickHealth();
@@ -174,10 +175,9 @@ try {
     assert(fs.existsSync(path.join(campaign, `${stage}.passed`)), `missing evidence for ${stage}`);
     record('pass', { stage });
   }
-} finally {
+} catch (error) { failures.push(error); } finally {
   // The test JVM has ended before any mount is removed. Never discover kill authority by PID/name.
   assert(!testProcess || testFinished, 'test process must exit before mount cleanup');
-  const failures = [];
   try { await unmount(); } catch (error) { failures.push(error); }
   if (!mounted) {
     for (const { device, image } of [...loops.values()].reverse()) {
@@ -192,5 +192,5 @@ try {
   }
   fs.writeFileSync(path.join(campaign, 'evidence.json'), JSON.stringify(evidence, null, 2));
   console.log(`Evidence: ${campaign}`);
-  if (failures.length) throw new AggregateError(failures, 'disposable mount cleanup failed');
 }
+if (failures.length) throw new AggregateError(failures, 'root-volume campaign or disposable mount cleanup failed');

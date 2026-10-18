@@ -94,7 +94,6 @@ for (const fixture of ['own-stack-checkout', 'worktree-run-record', 'gate-integr
 }
 
 test('instrumented fixture kill refuses a process without a spawn-recorded identity', () => {
-  if (process.platform !== 'win32') return;
   const { ChildProcess } = require('node:child_process');
   assert.throws(() => ChildProcess.prototype.kill.call({ pid, exitCode: null, signalCode: null }),
     /without a spawn-recorded identity refused/);

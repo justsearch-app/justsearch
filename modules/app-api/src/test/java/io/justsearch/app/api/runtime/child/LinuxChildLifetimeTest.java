@@ -85,6 +85,18 @@ final class LinuxChildLifetimeTest {
     } finally { process.destroyForcibly(); assertTrue(process.waitFor(2, TimeUnit.SECONDS)); }
   }
 
+  @Test void completedBoundChildKeepsItsBirthOnTheOriginalSpawnObject() throws Exception {
+    Process process = BoundChildProcess.start(new ProcessBuilder(FakeChild.argv("exit:0:100")));
+    var original = LinuxProcessIdentity.read(process.pid()).orElseThrow();
+    assertTrue(process.waitFor(5, TimeUnit.SECONDS));
+    var held = ProcessTerminator.forCurrentOs().open(process);
+    try {
+      assertEquals(Optional.of(original), held.processIdentity(),
+          "reaping must not erase the original birth before a caller acquires its receipt");
+      assertEquals(0, held.exitCode().orElseThrow());
+    } finally { held.close(); }
+  }
+
   @Test void badBootOrStartNeverSignalsForeignProcessButExactTupleDoes() throws Exception {
     Process decoy = new ProcessBuilder("/bin/sleep", "60").start();
     var identity = LinuxProcessIdentity.read(decoy.pid()).orElseThrow();

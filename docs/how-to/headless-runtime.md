@@ -30,7 +30,13 @@ From an installed bundle (the launcher sits next to `ui-headless.jar`):
 justsearch-headless.cmd mcp-lite
 ```
 
-or with PowerShell:
+On Linux, from an installed Gradle distribution, use its native launcher:
+
+```sh
+JUSTSEARCH_MODE=mcp-lite /absolute/path/to/ui/bin/ui
+```
+
+On Windows, the PowerShell form is:
 
 ```powershell
 .\justsearch-headless.ps1 -Mode mcp-lite
@@ -43,10 +49,23 @@ set JUSTSEARCH_DATA_DIR=%LOCALAPPDATA%\JustSearch\data
 set JUSTSEARCH_HOME=%APPDATA%\io.justsearch.shell
 ```
 
+On Linux, set the corresponding paths in Bash before invoking the launcher:
+
+```sh
+export JUSTSEARCH_DATA_DIR=/absolute/path/to/engine-data
+export JUSTSEARCH_HOME=/absolute/path/to/ai-assets
+```
+
+The desktop shell retains its platform app-data directory. On Linux its private
+test location is selected with `XDG_DATA_HOME`; `JUSTSEARCH_DATA_DIR` remains a
+headless/dev override and does not relocate the desktop shell's saved data or
+its delete-data target. The shell passes its selected directory to the Engine,
+which publishes the runtime manifest there for the UI/tools.
+
 ### From a dev checkout
 
 ```bash
-./gradlew.bat :modules:ui:runHeadless -Pmode=mcp-lite
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:runHeadless -Pmode=mcp-lite
 ```
 
 `-Pmode` sets `-Djustsearch.mode`; omit it for `full-desktop`. The equivalent environment

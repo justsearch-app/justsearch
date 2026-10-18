@@ -943,6 +943,18 @@ Start-Process powershell -WindowStyle Hidden -ArgumentList @(
 )
 ```
 
+On Linux, from `scripts/jseval` with the supported Python environment activated,
+start a separate session and redirect all terminal handles:
+
+```sh
+mkdir -p tmp
+setsid sh -c 'python -m jseval run --dataset scifact --output-dir tmp/run1; status=$?; printf "%s\n" "$status" > tmp/run1.done' > tmp/run1.launch.log 2>&1 < /dev/null &
+```
+
+`setsid` is provided by util-linux. The Python process remains the owner of its
+bound backend runner for the duration of the campaign; use jseval's own cleanup
+rather than signalling a PID copied from a log.
+
 Then wait on the `tmp/run1.done` marker with the `Monitor` tool, and read results
 from the run's `--output-dir` (`tmp/run1`) — do **not** parse the process's
 redirected stdout/stderr: PowerShell 5.1 writes those UTF-16 and wraps stderr

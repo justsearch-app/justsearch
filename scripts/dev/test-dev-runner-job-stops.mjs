@@ -13,10 +13,10 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
-// Every case exercises a real Windows job, native creation identity or console Ctrl+C.
-// Keep the full suite on Windows; these prerequisites do not exist on the Ubuntu runner.
-if (process.platform !== 'win32') {
-  console.log('job-stops: SKIP (Windows job objects, process creation identities and console events)');
+// Actual Windows console events stay Windows-only. Run membership, readiness failure, ordered
+// quit, data isolation and stranger safety use the shared native backend on both platforms.
+if (!['win32', 'linux'].includes(process.platform)) {
+  console.log('job-stops: SKIP (no native process-identity backend)');
   process.exit(0);
 }
 
@@ -24,14 +24,19 @@ const require = createRequire(import.meta.url);
 const repo = path.resolve(import.meta.dirname, '../..');
 const actuator = require('./lib/engine-actuator.cjs');
 const { identityExecutable } = require('./lib/test-fixture-processes.cjs');
+const nativeIdentity = require('./lib/process-identity.cjs');
+const { nativeTarget } = require('../lib/native-targets.cjs');
 const tests = [], decoys = [], logged = [];
-const test = (name, fn) => tests.push([name, fn]);
+const test = (name, fn, windowsOnly = false) => tests.push([name, fn, windowsOnly]);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'job-stops-'));
 
 const FIXTURE_COMMON = `const cp=require('child_process'),fs=require('fs');
-const own=cp.spawnSync(process.env.FIXTURE_IDENTITY_EXE,[String(process.pid)],{encoding:'utf8',windowsHide:true}).stdout.trim();
-const note=(role,pid,birth)=>fs.appendFileSync(process.env.FIXTURE_LOG,JSON.stringify({role,pid,creationFileTimeUtc:birth})+'\\n');
+const native=process.platform==='linux'?require(process.env.FIXTURE_NATIVE_MODULE):null;
+const own=native?null:cp.spawnSync(process.env.FIXTURE_IDENTITY_EXE,[String(process.pid)],{encoding:'utf8',windowsHide:true}).stdout.trim();
+const processIdentity=native?native.readLinuxProcess(process.pid).processIdentity:null;
+const spawnChild=native?require(process.env.FIXTURE_JOB_MODULE).spawnBoundChild:cp.spawn;
+const note=(role,pid,birth)=>fs.appendFileSync(process.env.FIXTURE_LOG,JSON.stringify({role,pid,creationFileTimeUtc:birth,...(processIdentity?{processIdentity}:{})})+'\\n');
 setTimeout(()=>process.exit(0),120000).unref();
 const keep=setInterval(()=>{},1000);
 `;
@@ -65,12 +70,12 @@ s.statusCode=q.url.startsWith('/api/status')?200:404;s.end('{}')}).listen(Number
 function fixtureSources() {
   const vite = `${FIXTURE_COMMON}note('vite',process.pid,own);
 // Vite starts helpers of its own (the esbuild service): a non-detached child here.
-cp.spawn(process.execPath,['-e',${JSON.stringify(HELPER)},'vite-helper'],{stdio:'ignore',windowsHide:true});
+spawnChild(process.execPath,['-e',${JSON.stringify(HELPER)},'vite-helper'],{stdio:'ignore',windowsHide:true});
 if(process.env.FIXTURE_VITE_MODE==='exit-on-stop'){setInterval(()=>{if(fs.existsSync(process.env.FIXTURE_STOP))process.exit(0)},50)}
 `;
   const backend = `${FIXTURE_COMMON}note('backend',process.pid,own);
 // Gradle's application run, detached from the client as Gradle's own daemon is.
-const app=cp.spawn(process.execPath,['-e',${JSON.stringify(HELPER)},'backend-app'],{stdio:'ignore',detached:true,windowsHide:true});app.unref();
+const app=spawnChild(process.execPath,['-e',${JSON.stringify(HELPER)},'backend-app'],{stdio:'ignore',detached:true,windowsHide:true});app.unref();
 if(process.env.FIXTURE_BACKEND_MODE==='engine'){${ENGINE_FIXTURE}}else{
 require('http').createServer((q,s)=>{s.statusCode=q.url.startsWith('/api/status')?200:404;s.end('{}')}).listen(Number(process.env.JUSTSEARCH_API_PORT),'127.0.0.1');
 }
@@ -88,6 +93,11 @@ function fakeRepository(name) {
     fs.mkdirSync(path.dirname(path.join(fake, file)), { recursive: true });
     fs.copyFileSync(path.join(repo, file), path.join(fake, file));
   }
+  if (process.platform === 'linux') {
+    const helper = path.join(fake, 'modules/ui/build/install/ui', nativeTarget().paths['bound-exec']);
+    fs.mkdirSync(path.dirname(helper), { recursive: true });
+    fs.copyFileSync(nativeIdentity.boundExecPath(), helper);
+  }
   const ui = path.join(fake, 'modules/ui-web');
   const { vite, backend } = fixtureSources();
   fs.writeFileSync(path.join(ui, 'package.json'), JSON.stringify({ name: 'fixture-ui', private: true, scripts: { dev: 'vite' } }));
@@ -98,6 +108,8 @@ function fakeRepository(name) {
   fs.writeFileSync(path.join(ui, 'node_modules/.bin/vite.cmd'), `@echo off\r\n"${process.execPath}" "%~dp0..\\vite\\bin\\vite.js" %*\r\n`);
   fs.writeFileSync(path.join(fake, 'fixture-backend.js'), backend);
   fs.writeFileSync(path.join(fake, 'gradlew.bat'), `@echo off\r\n"${process.execPath}" "%~dp0fixture-backend.js" %*\r\n`);
+  if (process.platform === 'linux') fs.writeFileSync(path.join(fake, 'gradlew'),
+    '#!/bin/sh\nexec ' + [process.execPath, path.join(fake, 'fixture-backend.js')].map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(' ') + ' \"$@\"\n', { mode: 0o755 });
   return fake;
 }
 
@@ -107,7 +119,9 @@ function fixtureEnv(name, extra = {}) {
   return {
     dir,
     env: { ...process.env, NODE_OPTIONS: '', npm_config_offline: 'true', npm_config_update_notifier: 'false',
-      FIXTURE_IDENTITY_EXE: identityExecutable(), FIXTURE_LOG: path.join(dir, 'fixture.log'),
+      FIXTURE_IDENTITY_EXE: process.platform === 'win32' ? identityExecutable() : '',
+      FIXTURE_NATIVE_MODULE: path.join(repo, 'scripts/dev/lib/process-identity.cjs'),
+      FIXTURE_JOB_MODULE: path.join(repo, 'scripts/dev/lib/job-run.cjs'), FIXTURE_LOG: path.join(dir, 'fixture.log'),
       JUSTSEARCH_JOB_RECORD_DIR: path.join(dir, 'job-runs'), JUSTSEARCH_DEV_RUNNER_STATE_ROOT: path.join(dir, 'dev-runner'),
       ...extra },
   };
@@ -122,7 +136,7 @@ function snapshotRecords(dir, seen) {
     if (!name.endsWith('.json')) continue;
     try {
       const record = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
-      for (const p of [record.root, ...(record.members ?? [])]) if (p?.pid) seen.set(`${p.pid}:${p.creationFileTimeUtc}`, p);
+      for (const p of [record.root, ...(record.members ?? [])]) if (p?.pid) seen.set(`${p.pid}:${p.processIdentity ? p.processIdentity.bootId + ':' + p.processIdentity.startTicks : p.creationFileTimeUtc}`, p);
     } catch { /* mid-replace: the next read sees it */ }
   }
   return seen;
@@ -136,6 +150,12 @@ async function stillRunning(identities, waitMs = 5000) {
     assert.ok(rows, 'the process table must be readable');
     const alive = identities.filter(p => {
       const row = rows.get(p.pid);
+      if (process.platform === 'linux') {
+        if (!row?.present) return false;
+        const expected = nativeIdentity.linuxIdentity(p), seen = nativeIdentity.linuxIdentity(row);
+        assert.ok(expected && seen, 'live process identity must be readable: ' + JSON.stringify({ p, row }));
+        return expected.bootId === seen.bootId && expected.startTicks === seen.startTicks;
+      }
       return row?.present && row.creationFileTime && BigInt(row.creationFileTime) / 10n === BigInt(p.creationFileTimeUtc) / 10n;
     });
     if (!alive.length || Date.now() > end) return alive;
@@ -264,8 +284,66 @@ Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; pu
 [Console]::Out.WriteLine([FixtureCtrlC]::Send([uint32]$Target))
 `;
 
+// A private controlling terminal delivers the real POSIX Ctrl+C to its foreground group.
+// The terminal FD grants the signal target; no PID/group-name lookup authorizes a signal.
+async function startInLinuxTerminal(name, args, { cwd, env }) {
+  const dir = path.join(root, `${name}-console`); fs.mkdirSync(dir, { recursive: true });
+  const files = { log: path.join(dir, 'output.log'), pidFile: path.join(dir, 'child.pid'),
+    exitFile: path.join(dir, 'exit.code'), interrupt: path.join(dir, 'ctrl-c') };
+  const program = String.raw`import os,pty,sys,json,pathlib,select,time,signal
+s=json.loads(sys.argv[1]);pid,master=pty.fork()
+if pid==0:
+ os.execve(s['helper'],[s['helper'],'exec',str(os.getppid()),'--',s['command']]+s['args'],os.environ)
+fd=os.pidfd_open(pid);reaped=False;interrupted=False;code=9
+pathlib.Path(s['pidFile']).write_text(str(pid))
+try:
+ with open(s['log'],'wb',buffering=0) as log:
+  until=time.monotonic()+180
+  while time.monotonic()<until:
+   if not interrupted and pathlib.Path(s['interrupt']).exists():
+    os.write(master,b'\x03');interrupted=True
+   if select.select([master],[],[],.02)[0]:
+    try:
+     data=os.read(master,65536)
+     if data:log.write(data)
+    except OSError:pass
+   child,status=os.waitpid(pid,os.WNOHANG)
+   if child:reaped=True;code=os.waitstatus_to_exitcode(status);break
+finally:
+ if not reaped:
+  signal.pidfd_send_signal(fd,signal.SIGKILL);os.waitpid(pid,0)
+ os.close(fd);os.close(master)
+pathlib.Path(s['exitFile']).write_text(str(code))
+sys.exit(0 if code==0 else 1)
+`;
+  const launcher = spawn('python3', ['-c', program, JSON.stringify({ ...files, command: process.execPath,
+    helper: nativeIdentity.boundExecPath(), args })], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  logged.push(launcher.recordedIdentity);
+  const output = collect(launcher);
+  let pid = 0;
+  for (const end = Date.now() + 10000; !pid && Date.now() < end;) {
+    try { pid = Number(fs.readFileSync(files.pidFile, 'utf8')); } catch { await sleep(20); }
+  }
+  assert.ok(pid > 0, 'terminal command started: ' + output());
+  const identity = { pid, ...nativeIdentity.readLinuxProcess(pid) };
+  assert.ok(identity.processIdentity, 'terminal command native identity is readable');
+  logged.push(identity);
+  return { identity,
+    output: () => { try { return fs.readFileSync(files.log, 'utf8'); } catch { return output(); } },
+    exitCode: () => { try { return Number(fs.readFileSync(files.exitFile, 'utf8')); } catch { return null; } },
+    ctrlC() { fs.writeFileSync(files.interrupt, ''); },
+    async waitExit(ms) {
+      for (const end = Date.now() + ms; Date.now() < end;) { if (this.exitCode() !== null) {
+        await waitExit(launcher, 5000); return this.exitCode();
+      } await sleep(50); }
+      assert.fail('terminal command did not exit: ' + this.output());
+    },
+  };
+}
+
 /** Starts `node <args>` in its own hidden console; returns its identity, exit code and output. */
 async function startInConsole(name, args, { cwd, env }) {
+  if (process.platform === 'linux') return startInLinuxTerminal(name, args, { cwd, env });
   const dir = path.join(root, `${name}-console`); fs.mkdirSync(dir, { recursive: true });
   const launcher = path.join(dir, 'launcher.ps1'); fs.writeFileSync(launcher, CONSOLE_LAUNCHER);
   const files = { log: path.join(dir, 'output.log'), pidFile: path.join(dir, 'child.pid'), exitFile: path.join(dir, 'exit.code') };
@@ -468,18 +546,27 @@ test('serve-worktree-fe: a console Ctrl+C ends Vite and its helper and leaves no
 });
 
 test('a run stop never touches a process outside the run: a recycled-looking PID or the same image name', async () => {
-  const stopper = path.join(repo, 'scripts/dev/lib/stop-job-run.ps1');
-  assert.ok(fs.existsSync(stopper), 'the run stop must exist: scripts/dev/lib/stop-job-run.ps1');
+  if (process.platform === 'win32') {
+    const stopper = path.join(repo, 'scripts/dev/lib/stop-job-run.ps1');
+    assert.ok(fs.existsSync(stopper), 'the run stop must exist: scripts/dev/lib/stop-job-run.ps1');
+  } else assert.ok(fs.existsSync(nativeIdentity.boundExecPath()), 'the Linux pidfd stop backend exists');
   const jobRun = require('./lib/job-run.cjs');
   const decoy = startDecoy();
   const identity = decoy.recordedIdentity;
-  // The decoy's live PID under a birth one second earlier: what a recycled PID looks like to a record.
-  const stale = String(BigInt(identity.creationFileTimeUtc) - 10_000_000n);
+  // The decoy's live PID under an earlier birth: a reused PID must never authorize a signal.
+  const native = process.platform === 'linux';
+  const stale = native ? { ...identity.processIdentity,
+    startTicks: String(BigInt(identity.processIdentity.startTicks) - 1n) }
+    : String(BigInt(identity.creationFileTimeUtc) - 10_000_000n);
+  const staleIdentity = native ? { pid: decoy.pid, processIdentity: stale }
+    : { pid: decoy.pid, creationFileTimeUtc: stale };
   const dir = path.join(root, 'recycled'); fs.mkdirSync(dir, { recursive: true });
   const recordPath = path.join(dir, 'run.json');
-  fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1', pid: decoy.pid, creationFileTimeUtc: stale,
-    root: { pid: decoy.pid, creationFileTimeUtc: stale }, members: [{ pid: decoy.pid, creationFileTimeUtc: stale }], state: 'running' }));
-  const recycled = jobRun.stopJobRunSync({ recordPath, host: { pid: decoy.pid, creationFileTimeUtc: stale } }, { waitMs: 1000 });
+  fs.writeFileSync(recordPath, JSON.stringify(native
+    ? { backend: 'linux-bound-child-v1', pid: decoy.pid, root: staleIdentity, members: [staleIdentity], state: 'running' }
+    : { schema: 'justsearch-job-run.v1', pid: decoy.pid, creationFileTimeUtc: stale,
+      root: { pid: decoy.pid, creationFileTimeUtc: stale }, members: [{ pid: decoy.pid, creationFileTimeUtc: stale }], state: 'running' }));
+  const recycled = jobRun.stopJobRunSync({ recordPath, host: staleIdentity }, { waitMs: 1000 });
   assert.equal(recycled.outcome, 'gone', 'a recorded PID that now shows another birth is not the run: ' + JSON.stringify(recycled));
   assert.deepEqual(await stillRunning([identity], 0), [identity], 'the process now holding that PID is never touched');
 
@@ -495,17 +582,23 @@ test('a run stop never touches a process outside the run: a recycled-looking PID
   assert.deepEqual(await stillRunning([identity], 0), [identity], 'the decoy node.exe outside the run is never touched');
 });
 
-let failed = 0;
+let failed = 0, skipped = 0;
 try {
-  for (const [name, fn] of tests) {
+  for (const [name, fn, windowsOnly] of tests) {
+    if (windowsOnly && process.platform !== 'win32') {
+      skipped++; console.log(`SKIP ${name}: Windows console control event API; Linux: native ordered-quit case here, test-dev-runner-linux-bound-child and test-linux-dev-workflow`); continue;
+    }
     try { await fn(); console.log(`PASS ${name}`); }
     catch (error) { failed++; console.error(`FAIL ${name}: ${error.stack}`); }
   }
 } finally {
   // Only identities this harness or its fixtures recorded at start, each by its own birth.
-  for (const p of logged) spawnSync(identityExecutable(), [String(p.pid), p.creationFileTimeUtc], { windowsHide: true });
+  for (const p of logged) {
+    if (process.platform === 'linux') nativeIdentity.signalLinuxProcess(p.processIdentity);
+    else spawnSync(identityExecutable(), [String(p.pid), p.creationFileTimeUtc], { windowsHide: true });
+  }
   for (const decoy of decoys) if (decoy.exitCode === null) decoy.kill();
   fs.rmSync(root, { recursive: true, force: true });
 }
-console.log(`job-stops: ${tests.length - failed}/${tests.length} passed`);
+console.log(`job-stops: ${tests.length - failed - skipped}/${tests.length - skipped} passed, ${skipped} skipped`);
 process.exitCode = failed ? 1 : 0;

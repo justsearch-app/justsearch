@@ -22,7 +22,8 @@ const { stopRun, acquireAdmission, holderBlockFor, resolveCallerIdentity } = req
 const tests = [], children = [];
 const extraOwned = [];
 const test = (name, fn, windowsOnly = false) => tests.push([name, fn, windowsOnly]);
-const windowsNative = (name, fn) => test(name, fn, true);
+const windowsNative = (name, fn) => test(name, fn);
+const windowsMechanism = (name, fn) => test(name, fn, true);
 const pid = 987654, birth = '134000000000000000';
 function fixture(name, extra = {}) {
   const run = { runId: name, holder: holderBlockFor(resolveCallerIdentity('recovery-owner')), pids: { frontendRootPid: pid },
@@ -169,7 +170,7 @@ test('dev-all birth capture finishes in the spawn turn before stop', () => {
   assert.equal(calls[0]?.[0]?.host?.creationFileTimeUtc, birth, 'stop immediately after spawn must carry the birth');
 });
 let exitedWrapper;
-windowsNative('spawn capture retains the exited wrapper identity, and its identity stop ends nothing else', () => {
+windowsMechanism('spawn capture retains the exited wrapper identity, and its identity stop ends nothing else', () => {
   const proof = path.join(root, 'exited-wrapper.json');
   const identityExe = process.platform === 'win32' ? require('./lib/test-fixture-processes.cjs').identityExecutable() : null;
   const code = `const cp=require('child_process'),fs=require('fs'); const child=cp.spawn(process.execPath,['-e','setTimeout(()=>{},120000)'],{stdio:'ignore',detached:true,windowsHide:true}); const r=cp.spawnSync(${JSON.stringify(identityExe)},[String(child.pid)],{encoding:'utf8',windowsHide:true}); fs.writeFileSync(${JSON.stringify(proof)},JSON.stringify({pid:child.pid,creationFileTimeUtc:r.stdout.trim()})); process.exit(0);`;
@@ -189,7 +190,7 @@ windowsNative('spawn capture retains the exited wrapper identity, and its identi
   assert.equal(stopped.outcome, 'gone', JSON.stringify(stopped));
   exitedWrapper = { wrapper, captured, leaf };
 });
-windowsNative('a detached leaf of an exited wrapper does not survive its run\'s stop', async () => {
+windowsMechanism('a detached leaf of an exited wrapper does not survive its run\'s stop', async () => {
   // A dev tool's run: started through the tools' job starter when the tree has one, so the kernel adds
   // the leaf to the run's job at its creation and the run's stop ends it, without parent links. A
   // tree without it starts and stops the run as the check above does, by the wrapper's identity alone.
@@ -240,7 +241,14 @@ windowsNative('real CLI first stop resolves a frontend exiting during the stop r
   // The frontend exits by itself once the runner has taken the stop request (its quit intent is in
   // the Engine ledger), while the runner's identity-bound frontend stop is still on its way. A tree
   // stop's enumeration used to leave a fixed 400 ms margin; an identity-only stop needs this signal.
-  const frontend = `const fs=require('fs'),p=require('path');let ending=false;setInterval(()=>{if(ending)return;const root=process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT,r=p.join(root,'runs');if(!fs.existsSync(r))return;for(const id of fs.readdirSync(r)){if(!fs.existsSync(p.join(r,id,'control','stop-request.json')))continue;let run;try{run=JSON.parse(fs.readFileSync(p.join(r,id,'run.json'),'utf8'))}catch{continue}let text='';try{text=fs.readFileSync(p.join(run.dataDir,'runtime','exit-ledger','engine.v1.jsonl'),'utf8')}catch{}const taken=text.split(/\\r?\\n/).some(l=>{try{const x=JSON.parse(l);return x.type==='engine-intent'&&x.writer&&x.writer.role==='dev-runner'}catch{return false}});if(taken){ending=true;fs.writeFileSync(p.join(root,'frontend-self-exit.json'),JSON.stringify({pid:process.pid}));process.exit(0)}}},20)`;
+  const frontendReady = path.join(state, 'frontend-ready.json');
+  const frontend = process.platform === 'linux'
+    ? `const fs=require('node:fs'),p=require('node:path');const root=process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT;
+process.on('SIGTERM',()=>{const active=JSON.parse(fs.readFileSync(p.join(root,'active.json'),'utf8'));
+if(!fs.existsSync(p.join(root,'runs',active.runId,'control','stop-request.json')))return;
+fs.writeFileSync(p.join(root,'frontend-self-exit.json'),JSON.stringify({pid:process.pid}));process.exit(0)});
+fs.writeFileSync(${JSON.stringify(frontendReady)},JSON.stringify({pid:process.pid}));setInterval(()=>{},60000);`
+    : `const fs=require('fs'),p=require('path');let ending=false;setInterval(()=>{if(ending)return;const root=process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT,r=p.join(root,'runs');if(!fs.existsSync(r))return;for(const id of fs.readdirSync(r)){if(!fs.existsSync(p.join(r,id,'control','stop-request.json')))continue;let run;try{run=JSON.parse(fs.readFileSync(p.join(r,id,'run.json'),'utf8'))}catch{continue}let text='';try{text=fs.readFileSync(p.join(run.dataDir,'runtime','exit-ledger','engine.v1.jsonl'),'utf8')}catch{}const taken=text.split(/\\r?\\n/).some(l=>{try{const x=JSON.parse(l);return x.type==='engine-intent'&&x.writer&&x.writer.role==='dev-runner'}catch{return false}});if(taken){ending=true;fs.writeFileSync(p.join(root,'frontend-self-exit.json'),JSON.stringify({pid:process.pid}));process.exit(0)}}},20)`;
   const env = { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state, JUSTSEARCH_SUPERVISOR_HARNESS: '1',
     JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', JUSTSEARCH_FAKE_ENGINE_PLAN: plan, CI: '',
     JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, '--require', delayExit, path.join(repo, 'scripts/supervisor-conformance/fake-engine.mjs')]),
@@ -251,14 +259,17 @@ windowsNative('real CLI first stop resolves a frontend exiting during the stop r
     const child = spawn(process.execPath, [path.join(repo, 'scripts/dev/dev-runner.cjs'), 'start', '--json',
       '--skip-build', '--clean', 'none', '--api-port', '0', '--ui-port', '5599', '--data-dir', path.join(dataRoot, session),
       '--session-id', session, ...(takeover ? ['--takeover', 'force'] : [])], { cwd: repo, env: e, stdio: ['ignore','pipe','pipe'] });
-    const captured = spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-Process -Id ${child.pid}).StartTime.ToFileTimeUtc().ToString()`], { encoding: 'utf8', windowsHide: true });
-    const identity = { pid: child.pid, creationFileTimeUtc: captured.stdout.trim() }; children.push({ child, identity });
+    const identity = process.platform === 'linux' ? child.recordedIdentity
+      : { pid: child.pid, creationFileTimeUtc: spawnSync('powershell.exe', ['-NoProfile', '-Command',
+        `(Get-Process -Id ${child.pid}).StartTime.ToFileTimeUtc().ToString()`], { encoding: 'utf8', windowsHide: true }).stdout.trim() };
+    children.push({ child, identity });
     let output = ''; child.stdout.on('data', b => { output += b; }); child.stderr.on('data', b => { output += b; });
     return until(() => { const active = read(path.join(state, 'active.json')); const run = active?.runId ? read(path.join(state, 'runs', active.runId, 'run.json')) : null;
       if (child.exitCode !== null) return { failed: true, output };
       return active?.phase !== 'starting' && run?.pids?.runnerPid === child.pid && run?.pids?.frontendRootPid && run?.holder?.sessionId !== 'impossible' ? { child, run, active, output } : null; });
   }
   const first = await start('first'); assert.ok(!first.failed, first.output);
+  if (process.platform === 'linux') await until(() => read(frontendReady)?.pid === first.run.pids.frontendRootPid);
   const stopped = cli(['stop', '--session-id', 'first'], env);
   assert.equal(read(path.join(state, 'frontend-self-exit.json'))?.pid, first.run.pids.frontendRootPid,
     'the frontend must actually exit by itself once the runner took the stop, before the delayed Engine exit');
@@ -308,7 +319,7 @@ let failed = 0, skipped = 0;
 try {
   for (const [name, fn, windowsOnly] of tests) {
     if (windowsOnly && process.platform !== 'win32') {
-      console.log(`SKIP ${name}: Windows native process identities and job-object stops`);
+      console.log(`SKIP ${name}: Windows post-exit process handles / detached descendants in Job Objects; Linux: test-dev-runner-linux-bound-child.mjs`);
       skipped++;
       continue;
     }
@@ -324,9 +335,9 @@ finally {
       fs.writeFileSync(exitFile, 'quit');
       await until(() => child.exitCode !== null, 5000);
       await exited;
-    } else if (identity && child.exitCode === null) actuator.terminateWithCodeSync(child.pid, identity.creationFileTimeUtc, 1);
+    } else if (identity && child.exitCode === null) actuator.terminateWithCodeSync(child.pid, identity.processIdentity ?? identity.creationFileTimeUtc, 1);
   }
-  for (const p of extraOwned) actuator.terminateWithCodeSync(p.pid, p.creationFileTimeUtc, 1);
+  for (const p of extraOwned) actuator.terminateWithCodeSync(p.pid, p.processIdentity ?? p.creationFileTimeUtc, 1);
   // JSON/log-only fixture; no symlinks or junctions are created here.
   fs.rmSync(root, { recursive: true, force: true });
   fs.rmSync(dataRoot, { recursive: true, force: true });

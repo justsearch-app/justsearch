@@ -429,8 +429,8 @@ await check('resolveNodeModulesRealPath resolves through the junction, and repor
   assert.equal(await resolveNodeModulesRealPath(null), null);
 });
 
-if (process.platform === 'win32') {
-  await check('[win32] a REAL junction: the query path resolves, and a forgotten realpath is fixed at normalize time', async () => {
+if (['win32', 'linux'].includes(process.platform)) {
+  await check('[native] a REAL directory link: the query path resolves, and a forgotten realpath is fixed at normalize time', async () => {
     // The incident shape (861 §6.2): a Vite serving a WORKTREE holds the MAIN checkout's
     // node_modules because the worktree's copy is a junction into it — and the path a build error
     // prints is the JUNCTION side. A lexical-only lookup returns false for exactly that query,
@@ -442,10 +442,10 @@ if (process.platform === 'win32') {
 
     const worktree = await makeDir();
     const junction = path.join(worktree, 'node_modules');
-    const mk = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    const mk = process.platform === 'win32' ? spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
       `New-Item -ItemType Junction -Path '${junction.replace(/'/g, "''")}' -Target '${mainNodeModules.replace(/'/g, "''")}' | Out-Null`],
-    { encoding: 'utf8' });
-    assert.equal(mk.status, 0, `junction creation failed: ${mk.stderr}`);
+    { encoding: 'utf8' }) : await fsp.symlink(mainNodeModules, junction, 'dir').then(() => ({status:0}));
+    assert.equal(mk.status, 0, `directory link creation failed: ${mk.stderr}`);
 
     const viaJunction = path.join(junction, 'lightningcss.node');
     assert.notEqual(path.resolve(viaJunction).toLowerCase(), path.resolve(held).toLowerCase(), 'fixture is only meaningful if the two spellings differ');

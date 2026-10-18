@@ -35,7 +35,7 @@ Use the [feature request template](https://github.com/justsearch-app/justsearch/
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/your-feature`)
 3. Make your changes
-4. Verify locally: `./gradlew.bat build` (compile + tests), and for frontend changes `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
+4. Verify locally: `node scripts/lib/tool-invoker.cjs gradle build` (compile + tests), and for frontend changes `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
 5. Commit your changes
 6. Push and open a pull request
 
@@ -90,11 +90,12 @@ download** — the models are fetched on first *run* of the app, not to build or
 
 ### Building
 
-```text
-# Windows                         # Dev container / Unix
-./gradlew.bat build               ./gradlew build
-./gradlew.bat build -x test       ./gradlew build -x test
-./gradlew.bat :modules:ui:run     ./gradlew :modules:ui:run
+Run these commands from the repository root on Windows or Linux:
+
+```sh
+node scripts/lib/tool-invoker.cjs gradle build
+node scripts/lib/tool-invoker.cjs gradle build -x test
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:run
 ```
 
 ### First run from source (the onramp)
@@ -116,10 +117,10 @@ stack, indexes the demo corpus, and asserts a first result end-to-end.
 ### Testing
 
 ```text
-# Replace gradlew.bat with ./gradlew in the dev container or on Unix.
-./gradlew.bat test
-./gradlew.bat :modules:adapters-lucene:test
-./gradlew.bat build
+# The shared invoker works on Windows and Unix, including before npm ci.
+node scripts/lib/tool-invoker.cjs gradle test
+node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test
+node scripts/lib/tool-invoker.cjs gradle build
 ```
 
 ### Code Style
@@ -133,8 +134,8 @@ Code style is enforced automatically:
 To fix formatting issues:
 
 ```text
-# Replace gradlew.bat with ./gradlew in the dev container or on Unix.
-./gradlew.bat spotlessApply
+# The shared invoker works on Windows and Unix, including before npm ci.
+node scripts/lib/tool-invoker.cjs gradle spotlessApply
 ```
 
 ## Contributor agreement: CLA

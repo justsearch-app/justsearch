@@ -24,7 +24,7 @@ import org.mockito.Mockito;
  * it does not. Counts real owned launches through the helper ledger; runs unchanged on
  * b599d4d7e, where every snapshot started three nvidia-smi processes.
  */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class GpuSnapshotNvidiaSmiRateTest {
   private final List<String> launches = new CopyOnWriteArrayList<>();
   private Object savedRecorder;
@@ -58,13 +58,20 @@ final class GpuSnapshotNvidiaSmiRateTest {
   }
 
   private static boolean nvidiaSmiOnPath() {
-    try {
-      Process where = new ProcessBuilder("where", "nvidia-smi").redirectErrorStream(true).start();
-      where.getInputStream().readAllBytes();
-      return where.waitFor(10, TimeUnit.SECONDS) && where.exitValue() == 0;
-    } catch (Exception e) {
-      return false;
+    if (io.justsearch.configuration.PlatformPaths.isWindows()) {
+      try { return new ProcessBuilder("where", "nvidia-smi").start().waitFor() == 0; }
+      catch (java.io.IOException unavailable) { return false; }
+      catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return false; }
     }
+    String path = System.getenv("PATH");
+    return path != null && java.util.Arrays.stream(path.split(java.io.File.pathSeparator))
+        .anyMatch(dir -> {
+          try {
+            var file = java.nio.file.Path.of(dir, io.justsearch.configuration.NativeTargets.current().executableName("nvidia-smi"));
+            return java.nio.file.Files.isRegularFile(file)
+                && (io.justsearch.configuration.PlatformPaths.isWindows() || java.nio.file.Files.isExecutable(file));
+          } catch (RuntimeException invalid) { return false; }
+        });
   }
 
   @Test void snapshotsStartNoNvidiaSmiWhenNvmlAnswersInProcess() {

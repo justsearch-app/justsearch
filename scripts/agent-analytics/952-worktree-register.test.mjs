@@ -319,6 +319,35 @@ try {
 
   /* ── 5. Finalization records ────────────────────────────────────────────────────────────── */
 
+  await check('finalization identities accept legal folder names without changing legacy safe records', async () => {
+    const { root } = await makeRepo('encoded-final');
+    const env = { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: path.join(root, 'state') };
+    const names = ['prep tree', 'Prep tree', 'é & $(touch PWNED)', '.hidden', 'a..b', 'CON', 'x'.repeat(200), 'lane-a', ...(process.platform === 'linux' ? ['back\\slash', 'line\nbreak'] : [])];
+    const files = [];
+    for (const resource of names) {
+      const record = buildFinalizationRecord({ resource, worktreePath: path.join(root, resource),
+        branch: 'fixture', head: 'c'.repeat(40), by: { sessionId: 'fixture', pid: process.pid,
+          creationFileTimeUtc: '133712345678901234' }, leaseDurationSec: 900, now: NOW });
+      files.push(await writeFinalization({ mainRepoRoot: root, record, env }));
+    }
+    assert.equal(new Set(files).size, names.length, 'different spelling never shares a record');
+    assert.ok(files.every(file => path.basename(file).length < 128));
+    assert.equal(path.basename(files[names.indexOf('lane-a')]), 'lane-a.json', 'existing records keep their filename');
+    const records = await readFinalizations({ mainRepoRoot: root, env });
+    assert.deepEqual(records.map(entry => { assert.equal(entry.ok, true, entry.reason); return entry.record.resource; }).sort(), [...names].sort());
+    const legacyResource = 'legacy.lock';
+    const legacyRecord = buildFinalizationRecord({ resource: legacyResource, worktreePath: path.join(root, legacyResource),
+      branch: 'legacy', head: 'c'.repeat(40), by: { sessionId: 'fixture', pid: process.pid,
+        creationFileTimeUtc: '133712345678901234' }, leaseDurationSec: 900, now: NOW });
+    const legacyFile = path.join(root, 'state', 'worktrees', legacyResource + '.json');
+    await fsp.writeFile(legacyFile, JSON.stringify(legacyRecord));
+    assert.equal(await writeFinalization({ mainRepoRoot: root, record: legacyRecord, env }), legacyFile,
+      'an existing safe legacy filename stays addressable even when new names use encoding');
+    await removeFinalization({ mainRepoRoot: root, resource: legacyResource, env });
+    for (const resource of names) await removeFinalization({ mainRepoRoot: root, resource, env });
+    assert.deepEqual(await readFinalizations({ mainRepoRoot: root, env }), []);
+  });
+
   await check('finalization records round-trip, validate per scope, and advance only forwards', async () => {
     const { root } = await makeRepo('final');
     const stateRoot = path.join(root, 'state');

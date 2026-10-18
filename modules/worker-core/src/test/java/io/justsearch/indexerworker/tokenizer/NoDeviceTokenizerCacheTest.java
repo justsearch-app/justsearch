@@ -16,7 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.io.CleanupMode;
 
 /** Runs in its own masked JVM: native initialization and device visibility are process-wide. */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 @EnabledIfEnvironmentVariable(named = "CUDA_VISIBLE_DEVICES", matches = "-1")
 final class NoDeviceTokenizerCacheTest {
   @Test

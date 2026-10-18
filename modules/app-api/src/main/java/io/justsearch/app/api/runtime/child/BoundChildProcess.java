@@ -9,7 +9,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -19,10 +18,13 @@ import java.util.concurrent.TimeUnit;
 public final class BoundChildProcess {
   private BoundChildProcess() {}
 
+  // The original Process object owns this birth even after reaping. A PID-only cache cannot
+  // do that safely; weak keys retire metadata when the original spawn reference is released.
+  private static final java.util.Map<Process, LinuxProcessIdentity> BIRTHS =
+      java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
   private static final class Spawner {
     static final LinkedBlockingQueue<FutureTask<Process>> QUEUE = new LinkedBlockingQueue<>();
-    static final ConcurrentHashMap<Long, LinuxProcessIdentity> CHILDREN = new ConcurrentHashMap<>();
     static {
       Thread.ofPlatform().daemon().name("linux-bound-child-spawn").start(() -> {
         for (;;) {
@@ -112,6 +114,7 @@ public final class BoundChildProcess {
   private static Process spawn(ProcessBuilder builder, Path helper) throws IOException {
     Process process = builder.start();
     try {
+      Optional<LinuxProcessIdentity> identity = LinuxProcessIdentity.captureSpawned(process);
       // ProcessBuilder observes the wrapper's exec, not its workload's exec. Do not publish the
       // wrapper image/identity as a successful workload, or report setup refusal as readiness.
       long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
@@ -126,11 +129,12 @@ public final class BoundChildProcess {
         if (System.nanoTime() >= deadline) throw new IOException("Linux child wrapper did not exec");
         TimeUnit.MILLISECONDS.sleep(1);
       }
-      if (!executed && !process.isAlive() && process.exitValue() == 125)
-        throw new IOException("Linux child wrapper refused launch (exit 125)");
-      Optional<LinuxProcessIdentity> identity = LinuxProcessIdentity.read(process.pid());
-      identity.ifPresent(value -> Spawner.CHILDREN.put(process.pid(), value));
-      process.onExit().thenRun(() -> identity.ifPresent(value -> Spawner.CHILDREN.remove(process.pid(), value)));
+      if (!executed && !process.isAlive() && process.exitValue() == 125) {
+        String detail = new String(process.getErrorStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip();
+        throw new IOException("Linux child wrapper refused launch (exit 125): " + detail);
+      }
+      if (identity.isEmpty()) identity = LinuxProcessIdentity.captureSpawned(process);
+      identity.ifPresent(value -> BIRTHS.put(process, value));
       return process;
     } catch (IOException | RuntimeException | InterruptedException failure) {
       process.destroyForcibly();
@@ -141,13 +145,23 @@ public final class BoundChildProcess {
           catch (InterruptedException cancelled) { interrupted = true; }
         }
       } finally { if (interrupted) Thread.currentThread().interrupt(); }
-      throw new IOException("Linux bound child launch failed", failure);
+      String target = builder.command().get(4);
+      String cwd = builder.directory() == null ? "" : " (in directory \"" + builder.directory() + "\")";
+      throw new IOException("Cannot run program \"" + target + "\"" + cwd + ": " + failure.getMessage(), failure);
     }
   }
 
+  static Optional<LinuxProcessIdentity> birthOf(Process process) {
+    return Optional.ofNullable(BIRTHS.get(process));
+  }
+
   public static Optional<Boolean> contains(ProcessHandle process) {
-    LinuxProcessIdentity bound = Spawner.CHILDREN.get(process.pid());
-    if (bound == null) return Optional.empty();
-    return LinuxProcessIdentity.read(process.pid()).map(bound::equals);
+    if (!process.isAlive()) return Optional.empty();
+    var observed = LinuxProcessIdentity.read(process.pid());
+    if (observed.isEmpty()) return Optional.empty();
+    synchronized (BIRTHS) {
+      return BIRTHS.entrySet().stream().filter(entry -> entry.getKey().toHandle().equals(process))
+          .map(entry -> entry.getValue().equals(observed.get())).findFirst();
+    }
   }
 }

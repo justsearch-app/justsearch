@@ -103,12 +103,12 @@ zero-callback specialized packages.
 Run the focused checks first, then each affected module's full tests and hygiene checks:
 
 ```powershell
-./gradlew.bat :modules:app-services:test --tests '*VduImageLimitsTest' --tests '*VduProcessorAbstentionTest'
-./gradlew.bat :modules:worker-core:test --tests '*IngestionSkipPolicyTest'
-./gradlew.bat :modules:worker-services:test --tests '*ArchiveExtractionLimitsTest' --tests '*PolicyDrivenFormatCapabilityTest' --tests '*WorkerIngestionAuthorityTest' --tests '*WorkerMethvinWatcherTest' --tests '*WorkerWatcherEventOwnershipTest' --tests '*WorkerScanOpsTest' --tests '*SyncDirectoryOpsWalkSkipPolicyTest' --tests '*SyncDirectoryOpsCandidateDiscoveryTest' --tests '*WorkerIngestServiceCandidateReconciliationTest' --tests '*JobBatchExtractorForcedPathTest' --tests '*IndexingLoopTest' --tests '*IndexingLoopRestartTest' --tests '*IndexingLoopCutoverPauseTest' --tests '*AdversarialCorpusIngestionTest'
-./gradlew.bat :modules:indexer-worker:test --tests '*LegacyIngestionBoundaryTest' --tests '*WatcherConstructorBoundaryTest' --tests '*JobQueueTest' --tests '*JobQueueMigrationTest' --tests '*SwitchBufferVersionTest'
-./gradlew.bat :modules:app-services:test :modules:worker-core:test :modules:worker-services:test :modules:indexer-worker:test
-./gradlew.bat :modules:app-services:spotlessCheck :modules:worker-core:spotlessCheck :modules:worker-services:spotlessCheck :modules:indexer-worker:spotlessCheck
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests '*VduImageLimitsTest' --tests '*VduProcessorAbstentionTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:worker-core:test --tests '*IngestionSkipPolicyTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:worker-services:test --tests '*ArchiveExtractionLimitsTest' --tests '*PolicyDrivenFormatCapabilityTest' --tests '*WorkerIngestionAuthorityTest' --tests '*WorkerMethvinWatcherTest' --tests '*WorkerWatcherEventOwnershipTest' --tests '*WorkerScanOpsTest' --tests '*SyncDirectoryOpsWalkSkipPolicyTest' --tests '*SyncDirectoryOpsCandidateDiscoveryTest' --tests '*WorkerIngestServiceCandidateReconciliationTest' --tests '*JobBatchExtractorForcedPathTest' --tests '*IndexingLoopTest' --tests '*IndexingLoopRestartTest' --tests '*IndexingLoopCutoverPauseTest' --tests '*AdversarialCorpusIngestionTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:test --tests '*LegacyIngestionBoundaryTest' --tests '*WatcherConstructorBoundaryTest' --tests '*JobQueueTest' --tests '*JobQueueMigrationTest' --tests '*SwitchBufferVersionTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test :modules:worker-core:test :modules:worker-services:test :modules:indexer-worker:test
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:spotlessCheck :modules:worker-core:spotlessCheck :modules:worker-services:spotlessCheck :modules:indexer-worker:spotlessCheck
 ```
 
 No Gradle, stack, commit or publishing commands were run by this builder. Runtime module
@@ -267,9 +267,9 @@ Full module compilation, tests and spotless remain with the orchestrator. This r
 focused commands, followed by full affected-module tests and spotless, are:
 
 ```powershell
-./gradlew.bat :modules:app-services:test --tests '*VduImageLimitsTest'
-./gradlew.bat :modules:worker-services:test --tests '*WorkerMethvinWatcherTest' --tests '*WorkerWatcherEventOwnershipTest'
-./gradlew.bat :modules:indexer-worker:test --tests '*WatcherConstructorBoundaryTest'
-./gradlew.bat :modules:app-services:test :modules:worker-services:test :modules:indexer-worker:test
-./gradlew.bat :modules:app-services:spotlessCheck :modules:worker-services:spotlessCheck :modules:indexer-worker:spotlessCheck
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests '*VduImageLimitsTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:worker-services:test --tests '*WorkerMethvinWatcherTest' --tests '*WorkerWatcherEventOwnershipTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:test --tests '*WatcherConstructorBoundaryTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test :modules:worker-services:test :modules:indexer-worker:test
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:spotlessCheck :modules:worker-services:spotlessCheck :modules:indexer-worker:spotlessCheck
 ```

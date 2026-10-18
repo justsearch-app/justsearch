@@ -246,7 +246,15 @@ check('(iii) readProcessTable never degrades to [] — it reports the failure, a
   assert.equal(readProcessTable({ platform: 'win32', exec: failing }).ok, false);
   assert.equal(readProcessTable({ platform: 'win32', exec: () => ({ status: 0, stdout: '[]' }) }).ok, false, 'a zero-row enumeration on a running host is a failed query');
   assert.equal(readProcessTable({ platform: 'win32', exec: () => ({ status: 0, stdout: 'not json' }) }).ok, false);
-  assert.equal(readProcessTable({ platform: 'linux' }).ok, false);
+  if (process.platform === 'linux') {
+    const live = readProcessTable({ platform: 'linux' });
+    assert.equal(live.ok, true, live.reason);
+    const self = live.table.find(row => row.ProcessId === process.pid);
+    assert.equal(self.processIdentity.kind, 'linux-proc-v1');
+    assert.match(self.processIdentity.startTicks, /^(0|[1-9][0-9]*)$/);
+    assert.equal(verifyProcessIdentity({ record: { pid: process.pid, processIdentity: self.processIdentity,
+      cmdlineFingerprint: '861-w2-process-identity' }, table: live }).verdict, IDENTITY.MATCH);
+  } else assert.equal(readProcessTable({ platform: 'linux' }).ok, false);
   assert.equal(readProcessTable({ platform: 'win32', exec: () => { throw new Error('spawn EPERM'); } }).ok, false);
   const single = readProcessTable({ platform: 'win32', exec: () => ({ status: 0, stdout: JSON.stringify(ROW()) }), now: () => 1234 });
   assert.equal(single.ok, true, 'a single-object CIM result is wrapped into a one-row table');
@@ -455,6 +463,24 @@ if (process.platform === 'win32') {
     assert.ok(normalizeCreationTime(self.CreationFileTimeUtc) !== null, 'getProcessTable still projects the creation time away (861 [A2])');
     assert.equal(typeof self.CommandLine, 'string', 'the holder scan lost CommandLine');
   });
+} else if (process.platform === 'linux') {
+  check('[linux] readProcessTable verifies this process, rejects a changed tuple and a stale table', () => {
+    const result = readProcessTable();
+    assert.equal(result.ok, true, result.reason);
+    const self = result.table.find(row => row.ProcessId === process.pid);
+    assert.equal(self.processIdentity.kind, 'linux-proc-v1');
+    const record = { pid: process.pid, processIdentity: self.processIdentity, cmdlineFingerprint: '861-w2-process-identity' };
+    assert.equal(verifyProcessIdentity({ record, table: result }).verdict, IDENTITY.MATCH);
+    const shifted = { ...self.processIdentity, startTicks: String(BigInt(self.processIdentity.startTicks) + 1n) };
+    assert.equal(verifyProcessIdentity({ record: { ...record, processIdentity: shifted }, table: result }).verdict, IDENTITY.MISMATCH);
+    assert.equal(verifyProcessIdentity({ record, table: { ...result, readAt: result.readAt - 60000 } }).verdict, IDENTITY.REFUSE);
+  });
+  check('[linux] the worktree holder scan retains native process identity and command line', () => {
+    const rows = getProcessTable();
+    const self = rows.find(row => row.ProcessId === process.pid);
+    assert.equal(self.processIdentity.kind, 'linux-proc-v1');
+    assert.equal(typeof self.CommandLine, 'string');
+  });
 } else {
   skipped += 2;
 }
@@ -504,6 +530,20 @@ if (process.platform === 'win32') {
       killMarked(child);
     }
   });
+} else if (process.platform === 'linux') {
+  for (const marker of ['W2_CTRL_' + String.fromCharCode(1) + '_END', 'W2_SYMBOL_•_☺_END']) {
+    await checkAsync('[linux] actual argv round trip preserves ' + JSON.stringify(marker), async () => {
+      const child = spawnMarked(marker);
+      try {
+        const { result, row } = await waitForPidInTable(child.pid);
+        assert.equal(result.ok, true, result.reason);
+        assert.ok(row.CommandLine.includes(marker), JSON.stringify(row.CommandLine));
+        const roundTrip = JSON.parse(JSON.stringify(result));
+        assert.equal(verifyProcessIdentity({ record: { pid: child.pid, processIdentity: row.processIdentity,
+          cmdlineFingerprint: marker }, table: roundTrip }).verdict, IDENTITY.MATCH);
+      } finally { killMarked(child); }
+    });
+  }
 } else {
   skipped += 2;
 }
