@@ -25,6 +25,7 @@ const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
 const { execFile, spawnSync } = require('child_process');
+const { readLinuxProcess, linuxIdentity, signalLinuxProcess } = require('./process-identity.cjs');
 const { terminateWithCodeSync } = require('./recorded-termination.cjs');
 
 const ledgerLib = require('./exit-ledger.cjs');
@@ -139,6 +140,7 @@ const LOOKUP_FILTER_MAX_PIDS = 200;
 function lookupProcessIdentities(pids, { exec = execFile, platform = process.platform, timeoutMs = 5000 } = {}) {
   const wanted = [...new Set(pids.map(Number).filter((p) => Number.isInteger(p) && p > 0))];
   if (wanted.length === 0) return Promise.resolve(new Map());
+  if (platform === 'linux') return Promise.resolve(new Map(wanted.map(pid => [pid, readLinuxProcess(pid)])));
   if (platform !== 'win32') return Promise.resolve(null);
   const filter = wanted.length <= LOOKUP_FILTER_MAX_PIDS ? ` -Filter '${wanted.map((p) => `ProcessId=${p}`).join(' OR ')}'` : '';
   const command = [
@@ -181,6 +183,11 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
 
 /** Capture before yielding: libuv still holds the spawned child's handle and reserves its PID. */
 function captureSpawnedIdentity(child, { exec = spawnSync, platform = process.platform, timeoutMs = 5000 } = {}) {
+  if (platform === 'linux') {
+    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return null;
+    const seen = readLinuxProcess(child.pid);
+    return seen?.present && seen.processIdentity ? { pid: child.pid, processIdentity: seen.processIdentity } : null;
+  }
   if (platform !== 'win32' || !child?.pid || child.exitCode !== null || child.signalCode !== null
       || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return null;
   const result = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
@@ -201,6 +208,8 @@ function captureSpawnedIdentity(child, { exec = spawnSync, platform = process.pl
  */
 function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeoutMs = 10000,
   birthTick = ledgerLib.BIRTH_TICKS.MICROSECOND } = {}) {
+  if (linuxIdentity(creationFileTime)) return Promise.resolve(creationFileTime.pid === pid
+    ? signalLinuxProcess(creationFileTime) : { ok: false, outcome: 'unknown-identity', status: null });
   return new Promise((resolve) => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', TERMINATE_SCRIPT,
       '-Pid', String(pid), '-CreationFileTimeUtc', String(creationFileTime), '-Code', String(code >>> 0),
@@ -218,6 +227,7 @@ function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeo
 
 /** Non-distinctive fallback, retaining its historical name for callers and exit accounting. */
 function taskkillPid(pid, { platform = process.platform, creationFileTime, exec = spawnSync } = {}) {
+  if (platform === 'linux') return linuxIdentity(creationFileTime)?.pid === pid && signalLinuxProcess(creationFileTime).ok;
   if (platform !== 'win32') return false; // no same-handle identity primitive on this platform
   return terminateWithCodeSync(pid, creationFileTime, NON_DISTINCTIVE_KILL_CODE, { exec }).ok;
 }
@@ -385,6 +395,11 @@ function createEngineActuator({
           const seen = identities ? identities.get(Number(start.pid)) : null;
           if (!identities || !seen) osCheck = 'IDENTITY_UNKNOWN';
           else if (!seen.present) osCheck = 'GONE';
+          else if (start.processIdentity) {
+            const actual = linuxIdentity(seen);
+            osCheck = !actual ? 'IDENTITY_UNKNOWN'
+              : actual.bootId === start.processIdentity.bootId && actual.startTicks === start.processIdentity.startTicks ? 'ALIVE_MATCH' : 'GONE';
+          }
           else if (!start.creationFileTime || !seen.creationFileTime) osCheck = 'IDENTITY_UNKNOWN';
           else osCheck = sameBirth(start.creationFileTime, seen.creationFileTime) ? 'ALIVE_MATCH' : 'GONE';
           const record = {
@@ -433,7 +448,7 @@ function createEngineActuator({
         ? lookupIdentities([state.pid]).then((map) => {
           const seen = map?.get(state.pid);
           state.identity = !state.exit && child.exitCode == null && child.signalCode == null && seen?.present
-            ? { creationFileTime: seen.creationFileTime, executable: seen.executable }
+            ? { creationFileTime: seen.creationFileTime ?? null, ...(seen.processIdentity ? { processIdentity: seen.processIdentity } : {}), executable: seen.executable }
             : { creationFileTime: null, executable: null, unknown: !map || Boolean(state.exit) };
           return state.identity;
         }).catch(() => (state.identity = { creationFileTime: null, executable: null, unknown: true }))
@@ -447,6 +462,7 @@ function createEngineActuator({
           incarnation: incarnationRef(n),
           pid: state.pid ?? 0,
           creationFileTime: identity.creationFileTime,
+          ...(identity.processIdentity ? { processIdentity: identity.processIdentity } : {}),
           processStartedAt: startedMs === null ? null : new Date(startedMs),
           executable: String(identity.executable ?? child.spawnfile ?? '').slice(0, 1024),
           cause,
@@ -558,6 +574,11 @@ function createEngineActuator({
       if (state.exit) {
         state.terminate.outcome = 'already-exited';
         return { attempted: false, reason: 'already-exited' };
+      }
+      if (identity?.processIdentity && state.pid) {
+        const result = await terminate(state.pid, identity.processIdentity, NON_DISTINCTIVE_KILL_CODE);
+        state.terminate.outcome = result.outcome;
+        return { attempted: true, distinctive: false, outcome: result.outcome, killed: result.ok };
       }
       if (identity?.creationFileTime && state.pid) {
         const result = await terminate(state.pid, identity.creationFileTime, ledgerLib.JS_ENGINE_STOP);

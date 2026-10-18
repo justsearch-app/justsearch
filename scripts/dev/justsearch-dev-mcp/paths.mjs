@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import processRecords from '../lib/process-record.cjs';
 
 function fileExists(p) {
   try {
@@ -89,9 +90,7 @@ export function resolveMainRepoRoot(repoRoot) {
  * `dev-runner.cjs`. Owner touch records live under it.
  */
 export function resolveDevRunnerStateRoot(mainRepoRoot, env = process.env) {
-  return env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT
-    ? path.resolve(env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT)
-    : path.resolve(mainRepoRoot, 'tmp', 'dev-runner');
+  return processRecords.resolveRegisterDir(mainRepoRoot, '', env);
 }
 
 export function ensureLoopbackUrl(urlStr, label = 'url') {

@@ -42,7 +42,7 @@ const {
   readRegister,
   writeRecordAtomic,
 } = require('./process-record.cjs');
-const { normalizeCreationTime } = require('./process-identity.cjs');
+const { normalizeCreationTime, linuxIdentity } = require('./process-identity.cjs');
 
 /* ── Scope constants ───────────────────────────────────────────────────────────────────────── */
 
@@ -181,7 +181,8 @@ function validateAgentSpawnRecord(record) {
   // The identity triple's other two terms. A record missing either can never be verified, so a
   // kill path could never act on it — accepting it would put a permanently unactionable record in
   // a register whose product is authority.
-  if (normalizeCreationTime(record.creationFileTimeUtc) === null) {
+  if (record.processIdentity && !linuxIdentity(record)) return { ok: false, reason: 'invalid Linux process identity' };
+  if (normalizeCreationTime(record.creationFileTimeUtc) === null && !linuxIdentity(record)) {
     return {
       ok: false,
       reason: `record declares no readable creationFileTimeUtc (${JSON.stringify(record.creationFileTimeUtc)}); pid alone cannot survive pid reuse`,
@@ -270,6 +271,7 @@ async function buildAgentSpawnRecord({
   producer,
   pid,
   creationFileTimeUtc,
+  processIdentity = null,
   cmdlineFingerprint,
   port,
   leaseDurationSec,
@@ -288,6 +290,7 @@ async function buildAgentSpawnRecord({
     pid,
     // Normalized at construction so the register never holds two spellings of the same instant.
     creationFileTimeUtc: normalizeCreationTime(creationFileTimeUtc),
+    ...(linuxIdentity(processIdentity) ? { processIdentity: linuxIdentity(processIdentity) } : {}),
     cmdlineFingerprint,
     ownership,
     probe: { kind: 'port', port },
@@ -400,10 +403,7 @@ function leaseState(record, now = Date.now()) {
 
 function normalizePathForCompare(p) {
   if (!isNonEmptyString(p)) return null;
-  const resolved = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, '');
-  // Windows paths are case-insensitive; a holder lookup that missed on case would be a lookup that
-  // silently found nothing, which is the failure mode this field exists to remove.
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+  return require('../../lib/path-identity.cjs').pathKey(p);
 }
 
 /**

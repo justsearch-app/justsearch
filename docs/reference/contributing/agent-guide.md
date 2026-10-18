@@ -106,7 +106,7 @@ Path and dependency rules:
 
 - Model/native path environment variables used for Java or ONNX launches should be absolute
 - After changing Gradle dependencies or telemetry/exporter coordinates, regenerate lockfiles before handoff:
-  `./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks`
+  `./gradlew --no-configuration-cache resolveAndLockAll --write-locks`
 
 ### 3.3. Pre-commit Verification
 
@@ -148,7 +148,7 @@ working directory, and an unresolvable ref makes PMD analyse **zero files while 
 success**. `scripts/ci/check-pmd-ruleset-sync.mjs` therefore enforces that each derived ruleset is
 the authority minus its declared, description-justified subtraction, and that no ref is a file path.
 
-Run everything with `./gradlew.bat pmdAll` (root aggregate over all 93 PMD tasks); CI runs the same
+Run everything with `./gradlew pmdAll` (root aggregate over all 93 PMD tasks); CI runs the same
 task in the required `Build (no model blobs)` job, measured at 188 s there. Running it instead on
 `Unit tests (platform-contracts)` was tried and measured worse (201 s, and that lane over its
 advisory budget) — `pmdAll` compiles every source set of every module either way, so the placement
@@ -231,7 +231,7 @@ CI and the local gate both run `resolveAndLockAll --write-locks` then `git diff 
 Regenerate lockfiles after changing versions in `libs.versions.toml`, adding/removing dependencies, or changing plugin versions:
 
 ```bash
-./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks
+./gradlew --no-configuration-cache resolveAndLockAll --write-locks
 ```
 
 **Unreferenced Code Detection (ArchUnit):**
@@ -270,10 +270,10 @@ Records in `app-api` that have **>10 positional parameters** and are **construct
 
 1. Add the field to the record parameter list.
 2. If collection type, add null-coalescing in compact constructor (e.g., `myList = myList == null ? List.of() : List.copyOf(myList)`).
-3. Compile: `./gradlew.bat :modules:app-api:compileJava` -- the builder regenerates automatically.
+3. Compile: `./gradlew :modules:app-api:compileJava` -- the builder regenerates automatically.
 4. Update production construction site (e.g., `KnowledgeHttpApiAdapter`) to pass the new field.
 5. If part of API contract, update the controller (`KnowledgeSearchController`) -- the controller uses a manual HashMap build, NOT direct record serialization. Adding a field to the record does NOT change API output unless the controller is also updated.
-6. Regenerate schemas and fixtures: `./gradlew.bat :modules:app-api:updateSchemas`
+6. Regenerate schemas and fixtures: `./gradlew :modules:app-api:updateSchemas`
 7. If the record is part of `/api/status` or `/api/knowledge/search`, also update the Zod schema in `modules/ui-web/src/api/schemas.ts` and the TypeScript type in `stores/systemTypes.ts` (for status) or `api/domains/search.ts` (for search). Zod schemas use `.loose()` -- new fields pass validation without being declared, so contract tests alone won't catch a missing Zod field.
 8. Run frontend contract tests: `cd modules/ui-web && npm run test:unit:run`
 9. Note: v1 contract files (`status-v1.json`, `knowledge-status-v1.json`, `debug-state-v1.json`) are intentionally manual -- only update on breaking changes (field removal/rename), not field additions.
@@ -454,7 +454,7 @@ pull-request `GITHUB_TOKEN` cannot read branch-protection settings.
 **Test failure:**
 
 - Symptom: `dorny/test-reporter` Check Run shows failing test names with line numbers.
-- Reproduce: `./gradlew.bat :modules:<m>:test --tests "*FailingTest"`
+- Reproduce: `./gradlew :modules:<m>:test --tests "*FailingTest"`
 - Fix: Read the failing test, fix the code or test expectation, re-run.
 
 **PMD violation:**
@@ -466,8 +466,8 @@ pull-request `GITHUB_TOKEN` cannot read branch-protection settings.
 **Spotless formatting:**
 
 - Symptom: `./gradlew check` fails with "Spotless violations found".
-- Reproduce: `./gradlew.bat spotlessCheck`
-- Fix: Run `./gradlew.bat spotlessApply`, then re-stage the changed files.
+- Reproduce: `./gradlew spotlessCheck`
+- Fix: Run `./gradlew spotlessApply`, then re-stage the changed files.
 
 **Docs lint (markdownlint):**
 

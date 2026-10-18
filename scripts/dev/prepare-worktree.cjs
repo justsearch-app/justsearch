@@ -5,15 +5,9 @@
  * A worktree is a fresh checkout: it needs its own `node_modules` (for FE typecheck/test/Vite) and
  * its own installDist before the dev stack will start. What it does NOT need a setup step for:
  *   - models: the dev-runner resolves JUSTSEARCH_MODELS_DIR from the MAIN checkout (618 §2);
- *   - GPU runtime: the dev-runner resolves the shared cuda12 llama-server from the MAIN checkout
- *     (tempdoc 656 Move 2), so every worktree references one copy — no per-worktree download.
- *
- * GPU runtime is GPU-only by design (tempdoc 656): dev never provisions a CPU llama-server (a CPU
- * fallback runs the 9B model ~10x slower and saturates every core, DOSing concurrent worktrees). To
- * make the shared GPU runtime available, run ONCE at the MAIN checkout:
- *   ./gradlew :modules:ui:stageLlamaCudaVariant     # ~600 MB one-time download of the cuda12 build
- * After that the dev-runner auto-populates the shared native-bin and every worktree references it.
- * If it is absent, inference is cleanly unavailable (fails closed) — search still works.
+ *   - GPU runtime: Windows retains its shared cuda12 runtime; Linux uses the operator's
+ *     pinned CUDA build through JUSTSEARCH_SERVER_EXE. No CPU llama-server is provisioned.
+ *     See MAINTAINING.md for Linux prerequisites and node scripts/dev/doctor.mjs for readiness.
  *
  * What it DOES need (post-cutover): .mcp.json is gitignored (maintainer-local, not tracked) —
  * whether a fresh worktree starts with it depends on whether your base checkout already had it,
@@ -27,24 +21,17 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
 // Tempdoc 696: resolve a >= 24 JDK (Temurin 25) for the installDist gradle step so a
 // stale JDK-8 JAVA_HOME can't break worktree prep. Resolved lazily (only for gradle).
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const noDist = process.argv.includes('--no-dist');
-const isWin = process.platform === 'win32';
-const npm = isWin ? 'npm.cmd' : 'npm';
-// Absolute, cwd-qualified path: a bare 'gradlew.bat' is not reliably resolved
-// from the child's cwd by every spawn environment ("'gradlew.bat' is not
-// recognized" — tempdoc 684), even with cwd set correctly.
-const gradle = isWin ? path.join(repoRoot, 'gradlew.bat') : path.join(repoRoot, 'gradlew');
-
+const { runToolSync } = require('../lib/tool-invoker.cjs');
 function run(cmd, args, cwd, extraEnv) {
   console.error(`[prepare-worktree] $ ${cmd} ${args.join(' ')}  (cwd: ${cwd})`);
   const env = extraEnv ? { ...process.env, ...extraEnv } : process.env;
-  const r = spawnSync(cmd, args, { cwd, stdio: 'inherit', shell: true, env });
+  const r = runToolSync(cmd, args, { repoRoot, cwd, stdio: 'inherit', env });
   if (r.status !== 0) {
     console.error(`[prepare-worktree] FAILED (${r.status}): ${cmd} ${args.join(' ')}`);
     process.exit(r.status || 1);
@@ -75,8 +62,9 @@ function seedFromExample(exampleRelPath, destRelPath) {
 seedFromExample('.mcp.json.example', '.mcp.json');
 console.error('[prepare-worktree] if .mcp.json was just created: the justsearch-dev server needs no secret and works immediately.');
 
-// 1. FE deps — npm ci (clean, lockfile-pinned; same command the build task now uses).
-run(npm, ['ci'], path.join(repoRoot, 'modules', 'ui-web'));
+// 1. Root dev tools (including Windows batch invocation), then the frontend; both lockfile-pinned.
+run('npm', ['ci'], repoRoot);
+run('npm', ['ci'], path.join(repoRoot, 'modules', 'ui-web'));
 
 // 2. Dists the dev stack launches from (skippable for FE-only work).
 if (!noDist) {
@@ -91,9 +79,9 @@ if (!noDist) {
   // Lane F stage A item A13: one distribution. `:modules:indexer-worker:installDist` used to be
   // built alongside this one for the Worker child process; that process and its `application`
   // distribution are gone, and the Engine dist carries the worker jars.
-  run(gradle, [':modules:ui:installDist'], repoRoot, {
+  run('gradle', [':modules:ui:installDist'], repoRoot, {
     JAVA_HOME: devJdkHome,
   });
 }
 
-console.error('[prepare-worktree] done — models + the shared cuda12 GPU runtime resolve automatically via the dev-runner (run `./gradlew :modules:ui:stageLlamaCudaVariant` once at the main checkout to provision the GPU runtime; GPU-only by design — tempdoc 656).');
+console.error('[prepare-worktree] done — check models and the GPU runtime with node scripts/dev/doctor.mjs. Worktrees use the shared models directory and any JUSTSEARCH_SERVER_EXE override.');

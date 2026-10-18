@@ -17,6 +17,19 @@ the apparatus is visible and documented, never forced on a contributor.
 - **`scripts/agent-analytics/`**: maintainer telemetry and analytics tooling, session-to-merge
   links, the `world-state.mjs` orientation command, and the dev-tool tests (see its README).
 
+## Linux development prerequisites
+
+Use JDK 25, Node 24, a C compiler (`cc`) and Tesseract. For the GPU development stack, install
+an NVIDIA driver, build CUDA llama-server from the pinned llama.cpp version `b8571`, and export
+its executable path as `JUSTSEARCH_SERVER_EXE`. The file must be regular and executable; keep its
+shared libraries discoverable by the system loader. ONNX Runtime additionally needs its CUDA 12
+libraries, independently of llama-server's CUDA version. Development inference uses the GPU.
+
+Run `node scripts/dev/prepare-worktree.cjs` in each worktree, then
+`node scripts/dev/doctor.mjs`. Use `./gradlew` in Linux shells and Windows Git Bash, or
+`node scripts/lib/tool-invoker.cjs gradle <args...>` from either OS. The same invoker accepts
+`npm` for commands that need npm's portable entry point.
+
 ## Maintainer-only operational setup (contributors can skip)
 
 - **Agent work** — JustSearch uses agent-system: the projected `AGENTS.md` entry in this repository,

@@ -14,7 +14,7 @@ Run this procedure once before relying on the substrate for downstream slices (L
 ## Prerequisites
 
 - Backend not already running on port 33221.
-- Worker distribution built: `./gradlew.bat assemble` (wires in `installDist`).
+- Worker distribution built: `./gradlew assemble` (wires in `installDist`).
 - Models directory present (or set `JUSTSEARCH_MODELS_DIR`).
 - Item 8 additionally requires `--llm` (Brain/llama-server). Skip item 8 if not testing AI-mediated paths.
 
@@ -23,7 +23,7 @@ Run this procedure once before relying on the substrate for downstream slices (L
 In one terminal, start the backend in eval mode:
 
 ```powershell
-.\gradlew.bat runHeadlessEval
+./gradlew runHeadlessEval
 ```
 
 Wait for "ready" (worker port emit + ~38s to worker ready). In a second terminal, run the read-only checks:

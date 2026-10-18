@@ -309,14 +309,7 @@ function flagValue(argv, name) {
 
 const QUERY_ENV = Object.freeze({ GIT_OPTIONAL_LOCKS: '0' });
 
-function pathKey(p) {
-  const resolved = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, '');
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-}
-
-function samePath(a, b) {
-  return pathKey(a) === pathKey(b);
-}
+const { pathKey, samePath } = require('../lib/path-identity.cjs');
 
 function isWithin(candidate, root) {
   const child = pathKey(candidate);

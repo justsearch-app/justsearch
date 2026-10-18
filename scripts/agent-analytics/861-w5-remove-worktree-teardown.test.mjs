@@ -41,6 +41,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
 let removeWorktreeCli = null;
 const CLI_FILES = [
+  'scripts/lib/path-identity.cjs',
   'scripts/dev/remove-worktree.cjs',
   'scripts/dev/lib/process-identity.cjs',
   'scripts/dev/lib/process-record.cjs',

@@ -21,6 +21,7 @@ const { readProcessTable } = require(path.join(SOURCE_ROOT, 'scripts', 'dev', 'l
 const FIXTURE_PROCESS_TABLE_ENV = 'JUSTSEARCH_936_FIXTURE_PROCESS_TABLE_PIDS';
 const PROCESS_IDENTITY_REL = 'scripts/dev/lib/process-identity.cjs';
 const CLI_FILES = [
+  'scripts/lib/path-identity.cjs',
   'scripts/dev/remove-worktree.cjs',
   'scripts/dev/lib/process-identity.cjs',
   'scripts/dev/lib/process-record.cjs',
@@ -223,16 +224,24 @@ async function snapshot(fixture, target, stateRoot) {
 
 const fixtures = [];
 try {
-  await check('native process-table evidence stays fail-closed off Windows and observes this test on Windows', () => {
-    const nonWindows = readProcessTable({ platform: 'linux' });
-    assert.equal(nonWindows.ok, false);
-    assert.match(nonWindows.reason, /implemented for win32 only \(platform=linux\)/i);
+  await check('native process-table evidence observes this test on supported OSes and fails closed elsewhere', () => {
+    if (process.platform !== 'linux') {
+      const nonWindows = readProcessTable({ platform: 'linux' });
+      assert.equal(nonWindows.ok, false);
+      assert.match(nonWindows.reason, /implemented for win32 only \(platform=linux\)/i);
+    }
 
     if (process.platform === 'win32') {
       const native = readProcessTable();
       assert.equal(native.ok, true, native.reason);
       assert.equal(native.table.some((row) => Number(row?.ProcessId) === process.pid), true,
         `native process table did not contain test pid ${process.pid}`);
+    } else if (process.platform === 'linux') {
+      const native = readProcessTable();
+      assert.equal(native.ok, true, native.reason);
+      const self = native.table.find((row) => Number(row?.ProcessId) === process.pid);
+      assert.equal(self?.processIdentity?.kind, 'linux-proc-v1');
+      assert.equal(self.processIdentity.pid, process.pid);
     } else {
       const native = readProcessTable();
       assert.equal(native.ok, false);
@@ -535,6 +544,8 @@ try {
       const result = runCli(primary, nativeTarget, [], { stateRoot: nativeState });
       assert.equal(result.status, 1, result.output);
       if (process.platform === 'win32') {
+        assert.match(result.output, /shared runtime.*active.*references/i);
+      } else if (process.platform === 'linux') {
         assert.match(result.output, /shared runtime.*active.*references/i);
       } else {
         assert.match(result.output, /process liveness is unknown.*implemented for win32 only/i);

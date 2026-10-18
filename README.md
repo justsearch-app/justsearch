@@ -176,14 +176,21 @@ Accepted publication `agent-utility-hero-2026-07-28` (record `c5a75457b264`, pol
 
 ## Quickstart (build from source)
 
-> Prereqs to **build + test**: **JDK 25** (the Gradle toolchain auto-resolves it) and **Node.js** (for the
-> `modules/ui-web` frontend) — nothing else. Building/contributing needs **no GPU, no Rust toolchain, and no model
+> Prereqs to **build + test**: **JDK 25** (the Gradle toolchain auto-resolves it) and **Node.js 24** (for the
+> `modules/ui-web` frontend). Building/contributing needs **no GPU, no Rust toolchain, and no model
 > download**; the ~9 GB models below are runtime-only (fetched on first *run* of the app).
 
 ```bash
 git clone https://github.com/justsearch-app/justsearch && cd justsearch
-./gradlew.bat build              # build (Windows; use ./gradlew on *nix once cross-platform)
+./gradlew build                  # Linux, or Windows Git Bash
 ```
+
+On Linux, install JDK 25, Node 24, a C compiler (`cc`) and Tesseract. GPU development also
+needs an NVIDIA driver, a CUDA-enabled llama-server built from the project's pinned llama.cpp
+version (`b8571`), and the ORT CUDA 12 libraries. Export the regular executable as
+`JUSTSEARCH_SERVER_EXE`; make it executable and put its required shared libraries on the loader's
+search path. Keep ORT's CUDA 12 dependencies available even if llama-server uses another CUDA
+version. See [the development runtime guide](docs/agent-knowledge/inference-runtime.md).
 
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
 Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). First run

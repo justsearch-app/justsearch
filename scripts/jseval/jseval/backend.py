@@ -7,7 +7,10 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import time
+import threading
+import io
 from pathlib import Path
 
 import httpx
@@ -29,9 +32,8 @@ _LLM_HEALTH_TIMEOUT_SEC = 240.0  # 369: LLM model loading adds significant time
 # discover that only after burning the full inference deadline (~240s) and failing
 # with the generic "inference stayed offline". The chain, verified at the source:
 #
-#   `_boot_and_wait` always launches `:modules:ui:runHeadlessEval`, whose
-#   `applyHeadlessEvalContract()` HARD-CODES `justsearch.ui.settings.mode=IN_MEMORY`
-#   (`modules/ui/build.gradle.kts:2151`, not overridable by caller env) ->
+#   `_boot_and_wait` launches the installed eval Engine; its shared launch definition
+#   also supplies `:modules:ui:runHeadlessEval` and pins settings to IN_MEMORY ->
 #   `UiSettingsStore.save()` is a silent no-op and `load()` always returns fresh
 #   defaults in that mode (`UiSettingsStore.java:43-68`) -> `-Pllm=true` only sets
 #   `JUSTSEARCH_AI_AUTOSTART_ENABLED` (`build.gradle.kts:2200-2205`), which seeds
@@ -45,7 +47,7 @@ _LLM_HEALTH_TIMEOUT_SEC = 240.0  # 369: LLM model loading adds significant time
 # the recipe the 782 campaign actually shipped on.
 _EVAL_MODE_LLM_ERROR = (
     "start_backend(llm=True) cannot bring inference up: this entry point boots "
-    "`:modules:ui:runHeadlessEval`, whose eval contract pins "
+    "the installed eval Engine under the shared runHeadlessEval contract, which pins "
     "justsearch.ui.settings.mode=IN_MEMORY (read-only settings). -Pllm=true only "
     "seeds chatEnabled through RuntimeSpecStore, that write is silently discarded "
     "in IN_MEMORY mode, and RuntimeReconciler therefore never starts llama-server "
@@ -104,10 +106,10 @@ def start_backend(
     pin_selector_key: str | None = None,
     raw_context=None,
 ) -> BackendInfo:
-    """Start runHeadlessEval and wait for the backend to become healthy.
+    """Build and launch the installed eval Engine, then wait for backend readiness.
 
     Returns a BackendInfo with the Popen handle and data directory path.
-    When llm=True, passes -Pllm=true to Gradle and waits for inference readiness.
+    llm=True is refused because the shared eval contract uses read-only settings.
     Uses a single deadline for all readiness checks.
 
     health_timeout_sec=None resolves JSEVAL_HEALTH_TIMEOUT_SEC from the
@@ -237,6 +239,15 @@ def start_backend(
     return BackendInfo(proc=proc, data_dir=resolved_data, spawn_env=env)
 
 
+def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
+    """Build the distribution before the lifetime helper or runner is needed."""
+    command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
+               ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet"]
+    result = subprocess.run(command, cwd=str(resolved_root), env=env, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
+
+
 def _boot_and_wait(
     *,
     resolved_root: Path,
@@ -247,26 +258,17 @@ def _boot_and_wait(
     llm: bool,
     health_timeout_sec: float,
 ) -> subprocess.Popen:
-    """Spawn runHeadlessEval and wait for readiness; return the healthy Popen.
+    """Build installDist, start the bound persistent runner and wait for readiness.
 
-    Extracted verbatim from start_backend so the tempdoc 751 adopt path and its
-    fresh-build fallthrough share ONE boot+health block (a confirm failure boots
-    twice -- the fallthrough must reach the identical code a fresh build gets, not
-    a divergent copy).
+    Fresh boots and index-cache adoption share this one launch/health boundary.
     """
-    cmd = [
-        str(gradlew),
-        ":modules:ui:runHeadlessEval",
-        "--no-configuration-cache",
-        "--quiet",
-    ]
-    # 369: Pass -Pllm=true so Gradle enables autostart + longer health timeout.
-    # Unreachable from `start_backend` since tempdoc 782 §I -- it fails closed on
-    # `llm=True` (see `_EVAL_MODE_LLM_ERROR`) because the eval contract's read-only
-    # settings store makes autostart structurally impossible. Kept intact so the
-    # boot block stays correct for a caller that does not carry that contract.
-    if llm:
-        cmd.append("-Pllm=true")
+    if sys.platform == "linux" and threading.current_thread() is not threading.main_thread():
+        raise RuntimeError("Linux eval backends must be launched from the process-lifetime main thread")
+    _install_distribution(resolved_root, env)
+    cmd = ["node", str(resolved_root / "scripts" / "dev" / "eval-runner.cjs")]
+    if os.name != "nt":
+        helper = resolved_root / "modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec"
+        cmd = [str(helper), "exec", str(os.getpid()), "--", *cmd]
 
     log.info("Starting backend: %s (port=%d, data=%s)", " ".join(cmd), port, resolved_data)
 
@@ -274,10 +276,19 @@ def _boot_and_wait(
         cmd,
         cwd=str(resolved_root),
         env=env,
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
+
+    # Drain continuously during health polling (and afterwards); a full pipe must not freeze boot.
+    def drain_output():
+        for line in iter(proc.stdout.readline, b""):
+            log.debug("backend: %s", line.decode("utf-8", errors="replace").rstrip())
+    if isinstance(proc.stdout, io.BufferedIOBase):
+        threading.Thread(target=drain_output, name="jseval-backend-output", daemon=True).start()
+        proc._justsearch_eval_runner = True
 
     # Tempdoc 844 D3: declare this backend to the other dev-stack lifecycle, which otherwise
     # cannot see it (§6.1 — an invisible runHeadlessEval already contaminated a measurement).
@@ -566,24 +577,37 @@ def _clean_data_dir(resolved_data: Path) -> None:
 def stop_backend(proc: subprocess.Popen, data_dir: Path | None = None) -> None:
     """Stop the Engine process tree and retire its foreign-run record.
 
-    Uses the original Popen handle on Windows. data_dir is retained for caller compatibility;
-    registered-child cleanup is owned by dev-runner, not a jseval process scan.
+    Requests ordered cleanup from the persistent runner. data_dir is retained for caller
+    compatibility; the runner's recorded job, rather than a process scan, owns helper cleanup.
     Unregistering by proc.pid also covers boot failures before registration.
     """
     if proc.poll() is not None:
         log.info("Backend already exited (rc=%d)", proc.returncode)
+        if getattr(proc, "_justsearch_eval_runner", False) is True and proc.returncode != 0:
+            raise RuntimeError(f"Eval runner cleanup failed (exit {proc.returncode}); retaining registration")
     else:
         pid = proc.pid
         log.info("Stopping backend (PID=%d)...", pid)
 
         # Popen retains the Windows process handle opened at this fixture's start.
         # The Engine's job owns helper cleanup; no PID tree or name-based kill.
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=10)
+        if getattr(proc, "_justsearch_eval_runner", False) is True:
+            try:
+                proc.stdin.write(b"stop\n")
+                proc.stdin.flush()
+                proc.wait(timeout=30)
+            except (BrokenPipeError, subprocess.TimeoutExpired):
+                proc.terminate()
+                proc.wait(timeout=10)
+            if proc.returncode != 0:
+                raise RuntimeError(f"Eval runner cleanup failed (exit {proc.returncode}); retaining registration")
+        else:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=10)
 
         log.info("Backend stopped")
 

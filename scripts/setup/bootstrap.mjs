@@ -108,22 +108,7 @@ export function runProcess(command, args, options = {}) {
   return `${result.stdout || ''}${result.stderr || ''}`.trim();
 }
 
-export function resolveNpmInvocation({
-  platform = process.platform,
-  execPath = process.execPath,
-  env = process.env,
-} = {}) {
-  const candidates = [
-    env.npm_execpath,
-    path.join(path.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-  ].filter(Boolean);
-  const npmCli = candidates.find((candidate) => fs.existsSync(candidate));
-  if (npmCli) return { command: execPath, prefixArgs: [npmCli] };
-  if (platform === 'win32') {
-    throw new Error('npm CLI could not be located beside Node; reinstall Node with npm included.');
-  }
-  return { command: 'npm', prefixArgs: [] };
-}
+export const { resolveNpmInvocation } = require('../lib/tool-invoker.cjs');
 
 export function probeSupportedPython(candidates, runner = runProcess) {
   let firstReadable = null;
