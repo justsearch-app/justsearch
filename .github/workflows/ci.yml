@@ -998,6 +998,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     # The app-ui shard reached its final UI task with clean completed suites, then exhausted
     # the old 25-minute job cap. Keep every per-test budget and give that shard CI headroom.
+    # 35 -> 45: on main the shard already took 31 of 35 minutes; the Linux port runs about
+    # 200 s more of tests that were Windows-only (GpuSwitchBarrierTest 100 s, DownloadLoopbackTest
+    # 81 s), and 4 of 5 port runs were cancelled at the cap with no failing test.
     timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
       fail-fast: false
@@ -1005,7 +1008,7 @@ jobs:
         include:
           - lane: app-ui
             os: ubuntu-latest
-            timeout_minutes: 35
+            timeout_minutes: 45
             artifact: unit-test-attribution-app-ui
             runner_label: ubuntu-latest/app-ui
             fetch_depth: 1
