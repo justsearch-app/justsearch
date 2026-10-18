@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { test } from 'node:test';
 const require = createRequire(import.meta.url);
 const { parseLinuxStat, readLinuxProcess, verifyProcessIdentity, readProcessTable } = require('./lib/process-identity.cjs');
@@ -13,17 +14,17 @@ test('Linux stat parses field 22 after the final parenthesis without losing prec
 });
 
 test('Linux birth reads distinguish gone, zombie, changed and unreadable evidence', () => {
-  const files = (file) => file.endsWith('/stat') ? stat() : file.endsWith('/boot_id') ? bootId : 'node\0fixture';
+  const files = (file) => path.basename(file) === 'stat' ? stat() : path.basename(file) === 'boot_id' ? bootId : 'node\0fixture';
   const options = { readFile: files, readlink: () => '/usr/bin/node' };
   const seen = readLinuxProcess(42, options);
   assert.equal(seen.processIdentity.startTicks, '9007199254740993');
   assert.equal(seen.commandLine, 'node fixture');
   assert.deepEqual(readLinuxProcess(42, { ...options, readFile: () => stat('Z') }), { present: false });
   let reads = 0;
-  assert.equal(readLinuxProcess(42, { ...options, readFile: file => file.endsWith('/stat') ? stat('S', String(++reads)) : files(file) }), null);
+  assert.equal(readLinuxProcess(42, { ...options, readFile: file => path.basename(file) === 'stat' ? stat('S', String(++reads)) : files(file) }), null);
   for (const code of ['ENOENT', 'EACCES']) {
     assert.equal(readLinuxProcess(42, { ...options, readFile: file => {
-      if (file.endsWith('/boot_id')) throw Object.assign(new Error('unavailable'), { code, path: file });
+      if (path.basename(file) === 'boot_id') throw Object.assign(new Error('unavailable'), { code, path: file });
       return files(file);
     } }), null, 'unreadable boot identity is unknown, even if the file is missing');
   }
@@ -135,7 +136,7 @@ test('Linux canonical identities admit tick zero/u64 and reject malformed tuples
   }
   assert.equal(linuxIdentity({ ...identity, pid: 2147483648 }), null);
   assert.equal(linuxIdentity({ ...identity, bootId: bootId.toUpperCase() }), null);
-  const options = { readFile: file => file.endsWith('/stat') ? stat('S', '0') : bootId, readlink: () => '/bin/sleep' };
+  const options = { readFile: file => path.basename(file) === 'stat' ? stat('S', '0') : bootId, readlink: () => '/bin/sleep' };
   assert.equal(readLinuxProcess(42, options).processIdentity.startTicks, '0');
   for (const state of ['Z', 'X', 'x']) {
     assert.deepEqual(readLinuxProcess(42, { ...options, readFile: () => stat(state) }), { present: false });
