@@ -89,7 +89,9 @@ export async function runLifecycle({ name, testCase, policy, io }) {
       else {
         assert.equal(exits.length,1,'one Engine exit record');
         const intents=records.filter(r=>r.type==='engine-intent'&&r.reason==='QUIT'&&r.channel!=='TERMINATE');assert.equal(intents.length,1,'one cooperative QUIT intent');
-        assert.equal(exits[0].exitClass,probe==='crash'?'UNEXPECTED':'REQUESTED');
+        const linuxForced = name==='dev-runner' && process.platform==='linux' && ['forced','deadline'].includes(probe);
+        assert.equal(exits[0].exitClass,probe==='crash'?'UNEXPECTED':linuxForced?'UNKNOWN':'REQUESTED');
+        if(linuxForced) { assert.equal(exits[0].code,null); assert.equal(exits[0].codeDistinctive,false); }
         if(probe==='forced'||probe==='deadline') {
           assert.equal(exits[0].forced,true);
           assert(exits[0].code===1246953474 || (name==='dev-runner'&&exits[0].codeDistinctive===false));

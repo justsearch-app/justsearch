@@ -47,11 +47,110 @@
  * outright unless the caller names the waiver. Same standard as `isVerifiedMatch`: the unsafe
  * spelling is the one that must be unwritable.
  *
- * Nothing in this module kills, signals, or writes anything. It answers one question.
+ * Identity reads are side-effect free. Linux termination uses the pidfd helper below; Windows
+ * termination retains its existing native-handle backend.
  */
 'use strict';
 
 const { spawnSync, execFile } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+/** Linux birth identity is deliberately unrelated to Windows FILETIME. */
+function linuxIdentity(value) {
+  const v = value?.processIdentity ?? value;
+  if (value?.processIdentity && value.pid != null && value.pid !== v.pid) return null;
+  return v?.kind === 'linux-proc-v1' && Number.isSafeInteger(v.pid) && v.pid > 0
+    && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(v.bootId ?? '')
+    && typeof v.startTicks === 'string' && /^[1-9][0-9]*$/.test(v.startTicks)
+    ? { kind: v.kind, pid: v.pid, bootId: v.bootId, startTicks: v.startTicks } : null;
+}
+
+function parseLinuxStat(text) {
+  const end = text.lastIndexOf(')');
+  const fields = text.slice(end + 2).trim().split(/\s+/);
+  if (end < 0 || fields.length < 20 || !/^[0-9]+$/.test(fields[19])) throw new Error('unreadable /proc stat');
+  return { state: fields[0], parentPid: Number(fields[1]), startTicks: fields[19],
+    name: text.slice(text.indexOf('(') + 1, end) };
+}
+
+/** Bracket executable/argv reads with birth reads; unreadable is unknown, zombies ended. */
+function readLinuxProcess(pid, { procRoot = '/proc', readFile = fs.readFileSync, readlink = fs.readlinkSync } = {}) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+  const dir = path.join(procRoot, String(pid));
+  try {
+    const before = parseLinuxStat(readFile(path.join(dir, 'stat'), 'utf8'));
+    if (before.state === 'Z' || before.state === 'X') return { present: false };
+    const bootId = readFile(path.join(procRoot, 'sys/kernel/random/boot_id'), 'utf8').trim();
+    const processIdentity = linuxIdentity({ kind: 'linux-proc-v1', pid, bootId, startTicks: before.startTicks });
+    if (!processIdentity) return null;
+    let executable = null, commandLine = null;
+    // Kernel threads and protected processes can have a readable birth but no executable/argv.
+    try { executable = readlink(path.join(dir, 'exe')); } catch {}
+    try { commandLine = readFile(path.join(dir, 'cmdline'), 'utf8').replace(/\0/g, ' ').trim(); } catch {}
+    const after = parseLinuxStat(readFile(path.join(dir, 'stat'), 'utf8'));
+    const afterBoot = readFile(path.join(procRoot, 'sys/kernel/random/boot_id'), 'utf8').trim();
+    if (after.state === 'Z' || after.state === 'X') return { present: false };
+    if (before.startTicks !== after.startTicks || bootId !== afterBoot || before.parentPid !== after.parentPid) return null;
+    return { present: true, processIdentity, executable, commandLine, name: before.name, parentPid: before.parentPid };
+  } catch (error) {
+    if ((error.code === 'ENOENT' || error.code === 'ESRCH') && error.path === path.join(dir, 'stat')) return { present: false };
+    return null;
+  }
+}
+
+/** Direct kernel child links for every thread of a birth-verified parent. Unknown grants nothing. */
+function readLinuxChildren(parent) {
+  const id = linuxIdentity(parent);
+  if (!id) return { ok: false, children: [] };
+  const agrees = seen => seen?.present && seen.processIdentity?.bootId === id.bootId
+    && seen.processIdentity?.startTicks === id.startTicks;
+  if (!agrees(readLinuxProcess(id.pid))) return { ok: false, children: [] };
+  try {
+    const children = new Map();
+    const tasks = `/proc/${id.pid}/task`;
+    for (const tid of fs.readdirSync(tasks)) {
+      let text;
+      try { text = fs.readFileSync(path.join(tasks, tid, 'children'), 'utf8'); }
+      catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+      for (const value of text.trim().split(/\s+/).filter(Boolean)) {
+        const pid = Number(value), seen = readLinuxProcess(pid);
+        if (seen?.present && seen.parentPid === id.pid && seen.processIdentity?.bootId === id.bootId
+          && BigInt(seen.processIdentity.startTicks) >= BigInt(id.startTicks)) children.set(pid, { pid, ...seen });
+      }
+    }
+    return agrees(readLinuxProcess(id.pid)) ? { ok: true, children: [...children.values()] } : { ok: false, children: [] };
+  } catch { return { ok: false, children: [] }; }
+}
+
+function readLinuxTable({ now = Date.now } = {}) {
+  try {
+    const table = [];
+    for (const entry of fs.readdirSync('/proc')) {
+      if (!/^[1-9][0-9]*$/.test(entry)) continue;
+      const pid = Number(entry), seen = readLinuxProcess(pid);
+      if (seen?.present === false) continue;
+      table.push({ ProcessId: pid, ParentProcessId: seen?.parentPid ?? null, Name: seen?.executable ? path.basename(seen.executable) : seen?.name ?? null,
+        CommandLine: seen?.commandLine ?? null, ExecutablePath: seen?.executable ?? null,
+        processIdentity: seen?.processIdentity ?? null });
+    }
+    return table.length ? { ok: true, table, readAt: now() } : { ok: false, reason: 'no readable /proc rows' };
+  } catch (error) { return { ok: false, reason: `process table unavailable: ${error.message}` }; }
+}
+
+function boundExecPath() {
+  return path.resolve(__dirname, '../../../modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec');
+}
+
+/** The helper opens a pidfd BEFORE checking the birth; no check-then-kill by PID. */
+function signalLinuxProcess(identity, signal = 'SIGKILL', { exec = spawnSync, helperPath = boundExecPath() } = {}) {
+  const id = linuxIdentity(identity);
+  if (!id) return { ok: false, outcome: 'unknown-identity', status: null };
+  const result = exec(helperPath, ['signal', String(id.pid), id.bootId, id.startTicks, signal],
+    { encoding: 'utf8', timeout: 5000, shell: false });
+  return { ok: result.status === 0, outcome: result.status === 0 ? 'terminated' : result.status === 3 ? 'mismatch' : 'failed',
+    status: result.status, reason: String(result.stderr ?? result.error?.message ?? '').trim() };
+}
 
 /**
  * The ONE process-table projection. `remove-worktree.cjs` consumes this same constant so the two
@@ -205,6 +304,7 @@ const EMPTY_TABLE_REASON =
  * PowerShell.
  */
 function readProcessTable({ platform = process.platform, exec = spawnSync, now = Date.now } = {}) {
+  if (platform === 'linux' && process.platform === 'linux') return readLinuxTable({ now });
   if (platform !== 'win32') {
     return { ok: false, reason: `process-table enumeration is implemented for win32 only (platform=${platform})` };
   }
@@ -310,6 +410,20 @@ function verifyProcessIdentity({ record, table, maxTableAgeMs = DEFAULT_MAX_TABL
   if (!Number.isInteger(pid) || pid <= 0) {
     return verdict(IDENTITY.REFUSE, `record declares no usable pid (${JSON.stringify(record?.pid)})`);
   }
+  if (record?.processIdentity?.kind === 'linux-proc-v1') {
+    const id = linuxIdentity(record);
+    if (!id || id.pid !== pid) return verdict(IDENTITY.REFUSE, 'invalid Linux birth identity', { pid });
+    const resolved = coerceProcessTable(table, { now, maxTableAgeMs, acceptUnstampedTable });
+    if (!resolved.ok) return verdict(IDENTITY.REFUSE, resolved.reason, { pid });
+    const row = resolved.table.find(r => Number(r.ProcessId) === pid);
+    if (!row) return verdict(IDENTITY.MISMATCH, 'process ended', { pid });
+    const actual = linuxIdentity(row);
+    if (!actual) return verdict(IDENTITY.REFUSE, 'unreadable Linux birth identity', { pid });
+    if (actual.bootId !== id.bootId || actual.startTicks !== id.startTicks) return verdict(IDENTITY.MISMATCH, 'Linux birth differs', { pid });
+    const fingerprint = typeof record.cmdlineFingerprint === 'string' ? record.cmdlineFingerprint.trim() : '';
+    if (!fingerprint || typeof row.CommandLine !== 'string' || !row.CommandLine.trim()) return verdict(IDENTITY.REFUSE, 'unreadable fingerprint', { pid });
+    return verdict(row.CommandLine.includes(fingerprint) ? IDENTITY.MATCH : IDENTITY.MISMATCH, 'Linux birth and fingerprint checked', { pid });
+  }
   const recordedTime = normalizeCreationTime(record?.creationFileTimeUtc);
   if (recordedTime === null) {
     return verdict(
@@ -387,6 +501,7 @@ function isVerifiedMatch(result) {
 
 /** Bounded, non-blocking capture for supervisors that must keep observing child exits. */
 async function readProcessTableAsync({ platform = process.platform, exec = execFile, now = Date.now } = {}) {
+  if (platform === 'linux' && process.platform === 'linux') return readLinuxTable({ now });
   if (platform !== 'win32') return readProcessTable({ platform });
   const result = await new Promise(resolve => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', PROCESS_TABLE_PS_COMMAND],
@@ -397,6 +512,7 @@ async function readProcessTableAsync({ platform = process.platform, exec = execF
 }
 
 module.exports = {
+  linuxIdentity, parseLinuxStat, readLinuxProcess, readLinuxChildren, readLinuxTable, signalLinuxProcess, boundExecPath,
   readProcessTableAsync,
   PROCESS_TABLE_PS_COMMAND,
   IDENTITY,

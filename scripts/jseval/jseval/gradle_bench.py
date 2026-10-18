@@ -23,8 +23,8 @@ def run_gradle_task(
     quiet: bool = True,
 ) -> dict:
     """Run a Gradle benchmark task and return the parsed result.json."""
-    gradlew = "./gradlew.bat"
-    args = [gradlew, task]
+    gradlew = str(REPO_ROOT / "scripts" / "lib" / "tool-invoker.cjs")
+    args = ["node", gradlew, "gradle", task]
     for k, v in props.items():
         args.append(f"-P{k}={v}")
     if quiet:

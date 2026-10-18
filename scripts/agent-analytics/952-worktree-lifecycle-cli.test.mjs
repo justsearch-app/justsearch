@@ -32,9 +32,12 @@ const require = createRequire(import.meta.url);
 
 /** Staged into every fixture checkout: the CLI, its deletion primitive, and their libraries. */
 const CLI_FILES = [
+  'scripts/lib/path-identity.cjs',
+  'scripts/lib/tool-invoker.cjs',
   'scripts/dev/worktree-lifecycle.cjs',
   'scripts/dev/remove-worktree.cjs',
   'scripts/dev/prepare-worktree.cjs',
+  'scripts/dev/lib/resolve-jdk.cjs',
   'scripts/dev/lib/process-identity.cjs',
   'scripts/dev/lib/process-record.cjs',
   'scripts/dev/lib/agent-spawn-record.cjs',
@@ -146,8 +149,9 @@ function worktreeEntries(repo) {
 }
 
 function entryFor(repo, worktreePath) {
-  const wanted = path.resolve(worktreePath).replace(/\\/g, '/').toLowerCase();
-  return worktreeEntries(repo).find((e) => path.resolve(e.path).replace(/\\/g, '/').toLowerCase() === wanted) || null;
+  const key = p => process.platform === 'win32' ? path.resolve(p).replace(/\\/g, '/').toLowerCase() : path.resolve(p);
+  const wanted = key(worktreePath);
+  return worktreeEntries(repo).find(e => key(e.path) === wanted) || null;
 }
 
 /** A pid that is provably not running: spawn a process, wait for it, verify it is gone. */
@@ -721,6 +725,35 @@ try {
     assert.equal(refSha(resumeFx.checkout, 'refs/heads/worktree-r11'), head, 'an UNKNOWN receipt keeps the branch');
     assert.notEqual(cfg(resumeFx.checkout, 'branch.worktree-r11.justsearch-released'), null);
   });
+  if (process.platform === 'linux') await check('Linux prepare/register/release preserves spaced paths and case-distinct worktrees', async () => {
+    const fx = await makeFixture('Linux space Case');
+    commitIn(fx.checkout, 'modules/ui-web/package.json', '{}\n', 'fixture npm working directory');
+    git(fx.checkout, 'push', 'origin', 'main');
+    const npmCli = path.join(fx.root, 'npm fixture.cjs'), trace = path.join(fx.root, 'prepare.json');
+    fs.writeFileSync(npmCli, 'require("node:fs").writeFileSync(process.env.PREPARE_TRACE, JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}));');
+    const bin = path.join(fx.root, 'fake npm bin'); fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\nexec '${process.execPath}' '${npmCli}' "$@"\n`, { mode: 0o755 });
+    const upper = path.join(fx.sanctioned, 'Case');
+    const prepared = runCli(fx, ['create', 'Case', '--prepare', '--no-dist', '--session-id', 'session-Case'],
+      { env: { npm_execpath: npmCli, PREPARE_TRACE: trace, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    assert.equal(prepared.status, 0, prepared.out);
+    assert.deepEqual(JSON.parse(fs.readFileSync(trace, 'utf8')), { cwd: path.join(upper, 'modules/ui-web'), args: ['ci'] });
+    const lower = createWorktree(fx, 'case', 'session-case');
+    for (const [dest, session] of [[upper, 'session-Case'], [lower, 'session-case']]) {
+      const result = runCli(fx, ['register', dest, '--session-id', session]);
+      assert.equal(result.status, 0, result.out);
+      assert.equal(entryFor(fx.checkout, dest).path, dest);
+    }
+    assert.notEqual(upper, lower);
+    const releasedUpper = runCli(fx, ['release', upper, '--no-fetch', '--session-id', 'session-Case']);
+    assert.equal(releasedUpper.status, 0, releasedUpper.out);
+    assert.equal(fs.existsSync(upper), false);
+    assert.equal(fs.existsSync(lower), true, 'releasing Case must preserve case');
+    const releasedLower = runCli(fx, ['release', lower, '--no-fetch', '--session-id', 'session-case']);
+    assert.equal(releasedLower.status, 0, releasedLower.out);
+    assert.equal(fs.existsSync(lower), false);
+  });
+
 } finally {
   for (const fixture of fixtures.reverse()) {
     await fsp.rm(fixture.root, { recursive: true, force: true }).catch(() => {});

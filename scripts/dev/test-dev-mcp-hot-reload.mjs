@@ -534,7 +534,7 @@ const signalGateTests = [
   // hardcoded pair, and the retired task is asserted absent so it cannot creep back.
   ['F4: the dev-runner build step installs exactly the dist it launches from', async () => {
     const src = await fsp.readFile(path.join(HERE, 'dev-runner.cjs'), 'utf8');
-    const tasks = src.match(/\[\s*'assemble',\s*'([^']+)',\s*'-PskipWebBuild=true'\s*\]/);
+    const tasks = src.match(/\[\s*'([^']+)',\s*'-PskipWebBuild=true'\s*\]/);
     assert.ok(tasks, 'the gradle task list for the pre-launch build was not found');
     assert.equal(tasks[1], ':modules:ui:installDist');
     const builtModule = tasks[1].match(/^:modules:([^:]+):installDist$/)?.[1];
@@ -549,7 +549,7 @@ const signalGateTests = [
   }],
   ['F4: the message names what it actually runs (assemble alone did not refresh the launched dist)', async () => {
     const src = await fsp.readFile(path.join(HERE, 'dev-runner.cjs'), 'utf8');
-    assert.match(src, /Ensuring distribution is up-to-date \(assemble \+ installDist\)/);
+    assert.match(src, /Ensuring distribution is up-to-date \(installDist\)/);
     assert.doesNotMatch(src, /Ensuring distribution is up-to-date \(assemble\)/);
   }],
 ];

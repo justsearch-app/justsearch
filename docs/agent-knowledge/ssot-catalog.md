@@ -25,13 +25,13 @@ Two copies of SSOT catalogs exist and MUST be kept in sync:
 5. **Re-index existing data** — existing indices do NOT have the new field:
    - Eval mode: `jseval run --reset` or `--start-backend --clean`
    - Dev mode: `jseval run --start-backend --clean`
-6. **Regenerate the repro manifest:** `./gradlew.bat :modules:ssot-tools:regenSsotManifest`
+6. **Regenerate the repro manifest:** `./gradlew :modules:ssot-tools:regenSsotManifest`
    regenerates `SSOT/manifests/repro/repro.v1.json` so the canonical-JSON SHA-256s of
    each catalog stay in sync. The repro hash is read at Worker startup and recorded as
    build-trace metadata; if you skip this step, the worktree carries a stale hash for
    the catalog you just edited (no test fails, but `WorkerConfig.manifestHash` lies).
-7. Verify pinned-hash tests: `./gradlew.bat :modules:ssot-tools:test`
-8. Verify commit metadata: `./gradlew.bat :modules:adapters-lucene:test`
+7. Verify pinned-hash tests: `./gradlew :modules:ssot-tools:test`
+8. Verify commit metadata: `./gradlew :modules:adapters-lucene:test`
 
 ## Field Roles
 

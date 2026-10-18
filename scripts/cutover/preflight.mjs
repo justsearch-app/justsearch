@@ -109,7 +109,7 @@ function main() {
     note: "everyDownloadUrlResolvesFromPublicHost — no private/localhost download host",
     run: () => {
       if (!(runFull || flip)) return { status: PENDING, detail: "gradle test (ModelRegistryLoaderTest); --full to run" };
-      const r = sh(path.join(root, "gradlew.bat"), [
+      const r = sh(process.execPath, [path.join(root, "scripts/lib/tool-invoker.cjs"), "gradle",
         ":modules:configuration:test",
         "--tests",
         "*ModelRegistryLoaderTest.everyDownloadUrlResolvesFromPublicHost",
@@ -137,10 +137,10 @@ function main() {
     id: "build-test",
     note: "./gradlew build + test green on the snapshot",
     run: () => {
-      if (!(runFull || flip)) return { status: PENDING, detail: "`./gradlew.bat build` + `test`; --full to run" };
-      const b = sh(path.join(root, "gradlew.bat"), ["build", "-x", "test"], root);
+      if (!(runFull || flip)) return { status: PENDING, detail: "`./gradlew build` + `test`; --full to run" };
+      const b = sh(process.execPath, [path.join(root, "scripts/lib/tool-invoker.cjs"), "gradle","build", "-x", "test"], root);
       if (b.code !== 0) return { status: FAIL, detail: "build failed" };
-      const t = sh(path.join(root, "gradlew.bat"), ["test"], root);
+      const t = sh(process.execPath, [path.join(root, "scripts/lib/tool-invoker.cjs"), "gradle","test"], root);
       return { status: t.code === 0 ? PASS : FAIL, detail: t.code === 0 ? "build+test green" : "tests failed" };
     },
   });

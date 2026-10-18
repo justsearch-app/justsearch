@@ -87,6 +87,7 @@ const {
   DEFAULT_MAX_TABLE_AGE_MS,
   readProcessTable,
   normalizeCreationTime,
+  linuxIdentity, signalLinuxProcess,
   verifyProcessIdentity,
   isVerifiedMatch,
 } = require('./process-identity.cjs');
@@ -773,7 +774,8 @@ async function markRefusals(entries, { dir, now = Date.now() } = {}) {
 
 /* ── The effectful arm ─────────────────────────────────────────────────────────────────────── */
 
-function taskkillByPid(pid, { creationFileTimeUtc, exec = spawnSync, platform = process.platform } = {}) {
+function taskkillByPid(pid, { creationFileTimeUtc, processIdentity, exec = spawnSync, platform = process.platform } = {}) {
+  if (platform === 'linux') return signalLinuxProcess({ pid, processIdentity }, 'SIGKILL', { exec });
   if (platform !== 'win32') {
     return { ok: false, reason: `kill is implemented for win32 only (platform=${platform})`, status: null };
   }
@@ -872,7 +874,7 @@ async function executeReap(entry, {
     };
   }
 
-  const kill = taskkillByPid(record.pid, { creationFileTimeUtc: record.creationFileTimeUtc, exec, platform });
+  const kill = taskkillByPid(record.pid, { creationFileTimeUtc: record.creationFileTimeUtc, processIdentity: record.processIdentity, exec, platform });
 
   // Step 6 — confirm. A MISMATCH here is the success signal: the pid is gone from the table.
   const after = readTable();

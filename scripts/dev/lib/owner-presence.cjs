@@ -26,7 +26,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { normalizeCreationTime, coerceProcessTable, DEFAULT_MAX_TABLE_AGE_MS } = require('./process-identity.cjs');
+const { normalizeCreationTime, coerceProcessTable, DEFAULT_MAX_TABLE_AGE_MS, linuxIdentity } = require('./process-identity.cjs');
 const { isSafeKey, readFixtureTable } = require('./agent-identity.cjs');
 
 const OWNERS_DIRNAME = 'owners';
@@ -95,6 +95,7 @@ function touchOwner(stateRoot, identity, { now = Date.now() } = {}) {
     harness: identity.harness,
     pid: owner.pid ?? null,
     creationTime: owner.creationTime ?? null,
+    ...(owner.processIdentity ? { processIdentity: owner.processIdentity } : {}),
     sessionId: identity.sessionId ?? null,
     lastDevStackTouchAt: new Date(now).toISOString(),
   });
@@ -113,6 +114,7 @@ function ownerBlockFor(identity) {
     harness: identity.harness,
     pid: o.pid ?? null,
     creationTime: o.creationTime ?? null,
+    ...(o.processIdentity ? { processIdentity: o.processIdentity } : {}),
     key: o.key,
   };
 }
@@ -122,6 +124,11 @@ function ownerBlockFor(identity) {
  * null for an override key, a legacy value or anything else. Pure.
  */
 function parseOwnerKey(key) {
+  const linux = /^(claude|codex)-(\d+)-linux-([0-9a-f-]{36})-([1-9][0-9]*)$/.exec(String(key ?? ''));
+  if (linux) {
+    const processIdentity = linuxIdentity({ kind: 'linux-proc-v1', pid: Number(linux[2]), bootId: linux[3], startTicks: linux[4] });
+    return processIdentity ? { harness: linux[1], pid: processIdentity.pid, creationTime: null, processIdentity, key } : null;
+  }
   const m = /^(claude|codex)-(\d+)-(\d+)$/.exec(String(key ?? ''));
   if (!m) return null;
   return { harness: m[1], pid: Number(m[2]), creationTime: m[3], key: m[0] };
@@ -134,6 +141,18 @@ function parseOwnerKey(key) {
 function ownerLiveness(owner, { table, now = Date.now(), maxTableAgeMs = DEFAULT_MAX_TABLE_AGE_MS } = {}) {
   if (!owner || !owner.key) return { state: 'unknown', reason: 'no owner recorded' };
   const pid = Number(owner.pid);
+  if (owner.processIdentity) {
+    const id = linuxIdentity(owner);
+    if (!id || id.pid !== pid) return { state: 'unknown', reason: 'invalid Linux owner identity' };
+    const coerced = coerceProcessTable(table, { now, maxTableAgeMs });
+    if (!coerced.ok) return { state: 'unknown', reason: coerced.reason };
+    const row = coerced.table.find(r => Number(r.ProcessId) === pid);
+    if (!row) return { state: 'ended', reason: 'owner process ended' };
+    const actual = linuxIdentity(row);
+    if (!actual) return { state: 'unknown', reason: 'owner birth unreadable' };
+    return actual.bootId === id.bootId && actual.startTicks === id.startTicks
+      ? { state: 'alive', reason: 'Linux owner birth matches' } : { state: 'ended', reason: 'owner birth differs' };
+  }
   const ct = normalizeCreationTime(owner.creationTime == null ? null : String(owner.creationTime));
   if (!Number.isInteger(pid) || pid <= 0 || !ct) return { state: 'unknown', reason: 'owner has no process identity (override or legacy)' };
   const coerced = coerceProcessTable(table, { now, maxTableAgeMs });

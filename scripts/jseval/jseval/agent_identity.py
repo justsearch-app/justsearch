@@ -59,6 +59,7 @@ def _coerce(doc: Any) -> dict[str, Any]:
                 "harness": owner.get("harness", doc["harness"]),
                 "pid": owner.get("pid"),
                 "creationTime": owner.get("creationTime"),
+                **({"processIdentity": owner["processIdentity"]} if owner.get("processIdentity") else {}),
                 "key": key,
             }
     return {"harness": doc["harness"], "owner": owner, "sessionId": sid, "source": str(doc.get("source", ""))}
@@ -103,5 +104,6 @@ def owner_block() -> dict[str, Any] | None:
         "harness": ident.get("harness"),
         "pid": owner.get("pid"),
         "creationTime": owner.get("creationTime"),
+        **({"processIdentity": owner["processIdentity"]} if owner.get("processIdentity") else {}),
         "key": owner.get("key"),
     }

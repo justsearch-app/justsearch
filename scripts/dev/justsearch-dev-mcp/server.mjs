@@ -184,7 +184,7 @@ const {
 /** Read non-expired op-leases (mirrors the dev-runner filter) and bucket by criticality. */
 async function readOwnershipOpLeases(mainRepoRoot) {
   try {
-    const raw = await fsp.readFile(path.join(mainRepoRoot, 'tmp', 'dev-runner', 'op-leases.json'), 'utf8').catch(() => null);
+    const raw = await fsp.readFile(path.join(resolveDevRunnerStateRoot(mainRepoRoot), 'op-leases.json'), 'utf8').catch(() => null);
     if (!raw) return { byCriticality: { mustComplete: [], unsafeToInterrupt: [], interruptibleWithLoss: [] }, entries: [], active: [] };
     const doc = JSON.parse(raw);
     const now = Date.now();
@@ -329,8 +329,8 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
 export async function withStaleness(structured, { mainRepoRoot, callerRepoRoot, callerIdentity }) {
   try {
     const active = await readJsonFileNoSymlinks({
-      repoRoot: mainRepoRoot,
-      relPosix: 'tmp/dev-runner/active.json',
+      repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
+      relPosix: 'active.json',
       maxBytes: 200_000,
     });
     if (!active?.holder) return structured; // no running stack → nothing to declare
@@ -563,8 +563,8 @@ async function resolveRunId(sharedRoot, runId) {
   if (runId) return runId;
   try {
     const active = await readJsonFileNoSymlinks({
-      repoRoot: sharedRoot,
-      relPosix: 'tmp/dev-runner/active.json',
+      repoRoot: resolveDevRunnerStateRoot(sharedRoot),
+      relPosix: 'active.json',
       maxBytes: 200_000,
     });
     return active?.runId ?? null;
@@ -1353,7 +1353,7 @@ export async function main() {
       const callerIdentity = await callerIdentityFor(input);
       if (!takeover || takeover === 'deny') {
         try {
-          const active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
+          const active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 });
           const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
           if (decision && decision.action === 'conflict') {
             const idle = decision.verdict === 'IDLE_HOLD';
@@ -1432,7 +1432,7 @@ export async function main() {
         maybeAppendNdjson(mainRepoRoot, { event: 'tool_start_result', tool: 'justsearch.dev.start', ok: false, timedOut: true });
         const observed = { activeRunId: null, apiBaseUrl: null, uiUrl: null, apiPort: null, uiPort: null, dataDir: null, apiStatusCode: null };
         try {
-          const active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
+          const active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 });
           if (active?.runId) {
             observed.activeRunId = active.runId;
             const runJson = await readRunJson({ repoRoot: mainRepoRoot, runId: active.runId });
@@ -1534,8 +1534,8 @@ export async function main() {
       const maxBytes = input.maxBytes ?? 65_536;
       const maxLines = input.maxLines ?? 200;
 
-      const { relPosix } = resolveAllowedRunFile({ repoRoot: mainRepoRoot, runId: input.runId, kind: input.kind });
-      const tailRes = await tailTextFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix, maxBytes, maxLines });
+      const { relPosix, abs } = resolveAllowedRunFile({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), runId: input.runId, kind: input.kind });
+      const tailRes = await tailTextFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix, maxBytes, maxLines });
 
       if (input.grepPattern && tailRes.ok) {
         try {
@@ -1555,7 +1555,7 @@ export async function main() {
               ok: true,
               runId: input.runId,
               kind: input.kind,
-              path: relPosix,
+              path: path.relative(mainRepoRoot, abs).split(path.sep).join('/'),
               truncated: !!tailRes.truncated,
               bytesRead: tailRes.bytesRead,
               text: tailRes.text,
@@ -2144,8 +2144,8 @@ export async function main() {
       // 2. No stale or active run
       let recordedRunJson = null;
       const activeObservation = await observeOptionalJsonFile({
-        repoRoot: mainRepoRoot,
-        relPosix: 'tmp/dev-runner/active.json',
+        repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
+        relPosix: 'active.json',
         maxBytes: 200_000,
       });
       if (activeObservation.state === FILE_OBSERVATION.ABSENT) {
@@ -2163,9 +2163,9 @@ export async function main() {
         } else {
           let runObservation;
           try {
-            const runFile = resolveAllowedRunFile({ repoRoot: mainRepoRoot, runId: activeRunId, kind: 'run_json' });
+            const runFile = resolveAllowedRunFile({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), runId: activeRunId, kind: 'run_json' });
             runObservation = await observeOptionalJsonFile({
-              repoRoot: mainRepoRoot,
+              repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
               relPosix: runFile.relPosix,
               maxBytes: 2_000_000,
             });
@@ -2267,46 +2267,17 @@ export async function main() {
       // 5. Shared cuda12 GPU llama-server resolvable (tempdoc 656). REPORT-ONLY: the stack starts
       // fine without it (inference fails closed), so this does NOT gate `ready`. GPU-only by design:
       // there is deliberately no CPU baseline in dev (a CPU 9B fallback DOSes concurrent worktrees).
-      const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
-      const cuda12 = ['native-bin', 'llama-server', 'variants', 'cuda12', exe];
-      const resolvedMainRepoRoot = resolveMainRepoRoot(repoRoot);
-      const worktreeCuda12 = path.join(repoRoot, 'modules', 'ui', ...cuda12);
-      const sharedCuda12 = path.join(resolvedMainRepoRoot, 'modules', 'ui', ...cuda12);
-      const worktreeCudaObservation = await observePath(worktreeCuda12);
-      const sharedCudaObservation = sharedCuda12 === worktreeCuda12
-        ? worktreeCudaObservation
-        : await observePath(sharedCuda12);
-      if (worktreeCudaObservation.state === FILE_OBSERVATION.PRESENT) {
-        setCheck('llamaVariantResolvable', 'PASS', 'OK (cuda12 GPU runtime resolvable — worktree)');
-      } else if (sharedCudaObservation.state === FILE_OBSERVATION.PRESENT) {
-        setCheck('llamaVariantResolvable', 'PASS', 'OK (cuda12 GPU runtime resolvable — shared main-checkout)');
-      } else if (
-        worktreeCudaObservation.state === FILE_OBSERVATION.ABSENT
-        && sharedCudaObservation.state === FILE_OBSERVATION.ABSENT
-      ) {
-        setCheck(
-          'llamaVariantResolvable',
-          'FAIL',
-          'No cuda12 GPU runtime resolvable. Provision the shared runtime ONCE at the main checkout: '
-            + '`./gradlew :modules:ui:stageLlamaCudaVariant` (~600 MB), then the dev-runner auto-populates '
-            + 'the shared native-bin and every worktree references it. Dev is GPU-only (no CPU baseline); '
-            + 'until then inference is unavailable (fails closed) but search works.',
-        );
-      } else {
-        const uncertain = worktreeCudaObservation.state !== FILE_OBSERVATION.ABSENT
-          ? worktreeCudaObservation
-          : sharedCudaObservation;
-        setCheck(
-          'llamaVariantResolvable',
-          'UNKNOWN',
-          `Could not verify cuda12 runtime (${uncertain.state}): ${uncertain.error?.message}`,
-        );
-      }
+      const runtime = _ownReq('../lib/dev-runtime.cjs').resolveDevRuntime(repoRoot, resolveMainRepoRoot(repoRoot));
+      setCheck('llamaVariantResolvable', runtime.valid ? 'PASS' : 'FAIL', runtime.valid
+        ? `OK (GPU runtime: ${runtime.path})` : runtime.source === 'override'
+          ? 'JUSTSEARCH_SERVER_EXE must name a regular executable file'
+          : 'GPU runtime unavailable. Export JUSTSEARCH_SERVER_EXE to the pinned CUDA llama-server build.');
 
       const checks = Object.fromEntries(
         Object.entries(checkStates).map(([name, state]) => [name, state === 'PASS']),
       );
-      const ready = ['headDist', 'noStaleRun', 'modelsDir', 'noInferenceOrphan']
+      const ready = ['headDist', 'noStaleRun', 'modelsDir', 'noInferenceOrphan',
+        ...(process.env.JUSTSEARCH_SERVER_EXE ? ['llamaVariantResolvable'] : [])]
         .every((name) => checkStates[name] === 'PASS');
       return toToolResult(PreflightOutputSchema.parse({
         ready,
@@ -2350,8 +2321,8 @@ export async function main() {
       let activeRecord = null;
       let activeRunJson = null;
       const activeObservation = await observeOptionalJsonFile({
-        repoRoot: mainRepoRoot,
-        relPosix: 'tmp/dev-runner/active.json',
+        repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
+        relPosix: 'active.json',
         maxBytes: 200_000,
       });
       if (activeObservation.state === FILE_OBSERVATION.ABSENT) {
@@ -2372,9 +2343,9 @@ export async function main() {
           runId = activeRecord.runId;
           let runObservation;
           try {
-            const runFile = resolveAllowedRunFile({ repoRoot: mainRepoRoot, runId, kind: 'run_json' });
+            const runFile = resolveAllowedRunFile({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), runId, kind: 'run_json' });
             runObservation = await observeOptionalJsonFile({
-              repoRoot: mainRepoRoot,
+              repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
               relPosix: runFile.relPosix,
               maxBytes: 2_000_000,
             });
@@ -2675,7 +2646,7 @@ export async function main() {
       let last = null;
       for (;;) {
         let active = null;
-        try { active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 }); } catch { /* none */ }
+        try { active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 }); } catch { /* none */ }
         const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
         const rt = recommendedTakeoverFor(decision);
         if (rt !== null) {
@@ -2893,7 +2864,7 @@ export async function main() {
       const input = AiActivateInputSchema.parse(rawArgs);
       const timeoutMs = input.timeoutMs ?? 60_000;
       const pollIntervalMs = input.pollIntervalMs ?? 2_000;
-      const variantId = input.variantId ?? 'cuda12';
+      const variantId = input.variantId ?? (process.env.JUSTSEARCH_SERVER_EXE ? 'default' : 'cuda12');
 
       const resolved = await resolveApiBaseUrl({ runId: input.runId, apiPort: input.apiPort, mainRepoRoot });
       if (!resolved.ok) {
@@ -2963,7 +2934,7 @@ export async function main() {
       let active = null;
       let runJson = null;
       try {
-        active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
+        active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 });
         if (!active?.runId) throw new Error('no runId');
         runJson = await readRunJson({ repoRoot: mainRepoRoot, runId: active.runId });
         if (!runJson) throw new Error('no run.json');
@@ -3031,7 +3002,7 @@ export async function main() {
       // hold: an older copy would silently skip the identity check it does not have. The bytecode
       // and the Gradle wrapper come from the run's tree; only the pusher binary is ours.
       const hotSwapScript = path.join(repoRoot, 'scripts', 'dev', 'HotSwapPush.java');
-      const gradleCmd = path.join(runRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+      const invoker = path.join(runRoot, 'scripts/lib/tool-invoker.cjs');
       result.compiledFrom = runRoot;
       result.debugPort = debugPort;
 
@@ -3040,9 +3011,9 @@ export async function main() {
         const compileStart = Date.now();
         try {
           const compileResult = await execFileP(
-            gradleCmd,
-            [`:modules:${module}:compileJava`],
-            { cwd: runRoot, timeout: 60_000, windowsHide: true, shell: process.platform === 'win32', env: jdkEnv },
+            process.execPath,
+            [invoker, 'gradle', `:modules:${module}:compileJava`],
+            { cwd: runRoot, timeout: 60_000, windowsHide: true, env: jdkEnv },
           );
           result.compileMs = Date.now() - compileStart;
           // Check for compilation errors in output

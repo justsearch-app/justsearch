@@ -570,12 +570,21 @@ export function ledgerMismatch(records, expected, { runId, previousRunId }) {
       problems.push(`${where}: session ${got.incarnation?.session}, expected the previous run ${previousRunId}`);
     }
     const compared = { ...fields };
-    if (type === 'engine-exit' && compared.code === JS_ENGINE_STOP && got.codeDistinctive === false) {
+    if (type === 'engine-exit' && compared.code === JS_ENGINE_STOP && process.platform === 'linux') {
+      // POSIX reports the terminating signal, not a Windows DWORD exit code. Keep forced-stop
+      // provenance and its deadline asserted while requiring truthful unknown code/class fields.
+      compared.code = null;
+      compared.exitClass = 'UNKNOWN';
+      compared.codeDistinctive = false;
+      compared.forced = true;
+      if (!Number.isFinite(Date.parse(got.terminateCalledAt))) problems.push(`${where}: missing forced-stop timestamp`);
+      if (got.exitedAt !== null) problems.push(`${where}: fabricated OS exit timestamp`);
+    } else if (type === 'engine-exit' && compared.code === JS_ENGINE_STOP && got.codeDistinctive === false) {
       // The documented dev fallback (Spec F §5.2): taskkill /F, code 1, recorded as such.
       compared.code = 1;
     }
     problems.push(...subsetMismatch(compared, got, where));
-    if (type === 'engine-exit' && got.codeDistinctive === false && got.code !== 1) {
+    if (type === 'engine-exit' && got.codeDistinctive === false && got.code !== (process.platform === 'linux' ? null : 1)) {
       problems.push(`${where}: codeDistinctive false with code ${got.code}`);
     }
   });

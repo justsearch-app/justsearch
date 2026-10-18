@@ -166,6 +166,11 @@ class TestUnregister:
 
 
 class TestStartBackendRegisters:
+    @pytest.fixture(autouse=True)
+    def installed_distribution_fixture(self, monkeypatch):
+        # These producer tests mock the running backend; build behavior has its own launch tests.
+        monkeypatch.setattr("jseval.backend._install_distribution", lambda *_args: None)
+
     """Wiring: the record is written at SPAWN, before health — the JVM holds ports, the data dir
     and the GPU from that moment, and that boot window is exactly what a neighbour's "is the
     machine free?" check must not miss."""

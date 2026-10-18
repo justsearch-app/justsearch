@@ -66,6 +66,7 @@ function copyCheckout(dest) {
     'scripts/dev/justsearch-dev-mcp.mjs',
     'scripts/dev/justsearch-dev-mcp',
     'scripts/dev/lib',
+    'scripts/lib',
     'governance/supervision-contract.v1.json',
   ];
   for (const rel of items) {

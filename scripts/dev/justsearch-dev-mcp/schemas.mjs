@@ -95,7 +95,7 @@ export const StartInputSchema = z
     waitLevel: ReadyLevelSchema.optional().describe('Readiness level to wait for after start (default: ready_worker)'),
     skipBuild: z.boolean().optional().describe('Skip the Gradle build step and launch from the '
       + 'artifacts already on disk (default: false). Two consequences, both from tempdoc 844: the '
-      + 'step that is skipped is `assemble + :modules:ui:installDist` (F4 — `assemble` alone left '
+      + 'step that is skipped is `:modules:ui:installDist` (F4 — `assemble` alone left '
       + 'the launched dist untouched), so a Java edit you '
       + 'have not installed will NOT be in the running stack; and hot reload needs the '
       + 'worker-services classes dir to be paired with those jars, which skipping the build cannot '
@@ -550,7 +550,7 @@ export const AiActivateInputSchema = z
   .object({
     runId: z.string().meta({ format: 'uuid' }).optional().describe('Run ID (omit to use active run)'),
     apiPort: z.number().int().positive().optional().describe('API port (alternative to runId for untracked instances)'),
-    variantId: z.string().min(1).default('cuda12'),
+    variantId: z.string().min(1).optional(),
     // Tempdoc 842 §2.4: activation is when llama-server spawns, so it is the natural chat-model
     // profile switch point. Forwarded to POST /api/ai/runtime/activate when set; backend support
     // lands in a parallel Java slice — sending the field is forward-compatible either way.

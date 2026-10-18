@@ -2014,12 +2014,6 @@ tasks.withType<CreateStartScripts>().configureEach {
               Regex("(?m)^set CLASSPATH=.*$", RegexOption.MULTILINE),
               "set CLASSPATH=%APP_HOME%\\\\lib\\\\*")
       windowsScript.writeText(collapsed)
-    } else {
-      val unixText = unixScript.readText()
-      // Lambda form: the string-replacement overload treats '$' as a group reference, so
-      // "$APP_HOME" -> "$A" throws "Illegal group reference" when building on Linux (tempdoc 668).
-      val collapsed = Regex("(?m)^CLASSPATH=.*$").replace(unixText) { "CLASSPATH=\"\$APP_HOME/lib/*\"" }
-      unixScript.writeText(collapsed)
     }
   }
 }
@@ -2132,157 +2126,16 @@ val HEADLESS_GPU_ENV_VARS = listOf(
 )
 
 fun JavaExec.applyHeadlessEvalContract() {
-  workingDir = rootProject.layout.projectDirectory.asFile
-  val repoRootProvider =
-    providers.environmentVariable("JUSTSEARCH_REPO_ROOT")
-      .orElse(rootProject.layout.projectDirectory.asFile.absolutePath)
-  val dataDirProvider =
-    providers.environmentVariable("JUSTSEARCH_DATA_DIR")
-      .orElse(rootProject.layout.projectDirectory.dir("tmp/headless-eval-data").asFile.absolutePath)
-  val indexBasePathProvider =
-    providers.environmentVariable("JUSTSEARCH_INDEX_BASE_PATH")
-      .orElse(dataDirProvider.map { dataDir ->
-        File(dataDir).toPath().resolve("index").resolve("default").toString()
-      })
-  val ssotPathProvider =
-    providers.environmentVariable("JUSTSEARCH_SSOT_PATH")
-      .orElse(repoRootProvider.map { repoRoot -> File(repoRoot, "SSOT").absolutePath })
-  val pluginsManifestProvider =
-    providers.environmentVariable("JUSTSEARCH_STAGE_PLUGIN_MANIFEST")
-      .orElse(
-        repoRootProvider.map { repoRoot ->
-          File(repoRoot, "SSOT/manifests/plugins/pipeline-stage-plugins.v1.json").absolutePath
-        }
-      )
-  val configPathProvider =
-    providers.environmentVariable("JUSTSEARCH_CONFIG")
-      .orElse(
-        project.layout.projectDirectory.file("src/main/resources/headless-config/application.yaml")
-          .asFile.absolutePath
-      )
-  val modelsDirProvider =
-    providers.environmentVariable("JUSTSEARCH_MODELS_DIR")
-      .orElse(repoRootProvider.map { repoRoot -> File(repoRoot, "models").absolutePath })
-  val serverExeProvider = providers.environmentVariable("JUSTSEARCH_SERVER_EXE")
-  val ortNativePathProvider = providers.environmentVariable("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH")
-  val apiPortProvider = providers.environmentVariable("JUSTSEARCH_API_PORT").orElse("33221")
-
-  val repoRoot = repoRootProvider.get()
-  val dataDir = dataDirProvider.get()
-  val indexBasePath = indexBasePathProvider.get()
-  val ssotPath = ssotPathProvider.get()
-  val pluginsManifest = pluginsManifestProvider.get()
-  val configPath = configPathProvider.get()
-  val modelsDir = modelsDirProvider.get()
-  val serverExe = serverExeProvider.orNull
-  var ortNativePath = ortNativePathProvider.orNull
-  // Auto-detect ORT CUDA DLLs when not explicitly set (ORT 1.24.3 + CUDA 12.4).
-  // Without this, all ONNX GPU sessions fall back to CPU silently.
-  if (ortNativePath.isNullOrBlank()) {
-    ortNativePath = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile)
-  }
-  val apiPort = apiPortProvider.get()
-
-  val envValues =
-    linkedMapOf(
-      "JUSTSEARCH_API_PORT" to apiPort,
-      "JUSTSEARCH_DATA_DIR" to dataDir,
-      "JUSTSEARCH_HOME" to dataDir,
-      "JUSTSEARCH_UI_SETTINGS_MODE" to "IN_MEMORY",
-      "JUSTSEARCH_INDEX_BASE_PATH" to indexBasePath,
-      "JUSTSEARCH_REPO_ROOT" to repoRoot,
-      "JUSTSEARCH_SSOT_PATH" to ssotPath,
-      "JUSTSEARCH_STAGE_PLUGIN_MANIFEST" to pluginsManifest,
-      "JUSTSEARCH_CONFIG" to configPath,
-      "JUSTSEARCH_MODELS_DIR" to modelsDir,
-    )
-  if (!serverExe.isNullOrBlank()) {
-    envValues["JUSTSEARCH_SERVER_EXE"] = serverExe
-  }
-  if (!ortNativePath.isNullOrBlank()) {
-    envValues["JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH"] = ortNativePath
-  }
-  // GPU eval profile: forward GPU-related env vars when set by the caller.
-  for (gpuVar in HEADLESS_GPU_ENV_VARS) {
-    val value = providers.environmentVariable(gpuVar).orNull
-    if (!value.isNullOrBlank()) {
-      envValues[gpuVar] = value
-    }
-  }
-  // AI env vars declared in HEADLESS_AI_ENV_VARS but not hardcoded above.
-  // Mirrors the runHeadless task (line 1828) so keys like
-  // JUSTSEARCH_INDEX_TRACING_LEVEL (400 Layer 2) and JUSTSEARCH_LLM_* reach
-  // the Engine JVM in eval mode. Hardcoded keys in envValues take precedence
-  // via LinkedHashMap insertion semantics (first write wins only when using
-  // putIfAbsent — Map.set overwrites, so only forward missing keys).
-  for (aiVar in HEADLESS_AI_ENV_VARS) {
-    if (envValues.containsKey(aiVar)) continue
-    val value = providers.environmentVariable(aiVar).orNull
-    if (!value.isNullOrBlank()) {
-      envValues[aiVar] = value
-    }
-  }
-  // Auto-enable GPU inference via master switch when CUDA DLLs are detected (tempdoc 337).
-  // Per-model overrides (EMBED_GPU_ENABLED, SPLADE_GPU_ENABLED, etc.) take precedence when set.
-  if (!ortNativePath.isNullOrBlank()) {
-    if (!envValues.containsKey("JUSTSEARCH_GPU_ENABLED")) {
-      envValues["JUSTSEARCH_GPU_ENABLED"] = "true"
-    }
-  }
-  envValues.forEach { (key, value) -> environment(key, value) }
-
-  // Logback config is shipped on the ui-headless.jar classpath via
-  // src/main/resources/logback.xml; no -Dlogback.configurationFile needed.
-  // Tempdoc 374 alpha.23 follow-up — closes Jetty DEBUG noise + dev/prod drift.
-
-  systemProperty("justsearch.api.port", apiPort)
-  systemProperty("justsearch.data.dir", dataDir)
-  systemProperty("justsearch.home", dataDir)
-  systemProperty("justsearch.ui.settings.mode", "IN_MEMORY")
-  systemProperty("justsearch.index.base_path", indexBasePath)
-  systemProperty("justsearch.config", configPath)
-  systemProperty("justsearch.repo.root", repoRoot)
-  systemProperty("justsearch.ssot.path", ssotPath)
-  systemProperty("justsearch.plugins.manifest", pluginsManifest)
-  systemProperty("justsearch.models.dir", modelsDir)
-  // 355: Enable eval-only endpoints (e.g. POST /api/debug/reset-index)
-  systemProperty("justsearch.eval.mode", "true")
-  if (!serverExe.isNullOrBlank()) {
-    systemProperty("justsearch.server.exe", serverExe)
-  }
-  if (!ortNativePath.isNullOrBlank()) {
-    systemProperty("justsearch.onnxruntime.native_path", ortNativePath)
-  }
-  // 363: Forward LLM config from env to system properties for QU eval
-  val llmEnabled = providers.environmentVariable("JUSTSEARCH_LLM_ENABLED").orNull
-  if (!llmEnabled.isNullOrBlank()) {
-    systemProperty("justsearch.llm.enabled", llmEnabled)
-  }
-  val llmModelPath = providers.environmentVariable("JUSTSEARCH_LLM_MODEL_PATH").orNull
-  if (!llmModelPath.isNullOrBlank()) {
-    systemProperty("justsearch.llm.model_path", llmModelPath)
-  }
-  // 334 Phase 11: Profiling support. Enable via env vars:
-  // JUSTSEARCH_JFR_ENABLED=true — starts Java Flight Recorder (writes to tmp/eval-profile.jfr)
-  // JUSTSEARCH_ORT_PROFILING=true — enables ORT per-node profiling (writes Chrome trace to tmp/)
-  val jfrEnabled = providers.environmentVariable("JUSTSEARCH_JFR_ENABLED").orNull
-  if (jfrEnabled == "true") {
-    val jfrPath = rootProject.layout.projectDirectory.dir("tmp").file("eval-profile.jfr").asFile.absolutePath
-    jvmArgs("-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=$jfrPath,duration=300s,settings=profile")
-  }
-  val ortProfiling = providers.environmentVariable("JUSTSEARCH_ORT_PROFILING").orNull
-  if (ortProfiling == "true") {
-    val profileDir = rootProject.layout.projectDirectory.dir("tmp").asFile.absolutePath
-    environment("JUSTSEARCH_ORT_PROFILING_DIR", profileDir)
-  }
-  // 347: Removed env→sysprop bridges for EMBED_ONNX_MODEL_PATH and INDEX_SCHEMA_MISMATCH_POLICY.
-  // These are forwarded as env vars via HEADLESS_GPU_ENV_VARS, and EnvRegistry.get() + contributeEnvRegistry()
-  // both read env vars, so sysprop bridges are redundant.
-
-  // 369: -Pllm=true enables LLM autostart with a generous health check timeout.
-  // Usage: ./gradlew.bat :modules:ui:runHeadlessEval -Pllm=true
-  // Server exe auto-detection is handled by InferenceConfig.findServerExecutable()
-  // which searches dev-layout paths when justsearch.repo.root is set.
+  val root = rootProject.layout.projectDirectory.asFile
+  workingDir = root
+  val definition = providers.exec {
+    workingDir(root)
+    commandLine("node", File(root, "scripts/dev/lib/eval-launch.cjs").absolutePath)
+    environment(providers.environmentVariablesPrefixedBy("JUSTSEARCH_").get())
+  }.standardOutput.asText.get()
+  val launch = ObjectMapper().readTree(definition)
+  launch.get("environment").fields().forEachRemaining { (key, value) -> environment(key, value.asText()) }
+  jvmArgs(launch.get("jvmArgs").map { it.asText() })
   val llmFlag = project.findProperty("llm")?.toString()?.lowercase() == "true"
   if (llmFlag) {
     environment("JUSTSEARCH_AI_AUTOSTART_ENABLED", "true")

@@ -19,6 +19,13 @@ from jseval.backend import (
 )
 
 
+@pytest.fixture(autouse=True)
+def installed_distribution_fixture(monkeypatch):
+    # These existing lifecycle tests replace Popen/the health boundary. Stage the new build
+    # prerequisite separately; test_backend_launch.py exercises build order and failure handling.
+    monkeypatch.setattr("jseval.backend._install_distribution", lambda *_args: None)
+
+
 class TestRepoRoot:
     def test_returns_path(self):
         assert REPO_ROOT.is_dir()
