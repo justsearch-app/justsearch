@@ -10,7 +10,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 test('MCP state readers use the runner state override, including outside the repository', async () => {
   const root = path.resolve(import.meta.dirname, '../..');
-  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'MCP state space ü '));
+  // Windows CI TEMP may be an 8.3 alias; the file reader checks canonical containment.
+  const state = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'MCP state space ü ')));
   const runId = 'state-path-test';
   const runDir = path.join(state, 'runs', runId);
   const server = http.createServer((_request, response) => {

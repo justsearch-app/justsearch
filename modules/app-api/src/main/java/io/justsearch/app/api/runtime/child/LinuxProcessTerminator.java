@@ -19,8 +19,17 @@ final class LinuxProcessTerminator implements ProcessTerminator {
 
   @Override public OsProcess open(Process process) throws IOException {
     var observed = LinuxProcessIdentity.observe(process.pid());
-    if (observed.presence() != IdentityPresence.PRESENT && process.isAlive())
-      throw new IOException("Cannot acquire Linux child birth identity");
+    if (observed.presence() != IdentityPresence.PRESENT && process.isAlive()) {
+      // procfs can already report gone/zombie before the JDK reaper publishes the exit. Only
+      // the original spawn object can confirm that exit; missing birth alone grants no ownership.
+      try {
+        if (!process.waitFor(2, TimeUnit.SECONDS))
+          throw new IOException("Cannot acquire Linux child birth identity");
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted acquiring Linux child birth identity", interrupted);
+      }
+    }
     OsProcess held = children.open(process);
     return new OsProcess() {
       @Override public Optional<String> creationFileTime() { return Optional.empty(); }
