@@ -47,6 +47,7 @@ import java.util.List;
  *     decline it ({@link Necessity#userDeclinable()}). Never null: an unclassified package
  *     normalizes to {@link Necessity#REQUIRED}, so nobody's omission can make a package
  *     switch-off-able.
+ * @param nativeTarget native-targets descriptor key for all artifacts in this package; null means portable
  * @param dependsOn ids of packages this one cannot function without (tempdoc 840 Phase 2). Today
  *     the only edge is "…→ cuda-runtime", declared by every package that can select a CUDA/FP16
  *     variant: it makes the previously implicit H1 invariant (no CUDA variant is selected unless
@@ -68,7 +69,8 @@ public record ModelPackage(
     boolean requiresCuda,
     boolean devOnly,
     Necessity necessity,
-    List<String> dependsOn) {
+    List<String> dependsOn,
+    String nativeTarget) {
 
   /**
    * Compact constructor — normalize nulls to empty lists, and an unclassified {@code necessity} to
@@ -80,6 +82,16 @@ public record ModelPackage(
     if (supportingFiles == null) supportingFiles = List.of();
     if (dependsOn == null) dependsOn = List.of();
     if (necessity == null) necessity = Necessity.REQUIRED;
+    if (nativeTarget != null) io.justsearch.configuration.NativeTargets.forTarget(nativeTarget);
+  }
+
+  /** Registries without a native target contain portable artifacts, as before. */
+  public ModelPackage(String id, String label, String description, String targetDir,
+      List<ModelVariant> variants, List<SupportingFile> supportingFiles, long minVramBytes,
+      String termsUrl, String installRoot, String license, CapabilityTier tier,
+      boolean requiresCuda, boolean devOnly, Necessity necessity, List<String> dependsOn) {
+    this(id, label, description, targetDir, variants, supportingFiles, minVramBytes, termsUrl,
+        installRoot, license, tier, requiresCuda, devOnly, necessity, dependsOn, null);
   }
 
   /** Backwards-compat constructor — no installRoot (existing default behavior under modelsDir). */

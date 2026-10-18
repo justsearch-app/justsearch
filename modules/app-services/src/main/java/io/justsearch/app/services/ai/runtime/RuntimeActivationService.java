@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.runtime;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.app.api.AiInstallService;
 import io.justsearch.app.api.AiRuntimeStatusResponse;
 import io.justsearch.app.api.AiRuntimeActivationStatus;
@@ -821,8 +822,12 @@ public final class RuntimeActivationService
   public Attempt startActivate(String variantId, String chatProfile) {
     String v = variantId == null ? "" : variantId.trim();
     if (v.isBlank()) {
-      throw new IllegalArgumentException("variantId is required");
+      if (PlatformPaths.isWindows()) {
+        throw new IllegalArgumentException("variantId is required");
+      }
+      v = "default";
     }
+    final String selectedVariant = v;
     String profileRaw = chatProfile == null || chatProfile.isBlank() ? null : chatProfile.trim();
     AiRuntimeActivationStatus started;
     AttemptPublication publication;
@@ -850,7 +855,7 @@ public final class RuntimeActivationService
       throw failure;
     }
     return new Attempt(started, startLeasedThread(
-        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(v, profileRaw, publication)));
+        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(selectedVariant, profileRaw, publication)));
   }
 
   public Attempt startDeactivate() {
@@ -919,23 +924,12 @@ public final class RuntimeActivationService
       return;
     }
 
-    Path root = variantsRoot();
-    Path exe = root.resolve(variantId).resolve("llama-server.exe");
-    if (!Files.isRegularFile(exe)) {
-      // G17: "default" variant may be the baseline exe flat in native-bin/llama-server/
-      // (not under variants/). Fall back to it so fresh installs can activate.
-      if ("default".equals(variantId)) {
-        Path baseline = root.getParent().resolve("llama-server.exe");
-        if (Files.isRegularFile(baseline)) {
-          log.info("Using baseline exe as default variant: {}", baseline);
-          exe = baseline;
-        }
-      }
-      if (!Files.isRegularFile(exe)) {
-        fail("RUNTIME_VARIANT_NOT_INSTALLED", "Variant not installed: " + variantId, null,
-            publication);
-        return;
-      }
+    Path exe;
+    try {
+      exe = activationExecutable(variantsRoot(), variantId, operatorServerExeOrNull());
+    } catch (IllegalStateException invalid) {
+      fail("RUNTIME_VARIANT_NOT_INSTALLED", invalid.getMessage(), invalid, publication);
+      return;
     }
 
     UiSettingsStore.Snapshot base = settingsStore.inspect();
@@ -1047,17 +1041,22 @@ public final class RuntimeActivationService
 
   private void runDeactivate(AttemptPublication publication) {
     UiSettingsStore.Snapshot base = settingsStore.inspect();
-    Path baselineExe = resolveCpuBaselineExe(aiHome);
-    if (baselineExe == null || !Files.isRegularFile(baselineExe)) {
-      fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null,
-          publication);
-      return;
-    }
-    requireMutableServerExecutable(baselineExe);
+    Path baselineExe = PlatformPaths.isWindows() ? resolveCpuBaselineExe(aiHome) : null;
     UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(base.settings()), UiSettings.class);
-    // A blank value would expose the remembered CUDA auto-detection source again.
-    next.setServerExecutablePath(baselineExe.toAbsolutePath().toString());
-    next.setGpuLayers(0);
+    if (baselineExe == null || !Files.isRegularFile(baselineExe)) {
+      if (PlatformPaths.isWindows()) {
+        fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null,
+            publication);
+        return;
+      }
+      // No fallback runtime is supplied on this target. Keep the operator's runtime and GPU
+      // configuration for reactivation, and stop chat through the recorded settings owner.
+      next.setChatEnabled(false);
+    } else {
+      requireMutableServerExecutable(baselineExe);
+      next.setServerExecutablePath(baselineExe.toAbsolutePath().toString());
+      next.setGpuLayers(0);
+    }
     // The commit restarts the engine on the baseline; a freeze keeps convergence from acting on
     // the half-applied runtime meanwhile (the procedure this replaced did the same).
     Hold freeze =
@@ -1089,7 +1088,9 @@ public final class RuntimeActivationService
     }
     boolean cpu = activating && selfTestDevicePlan(next).gpuLayers() == 0;
     String message = activating ? (cpu ? "CPU runtime activated." : "GPU runtime activated.")
-        : "GPU runtime deactivated (CPU baseline).";
+        : (PlatformPaths.isWindows() || next.getChatEnabled()
+            ? "GPU runtime deactivated (CPU baseline)."
+            : "Chat unavailable: deactivated; no fallback runtime is installed.");
     return () -> updateState("completed", "done", message, null);
   }
 
@@ -1148,12 +1149,39 @@ public final class RuntimeActivationService
     return new SettingsWitness(Math.addExact(expected.acceptedRevision(), 1), result.record().key());
   }
 
+  /** Resolve one candidate, preserving the operator's exact Linux runtime path. */
+  static Path activationExecutable(Path root, String variantId, Path operatorExe) {
+    boolean windows = PlatformPaths.isWindows();
+    boolean defaultVariant = variantId == null || variantId.isBlank() || "default".equals(variantId);
+    if (!windows) {
+      if (!defaultVariant) {
+        throw new IllegalStateException("Runtime packs are Windows-only; use the default variant with JUSTSEARCH_SERVER_EXE.");
+      }
+      if (operatorExe == null || !Files.isRegularFile(operatorExe) || !Files.isExecutable(operatorExe)) {
+        throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + operatorExe);
+      }
+      return operatorExe;
+    }
+    String name = NativeTargets.current().executableName("llama-server");
+    Path exe = root.resolve(variantId).resolve(name);
+    if (!Files.isRegularFile(exe) && defaultVariant) exe = root.getParent().resolve(name);
+    if (!Files.isRegularFile(exe)) throw new IllegalStateException("Variant not installed: " + variantId);
+    return exe;
+  }
+
+  private static Path operatorServerExeOrNull() {
+    ConfigStore store = ConfigStore.globalOrNull();
+    var resolution = store == null ? null : store.get().resolution(SERVER_EXE_KEY);
+    return resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400
+        ? store.get().ai().serverExe() : null;
+  }
+
   private static void requireMutableServerExecutable(Path requested) {
     ConfigStore config = ConfigStore.globalOrNull();
     var resolution = config == null ? null : config.get().resolution(SERVER_EXE_KEY);
     if (resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400
-        && !Path.of(resolution.value()).toAbsolutePath().normalize()
-            .equals(requested.toAbsolutePath().normalize())) {
+        && !(PlatformPaths.isWindows() ? Path.of(resolution.value()) : config.get().ai().serverExe())
+            .toAbsolutePath().normalize().equals(requested.toAbsolutePath().normalize())) {
       throw new IllegalStateException("Server executable override is locked by operator config");
     }
   }
@@ -1579,11 +1607,18 @@ public final class RuntimeActivationService
 
   private List<AiRuntimeStatusResponse.InstalledVariant> listInstalledVariants() {
     List<AiRuntimeStatusResponse.InstalledVariant> out = new ArrayList<>();
+    if (!PlatformPaths.isWindows()) {
+      Path operator = operatorServerExeOrNull();
+      if (operator != null && Files.isRegularFile(operator) && Files.isExecutable(operator)) {
+        out.add(new AiRuntimeStatusResponse.InstalledVariant("default", operator.toString()));
+      }
+      return out;
+    }
 
     // G17: Include the baseline exe as a synthetic "default" variant if it exists
     // flat in native-bin/llama-server/ (not under variants/).
     Path root = variantsRoot();
-    Path baselineExe = root.getParent().resolve("llama-server.exe");
+    Path baselineExe = root.getParent().resolve(NativeTargets.current().executableName("llama-server"));
     boolean hasDefaultVariantDir = Files.isDirectory(root.resolve("default"));
     if (Files.isRegularFile(baselineExe) && !hasDefaultVariantDir) {
       out.add(
@@ -1600,7 +1635,7 @@ public final class RuntimeActivationService
                     p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
             .forEach(
                 dir -> {
-                  Path exe = dir.resolve("llama-server.exe");
+                  Path exe = dir.resolve(NativeTargets.current().executableName("llama-server"));
                   if (Files.isRegularFile(exe)) {
                     out.add(
                         new AiRuntimeStatusResponse.InstalledVariant(
@@ -1925,7 +1960,7 @@ public final class RuntimeActivationService
       if (!Files.isDirectory(nativeBin)) return null;
 
       // 1. Check canonical baseline path FIRST (deterministic, preferred)
-      Path canonical = nativeBin.resolve("llama-server.exe");
+      Path canonical = nativeBin.resolve(NativeTargets.current().executableName("llama-server"));
       if (Files.isRegularFile(canonical)) {
         return canonical;
       }
@@ -1936,7 +1971,7 @@ public final class RuntimeActivationService
             .filter(Files::isDirectory)
             .filter(d -> !"variants".equalsIgnoreCase(d.getFileName().toString()))
             .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
-            .map(d -> d.resolve("llama-server.exe"))
+            .map(d -> d.resolve(NativeTargets.current().executableName("llama-server")))
             .filter(Files::isRegularFile)
             .findFirst()
             .orElse(null);

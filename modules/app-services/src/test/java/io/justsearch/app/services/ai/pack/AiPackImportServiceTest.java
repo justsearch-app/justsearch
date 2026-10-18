@@ -27,6 +27,22 @@ import org.junit.jupiter.api.io.TempDir;
 
 class AiPackImportServiceTest {
 
+  private String nativeFixtureOs;
+
+  @org.junit.jupiter.api.BeforeEach
+  void selectRuntimePackFixtureTarget(org.junit.jupiter.api.TestInfo info) {
+    nativeFixtureOs = System.getProperty("os.name");
+    if (info.getTestMethod().orElseThrow().getName().startsWith("zipImportRuntimePack")) {
+      System.setProperty("os.name", "Windows 11");
+    }
+  }
+
+  @AfterEach
+  void restoreNativeFixtureTarget() {
+    if (nativeFixtureOs == null) System.clearProperty("os.name");
+    else System.setProperty("os.name", nativeFixtureOs);
+  }
+
   @TempDir Path tmp;
 
   private String prevHome;

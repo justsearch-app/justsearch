@@ -75,6 +75,9 @@ final class GenerativeSettingsComponentOwnerTest {
     Files.writeString(projector, "projector");
     Path executable = directory.resolve("llama-server.exe");
     Files.writeString(executable, "server");
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      org.junit.jupiter.api.Assertions.assertTrue(executable.toFile().setExecutable(true, true));
+    }
     ResolvedConfig desired = ResolvedConfig.builder()
         .putDefault("justsearch.models.dir", models.toString())
         .putDefault("justsearch.server.exe", executable.toString())

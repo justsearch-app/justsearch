@@ -69,6 +69,9 @@ class BootstrapInferenceFactoryCapturedConfigTest {
   private ResolvedConfig snapshot(String name, int port, int context, int layers) throws Exception {
     Path root = Files.createDirectories(directory.resolve(name));
     Path server = Files.writeString(root.resolve("llama-server.exe"), "test fixture; never launched");
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      org.junit.jupiter.api.Assertions.assertTrue(server.toFile().setExecutable(true, true));
+    }
     Path model = Files.writeString(root.resolve("model.gguf"), "test fixture; never loaded");
     var builder = new ResolvedConfigBuilder();
     builder.putDefault("justsearch.home", root.toString());

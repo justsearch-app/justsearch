@@ -55,13 +55,13 @@ class OrtNativePackDetectionTest {
   @DisplayName("incomplete dir (missing a DLL) → INCOMPLETE naming the missing DLL")
   void incompleteDir_returnsIncomplete() throws IOException {
     Path dir = completePackDir(OrtCudaHelper.EXPECTED_ORT_NATIVE_VERSION);
-    Files.delete(dir.resolve("onnxruntime_providers_cuda.dll"));
+    Files.delete(dir.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("ort-cuda")));
 
     OrtNativePackDecision decision = OrtCudaHelper.evaluateOrtNativePack(dir, null);
 
     assertEquals(OrtNativePackStatus.INCOMPLETE, decision.status());
     assertTrue(
-        decision.detail().contains("onnxruntime_providers_cuda.dll"),
+        decision.detail().contains(io.justsearch.configuration.NativeTargets.current().libraryName("ort-cuda")),
         "the missing DLL must be named in the decision detail: " + decision.detail());
   }
 

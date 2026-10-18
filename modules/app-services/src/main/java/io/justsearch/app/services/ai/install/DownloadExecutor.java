@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.app.api.runtime.child.OwnedHelper;
 
 import io.justsearch.configuration.EnvRegistry;
@@ -511,7 +512,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    */
   static List<String> curlCommand(String url, Path destPartial, boolean forceHttp11) {
     List<String> cmd = new ArrayList<>();
-    cmd.add("curl.exe");
+    cmd.add(NativeTargets.current().executableName("curl"));
     cmd.add("--fail");
     cmd.add("--location");
     cmd.add("--silent");

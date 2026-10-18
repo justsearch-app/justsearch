@@ -46,7 +46,11 @@ final class InferenceConfigArtifactIdentityTest {
     java.util.Arrays.fill(bytes, (byte) 7);
     Path model = Files.write(directory.resolve(ChatModelProfile.STANDARD.modelFile()), bytes)
         .toRealPath();
-    Path executable = Files.writeString(directory.resolve("llama-server.exe"), "fixture");
+    Path executable = Files.writeString(directory.resolve(
+        io.justsearch.configuration.NativeTargets.current().executableName("llama-server")), "fixture");
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      assertTrue(executable.toFile().setExecutable(true, true));
+    }
     Files.writeString(directory.resolve(ChatModelProfile.STANDARD.mmprojFile()), "projector");
     String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     var variant = new ModelVariant(model.getFileName().toString(), ModelPrecision.GGUF,

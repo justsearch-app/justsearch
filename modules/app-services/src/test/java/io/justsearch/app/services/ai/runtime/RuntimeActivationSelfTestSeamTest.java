@@ -53,7 +53,6 @@ import org.junit.jupiter.api.io.TempDir;
  * the activation.
  */
 final class RuntimeActivationSelfTestSeamTest {
-
   private static final long START_DELAY_MS = 300;
 
   @TempDir Path tmp;
@@ -94,6 +93,12 @@ final class RuntimeActivationSelfTestSeamTest {
     clearProp("justsearch.server.exe.source");
     seam = new ManagedChatSeam(tmp, START_DELAY_MS);
     InferenceLifecycleManager manager = seam.manager();
+    boolean windowsRuntime = io.justsearch.configuration.PlatformPaths.isWindows();
+    if (!windowsRuntime) {
+      // Linux activates the executable supplied by its operator, while the Windows case keeps
+      // exercising the installed cuda12 variant. Both run the same real-process assertions.
+      setProp("justsearch.server.exe", seam.base().serverExecutable().toString());
+    }
     Path variant = tmp.resolve("native-bin/llama-server/variants/cuda12/llama-server.exe");
     Files.createDirectories(variant.getParent());
     Files.writeString(variant, "not runnable; the self-test seam launches the fake instead");
@@ -105,8 +110,9 @@ final class RuntimeActivationSelfTestSeamTest {
     initial.setChatEnabled(true);
     initial.setLlmModelPath(candidate.toString());
     store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
-    intent = new RuntimeIntentTestFixture(tmp.resolve("intent"), store,
-        new ConfigStore(ConfigStoreRebuilder.prepare(store.load())));
+    ConfigStore intentConfig = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
+    if (!windowsRuntime) ConfigStore.setGlobal(intentConfig);
+    intent = new RuntimeIntentTestFixture(tmp.resolve("intent"), store, intentConfig);
     reconciler = new RuntimeReconciler(
         manager,
         manager::getCurrentMode,
@@ -134,7 +140,7 @@ final class RuntimeActivationSelfTestSeamTest {
     });
 
     try (var alive = new AliveSampler(seam.fakeHome())) {
-      svc.startActivate("cuda12");
+      svc.startActivate(windowsRuntime ? "cuda12" : "default");
       AiRuntimeActivationStatus status = awaitDone(svc);
       assertEquals("completed", status.state, "message=" + status.message);
       assertTrue(candidateHealthy.get(), "the candidate was launched and answered");

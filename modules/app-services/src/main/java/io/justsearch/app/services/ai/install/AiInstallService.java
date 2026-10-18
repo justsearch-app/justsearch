@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.app.api.AiInstallException;
 import io.justsearch.app.api.AiInstallStatus;
 import io.justsearch.app.api.ApiErrorCode;
@@ -550,7 +551,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
             switch (skipped.cause() == null ? SkipCause.HARDWARE : skipped.cause()) {
               case USER_DECLINED -> "declined";
               case INTENT -> "not-in-mode";
-              case HARDWARE -> "unavailable";
+              case HARDWARE, PLATFORM -> "unavailable";
               // Not reachable today — devOnly packages are filtered out of this loop above. The arm
               // exists so the switch stays exhaustive: if that filter is ever removed, a dev package
               // reads as "this build does not install it" rather than as a hardware failure.
@@ -2324,10 +2325,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    *     override was respected
    */
   private boolean applyCudaServerExe() {
+    if (!PlatformPaths.isWindows()) return false;
     Path cuda12Exe =
         homeDir
             .resolve("native-bin/llama-server/variants/cuda12")
-            .resolve("llama-server.exe");
+            .resolve(NativeTargets.current().executableName("llama-server"));
     if (!Files.isRegularFile(cuda12Exe)) {
       log.debug(
           "alpha.15: cuda12 llama-server.exe not at {} — skipping (cuda-runtime"
@@ -3032,8 +3034,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           throw new IOException(
               "Refusing zip entry that escapes target directory: " + entry.getName());
         }
-        if (Files.exists(resolved)) continue; // idempotent re-extract
+        if (!PlatformPaths.isWindows() && Files.isSymbolicLink(resolved)) {
+          throw new IOException("Refusing symbolic-link archive target: " + entry.getName());
+        }
+        if (Files.exists(resolved)) {
+          if (!PlatformPaths.isWindows() && !resolved.toRealPath().startsWith(normalizedTarget.toRealPath())) {
+            throw new IOException("Refusing archive target outside directory: " + entry.getName());
+          }
+          applyExecutablePermission(resolved);
+          continue;
+        }
         Files.createDirectories(resolved.getParent());
+        if (!PlatformPaths.isWindows() && !resolved.getParent().toRealPath().startsWith(normalizedTarget.toRealPath())) {
+          throw new IOException("Refusing archive parent outside directory: " + entry.getName());
+        }
         // Extract to a sibling .partial then atomically rename, so a crash mid-copy never leaves a
         // half-written file at the final path (which the existence-skip above would then trust
         // forever). Mirrors the download path's partial-then-moveAtomicBestEffort discipline.
@@ -3042,6 +3056,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         try (var in = zip.getInputStream(entry)) {
           Files.copy(in, partial);
         }
+        applyExecutablePermission(partial, resolved.getFileName().toString());
         DownloadExecutor.moveAtomicBestEffort(partial, resolved);
         extracted++;
       }
@@ -3051,6 +3066,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         extracted,
         zipFile.getFileName(),
         normalizedTarget);
+  }
+
+  private static void applyExecutablePermission(Path file) throws IOException {
+    applyExecutablePermission(file, file.getFileName().toString());
+  }
+
+  private static void applyExecutablePermission(Path file, String declaredName) throws IOException {
+    if (PlatformPaths.isWindows()) return;
+    // Archives do not carry trustworthy executable modes. Only a declared executable gets +x.
+    if (declaredName.equals(NativeTargets.current().executableName("llama-server"))) {
+      var permissions = Files.getPosixFilePermissions(file);
+      permissions.add(java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE);
+      Files.setPosixFilePermissions(file, permissions);
+    }
   }
 
   private long countPackagesByState(String state) {
