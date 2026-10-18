@@ -1,24 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { signalLinuxProcess } from '../dev/lib/process-identity.cjs';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
-import { runBinary } from './adapters/tauri.mjs';
+import { binaryPath, runBinary } from './adapters/tauri.mjs';
 import { engineRecords, watchSupervisor } from './adapters/dev-runner.mjs';
 import { enginePlanFor } from './contract.mjs';
 
-const alive = (pid) => {
-  try { process.kill(pid, 0); return true; } catch (err) {
-    if (err.code === 'ESRCH') return false;
-    throw err;
-  }
-};
-
 export async function runUpdaterHold({ testCase, io }) {
+  const alive = io.isAlive;
   const workDir = io.makeWorkDir(`tauri-${testCase.id}`);
   const dataDir = path.join(workDir, 'data');
   fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
   const run = runBinary({
-    binary: path.join(io.repoRoot, 'modules/shell/src-tauri/target/debug/supervisor-conformance.exe'),
+    binary: binaryPath(io.repoRoot),
     workDir, dataDir, planPath: io.writeEnginePlan(workDir, enginePlanFor(testCase)), io,
     env: { ...process.env, ...io.harnessOverrides }, stopAfterIncarnation: 0,
   });
@@ -101,7 +96,13 @@ export async function runUpdaterHold({ testCase, io }) {
       }).filter(Boolean).at(-1);
       assert.equal(summary.outcome.reason, 'upgrade', 'terminal outcome is stopped(upgrade)');
     } else if (probe === 'updater-held-exit' || probe === 'updater-release') {
-      process.kill(enginePid);
+      if (process.platform === 'linux') {
+        const started = records().find(row => row.type === 'engine-start' && row.pid === enginePid);
+        const result = signalLinuxProcess(started?.processIdentity, 'SIGTERM');
+        assert(result.ok, `fixture crash signal failed: ${result.reason}`);
+      } else {
+        process.kill(enginePid);
+      }
       await io.sleep(700); // More than the harness's normal cooldown.
       const exit = records().find(r => r.type === 'engine-exit');
       assert(exit, 'held exit must be recorded');
@@ -147,8 +148,17 @@ export async function runUpdaterHold({ testCase, io }) {
       await run.exited;
     }
     // Exact fixture pids only; older binaries have no supervisor kill-on-close job.
-    const pids = new Set([enginePid, io.readJsonIfPresent(statePath)?.pid]);
-    for (const pid of pids) if (Number.isInteger(pid) && alive(pid)) process.kill(pid);
+    if (process.platform === 'linux') {
+      for (const record of records().filter(row => row.type === 'engine-start')) {
+        if (!alive(record.pid)) continue;
+        const result = signalLinuxProcess(record.processIdentity, 'SIGKILL');
+        assert(result.ok || result.outcome === 'mismatch',
+          `fixture identity-bound stop failed: ${result.reason}`);
+      }
+    } else {
+      const pids = new Set([enginePid, io.readJsonIfPresent(statePath)?.pid]);
+      for (const pid of pids) if (Number.isInteger(pid) && alive(pid)) process.kill(pid);
+    }
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP !== '1') {
       // A cleanup handle race must not replace the scenario's original failure.
       try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); }

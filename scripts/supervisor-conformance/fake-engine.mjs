@@ -46,8 +46,8 @@
  * on request, with the reason and code the real Engine records for that request
  * (`EngineShutdownSequence.selfIntentOf`); `selfIntent: {reason, detail, expectedCode}` records one
  * before a timed `clean-exit`, as the Engine does before an escalated restart. `crash` and `oom`
- * record none, as a fatal exit records none. Its birth is written as unknown (null): Node cannot read
- * its own creation FILETIME without a process query, and the owner matches an unknown birth by pid.
+ * record none, as a fatal exit records none. Linux records its real process birth through the shared
+ * reader. Windows retains its unknown FILETIME fixture and the existing owner matching.
  *
  * Usage:
  *   node fake-engine.mjs --mode crash --exit-after-ms 500
@@ -66,7 +66,10 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
-const ledgerLib = createRequire(import.meta.url)('../dev/lib/exit-ledger.cjs');
+const require = createRequire(import.meta.url);
+const ledgerLib = require('../dev/lib/exit-ledger.cjs');
+const { readLinuxProcess } = require('../dev/lib/process-identity.cjs');
+const { spawnBoundChild } = require('../dev/lib/job-run.cjs');
 
 const MODES = new Set([
   'clean-exit',
@@ -267,7 +270,9 @@ function recordSelfIntent(intent) {
     });
     writer.startSession();
     const durable = writer.append('engine-self-intent', {
-      engine: { pid: process.pid, creationFileTime: null, instanceId },
+      engine: { pid: process.pid, creationFileTime: null, instanceId,
+        ...(process.platform === 'linux' ? { processIdentity: readLinuxProcess(process.pid)?.processIdentity } : {}),
+      },
       reason: intent.reason,
       detail: intent.detail ?? null,
       expectedCode: intent.expectedCode,
@@ -279,18 +284,21 @@ function recordSelfIntent(intent) {
 }
 
 // Detached avoids libuv's own child job: this models a Java ProcessBuilder helper.
-// Only the supervisor's incarnation job can contain this helper on the fake Engine path.
+// Match the production helper seam: the Windows incarnation job or Linux bound-exec.
 function spawnGrandchild() {
   const [command, argv] = process.platform === 'win32'
     ? ['ping', ['-n', '600', '127.0.0.1']] : ['sleep', ['600']];
   const birthMs = Date.now();
-  const helper = spawn(command, argv, { detached: true, stdio: 'ignore', windowsHide: true });
+  const helper = (process.platform === 'linux' ? spawnBoundChild : spawn)(
+    command, argv, { detached: true, stdio: 'ignore', windowsHide: true });
   helper.on('error', (err) => log(`grandchild failed: ${err.message}`));
   helper.unref();
   if (!helper.pid) return;
   writeJsonAtomic(path.join(behaviour.planDir ?? runtimeDir,
     `grandchild-${behaviour.incarnation}.json`),
-  { pid: helper.pid, birthMs, parentPid: process.pid, incarnation: behaviour.incarnation });
+  { pid: helper.pid, birthMs, parentPid: process.pid, incarnation: behaviour.incarnation,
+    ...(process.platform === 'linux' ? { processIdentity: readLinuxProcess(helper.pid)?.processIdentity } : {}),
+  });
 }
 
 function orderlyExit(code, why) {
