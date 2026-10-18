@@ -1490,8 +1490,8 @@ val verifyTesseractRuntime by tasks.registering {
 //   1. §G — `ai/onnxruntime/native/linux-x64/**` (~201 MB, incl. a ~316 MB-uncompressed
 //      `libonnxruntime_providers_cuda.so`). ONNX Runtime's Java loader
 //      (`OnnxRuntime.initOsArch()` / `extractFromResources()`) only ever reads
-//      `/ai/onnxruntime/native/<current-JVM-OS_ARCH>/…`, so on this Windows-only product the
-//      Linux natives are provably dead weight.
+//      `/ai/onnxruntime/native/<current-JVM-OS_ARCH>/…`, so Linux natives are excluded only
+//      from the Windows payload. Linux sidecars retain the upstream jar unchanged.
 //   2. §J item 2 — `ai/onnxruntime/native/win-x64/onnxruntime_providers_cuda.dll` (the ~164 MB
 //      Windows CUDA execution-provider DLL). This DLL is strictly useless without the CUDA
 //      dependency DLLs, which only ever arrive via the consent-gated `cuda-runtime` Install-AI
@@ -1525,6 +1525,7 @@ val stageTrimmedOnnxRuntimeGpu by tasks.registering(Jar::class) {
   group = "distribution"
   description = "Repackage the onnxruntime_gpu jar without its Linux natives or win-x64 CUDA EP DLL (Windows-only installer). Tempdoc 772 §G + §J item 2."
   dependsOn(headlessDist)
+  enabled = isWindowsHost
   // headlessDist copies the runtimeClasspath jars into lib/ under their original Maven names, so
   // the untrimmed jar lands at a path we can derive statically from the single source of truth for
   // the version — the version catalog (libs.versions.onnxruntime), NOT a hardcoded string — so a
@@ -1558,12 +1559,14 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
   // the deleted WorkerSpawner launched. Since item A6 the index half is composed in this JVM and
   // `ui`'s own runtimeClasspath already contains indexer-worker, Lucene, Tika, SQLite and
   // onnxruntime_gpu, so `lib/worker/` was a duplicate the shipped installer paid for twice.
-  // The untrimmed onnxruntime_gpu jar is excluded here and replaced (below) by the
-  // Linux-natives-stripped variant from stageTrimmedOnnxRuntimeGpu — Tempdoc 772 §G.
+  // Windows replaces the upstream ORT jar with its existing trimmed variant (Tempdoc 772 §G).
+  // Linux retains the upstream jar, including its JNI and provider shared libraries.
   from(headlessDistDir) {
     include("ui-headless.jar")
     include("lib/**")
-    exclude("lib/onnxruntime_gpu-*.jar")
+    if (isWindowsHost) {
+      exclude("lib/onnxruntime_gpu-*.jar")
+    }
   }
   // Tempdoc 657 — the Headless Runtime launcher: runs the co-located ui-headless.jar as a local,
   // loopback-only service (no desktop shell) in a chosen mode. See docs/how-to/headless-runtime.md.
@@ -1572,8 +1575,22 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
   }
   // Tempdoc 772 §G — the trimmed onnxruntime_gpu jar (Linux natives + CUDA EP DLL removed) lands
   // in lib/ where the untrimmed original was excluded above.
-  from(stageTrimmedOnnxRuntimeGpu.map { it.archiveFile }) {
-    into("lib")
+  if (isWindowsHost) {
+    from(stageTrimmedOnnxRuntimeGpu.map { it.archiveFile }) {
+      into("lib")
+    }
+  } else if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("linux")) {
+    // installDist owns compilation/staging of the shared lifetime helper (also used by Java).
+    val installed = tasks.named<Sync>("installDist")
+    dependsOn(installed)
+    from(installed.map { it.destinationDir.resolve("native") }) {
+      into("native")
+    }
+    doLast {
+      check(destinationDir.resolve("native/linux-x86_64/justsearch-bound-exec").canExecute()) {
+        "Linux sidecar is missing its executable bound-exec helper from installDist"
+      }
+    }
   }
   // AOT cache file for the Engine (JEP 514). Item A13: one JVM, one cache — `worker/worker.aot`
   // was deleted with the task that produced it.
@@ -1593,6 +1610,12 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
   }
   from(headlessRuntimeImageDir) {
     into("runtime")
+    if (!isWindowsHost) {
+      // jlink emits read-only legal files. Keep staged copies replaceable on later builds.
+      filesMatching("legal/**") {
+        permissions { unix("rw-r--r--") }
+      }
+    }
   }
 
   // Bundle the llama-server runtime (CPU-only) into the sidecar payload.

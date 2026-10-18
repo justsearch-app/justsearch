@@ -7,6 +7,8 @@ mod engine_probe;
 #[allow(dead_code)]
 mod exit_ledger;
 mod platform_paths;
+#[cfg(target_os = "linux")]
+mod linux_process;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
@@ -387,6 +389,9 @@ fn resolve_headless_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<
 }
 
 fn resolve_app_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+    if let Some(path) = platform_paths::explicit_data_dir() {
+        return Ok(path);
+    }
     app.path()
         .app_data_dir()
         .map_err(|e| format!("app_data_dir() failed: {e}"))
@@ -533,6 +538,9 @@ fn spawn_headless_backend<R: tauri::Runtime>(
             headless_dir.display()
         ));
     }
+
+    #[cfg(target_os = "linux")]
+    linux_process::set_bundle_dir(&headless_dir);
 
     // Use javaw.exe on Windows to avoid opening a console window (java.exe creates one).
     let java_bin = headless_dir
@@ -959,8 +967,12 @@ pub(crate) fn restart_headless_backend(
 #[serde(rename_all = "camelCase")]
 struct ManagedChildRecord {
     pid: u32,
+    #[serde(default)]
     started_at: String,
     executable: String,
+    #[cfg(target_os = "linux")]
+    #[serde(rename = "processIdentity")]
+    identity: Option<linux_process::Identity>,
 }
 
 /// Terminal fallback reports incomplete ownership; recoverable supervision never calls it.
@@ -996,10 +1008,14 @@ fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), Strin
             let child: ManagedChildRecord = serde_json::from_value(value.clone())
                 .map_err(|error| format!("Malformed managed child identity: {error}"))?;
             if child.pid == 0
-                || child.started_at.trim().is_empty()
+                || (cfg!(windows) && child.started_at.trim().is_empty())
                 || !std::path::Path::new(&child.executable).is_absolute()
             {
                 return Err("Incomplete managed child identity".into());
+            }
+            #[cfg(target_os = "linux")]
+            if !child.identity.as_ref().is_some_and(|id| id.valid(child.pid)) {
+                return Err("Incomplete Linux managed child identity".into());
             }
             Ok(child)
         })
@@ -1068,7 +1084,15 @@ try {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) -> Result<(), String> {
+    linux_process::terminate(
+        child.identity.as_ref().ok_or("Missing Linux managed child identity")?,
+        std::path::Path::new(&child.executable),
+    )
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 fn terminal_kill_if_identity_matches(_child: &ManagedChildRecord) -> Result<(), String> {
     Err("Registered child termination is unsupported on this installer platform".into())
 }
@@ -1319,10 +1343,7 @@ async fn confirm_delete_data(
         _ => return Err("Invalid or expired confirmation token".into()),
     }
 
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("app_data_dir() failed: {e}"))?;
+    let app_data_dir = resolve_app_data_dir(&app)?;
     std::fs::create_dir_all(&app_data_dir).map_err(|e| {
         format!(
             "Failed to create app data dir {}: {e}",
@@ -1341,10 +1362,7 @@ async fn confirm_delete_data(
 
 #[tauri::command]
 async fn justsearch_paths(app: tauri::AppHandle) -> Result<JustSearchPaths, String> {
-    let home = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("app_data_dir() failed: {e}"))?;
+    let home = resolve_app_data_dir(&app)?;
     let models_dir = home.join("models");
     let llama_server_dir = home.join("native-bin").join("llama-server");
     let logs_dir = home.join("logs");
@@ -1405,10 +1423,7 @@ fn read_capped(path: &std::path::Path, max_bytes: u64) -> Result<Option<String>,
 }
 
 fn plugin_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let home = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("app_data_dir() failed: {e}"))?;
+    let home = resolve_app_data_dir(&app)?;
     Ok(home.join("plugins"))
 }
 

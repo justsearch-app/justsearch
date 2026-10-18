@@ -48,6 +48,8 @@ struct HostInner {
     discovery: Discovery,
     spawn_error: Option<String>,
     latest_record: Option<StateRecord>,
+    #[cfg(target_os = "linux")]
+    exit_signal: Option<i32>,
     last_tooltip: Option<String>,
 }
 
@@ -65,6 +67,8 @@ impl Default for HostInner {
             discovery: Discovery::AwaitingSuccessor { predecessor: None },
             spawn_error: None,
             latest_record: None,
+            #[cfg(target_os = "linux")]
+            exit_signal: None,
             last_tooltip: None,
         }
     }
@@ -190,6 +194,8 @@ impl EngineHost {
             Err(error) => return Err(format!("spawn java failed: {error}")),
         };
         *self.exit_observed.0.lock().unwrap() = None;
+        #[cfg(target_os = "linux")]
+        { inner.exit_signal = None; }
         let pid = child.id();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -385,11 +391,28 @@ impl EngineHost {
     pub(crate) fn try_reap(&self) -> Option<i32> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
         let status = inner.child.as_mut()?.child.try_wait().ok()??;
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            inner.exit_signal = status.signal();
+        }
         let owned = inner.child.take().expect("the child was just observed");
         let predecessor = inner.binding.instance_id.clone();
         inner.discovery = Discovery::AwaitingSuccessor { predecessor };
         Self::end_owned(&mut inner, owned);
+        // Negative signals are an internal policy observation, never persisted as program codes.
+        #[cfg(target_os = "linux")]
+        return status.code().or_else(|| {
+            use std::os::unix::process::ExitStatusExt;
+            status.signal().map(|signal| -signal)
+        });
+        #[cfg(not(target_os = "linux"))]
         Some(status.code().unwrap_or(1))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn exit_signal(&self) -> Option<i32> {
+        self.inner.lock().expect("engine host mutex poisoned").exit_signal
     }
 
     fn end_owned(inner: &mut HostInner, owned: OwnedChild) -> Child {
