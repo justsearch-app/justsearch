@@ -280,6 +280,8 @@ public final class RootWitness implements SourcePresence.RootCheck {
    * awaits it and is a present, listable real folder whose volume can be read, that volume is
    * recorded only if {@code evidence} confirms the root's indexed files are on it. Anything else
    * records nothing and the root keeps awaiting, so a later attempt adopts a returning drive.
+   * With no platform identity and no known record, only the comparison is skipped and seeding
+   * finishes without recording an identity. A known record that cannot be confirmed stays pending.
    *
    * @return whether the root no longer awaits seeding
    */
@@ -295,6 +297,9 @@ public final class RootWitness implements SourcePresence.RootCheck {
     }
     try {
       String volume = RootIdentity.capture(key).volume();
+      if (volume == null && volumes.recordedFor(key).isPresent()) {
+        return false;
+      }
       if (volume != null && !evidence.test(key)) {
         log.info("Root {} is not recorded after the upgrade: its indexed files are not on the drive"
             + " at its path", key);
@@ -351,9 +356,9 @@ public final class RootWitness implements SourcePresence.RootCheck {
    * nothing recorded is unproven, as is one whose volume or record cannot be read. The
    * deferred-root check asks this, so a recovery path never adopts the volume it finds.
    *
-   * <p>Round 9: on a platform that exposes no volume identity nothing is ever recorded or
-   * compared, so a present, listable real folder is proven, as {@link #refusesRoot} never refuses
-   * it there; only the comparison is skipped.
+   * <p>Without a platform volume identity and without a previously recorded identity, only the
+   * comparison is skipped. A known recorded identity that cannot now be confirmed is uncertainty
+   * on every platform, even when the replacement filesystem is present and listable.
    */
   @SuppressWarnings("PMD.AvoidCatchingGenericException") // a native identity read may throw unchecked
   boolean provenOnRecordedVolume(Path root) {
@@ -364,11 +369,9 @@ public final class RootWitness implements SourcePresence.RootCheck {
     }
     try {
       String volume = RootIdentity.capture(key).volume();
-      if (volume == null) {
-        return true;
-      }
       Optional<String> recorded = volumes.recordedFor(key);
-      return recorded.isPresent() && recorded.get().equals(volume);
+      return volume == null ? recorded.isEmpty()
+          : recorded.isPresent() && recorded.get().equals(volume);
     } catch (IOException | RuntimeException cannotTell) {
       log.debug("Root {} is not proven on its recorded volume ({})", key, cannotTell.getMessage());
       return false;
@@ -433,12 +436,12 @@ public final class RootWitness implements SourcePresence.RootCheck {
       return;
     }
     String volume = current.volume();
-    if (volume == null) {
-      return;
-    }
     Optional<String> recorded = volumes.recordedFor(folder);
     if (recorded.isEmpty()) {
       recorded = volumes.recordedFileFolder(folder);
+    }
+    if (recorded.isEmpty() && volume == null) {
+      return;
     }
     if (recorded.isEmpty()) {
       throw new IOException("no volume is recorded for this folder; only adding or ingesting it"
@@ -494,14 +497,12 @@ public final class RootWitness implements SourcePresence.RootCheck {
    * recorded folder above it. Round 8 (refined decision 2): nothing recorded is unproven and
    * throws, recording nothing; only the in-memory ledger of an unwired owner records the folder the
    * first time it is seen, and a disabled ledger checks nothing. A record that cannot be read
-   * throws, which callers treat as "cannot tell".
+   * throws, which callers treat as "cannot tell". With no platform identity and no known record,
+   * only the comparison is skipped. A known record must still be confirmed on every platform.
    */
   static void requireRecordedVolume(RootVolumeLedger volumes, Path folder, RootIdentity current)
       throws IOException {
     String volume = current.volume();
-    if (volume == null) {
-      return;
-    }
     Optional<String> recorded = volumes.recordedFor(folder);
     if (recorded.isPresent()) {
       if (!recorded.get().equals(volume)) {
@@ -510,7 +511,7 @@ public final class RootWitness implements SourcePresence.RootCheck {
       }
       return;
     }
-    if (!volumes.enabled()) {
+    if (volume == null || !volumes.enabled()) {
       return;
     }
     if (!volumes.adoptsOnFirstSight()) {
