@@ -133,6 +133,15 @@ jobs:
       # remembered. That is the exact failure mode 745 documents: a layer nothing
       # invokes is dead regardless of its quality. The runner auto-discovers
       # *.test.mjs so a new test is covered the moment it lands.
+      - name: Stage Linux process helper for Node lifecycle tests
+        # Both the analytics suite here and the dev-runner suite below exercise real pidfd
+        # stops. Compile the production source with its Gradle flags, without configuring JVM
+        # projects or building a distribution in this time-bounded Node/Python lane.
+        run: |
+          helper="modules/ui/build/install/ui/$(node -p 'require("./scripts/lib/native-targets.cjs").nativeTarget().paths["bound-exec"]')"
+          mkdir -p "$(dirname "$helper")"
+          cc -std=c11 -O2 -Wall -Wextra -Werror native/bound-exec/bound-exec.c -o "$helper"
+
       - name: Test agent-analytics instrument (node)
         run: node scripts/agent-analytics/run-all-tests.mjs
 

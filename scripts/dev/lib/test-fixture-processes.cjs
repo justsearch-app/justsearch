@@ -27,6 +27,8 @@ function record(child) {
   if (!child?.pid) return child;
   if (process.platform === 'linux') {
     const seen = require('./process-identity.cjs').readLinuxProcess(child.pid);
+    records.set(child, { pid: child.pid,
+      processIdentity: seen?.present && seen.processIdentity ? { ...seen.processIdentity } : null });
     if (seen?.present && seen.processIdentity) child.recordedIdentity = { pid: child.pid,
       processIdentity: seen.processIdentity, executable: seen.executable };
     return child;
@@ -45,10 +47,21 @@ if (process.platform === 'linux') {
   cp.execFile = function(...args) { return record(execFile.apply(this, args)); };
   cp.ChildProcess.prototype.kill = function(signal = 'SIGTERM') {
     if (!this.pid || this.exitCode !== null || this.signalCode !== null) return false;
-    const identity = this.recordedIdentity?.processIdentity;
-    if (!identity) throw new Error('Fixture stop without a spawn-recorded identity refused: ' + this.pid);
-    const result = require('./process-identity.cjs').signalLinuxProcess(identity, signal);
-    if (![0, 3].includes(result.status)) throw new Error('Fixture identity-bound stop failed: ' + this.pid + ' ' + result.reason);
+    const original = records.get(this);
+    if (original?.pid !== this.pid) throw new Error('Fixture stop without a spawn-recorded identity refused: ' + this.pid);
+    const identity = original.processIdentity;
+    const result = identity ? require('./process-identity.cjs').signalLinuxProcess(identity, signal)
+      : { reason: 'Fixture stop without a spawn-recorded identity refused: ' + this.pid };
+    if (![0, 3].includes(result.status)) {
+      // A failed product stop must remain a failure, but cannot strand this test's own child.
+      // Only an original spawn object reaches this path; never signal a discovered PID or a
+      // copied identity. Force cleanup even if the requested soft signal would be ignored.
+      const failure = new Error('Fixture identity-bound stop failed: ' + this.pid + ' ' + result.reason);
+      process.exitCode = 1;
+      console.error(failure.message);
+      originalKill.call(this, 'SIGKILL');
+      throw failure;
+    }
     return result.status === 0;
   };
 }

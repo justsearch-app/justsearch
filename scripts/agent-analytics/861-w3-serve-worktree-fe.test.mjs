@@ -334,9 +334,15 @@ if (process.platform === 'linux') {
       assert.equal(await sw.waitForPortListening(port,{timeoutMs:100,intervalMs:20}),false);
       await fsp.rm(file);
     } finally {
-      if(child.exitCode===null&&child.signalCode===null) { const exit=new Promise(resolve=>child.once('exit',resolve));child.send('quit');await exit; }
-      if(prior===undefined)delete process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT;else process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT=prior;
-      await fsp.rm(stateDir,{recursive:true,force:true});
+      try {
+        if(child.exitCode===null&&child.signalCode===null) {
+          const exit=new Promise(resolve=>child.once('exit',resolve));
+          try { child.kill('SIGKILL'); } finally { await exit; }
+        }
+      } finally {
+        if(prior===undefined)delete process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT;else process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT=prior;
+        await fsp.rm(stateDir,{recursive:true,force:true});
+      }
     }
   });
 }
