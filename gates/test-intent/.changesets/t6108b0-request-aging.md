@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261018-6108b0
 author-role: builder
-author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
+author-session: builder-t6108b0-aging-claude-subagent
 ---
 
 # Request aging without wall-clock sleeps
@@ -32,3 +32,14 @@ Each class's aged case fails when the back-dating is set to zero.
 ## Acceptance records
 
 Pending independent review. The builder records no acceptances.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "orchestrator-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:7853fccea5725ca19760febb8e0680dce96870b4228d641409422278b50cc92a",
+  "note": "Adaptation (input re-encoding) confirmed: before-state slept Q after building a call of budget B; candidate back-dates start by Q with deadline start+B, same elapsed and remaining budget at entry. Added asserts are setup preconditions on SearchBudgetPolicy.DEFAULT, not expected values. All assertions, real index/search, doubles and latches unchanged. Independent Codex verifier (results in task t-20261018-6108b0) reproduced: same 22 pass; a production mutation counting the budget from service entry makes 18 fail; full module 1802 pass."
+}
+```
