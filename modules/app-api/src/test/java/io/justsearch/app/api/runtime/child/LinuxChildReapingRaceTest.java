@@ -24,7 +24,7 @@ final class LinuxChildReapingRaceTest {
       }
     }
     var delayed = new DelayedReaper(child.pid(), true);
-    var held = ProcessTerminator.forCurrentOs().open(delayed);
+    var held = assertDoesNotThrow(() -> ProcessTerminator.forCurrentOs().open(delayed));
     try {
       assertTrue(delayed.waited, "reconcile procfs absence with the original spawn object");
       assertTrue(held.processIdentity().isEmpty(), "do not fabricate a birth for an ended child");

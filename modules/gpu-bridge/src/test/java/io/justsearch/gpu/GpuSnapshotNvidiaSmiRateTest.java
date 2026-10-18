@@ -59,7 +59,11 @@ final class GpuSnapshotNvidiaSmiRateTest {
 
   private static boolean nvidiaSmiOnPath() {
     if (io.justsearch.configuration.PlatformPaths.isWindows()) {
-      try { return new ProcessBuilder("where", "nvidia-smi").start().waitFor() == 0; }
+      try {
+        Process where = new ProcessBuilder("where", "nvidia-smi").redirectErrorStream(true).start();
+        where.getInputStream().readAllBytes();
+        return where.waitFor(10, TimeUnit.SECONDS) && where.exitValue() == 0;
+      }
       catch (java.io.IOException unavailable) { return false; }
       catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return false; }
     }

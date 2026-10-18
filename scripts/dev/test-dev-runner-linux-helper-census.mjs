@@ -29,8 +29,9 @@ function fixture(change = () => {}) {
   change({ engine, children });
   const ledgerDir = ledger.ledgerDirectory(dir); fs.mkdirSync(ledgerDir, { recursive: true });
   for (const [family, records] of Object.entries({ engine, children })) fs.writeFileSync(path.join(ledgerDir, family + '.v1.jsonl'), records.map(r => JSON.stringify(r)).join('\n') + '\n');
-  const read = census.readRunLedger(dir), view = census.ledgerView(read, incarnation.session);
-  return { dir, read, view, input: census.exitTargets({ runId: incarnation.session, pids: { backendRootPid: owner.pid } }, null, [], read, view) };
+  const session = engine[0].incarnation.session;
+  const read = census.readRunLedger(dir), view = census.ledgerView(read, session);
+  return { dir, read, view, input: census.exitTargets({ runId: session, pids: { backendRootPid: owner.pid } }, null, [], read, view) };
 }
 test('native writer birth survives the shared ledger reader', { skip: !linux }, () => {
   const f = fixture(); try { assert.deepEqual(f.read.children.records[0].writer.processIdentity, native(owner.pid)); }
@@ -152,7 +153,7 @@ for (const [name, mutate] of [
   ['malformed birth', x => { for (const r of x.children) r.processIdentity = { ...native(5001), startTicks: 'unknown' }; }],
   ['malformed helper key', x => { for (const r of x.children) r.helperId = '../invalid'; }],
 ]) test('a native helper with ' + name + ' is explicit unknown inventory', { skip: !linux }, () => {
-  const f = fixture(mutate); try {
+  const f = fixture(x => { mutate(x); if (name === 'missing birth' || name === 'null birth') x.children[1].code = null; }); try {
     const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
     const row = result.processExits.find(r => r.pid === 5001);
     assert.ok(row, 'the ledger names a helper; missing authority must never erase it');
@@ -169,7 +170,7 @@ test('a stop with an unidentified native helper stays incomplete, retains state 
   const api = require('./dev-runner.cjs').__test;
   try {
     for (const birth of [undefined, null, { ...native(5001), startTicks: 'unknown' }]) {
-      const f = fixture(x => { for (const r of x.children) r.processIdentity = birth; });
+      const f = fixture(x => { for (const r of x.children) r.processIdentity = birth; if (birth == null) x.children[1].code = null; });
       try {
         const run = { runId: incarnation.session, dataDir: f.dir, pids: {}, identities: {},
           holder: api.holderBlockFor(api.resolveCallerIdentity('unknown-helper-stop')) };
@@ -188,6 +189,26 @@ test('a stop with an unidentified native helper stays incomplete, retains state 
         assert.deepEqual(signals, []);
       } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
     }
+    const f = rapidFixture();
+    try {
+      const helper = f.view.helpers[0];
+      const run = { runId: helper.incarnation.session, dataDir: f.dir, pids: {}, identities: {},
+        holder: api.holderBlockFor(api.resolveCallerIdentity('unknown-helper-stop')),
+        stopTrackedProcesses: [{ pid: helper.pid, role: 'native-helper', creationFileTimeUtc: null }] };
+      const runPath = path.join(f.dir, 'run.json'); fs.writeFileSync(runPath, JSON.stringify(run));
+      fs.writeFileSync(path.join(state, 'active.json'), JSON.stringify({ runId: run.runId }));
+      const signals = [], lookups = [];
+      const result = await api.stopRun({}, { resolveTarget: async () => ({ run, runPath }),
+        lookupIdentities: async pids => { lookups.push(...pids); return new Map(pids.map(pid => [pid, { present: false }])); },
+        portOwner: async () => ({ closed: true }), portWaitMs: 0,
+        terminateProcess: (...args) => { signals.push(args); throw new Error('receipt is never signal authority'); } });
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(result.outcome, 'STOPPED');
+      assert.deepEqual(result.unresolvedProcesses, []);
+      assert.equal(fs.existsSync(path.join(state, 'active.json')), false);
+      assert.deepEqual(signals, []);
+      assert.equal(lookups.includes(helper.pid), false, 'creator receipt needs no PID observation');
+    } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
   } finally {
     if (previous === undefined) delete process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT;
     else process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = previous;
@@ -212,4 +233,98 @@ test('a malformed legacy birth never hides a native helper with an unreadable tu
     assert.equal(result.processExits.find(p => p.pid === 5001)?.ledgerClass, 'UNKNOWN');
     assert.equal(result.exitAccountingComplete, false);
   } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+const rapidProbe = () => fs.readFileSync(new URL('./fixtures/rapid-tesseract-helper.jsonl', import.meta.url), 'utf8')
+  .trim().split('\n').map(JSON.parse);
+function rapidFixture(mutate = () => {}) {
+  return fixture(x => {
+    x.children.splice(0, x.children.length, ...rapidProbe());
+    const start = x.children[0];
+    x.engine[0] = { ...x.engine[0], ...start.owner, incarnation: start.incarnation };
+    x.engine[1].incarnation = start.incarnation;
+    mutate(x);
+  });
+}
+test('creator-observed rapid Tesseract exit accounts its logical helper without a birth or PID authority', { skip: !linux }, () => {
+  const f = rapidFixture(); try {
+    const helper = f.view.helpers[0];
+    assert.equal(helper.proof?.by, 'direct');
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    const row = result.processExits.find(r => r.helperId === helper.helperId);
+    assert.equal(row?.accounted, true);
+    assert.equal(row.exitCode, 0);
+    assert.equal(result.exitAccountingGaps.some(g => g.pid === helper.pid), false);
+    const resolution = census.ledgerResolution(f.view);
+    assert.equal(resolution.unproven.some(p => p.pid === helper.pid), false);
+    assert.equal(resolution.isEnded({ ...helper, role: 'native-helper' }), true);
+    assert.equal(resolution.isEnded({ pid: helper.pid }), false, 'a bare PID gains no authority');
+    assert.equal(census.lookupObservation(helper, { present: false }, Date.now()), null);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+for (const [name, mutate] of [
+  ['missing exit', x => x.children.pop()],
+  ['missing awaited exit code', x => { x.children[1].code = null; }],
+  ['another helper id', x => { x.children[1].helperId = 'h-other'; }],
+  ['another writer', x => { x.children[1].writer = { ...x.children[1].writer, processIdentity: native(x.children[1].writer.pid) }; }],
+  ['another writer start', x => { x.children[1].writer = { ...x.children[1].writer, startedAt: '2026-10-18T21:36:33.331Z' }; }],
+  ['reconciled exit', x => { x.children[1].reconciled = true; }],
+  ['malformed birth', x => { for (const r of x.children) r.processIdentity = { kind: 'unknown' }; }],
+]) test('an unidentified helper remains unproven with ' + name, { skip: !linux }, () => {
+  const f = rapidFixture(mutate); try {
+    const helper = f.view.helpers[0];
+    assert.equal(helper.proof, null);
+    const resolution = census.ledgerResolution(f.view);
+    assert.equal(resolution.isEnded({ ...helper, role: 'native-helper' }), false);
+    assert.ok(resolution.unproven.some(p => p.pid === helper.pid));
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    assert.equal(result.exitAccountingComplete, false);
+    assert.ok(result.exitAccountingGaps.some(p => p.pid === helper.pid));
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test('a rapid parser helper is bound through the parser owner when child-start carries no incarnation', { skip: !linux }, () => {
+  const f = rapidFixture(x => {
+    const parser = x.children[0].owner, inc = x.children[0].incarnation;
+    x.engine[0] = { ...x.engine[0], ...owner, incarnation: inc };
+    x.children.unshift({ schemaVersion: 1, type: 'child-start', seq: 1, at,
+      writer: engineWriter, owner, childId: 'parser-child', kind: 'PARSER',
+      pid: parser.pid, processIdentity: parser.processIdentity, executable: '/java' });
+  }); try {
+    assert.equal(f.view.helpers[0].proof?.by, 'direct');
+    const resolution = census.ledgerResolution(f.view);
+    assert.equal(resolution.isEnded({ pid: 2364530, role: 'native-helper' }), true,
+      'legacy unresolved helper reports reconcile only against all creator-proven logical starts');
+    assert.equal(resolution.isEnded({ pid: 2364530, role: 'native-helper', helperId: 'h-stranger' }), false);
+    assert.equal(resolution.isEnded({ pid: 2364530, role: 'engine' }), false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test('an unidentified helper with conflicting creator codes stays incomplete on retry', { skip: !linux }, () => {
+  const f = rapidFixture(x => x.children.push({ ...x.children[1], seq: 8, code: 1 })); try {
+    const helper = f.view.helpers[0];
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    assert.ok(result.exitAccountingGaps.some(g => g.pid === helper.pid && g.reason === 'ledger_codes_disagree'));
+    assert.equal(result.processExits.find(r => r.helperId === helper.helperId).accounted, false);
+    assert.equal(census.ledgerResolution(f.view).isEnded({ pid: helper.pid, role: 'native-helper' }), false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+test('an unobserved helper sharing a recycled PID is not discharged by another helper receipt', { skip: !linux }, () => {
+  const f = rapidFixture(x => x.children.push({ ...x.children[0], seq: 8, helperId: 'h-unobserved' })); try {
+    const helper = f.view.helpers[0];
+    const resolution = census.ledgerResolution(f.view);
+    assert.equal(resolution.isEnded({ pid: helper.pid, role: 'native-helper' }), false);
+    assert.ok(resolution.unproven.some(p => p.helperId === 'h-unobserved'));
+    assert.equal(resolution.isEnded({ pid: helper.pid, role: 'native-helper', helperId: 'h-unobserved' }), false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test('a creator receipt cannot prove a helper start with an invalid PID', { skip: !linux }, () => {
+  for (const pid of [0, null, -1]) {
+    const f = rapidFixture(x => { for (const r of x.children) r.pid = pid; }); try {
+      const start = f.view.allStarts.find(s => s.family === 'helper');
+      assert.equal(start.identity.pid, null);
+      assert.equal(census.isProven(start, f.read.children.records, f.view.allStarts), null);
+    } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+  }
 });

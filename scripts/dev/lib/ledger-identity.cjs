@@ -25,6 +25,9 @@
  *                 dev runner, dev CLI), that Engine itself (its PID, started its millisecond) or a
  *                 writer that recorded the start (`ctx.startWriters`: role, PID and start instant).
  *                 Any other record must carry and agree on every field the start carries.
+ *                 A helper with no birth can instead be proven only by its unique logical key,
+ *                 exact owner/incarnation, same creator writer and an observed integer exit code;
+ *                 this receipt proves an exit, never an OS identity or signal authority.
  *   'contradicts' some field both carry disagrees (a record about another process of the same key).
  *   'exact'       one start: the same fields, each equal, the births to the tick.
  *   'native'      one process by PID and birth alone, for pairing records whose other fields describe
@@ -216,6 +219,14 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
   const R = identityOf(line, { defaultTick: TICK.EXACT, owner: line.owner ?? line.previousOwner ?? null });
   if (S.conflicts.length) return false;
   const engine = (family ?? S.kind) === 'engine';
+  // A helper's creator can observe its own held Process exit before /proc birth capture.
+  // This proves only the unique logical helper start; it never identifies a PID for signalling.
+  if (family === 'helper' && S.rawBirth === null && R.rawBirth === null) {
+    return S.pid !== null && keyStarts === 1 && !contested && Number.isInteger(line.code)
+      && S.helperId !== null && S.incarnation !== null && exact(R, S)
+      && startWriters.some(w => sameWriter(writer, w));
+  }
+
   // Without its birth an Engine record is about its incarnation (the dev runner's engine-owner-died
   // names the PID beside it, which must then agree); a child record without PID, birth or incarnation
   // is about its childId.

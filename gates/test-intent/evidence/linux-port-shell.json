@@ -1,0 +1,323 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-18T22:31:14.943Z",
+  "revision": "d5e4aa16ae796259c857a7c783be0b5d3f8ad3bf",
+  "tree": "f7a4905783b247413967b572b19a4e1613d3bc0f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::linux_tests::changed_parent_refuses_exec_before_user_code\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6715
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::linux_tests::child_survives_caller_thread_exit_but_not_owner_death\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 333
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::linux_tests::missing_shared_helper_refuses_workload\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 171
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::linux_tests::shared_helper_preserves_command_and_refuses_parent_mismatch\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 162
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"linux_process::tests::canonical_identity_encoding_agrees_with_the_other_readers\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 163
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"linux_process::tests::identity_matches_only_the_same_birth_and_boot\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 164
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"linux_process::tests::stat_handles_spaces_and_parentheses_in_comm\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 158
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"linux_process::tests::zombie_is_ended_without_requiring_executable_readability\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 162
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"native_targets::tests::shared_fixtures_agree\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 158
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"platform_paths::tests::explicit_override_expands_home_and_preserves_spaces_and_unicode\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 189
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::linux_identity_tests::deleted_executable_is_still_the_same_live_process_and_is_terminated\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 159
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::linux_identity_tests::linux_signal_has_no_fabricated_exit_code_and_requires_prior_owner_intent\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 181
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::linux_identity_tests::records_use_linux_birth_identity_without_windows_timestamps\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 157
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::retention_keeps_linux_process_identity_in_loss_receipts\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 611
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::linux_tests::changed_parent_refuses_exec_before_user_code",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:976fac3a227ec12962aa564b59e19696e7dfb2c2c7d29a3fe7f9dd80b888efe2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::linux_tests::changed_parent_refuses_exec_before_user_code",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::linux_tests::child_survives_caller_thread_exit_but_not_owner_death",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:976fac3a227ec12962aa564b59e19696e7dfb2c2c7d29a3fe7f9dd80b888efe2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::linux_tests::child_survives_caller_thread_exit_but_not_owner_death",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::linux_tests::missing_shared_helper_refuses_workload",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:976fac3a227ec12962aa564b59e19696e7dfb2c2c7d29a3fe7f9dd80b888efe2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::linux_tests::missing_shared_helper_refuses_workload",
+          "status": "passed"
+        },
+        {
+          "name": "containment::linux_tests::missing_shared_helper_refuses_workload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::linux_tests::shared_helper_preserves_command_and_refuses_parent_mismatch",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:976fac3a227ec12962aa564b59e19696e7dfb2c2c7d29a3fe7f9dd80b888efe2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::linux_tests::shared_helper_preserves_command_and_refuses_parent_mismatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/linux_process.rs#linux_process::tests::canonical_identity_encoding_agrees_with_the_other_readers",
+      "file": "modules/shell/src-tauri/src/linux_process.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f4aa1cff60c40693e5f14750626ee6ee8b34c188d69e3e7087303493c0221ca5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linux_process::tests::canonical_identity_encoding_agrees_with_the_other_readers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/linux_process.rs#linux_process::tests::identity_matches_only_the_same_birth_and_boot",
+      "file": "modules/shell/src-tauri/src/linux_process.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f4aa1cff60c40693e5f14750626ee6ee8b34c188d69e3e7087303493c0221ca5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linux_process::tests::identity_matches_only_the_same_birth_and_boot",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/linux_process.rs#linux_process::tests::stat_handles_spaces_and_parentheses_in_comm",
+      "file": "modules/shell/src-tauri/src/linux_process.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f4aa1cff60c40693e5f14750626ee6ee8b34c188d69e3e7087303493c0221ca5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linux_process::tests::stat_handles_spaces_and_parentheses_in_comm",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/linux_process.rs#linux_process::tests::zombie_is_ended_without_requiring_executable_readability",
+      "file": "modules/shell/src-tauri/src/linux_process.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f4aa1cff60c40693e5f14750626ee6ee8b34c188d69e3e7087303493c0221ca5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linux_process::tests::zombie_is_ended_without_requiring_executable_readability",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/native_targets.rs#native_targets::tests::shared_fixtures_agree",
+      "file": "modules/shell/src-tauri/src/native_targets.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b38e8cf41a9815321d43bcbba3cdc9385566720177a18bbaa40935dde168a8df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native_targets::tests::shared_fixtures_agree",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/platform_paths.rs#platform_paths::tests::explicit_override_expands_home_and_preserves_spaces_and_unicode",
+      "file": "modules/shell/src-tauri/src/platform_paths.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:152c4d0157411b035adf98c04f19fcca2e453e6086cbc4ff0090912a328b1d5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "platform_paths::tests::explicit_override_expands_home_and_preserves_spaces_and_unicode",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_actuator.rs#shell_actuator::linux_identity_tests::deleted_executable_is_still_the_same_live_process_and_is_terminated",
+      "file": "modules/shell/src-tauri/src/shell_actuator.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d1d421d8fe6caa15eb5fb4daf9d77eccded2d1f1fef887873c0cc06770e14c53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::linux_identity_tests::deleted_executable_is_still_the_same_live_process_and_is_terminated",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_actuator.rs#shell_actuator::linux_identity_tests::linux_signal_has_no_fabricated_exit_code_and_requires_prior_owner_intent",
+      "file": "modules/shell/src-tauri/src/shell_actuator.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d1d421d8fe6caa15eb5fb4daf9d77eccded2d1f1fef887873c0cc06770e14c53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::linux_identity_tests::linux_signal_has_no_fabricated_exit_code_and_requires_prior_owner_intent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_actuator.rs#shell_actuator::linux_identity_tests::records_use_linux_birth_identity_without_windows_timestamps",
+      "file": "modules/shell/src-tauri/src/shell_actuator.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d1d421d8fe6caa15eb5fb4daf9d77eccded2d1f1fef887873c0cc06770e14c53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::linux_identity_tests::records_use_linux_birth_identity_without_windows_timestamps",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::retention_keeps_linux_process_identity_in_loss_receipts",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b585a296438a776cebb435e95930ff374b174518799ad27553f2bdad4bbef43e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::retention_keeps_linux_process_identity_in_loss_receipts",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:566e522223775122c8cbaff11ddf2eb3a1d26ce3ea453d637139c9e8db2ddd00"
+}

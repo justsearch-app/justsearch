@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-18T22:15:26.123Z",
+  "revision": "d5e4aa16ae796259c857a7c783be0b5d3f8ad3bf",
+  "tree": "a7c1f8e3677d2d7ef0bdae71678ef68d33a92c87",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6168
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6ad0b64434fbf37557adc542d4794063b82f04f8d7ea92d4c8620ce2b23037bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:60aed45e5010ab022b49e35940679621b614caf092be97ec3295a47ff696b439"
+}

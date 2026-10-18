@@ -701,8 +701,21 @@ mod linux_identity_tests {
     fn deleted_executable_is_still_the_same_live_process_and_is_terminated() {
         let dir = tempfile::tempdir().unwrap();
         let executable = dir.path().join("replaceable-sleep");
-        std::fs::copy("/bin/sleep", &executable).unwrap();
-        let mut child = std::process::Command::new(&executable).arg("30").spawn().unwrap();
+        // Wait for the image to finish startup before unlinking it. A multicall sleep
+        // can reject a deleted /proc/self/exe during startup and exit without our signal.
+        std::fs::copy("/bin/sh", &executable).unwrap();
+        let mut child = std::process::Command::new(&executable)
+            .args(["-c", "printf ready; read -r hold"])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn().unwrap();
+        let mut ready = [0; 5];
+        let readiness = std::io::Read::read_exact(child.stdout.as_mut().unwrap(), &mut ready);
+        if readiness.is_err() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        assert!(readiness.is_ok(), "owned shell did not acknowledge startup: {readiness:?}");
         let record = process_record(child.id());
         let identity = serde_json::from_value(record["processIdentity"].clone()).unwrap();
         std::fs::remove_file(&executable).unwrap();

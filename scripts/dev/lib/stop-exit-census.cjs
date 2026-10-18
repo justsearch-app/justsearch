@@ -206,7 +206,7 @@ const keyOfLine = (family, line) => (family === 'engine' ? incarnationKey(line?.
  */
 function nativeHelperWrittenByOwner(record, owner) {
   const line = record?.line;
-  return Boolean(line && owner && identity.linuxIdentity(line)
+  return Boolean(line && owner && identity.linuxIdentity(owner)
     && writerIsOwner(record.writer, owner) && compareIdentity(line.owner, owner, 'exact')
     && compareIdentity({ pid: line.creatorPid, processIdentity: line.creatorProcessIdentity }, owner, 'native'));
 }
@@ -773,9 +773,10 @@ function ledgerView(ledger, runId, { stopBindings = [] } = {}) {
     ...(typeof r.line.witnessId === 'string' ? { witnessId: r.line.witnessId } : {}),
     ...(r.line.incarnation ? { incarnation: r.line.incarnation } : {}),
     ...(hasBirth(r.line) ? {} : { bornNotAfterMs: seenAtMs(r.line) }) }));
-  // A Linux OwnedHelper holds the spawned Process and pidfd until its native receipt. There
+  // A Linux OwnedHelper retains the original spawned Process through its exit receipt. There
   // is no Windows Job Object witness on this backend. Keep this inventory separate, and require
-  // the writer and creator's native birth as well as the helper's full identity on every proof.
+  // the writer and creator's native birth on every proof. A missing helper birth needs a
+  // matching creator-held exit code for the unique helper start instead of a PID lookup.
   const helpers = [], helperGroups = new Map();
   const helperRecords = (ledger?.children?.records ?? []).filter(r => r.line.incarnation?.session === runId
     && ['helper-start', 'helper-exit'].includes(r.type) && (r.line.processIdentity != null
@@ -786,18 +787,20 @@ function ledgerView(ledger, runId, { stopBindings = [] } = {}) {
     // Inventory precedes proof. An unreadable birth or malformed key is still a helper the
     // ledger names, never an absent process or a complete stop. Do not invent a PID-only birth.
     reportIdentities.push({ pid: line.pid, processIdentity: line.processIdentity, creationFileTimeUtc: null,
-      role: 'native-helper', helperId: line.helperId, incarnation: line.incarnation });
+      role: 'native-helper', helperId: line.helperId, owner: line.owner, incarnation: line.incarnation });
     if (typeof line.helperId !== 'string' || !/^[\w-]+$/.test(line.helperId)) continue;
     const id = startIdentity({ ...line, kind: 'helper' });
     const group = helperGroups.get(line.helperId) ?? [];
-    if (!group.some(s => compareIdentity(s.identity, id, 'exact'))) group.push({ family: 'helper', identity: id, start: r });
+    if (!group.some(s => compareIdentity(s.identity, id, 'exact'))) group.push({ family: 'helper', identity: id, start: r, writers: [r.writer] });
     helperGroups.set(line.helperId, group);
   }
   for (const group of helperGroups.values()) for (const start of group) {
     const line = start.start.line, owner = line.owner;
     const engine = engines.find(e => compareIdentity({ ...owner, incarnation: line.incarnation }, e, 'same'))
       ?? children.find(c => compareIdentity(c, owner, 'native')
-        && incarnationKey(c.incarnation) === incarnationKey(line.incarnation));
+        && (!c.incarnation || incarnationKey(c.incarnation) === incarnationKey(line.incarnation))
+        && engines.some(e => compareIdentity(c.owner, e, 'same')
+          && incarnationKey(e.incarnation) === incarnationKey(line.incarnation)));
     const validOwner = r => Boolean(engine && nativeHelperWrittenByOwner(r, owner));
     const exits = helperRecords.filter(r => r.type === 'helper-exit' && r.line.helperId === line.helperId);
     const eligible = validOwner(start.start) ? exits.filter(validOwner) : [];
@@ -1268,7 +1271,7 @@ function ledgerExitFor(target, view) {
  * A missing exit code is a fact the row reports, not a gap.
  */
 const LOOKUP_ENDED_RESOLVES = new Set(['exit_unproven', 'ledger_record_missing', 'unrecorded_exit',
-  'final_owner_receipt_unavailable', 'identity-bound OS exit code/time unavailable through teardown']);
+  'final_owner_receipt_unavailable', 'identity-bound OS exit code/time unavailable through teardown', 'helper_identity_or_membership_unproven']);
 const PRE_STOP_HANDLE_GAP = 'process handle unavailable before stop';
 const LOOKUP_ENDED_REASON = 'ended, observed by identity-checked lookup';
 /**
@@ -1394,7 +1397,8 @@ function exitResult(input, output, source, ledger = null, view = null, { lookupE
     if (!rowStarts.has(pid)) rowStarts.set(pid, []);
     rowStarts.get(pid).push(x);
   };
-  const rowFor = (s) => (rowStarts.get(identityOf(s)?.pid ?? null) ?? []).some(t => compareIdentity(t, s, 'same')
+  const rowFor = (s) => (rowStarts.get(identityOf(s)?.pid ?? null) ?? []).some(t => (compareIdentity(t, s, 'same')
+    || (s.helperId && t.helperId && compareIdentity(t, s, 'exact')))
     && (t.childId ?? null) === (s.childId ?? null) && (t.witnessId ?? null) === (s.witnessId ?? null) && (t.helperId ?? null) === (s.helperId ?? null)
     && (s.childId != null || s.helperId != null || s.witnessId != null || (t.incarnation != null && s.incarnation != null)));
   // A gap names an identity (its PID and birth), or only a PID when it records no birth.
@@ -1567,7 +1571,7 @@ function exitResult(input, output, source, ledger = null, view = null, { lookupE
     return denying;
   };
   for (const item of [...view.engines, ...view.children, ...(view.helpers ?? []), ...(view.witnesses ?? [])]) {
-    if (!item.pid || !hasBirth(item) || rowFor(item)) continue;
+    if (!item.pid || (!hasBirth(item) && !(item.helperId && item.proof)) || rowFor(item)) continue;
     rowWrittenFor(item);
     const role = item.witnessId ? witnessRole(item, item.executable, childrenIndexOf(view.children))
       : item.helperId ? 'native-helper' : item.childId ? roleOfKind(item.kind) : 'engine';
@@ -1825,6 +1829,19 @@ function unprovenIdentitiesOf(starts) {
 function ledgerResolution(view) {
   const starts = ledgerStartsOf(view);
   const index = byPid(starts, s => s.item);
+  // Old stop reports projected native-helper obligations without their logical key. They
+  // can be discharged only when every inventoried start of that PID is a proven creator
+  // receipt. This is report reconciliation, never an OS identity or permission to signal.
+  const receiptEnded = tracked => {
+    const id = identityOf(tracked);
+    if (tracked?.role !== 'native-helper' || id?.pid == null || id.rawBirth !== null) return false;
+    const candidates = index.get(id.pid) ?? [];
+    return candidates.length > 0 && candidates.every(s => s.role === 'native-helper'
+      && s.item.proof && !s.item.conflictingCodes && s.item.identity.rawBirth === null
+      && (!tracked.helperId || tracked.helperId === s.item.helperId)
+      && (!tracked.incarnation || incarnationKey(tracked.incarnation) === incarnationKey(s.item.incarnation))
+      && (!tracked.owner || compareIdentity(tracked.owner, s.item.owner, 'exact')));
+  };
   return {
     ended: endedIdentitiesOf(view, starts),
     // A native helper remains a stop obligation when its birth/key is unreadable. The
@@ -1832,7 +1849,7 @@ function ledgerResolution(view) {
     unproven: [...unprovenIdentitiesOf(starts), ...(view.reportIdentities ?? []).filter(p => {
       const id = identityOf(p);
       if (id?.pid == null) return false;
-      if (p.role === 'native-helper') return !(index.get(id.pid) ?? []).some(s =>
+      if (p.role === 'native-helper') return !receiptEnded(p) && !(index.get(id.pid) ?? []).some(s =>
         s.role === 'native-helper' && compareIdentity(s.item, p, 'same'));
       return !id.birth && Number.isFinite(p.bornNotAfterMs);
     }).map(p => ({ pid: identityOf(p).pid,
@@ -1842,7 +1859,8 @@ function ledgerResolution(view) {
       ...(p.witnessId ? { witnessId: p.witnessId } : {}), ...(p.incarnation ? { incarnation: p.incarnation } : {}) }))],
     isEnded(tracked) {
       const id = identityOf(tracked);
-      if (!id || id.pid === null || id.birth === null) return false;
+      if (!id || id.pid === null) return false;
+      if (id.birth === null) return receiptEnded(tracked);
       const agreeing = (index.get(id.pid) ?? []).filter(s => compareIdentity(s.item, tracked, 'same'));
       return agreeing.length > 0 && agreeing.every(s => s.item.proof);
     },
@@ -1879,7 +1897,7 @@ const NOT_SEEN_YET = new Set(['unrecorded_exit']);
  * (stopProves). A disagreement, damage or unreadable evidence is never one of them.
  */
 const NOT_SEEN_UNTIL_PROVEN = new Set(['exit_unproven', 'ledger_record_missing', 'final_owner_receipt_unavailable',
-  'identity-bound OS exit code/time unavailable through teardown']);
+  'identity-bound OS exit code/time unavailable through teardown', 'helper_identity_or_membership_unproven']);
 const notSeenUntilProven = (gap) => NOT_SEEN_UNTIL_PROVEN.has(gap?.reason)
   || String(gap?.reason ?? '').startsWith(PRE_STOP_HANDLE_GAP);
 /**
@@ -1891,8 +1909,9 @@ const notSeenUntilProven = (gap) => NOT_SEEN_UNTIL_PROVEN.has(gap?.reason)
  */
 function stopProves({ isEnded = () => false, lookupEnded = [] } = {}) {
   const observations = lookupEndedIdentities(lookupEnded);
-  return (gap) => notSeenUntilProven(gap) && Number.isInteger(gap.pid) && Boolean(gap.creationFileTimeUtc || identity.linuxIdentity(gap))
-    && (Boolean(isEnded(gap)) || endedByObservation(observations, gap));
+  return (gap) => notSeenUntilProven(gap) && Number.isInteger(gap.pid)
+    && (Boolean(isEnded(gap)) || (Boolean(gap.creationFileTimeUtc || identity.linuxIdentity(gap))
+      && endedByObservation(observations, gap)));
 }
 function isFinding(gap) {
   if (!gap || typeof gap !== 'object') return false;

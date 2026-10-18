@@ -1,0 +1,88 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-18T22:06:53.878Z",
+  "revision": "d5e4aa16ae796259c857a7c783be0b5d3f8ad3bf",
+  "tree": "03bf2f758112612df11d8e366143f9283d8a2f54",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineLinuxRootVolumeLiveTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 70532
+    },
+    {
+      "command": "./gradlew :modules:ort-common:test --tests \"io.justsearch.ort.NativeGpuLinuxLiveTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2708
+    },
+    {
+      "command": "./gradlew :modules:gpu-bridge:test --tests \"io.justsearch.gpu.NativeNvmlLinuxLiveTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2032
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineLinuxRootVolumeLiveTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineLinuxRootVolumeLiveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c52d1ad70e3861a42da7c6080edcc2e06d7b19897e1600df0db56739b21b81d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentDifferentUnknownAndReturningFilesystemsPreserveTheOriginalIndex()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeGpuLinuxLiveTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeGpuLinuxLiveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3ad978b84f0786dab7e5eeff36642e706a3d625f40d623f518c9a925918bb846",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "driverReportsDeviceIdentityAndMemoryWithoutSubprocesses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NativeNvmlLinuxLiveTest.java",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/NativeNvmlLinuxLiveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:df2858d53cba21779f8bf4dc80dd33a3c4203f37795ca2bfd2a52a0b19c9bdd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nvmlReportsDeviceCountAndVramWithoutSubprocesses()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ac494b034b122c9227e15a94738af83a4db249343770305b2ea6c60802401bac"
+}

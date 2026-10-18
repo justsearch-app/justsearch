@@ -42,9 +42,11 @@ final class OwnedHelperRollbackTest {
         : FakeChild.argv("sleep")).redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .redirectError(ProcessBuilder.Redirect.DISCARD).start();
     var os = ProcessTerminator.forCurrentOs();
-    var cleanup = os.open(raw);
     Object birth = io.justsearch.configuration.PlatformPaths.isLinux()
-        ? cleanup.processIdentity().orElseThrow() : cleanup.creationFileTime().orElseThrow();
+        ? LinuxProcessIdentity.read(raw.pid()).orElseThrow() : os.creationFileTime(raw.pid()).orElseThrow();
+    var cleanup = os.open(raw);
+    assertEquals(birth, io.justsearch.configuration.PlatformPaths.isLinux()
+        ? cleanup.processIdentity().orElseThrow() : cleanup.creationFileTime().orElseThrow());
     System.out.println("fixture-start=" + raw.pid() + "/" + birth);
     // Only handle acquisition sees an invalid PID. Rollback retains the original spawn object.
     Process failedOpen = new Process() {

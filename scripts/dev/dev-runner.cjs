@@ -2175,7 +2175,7 @@ function earlierReportIdentities(runDir) {
 
 /** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
 function describeResolved(p) {
-  return { pid: Number(p.pid), creationFileTimeUtc: p.processIdentity ? null : String(p.creationFileTimeUtc), ...(p.processIdentity ? { processIdentity: p.processIdentity } : {}), role: p.role ?? null,
+  return { pid: Number(p.pid), creationFileTimeUtc: p.processIdentity || p.creationFileTimeUtc == null ? null : String(p.creationFileTimeUtc), ...(p.processIdentity ? { processIdentity: p.processIdentity } : {}), role: p.role ?? null,
     observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null, basis: 'exit ledger' };
 }
 
@@ -3844,7 +3844,7 @@ function checkRecordedProcess(recorded, seen) {
 function describeUnresolved(p, state) {
   const birth = p.creationFileTimeUtc ?? null;
   const ms = engineActuator.fileTimeToMs(birth ?? p.observedCreationFileTimeUtc);
-  return { pid: p.pid, name: p.name ?? p.observedName ?? (p.executable ? path.win32.basename(p.executable) : 'unknown'), role: p.role,
+  return { ...(p.helperId ? { helperId: p.helperId, owner: p.owner, incarnation: p.incarnation } : {}), pid: p.pid, name: p.name ?? p.observedName ?? (p.executable ? path.win32.basename(p.executable) : 'unknown'), role: p.role,
     creationFileTimeUtc: birth, ...(p.processIdentity ? { processIdentity: p.processIdentity } : {}), bornNotAfterMs: p.bornNotAfterMs ?? null, owned: p.owned,
     startedAt: ms === null ? p.startedAt ?? 'unknown' : new Date(ms).toISOString(),
     observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null,
@@ -4009,7 +4009,7 @@ async function stopRun(opts, {
     }
     return ledgerEnded;
   };
-  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc || processIdentity.linuxIdentity(p)) && Boolean(ledgerResolved?.isEnded(p));
+  const provenEnded = (p) => Boolean(p?.pid) && Boolean(ledgerResolved?.isEnded(p));
   // Each identity resolved by its ledger exit instead of a lookup, once.
   const resolvedByLedger = [];
   const noteResolved = (p) => {
