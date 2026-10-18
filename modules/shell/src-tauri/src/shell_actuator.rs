@@ -17,13 +17,15 @@ pub(crate) struct ShellActuator {
     pid: Option<u32>,
     intents: Vec<Value>,
     forced: bool,
+    #[cfg(target_os = "linux")]
+    forced_with_intent: bool,
     terminated_at: Option<u64>,
     started_at: u64,
-    creation_time: Option<String>,
+    process: Value,
     suspended_at_start: u64,
     detail: Option<String>,
     old_holder_recent: bool,
-    lock_holder: Option<(u32, Option<String>)>,
+    lock_holder: Option<Value>,
     intervals: Vec<(u64, u64)>,
     applied: std::collections::HashSet<(usize, bool)>,
 }
@@ -61,19 +63,13 @@ impl ShellActuator {
         let mut old_holder_recent = false;
         let mut lock_holder = None;
         for (_, (start, intent)) in open {
-            let check = identity_check(
-                start["pid"].as_u64().unwrap_or(0) as u32,
-                start["creationFileTime"].as_str(),
-            );
+            let check = identity_check(&start);
             old_holder_recent |= check == "ALIVE_MATCH"
                 || now
                     .saturating_sub(exit_ledger::known_timestamp(&start["at"]).unwrap_or(0) as u64)
                     < supervisor::load_policy().data_dir_locked_wait_ms;
             if check == "ALIVE_MATCH" {
-                lock_holder = Some((
-                    start["pid"].as_u64().unwrap_or(0) as u32,
-                    start["creationFileTime"].as_str().map(String::from),
-                ));
+                lock_holder = Some(start.clone());
             }
             let fields = json!({"incarnation":start["incarnation"], "pid":start["pid"],
                 "basis":if intent {"OPEN_INTENT"} else {"OPEN_START"}, "osCheck":check,
@@ -105,9 +101,11 @@ impl ShellActuator {
             pid: None,
             intents: Vec::new(),
             forced: false,
+            #[cfg(target_os = "linux")]
+            forced_with_intent: false,
             terminated_at: None,
             started_at: 0,
-            creation_time: None,
+            process: Value::Null,
             suspended_at_start: 0,
             detail: None,
             old_holder_recent,
@@ -171,15 +169,17 @@ impl Actuator for ShellActuator {
         self.pid = Some(pid);
         self.intents.clear();
         self.forced = false;
+        #[cfg(target_os = "linux")]
+        { self.forced_with_intent = false; }
         self.detail = None;
         self.terminated_at = None;
         self.started_at = epoch();
         self.suspended_at_start = self.host.clock.lock().unwrap().suspended_ms_since(0);
-        let (birth, executable) = process_identity(pid);
-        self.creation_time = birth.clone();
-        self.append("engine-start", json!({"incarnation":self.incarnation(), "pid":pid,
-            "creationFileTime":birth, "processStartedAt":birth.as_deref().and_then(filetime_ms).map(supervisor::epoch_ms_to_iso),
-            "executable":executable.map(|s|s.chars().take(1024).collect::<String>()), "cause":if self.n == 1 {"INITIAL"} else {"RESTART"}, "supervisorKind":"tauri"}));
+        self.process = process_record(pid);
+        let mut start = self.process.clone();
+        start.as_object_mut().unwrap().extend(json!({"incarnation":self.incarnation(),
+            "cause":if self.n == 1 {"INITIAL"} else {"RESTART"}, "supervisorKind":"tauri"}).as_object().unwrap().clone());
+        self.append("engine-start", start);
         Ok(pid)
     }
     fn await_ready(&mut self, _deadline: u64) -> Result<Ready, String> {
@@ -296,7 +296,13 @@ impl Actuator for ShellActuator {
     fn force_kill(&mut self) {
         self.forced = true;
         self.terminated_at = Some(epoch());
-        let _ = self.host.force_stop();
+        #[cfg(target_os = "linux")]
+        { self.forced_with_intent = !self.intents.is_empty(); }
+        let sent = self.host.force_stop();
+        #[cfg(target_os = "linux")]
+        { self.forced_with_intent &= sent.is_ok(); }
+        #[cfg(not(target_os = "linux"))]
+        let _ = sent;
     }
     fn record_exit(&mut self, code: i32, phase: &str, decision: &Decision) {
         let mut intents = self.intents.clone();
@@ -309,9 +315,7 @@ impl Actuator for ShellActuator {
                     && row["engine"]["pid"].as_u64() == self.pid.map(u64::from)
                     && exit_ledger::known_timestamp(&row["at"])
                         .is_some_and(|at| at >= self.started_at as i64)
-                    && (row["engine"]["creationFileTime"].is_null()
-                        || row["engine"]["creationFileTime"].as_str()
-                            == self.creation_time.as_deref())
+                    && same_engine_identity(&row["engine"], &self.process)
                 {
                     intents.insert(0, row);
                 }
@@ -324,16 +328,39 @@ impl Actuator for ShellActuator {
         let latest = intents.last();
         let requested = matched.is_some()
             || (self.forced && code == exit_ledger::JS_ENGINE_STOP as i32 && latest.is_some());
+        #[cfg(target_os = "linux")]
+        let requested = if self.host.exit_signal().is_some() {
+            // Only our successful forced SIGKILL following an owner intent is requested.
+            self.host.exit_signal() == Some(9) && self.forced_with_intent
+        } else { requested };
         let intent = matched.or(latest);
-        let contained = self.host.latest_record().is_some_and(|r| r.containment.as_deref() != Some("shell_unavailable"));
-        self.append("engine-exit", json!({"incarnation":self.incarnation(), "exitClass":if requested {"REQUESTED"} else {"UNEXPECTED"},
+        let contained = cfg!(windows) && self.host.latest_record().is_some_and(|r| r.containment.as_deref() != Some("shell_unavailable"));
+        #[allow(unused_mut)]
+        let mut exit = json!({"incarnation":self.incarnation(), "exitClass":if requested {"REQUESTED"} else {"UNEXPECTED"},
             "reason":intent.map(|i|i["reason"].clone()),"detail":intent.map(|i|i["detail"].clone()), "code":code,
             "codeName":supervisor::describe_exit(code,&supervisor::load_policy()), "exitedAt":null,"observedAt":supervisor::epoch_ms_to_iso(epoch()),
             "forced":self.forced, "terminateCalledAt":self.terminated_at.map(supervisor::epoch_ms_to_iso),"suspendedMs":self.host.clock.lock().unwrap().suspended_ms_since(0).saturating_sub(self.suspended_at_start),
-            "phase":phase,"codeDistinctive":!self.forced || contained,"containment":if contained {"SHELL_JOB"} else {"NONE"},"jobEmpty":if contained {json!(self.host.predecessor_job_empty())} else {Value::Null},
-            "contract":{"action":decision.action.name(),"exitClass":decision.exit_class,"counted":decision.counted}}));
+            "phase":phase,"codeDistinctive":!self.forced || contained,"containment":if contained {"SHELL_JOB"} else if cfg!(target_os = "linux") {"LINUX_PARENT_DEATH"} else {"NONE"},"jobEmpty":if contained {json!(self.host.predecessor_job_empty())} else {Value::Null},
+            "contract":{"action":decision.action.name(),"exitClass":decision.exit_class,"counted":decision.counted}});
+        #[cfg(target_os = "linux")]
+        if let Some(signal) = self.host.exit_signal() {
+            // A signal is not a numeric program exit code or an OS exit timestamp.
+            exit["code"] = Value::Null;
+            exit["signal"] = json!(signal);
+            exit["signalName"] = json!(linux_signal_name(signal));
+            exit["codeName"] = json!(linux_signal_name(signal));
+            exit["ownerIntentBeforeSignal"] = if self.forced_with_intent || self.intents.is_empty() {
+                json!(self.forced_with_intent)
+            } else {
+                // An unrelated signal's OS delivery time is unknown; observation order alone
+                // cannot prove a pending cooperative intent preceded that signal.
+                Value::Null
+            };
+            exit["codeDistinctive"] = json!(false);
+        }
+        self.append("engine-exit", exit);
         if code != 2 {
-            self.lock_holder = self.pid.map(|pid| (pid, self.creation_time.clone()));
+            self.lock_holder = self.pid.map(|_| self.process.clone());
         }
         self.host.acknowledge_exit(code);
     }
@@ -380,7 +407,7 @@ impl Actuator for ShellActuator {
     fn lock_holder_gone(&self) -> bool {
         self.lock_holder
             .as_ref()
-            .is_some_and(|(pid, birth)| identity_check(*pid, birth.as_deref()) == "GONE")
+            .is_some_and(|record| identity_check(record) == "GONE")
     }
     fn prior_owner_recent(&mut self) -> bool {
         self.old_holder_recent
@@ -413,6 +440,7 @@ pub(crate) fn write_atomic(path: &Path, bytes: &str) -> Result<(), String> {
     std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(tmp, path).map_err(|e| e.to_string())
 }
+#[cfg(not(target_os = "linux"))]
 fn filetime_ms(birth: &str) -> Option<u64> {
     (birth.parse::<u64>().ok()? / 10000).checked_sub(11644473600000)
 }
@@ -451,11 +479,12 @@ fn process_identity(pid: u32) -> (Option<String>, Option<String>) {
         (birth, executable)
     }
 }
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn process_identity(_pid: u32) -> (Option<String>, Option<String>) {
     (None, None)
 }
-fn identity_check(pid: u32, birth: Option<&str>) -> &'static str {
+#[cfg(not(target_os = "linux"))]
+fn legacy_identity_check(pid: u32, birth: Option<&str>) -> &'static str {
     #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::{
@@ -477,6 +506,61 @@ fn identity_check(pid: u32, birth: Option<&str>) -> &'static str {
         _ => "IDENTITY_UNKNOWN",
     }
 }
+
+#[cfg(target_os = "linux")]
+fn linux_signal_name(signal: i32) -> String {
+    match signal {
+        1 => "SIGHUP", 2 => "SIGINT", 3 => "SIGQUIT", 4 => "SIGILL", 6 => "SIGABRT",
+        8 => "SIGFPE", 9 => "SIGKILL", 11 => "SIGSEGV", 13 => "SIGPIPE", 14 => "SIGALRM",
+        15 => "SIGTERM", _ => return format!("signal {signal}"),
+    }.to_string()
+}
+
+fn process_record(pid: u32) -> Value {
+    #[cfg(target_os = "linux")]
+    {
+        return match crate::linux_process::capture(pid) {
+            Ok((identity, executable)) => json!({"pid":pid, "processIdentity":identity,
+                "processStartedAt":null, "executable":executable.to_string_lossy()}),
+            Err(_) => json!({"pid":pid, "processIdentity":null, "processStartedAt":null, "executable":null}),
+        };
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let (birth, executable) = process_identity(pid);
+        json!({"pid":pid, "creationFileTime":birth,
+            "processStartedAt":birth.as_deref().and_then(filetime_ms).map(supervisor::epoch_ms_to_iso),
+            "executable":executable.map(|s|s.chars().take(1024).collect::<String>())})
+    }
+}
+
+fn same_engine_identity(engine: &Value, owned: &Value) -> bool {
+    #[cfg(target_os = "linux")]
+    return !owned["processIdentity"].is_null() && engine["processIdentity"] == owned["processIdentity"];
+    #[cfg(not(target_os = "linux"))]
+    return engine["creationFileTime"].is_null() || engine["creationFileTime"] == owned["creationFileTime"];
+}
+
+fn identity_check(record: &Value) -> &'static str {
+    let pid = record["pid"].as_u64().and_then(|p| u32::try_from(p).ok()).unwrap_or(0);
+    #[cfg(target_os = "linux")]
+    {
+        let identity: Option<crate::linux_process::Identity> = serde_json::from_value(record["processIdentity"].clone()).ok();
+        let state = crate::linux_process::check(pid, identity.as_ref());
+        if state != "ALIVE_MATCH" { return state; }
+        let Some(executable) = record["executable"].as_str().filter(|exe| Path::new(exe).is_absolute())
+            else { return "IDENTITY_UNKNOWN"; };
+        match crate::linux_process::capture(pid) {
+            Ok((seen, exe)) if Some(&seen) == identity.as_ref() && exe == Path::new(executable) => "ALIVE_MATCH",
+            Ok(_) => "GONE",
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => "GONE",
+            Err(_) => "IDENTITY_UNKNOWN",
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    legacy_identity_check(pid, record["creationFileTime"].as_str())
+}
+
 /// Bounded loopback HTTP from the actor, including during runtime teardown.
 fn post(
     port: u16,
@@ -544,3 +628,70 @@ fn post_before_send(
 #[cfg(test)]
 #[path = "shell_commit_transport_tests.rs"]
 mod commit_transport_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+mod linux_identity_tests {
+    use super::*;
+    fn signalled_exit(with_intent: bool) -> Value {
+        let dir = tempfile::tempdir().unwrap();
+        let host = Arc::new(EngineHost::default());
+        let spawn_host = host.clone();
+        let mut actuator = ShellActuator::new(host.clone(), dir.path().into(), move || {
+            let mut command = std::process::Command::new("sleep");
+            command.arg("30");
+            spawn_host.admit(crate::engine_host::PreparedCommand { command }).map(|c| c.pid)
+        }, |_| {});
+        actuator.spawn_engine().unwrap();
+        if with_intent {
+            actuator.record_intent("quit", None, "TERMINATE", epoch() + 1000);
+        }
+        if with_intent { actuator.force_kill(); }
+        else { host.force_stop().unwrap(); }
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        let code = loop {
+            if let Some(code) = actuator.poll_exit() { break code; }
+            assert!(std::time::Instant::now() < deadline, "owned fixture did not exit");
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        let decision = Decision { action: supervisor::Action::Stop, reason: None,
+            exit_class: None, cooldown_ms: None, counted: false };
+        actuator.record_exit(code, "running", &decision);
+        exit_ledger::read_ledger(&exit_ledger::ledger_directory(dir.path()), exit_ledger::Family::Engine)
+            .unwrap().records.into_iter().find(|r| r["type"] == "engine-exit").unwrap()
+    }
+
+    #[test]
+    fn linux_signal_has_no_fabricated_exit_code_and_requires_prior_owner_intent() {
+        for with_intent in [false, true] {
+            let exit = signalled_exit(with_intent);
+            assert!(exit["code"].is_null(), "{exit}");
+            assert_eq!(exit["signal"], 9);
+            assert_eq!(exit["signalName"], "SIGKILL");
+            assert_eq!(exit["forced"], with_intent);
+            assert_eq!(exit["ownerIntentBeforeSignal"], with_intent);
+            assert_eq!(exit["exitClass"], if with_intent { "REQUESTED" } else { "UNEXPECTED" });
+            assert!(exit["exitedAt"].is_null());
+            assert_eq!(exit["containment"], "LINUX_PARENT_DEATH");
+        }
+    }
+
+    #[test]
+    fn records_use_linux_birth_identity_without_windows_timestamps() {
+        let process = process_record(std::process::id());
+        assert_eq!(process["processIdentity"]["kind"], "linux-proc-v1");
+        assert!(process.get("creationFileTime").is_none());
+        assert!(process["processStartedAt"].is_null());
+        assert_eq!(identity_check(&process), "ALIVE_MATCH");
+        let mut missing_executable = process.clone();
+        missing_executable["executable"] = Value::Null;
+        assert_eq!(identity_check(&missing_executable), "IDENTITY_UNKNOWN");
+        assert!(same_engine_identity(&process, &process));
+        let mut changed = process.clone();
+        changed["processIdentity"]["startTicks"] = json!("0");
+        assert_eq!(identity_check(&changed), "GONE");
+        assert!(!same_engine_identity(&changed, &process));
+        let legacy = json!({"pid":std::process::id(),"creationFileTime":"123"});
+        assert_eq!(identity_check(&legacy), "IDENTITY_UNKNOWN");
+        assert!(!same_engine_identity(&legacy, &legacy));
+    }
+}

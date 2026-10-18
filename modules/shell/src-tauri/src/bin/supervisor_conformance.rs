@@ -52,6 +52,9 @@ mod quit;
 mod session_window;
 #[path = "../shell_actuator.rs"]
 mod shell_actuator;
+#[cfg(target_os = "linux")]
+#[path = "../linux_process.rs"]
+mod linux_process;
 // Binary-only updater edge injection; the product coordinator is included unchanged.
 #[allow(dead_code)]
 mod updater_probe {
