@@ -15,7 +15,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -75,8 +74,9 @@ final class WorkerSearchServiceAvailabilityTest
     service.setModelReadyLatchSupplier(() -> {
       waits.incrementAndGet(); return new CountDownLatch(0);
     });
-    var call = foreground(Duration.ofSeconds(30));
-    if (expired) TimeUnit.MILLISECONDS.sleep(8500);
+    // Expired: queued 8500 ms, past the 8000 ms CPU cap, with 21.5 s of the request still live.
+    var call = WorkerSearchServiceQueuedUnavailableTest.queuedFor(
+        Duration.ofSeconds(30), Duration.ofMillis(expired ? 8500 : 0));
     assertAll("All modes for " + state, () -> {
     var hybrid = service.search(query(pipeline().setSparseEnabled(true).setDenseEnabled(true)), call);
     var hd = hybrid.getSearchTrace().getDegradation();
@@ -108,8 +108,9 @@ final class WorkerSearchServiceAvailabilityTest
     assertEquals("BM25", rag.getRetrievalMode());
     assertTrue(rag.getChunksCount() > 0);
     }, () -> {
-    var vectorCall = foreground(Duration.ofMillis(expired ? 2000 : 20000));
-    if (expired) TimeUnit.MILLISECONDS.sleep(1600);
+    // Expired: queued 1600 ms of 2000 ms; 400 ms live, under the 500 ms VECTOR-only margin.
+    var vectorCall = WorkerSearchServiceQueuedUnavailableTest.queuedFor(
+        Duration.ofMillis(expired ? 2000 : 20000), Duration.ofMillis(expired ? 1600 : 0));
     var error = assertThrows(WorkerServiceException.class,
         () -> service.search(query(pipeline().setDenseEnabled(true)), vectorCall));
     assertEquals(present ? WorkerServiceException.Status.DEADLINE_EXCEEDED
