@@ -50,10 +50,13 @@ or separate acceptance record. All of these conditions must hold:
 
 - The path is added and absent at the resolved base. Existing files stay gated, including when
   only adding a test case or changing an expected value.
+- The path must not equal, ignoring letter case, any path at the base or any other changed path.
+  This keeps additions that can collide on case-insensitive filesystems gated.
 - No in-scope test file, test-owned data, watched baseline, listed helper or Rust source is deleted
   in the diff. Deletion plus addition could be an edited move; the gate cannot prove isolation.
   An exact copy of any deleted file is also ineligible. Existing byte-identical move handling
-  remains: a move within the same execution context needs no entry; a move across contexts does.
+  remains for paths without case collisions: a move within the same execution context needs no
+  entry; a move across contexts does.
 - It is product test code, outside `modules/test-support`, `modules/app-api-tck` and
   `modules/system-tests`. Files under `__fixtures__`, `__snapshots__`, `resources`, `testFixtures`,
   `mocks` or `__test-setup__` are ineligible. A helper listed at either the base or the head,
@@ -64,6 +67,13 @@ or separate acceptance record. All of these conditions must hold:
   corresponding `kotlin/**/*{Test,Tests,IT}.kt`, where `<m>` is a JVM module (not `ui-web` or
   `shell`); or a `modules/ui-web` frontend test in the default or lockdown vitest selection
   described below. Other source sets, frontend modules and unselected extensions stay gated.
+- A Java or Kotlin source must declare exactly one top-level class, named after its file, with an
+  explicit package matching its directory under the `java/` or `kotlin/` source root. Extra types,
+  Kotlin top-level functions, properties or objects, and missing or mismatched packages stay gated.
+  Java static initializer blocks and Kotlin `init` blocks (including companion object initializers)
+  stay gated. The conservative scanner recognises ordinary comments, literals, imports, annotations
+  and class declarations; unsupported declarations or lexical forms (including Unicode escapes,
+  raw/text-block strings and Kotlin string templates), and unbalanced input stay gated.
 
 Rust integration tests stay gated too: even a top-level `tests/*.rs` can be imported through
 `mod`, `#[path]` or `include!`. The existing path classification cannot prove that it is isolated.
@@ -77,7 +87,10 @@ This deliberately removes digest-bound independent acceptance and mechanical fai
 enforcement for exempt files without entries. The independent verifier of the change must check
 that expectations have sources, named checks actually executed and passed without skips, and
 repair checks fail on the before-state for the asserted reason. Compile or environment failures
-do not establish fail-before. The gate no longer enforces those duties for exempt files.
+do not establish fail-before. The verifier must also check that the file changes nothing outside
+itself: no shadowed types and no JVM-wide or global state left changed, such as the default locale,
+time zone, system properties or `globalThis`. The gate cannot detect state changes made in test
+methods or lifecycle hooks. The gate no longer enforces those duties for exempt files.
 
 Existing or in-flight entries may still name an exempt file. Such entries keep all their source,
 evidence, digest and acceptance checks; no changeset or acceptance record needs rewriting merely

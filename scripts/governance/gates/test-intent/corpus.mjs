@@ -1126,6 +1126,69 @@ export const CASES = [
 
   // Isolated additions: no changeset or acceptance record is required.
   {
+    name: 'isolated-new preservation: k3 extra top-level Java type stays gated',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT + 'class Calc { static int add(int a, int b) { return 3; } }\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: k4 Java static initializer stays gated',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT.replace('class CalcNegTest {', 'class CalcNegTest { static { java.util.Locale.setDefault(java.util.Locale.US); System.setProperty("mode", "test"); }') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: k7 edited production move into test-named file stays gated',
+    scenario: { main: BASE, branch: [{ move: [[P.calc, NEW_TEST]], replaceIn: { [NEW_TEST]: ['return a + b;', 'return 3;'] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: k10 case collision with base path stays gated',
+    scenario: { main: BASE, branch: [{ write: { 'modules/core/src/test/java/io/x/calcTest.java': TEST_V1.replace('class CalcTest', 'class calcTest') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/test/java/io/x/calcTest.java'],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: case-only byte-identical move stays gated',
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/test/java/io/x/calcTest.java']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test, 'modules/core/src/test/java/io/x/calcTest.java'],
+    check: (r) => assert.deepEqual(r.moves, []),
+  },
+  {
+    name: 'isolated-new preservation: case collision between two new paths stays gated',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT, 'modules/core/src/test/java/io/x/calcNegTest.java': NEW_TEST_TEXT.replace('class CalcNegTest', 'class calcNegTest') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST, 'modules/core/src/test/java/io/x/calcNegTest.java'],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: frontend case collision with base path stays gated',
+    scenario: { main: BASE, branch: [{ write: { 'modules/ui-web/src/views/LIST.test.ts': BASE[P.uiTest] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/ui-web/src/views/LIST.test.ts'],
+  },
+  ...[
+    ['missing package', 'class CalcNegTest {}'],
+    ['mismatched package', 'package io.other; class CalcNegTest {}'],
+    ['mismatched class name', 'package io.x; class OtherTest {}'],
+    ['unclosed body', 'package io.x; class CalcNegTest {'],
+  ].map(([label, content]) => ({
+    name: `isolated-new preservation: JVM ${label} stays gated`,
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: content } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  })),
+  ...[
+    ['extra class', 'class Calc {}'],
+    ['top-level function', 'fun helper() = 3'],
+    ['top-level property', 'val helper = 3'],
+    ['top-level object', 'object Calc {}'],
+    ['companion initializer', '', 'companion object { init { System.setProperty("mode", "test") } }'],
+    ['top-level init', 'init { System.setProperty("mode", "test") }'],
+  ].map(([label, extra, body = '']) => ({
+    name: `isolated-new preservation: Kotlin ${label} stays gated`,
+    scenario: { main: BASE, branch: [{ write: { 'modules/core/src/test/kotlin/io/x/CalcNegTest.kt': `package io.x\nclass CalcNegTest { ${body} }\n${extra}\n` } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/test/kotlin/io/x/CalcNegTest.kt'],
+  })),
+  {
     name: 'isolated-new: added JVM Test.java needs no entry',
     scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }] },
     expect: 'pass', flagged: [],
@@ -1236,7 +1299,7 @@ export const CASES = [
     ['frontend lockdown', 'modules/ui-web/src/new-lockdown.test.ts'],
   ].map(([label, file]) => ({
     name: `isolated-new: added ${label} needs no entry`,
-    scenario: { main: BASE, branch: [{ write: { [file]: '// new test\n' } }] },
+    scenario: { main: BASE, branch: [{ write: { [file]: /\.(java|kt)$/.test(file) ? `package io.x;\nclass ${path.basename(file).replace(/\.(java|kt)$/, '')} {}\n` : '// new test\n' } }] },
     expect: 'pass', flagged: [],
     check: (r) => assert.deepEqual(r.exempt, [file]),
   })),

@@ -39,6 +39,7 @@ import { computeDigest, entryItems, normalizeText, parseChangeset, sha256 } from
 import { validateEvidence } from './evidence.mjs';
 import { BaseResolutionError, diffWorkingTree, git, readAtRef, readWorking, resolveBase } from './git-diff.mjs';
 import { RustScanError, extractTestItems, testModuleFiles } from './rust-tests.mjs';
+import { isIsolatedJvmTestSource } from './jvm-test-source.mjs';
 import {
   LOGIC_SEAMS_ITEM,
   LOGIC_SEAMS_PATH,
@@ -110,6 +111,13 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
 
   const { changes, baseBlobs } = diffWorkingTree(base.ref, repoRoot);
   const changedPaths = new Set(changes.map((c) => c.path));
+  // Check the base as well as the diff: a case-only addition can replace an existing file on
+  // case-insensitive filesystems, even when that base path is deleted in this change.
+  const casePaths = new Map();
+  for (const p of new Set([...baseBlobs.keys(), ...changedPaths])) {
+    const key = p.toLowerCase();
+    casePaths.set(key, (casePaths.get(key) ?? 0) + 1);
+  }
   const changeStatus = new Map(changes.map((c) => [c.path, c.status]));
   const readBase = (rel) => readAtRef(base.ref, rel, repoRoot);
   const readNow = (rel) => readWorking(rel, repoRoot);
@@ -234,7 +242,8 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   const paired = new Set();
   for (const d of wholeFile.filter((c) => c.status === 'D')) {
     const from = executionContext(d.path);
-    const same = added.filter((a) => !paired.has(a.path) && a.after === d.before);
+    const same = added.filter((a) => !paired.has(a.path) && a.after === d.before
+      && casePaths.get(a.path.toLowerCase()) === 1);
     const match = from === null ? undefined : same.find((a) => executionContext(a.path) === from);
     if (match) {
       paired.add(match.path).add(d.path);
@@ -257,7 +266,9 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     if (c.status === 'A' && c.before === null && c.kind === 'test-code'
       && !deletedTest && !deleted.some((d) => d.before === c.after)
       && !contextMoves.has(c.path) && !testSupport.has(c.path) && !rustTestFiles.has(c.path)
-      && !buildConfigKind(c.path) && isStandaloneTestSource(c.path)) {
+      && casePaths.get(c.path.toLowerCase()) === 1
+      && !buildConfigKind(c.path) && isStandaloneTestSource(c.path)
+      && (!/\.(java|kt)$/.test(c.path) || isIsolatedJvmTestSource(c.path, readNow(c.path)))) {
       exempt.push(c.path);
       findings.push(finding('isolated-new-test', 'note', `${c.path}: isolated new test source; no entry needed`, c.path));
       continue;

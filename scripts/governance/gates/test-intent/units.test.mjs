@@ -20,6 +20,7 @@ import {
   selectVitestCases, summarize,
 } from './evidence-runners.mjs';
 import { RustScanError, extractTestItems, testModuleFiles } from './rust-tests.mjs';
+import { isIsolatedJvmTestSource } from './jvm-test-source.mjs';
 import {
   buildConfigChange, buildConfigKind, changedLineIndices, identifierParts, packageTestProjection, rootScriptResolver, scanBlocks,
   scanWorkflow, workflowLineRunsTests,
@@ -122,6 +123,66 @@ test('scope: standalone test sources use known names and execution contexts', ()
     'modules/shell/src-tauri/tests/common/mod.rs',
     'modules/shell/src-tauri/src/a.rs',
   ]) assert.equal(isStandaloneTestSource(p), false, p);
+});
+
+test('isolated JVM source: single named class, matching package, comments and literals', () => {
+  const java = 'modules/core/src/test/java/io/x/CalcTest.java';
+  const kotlin = 'modules/core/src/test/kotlin/io/x/CalcTest.kt';
+  for (const src of [
+    'package io.x; class CalcTest {}',
+    'package io.x; import static org.junit.jupiter.api.Assertions.*; @Tag("a") public final class CalcTest { @Test void check() {} }',
+    'package io.x; /* class Calc {} static {} */ class CalcTest { String s = "class Calc {} static {"; char c = \'}\'; static int helper() { return 1; } class Nested {} }',
+    'package io.x; @Tags({@Tag("a"), @Tag("b")}) class CalcTest {}',
+  ]) assert.ok(isIsolatedJvmTestSource(java, src), src);
+  for (const src of [
+    'package io.x\nclass CalcTest {}',
+    'package io.x; import org.junit.jupiter.api.Test as Check\ninternal class CalcTest { @Check fun check() {} }',
+    'package io.x\n/* nested /* class Bad {} */ comment */ class CalcTest { val message = "init { class Bad" }',
+  ]) assert.ok(isIsolatedJvmTestSource(kotlin, src), src);
+});
+
+test('isolated JVM source: missing/mismatched declarations and extra top-level code stay gated', () => {
+  const java = 'modules/core/src/test/java/io/x/CalcTest.java';
+  for (const src of [
+    '', 'class CalcTest {}', 'package io.y; class CalcTest {}',
+    'package io.x; class Calc {}', 'package io.x; class CalcTest {} class Calc {}',
+    'package io.x; class Calc {} class CalcTest {}', 'package io.x; interface CalcTest {}',
+  ]) assert.equal(isIsolatedJvmTestSource(java, src), false, src);
+  const kotlin = 'modules/core/src/test/kotlin/io/x/CalcTest.kt';
+  for (const extra of ['class Calc {}', 'fun helper() = 3', 'val state = 3', 'object Calc {}', 'typealias Calc = CalcTest']) {
+    assert.equal(isIsolatedJvmTestSource(kotlin, `package io.x\nclass CalcTest {}\n${extra}`), false, extra);
+    assert.equal(isIsolatedJvmTestSource(kotlin, `package io.x\n${extra}\nclass CalcTest {}`), false, extra);
+  }
+  assert.equal(isIsolatedJvmTestSource('modules/core/src/test/java/CalcTest.java', 'class CalcTest {}'), false);
+  assert.equal(isIsolatedJvmTestSource('modules/core/src/test/java/io/x/CalcTest.kt', 'package io.x; class CalcTest {}'), false);
+});
+
+test('isolated JVM source: static and companion initializers stay gated through trivia and nesting', () => {
+  const java = 'modules/core/src/test/java/io/x/CalcTest.java';
+  for (const body of [
+    'static { System.setProperty("mode", "test"); }',
+    'static /* comment */\n { java.util.Locale.setDefault(java.util.Locale.US); }',
+    'class Nested { static { java.util.TimeZone.setDefault(null); } }',
+  ]) assert.equal(isIsolatedJvmTestSource(java, `package io.x; class CalcTest { ${body} }`), false, body);
+  const kotlin = 'modules/core/src/test/kotlin/io/x/CalcTest.kt';
+  for (const body of ['companion object { init { System.setProperty("mode", "test") } }', 'companion object Named { init /* comment */\n {} }', 'init {}']) {
+    assert.equal(isIsolatedJvmTestSource(kotlin, `package io.x\nclass CalcTest { ${body} }`), false, body);
+  }
+});
+
+test('isolated JVM source: uncertain lexical forms and unbalanced input stay gated', () => {
+  const java = 'modules/core/src/test/java/io/x/CalcTest.java';
+  for (const src of [
+    'package io.x; class CalcTest {', 'package io.x; class CalcTest { void check(] {} }',
+    'package io.x; class CalcTest {} /*', 'package io.x; class CalcTest { String x = "unterminated; }',
+    'package io.x; class CalcTest { String x = """\ntext\n"""; }',
+    'package io.x; class CalcTest {} // comment\rclass Calc {}',
+    String.raw`package io.x; class CalcTest {} // \u000a class Calc {}`,
+  ]) assert.equal(isIsolatedJvmTestSource(java, src), false, src);
+  const kotlin = 'modules/core/src/test/kotlin/io/x/CalcTest.kt';
+  assert.equal(isIsolatedJvmTestSource(kotlin, 'package io.x\nclass CalcTest { val x = "${call("nested")}" }'), false);
+  assert.equal(isIsolatedJvmTestSource(kotlin, 'package io.x\nclass `CalcTest` {}'), false);
+  assert.equal(isIsolatedJvmTestSource(kotlin, null), false);
 });
 
 // ---- Rust ----------------------------------------------------------------------------------------
