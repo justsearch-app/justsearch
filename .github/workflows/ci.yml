@@ -1304,24 +1304,12 @@ jobs:
       # prove the dev UI binds 127.0.0.1 on Windows too (localhost may resolve to ::1 first).
       - name: Dev-runner suite (auto-discovered)
         run: |
-          New-Item -ItemType Directory -Force build/ci | Out-Null
-          Start-Transcript -Path build/ci/dev-runner.log
           npm ci --audit=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm ci --prefix modules/ui-web --audit=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run test:dev-runner -- --verbose
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Stop-Transcript
-
-      - name: Preserve Windows-native Node evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-native-node-attempt-${{ github.run_attempt }}
-          path: build/ci/*.log
-          if-no-files-found: warn
-          retention-days: 30
 
   windows-native-contracts:
     name: Windows-native tests (contracts)
@@ -1346,11 +1334,8 @@ jobs:
 
       - name: Evidence capture exits cleanly after Windows fetch teardown
         run: |
-          New-Item -ItemType Directory -Force build/ci | Out-Null
-          Start-Transcript -Path build/ci/evidence-capture-exit.log
           node --test scripts/release/evidence-capture-exit.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Stop-Transcript
 
       - name: Engine discovery finds the desktop app's Engine (Roaming AppData)
         run: node --test scripts/lib/engine-discovery.test.mjs
@@ -1364,13 +1349,10 @@ jobs:
 
       - name: Supervisor conformance (dev-runner adapter)
         run: |
-          New-Item -ItemType Directory -Force build/ci | Out-Null
-          Start-Transcript -Path build/ci/conformance.log
           node scripts/supervisor-conformance/run.mjs --adapter dev-runner
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Stop-Transcript
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -1381,21 +1363,17 @@ jobs:
       - name: Release compatibility baseline contract tests
         shell: pwsh
         run: |
-          Start-Transcript -Path build/ci/compatibility.log
           ./scripts/ci/test-release-compatibility-baseline.ps1
-          Stop-Transcript
 
       - name: Release signing contract tests
         shell: pwsh
         run: |
-          Start-Transcript -Path build/ci/signing.log
           ./scripts/ci/test-install-codesign-tool.ps1
           ./scripts/ci/test-resolve-release-signing.ps1
           ./scripts/ci/test-sign-windows.ps1
           ./scripts/ci/test-sign-windows-diagnostics.ps1
           ./scripts/ci/test-verify-pe-signatures.ps1
           ./scripts/release/test-sign-vendored-payload.ps1
-          Stop-Transcript
 
       - name: Preserve Windows-native test results
         if: always()
@@ -1403,7 +1381,6 @@ jobs:
         with:
           name: windows-native-contracts-attempt-${{ github.run_attempt }}
           path: |
-            build/ci/*.log
             modules/**/build/test-results/test/TEST-*.xml
             modules/**/build/reports/tests/test/**
           retention-days: 30

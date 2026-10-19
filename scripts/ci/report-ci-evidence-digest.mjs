@@ -40,7 +40,6 @@ const UNIT_ARTIFACTS = new Map([
   ...Object.entries(SHARD_POLICY.historicalArtifacts || {}).map(([lane, artifact]) => [`Unit tests (${lane})`, artifact]),
 ]);
 const WINDOWS_ARTIFACTS = new Map([
-  ['Windows-native tests (node)', 'windows-native-node'],
   ['Windows-native tests (contracts)', 'windows-native-contracts'],
 ]);
 const BUILD_ATTRIBUTION_ARTIFACT = 'build-attribution';
@@ -261,7 +260,7 @@ function normalizeJob(job, policyEntry, artifacts, splitRun) {
   const part = /^(?:Unit tests \(app-ui-(?:ui|services)\)|Windows-native tests \((?:node|contracts)\))$/.test(name);
   const partBase = baseArtifact || WINDOWS_ARTIFACTS.get(name);
   const selected = partBase ? selectJobArtifact(artifacts, partBase, job) : null;
-  const partArtifact = part ? selected?.name || `${partBase}-attempt-${job.run_attempt || 1}` : null;
+  const partArtifact = part && partBase ? selected?.name || `${partBase}-attempt-${job.run_attempt || 1}` : null;
   const artifactName = baseArtifact && part ? partArtifact : baseArtifact;
   return {
     id: job.id || job.databaseId || null,

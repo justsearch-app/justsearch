@@ -376,17 +376,17 @@ console.log('test-report-ci-evidence-digest: PASS');
   const ui = { ...job('Unit tests (app-ui-ui)', 'success', 1, 3), run_attempt: 2 };
   const services = { ...job('Unit tests (app-ui-services)', 'success', 1, 4), run_attempt: 1 };
   const aggregate = job('Unit tests (app-ui)', 'success', 5, 6, [step('Require every app-ui part to succeed', 'success', 5, 6)]);
-  const windows = { ...job('Windows-native tests (node)', 'failure', 1, 2), run_attempt: 2 };
+  const windows = { ...job('Windows-native tests (contracts)', 'failure', 1, 2), run_attempt: 2 };
   const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [ui, services, aggregate, windows] }, artifactsDoc: artifacts([
     'unit-test-attribution-app-ui-ui-attempt-1',
     'unit-test-attribution-app-ui-services-attempt-1',
-    'windows-native-node-attempt-1',
+    'windows-native-contracts-attempt-1',
   ]) });
   assert.equal(report.unitAttribution.length, 2, 'aggregate owns no JUnit payload');
   assert.equal(report.unitAttribution[0].artifactPresent, false, 'old attempt cannot mask missing UI evidence');
   assert.equal(report.unitAttribution[1].artifactPresent, true, 'unchanged services part retains attempt 1');
   assert.equal(report.partEvidence.find((p) => p.job === windows.name).artifactPresent, false);
-  assert.ok(report.warnings.some((w) => w.includes('windows-native-node-attempt-2')));
+  assert.ok(report.warnings.some((w) => w.includes('windows-native-contracts-attempt-2')));
   assert.ok(report.jobs.find((j) => j.name === ui.name).factLane.required);
   assert.match(report.jobs.find((j) => j.name === ui.name).localReproduction[0], /:modules:ui:test/);
 }
@@ -411,4 +411,15 @@ console.log('test-report-ci-evidence-digest: PASS');
   const part = job('Unit tests (app-ui-ui)', 'cancelled', 1, 2, []);
   const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [part, aggregate] } });
   assert.equal(report.jobs.find((j) => j.name === aggregate.name).unitAttributionArtifact, null);
+}
+
+// Node's evidence lives in the Actions job log; there is no transcript artifact.
+{
+  const windows = { ...job('Windows-native tests (node)', 'success', 1, 2), run_attempt: 1 };
+  const windowsPolicy = { workflows: [{ ...policy.workflows[0], requiredStatusChecks: ['Windows-native tests'] }] };
+  const report = buildDigest({ policy: windowsPolicy, run: greenRun, jobsDoc: { jobs: [windows] }, artifactsDoc: artifacts([]) });
+  assert.equal(report.jobs[0].partArtifact, null);
+  assert.equal(report.partEvidence.length, 0);
+  assert.ok(report.jobs[0].factLane.required, 'removing an empty artifact does not change required status');
+  assert.ok(!report.warnings.some((w) => /windows-native-node|undefined-attempt/.test(w)));
 }

@@ -151,6 +151,7 @@
       "jobId": "windows-native-node",
       "commands": [
         "npm ci --audit=false",
+        "npm ci --prefix modules/ui-web --audit=false",
         "npm run test:dev-runner -- --verbose"
       ],
       "gradleTasks": []
