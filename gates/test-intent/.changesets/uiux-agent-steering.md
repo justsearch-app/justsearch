@@ -905,3 +905,14 @@ No acceptance record is supplied by the builder.
   "note": "Reviewed sources and baseline tests before the diff. Fresh frontend evidence matches committed classifications; eight live window cases and both resume modes pass. No unjustified oracle change found. One applied French correction produced English; recorded as a model-compliance limitation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-ycq0a_56",
+  "verdict": "accept",
+  "digest": "sha256:be4d5e7f97d2a3843d405f628dc4675f76a5674681e6922232558a9d02e3a9fc",
+  "note": "Reviewed baseline tests and supplied sources before the diff; all classifications warranted. Five fresh frontend evidence replays match committed classifications, including regenerated round 5. Merge-touched files: 484 baseline and 486 candidate tests pass. Independent overlapping-send case fails on merge-base and passes here. Unchanged JVM evidence reused. Test-intent acceptance only."
+}
+```
