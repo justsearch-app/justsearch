@@ -19,6 +19,7 @@ test('failure collection retains Engine, supervisor and fixture output with boun
     write(`${fixture}/state/runs/run/logs/backend.stderr.log`, 'child stderr');
     write(`${fixture}/fixture-output.txt`, 'fixture output');
     write(`${fixture}/data/jobs.db`, 'never upload a database');
+    write(`${fixture}/content/source.log`, 'corpus content is not child output');
     write(`${fixture}/models/private.log`, 'never traverse models');
     write('modules/system-tests/build/reports/isolated-backend/case/backend.log', 'boot failure');
     write(`${fixture}/large-output.txt`, 'discard'.repeat(100_000) + 'LAST LINE');
@@ -41,7 +42,7 @@ test('failure collection retains Engine, supervisor and fixture output with boun
     const tail = fs.readFileSync(path.join(destination, fixture, 'large-output.txt'), 'utf8');
     assert.ok(tail.endsWith('LAST LINE'));
     assert.equal(tail.length, result.fileBytes);
-    assert.ok(result.files.every((f) => !/models|linked|jobs.db/.test(f.path)));
+    assert.ok(result.files.every((f) => !/models|linked|jobs.db|content/.test(f.path)));
     assert.ok(fs.existsSync(path.join(destination, 'manifest.json')));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

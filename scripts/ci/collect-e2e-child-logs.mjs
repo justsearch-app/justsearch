@@ -14,11 +14,10 @@ export function collectChildLogs(root, destination) {
     files: [], errors: [], omitted: 0, scanLimitReached: false };
   let remaining = TOTAL_BYTES;
   let entries = 0;
-  const roots = ['tmp/lane-f-takeover', 'modules/system-tests/build/reports/isolated-backend'];
   // The installed Engine embeds the worker. Its application output is engine.log;
   // supervisor.log and backend.stdout/stderr.log live in each fixture's state/runs tree.
   const selected = (name) => /\.log(?:\.\d+)?$/.test(name) || /(?:^|-)output\.txt$/.test(name);
-  function walk(relative) {
+  function walk(relative, descend = true) {
     const source = path.join(root, relative);
     let children;
     try {
@@ -33,7 +32,7 @@ export function collectChildLogs(root, destination) {
       if (child.isSymbolicLink()) continue;
       const item = path.join(relative, child.name);
       if (child.isDirectory()) {
-        if (!['models', 'indices', 'index', 'corpus', 'node_modules'].includes(child.name)) walk(item);
+        if (descend && !['models', 'indices', 'index', 'corpus', 'node_modules'].includes(child.name)) walk(item);
       } else if (child.isFile() && selected(child.name)) {
         if (remaining === 0 || manifest.files.length >= MAX_FILES) { manifest.omitted++; continue; }
         let fd;
@@ -56,7 +55,25 @@ export function collectChildLogs(root, destination) {
       }
     }
   }
-  for (const relative of roots) walk(relative);
+  walk('modules/system-tests/build/reports/isolated-backend');
+  const fixtures = 'tmp/lane-f-takeover';
+  try {
+    const directory = path.join(root, fixtures);
+    if (!fs.lstatSync(directory).isSymbolicLink()) {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name))) {
+        if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+        const fixture = path.join(fixtures, entry.name);
+        // Corpus trees can contain hundreds of thousands of input files. The
+        // harness owns these two log locations and its top-level output files.
+        walk(path.join(fixture, 'data/logs'));
+        walk(path.join(fixture, 'state/runs'));
+        walk(fixture, false);
+      }
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') manifest.errors.push({ path: fixtures, error: error.message });
+  }
   fs.mkdirSync(destination, { recursive: true });
   fs.writeFileSync(path.join(destination, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   return manifest;
