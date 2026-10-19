@@ -1207,7 +1207,8 @@ final class EngineSupervisedRecoveryE2ETest {
         }
       }
       exit = process.exitValue();
-      assertEquals(0, exit, Files.readString(outputFile, StandardCharsets.UTF_8));
+      assertEquals(999, exit, "CC5 deliberate failure after the installed Engine scenario\n"
+          + Files.readString(outputFile, StandardCharsets.UTF_8));
     } catch (InterruptedException e) {
       interrupted = true;
       primaryFailure = e;
