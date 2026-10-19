@@ -108,3 +108,13 @@ fail-before. Both entries marked `repaired: true` have assertion-classified fail
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cc6d91b2-5314-42fd-867b-dbc2d8a68699",
+  "verdict": "accept",
+  "digest": "sha256:e0808999f67f97c70b0ad355fb2b72524009e6a4335033c0c497b337698336cc"
+}
+```
