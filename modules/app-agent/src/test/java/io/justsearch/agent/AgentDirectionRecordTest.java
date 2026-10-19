@@ -1,16 +1,26 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import static io.justsearch.agent.AgentLoopServiceTest.observed;
+import static io.justsearch.agent.AgentLoopServiceTest.stubCatalog;
+import static io.justsearch.agent.AgentLoopServiceTest.stubEmitter;
+import static io.justsearch.agent.AgentLoopServiceTest.stubExecutor;
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.agent.AgentLoopServiceTest.ScriptedAiService;
+import io.justsearch.agent.AgentLoopServiceTest.ScriptedResponse;
+import io.justsearch.agent.AgentLoopServiceTest.StubTool;
+import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.interaction.InteractionEvent;
 import io.justsearch.agent.api.interaction.InteractionEventKind;
+import io.justsearch.agent.api.registry.RiskTier;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,6 +49,9 @@ class AgentDirectionRecordTest {
     assertEquals(List.of("applied", "not_applied", "queued"),
         thread.stream().map(e -> e.attributes().get("directiveOutcome")).toList());
     assertEquals("run_finished", thread.get(1).attributes().get("directiveReason"));
+    assertEquals(List.of("d1", "d2", "d3"),
+        thread.stream().map(e -> e.attributes().get("directiveId")).toList(),
+        "the id a live window matches its own report of the direction by");
     for (var event : thread) {
       assertEquals("user", event.originator());
       assertEquals(Boolean.TRUE, event.attributes().get("steer"));
@@ -145,6 +158,56 @@ class AgentDirectionRecordTest {
     assertEquals(0, new AgentRunReconciler(restarted).reconcile());
     assertEquals(List.of("queued", "not_applied"), outcomes(restarted, "r1"));
     assertNull(restarted.readSnapshot("r1").get("interruptedAt"), "a finished run is not interrupted");
+  }
+
+  /**
+   * Recovery runs on unlock while this process may still be running agents. A run the running loop
+   * owns is not interrupted: recovery must leave it, and its directions, to the loop, so the
+   * direction it carries in the next model request is reported applied and nothing else.
+   */
+  @Test
+  void recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop() {
+    var model = new ScriptedAiService(List.of(
+        ScriptedResponse.toolCall("search-1", "core_search", "{}"),
+        ScriptedResponse.textOnly("finished")));
+    var store = new AgentRunStore(tempDir.resolve("runs"));
+    var tool = new StubTool("search", RiskTier.LOW, "found");
+    var service = observed(new AgentLoopService(model, stubCatalog(tool), stubExecutor(tool),
+        stubEmitter(), null, null, store, null));
+    var sessionId = new AtomicReference<String>();
+    var stampedWhileLive = new java.util.ArrayList<Integer>();
+    var outcomesWhileLive = new java.util.ArrayList<List<Object>>();
+    List<Map<String, Object>> messages = List.of(
+        Map.of("role", "system", "content", "Be helpful."),
+        Map.of("role", "user", "content", "Inspect the files."));
+
+    service.runAgent(new AgentRequest(messages, List.of(), 5), event -> {
+      if (event instanceof AgentEvent.SessionStarted started) {
+        sessionId.set(started.sessionId());
+      }
+      if (event instanceof AgentEvent.ToolExecutionCompleted) {
+        // After the first model/tool round: the user steers, and recovery runs (unlock, re-unlock).
+        assertTrue(service.injectSteeringDirective(sessionId.get(), "Answer in French."));
+        stampedWhileLive.add(new AgentRunReconciler(store).reconcile());
+        stampedWhileLive.add(new AgentRunReconciler(store).reconcile());
+        outcomesWhileLive.add(outcomes(store, sessionId.get()));
+      }
+    }, EngineContextTestFixtures.AGENT_LOOP);
+
+    assertEquals(List.of(List.of("queued")), outcomesWhileLive,
+        "recovery must not decide a direction the live run still holds");
+    assertEquals(2, model.recordedMessages.size());
+    assertTrue(model.recordedMessages.get(1).toString().contains("Answer in French."),
+        "the live run sends the direction in its next model request");
+    assertEquals(List.of("queued", "applied"), outcomes(store, sessionId.get()),
+        "exactly one final outcome for the direction, the true one");
+    assertEquals(List.of(0, 0), stampedWhileLive, "a run live in this process is not interrupted");
+    assertNull(store.readSnapshot(sessionId.get()).get("interruptedAt"));
+
+    // Once the run has finished, recovery still has nothing to add.
+    assertEquals(0, new AgentRunReconciler(store).reconcile());
+    assertEquals(List.of("queued", "applied"), outcomes(store, sessionId.get()));
+    assertNull(store.readSnapshot(sessionId.get()).get("interruptedAt"));
   }
 
   private static void seedRun(AgentRunStore store, String sessionId, String state) {

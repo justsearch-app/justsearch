@@ -545,6 +545,8 @@ public final class AgentLoopService implements AgentService {
         swapSystemPrompt(session, initialProfile);
       }
     }
+    // WP6.2 — owned from before the first write until after the last (the finally below).
+    runStore.markLive(sessionId);
     runStore.startRun(sessionId, request, session.messages(), initialBudget);
     if (session.isBackground()) {
       // Tempdoc 561 P-D2: stamp the durable record so the presence projection (presenceSince) surfaces
@@ -701,6 +703,8 @@ public final class AgentLoopService implements AgentService {
       // defaults a missing mark to ERRORED/INTERNAL_ERROR (F6, loud ERROR), and fans out.
       finalizer.emitSessionEnd(sessionId, session);
       sessionRegistry.remove(sessionId);
+      // WP6.2 — the termination reason above was this run's last write; recovery may judge it now.
+      runStore.clearLive(sessionId);
       // Tempdoc 577 §2.14 Root I (#13) / 834 §2 — the run is terminal. ONE call owns the whole
       // transition: refuse late publishes, close attached observers, keep the replay readable for
       // the linger window, then drop it. It used to be two sites that disagreed — remove-then-close

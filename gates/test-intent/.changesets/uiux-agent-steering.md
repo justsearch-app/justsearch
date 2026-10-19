@@ -22,7 +22,9 @@ Removed expectations (the Obsolete entries):
 - AgentInteractionMapperTest and AgentRunDurabilityClosureTest listed directive_acknowledged among the kinds the thread record drops. Under S8.2 a direction's outcome must be visible after reload, and N8.3 allows restored threads to show direction outcomes, so it now projects (one entry per direction with its final outcome; an id-less historical acknowledgement still projects nothing).
 - AgentSessionController.test.ts "onDirectiveAcknowledged appends a human-origin steer-directive entry" fed an id-less acknowledgement and expected an entry. Under N8.3 a historical acknowledgement alone is not shown as proof the direction reached the model, so the case now feeds an applied report, and "onDirectiveAcknowledged shows nothing for an acknowledgement without an id" pins the old input.
 
-Coverage limits: no live Engine/Qwen check was run by the builder (S6.3's French correction and template acceptance remain the verifier's live checks). Recovery is checked at the store → reconciler → thread-record boundary with planted crash-equivalent states, not a timed Engine kill. The unlock-time re-run of the reconciler is not checked against a run still live in the same process.
+Coverage limits: no live Engine/Qwen check was run by the builder (S6.3's French correction and template acceptance remain the verifier's live checks). Recovery is checked at the store → reconciler → thread-record boundary with planted crash-equivalent states, not a timed Engine kill. The unlock-time re-run of the reconciler is checked against a run still live in the same process through the production loop and the real on-disk store (review 2), not through the encrypted-unlock HTTP trigger.
+
+Review history: a second independent verifier failed 30d55b804 on two regressions, and the review-2 repair answers them. (1) Recovery, which the unlock listener re-runs while the process still runs agents, reported a still-queued direction of a live run not_applied/run_interrupted; the live loop then sent it and reported it applied, so one direction had two final outcomes (the same pass also stamped the live run interrupted, which was pre-existing). The running loop now owns its run in the store from before its first write to after its last, and recovery leaves an owned run alone, which also ends the false interrupted stamp on a live run. (2) The old window rendered one applied direction twice once the record carried it as well as the live run; the record now carries the directive id the live report has, and the merge shows each direction once by that id, with the furthest-known outcome. The review-2 checks are in the main evidence files (fail-before on 485fe86b8) and in uiux-agent-steering-java-review2.json / uiux-agent-steering-ui-review2.json, which run them with --before 44b5a6d43 (the candidate the verifier failed) and record each failing there by assertion for the reason under test. The changed expectations in AgentDirectionRecordTest#reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome (the record's directiveId) and AgentSessionController.test.ts "a final outcome reported after done reaches the live display of both windows" (the live projection's directiveId) are part of repair (2).
 
 No acceptance record is supplied by the builder.
 
@@ -35,7 +37,7 @@ No acceptance record is supplied by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Over the production run store, startup reconciler and public thread record (AgentRunQueryService.threadEvents): a reloaded thread shows one entry per direction, at its first place, with its final outcome (applied, not_applied with reason) and a late queued report never undoes a final one. A direction a dead process left queued gets exactly one not_applied outcome on recovery, however often recovery runs and whichever write the process died after: before recovery (run_interrupted), after an interrupted recovery had stamped interruptedAt (run_interrupted), after the run's DONE / CANCELLED / ERROR checkpoint but before its final outcome and termination reason (run_finished / run_stopped / run_failed). A direction that already has a final outcome gets no second one.",
+      "behaviour": "Over the production run store, startup reconciler and public thread record (AgentRunQueryService.threadEvents): a reloaded thread shows one entry per direction, at its first place, with its final outcome (applied, not_applied with reason) and its directive id, and a late queued report never undoes a final one. A direction a dead process left queued gets exactly one not_applied outcome on recovery, however often recovery runs and whichever write the process died after: before recovery (run_interrupted), after an interrupted recovery had stamped interruptedAt (run_interrupted), after the run's DONE / CANCELLED / ERROR checkpoint but before its final outcome and termination reason (run_finished / run_stopped / run_failed). A direction that already has a final outcome gets no second one.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -424,7 +426,7 @@ No acceptance record is supplied by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "In the controller both windows render from: a direction's reports update one entry per direction id (queued becomes applied in place; a late queued never undoes a final outcome; not_applied keeps its reason); a final outcome the run reports after done (queued, done, not_applied/run_finished on one SSE stream) reaches the live display, as 'Not applied' in Search v3's run feed and as the not_applied attributes the old window's chip reads; an acknowledgement without an id, live or in a replayed exported transcript followed by an error, shows nothing (no 'Steered'), while a replayed queued/applied direction still reads 'Steered'; a failed steer says why: connection failure, HTTP status other than 404, or no session yet.",
+      "behaviour": "In the controller both windows render from: a direction's reports update one entry per direction id (queued becomes applied in place; a late queued never undoes a final outcome; not_applied keeps its reason); a final outcome the run reports after done (queued, done, not_applied/run_finished on one SSE stream) reaches the live display, as 'Not applied' in Search v3's run feed and as the not_applied attributes (with the directive id) the old window's chip and merge read; an acknowledgement without an id, live or in a replayed exported transcript followed by an error, shows nothing (no 'Steered'), while a replayed queued/applied direction still reads 'Steered'; a failed steer says why: connection failure, HTTP status other than 404, or no session yet.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -535,6 +537,58 @@ No acceptance record is supplied by the builder.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#becomes a note labelled by its recorded outcome",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-run.test.ts#labels applied, queued and not-applied directions differently",
         "modules/ui-web/src/shell-v0/views/unifiedThreadProjection.test.ts#WP6.2 — a live direction carries its outcome to the spine, like a reloaded one"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 2. Through the production agent loop and the real on-disk run store: after the first model/tool round the user sends a direction and recovery runs twice (as the unlock listener re-runs it) while the run is live; recovery stamps nothing and gives the still-queued direction no outcome, the next model request carries the direction, and the run's record ends with exactly one final outcome for it (queued, applied), no interruptedAt, and nothing more from a recovery pass after the run finished. The reloaded thread carries each direction's directive id.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-java-review2.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop",
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 2. The old window's merge of the live run with the record shows each direction once, matched by directive id, at the record's place: an applied direction both carry renders one 'Your direction …' chip; a record read while the direction was still queued shows the live run's final outcome and reason; a direction only the record has (an earlier run) or only the live run has (not yet recorded) stays; two directions with the same words stay two. Without the live run (restored conversation) the record alone shows each once. The live projection carries the directive id it is matched by.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AN4",
+          "quote": "Search v3 Delegate and the old window's agent view show steering as before for applied directions.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui-review2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#shows each direction once when the live run and the record both carry it",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a final outcome reported after done reaches the live display of both windows"
       ]
     }
   ]

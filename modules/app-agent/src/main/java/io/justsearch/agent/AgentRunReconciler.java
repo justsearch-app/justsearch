@@ -41,7 +41,8 @@ public final class AgentRunReconciler {
 
   /**
    * Stamp every persisted run that is non-terminal and not already stamped, and report every
-   * direction a run left queued as not applied (WP6.2). Returns how many runs this pass stamped —
+   * direction a run left queued as not applied (WP6.2). A run a loop in this process still runs is
+   * left alone ({@link AgentRunStore#isLive}). Returns how many runs this pass stamped —
    * {@code 0} when there was nothing to do AND when the store was unreadable (a locked store is
    * indistinguishable from an empty one here by design; the unlock listener re-runs the pass rather
    * than this method guessing).
@@ -66,12 +67,23 @@ public final class AgentRunReconciler {
       if (!(summary.get("sessionId") instanceof String sessionId) || sessionId.isBlank()) {
         continue;
       }
-      LifecycleState state = LifecycleState.parse(summary.get("state"));
       try {
+        // WP6.2 — a run a loop in this process still owns was not interrupted: its loop reports its
+        // directions itself. Ownership ends after the run's last write and a session id never runs
+        // again, so a run not owned now is judged on a fresh read, not on the listing, which can
+        // predate its finish.
+        if (store.isLive(sessionId)) {
+          continue;
+        }
+        Map<String, Object> run = store.readSnapshot(sessionId);
+        if (run == null) {
+          continue;
+        }
+        LifecycleState state = LifecycleState.parse(run.get("state"));
         if (state.isTerminal()) {
           // Finished before the process died — no marker. The run's last write, its termination
           // reason, follows the outcomes of its directions; without it, finishing was cut short.
-          if (summary.get("terminationReason") == null) {
+          if (run.get("terminationReason") == null) {
             reportUnappliedDirections(sessionId, notAppliedReason(state));
           }
           continue;

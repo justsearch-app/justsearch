@@ -6731,4 +6731,64 @@ describe('a direction chip reports its outcome', () => {
     __resetAgentSessionStore();
     view.remove();
   });
+
+  // N8.4 / S8.2 — a direction is durable progress: the record carries it as well as the live run. The
+  // merge shows each direction once (matched by its directive id), with the furthest-known outcome, and
+  // keeps one that only the live run or only the record has.
+  it('shows each direction once when the live run and the record both carry it', async () => {
+    __resetAgentSessionStore();
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'agent';
+    const ctrl = getAgentSessionController('http://localhost:5173');
+    const ack = (directiveId: string, directiveText: string, outcome: string, reason?: string) =>
+      ctrl.onDirectiveAcknowledged({ directiveId, directiveText, outcome, ...(reason ? { reason } : {}) });
+    ack('d1', 'Answer in French.', 'queued');
+    ack('d1', 'Answer in French.', 'applied');
+    ack('d2', 'Skip drafts.', 'queued');
+    ack('d2', 'Skip drafts.', 'not_applied', 'run_finished');
+    ack('d3', 'Answer in French.', 'queued'); // same words, a second direction: not merged with d1
+    (view as unknown as { agentCtrl: unknown }).agentCtrl = ctrl;
+    const recorded = (directiveId: string, second: number, content: string, attributes: Record<string, unknown>) => ({
+      id: `conv:direction:${directiveId}`, occurredAt: `2026-01-01T00:00:0${second}Z`, kind: 'PROGRESS',
+      originator: 'user', content,
+      attributes: { steer: true, phase: 'direction', directiveId, ...attributes },
+    });
+    const v = view as unknown as {
+      unifiedEvents: unknown[];
+      mergedTimeline: () => Array<{ content: string; attributes: Record<string, unknown> }>;
+    };
+    v.unifiedEvents = [
+      { id: 'u0', occurredAt: '2026-01-01T00:00:00Z', kind: 'USER_MESSAGE', originator: 'user', content: 'q', attributes: {} },
+      recorded('d0', 1, 'Focus on Q3.', { directiveOutcome: 'applied' }), // an earlier run's, record only
+      recorded('d1', 2, 'Answer in French.', { directiveOutcome: 'applied' }),
+      recorded('d2', 3, 'Skip drafts.', { directiveOutcome: 'queued' }), // read before its final outcome
+    ];
+
+    const directions = v.mergedTimeline().filter((it) => it.attributes.steer === true);
+    expect(directions.map((it) => [it.content, it.attributes.directiveOutcome])).toEqual([
+      ['Focus on Q3.', 'applied'],
+      ['Answer in French.', 'applied'],
+      ['Skip drafts.', 'not_applied'],
+      ['Answer in French.', 'queued'],
+    ]);
+    expect(directions[2]!.attributes.directiveReason).toBe('run_finished');
+
+    view.requestUpdate();
+    await view.updateComplete;
+    const chips = [...view.shadowRoot!.querySelectorAll('.steer-directive')].map((chip) =>
+      (chip.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+    expect(chips.filter((c) => c === 'Your direction Answer in French.')).toHaveLength(1);
+
+    // Restored without the live run: the record alone, still once each.
+    (view as unknown as { agentCtrl: unknown }).agentCtrl = null;
+    expect(v.mergedTimeline().filter((it) => it.attributes.steer === true).map((it) => it.content)).toEqual([
+      'Focus on Q3.',
+      'Answer in French.',
+      'Skip drafts.',
+    ]);
+    __resetAgentSessionStore();
+    view.remove();
+  });
 });

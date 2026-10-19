@@ -4156,6 +4156,13 @@ export class UnifiedChatView extends JfElement {
     // consecutive turns ("ok" / "ok") no longer collapse to one.
     const recordedCallIds = new Set<string>();
     const recordedContentCount = new Map<string, number>();
+    // WP6.2 — a direction is durable progress: the record carries it too, under the same directive id.
+    const recordedDirections = new Map<string, number>();
+    recordItems.forEach((it, index) => {
+      if (it.attributes.steer === true && typeof it.attributes.directiveId === 'string') {
+        recordedDirections.set(it.attributes.directiveId, index);
+      }
+    });
     for (const it of recordItems) {
       if (it.kind === 'tool-activity') {
         const cid = typeof it.attributes.callId === 'string' ? it.attributes.callId : it.id;
@@ -4171,6 +4178,30 @@ export class UnifiedChatView extends JfElement {
         const cid = typeof it.attributes.callId === 'string' ? it.attributes.callId : it.id;
         return !recordedCallIds.has(cid);
       }
+      const recorded =
+        typeof it.attributes.directiveId === 'string'
+          ? recordedDirections.get(it.attributes.directiveId)
+          : undefined;
+      if (recorded !== undefined) {
+        // Shown once, at the record's place. A record read before the direction's final outcome
+        // still says queued; the live run already knows what became of it.
+        const record = recordItems[recorded]!;
+        const recordFinal =
+          record.attributes.directiveOutcome !== undefined && record.attributes.directiveOutcome !== 'queued';
+        const liveFinal =
+          it.attributes.directiveOutcome !== undefined && it.attributes.directiveOutcome !== 'queued';
+        if (!recordFinal && liveFinal) {
+          recordItems[recorded] = {
+            ...record,
+            attributes: {
+              ...record.attributes,
+              directiveOutcome: it.attributes.directiveOutcome,
+              directiveReason: it.attributes.directiveReason,
+            },
+          };
+        }
+        return false;
+      }
       if (it.kind === 'user' || it.kind === 'assistant') {
         const k = `${it.kind} ${it.content}`;
         const used = usedContent.get(k) ?? 0;
@@ -4180,7 +4211,7 @@ export class UnifiedChatView extends JfElement {
         }
         return true; // no unused record occurrence remains → keep (e.g. a 2nd identical turn)
       }
-      return true; // progress / handoff / error are ephemeral — never in the record
+      return true; // other progress / handoff / error are ephemeral — never in the record
     });
 
     const ordered = [...recordItems, ...liveOnly].sort(

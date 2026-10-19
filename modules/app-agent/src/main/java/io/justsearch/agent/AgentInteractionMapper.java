@@ -351,8 +351,9 @@ public final class AgentInteractionMapper {
       }
       // WP6.2 — a user's direction, with what became of it. Each report (queued, then applied or
       // not applied) is its own record; `fromRunEvents` keeps one event per direction, at its first
-      // place, carrying the final outcome. A record from before WP6.2 has no id and no outcome, and
-      // an acknowledgement alone never proved the direction reached the model, so it shows nothing.
+      // place, carrying the final outcome and the id the live run's report carries too. A record
+      // from before WP6.2 has no id and no outcome, and an acknowledgement alone never proved the
+      // direction reached the model, so it shows nothing.
       case "directive_acknowledged" -> {
         if (!(payload.get("directiveId") instanceof String directiveId)) {
           yield Optional.empty();
@@ -368,6 +369,7 @@ public final class AgentInteractionMapper {
                 attrs(
                     "steer", Boolean.TRUE,
                     "phase", "direction",
+                    "directiveId", directiveId,
                     "directiveOutcome", payload.get("outcome"),
                     "directiveReason", payload.get("reason"))));
       }

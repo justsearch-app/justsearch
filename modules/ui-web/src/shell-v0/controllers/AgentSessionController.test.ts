@@ -1235,7 +1235,7 @@ describe('AgentSessionController interaction methods', () => {
     ]);
     const live = projectLiveAgentActivity(ctrl.conversation, ctrl.toolCalls).filter((i) => i.attributes.steer);
     expect(live.map((i) => i.attributes)).toEqual([
-      { steer: true, directiveOutcome: 'not_applied', directiveReason: 'run_finished' },
+      { steer: true, directiveId: 'd1', directiveOutcome: 'not_applied', directiveReason: 'run_finished' },
     ]);
   });
 

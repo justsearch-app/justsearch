@@ -392,7 +392,8 @@ export interface LiveConversationEntry {
   readonly severity?: string;
   /** Tempdoc 577 Ext II: typed progress phase token (see ConversationEntry.phase). */
   readonly phase?: string;
-  /** WP6.2 — a `steer-directive` entry's outcome and reason (see ConversationEntry). */
+  /** WP6.2 — a `steer-directive` entry's id, outcome and reason (see ConversationEntry). */
+  readonly directiveId?: string;
   readonly directiveOutcome?: string;
   readonly directiveReason?: string;
   readonly timestamp: number;
@@ -565,6 +566,7 @@ export function projectLiveAgentActivity(
           id: e.id, ts: e.timestamp, kind: 'progress', originator: 'user', content: e.content,
           attributes: {
             steer: true,
+            ...(e.directiveId ? { directiveId: e.directiveId } : {}),
             ...(e.directiveOutcome ? { directiveOutcome: e.directiveOutcome } : {}),
             ...(e.directiveReason ? { directiveReason: e.directiveReason } : {}),
           },
