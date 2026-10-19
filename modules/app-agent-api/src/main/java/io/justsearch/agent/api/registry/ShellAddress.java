@@ -30,8 +30,7 @@ import java.util.Optional;
  *       {@code OperationInvocationRequest}).
  * </ul>
  *
- * <p>The grammar (slice 489 §7.1, lifted from
- * {@code scripts/ci/agent-battery-url-scorer.mjs} round-2 §7 finding):
+ * <p>The shell-address grammar (slice 489 §7.1):
  *
  * <pre>
  *   justsearch://surface/&lt;surfaceId&gt;[?k=v&amp;...]    → Navigation

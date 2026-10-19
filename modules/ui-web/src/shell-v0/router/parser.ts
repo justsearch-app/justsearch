@@ -2,10 +2,8 @@
 /**
  * URL parser — slice 489 §7 stage 1.
  *
- * TS port of the structural parser in
- * `scripts/ci/agent-battery-url-scorer.mjs` (round-2 §7 finding). Same grammar,
- * same canonicalization, same id regex. The scorer's parser is the canonical
- * reference; this module mirrors it.
+ * Structural parser for shell-address URLs. The Java shell-address model
+ * and URL emitters share this grammar and canonicalization.
  *
  * Grammar:
  *   justsearch://surface/<surfaceId>[?key=value&...]    → Navigation

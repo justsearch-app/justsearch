@@ -24,8 +24,7 @@ import java.util.TreeMap;
  * invocation URLs, this emitter handles surface activation addresses — the
  * {@link ShellAddress.Navigation} half of the address taxonomy.
  *
- * <p>Grammar (lifted from {@code scripts/ci/agent-battery-url-scorer.mjs}
- * round-2 §7 finding):
+ * <p>Surface-navigation URL grammar:
  *
  * <pre>
  *   justsearch://surface/&lt;surfaceId&gt;[?key=value&amp;key=value...]
@@ -33,11 +32,11 @@ import java.util.TreeMap;
  *
  * <p>Canonicalization: keys sorted alphabetically; values URL-encoded; array
  * values produce repeated keys ({@code ?ids=a&ids=b} not {@code ?ids=a,b}) —
- * matches the parser convention in the scorer module.
+ * matches the frontend URL parser convention.
  *
  * <p>Per slice 489 §13 anti-pattern #3: the Java and TS implementations of
- * the grammar must stay in sync. The scorer module is the canonical TS
- * reference; this emitter mirrors it exactly. A future wire-contract
+ * the grammar must stay in sync. The frontend URL parser and this emitter
+ * share the same canonicalization rules. A future wire-contract
  * integration ({@code contracts/wire/}) can drive both sides from one source,
  * but is out of scope for slice 489.
  *
@@ -112,8 +111,7 @@ public final class URLSurfaceEmitter {
     // inside a List<?> value, however, can in principle be null when callers
     // construct the list manually — defensive skip preserved for that case.
     //
-    // Canonical ordering: keys sorted alphabetically per the scorer's
-    // canonicalUrlString convention (matches scripts/ci/agent-battery-url-scorer.mjs).
+    // Canonical URL convention: sort keys and encode each value.
     Map<String, Object> sorted = new TreeMap<>(Comparator.naturalOrder());
     sorted.putAll(values);
     List<String> parts = new ArrayList<>();

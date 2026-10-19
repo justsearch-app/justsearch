@@ -21,8 +21,7 @@
  *   browser-network.json must be a JSON array of /api*-scoped entries.
  * - scripts/evidence/validate-determinism-budget-v1.mjs:
  *   determinism_budget { budget, usage, violations } with the four v1 counters.
- * - CI wrappers (scripts/ci/*.ps1, scripts/ci/*.sh,
- *   scripts/test-support/run-matrix.sh, scripts/ops/*.sh):
+ * - CI wrappers (scripts/ci/*.ps1, scripts/ci/*.sh, scripts/ops/*.sh):
  *   `--flag=value` form, `--api-base-url=none`, `--external-status`,
  *   `--external-error`, `--attach-dir`. Non-zero exit for external-status=failed
  *   is expected by those callers.
