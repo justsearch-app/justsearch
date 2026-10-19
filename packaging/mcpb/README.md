@@ -52,7 +52,7 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    manifest names is trusted with request content from whatever answers
    it, but never with a session token fetched on another connection: each new connection fetches
    `GET /api/mcp/token` on itself first (within 2 s, or the connection is refused), and a request
-   carries only that connection's token.
+   carries only that connection's token; when the Engine there offers none, nothing is sent.
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a
@@ -61,7 +61,8 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    (the `Mcp-Session-Id`, which is only ever sent to the Engine that issued it, the
    `MCP-Protocol-Version` and the server stream; also when it assigned no session id), and re-initializes the session with
    the cached `initialize` params, sent exactly as a first `initialize` is; the
-   version is negotiated again from the new Engine's answer. The failed call is sent again once only if it surely did not reach the
+   version is negotiated again from the new Engine's answer (an answer or event that still
+   arrives from the old session changes nothing). The failed call is sent again once only if it surely did not reach the
    app (it never had a connection, or the app answered 400/404 for its session);
    otherwise it fails with an error saying its outcome is unknown, so a mutating
    call never runs twice. Idle connections are closed after 25 s, before the

@@ -485,7 +485,10 @@ function send(agent, port, { method = 'GET', path: urlPath, headers = {}, timeou
  * (fetched over its proven connections) and the Engine itself; for a pin, what the connection
  * it is written on fetched itself, read once the request has its connection. Both are left on
  * the request (req.connectionToken, req.connectionIdentity). credential: true adds that token
- * (X-JustSearch-Session). session ({ id, identity }: what a client negotiated with one Engine)
+ * (X-JustSearch-Session), and fails closed: when the Engine this connection reaches offers no
+ * token (null; '' is dev mode and needs none), the request is destroyed before anything is
+ * written, with err.code 'NO_TOKEN'. For a manifest Engine that is decided only once a connection
+ * is proven to be that Engine, so a replaced one surfaces as ENGINE_NOT_PROVEN instead. session ({ id, identity }: what a client negotiated with one Engine)
  * adds Mcp-Session-Id when id is set (a server may assign none); on a connection to any other
  * identity the request is destroyed before anything is written, with err.code
  * 'SESSION_TARGET_CHANGED', so nothing negotiated with one Engine (session id, protocol version)
@@ -503,12 +506,19 @@ function engineRequest(target, { method = 'GET', path: urlPath, headers = {}, ti
       req.destroy(Object.assign(err, { code: 'SESSION_TARGET_CHANGED' }));
       return;
     }
+    if (credential && typeof token !== 'string') {
+      const err = new Error(`the Engine on port ${target.port} offers no session token (GET /api/mcp/token); nothing that needs one was sent`);
+      req.destroy(Object.assign(err, { code: 'NO_TOKEN' }));
+      return;
+    }
     if (credential && token) req.setHeader(SESSION_HEADER, token);
     if (session && session.id) req.setHeader('mcp-session-id', session.id);
     req.end(body);
   };
+  const identity = engine ? `${engine.pid}/${engine.instanceId}` : null;
   if ((credential || session) && !engine) req.once('socket', (socket) => finish(socket[SOCKET_TOKEN], socket[SOCKET_IDENTITY]));
-  else finish(target.token, engine ? `${engine.pid}/${engine.instanceId}` : null);
+  else if (credential && typeof target.token !== 'string') req.once('socket', () => finish(target.token, identity));
+  else finish(target.token, identity);
   return req;
 }
 

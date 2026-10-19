@@ -77,9 +77,9 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
 let engineTarget = null;
 
 function transportFailure(err) {
-  return err?.code === 'ENGINE_NOT_PROVEN'
-    ? { message: 'engine_gone', detail: `${err.status}: ${err.detail}` }
-    : { message: err?.message || String(err) };
+  if (err?.code === 'ENGINE_NOT_PROVEN') return { message: 'engine_gone', detail: `${err.status}: ${err.detail}` };
+  if (err?.code === 'NO_TOKEN') return { message: 'no_token' }; // nothing was sent (engineRequest fails closed)
+  return { message: err?.message || String(err) };
 }
 
 /**
@@ -145,20 +145,6 @@ function noTokenError() {
 }
 
 /**
- * A credentialed request (credential: true) to a target whose Engine answered at selection that
- * it has no token endpoint (token null; "" is dev mode and needs none). That answer belongs to the
- * Engine that gave it, so before the request is refused the port is asked who serves it now:
- * GET /api/mcp/token over a proven connection, which carries nothing. If it is no longer that
- * Engine, the result is engine_gone, and withReselect selects the one there now, whose own answer
- * decides; if it is, the result is no_token (NO_TOKEN). The request itself is not sent.
- */
-async function noTokenOnce(target, urlStr) {
-  const probe = await httpGetOnce(target, new URL('/api/mcp/token', urlStr).href, { timeoutMs: 5_000, maxBytes: 64 * 1024 });
-  if (probe.error) return probe;
-  return { ok: false, statusCode: null, text: null, error: { message: 'no_token' } };
-}
-
-/**
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
@@ -167,7 +153,6 @@ function httpGetTextLimited(urlStr, options) {
 }
 
 function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {}, credential = false }) {
-  if (credential && target.token === null) return noTokenOnce(target, urlStr);
   return new Promise((resolve) => {
     let u;
     try {
@@ -239,7 +224,6 @@ function httpPostJsonLimited(urlStr, body, options) {
 }
 
 function httpPostOnce(target, urlStr, body, { timeoutMs, maxBytes, headers = {}, credential = false }) {
-  if (credential && target.token === null) return noTokenOnce(target, urlStr);
   return new Promise((resolve) => {
     let u;
     try {
@@ -553,7 +537,7 @@ export async function main() {
   //   non-empty string → prod mode, sent on requests made with credential: true
   //   "" (empty string) → dev mode, no token enforcement (POST works without header)
   //   null              → endpoint not available (old JustSearch): a credentialed call answers
-  //                       NO_TOKEN once the port is confirmed to still be that Engine (noTokenOnce)
+  //                       NO_TOKEN once a connection is proven to be that Engine (engineRequest)
   //   undefined         → a pin no manifest names: each connection carries the token it fetched
   log(`Token: ${token === undefined ? 'per connection (pinned port)' : token ? 'available (prod mode)' : token === '' ? 'empty (dev mode)' : 'unavailable (old version?)'}`);
 

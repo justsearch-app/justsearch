@@ -61,7 +61,8 @@ MCP server on?" is exactly "which port is the API on?":
   names is trusted with request content from whatever answers it, but never with a session token
   fetched on another connection: each new connection fetches `GET /api/mcp/token` on itself
   before anything else is written on it, and a request carries only that connection's token (so
-  after an Engine restart on the same port, the next call uses the new token). That fetch is
+  after an Engine restart on the same port, the next call uses the new token; a call that needs a
+  token is refused, `NO_TOKEN`, with nothing sent, when the Engine there offers none). That fetch is
   bounded (2 s); a port that accepts it and never answers is refused with an error saying so.
   Neither client sends a request again once it may have reached the Engine: the bridge redoes
   session setup (`initialize`, notifications) on a newly proven Engine, and sends another
@@ -73,7 +74,9 @@ MCP server on?" is exactly "which port is the API on?":
   connection to any other Engine gets nothing negotiated with the first, and the
   bridge initializes a new session there first, sent exactly as a first `initialize` is: nothing
   negotiated with the earlier Engine (session, `MCP-Protocol-Version`, server stream) is carried
-  over, and the version is negotiated again from the new Engine's answer. Idle pooled connections are closed after 25 s,
+  over, and the version is negotiated again from the new Engine's answer. The bridge keeps all of
+  that per Engine epoch: a new Engine, or a client `initialize`, starts a new one, ends requests
+  still in flight in the old one, and an answer or event of an ended epoch changes nothing. Idle pooled connections are closed after 25 s,
   before the Engine's 30 s idle expiry can cross a request. Closing stdin stops either client,
   also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found), waiting up to 30 s for the answer;
