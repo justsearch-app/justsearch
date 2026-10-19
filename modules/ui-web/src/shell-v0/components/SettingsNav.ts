@@ -260,6 +260,26 @@ export class SettingsNav extends JfElement {
       outline: 2px solid var(--focus-ring-color, var(--accent-tint));
       outline-offset: -2px;
     }
+    /* Forced colors (Windows High Contrast) erase the active pill and the brighter anchor text, so
+       the current row takes the selection pair ('forced-color-adjust: none' keeps the browser's
+       Canvas backplate from landing behind the label); its INSET focus ring turns HighlightText to
+       stay visible on that fill. */
+    @media (forced-colors: active) {
+      button.category-row.active,
+      button.anchor-row.active {
+        forced-color-adjust: none;
+        background: Highlight;
+        color: HighlightText;
+      }
+      button.category-row.active *,
+      button.anchor-row.active * {
+        color: HighlightText;
+      }
+      button.category-row.active:focus-visible,
+      button.anchor-row.active:focus-visible {
+        outline-color: HighlightText;
+      }
+    }
     .footer {
       flex-shrink: 0;
       padding: 0.5rem 0.75rem;

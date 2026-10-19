@@ -841,6 +841,21 @@ export class DocumentPane extends JfElement {
       color: var(--text-tint);
       border-color: var(--accent-tint);
     }
+    /* Forced colors (Windows High Contrast) erase the selected mode's tint, so it takes the selection
+       pair ('forced-color-adjust: none' keeps the browser's Canvas backplate from landing behind its
+       text, and leaves the ring to be stated in a system colour here). */
+    @media (forced-colors: active) {
+      .toggle-btn.selected {
+        forced-color-adjust: none;
+        background: Highlight;
+        border-color: Highlight;
+        color: HighlightText;
+      }
+      .toggle-btn.selected:focus-visible {
+        outline-color: Highlight;
+        outline-offset: 2px;
+      }
+    }
     /* Tempdoc 596 face 1.1 — this is a SOFT block (aria-disabled, not native disabled): the button
        stays focusable and its title reason stays reachable via hover/focus. A native disabled
        button suppresses its own title tooltip (596 §1.1) — the exact defect the retired
@@ -989,6 +1004,21 @@ export class DocumentPane extends JfElement {
       background: var(--accent-tint);
       color: var(--accent-on-tint);
       border-radius: 2px;
+    }
+    /* Forced colors (Windows High Contrast) erase the highlight's tint, which would leave the cited
+       passage looking like every other line. The strong phase takes the system's Mark pair (the
+       colours a highlighted run of text has in this palette); the weak phase keeps its left rule,
+       which forced colors already paint. */
+    @media (forced-colors: active) {
+      .blocks .block.hl-strong,
+      pre.source span.hl-strong {
+        forced-color-adjust: none;
+        background: Mark;
+        color: MarkText;
+      }
+      .blocks .block.hl-strong * {
+        color: MarkText;
+      }
     }
     /* a11y — honor prefers-reduced-motion (mirrors MarkdownBlock's cursor-blink suppression): the
        JS side already skips the loud phase (prefersReducedMotion() in syncHighlightDecay), this is

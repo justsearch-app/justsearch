@@ -20,12 +20,11 @@ ADRs complement the explanation docs — they capture *why not* and *what else w
 - **`last_reviewed:`** — the date the decision was last re-read against the code, `YYYY-MM-DD`.
 - **`status:` is the *doc-lifecycle* field, not the ADR-vocabulary one.** Write `stable` for a
   live decision; the ADR words (Accepted / Superseded by ADR-XXXX / Rejected) belong in the body's
-  `## Status` section. This matters mechanically: `scripts/docs/llmstxt-generate.mjs:149` includes
-  a doc only when `status` is **exactly** `stable`, `in-progress` or `advisory`, so
-  `status: accepted` silently drops the ADR out of `docs/llms.txt` — the index agents actually
-  read. A retired decision (`superseded`, `rejected - …`) dropping out is intended; a live one
-  dropping out is not. The `adr-coverage` gate is unaffected either way: it prefix-matches
-  `accepted*`/`stable*` as live (`enforcer.mjs:77`), so the gate will not catch this for you.
+  `## Status` section. ADRs that still carry `status: accepted` (or `accepted - …`) count as live
+  too: `scripts/docs/llmstxt-generate.mjs` lists a decision in `docs/llms.txt` — the index agents
+  actually read — when its `status` is `stable`, `in-progress` or `advisory`, or starts with
+  `accepted`, the same live prefix the `adr-coverage` gate matches (`enforcer.mjs:83`). A retired
+  decision (`superseded`, `rejected - …`) dropping out of the index is intended.
 
 ### Frontmatter: `probes:` and `last_reviewed:`
 

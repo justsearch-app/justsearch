@@ -389,7 +389,7 @@ export class TaskList extends JfElement {
     .label-link:hover,
     .label-link:focus-visible {
       text-decoration-style: solid;
-      outline: none;
+      outline: 2px solid transparent;
     }
     .bar {
       height: 4px;

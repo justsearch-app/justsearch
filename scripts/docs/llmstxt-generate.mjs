@@ -10,7 +10,9 @@
  * editable directly in docs/llms.txt — that file is the source of truth for those sections.
  *
  * Reads `title`, `status`, and `description` from YAML frontmatter.
- * Includes docs with status: stable, in-progress, or advisory. Excludes draft.
+ * Includes docs with status: stable, in-progress, or advisory, plus decisions whose status starts
+ * with `accepted` (the live prefix the adr-coverage gate uses). Excludes draft, superseded,
+ * deprecated and rejected.
  * Errors on files missing a `status` field. Warns on files missing a `description` field.
  */
 
@@ -144,9 +146,14 @@ function main() {
     return;
   }
 
-  // Filter: stable + in-progress + advisory only (excludes draft)
+  // Filter: stable + in-progress + advisory, plus live `accepted…` ADRs (excludes draft and
+  // retired statuses such as superseded, deprecated and rejected)
   const included = allDocs.filter(
-    (d) => d.status === "stable" || d.status === "in-progress" || d.status === "advisory"
+    (d) =>
+      d.status === "stable" ||
+      d.status === "in-progress" ||
+      d.status === "advisory" ||
+      (d.rel.startsWith("decisions/") && String(d.status).trim().toLowerCase().startsWith("accepted"))
   );
 
   // Warn about missing descriptions

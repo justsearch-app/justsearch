@@ -734,6 +734,20 @@ export class Shell extends JfElement {
       background: var(--surface-2);
       color: var(--text-primary);
     }
+    /* Forced colors (Windows High Contrast) erase both marks above (a fill and a tint), so the
+       pressed mode takes the selection pair and the bookmarked state the Highlight ink. A selection
+       pair needs 'forced-color-adjust: none': otherwise the browser paints a Canvas backplate behind
+       the text, and HighlightText on Canvas is unreadable. */
+    @media (forced-colors: active) {
+      .ui-mode-opt.active {
+        forced-color-adjust: none;
+        background: Highlight;
+        color: HighlightText;
+      }
+      .bookmark-btn.active {
+        color: Highlight;
+      }
+    }
     .copy-url {
       display: inline-flex;
       align-items: center;
@@ -2664,6 +2678,17 @@ export class Rail extends JfElement {
       background: var(--accent-tint-16);
       color: var(--text-tint);
       border-color: var(--accent-tint-30);
+    }
+    /* Forced colors (Windows High Contrast) paint every rail button's edge the same CanvasText and
+       erase the tint, so the current surface takes the selection pair ('forced-color-adjust: none'
+       keeps the browser's Canvas backplate from landing behind the label). */
+    @media (forced-colors: active) {
+      button.active {
+        forced-color-adjust: none;
+        background: Highlight;
+        border-color: Highlight;
+        color: HighlightText;
+      }
     }
     button.ai-dimmed {
       opacity: 0.4;

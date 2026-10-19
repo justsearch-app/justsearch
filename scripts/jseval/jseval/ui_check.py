@@ -196,6 +196,10 @@ class Step:
     # (unchanged behavior for every existing step); an isolated step that needs a specific
     # deterministic data/readiness state (e.g. `chat-proportion` needing `degraded`) sets this.
     fixtures_variant: str = "default"
+    # Playwright's `forced_colors` context emulation ("active" | "none"); None leaves the browser
+    # default. "active" is the CSS `forced-colors: active` state Windows High Contrast produces in
+    # WebView2 (Chromium), so a step can capture the UI as a High Contrast user sees it.
+    forced_colors: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -1272,6 +1276,69 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         if cooldown_ms > 0:
             await asyncio.sleep(cooldown_ms / 1000)
 
+    # --- Forced colors (Windows High Contrast): the Search v3 states a High Contrast reader meets ---
+    # Each capture ends with a KEYBOARD focus on screen, because under forced colors box-shadows are
+    # dropped and author colours replaced, so the focus indicator is the thing most likely to vanish.
+    async def _settle_focus_marks(page):
+        # Focus marks here are transitions (the composer frame, the grips' line), and a transition
+        # only starts on a rendered frame: without one, the capture IS the first frame and shows the
+        # mark at its starting colour. Two animation frames start it; the cooldown then lets it land.
+        await page.evaluate(
+            "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
+        )
+        if cooldown_ms > 0:
+            await asyncio.sleep(cooldown_ms / 1000)
+
+    async def _open_sv3_window(page):
+        # Hidden DEEPLINK surface, dev audience, no rail entry — the hash route is the only way in.
+        await page.evaluate(
+            "() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }"
+        )
+        await page.locator(S.CSS_SV3_WINDOW).first.wait_for(state="visible", timeout=20_000)
+        await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.wait_for(
+            state="visible", timeout=15_000
+        )
+
+    async def setup_sv3_hero_forced_colors(page):
+        await _open_sv3_window(page)
+        await page.locator("jf-sv3-window jf-sv3-composer[state='hero']").wait_for(
+            state="visible", timeout=15_000
+        )
+        await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.focus()
+        await _settle_focus_marks(page)
+
+    async def setup_sv3_docked_forced_colors(page):
+        # The `sv3-sources` variant restores a thread, so the window lands DOCKED over a transcript.
+        await _open_sv3_window(page)
+        await page.locator('[data-testid="sv3-turn-sources"]').first.wait_for(
+            state="visible", timeout=20_000
+        )
+        await page.locator("jf-sv3-window jf-sv3-composer[state='docked']").wait_for(
+            state="visible", timeout=15_000
+        )
+        await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.focus()
+        await _settle_focus_marks(page)
+
+    async def setup_sv3_palette_forced_colors(page):
+        await _open_sv3_window(page)
+        await page.locator(S.CSS_SV3_WINDOW).get_by_role(
+            "button", name="Open command palette", exact=True
+        ).click()
+        await page.locator(S.CSS_SV3_PALETTE).get_by_role("option").first.wait_for(
+            state="visible", timeout=10_000
+        )
+        # Move the highlight off the selected option, so the capture shows the selected and the
+        # highlighted option as two different rows.
+        await page.keyboard.press("ArrowDown")
+        await _settle_focus_marks(page)
+
+    _settings_setup = _view_setup("settings")
+
+    async def setup_settings_forced_colors(page):
+        await _settings_setup(page)
+        await page.keyboard.press("Tab")
+        await _settle_focus_marks(page)
+
     async def setup_tasks_occlusion(page):
         # Tempdoc 813 Slice D — the capture that proves the redesigned Tasks panel cannot cover the
         # rail's bottom controls. Registered in governance/ui-proportion-baseline.v1.json with TWO
@@ -2311,6 +2378,16 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # record with populated `attributes.citations`, which is all the Sources panel ever needed.
         Step("sv3-composer-occlusion", setup=setup_sv3_composer_occlusion, isolated=True,
              fixtures_variant="sv3-sources"),
+        # --- Forced colors (Windows High Contrast, CSS `forced-colors: active`) ---
+        # The states a High Contrast reader meets first, each with a keyboard focus on screen.
+        Step("sv3-hero-forced-colors", setup=setup_sv3_hero_forced_colors, isolated=True,
+             forced_colors="active"),
+        Step("sv3-docked-forced-colors", setup=setup_sv3_docked_forced_colors, isolated=True,
+             fixtures_variant="sv3-sources", forced_colors="active"),
+        Step("sv3-palette-forced-colors", setup=setup_sv3_palette_forced_colors, isolated=True,
+             forced_colors="active"),
+        Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
+             forced_colors="active"),
         # --- Tempdoc 813 §4/§5: the ENRICHING tier (folder rows + the aggregate card) ---
         # The one deterministic capture of the drained-but-enriching state: both folder arms (percent
         # caveat / "fully searchable") and the index-wide aggregate card, from the `enriching`
@@ -2478,6 +2555,7 @@ async def _run_isolated_step(
             ctx = await browser.new_context(
                 viewport={"width": 1280, "height": 720},
                 color_scheme=step.color_scheme,
+                forced_colors=step.forced_colors,
             )
             if fixtures:
                 await ui_fixtures.install_fixtures(

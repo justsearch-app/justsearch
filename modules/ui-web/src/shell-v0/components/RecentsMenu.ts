@@ -106,7 +106,7 @@ export class RecentsMenu extends JfElement {
       color: inherit; font: inherit; padding: 6px 8px; border-radius: var(--radius-sm, 4px); cursor: pointer;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .item:hover, .item:focus-visible { background: var(--surface-hover); outline: none; }
+    .item:hover, .item:focus-visible { background: var(--surface-hover); outline: 2px solid transparent; }
     .empty { padding: 6px 8px; opacity: 0.6; font-size: var(--font-size-sm); }
   `;
 

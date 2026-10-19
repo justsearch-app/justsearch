@@ -1005,6 +1005,15 @@ export class MarkdownBlock extends JfElement {
       background: var(--md-cite-selected-bg, var(--accent-tint));
       box-shadow: inset 0 0 0 1px var(--md-cite-selected-edge, transparent);
     }
+    /* Forced colors (Windows High Contrast) erase the wash and drop the inset edge, and the tier
+       colours are gone with every other author colour, so the selected mark takes the selection pair. */
+    @media (forced-colors: active) {
+      .cite-ref.cite-selected {
+        forced-color-adjust: none;
+        background: Highlight;
+        color: HighlightText;
+      }
+    }
     /* Tempdoc 577 §2.12 Move 3 — a citation-shaped token in an UNGROUNDED answer: muted inline text
        (NOT the accent superscript of a real cite-ref), so it cannot pose as a verifiable reference.
        Non-interactive by construction (a plain span, no handlers). Tempdoc 867 §7 — that frame is
