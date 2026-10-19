@@ -43,3 +43,13 @@ module resolve the same artifacts and run the same way.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "35b87879-0854-4043-9ecc-bee132ee7e9e",
+  "verdict": "accept",
+  "digest": "sha256:3eda0bc92da4717d8a7b5666a1913420c3d7d894c64c8b91343b1f44a8444696"
+}
+```
