@@ -32,7 +32,7 @@ basis for the README's privacy description. It is an NLnet-M2 deliverable.
 | **Webview ↔ Head** | The Tauri webview talks to the loopback HTTP API. Confined by CSP + Host/Origin/token checks. |
 | **Other local processes ↔ Head** | Any process (or a malicious web page the user visits) can attempt to reach `127.0.0.1:<port>`. The key inbound boundary. The decision of *where* that boundary is drawn — and what is deliberately inside it — is [ADR-0046: Local API trust boundary](../../decisions/0046-local-api-trust-boundary.md); this document is its threat analysis. |
 | **Head <-> index half / Inference** | The Head and the index half share one Engine JVM and meet at direct in-process calls - no socket, no listener, no IPC (ADR-0049; the retired gRPC channel and MMF bus no longer exist). `llama-server` remains a separate process on loopback. Not network-exposed. |
-| **Device ↔ Internet** | AI downloads, stable-release launch-time update checks, optional OTLP trace export, and user-selected integrations. The webview CSP does not constrain native Rust or Engine HTTP clients. |
+| **Device ↔ Internet** | AI downloads, launch-time update checks in desktop builds with an embedded release URL, optional OTLP trace export, and user-selected integrations. The webview CSP does not constrain native Rust or Engine HTTP clients. |
 
 ## The privacy guarantee and its mechanical anchors
 
@@ -56,8 +56,9 @@ Local indexing, retrieval, and built-in inference are anchored in the Engine and
 3. **AI downloads and automatic update checks.** Install AI downloads from `github.com` and
    `huggingface.co` with consent; repair and upgrades can download again. On Windows with supported
    NVIDIA hardware it also downloads a CUDA `llama-server` build and selects it automatically unless
-   the user configured an executable. Stable tagged desktop builds embed a GitHub release URL and
-   check it on launch, after about 30 seconds. There is **no off switch yet**. GitHub receives the
+   the user configured an executable. Desktop builds with an embedded release URL check it on launch,
+   after about 30 seconds. CI-built installers embed the repository's configured GitHub release URL,
+   including branch candidates and pre-releases. There is **no off switch yet**. GitHub receives the
    request IP and time; document content and queries are not sent by this check. Builds without a
    pinned URL do not contact an update server; debug builds can use a runtime-provided URL.
    See `startAppUpdateMonitor`, `updater.rs::check_release`, and [supply chain](#first-run-and-supply-chain).

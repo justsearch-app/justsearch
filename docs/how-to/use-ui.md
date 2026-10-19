@@ -30,7 +30,7 @@ What it does:
 - Starts the backend (`:modules:ui:runHeadless`) on a free port near `33221`.
 - Starts the frontend at `http://127.0.0.1:5173`.
 - Sets `VITE_JUSTSEARCH_API_PORT=<port>` (and legacy `VITE_API_PORT=<port>`) so the UI connects immediately (no `?api_port=` needed).
-- If you start the backend separately, the Vite proxy discovers it from the runtime manifest; there is no browser port-range scan.
+- For a separately started backend, set its port explicitly as shown below. There is no browser port-range scan.
 
 > On Linux, use `npm --prefix ./modules/ui-web run dev:all`. macOS is outside the supported platforms.
 
@@ -40,7 +40,7 @@ For more control (or when debugging backend startup), run the Frontend and Backe
 **Terminal 1 (Backend, Windows PowerShell):**
 
 ```powershell
-.\scripts\dev\run-headless-api.ps1
+.\scripts\dev\run-headless-api.ps1 -Port 33221
 ```
 
 **Windows note (memory safety):** If you hit Node/Vite “paging file / commit” issues during backend builds, you can skip bundling the web UI by passing `-PskipWebBuild=true` to Gradle. The `run-headless-api.ps1` script already uses this by default.
@@ -48,20 +48,29 @@ For more control (or when debugging backend startup), run the Frontend and Backe
 **Terminal 1 on Linux (from repo root):**
 
 ```bash
-node scripts/lib/tool-invoker.cjs gradle :modules:ui:runHeadless -PskipWebBuild=true
+JUSTSEARCH_API_PORT=33221 node scripts/lib/tool-invoker.cjs gradle :modules:ui:runHeadless -PskipWebBuild=true
 ```
 
-**Terminal 2 (Frontend, either platform):**
+**Terminal 2 (Frontend, Windows PowerShell, from repo root):**
 
 ```powershell
-cd modules/ui-web
-npm run dev
+$env:VITE_JUSTSEARCH_API_PORT = "33221"
+npm --prefix modules/ui-web run dev
 ```
 
-Open `http://127.0.0.1:5173`. The frontend resolves the backend using `resolveApiEndpoint()` and will typically
-connect automatically. Resolution order is `?api_port=`, the legacy JavaFX bridge, Tauri
-`invoke("api_port")`, `VITE_JUSTSEARCH_API_PORT` / `VITE_API_PORT`, then the browser Vite proxy.
-The proxy reads a running backend's runtime manifest; it does not probe a port range.
+**Terminal 2 on Linux (from repo root):**
+
+```bash
+VITE_JUSTSEARCH_API_PORT=33221 npm --prefix modules/ui-web run dev
+```
+
+Open `http://127.0.0.1:5173`. The explicit port connects Vite and the browser to the backend started above.
+The frontend resolves the backend using `resolveApiEndpoint()`. Resolution order is `?api_port=`,
+the legacy JavaFX bridge, Tauri `invoke("api_port")`, `VITE_JUSTSEARCH_API_PORT` / `VITE_API_PORT`,
+then the browser Vite proxy. Without a port override, Vite reads runtime manifests from its discovery
+folders; the backend's default `modules/ui/build/applauncher-data` is not among them. To use manifest
+discovery for this split-terminal setup, set the same absolute `JUSTSEARCH_DATA_DIR` in both terminals
+before starting either process.
 
 Tip: If you started the backend on a non-default port, you can force the UI to use it via:
 
@@ -118,7 +127,8 @@ The app includes built-in introspection tools reachable via browser.
 
 > Replace `33221` with your actual API port. The Windows wrapper prints `API Port: <port>`;
 > the Engine prints `JUSTSEARCH_API_PORT=<port>`. `dev:all` echoes the backend logs as it starts.
-> `dev:all` picks a free port near `33221`; the separate jseval dev runner requests an OS-assigned port.
+> `dev:all` picks a free port near `33221`; `jseval dev` defaults to `33221` (`--port` overrides it).
+> `scripts/dev/dev-runner.cjs start` defaults to port `0`, requesting an OS-assigned port.
 
 | Endpoint | URL | Purpose |
 | :--- | :--- | :--- |
@@ -261,11 +271,11 @@ npm --prefix .\modules\ui-web run dev:all
 
 # Or start separately on Windows:
 # Terminal 1: Backend (rebuilds on each start unless -SkipBuild)
-.\scripts\dev\run-headless-api.ps1
+.\scripts\dev\run-headless-api.ps1 -Port 33221
 
-# Terminal 2: Frontend (hot-reloads automatically)
-cd modules/ui-web
-npm run dev
+# Terminal 2: Frontend (hot-reloads automatically; from repo root)
+$env:VITE_JUSTSEARCH_API_PORT = "33221"
+npm --prefix modules/ui-web run dev
 ```
 
 On Linux, use the split-terminal commands in Quick Start above; the `.ps1` wrappers call

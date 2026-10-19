@@ -29,8 +29,9 @@ search, indexing, and AI behavior, run a backend.
 | Real backend | `npm --prefix modules/ui-web run dev:all` from repo root | Starts one; the UI receives its port | Real search and integration work |
 | Worktree FE | `node scripts/dev/serve-worktree-fe.cjs` from repo root | Borrows a running stack (read-only) | Validating this worktree's frontend without starting another backend |
 
-When running Vite separately, its proxy discovers a running backend through the runtime manifest.
-`VITE_JUSTSEARCH_API_PORT` (legacy alias `VITE_API_PORT`) overrides that discovery. See
+When running Vite separately, set `VITE_JUSTSEARCH_API_PORT` (legacy alias `VITE_API_PORT`) to the backend's
+port, or export the same absolute `JUSTSEARCH_DATA_DIR` in both terminals before startup. Vite's manifest
+discovery does not search the separate backend's default `modules/ui/build/applauncher-data` folder. See
 [Using the UI](use-ui.md) for split-terminal and desktop workflows, and
 [Capture UI Evidence](capture-ui-evidence.md) for the fixture capture commands.
 

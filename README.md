@@ -44,7 +44,7 @@ retrieval quality is benchmarked on English, German, and French (see [Benchmarks
    models and runtimes from `github.com` and `huggingface.co`. The dialog shows the exact download size
    for your hardware: about **10 GB** on Windows with a supported NVIDIA GPU, or **2–4 GB** without one.
    Search and built-in AI inference then work offline; the desktop app also checks for updates on launch
-   in stable release builds (see [Privacy](#privacy)).
+   when the build embeds a release URL (including CI-built branch candidates and pre-releases; see [Privacy](#privacy)).
 
 Installer SHA-256 (also in [`SHA256SUMS`](https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/SHA256SUMS)):
 
@@ -66,7 +66,7 @@ build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how
 | **Disk** | 261 MB installer + ~0.7 GB installed + **about 10 GB for AI with a supported NVIDIA GPU (2–4 GB without one)** + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
 | **RAM** | **16 GB recommended.** 8 GB is a conservative floor for keyword/semantic search only (not a benchmarked minimum; chat needs the GPU below regardless of RAM). The on-device chat model (~5.9 GB file) is loaded into memory when answering. |
 | **GPU** | **Required for chat.** Search and semantic ranking run on CPU — no GPU needed for those. Chat requires an NVIDIA GPU with **≥ 8 GB VRAM** (the app needs ~7.5 GB free VRAM to run the chat model). Without a supported NVIDIA GPU, or below that VRAM floor, no install path offers the chat model — chat does **not** fall back to CPU, so the app is search-only. |
-| **Network** | AI downloads and launch-time update checks in stable desktop releases; optional trace export when configured. See [Privacy](#privacy) for all network paths. |
+| **Network** | AI downloads and launch-time update checks in desktop builds with an embedded release URL; optional trace export when configured. See [Privacy](#privacy) for all network paths. |
 
 ## Two ways to use it
 
@@ -225,9 +225,9 @@ Indexing, retrieval, and built-in AI inference run locally. Network activity has
 - **Install AI** downloads models and runtimes from `github.com` and `huggingface.co` (and their download
   redirects), with your consent. Repair and upgrades can download them again. On Windows, supported NVIDIA
   hardware also gets a CUDA build of `llama-server`, selected automatically unless you chose your own executable.
-- **The desktop app checks for updates on launch** in stable tagged release builds, using the release URL
-  embedded in the build. It fetches signed update metadata from GitHub; GitHub sees your IP address and
-  request time, but the check sends no document content or queries. **There is no off switch yet.**
+- **The desktop app checks for updates on launch** when a release URL is embedded in the build. CI-built
+  installers embed the repository's configured URL, including branch candidates and pre-releases. It fetches
+  signed update metadata from GitHub; GitHub sees your IP address and request time, but the check sends no document content or queries. **There is no off switch yet.**
   Builds without an embedded release URL do not check; development builds can use an explicitly configured URL.
 - **Trace export is off by default.** Enabling API or index tracing writes local traces. If you also set
   an `OTEL_EXPORTER_OTLP_*ENDPOINT`, traces go to that endpoint, which may be off-device. Traces can include

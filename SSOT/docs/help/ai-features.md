@@ -24,8 +24,9 @@ own executable. Repair and upgrades may download files again.
 
 ## Network activity and privacy
 
-Stable tagged desktop releases check GitHub for updates on launch using the
-release URL embedded in the build. GitHub sees your IP address and request
+Desktop builds with an embedded release URL check GitHub for updates on launch.
+CI-built installers embed the repository's configured URL, including branch
+candidates and pre-releases. GitHub sees your IP address and request
 time; the check sends no document content or queries. There is no off switch
 yet. Builds without an embedded URL do not check; development builds can use
 an explicitly configured URL.
