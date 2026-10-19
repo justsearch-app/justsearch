@@ -32,7 +32,35 @@ MCP server on?" is exactly "which port is the API on?":
   is a *preference*: if that port is taken, the ephemeral fallback above still applies.
 - **Discover the actual port:** the backend writes it as `head.apiPort` in the runtime manifest,
   `<data dir>\runtime\manifest.json` — for the installed desktop app that is
-  `%APPDATA%\io.justsearch.shell\runtime\manifest.json`. It also prints
+  `%APPDATA%\io.justsearch.shell\runtime\manifest.json` (Linux:
+  `~/.local/share/io.justsearch.shell/runtime/manifest.json`, or under `$XDG_DATA_HOME` when it is
+  an absolute path). The MCPB bridge and `scripts/prod/justsearch-mcp.mjs` read it themselves
+  (after `--port` / `JUSTSEARCH_API_PORT` / `JUSTSEARCH_DATA_DIR`), accept it only when the pid is
+  alive, `GET /api/runtime/live` on that port reports the same pid and instance, and
+  `GET /api/health` answers 200 (an Engine that passes those checks but is still starting,
+  health 503, is re-checked for up to 30 s before it is passed over; no token is fetched before
+  200), and otherwise fail with a list of every folder they tried. Every request either client
+  sends to a manifest Engine (probes, token, `/mcp`, every tool's requests) goes through one
+  function whose keep-alive connections are proven before anything is written on them: the
+  manifest still names the same pid and instance, and the operating system reports that pid as
+  the owner of the server end of that very connection (Linux `/proc/net/tcp`, Windows
+  `netstat -ano`). A reused connection needs no new proof, since a process that binds the port
+  later cannot take over an established connection; the OS is asked once per connection. When a
+  proof fails, nothing is sent: the bridge re-discovers, the stdio server reports
+  `ENGINE_GONE` and must be restarted. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
+  the Roaming folder (so a redirected folder is still found).
+- **Order `scripts/prod/justsearch-mcp.mjs` tries:** `--port`, then `JUSTSEARCH_API_PORT`, then
+  the manifest in the legacy `JUSTSEARCH_HOME` folder when set (it wins over
+  `JUSTSEARCH_DATA_DIR`), then `JUSTSEARCH_DATA_DIR`, then the desktop app's folder, then a dev
+  checkout's `.dev-data` folders above the working directory, then the user data folder of
+  headless/CLI starts. The bridge has no `JUSTSEARCH_HOME` step.
+- **Installed app vs. a checkout's dev Engine:** `scripts/prod/justsearch-mcp.mjs` tries the
+  installed desktop app's folder *before* a dev checkout's `.dev-data` folders, so when both are
+  running it connects to the installed app (it prints which folder it used on stderr). To use the
+  dev Engine instead, set `JUSTSEARCH_DATA_DIR` to that checkout's data folder (for example
+  `<checkout>/modules/ui-web/.dev-data`) or pass its port with `--port` / `JUSTSEARCH_API_PORT`.
+  The MCPB bridge never looks in a checkout; point it at a dev Engine with `JUSTSEARCH_DATA_DIR` or
+  `JUSTSEARCH_API_PORT`. The backend also prints
   `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\engine.log`) and serves
   `GET /api/health` once up. (Gradle dev tasks like `runHeadless`/`devAll` default to `33221`,
   which is why older docs and scripts mention that number — the installed app does not use it.)

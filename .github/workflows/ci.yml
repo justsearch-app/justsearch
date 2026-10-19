@@ -543,6 +543,12 @@ jobs:
       - name: MCPB source matches server.json.fileSha256 (release integrity + freshness)
         run: node scripts/ci/check-mcpb-consistency.mjs
 
+      # Production MCP and the extracted MCPB bundle find the desktop app's Engine through the
+      # platform-paths contract's desktop data folder and validated manifests. Also runs in the
+      # Windows-native lane, where the folder is the Roaming AppData one.
+      - name: Test Engine discovery (desktop data folder, validated manifests)
+        run: node --test scripts/lib/engine-discovery.test.mjs
+
       - name: Test agent-utility projection lifecycle and drift
         run: node scripts/docs/gen-public-agent-utility.test.mjs
 
@@ -1189,6 +1195,9 @@ jobs:
 
       - name: Evidence capture exits cleanly after Windows fetch teardown
         run: node --test scripts/release/evidence-capture-exit.test.mjs
+
+      - name: Engine discovery finds the desktop app's Engine (Roaming AppData)
+        run: node --test scripts/lib/engine-discovery.test.mjs
 
       # Lane F stage B item B9. These nine files previously ran in CI NOWHERE: `test:dev-runner`
       # named TWO of them by hand and was invoked from `onramp-smoke.yml` alone, whose trigger is

@@ -2,14 +2,15 @@
  * Port discovery, data directory resolution, and session token acquisition
  * for the JustSearch production MCP server.
  *
- * Data dir resolution replicates PlatformPaths.java:66-120.
- * Port file location follows HeadlessApp.java:223-247.
+ * Data dir resolution replicates PlatformPaths.java:66-120. Manifest validation and the desktop
+ * app's data folder come from packaging/mcpb/server/engine-discovery.cjs, shared with the MCPB
+ * bridge.
  */
 
-import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
-import {findRunningManifest as findManifestShared, isPidAlive} from '../../lib/platform-paths.mjs';
+import {devDataDirCandidates, isPidAlive, resolveDataDir as resolveUserDataDir} from '../../lib/platform-paths.mjs';
+import {describeTried, engineRequest, selectEngine, standardCandidates} from '../../../packaging/mcpb/server/engine-discovery.cjs';
 
 /**
  * Resolve the JustSearch data directory.
@@ -51,15 +52,9 @@ export function resolveDataDir() {
  */
 export function validatePort(port, timeoutMs = 2000) {
   return new Promise((resolve) => {
-    const req = http.request(
-      {
-        hostname: '127.0.0.1',
-        port,
-        path: '/api/status',
-        method: 'GET',
-        timeout: timeoutMs,
-        headers: { Accept: 'application/json' },
-      },
+    const req = engineRequest(
+      { port, engine: null },
+      { path: '/api/status', timeoutMs, headers: { Accept: 'application/json' } },
       (res) => {
         if (res.statusCode !== 200) {
           res.resume();
@@ -87,20 +82,15 @@ export function validatePort(port, timeoutMs = 2000) {
 }
 
 /**
- * Fetch the session token from GET /api/mcp/token.
- * Returns the token string, empty string (dev mode), or null (endpoint not available).
+ * Fetch the session token from GET /api/mcp/token of target ({ port, engine }, engine-discovery.cjs
+ * engineRequest: a manifest Engine's connection is proven first).
+ * Returns the token string, empty string (dev mode), or null (endpoint not available or not proven).
  */
-export function fetchToken(port, timeoutMs = 3000) {
+export function fetchToken(target, timeoutMs = 3000) {
   return new Promise((resolve) => {
-    const req = http.request(
-      {
-        hostname: '127.0.0.1',
-        port,
-        path: '/api/mcp/token',
-        method: 'GET',
-        timeout: timeoutMs,
-        headers: { Accept: 'application/json' },
-      },
+    const req = engineRequest(
+      target,
+      { path: '/api/mcp/token', timeoutMs, headers: { Accept: 'application/json' } },
       (res) => {
         if (res.statusCode !== 200) {
           res.resume();
@@ -128,14 +118,18 @@ export function fetchToken(port, timeoutMs = 3000) {
 }
 
 /**
- * Probe a range of ports for a running JustSearch instance.
- * Returns the first validated port or null.
+ * The data folders whose runtime manifests discovery validates, in order:
+ * JUSTSEARCH_HOME (legacy), JUSTSEARCH_DATA_DIR, the desktop app's folder, the dev `.dev-data`
+ * folders above cwd, then the user data folder of headless/CLI starts.
  */
-async function probePortRange(startPort, count, timeoutMs = 800) {
-  for (let port = startPort; port < startPort + count; port++) {
-    if (await validatePort(port, timeoutMs)) return port;
-  }
-  return null;
+export function engineCandidates({env = process.env, cwd = process.cwd()} = {}) {
+  const out = [];
+  const jsHome = env.JUSTSEARCH_HOME && env.JUSTSEARCH_HOME.trim();
+  if (jsHome) out.push({source: 'JUSTSEARCH_HOME', dataDir: jsHome});
+  out.push(...standardCandidates({env}));
+  for (const dataDir of devDataDirCandidates(cwd)) out.push({source: 'dev checkout', dataDir});
+  out.push({source: 'user data folder', dataDir: resolveUserDataDir({env})});
+  return out;
 }
 
 /**
@@ -144,15 +138,17 @@ async function probePortRange(startPort, count, timeoutMs = 800) {
  * Priority:
  * 1. Explicit port (--port CLI arg)
  * 2. JUSTSEARCH_API_PORT env var
- * 3. api-port.txt from data dir
- * 4. api-port.txt from JUSTSEARCH_HOME
- * 5. Port probe 33221-33250
+ * 3. The first runtime manifest, in engineCandidates() order, whose pid is alive and whose port,
+ *    over a connection the OS reports as that pid's (engine-discovery.cjs engineRequest), answers
+ *    GET /api/runtime/live with the manifest's pid and instanceId and /api/health with 200.
  *
- * Every candidate is validated with GET /api/status before acceptance.
- * Once validated, fetches the session token via GET /api/mcp/token.
+ * There is no port probe: a port with no validated manifest behind it is never used unless the
+ * operator named it. Once selected, fetches the session token via GET /api/mcp/token.
  *
  * @param {{ port?: number, verbose?: boolean }} opts
- * @returns {Promise<{ port: number, baseUrl: string, token: string | null }>}
+ * @returns {Promise<{ port: number, baseUrl: string, token: string | null, instanceId?: string, dataDir?: string, source?: string, engine?: object }>}
+ *   engine: the validated manifest candidate (absent for --port / JUSTSEARCH_API_PORT); every
+ *   request to it goes through engine-discovery.cjs engineRequest({ port, engine }).
  */
 export async function discover({ port: explicitPort, verbose } = {}) {
   const log = verbose ? (msg) => process.stderr.write(`[justsearch-mcp] ${msg}\n`) : () => {};
@@ -162,7 +158,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   if (explicitPort != null) {
     log(`Trying explicit port ${explicitPort}...`);
     if (await validatePort(explicitPort)) {
-      const token = await fetchToken(explicitPort);
+      const token = await fetchToken({ port: explicitPort, engine: null });
       log(`Connected on port ${explicitPort}, token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
       return { port: explicitPort, baseUrl: `http://127.0.0.1:${explicitPort}`, token };
     }
@@ -174,51 +170,37 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   if (Number.isFinite(envPort) && envPort > 0) {
     log(`Trying JUSTSEARCH_API_PORT=${envPort}...`);
     if (await validatePort(envPort)) {
-      const token = await fetchToken(envPort);
+      const token = await fetchToken({ port: envPort, engine: null });
       log(`Connected on port ${envPort}, token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
       return { port: envPort, baseUrl: `http://127.0.0.1:${envPort}`, token };
     }
     attempts.push(`JUSTSEARCH_API_PORT=${envPort} (not responding)`);
   }
 
-  // 3. Runtime manifest (tempdoc 501 — the canonical discovery path).
-  // findRunningManifest walks: env JUSTSEARCH_DATA_DIR → worktree/repo .dev-data
-  // → platform default; reads each one's manifest; returns the first whose pid
-  // is alive on this OS. Production installs land in the platform-default branch.
-  const jsHome = process.env.JUSTSEARCH_HOME;
-  const extras = jsHome && jsHome.trim() ? [jsHome.trim()] : [];
-  const found = findManifestShared({extraDataDirs: extras});
-  if (found) {
-    const port = found.manifest?.head?.apiPort;
-    if (port != null) {
-      log(`Found manifest in ${found.dataDir} (instanceId=${found.manifest.instanceId})`);
-      if (await validatePort(port)) {
-        const token = await fetchToken(port);
-        log(`Connected on port ${port}, token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
-        return { port, baseUrl: `http://127.0.0.1:${port}`, token, instanceId: found.manifest.instanceId };
-      }
-      attempts.push(`manifest at ${found.dataDir} port ${port} (PID alive but HTTP probe failed)`);
-    }
-  } else {
-    attempts.push('runtime manifest (no live producer found in any candidate dataDir)');
+  // 3. Validated runtime manifests (tempdoc 501 — the canonical discovery path).
+  const { selected, tried } = await selectEngine(engineCandidates());
+  attempts.push(...describeTried(tried.filter((t) => !t.ok)));
+  if (selected) {
+    const { port } = selected;
+    const token = await fetchToken({ port, engine: selected });
+    process.stderr.write(
+      `[justsearch-mcp] Using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${port})\n`,
+    );
+    log(`token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
+    return {
+      port,
+      baseUrl: `http://127.0.0.1:${port}`,
+      token,
+      instanceId: selected.instanceId,
+      dataDir: selected.dataDir,
+      source: selected.source,
+      engine: selected,
+    };
   }
-
-  // 4. Port probe (last resort for ad-hoc launches with no metadata).
-  // Tempdoc 501 Phase 18 removed the api-port.txt fallback: the canonical filesystem
-  // transport is now manifest.json (checked above). No older-build path remains
-  // worth carrying.
-  log('Probing ports 33221-33250...');
-  const probedPort = await probePortRange(33221, 30);
-  if (probedPort != null) {
-    const token = await fetchToken(probedPort);
-    log(`Connected on port ${probedPort} (probed), token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
-    return { port: probedPort, baseUrl: `http://127.0.0.1:${probedPort}`, token };
-  }
-  attempts.push('port probe 33221-33250 (none responding)');
 
   throw new Error(
     'Could not find a running JustSearch instance.\n' +
-      'Attempts:\n' +
+      'Tried:\n' +
       attempts.map((a) => `  - ${a}`).join('\n') +
       '\n\nMake sure JustSearch is running, or specify the port:\n' +
       '  node justsearch-mcp.mjs --port <port>\n' +
