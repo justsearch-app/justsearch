@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T12:29:29.733Z",
+  "revision": "7b277b013888bfb21a629ccb628b0b917835fb20",
+  "tree": "0da89b75a3f5c0cf5469b8e9a1dde65d85c3942c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EnginePruneReappearedFileTest.aFileRecreatedAsItsRemovalIsPublishedIsIndexedAgainByTheSync\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10977
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EnginePruneReappearedFileTest.java#aFileRecreatedAsItsRemovalIsPublishedIsIndexedAgainByTheSync",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EnginePruneReappearedFileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84440c36464b555bf0cb0cbf48d9e760ca57c7e0a0c958c49724d78e08ea1552",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFileRecreatedAsItsRemovalIsPublishedIsIndexedAgainByTheSync()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7b277b013",
+    "revision": "7b277b013888bfb21a629ccb628b0b917835fb20",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EnginePruneReappearedFileTest.aFileRecreatedAsItsRemovalIsPublishedIsIndexedAgainByTheSync\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 13366
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EnginePruneReappearedFileTest.java#aFileRecreatedAsItsRemovalIsPublishedIsIndexedAgainByTheSync",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:aeca1c26a4601f9f1c07a1206595a3ef0249505a05738df8afc75f06e096d34c"
+}
