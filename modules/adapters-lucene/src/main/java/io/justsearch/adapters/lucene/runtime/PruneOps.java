@@ -123,8 +123,40 @@ public final class PruneOps {
     /** Runs {@code batch} with file publications held off and returns its result. */
     boolean hold(BooleanSupplier batch);
 
+    /**
+     * Starts recording the files whose rows a writer publishes under this fence from now on. A
+     * writer checks that its file still exists before it publishes, inside the fence; one that
+     * passed that check before the file was deleted can still publish the file's first rows after
+     * the prune's scan, which then never saw them. The prune therefore judges the recorded files
+     * once more, in its last pass inside the fence.
+     */
+    default Publications watch() {
+      return Publications.NONE;
+    }
+
     /** For a prune with no concurrent file publisher to coordinate with. */
     WriterFence NONE = BooleanSupplier::getAsBoolean;
+  }
+
+  /** The files whose rows were published under a {@link WriterFence} since its watch began. */
+  public interface Publications extends AutoCloseable {
+    /** The stored paths recorded since the last call; asked while holding the fence. */
+    Set<String> take();
+
+    /** Stops recording. */
+    @Override
+    void close();
+
+    /** Records nothing: there is no writer to record. */
+    Publications NONE = new Publications() {
+      @Override
+      public Set<String> take() {
+        return Set.of();
+      }
+
+      @Override
+      public void close() {}
+    };
   }
 
   /**
@@ -209,7 +241,9 @@ public final class PruneOps {
    * freshly refreshed view holds for it at that moment, each selected by the same rules as the
    * scan. A chunk written after the scan (a re-index or a VDU replacement gives chunks new ids) is
    * therefore removed with its file, a file that came back or can no longer be judged keeps its
-   * rows, and a renamed file's rows, which no longer carry the old path, are left alone. Confirmed
+   * rows, and a renamed file's rows, which no longer carry the old path, are left alone. A file
+   * whose first rows a writer published after the scan ({@link WriterFence#watch}) is judged in a
+   * last pass inside the fence, once every writer that started before it has finished. Confirmed
    * deletions are committed and the search view refreshed before the prune returns.
    */
   public PruneResult pruneByPathPrefix(
@@ -271,6 +305,9 @@ public final class PruneOps {
     }
     IndexSearcher searcher = null;
     Completion completion = Completion.COMPLETE;
+    // Recording starts before the scan's view is taken: a publication it misses was written
+    // before that view, so the scan sees it.
+    Publications late = writerFence.watch();
     try {
       // The background refresh may lag the writer by its whole interval; a stale view would miss
       // files written since, or hold only some of a file's chunks.
@@ -370,7 +407,9 @@ public final class PruneOps {
         }
         after = topDocs.scoreDocs[topDocs.scoreDocs.length - 1];
       }
-      if (completion == Completion.COMPLETE && !batch.flush()) {
+      // The last batch waits for every writer that checked its file before it, and judges the
+      // files they published since the scan began along with its own.
+      if (completion == Completion.COMPLETE && !batch.flushLate(late)) {
         completion = Completion.INCOMPLETE;
       }
       if (completion == Completion.COMPLETE && batch.keptUnknown > 0) {
@@ -412,6 +451,7 @@ public final class PruneOps {
     } catch (IOException e) {
       throw new IndexRuntimeIOException(classifyIOException(e), "Prune failed", e);
     } finally {
+      late.close();
       if (searcher != null) {
         try {
           mgr.release(searcher);
@@ -514,12 +554,32 @@ public final class PruneOps {
      * @return false when the root check failed; the candidates are discarded, nothing is removed
      */
     boolean flush() throws IOException {
+      return flush(null);
+    }
+
+    /**
+     * The prune's last batch: inside the fence, so after every writer that checked its file before
+     * it, the files {@code late} recorded under the prefix join the batch's candidates and are
+     * judged like them. The fence is taken even when nothing is pending: a writer still holding
+     * it may be about to publish a file's first rows.
+     */
+    boolean flushLate(Publications late) throws IOException {
+      return flush(Objects.requireNonNull(late, "late"));
+    }
+
+    private boolean flush(Publications late) throws IOException {
       rootCheckedSinceUncertain = false;
-      if (candidates.isEmpty()) {
+      if (candidates.isEmpty() && late == null) {
         return true;
       }
       try {
         return fence.hold(() -> {
+          if (late != null) {
+            nominate(late.take());
+          }
+          if (candidates.isEmpty()) {
+            return true;
+          }
           long start = System.nanoTime();
           try {
             return applyFenced();
@@ -536,6 +596,23 @@ public final class PruneOps {
         throw e.getCause();
       } finally {
         candidates.clear();
+      }
+    }
+
+    /**
+     * Makes each of {@code paths} under the prefix a candidate, by the rule the scan applies to
+     * a row's stored path; its absence is judged later.
+     */
+    private void nominate(Set<String> paths) {
+      for (String filePath : paths) {
+        if (filePath == null || !normalizePathPrefix(filePath).startsWith(prefix)) {
+          continue;
+        }
+        try {
+          candidates.add(new Candidate(filePath, filePath, Path.of(filePath)));
+        } catch (InvalidPathException unparseable) {
+          // Neither confirmed absent nor found: kept, as in the scan.
+        }
       }
     }
 

@@ -359,9 +359,92 @@ public final class WorkerIngestService {
         ? mutation.get() : indexingLoop.withFileMutationFence(mutation);
   }
 
-  /** A prune applies each batch of deletions inside the same fence as the file writers. */
+  /**
+   * A prune applies each batch of deletions inside the same fence as the file writers, and judges
+   * again the files the loop's writers published while it scanned.
+   */
   private final io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence pruneWriterFence =
-      batch -> withFileMutationFence(batch::getAsBoolean);
+      new io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence() {
+        @Override
+        public boolean hold(java.util.function.BooleanSupplier batch) {
+          return withFileMutationFence(batch::getAsBoolean);
+        }
+
+        @Override
+        public io.justsearch.adapters.lucene.runtime.PruneOps.Publications watch() {
+          io.justsearch.indexerworker.loop.FileMutationFence fence =
+              mutationAdmission == null || indexingLoop == null
+                  ? null : indexingLoop.fileMutationFence();
+          // No loop, or one without a fence of its own (a test double), records nothing.
+          return fence == null
+              ? io.justsearch.adapters.lucene.runtime.PruneOps.Publications.NONE : fence.watch();
+        }
+      };
+
+  /**
+   * For a replay service that stands in for {@code publisher}, the live Worker whose indexing loop
+   * writes while the replay runs: its prunes are vouched for by {@code publisher}'s root authority
+   * (the identity a watch registered, the recorded volume) and applied inside {@code publisher}'s
+   * file-mutation fence.
+   */
+  public void prunesUnder(WorkerIngestService publisher) {
+    java.util.Objects.requireNonNull(publisher, "publisher");
+    syncOps.setPruneGuardFactory(publisher::pruneGuard);
+    syncOps.setPruneWriterFence(publisher.pruneWriterFence);
+  }
+
+  /**
+   * Replays a buffered prune of {@code pathPrefix} into {@code target}: vouched for by the root
+   * that holds the prefix, as this service's own prunes are (present, listable, the identity a
+   * watch registered, the volume recorded when the person added it), and applied inside this
+   * service's file-mutation fence, the one its indexing loop's writers hold. A file the prune
+   * removed that is present again once the removal is committed is queued for indexing before
+   * this returns: it was recreated after its last absence check.
+   *
+   * @return the prune's result and how many recreated files were queued again
+   * @param firstRemoval runs once, at the prune's first removal, before anything is committed
+   *     (the harness stop point); ordinary replays pass a no-op
+   */
+  public ReplayedPrune replayBufferedPrune(
+      io.justsearch.adapters.lucene.runtime.RunningRuntime target, String pathPrefix,
+      Runnable firstRemoval) {
+    java.util.Objects.requireNonNull(target, "target");
+    java.util.Objects.requireNonNull(firstRemoval, "firstRemoval");
+    Path pruneRoot = pruneRootFor(pathPrefix);
+    java.util.Set<String> removed = new java.util.LinkedHashSet<>();
+    var result = target.pruneOps().pruneByPathPrefix(
+        pathPrefix,
+        () -> false,
+        100,
+        pruneGuard(pruneRoot),
+        path -> {
+          if (removed.isEmpty()) firstRemoval.run();
+          removed.add(path);
+        },
+        pruneWriterFence);
+    List<JobQueue.EnqueueEntry> reappeared = new ArrayList<>();
+    for (String path : removed) {
+      Path file = Path.of(path);
+      if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
+              == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT
+          && file.toAbsolutePath().normalize().startsWith(pruneRoot)
+          && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy
+              .shouldSkipWithinRoot(file, pruneRoot)) {
+        reappeared.add(JobQueue.EnqueueEntry.stat(file).withinRoot(pruneRoot));
+      }
+    }
+    int queued = 0;
+    if (!reappeared.isEmpty()) {
+      queued = jobQueue.enqueueEntries(reappeared);
+      log.info("Replayed prune of {}: {} removed files were present again, {} queued for indexing",
+          pathPrefix, reappeared.size(), queued);
+    }
+    return new ReplayedPrune(result, queued);
+  }
+
+  /** A replayed prune's result, and the number of files it removed that were queued again. */
+  public record ReplayedPrune(
+      io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result, int requeued) {}
 
   private boolean hasDistinctWritableServingTarget() {
     return searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active

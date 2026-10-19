@@ -121,9 +121,29 @@ public final class KnowledgeServerMigrationOps {
       long deadlineNanos,
       String replayGeneration,
       java.util.function.Predicate<String> projectionSourceReady,
-      Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions) {
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions,
+      // The live Worker whose indexing loop may write while this replay runs, or null when none
+      // exists yet (the synchronous boot replay runs before any application service is built).
+      // Replayed prunes take its root authority and its file-mutation fence.
+      WorkerIngestService publisher) {
     public DrainSwitchBufferContext {
       approvedGapVersions = Set.copyOf(approvedGapVersions);
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos,
+        String replayGeneration, java.util.function.Predicate<String> projectionSourceReady,
+        Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, null);
+    }
+    /** This context, with {@code publisher} as the live Worker whose writers the replay fences. */
+    public DrainSwitchBufferContext withPublisher(WorkerIngestService publisher) {
+      return new DrainSwitchBufferContext(jobQueue, ingestLifecycle, signalBus, indexingPacing,
+          indexBasePath, activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher);
     }
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
@@ -539,8 +559,19 @@ public final class KnowledgeServerMigrationOps {
   /** Only the candidate promotion caller supplies a harness cut inside its ordered replay. */
   public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
       DrainSwitchBufferContext context, Runnable firstCandidateProjectionApplied) {
+    return prepareSwitchReplayForPromotion(context, firstCandidateProjectionApplied, () -> {});
+  }
+
+  /**
+   * As {@link #prepareSwitchReplayForPromotion(DrainSwitchBufferContext, Runnable)}, with a second
+   * harness cut at a replayed prune's first removal, before anything of it is committed.
+   */
+  public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
+      DrainSwitchBufferContext context, Runnable firstCandidateProjectionApplied,
+      Runnable firstPruneRemoval) {
     var result = drainSwitchBuffer(context, true, false, true,
-        Objects.requireNonNull(firstCandidateProjectionApplied, "firstCandidateProjectionApplied"));
+        Objects.requireNonNull(firstCandidateProjectionApplied, "firstCandidateProjectionApplied"),
+        false, Objects.requireNonNull(firstPruneRemoval, "firstPruneRemoval"));
     return result.applied() ? java.util.Optional.of(new StrictReplay(result.versions()))
         : java.util.Optional.empty();
   }
@@ -900,6 +931,14 @@ public final class KnowledgeServerMigrationOps {
   private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
       boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
       Runnable firstCandidateProjectionApplied, boolean refusedSourceRecovery) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, includeUnscoped,
+        firstCandidateProjectionApplied, refusedSourceRecovery, () -> {});
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
+      Runnable firstCandidateProjectionApplied, boolean refusedSourceRecovery,
+      Runnable firstPruneRemoval) {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return new ReplayOutcome(false, List.of());
     }
@@ -941,6 +980,7 @@ public final class KnowledgeServerMigrationOps {
     boolean mutatedLucene = false;
     boolean allApplied = true;
     boolean firstCandidateProjectionObserved = false;
+    AtomicReference<RuntimeException> pruneCutFailure = new AtomicReference<>();
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
       if (op.op() == null || op.payload() == null) {
@@ -1283,18 +1323,10 @@ public final class KnowledgeServerMigrationOps {
               boolean force = buffered.force();
               JobQueue.EnqueueProvenance provenance = buffered.provenance();
 
-              WorkerIngestService tmp =
-                  new WorkerIngestService(
-                      context.jobQueue(),
-                      null,
-                      context.signalBus(),
-                      context.indexingPacing(),
-                      context.indexBasePath(),
-                      context.activeIndexPath(),
-                      context.ingestLifecycle(),
-                      null,
-                      null,
-                      0L);
+              WorkerIngestService tmp = replayService(context);
+              // The sync's prune is vouched for and fenced by the live Worker, whose loop may be
+              // writing files under the root while the sync runs.
+              if (context.publisher() != null) tmp.prunesUnder(context.publisher());
               SyncDirectoryRequest req =
                   SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
 
@@ -1344,17 +1376,23 @@ public final class KnowledgeServerMigrationOps {
         case "PRUNE_PREFIX" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
-              // Task t-20261013-ef3c41: replay prunes only confirmed absences — the prefix must be
-              // a present, listable folder, re-checked every batch. A prune that could not finish
-              // stays unapplied and is retried, exactly like a SYNC_ROOT replay whose root is gone.
-              var result =
-                  context.ingestLifecycle().pruneOps().pruneByPathPrefix(
-                      payload,
-                      () -> false,
-                      100,
-                      io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard.forRoot(
-                          Path.of(payload)),
-                      ignoredConfirmedDeletion -> {});
+              // Task t-20261013-ef3c41: replay prunes only confirmed absences. The root holding the
+              // prefix must be present, listable, the folder a watch registered and on the volume
+              // recorded for it, re-checked every batch; each batch is applied inside the live
+              // Worker's file-mutation fence. A prune that could not finish stays unapplied and is
+              // retried, exactly like a SYNC_ROOT replay whose root is gone.
+              WorkerIngestService authority =
+                  context.publisher() != null ? context.publisher() : replayService(context);
+              var replayed = authority.replayBufferedPrune(
+                  context.ingestLifecycle(), payload, () -> {
+                    try {
+                      firstPruneRemoval.run();
+                    } catch (RuntimeException barrierFailure) {
+                      pruneCutFailure.set(barrierFailure);
+                      throw barrierFailure;
+                    }
+                  });
+              var result = replayed.result();
               int pruned = result.pruned();
               mutatedLucene = mutatedLucene || pruned > 0;
               if (!result.complete()) {
@@ -1371,8 +1409,16 @@ public final class KnowledgeServerMigrationOps {
                 context
                     .log()
                     .info("Replayed buffered PRUNE_PREFIX: prefix={} pruned={}", payload, pruned);
+                // A removed file found present again was queued; a later direct delete must wait
+                // for its writer, as after a replayed SYNC_ROOT.
+                if (exactRead && replayed.requeued() > 0 && !awaitQueuedUpserts(context)) {
+                  return new ReplayOutcome(false, List.of());
+                }
               }
             } catch (Exception e) {
+              // A harness cut that could not record its marker aborts the whole attempt, as the
+              // projection cut does; it is not a replay gap.
+              if (pruneCutFailure.get() != null) throw pruneCutFailure.get();
               allApplied = false;
               context
                   .log()
@@ -1447,6 +1493,25 @@ public final class KnowledgeServerMigrationOps {
     }
     return new ReplayOutcome(allApplied && (removed || !removeAfterReplay) && !deferredVdu,
         allApplied ? ops : List.of());
+  }
+
+  /**
+   * A service over the replay target with no indexing loop of its own. Its prunes are unfenced
+   * and vouched for without a watch registration unless {@link WorkerIngestService#prunesUnder}
+   * hands them to the live publisher.
+   */
+  private static WorkerIngestService replayService(DrainSwitchBufferContext context) {
+    return new WorkerIngestService(
+        context.jobQueue(),
+        null,
+        context.signalBus(),
+        context.indexingPacing(),
+        context.indexBasePath(),
+        context.activeIndexPath(),
+        context.ingestLifecycle(),
+        null,
+        null,
+        0L);
   }
 
   /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */

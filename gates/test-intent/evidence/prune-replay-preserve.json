@@ -1,0 +1,254 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T15:49:52.208Z",
+  "revision": "5be9fb9007c0503505b9a89a06af5f9a00bebfcc",
+  "tree": "e5a9f52874066398c805324838a35ec15d7ac555",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aPromotionReplayWithAHeldWriterOfALiveFileCompletesAndKeepsItsRows\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aRefusedCandidateReplayOnTheSourceRemovesTheDeletedFileAndKeepsTheLiveOne\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aCommittedButUnacknowledgedPruneRetriesWithoutRemovingAReingestedFile\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.nativeCommittedWitnessSettlementRefusesAPruneAndKeepsIt\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aBufferedUpsertAfterThePruneQueuesTheReappearedFileAndKeepsItsRows\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.anExplicitDeleteAfterThePruneKeepsItsSemantics\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.vduUpdatesAroundThePruneKeepTheirOrderAndAMissedOneKeepsEveryReceipt\" --tests \"io.justsearch.indexerworker.services.PruneLatePublicationTest.aFileStillPresentKeepsTheRowsItsWriterPublishedDuringThePrune\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayUncertainRootTest.aBufferedPruneOfAMissingFolderRemovesNothingAndStaysBuffered\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayUncertainRootTest.aBufferedPruneOfAPresentFolderRemovesTheDeletedFile\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6808
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aPromotionReplayWithAHeldWriterOfALiveFileCompletesAndKeepsItsRows",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06c67e34e09479b9da4f0c119d5de01389036e51aa37246be498db8ececc2fd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPromotionReplayWithAHeldWriterOfALiveFileCompletesAndKeepsItsRows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aRefusedCandidateReplayOnTheSourceRemovesTheDeletedFileAndKeepsTheLiveOne",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06c67e34e09479b9da4f0c119d5de01389036e51aa37246be498db8ececc2fd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedCandidateReplayOnTheSourceRemovesTheDeletedFileAndKeepsTheLiveOne()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aCommittedButUnacknowledgedPruneRetriesWithoutRemovingAReingestedFile",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06c67e34e09479b9da4f0c119d5de01389036e51aa37246be498db8ececc2fd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCommittedButUnacknowledgedPruneRetriesWithoutRemovingAReingestedFile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#nativeCommittedWitnessSettlementRefusesAPruneAndKeepsIt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06c67e34e09479b9da4f0c119d5de01389036e51aa37246be498db8ececc2fd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeCommittedWitnessSettlementRefusesAPruneAndKeepsIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aBufferedUpsertAfterThePruneQueuesTheReappearedFileAndKeepsItsRows",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06c67e34e09479b9da4f0c119d5de01389036e51aa37246be498db8ececc2fd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBufferedUpsertAfterThePruneQueuesTheReappearedFileAndKeepsItsRows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#anExplicitDeleteAfterThePruneKeepsItsSemantics",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06c67e34e09479b9da4f0c119d5de01389036e51aa37246be498db8ececc2fd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitDeleteAfterThePruneKeepsItsSemantics()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#vduUpdatesAroundThePruneKeepTheirOrderAndAMissedOneKeepsEveryReceipt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06c67e34e09479b9da4f0c119d5de01389036e51aa37246be498db8ececc2fd5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vduUpdatesAroundThePruneKeepTheirOrderAndAMissedOneKeepsEveryReceipt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aFileStillPresentKeepsTheRowsItsWriterPublishedDuringThePrune",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e6f32ada202869fed25614f55be29787a1bc999010f71eff34dcf920949444d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFileStillPresentKeepsTheRowsItsWriterPublishedDuringThePrune()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java#aBufferedPruneOfAMissingFolderRemovesNothingAndStaysBuffered",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f068cc1026011aa5b83ff3f6f1e1253ac33768d38468c0e8dbbbb90551b5b5b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBufferedPruneOfAMissingFolderRemovesNothingAndStaysBuffered()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java#aBufferedPruneOfAPresentFolderRemovesTheDeletedFile",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f068cc1026011aa5b83ff3f6f1e1253ac33768d38468c0e8dbbbb90551b5b5b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBufferedPruneOfAPresentFolderRemovesTheDeletedFile()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5be9fb900",
+    "revision": "5be9fb9007c0503505b9a89a06af5f9a00bebfcc",
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/HeldFileWriter.java",
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/FenceRace.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/prune-replay-before-compat.patch",
+        "contentDigest": "sha256:59404546e9f0f9f116392591d2edd7291cd21e4e1eac9e65af0514e65117f12a"
+      }
+    ],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aPromotionReplayWithAHeldWriterOfALiveFileCompletesAndKeepsItsRows\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aRefusedCandidateReplayOnTheSourceRemovesTheDeletedFileAndKeepsTheLiveOne\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aCommittedButUnacknowledgedPruneRetriesWithoutRemovingAReingestedFile\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.nativeCommittedWitnessSettlementRefusesAPruneAndKeepsIt\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.aBufferedUpsertAfterThePruneQueuesTheReappearedFileAndKeepsItsRows\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.anExplicitDeleteAfterThePruneKeepsItsSemantics\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest.vduUpdatesAroundThePruneKeepTheirOrderAndAMissedOneKeepsEveryReceipt\" --tests \"io.justsearch.indexerworker.services.PruneLatePublicationTest.aFileStillPresentKeepsTheRowsItsWriterPublishedDuringThePrune\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayUncertainRootTest.aBufferedPruneOfAMissingFolderRemovesNothingAndStaysBuffered\" --tests \"io.justsearch.indexerworker.server.ops.PrunePrefixReplayUncertainRootTest.aBufferedPruneOfAPresentFolderRemovesTheDeletedFile\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 9989
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aPromotionReplayWithAHeldWriterOfALiveFileCompletesAndKeepsItsRows",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aRefusedCandidateReplayOnTheSourceRemovesTheDeletedFileAndKeepsTheLiveOne",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aCommittedButUnacknowledgedPruneRetriesWithoutRemovingAReingestedFile",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#nativeCommittedWitnessSettlementRefusesAPruneAndKeepsIt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aBufferedUpsertAfterThePruneQueuesTheReappearedFileAndKeepsItsRows",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#anExplicitDeleteAfterThePruneKeepsItsSemantics",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#vduUpdatesAroundThePruneKeepTheirOrderAndAMissedOneKeepsEveryReceipt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aFileStillPresentKeepsTheRowsItsWriterPublishedDuringThePrune",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java#aBufferedPruneOfAMissingFolderRemovesNothingAndStaysBuffered",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java#aBufferedPruneOfAPresentFolderRemovesTheDeletedFile",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:f7163fac3604a715c39e92be7e6ecd5105c5277d8bf5319c3621bf018bf7d318"
+}
