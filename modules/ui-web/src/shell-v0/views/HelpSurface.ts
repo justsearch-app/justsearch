@@ -47,46 +47,55 @@ const FAQ: FaqItem[] = [
   },
   {
     q: 'What file types are supported?',
-    a: 'JustSearch supports PDFs, Markdown, plain text, code files (JS, TS, Python, etc.), images (with OCR), and many more. Check the Library view for the full list.',
+    a: 'JustSearch supports PDFs, Word documents, HTML, Markdown, plain text, code files (JS, TS, Python, etc.), and images, whose text is read with OCR.',
   },
   {
     q: 'How does AI summarization work?',
-    a: 'Select a file and click "Summarize" in the Inspector panel. The AI runs locally on your machine using the configured model. No data is sent externally.',
+    a: 'Select text in a document and choose "Summarize" from the menu that appears, or type a request such as "summarize the budget notes" in the search bar. Summaries need the local chat model, which is installed only on a machine with an NVIDIA GPU with at least 7.5 GB of video memory. It runs on your machine; no data is sent externally.',
   },
   {
     q: 'Why is indexing slow?',
-    a: 'Initial indexing can take time for large folders. Once complete, incremental updates are fast. Check the Health view for indexing status.',
+    a: 'Initial indexing can take time for large folders. Once complete, incremental updates are fast. Check the Health tab of the System view for indexing status.',
   },
   {
-    q: 'How do I use the AI chat feature?',
-    a: 'Type ?? followed by your question in the search bar to ask the AI about your selected files or general questions.',
+    q: 'How do I ask the AI a question?',
+    a: 'Type your question in the search bar. A query that reads like a question (for example one with "?" or starting with "how" or "what") is answered with citations from your files; press Ctrl+Enter to search it instead. This needs the local chat model (see above).',
   },
 ];
 
 // Tempdoc 586 P-3 — only shortcuts that ACTUALLY fire are listed. The previous table advertised
-// `/` (focus search) and `/` (command mode) — both unimplemented V1 deferrals (no global `/`
-// binding; the only registered keybindings are mod+k / mod+z / mod+shift+z, see Shell.ts) — plus
+// `/` (focus search) and `/` (command mode) — unimplemented V1 deferrals at the time (the registered
+// bindings are in Shell.ts; `/` now focuses the Search view's bar there, and handleGlobalKey owns the
+// Alt+arrow, Ctrl+D and Ctrl+Shift+A chords; Composer.ts owns the search-bar keys) — plus
 // `??` (a documented search-box query *prefix* for the AI, not a keycap) and `Alt+1–4` agent tabs
 // (the standalone agent surface was retired into the unified chat window). Listing shortcuts that
 // don't work is worse than a short list, so the table now mirrors the real bindings.
 const SHORTCUTS: ShortcutRow[] = [
   { keys: 'Ctrl / ⌘ + K', desc: 'Open the command palette' },
-  { keys: 'Enter', desc: 'Run the search (when the search box is focused)' },
-  { keys: 'Esc', desc: 'Clear the search box · close an open panel or drawer' },
   { keys: 'Ctrl / ⌘ + Z', desc: 'Undo' },
   { keys: 'Ctrl / ⌘ + Shift + Z', desc: 'Redo' },
+  { keys: 'Ctrl / ⌘ + L or /', desc: 'Put the cursor in the search bar (in the Search view; / only when not typing)' },
+  { keys: 'Enter', desc: 'Run the query (in the search bar)' },
+  { keys: 'Shift + Enter', desc: 'New line in the search bar' },
+  { keys: 'Ctrl + Enter', desc: 'Run the query the other way: ask instead of search, or search instead of ask' },
+  { keys: 'Alt + ← / →', desc: 'Go back / forward between views (when not typing)' },
+  { keys: 'Ctrl + D', desc: 'Bookmark the current view, or remove its bookmark (when not typing)' },
+  { keys: 'Ctrl + Shift + A', desc: 'Open the Search view to ask the AI (when not typing; needs the chat model)' },
+  { keys: 'Esc', desc: 'Close an open menu, popover or dialog' },
   // Tempdoc 857 PR-A — J/K is the only keyboard navigation the product has for a run's steps, and it
   // was the least discoverable thing in it: a raw window listener, unregistered in the palette and
   // absent from this table. P-3's rule cuts both ways — a table that omits a binding that DOES fire
   // is as partial a mirror as one that lists bindings that don't. The scope note is part of the row
-  // because, unlike the five above, this one is window-scoped rather than global.
-  { keys: 'J / K', desc: 'Step to the next / previous step of a run (while a conversation transcript is on screen)' },
+  // because this one is a window listener that acts only on a Delegate run.
+  { keys: 'J / K', desc: 'Step to the next / previous step of a run (a Delegate run in a wide window, when not typing)' },
 ];
 
+// Labels are the operation catalog's (registry-operation.en.properties) as rendered by the Library
+// header and the Health quick actions (LibrarySurface.ts, HealthSurface.ts renderActions).
 const TROUBLESHOOTING: string[] = [
-  'If search results look stale, use "Reindex" in Library (Detailed) or Health.',
-  'If indexing seems stuck, try "Restart worker" in Health.',
-  'Use "Copy diagnostic summary" above before reporting a bug; review it before posting.',
+  'If search results look stale, use "Reindex" in Library or in the Health tab of the System view.',
+  'If indexing seems stuck, use "Recover component" in the Health tab of the System view (shown when Settings → Developer → View tier is Operator), or "Force Rebuild" there to rebuild the whole index from scratch, which takes a long time.',
+  'Use "Copy Diagnostic Summary" above before reporting a bug; review it before posting.',
 ];
 
 const NETWORK: string[] = [

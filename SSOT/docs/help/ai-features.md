@@ -3,6 +3,20 @@
 JustSearch includes optional AI capabilities that run entirely on your
 machine. No data is sent to external servers.
 
+## What gets installed
+
+Open the **AI Brain** view and click "Install AI". What is downloaded depends
+on your hardware, and the confirmation dialog shows the exact size:
+
+- **With a supported NVIDIA GPU** (CUDA working and at least 7.5 GB of video
+  memory): the search models plus the local chat model — about 10 GB on
+  Windows (including the GPU runtime) and about 8 GB on Linux.
+- **Without one**: the search models only (plus the GPU runtime on Windows if
+  CUDA works) — about 2–4 GB. Semantic search, entity recognition, and
+  reranking work; chat, questions with cited answers, summarization, and query
+  expansion are not available, and the AI Brain view says why the chat model
+  was skipped.
+
 ## Semantic search
 
 After installing AI models, search understands the meaning of your query,
@@ -11,14 +25,15 @@ not just keywords. Searching for "how to deploy" finds documents about
 
 ## Named entity recognition (NER)
 
-JustSearch automatically identifies people, organizations, locations, and
-other entities in your documents. This improves search accuracy for queries
-like "documents mentioning Acme Corp".
+JustSearch automatically identifies people, organizations, and locations in
+your documents. AI tools connected over MCP can use them to narrow results,
+for example to documents that mention a given organization.
 
 ## Query expansion
 
-Your search query is automatically expanded with related terms. A search
-for "auth" also considers "authentication", "authorization", and "login".
+While the chat model is running, your search query is expanded with other
+forms of the same words — plurals, past tenses, and similar variants — so a
+search for "deploy" also finds "deployed" and "deployment".
 
 ## Cross-encoder reranking
 
@@ -27,28 +42,34 @@ result directly against your query for more accurate relevance scoring.
 
 ## SPLADE sparse retrieval
 
-SPLADE (Sparse Lexical and Expansion) generates learned sparse
-representations of documents, bridging the gap between keyword and
-semantic search.
+The AI install includes a SPLADE (Sparse Lexical and Expansion) model, which
+adds learned term weights to your documents as they are indexed. The search
+bar does not use them by default; they are available to searches that request
+SPLADE explicitly, such as through the API or the built-in agent's search tool.
 
 ## Ask your documents
 
-With AI models installed, you can ask questions in natural language and get
-answers drawn from your files — each backed by **citations** to the source
-passages, so you can verify every claim. This is the primary AI mode.
+With the chat model installed, you can ask questions in natural language and
+get answers drawn from your files — each backed by **citations** to the source
+passages, so you can verify every claim. In the Search view, a query that reads
+like a question (for example one containing "?" or starting with "how" or
+"what") is asked rather than searched; press Ctrl+Enter to take the other
+route for that query, or choose "Ask — answers with citations" below the
+search bar.
 
-## Chat, summarize, and extract
+## Summarize and extract
 
-Beyond Q&A, the same local model powers several modes in one window: a
-free-chat mode, document **summarization**, and structured **extraction** —
-all running on your machine.
+The same local model can **summarize** text you select or a set of results,
+and the "Structured — fields as JSON" option below the search bar
+**extracts** fields from your documents against a JSON schema — all running
+on your machine.
 
 ## Built-in agent
 
-For multi-step requests, an optional agent can search your index, browse
-indexed folders, request ingestion of new files, and perform approved file
-operations. Anything that makes a change is gated — you approve it, and it is
-logged.
+For multi-step requests, choose "Delegate — the agent works multi-step" below
+the search bar. The agent can search your index, browse indexed folders,
+request ingestion of new files, and perform approved file operations. Anything
+that makes a change is gated — you approve it, and it is logged.
 
 ## Use JustSearch from other AI tools (MCP)
 
@@ -56,10 +77,14 @@ JustSearch can act as a private retrieval backend for external AI agents over
 the **Model Context Protocol (MCP)**. Tools like Claude Code, Cursor, and
 Claude Desktop can connect to your running instance and search, retrieve
 context, and ask questions over your files — without your data leaving your
-machine.
+machine. This works with or without the AI models installed.
 
 ## Requirements
 
-- AI models require approximately 8 GB of disk space
-- GPU acceleration (NVIDIA CUDA) is recommended for faster inference
-- CPU-only inference works but is slower
+- Search models: about 2–4 GB of disk space; they run on the CPU, and faster
+  with an NVIDIA GPU
+- Chat, cited answers, summarization, and query expansion: an NVIDIA GPU with
+  CUDA and at least 7.5 GB of video memory; about 10 GB of disk space on
+  Windows, about 8 GB on Linux
+- On Linux, chat also needs a CUDA-enabled llama.cpp server that you provide
+  through the `JUSTSEARCH_SERVER_EXE` environment variable (see the README)
