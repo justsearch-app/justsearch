@@ -243,16 +243,19 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
     }
     for (const part of aggregate.parts) {
       const partJob = jobs.find((j) => j.id === part);
-      if (!partJob || partJob.if || partJob['continue-on-error']) {
-        issues.push(`${part}: required part is missing, conditional or tolerates failure`);
+      if (!partJob || partJob.if || partJob['continue-on-error']
+          || /^        continue-on-error:/m.test(partJob.text)
+          || partJob.runs.some((run) => run.step?.if && run.step.if !== 'always()')) {
+        issues.push(`${part}: required part is missing, conditional or tolerates job/step failure`);
       }
     }
   }
   for (const part of policy.windowsParts ?? []) {
     const job = jobs.find((j) => j.id === part.jobId);
     const commands = job?.runs.map((r) => r.text).join('\n') ?? '';
+    const commandLines = commands.split('\n').map((line) => line.trim());
     for (const command of part.commands) {
-      if (commands.split(command).length !== 2) issues.push(`${part.jobId}: expected command exactly once: ${command}`);
+      if (commandLines.filter((line) => line === command).length !== 1) issues.push(`${part.jobId}: expected command exactly once: ${command}`);
     }
     const actualTasks = [...commands.matchAll(/:modules:[\w-]+:test\b/g)].map((m) => m[0]);
     if (!sameList(actualTasks, part.gradleTasks)) issues.push(`${part.jobId}: Windows Gradle task ownership differs`);
