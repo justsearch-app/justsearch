@@ -269,7 +269,7 @@ async function startBackend(port) {
 function startFrontend(port) {
   // ui-web's `dev` script is `vite`: run Vite's own node entry directly, as dev-runner does.
   const viteEntry = path.join(uiWebDir, "node_modules", "vite", "bin", "vite.js");
-  frontend = startOwnedChild(process.execPath, [viteEntry, "--host", "--port", "5173", "--strictPort"], {
+  frontend = startOwnedChild(process.execPath, [viteEntry, "--host", "127.0.0.1", "--port", "5173", "--strictPort"], {
     cwd: uiWebDir,
     env: {
       ...process.env,
@@ -372,7 +372,7 @@ if (claim.action === "adopt") console.log(`[dev-all] Marked ${dataDir} as the de
 
     console.log("");
     console.log("========================================");
-    console.log(` Frontend: http://localhost:5173`);
+    console.log(` Frontend: http://127.0.0.1:5173`);
     console.log(` Backend:  http://127.0.0.1:${port}/api/status`);
     console.log(` Debug:    http://127.0.0.1:${port}/api/debug/dashboard`);
     console.log("========================================");

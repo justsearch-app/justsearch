@@ -28,7 +28,7 @@ npm --prefix .\modules\ui-web run dev:all
 
 What it does:
 - Starts the backend (`:modules:ui:runHeadless`) on a free port near `33221`.
-- Starts the frontend at `http://localhost:5173`.
+- Starts the frontend at `http://127.0.0.1:5173`.
 - Sets `VITE_JUSTSEARCH_API_PORT=<port>` (and legacy `VITE_API_PORT=<port>`) so the UI connects immediately (no `?api_port=` needed).
 - If you started the backend separately (and didn’t set the Vite env var), the UI can also auto-discover by probing `33221..33250` on loopback and validating the `/api/status` payload.
 
@@ -52,13 +52,13 @@ cd modules\ui-web
 npm run dev
 ```
 
-Open `http://localhost:5173`. The frontend resolves the backend using `resolveApiEndpoint()` and will typically
+Open `http://127.0.0.1:5173`. The frontend resolves the backend using `resolveApiEndpoint()` and will typically
 connect automatically (via `VITE_JUSTSEARCH_API_PORT` / `VITE_API_PORT`, or by probing `33221..33250` on loopback).
 
 Tip: If you started the backend on a non-default port, you can force the UI to use it via:
 
 ```text
-http://localhost:5173/?api_port=33221
+http://127.0.0.1:5173/?api_port=33221
 ```
 
 You can also set `VITE_JUSTSEARCH_API_PORT` when running `npm run dev`.
@@ -84,7 +84,7 @@ Notes:
   (no `?api_port=` required).
 - The shell starts the backend with `-Djustsearch.prod=true`, so the Local API CORS allowlist is in **desktop/prod**
   mode (only `tauri://<loopback-host>` and `http(s)://tauri.localhost` are allowed). A browser UI
-  (`http://localhost:5173`) cannot directly call that backend by design.
+  (`http://127.0.0.1:5173`) cannot directly call that backend by design.
 - The current dev supervisor is **Windows-first** (it expects `runtime/bin/java.exe` and Windows classpath separators).
 
 ### Build the desktop installer (Windows)
@@ -206,10 +206,10 @@ When using browser automation tools (Playwright, Puppeteer, or MCP browser tools
 **Solution:** Use URL query parameters instead of typing:
 
 ```text
-http://localhost:5173/?q=search_term
+http://127.0.0.1:5173/?q=search_term
 
 # Optional deterministic override (avoid discovery delays in automation):
-http://localhost:5173/?api_port=<port>&q=search_term
+http://127.0.0.1:5173/?api_port=<port>&q=search_term
 ```
 
 The app reads `?q=` from the URL and sets the query state directly, bypassing the input event chain.

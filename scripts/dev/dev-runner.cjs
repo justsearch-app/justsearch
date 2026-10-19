@@ -2907,7 +2907,7 @@ async function runAdmittedStart(opts, ctx) {
       cwd: uiWebDir,
       command: process.execPath,
       args: [path.join(uiWebDir, 'node_modules', 'vite', 'bin', 'vite.js'),
-        '--host', '--port', String(uiPort), '--strictPort'],
+        '--host', '127.0.0.1', '--port', String(uiPort), '--strictPort'],
       shell: false,
     };
   };
@@ -3311,7 +3311,7 @@ async function runAdmittedStart(opts, ctx) {
   await endIfStopRequested();
 
   const apiBaseUrl = `http://127.0.0.1:${apiPortActual}`;
-  const uiUrl = `http://localhost:${uiPort}`;
+  const uiUrl = `http://127.0.0.1:${uiPort}`;
 
   // indexBasePath capture (271 stage 4)
   const expectedIbp = resolveExpectedIndexBasePath(dataDir);
