@@ -23,9 +23,6 @@
  *   OUT : log.error("text {}", e.getMessage())         — parameterized form (recipe also skips this)
  *   OUT : log.error("text: " + e.getMessage())         — concatenated (recipe also skips this)
  *
- * Local equivalent (still valid for developers):
- *   ./gradlew rewriteDryRun --no-configuration-cache "-Drewrite.activeRecipes=org.openrewrite.java.logging.slf4j.CompleteExceptionLogging"
- *
  * Usage:
  *   node scripts/ci/check-slf4j-bare-message-logging.mjs --mode gate
  *   node scripts/ci/check-slf4j-bare-message-logging.mjs --mode warn
