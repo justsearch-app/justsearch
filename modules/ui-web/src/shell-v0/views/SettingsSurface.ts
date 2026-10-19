@@ -34,6 +34,7 @@ import { authorizedFetch } from '../api/authorizedFetch.js';
 // host_.platform.capabilities so the legacy isTauriRuntime import was
 // dropped as part of the surface migration.
 import { icon } from '../components/Icon.js';
+import type { JfButton } from '../components/Button.js';
 // §2.A: rail-customization labels resolve through the one surface-label
 // authority — never the raw `core.*-surface` id.
 import { present } from '../display/present.js';
@@ -954,13 +955,7 @@ export class SettingsSurface extends JfElement {
     // destructive flow. The surface renders the confirm state from `deleteState` and runs the
     // bespoke Tauri delete (the §7 effect body) on entering `done`; the chart's declared effect is
     // the closed `toast`, dispatched + journaled through the same gated 550 seam.
-    this.deleteMachine = createMachine(
-      activeInteractionFor(CONFIRM_CEREMONY.id) ?? CONFIRM_CEREMONY,
-    );
-    this.deleteUnsub = this.deleteMachine.subscribe((state) => {
-      this.deleteState = state;
-      if (state === 'done') void this.runDelete();
-    });
+    this.initializeDeleteCeremony();
 
     // Tempdoc 560 §28 (4d) — load the operator's durable allow-always grants for the panel.
     void this.loadDurableGrants();
@@ -1197,9 +1192,36 @@ export class SettingsSurface extends JfElement {
    * user-authored statechart that gates it. The imperative `showConfirmDialog` is replaced by the
    * declared `confirming` state the surface renders inline (the typed-confirm panel).
    */
+  private initializeDeleteCeremony(): void {
+    this.deleteUnsub?.();
+    this.deleteMachine = createMachine(
+      activeInteractionFor(CONFIRM_CEREMONY.id) ?? CONFIRM_CEREMONY,
+    );
+    this.deleteUnsub = this.deleteMachine.subscribe((state) => {
+      this.deleteState = state;
+      if (state === 'done') void this.runDelete();
+      if (state === 'confirming') {
+        void this.updateComplete.then(() => {
+          this.shadowRoot?.querySelector<HTMLInputElement>('input[aria-label="Type DELETE to confirm"]')?.focus();
+        });
+      }
+    });
+  }
+
+  private cancelDelete(): void {
+    this.confirmText = '';
+    this.deleteMachine?.send('CANCEL');
+    void this.updateComplete.then(async () => {
+      const button = this.shadowRoot?.querySelector<JfButton>('jf-button[label="Delete all local data"]');
+      await button?.updateComplete;
+      button?.focus();
+    });
+  }
+
   private async runDelete(): Promise<void> {
     if (!this.host_.platform.capabilities.has('native-notifications') || this.deleting) return;
     this.deleting = true;
+    this.error = null;
     try {
       const mod = await import('@tauri-apps/api/core');
       const token = await mod.invoke<string>('prepare_delete_data');
@@ -1207,6 +1229,8 @@ export class SettingsSurface extends JfElement {
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
       this.deleting = false;
+      this.confirmText = '';
+      this.initializeDeleteCeremony();
     }
   }
 
@@ -2456,8 +2480,8 @@ export class SettingsSurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'database', size: 12 })} Data</h3>
         <p class="help" style="margin-top: 0">
-          If you want to uninstall JustSearch or start fresh, you can delete all local data from
-          inside the app.
+          Start fresh by deleting local data. Downloaded AI models and the AI runtime are kept.
+          This does not remove JustSearch itself.
         </p>
         <div style="margin-top: 0.75rem">
           ${this.deleteState === 'confirming'
@@ -2467,14 +2491,15 @@ export class SettingsSurface extends JfElement {
                 label="Delete all local data"
                 ?disabled=${!tauri || this.deleting}
                 title=${tauri
-                  ? 'Closes the app and wipes local data on next start'
+                  ? 'Restarts automatically and deletes local data before starting again'
                   : 'Available only in the desktop app (Tauri).'}
                 .onActivate=${() => this.deleteMachine?.send('REQUEST')}
               >
                 ${icon({ name: 'trash-2', size: 14 })}
-                ${this.deleting ? 'Closing…' : 'Delete all local data'}
+                ${this.deleting ? 'Restarting…' : 'Delete all local data'}
               </jf-button>`}
         </div>
+        ${!tauri ? html`<p class="help">Available only in the desktop app. A browser cannot delete the app's local data.</p>` : nothing}
       </div>
     `;
   }
@@ -2538,52 +2563,49 @@ export class SettingsSurface extends JfElement {
   private renderDeleteConfirm(): TemplateResult {
     const typed = this.confirmText.trim().toUpperCase() === 'DELETE';
     return html`
-      <div role="group" aria-label="Confirm delete all local data">
-        <p class="help" style="margin-top: 0">
-          This closes JustSearch and deletes your local index, settings, and logs on next launch
-          (your AI models in AI Home are preserved). Type <strong>DELETE</strong> to confirm.
+      <div role="group" aria-label="Confirm delete all local data"
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.cancelDelete(); }
+        }}>
+        <p id="delete-data-description" class="help" style="margin-top: 0">
+          JustSearch will restart automatically and delete conversations, memories, agent history,
+          the index, watched folders, settings, logs, and saved window data (including recent
+          searches, composer drafts, and conversation titles) before starting again.
+          Your original files and folders are untouched. Downloaded AI models and the AI runtime are kept.
+          These deleted items <strong>cannot be recovered</strong>, whether or not encryption is enabled.
+          Type <strong>DELETE</strong> to confirm.
         </p>
-        <div
-          style="margin-top:0.5rem; padding:0.6rem; background:var(--accent-warning-16); border-radius:0.25rem"
-        >
-          <!-- Tempdoc 629 (#protect-on-delete): the AUTHORED stores, if encrypted, are NOT rebuildable,
-               so the uniform wipe is permanent. Point to the encrypted export (in Security & Privacy)
-               first so the user can restore them later. -->
-          If you've encrypted your chat history, memories, or agent history, they
-          <strong>can't be rebuilt</strong> — export an encrypted backup first so you can restore them
-          later.
-          <div style="margin-top:0.5rem">
-            <jf-button
-              variant="secondary"
-              .onActivate=${() => this.host_.navigation.navigate('core.security-surface')}
-              >Open Security &amp; Privacy to export</jf-button
-            >
-          </div>
-        </div>
+        <p class="help">
+          Copy any conversations you want to keep before resetting. There is no automatic
+          conversation backup for an unencrypted store. If encryption is enabled, you can also
+          export an encrypted backup in Security &amp; Privacy first. Earlier backups and exports
+          are not deleted.
+          <jf-button variant="secondary"
+            .onActivate=${() => this.host_.navigation.navigate('core.security-surface')}
+          >Open Security &amp; Privacy</jf-button>
+        </p>
         <input
           type="text"
           aria-label="Type DELETE to confirm"
+          aria-describedby="delete-data-description"
           placeholder="DELETE"
-          style="padding:0.4rem 0.6rem; border-radius:0.375rem; border:1px solid var(--border-subtle); background:var(--surface-1); color:var(--text-primary); font:inherit; min-inline-size:12rem"
+          style="padding:0.4rem 0.6rem; border-radius:0.375rem; border:1px solid var(--border-subtle); background:var(--surface-1); color:var(--text-primary); font:inherit; box-sizing:border-box; min-inline-size:0; inline-size:min(18rem, 100%)"
           .value=${this.confirmText}
           @input=${(e: Event) => (this.confirmText = (e.target as HTMLInputElement).value)}
         />
-        <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem">
           <jf-button
             variant="danger"
-            label="Delete & Close"
+            label="Delete & Restart"
             ?disabled=${!typed}
             .onActivate=${() => this.deleteMachine?.send('CONFIRM', { typed })}
           >
-            ${icon({ name: 'trash-2', size: 14 })} Delete &amp; Close
+            ${icon({ name: 'trash-2', size: 14 })} Delete &amp; Restart
           </jf-button>
           <jf-button
             variant="ghost"
             label="Cancel"
-            .onActivate=${() => {
-              this.confirmText = '';
-              this.deleteMachine?.send('CANCEL');
-            }}
+            .onActivate=${() => this.cancelDelete()}
           >
             Cancel
           </jf-button>

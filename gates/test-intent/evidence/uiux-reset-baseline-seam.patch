@@ -1,0 +1,76 @@
+--- a/modules/shell/src-tauri/src/lib.rs
++++ b/modules/shell/src-tauri/src/lib.rs
+@@ -1,4 +1,5 @@
+ mod binding;
++mod factory_reset;
+ // Spec F §2: one kill-on-close job per Engine incarnation; the shell itself never joins one.
+ mod containment;
+ // Reader/writer enabler; lifecycle callers land in Spec F step 6.
+--- /dev/null
++++ b/modules/shell/src-tauri/src/factory_reset.rs
+@@ -0,0 +1,65 @@
++//! Resumable Option A reset, before any Engine or WebView can open user stores.
++use std::path::Path;
++
++pub(crate) const MARKER: &str = ".justsearch-reset-requested";
++
++#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub(crate) enum Phase { Idle, Requested, Incomplete, AwaitingStorage, Complete }
++
++#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
++pub(crate) struct Failure { pub path: String, pub error: String }
++
++#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
++pub(crate) struct Status { pub phase: Phase, pub remaining: Vec<Failure> }
++
++impl Status {
++    pub(crate) fn blocks_backend(&self) -> bool { false }
++}
++
++pub(crate) fn read_status(dir: &Path) -> Status {
++    Status { phase: if dir.join(MARKER).exists() { Phase::Requested } else { Phase::Idle }, remaining: vec![] }
++}
++
++pub(crate) fn request(dir: &Path) -> Result<(), String> {
++    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
++    std::fs::write(dir.join(MARKER), b"reset\n").map_err(|e| e.to_string())
++}
++
++pub(crate) fn run_pending(dir: &Path, _cleanup: impl FnOnce() -> Result<(), String>) -> Status {
++    legacy_wipe(dir);
++    read_status(dir)
++}
++
++pub(crate) fn storage_cleared(_dir: &Path) -> Result<(), String> { Err("No reset outcome channel".into()) }
++pub(crate) fn cancel(_dir: &Path) -> Result<(), String> { Err("No cancel reset command".into()) }
++pub(crate) fn dismiss(_dir: &Path) -> Result<(), String> { Err("No reset receipt".into()) }
++
++fn legacy_wipe(app_data_dir: &Path) {
++    let marker = app_data_dir.join(MARKER);
++    if !marker.exists() { return; }
++    let models_dir = app_data_dir.join("models");
++    let native_bin_dir = app_data_dir.join("native-bin");
++    let native_llama_dir = native_bin_dir.join("llama-server");
++    let _ = std::fs::create_dir_all(&models_dir);
++    let _ = std::fs::create_dir_all(&native_llama_dir);
++    if let Ok(entries) = std::fs::read_dir(app_data_dir) {
++        for entry in entries.flatten() {
++            let p = entry.path();
++            if p == marker || p == models_dir { continue; }
++            if p == native_bin_dir {
++                if let Ok(nentries) = std::fs::read_dir(&native_bin_dir) {
++                    for nentry in nentries.flatten() {
++                        let np = nentry.path();
++                        if np == native_llama_dir { continue; }
++                        let _ = if np.is_dir() { std::fs::remove_dir_all(&np) } else { std::fs::remove_file(&np) };
++                    }
++                }
++                continue;
++            }
++            let _ = if p.is_dir() { std::fs::remove_dir_all(&p) } else { std::fs::remove_file(&p) };
++        }
++    }
++    let _ = std::fs::remove_file(&marker);
++}
++

@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ send: vi.fn(), invoke: vi.fn(), listen: vi.fn() }));
 vi.mock('../utils/tauriRuntime.js', () => ({ isTauriRuntime: () => true }));
 vi.mock('./apiBase.js', () => ({ resolveBootApiBase: async () => 'http://bound' }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: (command: string) => command === 'factory_reset_status'
+  ? Promise.resolve({ phase: 'idle', remaining: [] }) : mocks.invoke(command) }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
 vi.mock('../shell-v0/api/authorizedFetch.js', async () => {
   const { fetchWithAdmissionWait } = await import('../api/admissionFetch.js');

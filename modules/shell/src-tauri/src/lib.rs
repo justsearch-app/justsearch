@@ -1,4 +1,5 @@
 mod binding;
+mod factory_reset;
 // Spec F §2: one kill-on-close job per Engine incarnation; the shell itself never joins one.
 mod containment;
 // Reader/writer enabler; lifecycle callers land in Spec F step 6.
@@ -42,8 +43,6 @@ use tokio::sync::Notify;
 /// Windows CREATE_NO_WINDOW flag - prevents console window from appearing.
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-const RESET_MARKER_FILE: &str = ".justsearch-reset-requested";
 
 /// The webview's signal that a NEW Engine incarnation is answering: everything it cached about the
 /// old one — above all the per-boot session token — is dead (tempdoc 805 G.1).
@@ -90,6 +89,7 @@ struct BackendState {
     session_token_ready: Arc<Notify>,
     /// Single-use token for confirming destructive operations (factory reset).
     delete_token: Mutex<Option<String>>,
+    reset_status: Mutex<factory_reset::Status>,
     /// Tempdoc 501 Phase 17: the tray icon's registered id. The manifest watcher
     /// uses the AppHandle (set separately in `init_tray_context`) to look up the
     /// live `TrayIcon` via `app.tray_by_id(...)`. Direct caching of `TrayIcon` or
@@ -109,6 +109,7 @@ impl Default for BackendState {
             port_ready: Arc::default(),
             session_token_ready: Arc::default(),
             delete_token: Mutex::default(),
+            reset_status: Mutex::new(factory_reset::Status { phase: factory_reset::Phase::Idle, remaining: vec![] }),
             tray_id: Mutex::default(),
         }
     }
@@ -395,68 +396,19 @@ fn resolve_app_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<
         .map_err(|e| format!("app_data_dir() failed: {e}"))
 }
 
-fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
-    let app_data_dir = resolve_app_data_dir(app)?;
-    let marker = app_data_dir.join(RESET_MARKER_FILE);
-    if !marker.exists() {
-        return Ok(());
+fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> factory_reset::Status {
+    match resolve_app_data_dir(app) {
+        Ok(dir) => factory_reset::run_pending(&dir, || {
+            // Reset runs before backend spawn, which normally initializes this path.
+            #[cfg(target_os = "linux")]
+            linux_process::set_bundle_dir(&resolve_headless_dir(app)?);
+            reconcile_registered_children(&dir)
+        }),
+        Err(error) => factory_reset::Status {
+            phase: factory_reset::Phase::Incomplete,
+            remaining: vec![factory_reset::Failure { path: "App data directory".into(), error }],
+        },
     }
-
-    // Locked choice (Option A): preserve BYO AI assets by default.
-    // - Keep: {appDataDir}/models/**
-    // - Keep: {appDataDir}/native-bin/llama-server/**
-    // - Delete: everything else (settings, index, logs, telemetry, etc)
-    eprintln!("Factory reset marker detected at: {}", marker.display());
-
-    // Best-effort: delete everything except the AI asset folders.
-    let models_dir = app_data_dir.join("models");
-    let native_bin_dir = app_data_dir.join("native-bin");
-    let native_llama_dir = native_bin_dir.join("llama-server");
-
-    // Ensure the kept dirs exist (so path comparisons are stable).
-    let _ = std::fs::create_dir_all(&models_dir);
-    let _ = std::fs::create_dir_all(&native_llama_dir);
-
-    // Delete all top-level entries except models/ and native-bin/ (handled specially).
-    if let Ok(entries) = std::fs::read_dir(&app_data_dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p == marker {
-                continue;
-            }
-            if p == models_dir {
-                continue;
-            }
-            if p == native_bin_dir {
-                // Delete everything in native-bin except llama-server/.
-                if let Ok(nentries) = std::fs::read_dir(&native_bin_dir) {
-                    for nentry in nentries.flatten() {
-                        let np = nentry.path();
-                        if np == native_llama_dir {
-                            continue;
-                        }
-                        let _ = if np.is_dir() {
-                            std::fs::remove_dir_all(&np)
-                        } else {
-                            std::fs::remove_file(&np)
-                        };
-                    }
-                }
-                continue;
-            }
-
-            let _ = if p.is_dir() {
-                std::fs::remove_dir_all(&p)
-            } else {
-                std::fs::remove_file(&p)
-            };
-        }
-    }
-
-    // Clear the marker after attempting the reset to avoid boot loops.
-    let _ = std::fs::remove_file(&marker);
-    eprintln!("Factory reset completed (AI assets preserved).");
-    Ok(())
 }
 
 fn spawn_headless_backend<R: tauri::Runtime>(
@@ -1338,19 +1290,62 @@ async fn confirm_delete_data(
     }
 
     let app_data_dir = resolve_app_data_dir(&app)?;
-    std::fs::create_dir_all(&app_data_dir).map_err(|e| {
-        format!(
-            "Failed to create app data dir {}: {e}",
-            app_data_dir.display()
-        )
-    })?;
+    if let Err(error) = factory_reset::request(&app_data_dir) {
+        // A synced rename may have succeeded even if syncing its directory failed.
+        // Never leave an armed marker behind while allowing new work in this renderer.
+        if factory_reset::read_status(&app_data_dir).blocks_backend() {
+            app.request_restart();
+        }
+        return Err(error);
+    }
+    // request_restart delivers Exit, preserving the existing owned-process shutdown path.
+    // On the new launch the reset plugin runs before any WebView or Engine opens stores.
+    app.request_restart();
+    Ok(())
+}
 
-    let marker = app_data_dir.join(RESET_MARKER_FILE);
-    std::fs::write(&marker, b"reset\n")
-        .map_err(|e| format!("Failed to write reset marker {}: {e}", marker.display()))?;
+#[tauri::command]
+fn factory_reset_status(state: tauri::State<'_, Arc<BackendState>>) -> factory_reset::Status {
+    state.reset_status.lock().expect("reset status mutex poisoned").clone()
+}
 
-    // Close the app so the reset runs on next launch, before the backend starts.
-    app.exit(0);
+#[tauri::command]
+fn retry_factory_reset(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
+    let status = state.reset_status.lock().expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Incomplete { return Err("Reset is not incomplete".into()); }
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_factory_reset(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
+    let mut status = state.reset_status.lock().expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Incomplete { return Err("Reset is not incomplete".into()); }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::cancel(&dir)?;
+    *status = factory_reset::read_status(&dir);
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
+fn complete_factory_reset_storage(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
+    let mut status = state.reset_status.lock().expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::AwaitingStorage { return Err("Reset is not awaiting window storage cleanup".into()); }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::storage_cleared(&dir)?;
+    *status = factory_reset::read_status(&dir);
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
+fn acknowledge_factory_reset(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
+    let mut status = state.reset_status.lock().expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Complete { return Err("Reset is not complete".into()); }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::dismiss(&dir)?;
+    *status = factory_reset::read_status(&dir);
     Ok(())
 }
 
@@ -1527,6 +1522,11 @@ pub fn run() {
             reveal_in_explorer,
             prepare_delete_data,
             confirm_delete_data,
+            factory_reset_status,
+            retry_factory_reset,
+            cancel_factory_reset,
+            complete_factory_reset_storage,
+            acknowledge_factory_reset,
             justsearch_paths,
             get_plugin_dir,
             scan_plugins,
@@ -1538,51 +1538,52 @@ pub fn run() {
         .setup(move |app| {
             let session_app = app.handle().clone();
             state.quit.set_session_exit(move || session_app.exit(0));
-            update_coordinator.initialize(app.handle());
             let launch_data_dir = resolve_app_data_dir(app.handle()).ok();
-            // Best-effort: spawn the bundled headless backend.
-            // If this fails in dev, the UI can still be pointed at an external backend via ?api_port=...
-            if let Err(err) = maybe_run_factory_reset(app.handle()) {
-                eprintln!("Factory reset failed: {err}");
-            }
-            if let Err(err) = start_supervision(app.handle(), state.clone()) {
-                {
-                    state.host.record_spawn_error(err.clone());
+            // Incomplete reset is a recovery-only launch. No backend, updater, or normal
+            // data-writing work starts until reset completes or the user cancels it.
+            if !state.reset_status.lock().expect("reset status mutex poisoned").blocks_backend() {
+                update_coordinator.initialize(app.handle());
+                // Best-effort: spawn the bundled headless backend.
+                // If this fails in dev, the UI can still be pointed at an external backend via ?api_port=...
+                if let Err(err) = start_supervision(app.handle(), state.clone()) {
+                    {
+                        state.host.record_spawn_error(err.clone());
+                    }
+                    // Notify waiters so they don't block forever on spawn error
+                    state.port_ready.notify_waiters();
+                    state.session_token_ready.notify_waiters();
+                    publish_terminal_spawn_failure(
+                        &state.host,
+                        state.binding_snapshot().instance_id,
+                        launch_data_dir.as_deref(),
+                        &err,
+                        |record| {
+                            let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
+                        },
+                    );
+                    eprintln!("Failed to spawn headless backend: {err}");
                 }
-                // Notify waiters so they don't block forever on spawn error
-                state.port_ready.notify_waiters();
-                state.session_token_ready.notify_waiters();
-                publish_terminal_spawn_failure(
-                    &state.host,
-                    state.binding_snapshot().instance_id,
-                    launch_data_dir.as_deref(),
-                    &err,
-                    |record| {
-                        let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
-                    },
-                );
-                eprintln!("Failed to spawn headless backend: {err}");
-            }
-            let reconciliation_app = app.handle().clone();
-            let reconciliation_state = state.clone();
-            let reconciliation_coordinator = update_coordinator.clone();
-            tauri::async_runtime::spawn(async move {
-                reconciliation_coordinator
-                    .reconcile_after_backend_ready(
-                        reconciliation_app.clone(),
-                        reconciliation_state.clone(),
+                let reconciliation_app = app.handle().clone();
+                let reconciliation_state = state.clone();
+                let reconciliation_coordinator = update_coordinator.clone();
+                tauri::async_runtime::spawn(async move {
+                    reconciliation_coordinator
+                        .reconcile_after_backend_ready(
+                            reconciliation_app.clone(),
+                            reconciliation_state.clone(),
+                        )
+                        .await;
+                    // Sandbox qualification lane only; inert unless compiled with the test gate AND
+                    // explicitly opted in at runtime. Sequenced after reconciliation, never
+                    // concurrently: the PASS verdict IS the reconciled phase.
+                    updater::maybe_autorun_qualification(
+                        reconciliation_app,
+                        reconciliation_state,
+                        reconciliation_coordinator.clone(),
                     )
                     .await;
-                // Sandbox qualification lane only; inert unless compiled with the test gate AND
-                // explicitly opted in at runtime. Sequenced after reconciliation, never
-                // concurrently: the PASS verdict IS the reconciled phase.
-                updater::maybe_autorun_qualification(
-                    reconciliation_app,
-                    reconciliation_state,
-                    reconciliation_coordinator.clone(),
-                )
-                .await;
-            });
+                });
+            }
 
             // System tray: icon with Show/Quit menu, left-click to show window.
             let show_i = MenuItem::with_id(app, "show", "Show JustSearch", true, None::<&str>)?;
@@ -1640,11 +1641,11 @@ pub fn run() {
             }
             let _ = TRAY_CONTEXT.set(app.handle().clone());
 
-            // Show the main window unless launched with --minimized (autostart).
+            // Show reset recovery even if restart retained --minimized from autostart.
             // Window-state plugin restores position/size but not visibility (VISIBLE
             // flag is excluded), so we control show/hide here.
             let start_minimized = std::env::args().any(|a| a == "--minimized");
-            if !start_minimized {
+            if !start_minimized || state.reset_status.lock().expect("reset status mutex poisoned").phase != factory_reset::Phase::Idle {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
@@ -1692,6 +1693,16 @@ pub fn run() {
                 }
             }
         }))
+        // Plugins initialize before configured WebViews are constructed. Run after
+        // single-instance (a second launch must not wipe a live instance) and before
+        // window-state (which otherwise caches and restores pre-reset settings).
+        .plugin(tauri::plugin::Builder::<tauri::Wry>::new("factory-reset")
+            .setup(|app, _| {
+                let status = maybe_run_factory_reset(app);
+                *app.state::<Arc<BackendState>>().reset_status.lock().expect("reset status mutex poisoned") = status;
+                Ok(())
+            })
+            .build())
         // Slice 489 §15 — OS-level deep-link plugin (tauri-plugin-deep-link).
         // Pair with single-instance above so all incoming URLs land in the
         // running instance, not a fresh process. The plugin is initialized

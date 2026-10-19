@@ -59,16 +59,12 @@ void __maybeLockdown()
 
 import './styles/tokens.css'
 // Register local strategies immediately; catalog requests start after API discovery.
-import { startMessageCatalogs } from './i18n'
 // Slice 449 phase 11 — Lit chrome is the production chrome. The React `<App>`
 // + `<GlassShell>` + `<ActivityRail>` + `<Stage>` and the React rail-view
 // components were decommissioned in this slice; the shell-v0 barrel registers
 // every <jf-*> custom element + the chrome (<jf-shell> + <jf-rail> +
 // <jf-stage>) at module load.
-import './shell-v0/index.ts'
 import { appLog } from './utils/logger.ts'
-import { authorizedFetch } from './shell-v0/api/authorizedFetch.ts'
-import { stopAiStateStore } from './shell-v0/state/aiStateStore.ts'
 
 // Global unhandled error capture — log-only, no UI notification
 window.addEventListener('unhandledrejection', (event) => {
@@ -91,6 +87,18 @@ window.onerror = (message, source, lineno, colno, error) => {
 
 async function bootstrap() {
   const params = new URLSearchParams(window.location.search);
+
+  // Reset recovery precedes surface registration and every persistent state singleton.
+  // Even debug routes must not open normal stores while a desktop reset is incomplete.
+  const { isTauriRuntime } = await import('./utils/tauriRuntime.ts')
+  if (isTauriRuntime()) {
+    const { gateFactoryReset } = await import('./boot/factoryReset.ts')
+    if (!await gateFactoryReset(document.getElementById('root'))) return
+  }
+  await import('./shell-v0/index.ts')
+  const { startMessageCatalogs } = await import('./i18n')
+  const { authorizedFetch } = await import('./shell-v0/api/authorizedFetch.ts')
+  const { stopAiStateStore } = await import('./shell-v0/state/aiStateStore.ts')
 
   // Substrate-isolation debug route: standalone Lit docking shell demo.
   if (params.get('shell-demo') === '1') {
