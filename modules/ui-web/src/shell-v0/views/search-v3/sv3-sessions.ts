@@ -662,6 +662,24 @@ export const settleTurn = (
   }));
 
 /**
+ * A turn this window let go of mid-stream (it left the conversation) is taken off the transcript:
+ * the Engine goes on and saves it as it ends, so the partial copy here would be neither what the
+ * reader stopped nor what was saved. The record puts back whatever the Engine saved, the next time
+ * the conversation is read. Only a turn still streaming is dropped, so a settled one never is.
+ */
+export function dropTurn(list: Sv3SessionList, ref: Sv3TurnRef): Sv3SessionList {
+  const session = sessionById(list, ref.sessionId);
+  const turn = session?.turns.find((t) => t.id === ref.turnId);
+  if (session === null || turn === undefined || turn.status !== 'streaming') return list;
+  return {
+    ...list,
+    sessions: list.sessions.map((s) =>
+      s.id === ref.sessionId ? { ...s, turns: s.turns.filter((t) => t.id !== ref.turnId) } : s,
+    ),
+  };
+}
+
+/**
  * The agent run's terminal (tempdoc 822 Phase F2): the turn settles AND becomes its own receipt in
  * ONE write, because the count and the outcome describe the same ended run and must never be able to
  * arrive separately. `toolCalls` is the feed projection's own count — the same list the cards were

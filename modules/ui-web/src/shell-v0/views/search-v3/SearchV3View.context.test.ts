@@ -1494,6 +1494,28 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
     ).toContain('Context starts at a message not shown here');
   });
 
+  it('keeps the newer saved state when an older write’s reload lands after a newer one', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(3);
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const main = await region(el, 'jf-sv3-main');
+
+    // Restore, whose reload is held; then, before it answers, a new floor on the first turn.
+    backend.holdHistoryFor.add('uc-ctx');
+    await press(main.shadowRoot?.querySelector('[data-testid="sv3-context-floor-restore"]'));
+    await settle(el);
+    await chooseFromTurnMenu(el, 0, CONTEXT_MENU_RESET);
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(0));
+
+    // The Restore's own reload lands last: it was replaced, so it changes nothing.
+    backend.heldHistories.get('uc-ctx')?.();
+    await settle(el);
+
+    expect(backend.histories['uc-ctx']?.contextFloor).toBe(storedId(0));
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(0));
+  });
+
   it('keeps the conversation the reader moved to on ITS saved state while the undo finishes', async () => {
     twoTurnConversation('uc-ctx', 'why did the renewal fail?');
     backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0)];

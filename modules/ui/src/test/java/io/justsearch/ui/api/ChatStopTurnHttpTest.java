@@ -11,6 +11,8 @@ import io.justsearch.agent.api.conversation.ContextInjector;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.ExecutionMode;
 import io.justsearch.agent.api.conversation.InjectorResult;
+import io.justsearch.agent.api.conversation.IterationController;
+import io.justsearch.agent.api.conversation.IterationDecision;
 import io.justsearch.agent.api.conversation.IterationMode;
 import io.justsearch.agent.api.conversation.PersistenceMode;
 import io.justsearch.agent.api.conversation.SingleHopController;
@@ -125,6 +127,9 @@ final class ChatStopTurnHttpTest {
     // registered its turn.
     HttpResponse<String> stop = stop("conv-1", "t-1");
     assertEquals(200, stop.statusCode(), stop.body());
+    // Not stopped yet, but waiting for its turn: the answer says which.
+    assertFalse(MAPPER.readTree(stop.body()).path("stopped").asBoolean(true), stop.body());
+    assertTrue(MAPPER.readTree(stop.body()).path("pending").asBoolean(false), stop.body());
     try (Dispatch turn = dispatch("conv-1", "t-1", "And who owns it?")) {
       List<Map<String, Object>> history = awaitOutcome("conv-1");
       assertEquals("And who owns it?", history.get(0).get("content"));
@@ -272,6 +277,71 @@ final class ChatStopTurnHttpTest {
     assertNull(history.get(1).get("disposition"));
   }
 
+  @Test
+  void aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed() throws Exception {
+    ai.reasoning = List.of("Owners are in the register.");
+    start(List.of("Half an ans"), List.of(new SourcesInjector()), List.of());
+    try (Dispatch turn = dispatch("conv-1", "t-1", "And who owns it?")) {
+      turn.awaitEvent("chunk");
+      HttpResponse<String> stop = stop("conv-1", "t-1");
+      assertEquals(200, stop.statusCode(), stop.body());
+      turn.awaitEnd();
+
+      List<Map<String, Object>> history = awaitOutcome("conv-1");
+      Map<String, Object> outcome = history.get(1);
+      assertEquals("CANCELLED", outcome.get("disposition"), history.toString());
+      assertTrue(turn.received().contains("event: reasoning_chunk"), turn.received());
+      assertTrue(turn.received().contains("event: rag.citations"), turn.received());
+      assertEquals(List.of(Map.of("text", "Owners are in the register.")),
+          ((List<?>) outcome.getOrDefault("reasoning", List.of())).stream()
+              .map(block -> Map.of("text", ((Map<?, ?>) block).get("text")))
+              .toList(),
+          "the thinking shown live is saved: " + history);
+      assertEquals(SourcesInjector.CITATIONS, outcome.get("citations"),
+          "the sources shown live are saved: " + history);
+    }
+  }
+
+  @Test
+  void aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed() throws Exception {
+    var retrieval = heldStep();
+    start(List.of(), List.of(retrieval.injector()), List.of());
+    try (Dispatch turn = dispatch("conv-1", "t-1", "And who owns it?")) {
+      assertTrue(retrieval.reached.await(5, TimeUnit.SECONDS));
+      stop("conv-1", "t-1");
+      retrieval.step.countDown();
+      turn.awaitEnd();
+
+      // A watcher that keeps reading sees one terminal, the Stop, never a retrieval failure first.
+      assertFalse(turn.received().contains("RETRIEVAL_FAILED"), turn.received());
+      assertTrue(turn.received().contains("\"errorCode\":\"CANCELLED\""), turn.received());
+      assertEquals(1, turn.received().split("event: error\n", -1).length - 1, turn.received());
+    }
+  }
+
+  @Test
+  void aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo() throws Exception {
+    var decision = new HeldController();
+    start(List.of("Ada owns"), List.of(), List.of(), decision);
+    ai.release.countDown();
+    try (Dispatch turn = dispatch("conv-1", "t-1", "And who owns it?")) {
+      assertTrue(decision.reached.await(5, TimeUnit.SECONDS));
+      // The complete answer is already saved; the stream has not ended yet.
+      HttpResponse<String> stop = stop("conv-1", "t-1");
+      decision.step.countDown();
+      turn.awaitEnd();
+
+      assertEquals(200, stop.statusCode(), stop.body());
+      assertFalse(MAPPER.readTree(stop.body()).path("stopped").asBoolean(true), stop.body());
+      assertFalse(MAPPER.readTree(stop.body()).path("pending").asBoolean(true), stop.body());
+      assertTrue(turn.received().contains("event: done\n"), turn.received());
+      assertFalse(turn.received().contains("event: error\n"), turn.received());
+      List<Map<String, Object>> history = awaitOutcome("conv-1");
+      assertEquals("Ada owns it.", history.get(1).get("content"), history.toString());
+      assertNull(history.get(1).get("disposition"), history.toString());
+    }
+  }
+
   // ── harness ──────────────────────────────────────────────────────────────────────────────────
 
   private HeldStep heldStep() {
@@ -286,6 +356,12 @@ final class ChatStopTurnHttpTest {
 
   private void start(
       List<String> chunksBeforeHold, List<ContextInjector> retrieval, List<StreamConsumer> consumers) {
+    start(chunksBeforeHold, retrieval, consumers, null);
+  }
+
+  private void start(
+      List<String> chunksBeforeHold, List<ContextInjector> retrieval, List<StreamConsumer> consumers,
+      IterationController decision) {
     ai.chunks = chunksBeforeHold;
     var injectors = new java.util.ArrayList<ContextInjector>(List.of(new RewriteInjector()));
     injectors.addAll(retrieval);
@@ -293,12 +369,13 @@ final class ChatStopTurnHttpTest {
     var engine = new ConversationEngine(
         ConversationShapeCatalog.of("core", List.of(shape(
             injectors.stream().map(ContextInjector::id).toList(),
-            consumers.stream().map(StreamConsumer::id).toList()))),
+            consumers.stream().map(StreamConsumer::id).toList(),
+            decision == null ? SingleHopController.ID : decision.id()))),
         List.of(),
         PromptContributorRegistry.of(List.of()),
         ContextInjectorRegistry.of(injectors),
         StreamConsumerRegistry.of(consumers),
-        IterationControllerRegistry.of(List.of()),
+        IterationControllerRegistry.of(decision == null ? List.of() : List.of(decision)),
         () -> ai,
         store,
         new EngineAdmissionController(4, 8, 1));
@@ -313,7 +390,8 @@ final class ChatStopTurnHttpTest {
     app.start("127.0.0.1", 0);
   }
 
-  private static ConversationShape shape(List<String> injectorIds, List<String> consumerIds) {
+  private static ConversationShape shape(
+      List<String> injectorIds, List<String> consumerIds, String controllerId) {
     return new ConversationShape(
         SHAPE,
         new Presentation(new I18nKey("test.label"), new I18nKey("test.desc"), Optional.empty(), Optional.empty()),
@@ -325,7 +403,7 @@ final class ChatStopTurnHttpTest {
         List.of(),
         injectorIds,
         consumerIds,
-        SingleHopController.ID,
+        controllerId,
         List.of(),
         true);
   }
@@ -477,12 +555,44 @@ final class ChatStopTurnHttpTest {
     }
   }
 
+  /** Retrieval that found one source and announces it live, as {@code RAGContext} does. */
+  private static final class SourcesInjector implements ContextInjector {
+    static final List<Map<String, Object>> CITATIONS =
+        List.of(Map.of("parentDocId", "doc-1", "chunkIndex", 0, "excerpt", "Ada owns Project Cobalt."));
+
+    @Override public String id() { return "core.test-sources"; }
+
+    @Override public InjectorResult inject(ConversationContext ctx) {
+      return new InjectorResult(List.of(),
+          List.of(new SseEvent("rag.citations", Map.of("citations", CITATIONS))), Optional.empty());
+    }
+  }
+
+  /** The turn's last decision, held after its answer is saved until the test lets it go. */
+  private static final class HeldController implements IterationController {
+    final CountDownLatch reached = new CountDownLatch(1);
+    final CountDownLatch step = new CountDownLatch(1);
+
+    @Override public String id() { return "core.test-held-decision"; }
+
+    @Override public IterationDecision next(ConversationContext ctx) {
+      reached.countDown();
+      try {
+        step.await(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      return IterationDecision.STOP_SUCCESS;
+    }
+  }
+
   /**
    * A model that streams its first chunks, then holds until its work is cancelled (and ends the way
    * the inference lane does, with the cancellation) or the test releases it (and finishes).
    */
   private static final class HeldAi implements OnlineAiService {
     volatile List<String> chunks = List.of();
+    volatile List<String> reasoning = List.of();
     final CountDownLatch release = new CountDownLatch(1);
     final CountDownLatch cancelled = new CountDownLatch(1);
     final AtomicInteger streams = new AtomicInteger();
@@ -501,6 +611,7 @@ final class ChatStopTurnHttpTest {
 
     @Override public void stream(StreamRequest request, StreamSink sink) {
       streams.incrementAndGet();
+      reasoning.forEach(sink.onReasoning());
       chunks.forEach(sink.onContent());
       var ended = new AtomicBoolean();
       if (request.work() != null) {

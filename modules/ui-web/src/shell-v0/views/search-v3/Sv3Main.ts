@@ -109,6 +109,8 @@ import {
   TURN_EMPTY_ANSWER,
   TURN_FAILED,
   TURN_HALTED,
+  TURN_STOP_FAILED,
+  TURN_STOPPING,
   VERSION_AT_FIRST,
   VERSION_AT_LAST,
   VERSION_NEXT,
@@ -190,6 +192,15 @@ export interface Sv3CitationOpen {
    * is how a claim match arriving AFTER the pane opened is re-resolved onto the open pane (§4).
    */
   readonly sourceIndex: number;
+}
+
+/**
+ * The reader's Stop on a streaming answer, until the Engine ends the turn: asked (`stopping`), or
+ * refused or unanswered (`failed`), so the answer goes on and Stop can be pressed again.
+ */
+export interface Sv3StopState {
+  readonly turnId: string;
+  readonly state: 'stopping' | 'failed';
 }
 
 export type Sv3RunDecision =
@@ -1313,6 +1324,7 @@ export class Sv3Main extends JfElement {
     turnLineage: { attribute: false },
     floorSummary: { attribute: false },
     streaming: { type: Boolean },
+    stopping: { attribute: false },
     showFloorSummary: { state: true },
     editingFloorSummary: { state: true },
     floorSummaryDraft: { state: true },
@@ -1419,6 +1431,11 @@ export class Sv3Main extends JfElement {
    * flight, and a turn that is not itself streaming cannot see that.
    */
   declare streaming: boolean;
+  /**
+   * The reader's Stop on the streaming answer. Only the Engine's terminal says the turn stopped, so
+   * until then the turn says "Stopping…", or that the Stop did not reach the Engine.
+   */
+  declare stopping: Sv3StopState | null;
   /** The divider's disclosure — the summary is a paragraph of the model's words, not a label. */
   declare showFloorSummary: boolean;
   declare editingFloorSummary: boolean;
@@ -1585,6 +1602,7 @@ export class Sv3Main extends JfElement {
     this.turnLineage = [];
     this.floorSummary = null;
     this.streaming = false;
+    this.stopping = null;
     this.showFloorSummary = false;
     this.editingFloorSummary = false;
     this.floorSummaryDraft = '';
@@ -3016,10 +3034,18 @@ export class Sv3Main extends JfElement {
   /**
    * What became of the turn, in words — the tail row's facts slot when the turn has no answer frame
    * of its own. A streaming turn says nothing: the text arriving IS the state, and a "generating…"
-   * label beside moving text would be a second, redundant claim.
+   * label beside moving text would be a second, redundant claim. The one exception is the reader's
+   * Stop, which the Engine has not yet confirmed: the text may still move, and the turn is not
+   * called stopped until the Engine says it is.
    */
   private turnNote(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.status === 'streaming') return nothing;
+    if (turn.status === 'streaming') {
+      const stop = this.stopping?.turnId === turn.id ? this.stopping.state : null;
+      if (stop === null) return nothing;
+      return html`<span class="tail-note" role="status" data-testid="sv3-turn-stopping"
+        >${stop === 'stopping' ? TURN_STOPPING : TURN_STOP_FAILED}</span
+      >`;
+    }
     const broken = turn.status === 'failed' || turn.status === 'refused';
     const fallback = retrievalFallbackPhrase(
       turn.evidence?.retrievalModeReason ?? '', turn.evidence?.retrievalModeCause ?? '',

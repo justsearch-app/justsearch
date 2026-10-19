@@ -123,6 +123,13 @@ export const TURN_EMPTY_ANSWER = '(empty response)';
 
 /** The reader's Stop. Said as the reader's own act, never as a failure the window suffered. */
 export const TURN_HALTED = 'Stopped by you.';
+/**
+ * Between the reader's Stop and the Engine's answer to it. Only the Engine's own end of the turn
+ * says whether it stopped (and was saved as stopped) or had already finished.
+ */
+export const TURN_STOPPING = 'Stopping…';
+/** The Stop never reached the Engine (refused, or no answer), so the answer goes on. */
+export const TURN_STOP_FAILED = 'Could not stop this answer — it goes on. Press Stop to try again.';
 
 export const TURN_FAILED = 'The answer failed.';
 

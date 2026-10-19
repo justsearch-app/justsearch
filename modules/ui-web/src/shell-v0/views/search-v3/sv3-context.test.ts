@@ -85,6 +85,18 @@ describe('what the effective context does with each turn', () => {
     expect(contexts[0]?.outOfContext).toBe(true);
   });
 
+  it('keeps a turn saved after the last /history read in context, below a floor not shown here', () => {
+    // The floor sits on a message no turn shows, the last one the read holds; turn c was answered
+    // and saved after that read, so its ids are newer than anything the read lists.
+    const turns = [recordTurn('a', 0, 1), recordTurn('b', 3, 4), recordTurn('c', 6, 7)];
+    const history: Sv3SessionHistory = {
+      contextFloor: stored(5),
+      messageIds: [stored(0), stored(1), stored(3), stored(4), stored(5)],
+    };
+    const contexts = projectSv3TurnContexts(turns, history);
+    expect(contexts.map((c) => c.outOfContext)).toEqual([true, true, false]);
+  });
+
   it('reports NO floor and NO exclusions for a conversation whose history was never read', () => {
     const contexts = projectSv3TurnContexts([recordTurn('a', 0, 1)], null);
     expect(contexts[0]).toMatchObject({ isFloor: false, outOfContext: false, hasExcluded: false });

@@ -1,30 +1,43 @@
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
+index b6570db2c..563c03da9 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java
+@@ -96,6 +96,9 @@ public final class ConversationEngine {
+   private final io.justsearch.agent.api.conversation.ConversationStore conversationStore;
+   private final io.justsearch.app.api.EngineAdmissionService admission;
+ 
++  /** Compat scaffolding for fail-before evidence: the Stop outcome type; nothing returns it here. */
++  public enum TurnStop { STOPPED, PENDING, UNCHANGED }
++
+   /**
+    * Constructs the engine. Phase B-compatible overload (registries + LLM source default to
+    * empty / unavailable) — used by tests and pre-substrate-driven assembly.
 diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/TurnStops.java b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/TurnStops.java
 new file mode 100644
-index 000000000..3f29f652b
+index 000000000..395e7469c
 --- /dev/null
 +++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/TurnStops.java
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,23 @@
 +/* SPDX-License-Identifier: Apache-2.0 */
 +package io.justsearch.app.services.conversation;
 +
 +import io.justsearch.app.api.EngineWorkHandle;
-+import java.time.Duration;
-+import java.util.function.LongSupplier;
 +
 +/** Compat scaffolding for fail-before evidence: declarations only; no before-state code reads it. */
 +final class TurnStops {
-+  static final Duration EARLY_STOP_TTL = Duration.ofSeconds(60);
 +  static final int MAX_EARLY_STOPS = 256;
 +
 +  record Turn(String conversationId, String turnId) {}
 +
-+  TurnStops(String reason, LongSupplier nanoTime) {}
++  TurnStops(String reason) {}
 +
 +  void started(Turn turn, EngineWorkHandle work) {}
 +
++  void completing(Turn turn, EngineWorkHandle work) {}
++
 +  void finished(Turn turn, EngineWorkHandle work) {}
 +
-+  boolean stop(Turn turn) {
-+    return false;
++  ConversationEngine.TurnStop stop(Turn turn) {
++    return ConversationEngine.TurnStop.UNCHANGED;
 +  }
 +}

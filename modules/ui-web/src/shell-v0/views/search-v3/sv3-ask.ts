@@ -213,6 +213,9 @@ export interface Sv3AskRequest {
   readonly signal?: AbortSignal;
 }
 
+/** The `errorCode` the Engine ends a turn with when the reader's Stop ended it. */
+const SV3_STOPPED_CODE = 'CANCELLED';
+
 export interface Sv3AskSink {
   /** Streaming text, delta by delta. The accumulated answer lives in the caller's turn. */
   onDelta(text: string): void;
@@ -248,8 +251,17 @@ export interface Sv3AskSink {
   onDone(usage: Sv3ContextUsage | null): void;
   /** The session lock refused this send (HTTP 423) — the ONLY 423 consumer in this window. */
   onRefused(): void;
-  /** The reader pressed Stop. Whatever streamed so far is kept; the turn is halted, not failed. */
+  /**
+   * The Engine ended the turn because the reader pressed Stop, and saved it as stopped. Whatever
+   * streamed so far is kept; the turn is halted, not failed.
+   */
   onHalted(): void;
+  /**
+   * The window let the stream go (it left the conversation, or went away) and was told nothing more:
+   * the Engine goes on and saves the turn as it ends, so what this window holds of it is not what is
+   * saved.
+   */
+  onLeft(): void;
   onFailed(message: string): void;
 }
 
@@ -509,6 +521,11 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     // test environments), so keying on the error's shape would report the reader's own Stop as a
     // backend failure on some runtimes and not others.
     if (req.signal?.aborted === true) {
+      sink.onLeft();
+      return;
+    }
+    // The Engine's own end of a turn the reader stopped: it is saved as stopped (`CANCELLED`).
+    if ((err as Error & { code?: string }).code === SV3_STOPPED_CODE) {
       sink.onHalted();
       return;
     }
@@ -532,18 +549,22 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
 /**
  * The reader's Stop, told to the Engine (S2.3). Aborting the stream alone only leaves: the Engine
  * keeps answering and saves a turn the reader never saw finish. Told, it ends the turn and saves it
- * as stopped, with its question, its "Interpreted as" note and what had streamed, so a reload says
- * what the live turn says. A Stop that overtakes its dispatch stops the turn when it starts. A closed
- * tab sends nothing, and a turn that already finished is left as it is. Best-effort: the turn halts
- * on screen whatever the answer.
+ * as stopped, with its question, its "Interpreted as" note, its thinking, its sources and what had
+ * streamed. A Stop that overtakes its dispatch stops the turn when it starts. A closed tab sends
+ * nothing, and a turn whose answer is already saved is left as it is.
+ *
+ * The stream is NOT let go here: the turn's own stream says how it ended — stopped (and saved so)
+ * or finished first — and carries every word the Engine sent before the Stop landed, which is what
+ * it saves. Resolves whether the Engine took the Stop; false when it was refused or never answered,
+ * and the answer goes on.
  */
 export async function sv3StopAsk(
   apiBase: string,
   conversationId: string,
   turnId: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
-    await authorizedFetch(
+    const response = await authorizedFetch(
       `${apiBase}/api/chat/conversations/${encodeURIComponent(conversationId)}/stop`,
       {
         method: 'POST',
@@ -551,7 +572,8 @@ export async function sv3StopAsk(
         body: JSON.stringify({ turnId }),
       },
     );
+    return response.ok;
   } catch {
-    // The halt stands on screen; the saved turn is whatever the Engine finished.
+    return false;
   }
 }

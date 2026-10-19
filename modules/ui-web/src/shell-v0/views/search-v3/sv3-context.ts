@@ -180,7 +180,12 @@ function placeFloor(
   const order = history?.messageIds ?? [];
   const floorRank = order.indexOf(floor);
   if (floorRank < 0) return null;
-  const rank = (id: string): number => order.indexOf(id);
+  // A stored id the order does not list was saved after `/history` was last read, so it is newer
+  // than every id the order does list, and on the kept side of any floor in it.
+  const rank = (id: string): number => {
+    const at = order.indexOf(id);
+    return at < 0 ? Number.POSITIVE_INFINITY : at;
+  };
   for (let index = 0; index < turns.length; index++) {
     const ids = savedIdsOf(turns[index]!);
     const kept = ids.filter((id) => rank(id) >= floorRank);
@@ -300,7 +305,7 @@ export interface Sv3ContextMessage {
 }
 
 /** The summary's framing — `FileConversationStore.loadEffectiveContext`'s own, so both paths read alike. */
-export const SV3_CONTEXT_SUMMARY_PREFIX = 'Summary of earlier conversation:\n';
+const SV3_CONTEXT_SUMMARY_PREFIX = 'Summary of earlier conversation:\n';
 
 /**
  * The conversation a FOLLOW-UP ask carries (S2.0): the compaction summary first when there is one,

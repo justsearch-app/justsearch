@@ -117,6 +117,7 @@ import {
   restoreSessionTitle,
   sessionById,
   setSessionContextUsage,
+  dropTurn,
   setTurnEvidence,
   setTurnReasoning,
   setTurnRewrite,
@@ -279,7 +280,7 @@ import {
   type Sv3RunTurnState,
   type Sv3RunView,
 } from './sv3-run.js';
-import { type Sv3CitationOpen, type Sv3RunDecision } from './Sv3Main.js';
+import { type Sv3CitationOpen, type Sv3RunDecision, type Sv3StopState } from './Sv3Main.js';
 import {
   sameCitationHeader,
   type CitationHeader,
@@ -677,6 +678,7 @@ export class SearchV3View extends JfElement {
     sessions: { state: true },
     aiSnapshot: { state: true },
     streaming: { state: true },
+    askStopping: { state: true },
     sidebarWidthPx: { state: true },
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
     resizing: { type: Boolean, reflect: true },
@@ -721,6 +723,8 @@ export class SearchV3View extends JfElement {
   declare aiSnapshot: AiState | null;
   /** A response is in flight. Window-level, not session-level: the composer's slot is one slot. */
   declare streaming: boolean;
+  /** Where the reader's Stop on the streaming answer stands, until the Engine ends the turn. */
+  declare askStopping: Sv3StopState | null;
   /**
    * The sidebar's chosen width (tempdoc 822 Phase F5). Kept EXPANDED-only: collapsing renders the
    * icon rail without touching this number, which is what makes "expand restores the width I chose"
@@ -836,6 +840,17 @@ export class SearchV3View extends JfElement {
    * {@link recordAbort} discipline applied to the other half of the same open.
    */
   private historyAbort: AbortController | null = null;
+  /** Which conversation the newest `/history` load is for. */
+  private historyLoadFor: string | null = null;
+  /**
+   * What landed context writes confirmed, per conversation, until a `/history` load settles them:
+   * one that lands has them already, one that does not land applies them to the copy the window
+   * holds (S2.10). A load superseded by a newer one of the same conversation leaves them to it.
+   */
+  private contextConfirms: {
+    readonly sessionId: string;
+    readonly confirmed: (history: Sv3SessionHistory) => Sv3SessionHistory;
+  }[] = [];
   /**
    * One-shot, mirroring the shipped window's `reattachChecked` (`views/UnifiedChatView.ts:3496`): a
    * cold load asks the shared controller to reattach to a live run ONCE. Re-asking on every render
@@ -851,7 +866,7 @@ export class SearchV3View extends JfElement {
   private draftSeedPending = false;
   /** The in-flight ask's abort handle; null exactly when no response is streaming. */
   private askAbort: AbortController | null = null;
-  /** The reader's Stop for that ask: the Engine ends the turn, then the stream is let go. */
+  /** The reader's Stop for that ask: the Engine is asked to end the turn, and its stream says how. */
   private askStop: (() => void) | null = null;
   /**
    * What this window remembers about the delegated run it dispatched — including the explicit turn
@@ -917,6 +932,7 @@ export class SearchV3View extends JfElement {
     this.sessions = SV3_SESSIONS_EMPTY;
     this.aiSnapshot = null;
     this.streaming = false;
+    this.askStopping = null;
     this.sidebarWidthPx = SV3_SIDEBAR_DEFAULT_PX;
     this.sidebarCollapsed = false;
     this.resizing = false;
@@ -1441,8 +1457,9 @@ export class SearchV3View extends JfElement {
    *
    * A FAILED read (`resumeConversation`'s `failed`, a server error or no answer) changes nothing:
    * the window keeps what it last read rather than taking the empty result for "no floor, nothing
-   * hidden" (S2.10). Returns whether a fresh reading was applied, so a write's tail can fall back
-   * to what the write itself confirmed.
+   * hidden" (S2.10): what earlier writes confirmed (`contextConfirms`) is applied to the copy the
+   * window holds instead. A load superseded by a newer load of the SAME conversation applies nothing
+   * and leaves those to the newer one, so an older answer can never undo a newer saved state.
    *
    * A reload for a conversation that is NOT the active one is not run at all — it would only be
    * dropped on landing, and starting it would supersede (and so discard) the active conversation's
@@ -1452,18 +1469,38 @@ export class SearchV3View extends JfElement {
    * setting or clearing a floor, compacting, excluding a message or a source. Each must re-run this
    * load after the write lands, or the window renders a floor the backend no longer holds.
    */
-  private async refreshHistory(conversationId: string): Promise<boolean> {
-    if (this.sessions.activeId !== conversationId) return false;
+  private async refreshHistory(conversationId: string): Promise<void> {
+    if (this.sessions.activeId !== conversationId) {
+      this.settleContextConfirms(conversationId, false);
+      return;
+    }
     this.historyAbort?.abort();
     const abort = new AbortController();
     this.historyAbort = abort;
+    this.historyLoadFor = conversationId;
     const history = await resumeConversation(conversationId, SV3_ASK_SHAPE_ID, { claim: false });
-    if (abort.signal.aborted) return false;
+    if (abort.signal.aborted) {
+      if (this.historyLoadFor !== conversationId) this.settleContextConfirms(conversationId, false);
+      return;
+    }
     if (this.historyAbort === abort) this.historyAbort = null;
-    if (this.sessions.activeId !== conversationId) return false;
-    if (history.failed === true) return false;
-    this.sessions = applySv3History(this.sessions, conversationId, sv3HistoryOf(history));
-    return true;
+    const landed = this.sessions.activeId === conversationId && history.failed !== true;
+    if (landed) {
+      this.sessions = applySv3History(this.sessions, conversationId, sv3HistoryOf(history));
+    }
+    this.settleContextConfirms(conversationId, landed);
+  }
+
+  /** Settles what landed writes confirmed: a fresh reading has them, and a missing one needs them. */
+  private settleContextConfirms(conversationId: string, read: boolean): void {
+    const pending = this.contextConfirms.filter((entry) => entry.sessionId === conversationId);
+    if (pending.length === 0) return;
+    this.contextConfirms = this.contextConfirms.filter((entry) => entry.sessionId !== conversationId);
+    if (read) return;
+    const history = sessionById(this.sessions, conversationId)?.history ?? null;
+    if (history === null) return;
+    const confirmed = pending.reduce((held, entry) => entry.confirmed(held), history);
+    this.sessions = applySv3History(this.sessions, conversationId, confirmed);
   }
 
   /* ── The effective context (tempdoc 610, ported by 852 S2) ────────────────────────────────── */
@@ -1685,10 +1722,11 @@ export class SearchV3View extends JfElement {
    * own idea of the ledger is least trustworthy — and the toast names the act, because the remedies
    * differ (a refused floor is the store; a compaction that returned nothing is usually the model).
    *
-   * When the reload does not land (it failed, or the reader has moved to another conversation),
+   * When no reload lands after it (it failed, or the reader has moved to another conversation),
    * `confirmed` applies what the write ITSELF confirmed to the copy the window holds — never more:
    * a refused toggle is not in it, so the bar cannot show a state that was not saved, and a write
-   * that did land is not shown as still pending (S2.10).
+   * that did land is not shown as still pending (S2.10). A reload overtaken by a newer one of the
+   * same conversation leaves the write to it ({@link refreshHistory}).
    */
   private async settleContextWrite(
     sessionId: string,
@@ -1696,13 +1734,8 @@ export class SearchV3View extends JfElement {
     failure: string,
     confirmed?: (history: Sv3SessionHistory) => Sv3SessionHistory,
   ): Promise<void> {
-    const reloaded = await this.refreshHistory(sessionId);
-    if (!reloaded && confirmed !== undefined) {
-      const history = sessionById(this.sessions, sessionId)?.history ?? null;
-      if (history !== null) {
-        this.sessions = applySv3History(this.sessions, sessionId, confirmed(history));
-      }
-    }
+    if (confirmed !== undefined) this.contextConfirms.push({ sessionId, confirmed });
+    await this.refreshHistory(sessionId);
     if (ok) return;
     emitEphemeralToast({ message: failure, severity: 'warning' });
   }
@@ -2826,15 +2859,27 @@ export class SearchV3View extends JfElement {
     void this.setComposerState('docked');
 
     const abort = new AbortController();
-    // Stop is explicit: the Engine is told to end THIS turn, then the stream is let go. Only the
-    // reader's Stop does this; a window that unmounts or starts afresh only lets the stream go
-    // (`abortAsk`), and the Engine finishes and saves the turn, as it does for a closed tab. The id
-    // the Stop names is this dispatch's own, never the turn's place in the list, which another
+    // Stop is explicit: the Engine is told to end THIS turn, and the stream is KEPT until the Engine
+    // ends it. Only the Engine knows whether the Stop landed before the answer was saved, so only its
+    // terminal says "stopped" (an error with CANCELLED, saved as stopped) or "finished" (`done`), and
+    // every word it sent before the Stop landed, which it saves, reaches the turn. A question still
+    // waiting to be sent (for the conversation's settings, or for Engine capacity) is sent all the
+    // same, and the Engine records it as stopped. Only a window that unmounts or starts afresh lets
+    // the stream go (`abortAsk`): the Engine finishes and saves the turn, as it does for a closed tab.
+    // The id the Stop names is this dispatch's own, never the turn's place in the list, which another
     // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
     const dispatchId = crypto.randomUUID();
+    let stopAsked = false;
     const stop = (): void => {
-      void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId);
-      abort.abort();
+      if (stopAsked) return;
+      stopAsked = true;
+      this.askStopping = { turnId: ref.turnId, state: 'stopping' };
+      void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId).then((taken) => {
+        if (taken || this.askAbort !== abort) return;
+        // Refused or unanswered: the answer goes on, and Stop can be pressed again.
+        stopAsked = false;
+        this.askStopping = { turnId: ref.turnId, state: 'failed' };
+      });
     };
     this.askAbort = abort;
     this.askStop = stop;
@@ -2857,30 +2902,37 @@ export class SearchV3View extends JfElement {
     // Every terminal below settles the SAME ref the dispatch opened, so a reader who claims another
     // session mid-stream still gets the answer written where it was asked.
     const settle = (
-      status: 'complete' | 'halted' | 'refused' | 'failed',
+      status: 'complete' | 'halted' | 'refused' | 'failed' | 'left',
       detail = '',
     ): void => {
-      // The thinking is closed out and RECORDED on the turn at every terminal, including a halt: what
-      // the model thought before the reader stopped it was really produced, and dropping it would
-      // lose evidence the window actually received (inventory C9).
-      this.askReasoning.finalize();
-      this.sessions = setTurnReasoning(this.sessions, ref, [...this.askReasoning.reasoningBlocks]);
-      this.sessions = settleTurn(
-        this.sessions,
-        ref,
-        status,
-        Date.now(),
-        detail,
-        // The model AS OF THIS TERMINAL (inventory C1). Recorded rather than read at render, so a
-        // transcript re-read after a model swap still names the one that wrote each answer.
-        this.currentModelLabel,
-      );
+      if (status === 'left') {
+        // Not stopped and not finished here: the Engine goes on and saves the turn, and the record
+        // shows what it saved the next time this conversation is read.
+        this.sessions = dropTurn(this.sessions, ref);
+      } else {
+        // The thinking is closed out and RECORDED on the turn at every terminal, including a halt:
+        // what the model thought before the reader stopped it was really produced, and dropping it
+        // would lose evidence the window actually received (inventory C9).
+        this.askReasoning.finalize();
+        this.sessions = setTurnReasoning(this.sessions, ref, [...this.askReasoning.reasoningBlocks]);
+        this.sessions = settleTurn(
+          this.sessions,
+          ref,
+          status,
+          Date.now(),
+          detail,
+          // The model AS OF THIS TERMINAL (inventory C1). Recorded rather than read at render, so a
+          // transcript re-read after a model swap still names the one that wrote each answer.
+          this.currentModelLabel,
+        );
+      }
       // Only THIS dispatch's terminal may clear the window's busy state: a later ask has already
       // installed its own controller, and clearing it here would strand a live stream with a Send
       // control in the slot.
       if (this.askAbort === abort) {
         this.askAbort = null;
         this.askStop = null;
+        this.askStopping = null;
         this.streaming = false;
         this.askReasoningTurnId = null;
         this.settleAiActivity();
@@ -2940,7 +2992,14 @@ export class SearchV3View extends JfElement {
           // The SERVER just said the store is locked, which is newer than any poll (inventory E4/E5).
           this.noteRefusedWhileLocked();
         },
-        onHalted: () => settle('halted'),
+        onHalted: () => {
+          settle('halted');
+          // Saved as stopped: the record gives the turn its store ids (so it can be retried,
+          // edited or branched) and the list its conversation, as after a finished answer.
+          void loadConversations();
+          void this.refreshRecord(ref.sessionId);
+        },
+        onLeft: () => settle('left'),
         onFailed: (message) => settle('failed', message),
       },
     );
@@ -2972,7 +3031,10 @@ export class SearchV3View extends JfElement {
     if (tier === 'search' && this.search.showing) this.search.type(this.currentDraft());
   }
 
-  /** Lets the stream go; the turn settles `halted` through the sink's own terminal. */
+  /**
+   * Lets the stream go without telling the Engine (leaving is not stopping); the turn leaves the
+   * transcript through the sink's own `onLeft`, and the record later shows what the Engine saved.
+   */
   private abortAsk(): void {
     this.askAbort?.abort();
   }
@@ -3962,6 +4024,7 @@ export class SearchV3View extends JfElement {
           .turnLineage=${this.turnLineage()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
+          .stopping=${this.askStopping}
           data-testid="sv3-main"
         ></jf-sv3-main>
         <!-- 859 §B — ONE positioned wrapper for the whole dock, so its height is one observable
