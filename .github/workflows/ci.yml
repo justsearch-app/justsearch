@@ -197,6 +197,11 @@ jobs:
       - name: PMD rulesets agree with their authority
         run: node scripts/ci/check-pmd-ruleset-sync.mjs
 
+      # docs/reference/contributing/logging-conventions.md names this as the CI rule; the step was
+      # lost when the hosted CI lane was rebuilt (88d14e8ce).
+      - name: No bare e.getMessage() logging
+        run: node scripts/ci/check-slf4j-bare-message-logging.mjs --mode gate
+
       - name: Test publish preflight contract
         run: node scripts/ci/test-run-publish-preflight.mjs
 
