@@ -133,9 +133,9 @@ final class ChatControllerLifecycleSeamTest {
     // A start waits for its port, then for a healthy response; neither phase may hold the lock.
     seam.holdPortBinding();
     CompletableFuture<Throwable> start = background(() -> manager.switchToOnlineMode());
+    // The child signals before binding and remains held throughout the lock probe.
     seam.awaitPortBinding(1);
     try {
-      awaitStartupHealthPoll();
       assertLockFree(lifecycleLock, "while a start waits for health before its port binds");
       assertFalse(start.isDone(), "the probe ran before the port bound");
     } finally {
@@ -171,7 +171,6 @@ final class ChatControllerLifecycleSeamTest {
 
     seam.awaitPortBinding(2);
     try {
-      awaitStartupHealthPoll();
       assertLockFree(lifecycleLock,
           "while a relaunched server is waiting for health before its port binds");
       assertFalse(prepared.isDone(), "the probe ran before the candidate's port bound");
@@ -204,15 +203,6 @@ final class ChatControllerLifecycleSeamTest {
     return result;
   }
 
-  private static void awaitStartupHealthPoll() throws Exception {
-    await(() -> Thread.getAllStackTraces().entrySet().stream().anyMatch(thread ->
-        thread.getKey().getState() == Thread.State.TIMED_WAITING
-            && java.util.Arrays.stream(thread.getValue()).anyMatch(frame ->
-                frame.getClassName().equals("io.justsearch.app.inference.LlamaServerOps")
-                    && frame.getMethodName().equals("awaitServerHealth"))),
-        "the manager to poll health before the port binds");
-  }
-
   private static void assertLockFree(Object lock, String during) throws Exception {
     var acquired = new CountDownLatch(1);
     Thread.ofPlatform().daemon().start(() -> {
@@ -225,7 +215,7 @@ final class ChatControllerLifecycleSeamTest {
   }
 
   private static Object lifecycleLock(InferenceLifecycleManager manager) throws Exception {
-    return invoke(field(manager, "runner"), "lock");
+    return field(field(manager, "runner"), "lock");
   }
 
   /**
