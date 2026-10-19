@@ -64,7 +64,7 @@ package the desktop application for Linux, mount models, or require a GPU.
 
 **For native development** (the dev container supplies these automatically):
 
-- Windows 10/11
+- Windows 10/11, or Linux with a C compiler (`cc`) and Tesseract
 - A JVM to launch the Gradle wrapper. The checked-in Daemon JVM criteria selects and, when necessary,
   auto-provisions Temurin JDK 25 for the build, independent of the wrapper client's ambient Java. Keeping
   `JAVA_HOME` and `PATH` on JDK 25 is still recommended so direct `java`/`javac` use and non-Gradle tooling
@@ -163,9 +163,9 @@ If you contribute on behalf of an employer, see §8 of the CLA (a Corporate CLA 
 
 | Directory | Purpose |
 |-----------|---------|
-| `modules/ui` | HTTP API (Head process) |
+| `modules/ui` | HTTP + MCP API (Engine JVM, application half) |
 | `modules/ui-web` | Frontend (Lit web components, TypeScript, Vite) |
-| `modules/indexer-worker` | Lucene indexing (Body process) |
+| `modules/indexer-worker` | Lucene indexing (Engine JVM, index half) |
 | `modules/gpu-bridge` | GPU/VRAM detection, hardware capability helpers |
 | `modules/app-inference` | Local `llama-server` lifecycle (chat/RAG) |
 | `modules/shell` | Tauri desktop shell |

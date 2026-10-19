@@ -5,7 +5,7 @@
 ## Canonical vs noncanonical (critical)
 
 - **Canonical (must not drift):** `docs/explanation/`, `docs/reference/`, `docs/how-to/`, `docs/decisions/`
-- **Noncanonical (allowed to drift):** `docs/tempdocs/`, `docs/future-features/`, `docs/ui-explorations/` (and background folders like `docs/Hardware/`, `docs/Economy/`)
+- **Noncanonical (allowed to drift):** `docs/tempdocs/`, `docs/future-features/` (and background folders like `docs/Hardware/`, `docs/Economy/`)
 - **Design contracts (dated, per lane):** `docs/design/<lane>/` holds a locked design plus its verified code facts, evidence and stage checklists (for example `docs/design/lane-f-engine-jvm/`). Not a tempdoc (no size cap, no append-only convention) and not canonical (`docs-validate` does not cover it); its status line and section 0 say what is decided.
 
 If docs disagree, treat **canonical** docs as truth. If canonical docs are unclear, verify against code + contract tests.
@@ -13,11 +13,13 @@ If docs disagree, treat **canonical** docs as truth. If canonical docs are uncle
 This repo does not maintain an `llms-full.txt`. Use this file as the index and follow links into canonical docs.
 
 ## Summary
-JustSearch runs entirely on localhost. Since ADR-0049 it is **one JVM plus one native process**:
+JustSearch runs entirely on localhost. Since ADR-0049 it is **one JVM plus two process boundaries**:
 1.  **Engine:** the API gateway and the index half (Lucene, Tika extraction) in a single JVM. The
     two halves are a module boundary reached through ports, not a process boundary.
 2.  **Brain (Inference):** a separate `llama-server` process for RAG and Chat — a different runtime
     and toolchain, which is why it stays out of process.
+3.  **Extraction sandbox pool:** child JVMs that parse untrusted files (ADR-0048), so a parser
+    crash or hang cannot take the Engine down.
 
 We strictly enforce "Inversion of Control" for configuration. There is no memory-mapped IPC: the
 halves share objects.
@@ -133,6 +135,7 @@ halves share objects.
 - [ADR-0006: Two-Pronged Citation Strategy](decisions/0006-two-pronged-citation-strategy.md): LLM-generated citations backed by RAG metadata, supplemented by CPU cross-encoder post-hoc matching.
 - [ADR-0007: Entity Faceting Over Full Knowledge Graph](decisions/0007-entity-faceting-over-knowledge-graph.md): Selective adoption of NER entity extraction for Lucene keyword facets with SQLite sidecar disambiguation, deferring full knowledge graph.
 - [ADR-0008: Settings Are Ephemeral, Defaults Are Safe](decisions/0008-settings-ephemeral-defaults-safe.md): User settings (settings.json) are not migration-protected. An incompatible settings file is preserved as a timestamped .corrupt- sibling, replaced with defaults, and the reset is surfaced as a lifecycle condition.
+- [ADR-0013: Synonyms FST Placeholder](decisions/0013-synonyms-fst-placeholder.md): Use deterministic text placeholders for synonym FST artifacts until a Java Lucene FST compiler is built.
 - [ADR-0014: Pipeline Definition and Schema Removal](decisions/0014-pipeline-definition-removal.md): Remove pipeline DAG definitions, budget profiles, and pipeline-schema module.
 - [ADR-0015: MCP Tool Surface Design](decisions/0015-mcp-tool-surface-design.md): Keep a short task-oriented MCP surface; the accepted seven-tool list includes a read-only operation outcome query for recovery (amended 2026-09-13).
 - [ADR-0016: Query Understanding Soft-Boost](decisions/0016-query-understanding-soft-boost.md): Use soft boosts (SHOULD clauses) for QU-extracted signals, not hard filters.
@@ -145,7 +148,24 @@ halves share objects.
 - [ADR-0023: API Responses Declare Runtime Context](decisions/0023-api-responses-declare-runtime-context.md): Any endpoint whose behavior varies by runtime mode must surface that mode in its response to prevent silent behavioral switches.
 - [ADR-0024: App Packaging: NSIS, Per-User Install, Download-on-Demand](decisions/0024-app-packaging-nsis-per-user-download.md): Use NSIS installer with per-user install to LocalAppData and post-install model download via Install AI flow.
 - [ADR-0025: Core DTO Dual-Type Layering (in-process ports vs REST)](decisions/0025-core-dto-dual-type-layering.md): Maintain separate core DTOs for in-process ports and app-api records for REST as intentional layering, not duplication.
+- [ADR-0026: Manual-Only CI Triggering](decisions/0026-manual-ci-triggering.md): Manual-only workflow policy for the former self-hosted/local-runner model; ADR-0044 now narrows this for the public hosted CI lane.
 - [ADR-0027: MetricCatalog as the Telemetry Contract](decisions/0027-metric-catalog-as-telemetry-contract.md): Every metric the JustSearch processes emit flows through a typed `MetricCatalog`. Callsites build `MetricDefinition`s at module load, register them with `LocalTelemetry` at boot, and emit through compile-checked `Counter/Histogram/Gauge/ObservableCounter` instruments. The legacy `Telemetry.counter/timer/histogram/gauge/meter` surface is retired.
+- [ADR-0028: Scoped Reverse Path-Hash Lookup](decisions/0028-scoped-reverse-path-lookup.md): Refines the tempdoc-410 ingestion-ledger privacy contract. Raw paths still never appear in any operator-visible export, telemetry stream, or support-bundle generation. They may now be returned by a single dedicated Worker RPC reachable only from one HTTP endpoint, invoked in direct response to a user's 'show filename' click in the local UI. Backed by a new internal-only `path_resolution` table and an ArchUnit guard.
+- [ADR-0029: TelemetryEvents Bridge vs Direct-Emit Façade for MetricCatalog Adoption](decisions/0029-telemetry-events-bridge-vs-direct-emit.md): Each MetricCatalog adoption picks between two consumption idioms — a TelemetryEvents bridge interface (decouples domain code from telemetry types; required when the domain module should not depend on the catalog package) or a direct-emit façade that wraps catalog instruments (cheaper when the domain module already depends on the catalog package). The choice is module-dep-driven, not preference-driven. Five shipped instances codify the criteria.
+- [ADR-0030: Policy on Operations vs MCP-style hints — JustSearch's deliberate divergence](decisions/0030-policy-on-operations-vs-mcp-hints.md): JustSearch's Operation registry primitive carries policy fields (risk, confirm, audit, retry, rate-limit, capabilities) on the entry, while MCP keeps equivalent metadata as untrusted hints clients should not trust. The divergence is justified by JustSearch's single-trust-domain threat model and is composed with MCP discipline at the plugin-tier boundary via a trust-tier-aware executor.
+- [ADR-0031: Frontend three primitives — Operation, Resource, Prompt](decisions/0031-fe-three-primitives.md): The frontend framework is built on three registry primitives — Operation (do), Resource (observe), Prompt (ask) — mirroring the MCP split. All UI affordances project from these.
+- [ADR-0032: Frontend rendering — Lit web components](decisions/0032-fe-lit-web-components.md): The frontend is authored as Lit web components (the React stack was retired in the rewrite). Components are projected from typed catalogs.
+- [ADR-0033: Frontend as a framework, not a product](decisions/0033-fe-framework-not-product.md): The frontend is a framework whose surfaces are projected from declarations, so users/plugins can author presentation without forking the shell.
+- [ADR-0034: Backend-owned truth — the frontend renders, never owns](decisions/0034-fe-backend-owned-truth.md): Operations, Resources, and Prompts (the truth) are singular and backend-owned; the frontend is a renderer/composition layer over them.
+- [ADR-0035: Plugin boundary — truth vs presentation](decisions/0035-fe-plugin-boundary.md): Plugins author presentation (renderers, surfaces, layout, theme) but never own backend truth (Operations/Resources/Prompts). The boundary is a type, not a convention.
+- [ADR-0036: Resource Category axis](decisions/0036-fe-resource-category.md): Resource is one primitive with a typed Category axis (status, history, timeseries, …) rather than a primitive-per-kind, so new information shapes are typed values, not new primitives.
+- [ADR-0037: Universal SSE envelope](decisions/0037-universal-sse-envelope.md): Streaming Resources share one multi-frame SSE envelope (initial snapshot frame + subsequent delta frames) rather than per-endpoint ad-hoc stream shapes.
+- [ADR-0038: Wire contract as a first-class artifact](decisions/0038-wire-contract-source-of-truth.md): The FE↔backend wire contract is a first-class, versioned artifact; hand-written per-language mirrors are forbidden; every consumer-side type is mechanically generated.
+- [ADR-0039: Contract substrate — every published contract is a first-class artifact](decisions/0039-contract-substrate.md): Generalizes ADR-0038 into a contract substrate: one authority per Category, projected per-target from a single spec. Narrowed 2026-09-02 to the one Category that exists (wire); plugin-SDK, catalog and registry-serialization Categories were never registered and are not decided here.
+- [ADR-0041: Catalog Category format — protobuf enums + companion metadata](decisions/0041-catalog-category-format.md): The catalog Category of the contract substrate used protobuf enums + a companion metadata message. Superseded in part by tempdoc 564 (proto demoted to a derived view).
+- [ADR-0042: Live-registry witness — consumer-presence over the live ContributionRegistry](decisions/0042-runtime-witness-consumer-presence.md): The live-registry tier of tempdoc 560 §4b/§5: a delivered contribution must carry a consumer, checked over the LIVE ContributionRegistry (not the static snapshot) so runtime-composed contributions are covered — closing the DR-D gap the two static tiers cannot reach. Resolves the four §E.2.1 decisions that gated it with defensible defaults.
+- [ADR-0043: Multilingual by construction — no per-language levers](decisions/0043-multilingual-by-construction-no-per-language-levers.md): The search engine is multilingual by construction via one multilingual model stack; no per-language analysis artifact (stemmer/analyzer field/stopwords/spelling dict/curated synonyms) may be authored or maintained. Language may be read as a signal to a uniform policy, but never forked into per-language components.
+- [ADR-0044: Public hosted CI fact lanes](decisions/0044-public-hosted-ci-fact-lanes.md): The public repository runs standard GitHub-hosted CI on push and pull requests, split into stable fact lanes; self-hosted and specialty workflows remain manually dispatched unless separately amended.
 - [ADR-0045: Public main history publication](decisions/0045-public-main-history-publication.md): Public main receives curated squash commits from pull requests while branch commits remain workspace history.
 - [ADR-0046: Local API trust boundary](decisions/0046-local-api-trust-boundary.md): The local HTTP API's trust boundary is the same-user native process: loopback bind, Host allowlist, MCP Origin validation, CORS pinned to the shell origin, and a per-boot session token on mutating routes. Same-user native processes are inside the boundary by construction.
 - [ADR-0047: Context window is a derived resource](decisions/0047-context-window-is-a-derived-resource.md): The LLM context window is derived at activation from a ladder of explicit rungs (32k on GPU, 8k on CPU, stepped down on a launch abort) rather than configured as a user preference, and every prompt-side budget is a fraction of the live window rather than a constant.
@@ -163,4 +183,4 @@ halves share objects.
     the index half, reached through a port (hard invariant 1, ADR-0049).
 *   **No internal wire:** the internal transport is retired; there is no gRPC server and no port to discover. The index half is bound
     in-process by `EngineRoot`; only the Brain is reached over a socket.
-*   **Local-only HTTP:** The Local API binds to loopback (`127.0.0.1`). The browser UI discovers it via URL/env overrides or by probing a narrow port range and validating `/api/status`.
+*   **Local-only HTTP:** The Local API binds to loopback (`127.0.0.1`). The UI resolves its port from a URL/env override, the host (Tauri shell or bridge), or the Vite dev proxy (`resolveApiEndpoint` in `modules/ui-web/src/api/http.ts`); it does not probe ports.
