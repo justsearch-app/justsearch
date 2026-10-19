@@ -43,6 +43,7 @@ env:
 
 jobs:
   public-claims:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: Public claims
     runs-on: ubuntu-latest
     # 15 -> 20 -> 30: this required lane exhausted both former limits while building kernel
@@ -679,6 +680,7 @@ jobs:
           if-no-files-found: warn
 
   jseval-suite:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: jseval Python suite
     # tempdoc 930 §18.1 row 7. `scripts/jseval/tests/` is ~47k lines that ran in CI
     # NOWHERE — a measurement harness behind public claims whose own tests were a claim
@@ -739,6 +741,7 @@ jobs:
         run: python -m pytest scripts/jseval/tests -q -p no:cacheprovider
 
   measured-axe:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: Measured axe (advisory)
     # Tempdoc 930 §22.2 follow-up 5. Chunk H retired twelve static a11y/token oracles in
     # favour of measurement, but only half the replacement ran on PRs: the four-palette
@@ -843,6 +846,7 @@ jobs:
           if-no-files-found: warn
 
   license-and-notices:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: License and notices
     runs-on: windows-latest
     timeout-minutes: 20
@@ -896,6 +900,7 @@ jobs:
         run: node scripts/ci/regen-all.mjs --check --only notices
 
   build:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: Build (no model blobs)
     # Migrated to Linux (tempdoc 668) — assemble is compile + web-bundle, no tests,
     # so no Windows-test portability tail; protoc already fixed for Linux.
@@ -990,6 +995,7 @@ jobs:
           npm --prefix packages/runtime-client run check:pack
 
   unit-tests:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: Unit tests (${{ matrix.lane }})
     # The other unit lanes keep their existing matrix and task selection.
     runs-on: ${{ matrix.os }}
@@ -1438,6 +1444,7 @@ jobs:
   # compile. The directory is gitignored and packaging is unaffected: build-installer.yml stages
   # the real bundle before it packages anything.
   shell-rust-tests:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     # The Windows leg keeps the exact required-check name; the Linux leg runs the Linux-only cfg tests.
     name: ${{ matrix.os == 'ubuntu-latest' && 'Shell crate tests (Rust, Linux)' || 'Shell crate tests (Rust)' }}
     strategy:
@@ -1534,6 +1541,7 @@ jobs:
   # `continue-on-error` off and add "Integration tests (system-tests tier)" to
   # requiredStatusChecks once the tier is green.
   integration-tests:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: Integration tests (system-tests tier)
     runs-on: windows-latest
     # Must stay above the Gradle task timeout (modules/system-tests/build.gradle.kts, 30 min),
@@ -1596,6 +1604,7 @@ jobs:
   # acceptance selectable locally with -PincludeAiTests=true; hosted CI owns the
   # model-free cases even while the broader integration tier remains advisory.
   lifecycle-integration-tests:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: Engine lifecycle tests (model-free)
     runs-on: windows-latest
     timeout-minutes: 35
@@ -1640,6 +1649,7 @@ jobs:
   # which includes merge_group. Both would turn this REQUIRED check red the day the
   # repo moves to an org and a merge queue is enabled. The CLI has neither limit.
   secret-scan:
+    if: ${{ false }} # cp-verify: unrelated job disabled in this forced-failure probe
     name: Secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 5
