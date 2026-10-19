@@ -607,14 +607,14 @@ Activated via `?demo=true` URL parameter. Provides a fully offline experience:
 
 ### Built-in Searchable Help Content
 Five markdown help files ship in `SSOT/docs/help/` and are auto-ingested on startup with collection tag `justsearch-help`:
-- `getting-started.md` (81 lines — comprehensive first-session guide)
-- `keyboard-shortcuts.md` (full binding table including `??` Q&A prefix and autocomplete navigation)
-- `search-syntax.md` (query modes, filters, zero-results page, autocomplete)
-- `ai-features.md` (setup, Q&A via `??` and Inspector, RAG explanation)
-- `troubleshooting.md` (symptom-based guidance with cross-references)
+- `getting-started.md` (adding folders in Library, searching, installing AI from AI Brain)
+- `keyboard-shortcuts.md` (the registered bindings and search-bar keys, plus mouse selection in results)
+- `search-syntax.md` (how words match in the default simple syntax, and how ranking works)
+- `ai-features.md` (what each install profile includes, Ask/Delegate/Structured, MCP, requirements)
+- `troubleshooting.md` (symptom-based guidance, data and log folders on Windows and Linux, resetting data)
 
-**Auto-ingestion:** `KnowledgeServerBootstrap.tryIngestHelpFiles()` runs after `reindexPersistedRoots()`. Uses a version-stamped marker file (`.help-ingested-version`) in the data directory for idempotency — only re-ingests when `HELP_FILES_VERSION` changes. Current version: `v2`.
+**Auto-ingestion:** `KnowledgeServerBootstrap.tryIngestHelpFiles()` runs after `reindexPersistedRoots()`. Uses a version-stamped marker file (`.help-ingested-version`) in the data directory for idempotency — only re-ingests when `HELP_FILES_VERSION` changes. Current version: `v3`.
 
-**Collection threading:** `target_collection` field flows through: proto `BatchRequest` → `WorkerIngestService` → `SqliteJobQueue` (V4 schema migration adds `collection` column) → `IndexingLoop.buildDocument()` → `SchemaFields.COLLECTION` → Lucene field catalog (`fields.v1.json`).
+**Collection threading:** `target_collection` field flows through: proto `BatchRequest` → `WorkerIngestService` → `SqliteJobQueue` (V4 schema migration adds `collection` column) → `IndexingDocumentOps.buildDocument()` (called from the indexing loop) → `SchemaFields.COLLECTION` → Lucene field catalog (`fields.v1.json`).
 
 **Frontend badge:** Results with `collection === 'justsearch-help'` display a teal "Help" pill in the result-row renderer (`shell-v0/renderers/`).

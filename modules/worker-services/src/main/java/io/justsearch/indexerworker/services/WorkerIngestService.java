@@ -123,6 +123,9 @@ public final class WorkerIngestService {
 
   private final JobQueue jobQueue;
   private final IndexingLoop indexingLoop;
+  // Where force-reindex marks go. By default the loop's own set; a read-only (deferred) service set
+  // has no loop, so its composer points this at the set the upgraded writer's loop will consume.
+  private java.util.function.Consumer<java.util.Collection<String>> forcedPathSink;
   /** Tempdoc 885 item 3: foreground-contention duty cycle for the prune / sync walks. */
   private final IndexingPacing indexingPacing;
   private final io.justsearch.adapters.lucene.runtime.RunningRuntime ingestLifecycle;
@@ -196,6 +199,7 @@ public final class WorkerIngestService {
       long migrationSwitchingMaxDurationMs) {
     this.jobQueue = jobQueue;
     this.indexingLoop = indexingLoop;
+    this.forcedPathSink = paths -> this.indexingLoop.markForced(paths);
     this.indexingPacing =
         java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     this.ingestLifecycle = ingestLifecycle;
@@ -279,6 +283,11 @@ public final class WorkerIngestService {
     catch (IllegalStateException retired) {
       throw WorkerServiceException.unavailable("Mutation producer belongs to a retired generation");
     }
+  }
+
+  /** The composing owner routes force-reindex marks, so a service set without a loop keeps them. */
+  public void setForcedPathSink(java.util.function.Consumer<java.util.Collection<String>> sink) {
+    forcedPathSink = java.util.Objects.requireNonNull(sink, "sink");
   }
 
   /** The composing owner supplies the serving mode used by admitted no-file writes. */
@@ -1143,7 +1152,7 @@ public final class WorkerIngestService {
         if (request.getForceReindex() && accepted > 0) {
           List<String> normalizedPaths =
               validPaths.stream().map(PathNormalizer::normalizeKey).toList();
-          indexingLoop.markForced(normalizedPaths);
+          forcedPathSink.accept(normalizedPaths);
           log.info("Marked {} paths for force reindex", normalizedPaths.size());
         }
 
@@ -3012,10 +3021,9 @@ public final class WorkerIngestService {
       try {
         // Tempdoc 821 §3-C3 — a FORCE_REINDEX scan marks its admitted paths through the SAME
         // forced-path set submitBatch's force_reindex flag feeds (see #submitBatch above).
-        // A lambda, not `indexingLoop::markForced`: a method reference dereferences its receiver
-        // when the sink is CREATED, which would make every ordinary scan depend on a field only
-        // the forced branch actually uses.
-        new WorkerScanOps(jobQueue, queueDepth, isCancelled, paths -> indexingLoop.markForced(paths),
+        // The marks go through the same sink as submitBatch's, so a forced scan admitted by a
+        // read-only (deferred) service set reaches the loop its writer upgrade creates.
+        new WorkerScanOps(jobQueue, queueDepth, isCancelled, paths -> forcedPathSink.accept(paths),
             () -> validateRecordedGeneration(java.util.Objects.requireNonNull(recorded), ctx),
             switchBufferOps::buildingGenerationForFileAdmission)
             .scan(scanRequest, sink);

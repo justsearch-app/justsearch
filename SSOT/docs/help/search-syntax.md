@@ -1,32 +1,38 @@
 # Search Syntax
 
-JustSearch supports several search modes depending on how you phrase your query.
+The search bar takes plain words. You do not need any operators: type what
+you are looking for.
 
 ## Basic search
 
-Type any words to search across all indexed documents. Results are ranked
-by relevance using BM25 scoring.
+Type any words to search across all indexed documents. Each word is matched
+against the document text, title, and author:
 
-    quarterly report 2025
+```text
+quarterly report 2025
+```
 
-## Phrase search
+## Matching words
 
-Wrap terms in double quotes to require an exact phrase match:
+- **Any word can match.** Words are combined with OR, so a document does not
+  need to contain every word to appear. Documents that match more of your
+  words, and match them more strongly, rank higher.
+- **The last word can be partial.** The final word of your query also matches
+  longer words that start with it, so `justsearc` finds "justsearch".
+- **Uppercase `AND` and `NOT` are read as operators, but they are not a strict
+  filter.** `budget AND forecast` favours documents that contain both words,
+  and `NOT` before a word works against documents that contain it. Because
+  the last word also matches on its own as a partial word, `budget AND
+  forecast` can still show a document that contains only "forecast", and
+  `budget NOT forecast` can still show documents that contain "forecast".
+  `OR` is what the search bar does anyway. Typed in lowercase, these are
+  ordinary words.
+- **Other symbols are taken literally.** Quotes, wildcards, and `field:value`
+  have no special meaning in the search bar; they are searched as ordinary
+  text. Typing `"machine learning pipeline"` finds documents with those words,
+  not only the exact phrase.
 
-    "machine learning pipeline"
-
-## Field search
-
-Search within specific document fields:
-
-    title:invoice
-    path:contracts
-
-## Combining terms
-
-All terms are combined with AND by default. Documents must match all terms:
-
-    budget quarterly review
+AI tools connected over MCP can also ask for exact-phrase queries.
 
 ## How ranking works
 

@@ -153,6 +153,31 @@ describe('HelpSurface — keyboard shortcuts (tempdoc 586 P-3)', () => {
     expect(text).not.toContain('Focus search bar');
     expect(text).not.toContain('Enter command mode');
     expect(text).not.toContain('Enter AI chat mode');
+
+    // The chords handled outside the registry (Shell.ts handleGlobalKey) and the search-bar keys
+    // (Composer.ts) are listed; Esc does not clear the search bar (Composer.ts has no Escape branch).
+    expect(text).toContain('Ctrl / ⌘ + L or /');
+    expect(text).toContain('Alt + ← / →');
+    expect(text).toContain('Ctrl + D');
+    expect(text).toContain('Ctrl + Shift + A');
+    expect(text).toContain('Ctrl + Enter');
+    expect(text).not.toContain('Clear the search box');
+  });
+
+  it('troubleshooting names only operations the Library and Health views render', async () => {
+    const el = await mountHelp();
+    const text = collectShadowText(el);
+    expect(text).not.toContain('Restart worker');
+    expect(text).not.toContain('Library (Detailed)');
+    expect(text).toContain('Recover component');
+    expect(text).toContain('Force Rebuild');
+  });
+
+  it('FAQ no longer teaches the retired `??` prefix', async () => {
+    const el = await mountHelp();
+    const text = collectShadowText(el);
+    expect(text).not.toContain('How do I use the AI chat feature?');
+    expect(text).toContain('How do I ask the AI a question?');
   });
 });
 

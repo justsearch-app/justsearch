@@ -32,7 +32,7 @@ final class HelpMigrationSourceTest {
     Path file = Files.writeString(help.resolve("welcome.md"), "# Help\n");
     Files.writeString(help.resolve("ignored.txt"), "not startup help");
     Files.writeString(Files.createDirectories(help.resolve("nested")).resolve("ignored.md"), "nested");
-    Files.writeString(directory.resolve(".help-ingested-version"), "v2");
+    Files.writeString(directory.resolve(".help-ingested-version"), "v3");
     var config = resolved(ssot);
 
     var sources = KnowledgeServerMigrationOps.loadMigrationRoots(directory, config.collections(), JSON);
@@ -65,7 +65,7 @@ final class HelpMigrationSourceTest {
       assertEquals(io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file), upsert.path());
       assertEquals("justsearch-help", queue.pollPending(1).getFirst().collection());
     }
-    assertEquals("v2", Files.readString(directory.resolve(".help-ingested-version")));
+    assertEquals("v3", Files.readString(directory.resolve(".help-ingested-version")));
     assertFalse(Files.exists(directory.resolve("watched_roots.json")));
   }
 

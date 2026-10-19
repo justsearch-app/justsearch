@@ -56,6 +56,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   private static final Logger log = LoggerFactory.getLogger(DefaultWorkerAppServices.class);
 
   private final IndexingLoop indexingLoop;
+  // The force-reindex marks this service set's loop consumes. A read-only (deferred) set has no
+  // loop; its writer upgrade inherits this set, so a force admitted before the upgrade survives it.
+  private final java.util.Set<String> forcedPaths;
   /** Runtime already owned by {@link #indexingLoop}; null for a deferred/read-only bundle. */
   private final RunningRuntime producerRuntime;
   /**
@@ -571,6 +574,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         ? encoderBindings : new EncoderBindings();
     // Even a deferred bundle owns its watcher; ordinary close semantics remain unchanged.
     this.producerOwnership = new SharedProducerOwnership(true, nativeSource == null);
+    this.forcedPaths = nativeSource != null && nativeSource.indexingLoop == null
+        ? nativeSource.forcedPaths : java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     if (ingestRunning != null) {
       // Extraction owns an executor, a shutdown hook and (after first routed file) child-process
@@ -594,7 +599,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
               ctx.documentIdentityStore(),                              // documentIdentityStore
               migrationActiveSupplier,                                  // 516 P3 final — pre-wired at ctor
               ingestRunning::latestCommitUserDataBestEffort,            // commitMetadataSupplier
-              embeddingTelemetryEvents);                                // 516 P3 final — pre-wired at ctor
+              embeddingTelemetryEvents,                                 // 516 P3 final — pre-wired at ctor
+              forcedPaths);                                             // inherited across a deferred upgrade
 
       try {
         this.indexingLoop =
@@ -664,6 +670,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.ingestService.setPathResolutionStore(ctx.pathResolutionStore());
     this.ingestService.setDocumentIdentityStore(ctx.documentIdentityStore());
     this.ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
+    this.ingestService.setForcedPathSink(forcedPaths::addAll);
 
     // Tempdoc 400 §22 Issue D / LR2-e.4 (Phase 6 / 6.7): wire the
     // active-generation supplier from the ingest service's
@@ -873,6 +880,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.producerIndexBasePath = greenContext.indexBasePath();
     this.producerActiveIndexPath = greenContext.activeIndexPath();
     this.indexingLoop = incumbent.indexingLoop;
+    this.forcedPaths = incumbent.forcedPaths;
     this.producerRuntime = greenRuntime;
     this.borrowedFrom = incumbent;
     // Query-only recomposition retains the exact writer and generation. Its root walks and

@@ -91,9 +91,9 @@ All three need an app build that serves `POST /mcp`, which the v0.1.0 installer 
 client lists no tools, POST a `tools/list` JSON-RPC request at the URL above before debugging the client; a 404
 means that build has no MCP endpoint, so use a newer release or a from-source build.
 
-Six tools: `justsearch_answer` (RAG, primary), `justsearch_search`, `justsearch_browse`, `justsearch_ingest`,
-`justsearch_status`, `justsearch_runtime_manifest`. The server binds to loopback and never uploads anything
-itself, but the passages it returns go to whichever client you connected — a cloud-hosted agent will forward
+Seven tools: `justsearch_answer` (RAG, primary), `justsearch_search`, `justsearch_browse`, `justsearch_ingest`,
+`justsearch_status`, `justsearch_runtime_manifest`, `justsearch_operation_outcome`. The server binds to
+loopback and never uploads anything itself, but the passages it returns go to whichever client you connected — a cloud-hosted agent will forward
 them to its model provider like any other tool result.
 
 Does wiring an agent to these tools measurably improve its answers? We benchmark that under a fail-closed
@@ -157,7 +157,8 @@ then `python -m jseval relevance-gate --dataset beir/scifact`. Slugs: `beir/scif
 `mixed/legal-clerc-200`, `mixed/miracl-de-2k`, `mixed/miracl-fr-2k`.
 Full methodology, comparison-class caveats, and reproduction:
 [`docs/reference/benchmarks/methodology.md`](docs/reference/benchmarks/methodology.md). The table above is
-projected from `scripts/jseval/release.v1.json` (the canonical 2026-08-14 release), not hand-transcribed.
+hand-written from `scripts/jseval/release.v1.json` (the canonical 2026-08-14 release); CI checks every
+number it shows against that file (`scripts/ci/check-readme-benchmark-numbers.mjs`).
 For the broader research angle — open questions, what's deferred, and how to get involved — see
 [`RESEARCH.md`](RESEARCH.md).
 
