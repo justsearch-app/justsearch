@@ -402,3 +402,12 @@ console.log('test-report-ci-evidence-digest: PASS');
   const missing = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [rerun] }, artifactsDoc: { artifacts: [old] } });
   assert.equal(missing.unitAttribution[0].artifactPresent, false);
 }
+
+// Cancellation can leave a new aggregate with no step metadata. It still owns
+// no historical app-ui test artifact when the run contains split part jobs.
+{
+  const aggregate = job('Unit tests (app-ui)', 'cancelled', 1, 2, []);
+  const part = job('Unit tests (app-ui-ui)', 'cancelled', 1, 2, []);
+  const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [part, aggregate] } });
+  assert.equal(report.jobs.find((j) => j.name === aggregate.name).unitAttributionArtifact, null);
+}
