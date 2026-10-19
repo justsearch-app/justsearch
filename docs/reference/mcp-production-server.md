@@ -47,7 +47,13 @@ MCP server on?" is exactly "which port is the API on?":
   `netstat -ano`). A reused connection needs no new proof, since a process that binds the port
   later cannot take over an established connection; the OS is asked once per connection. When a
   proof fails, nothing is sent: the bridge re-discovers, the stdio server reports
-  `ENGINE_GONE` and must be restarted. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
+  `ENGINE_GONE` and must be restarted. A port pinned with `--port` or `JUSTSEARCH_API_PORT` that a
+  manifest names is that manifest's Engine, with the same proof; when that proof fails, the pin is
+  refused (and named in the error), never used without it. A pinned port that no runtime manifest
+  names is trusted with request content from whatever answers it, but never with a session token
+  fetched on another connection: each new connection fetches `GET /api/mcp/token` on itself
+  before anything else is written on it, and a request carries only that connection's token (so
+  after an Engine restart on the same port, the next call uses the new token). On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found).
 - **Order `scripts/prod/justsearch-mcp.mjs` tries:** `--port`, then `JUSTSEARCH_API_PORT`, then
   the manifest in the legacy `JUSTSEARCH_HOME` folder when set (it wins over

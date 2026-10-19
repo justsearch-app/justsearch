@@ -44,8 +44,11 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    nothing until the manifest still names the same Engine and the OS reports that pid as the
    owner of the server end of that very connection; a reused connection needs no new proof.
    If a proof fails, nothing is sent: the bridge drops the token and re-runs discovery, so a
-   token never reaches whatever took the port (a `JUSTSEARCH_API_PORT` pin is the operator's
-   choice and is used as given).
+   token never reaches whatever took the port. A `JUSTSEARCH_API_PORT` pin that a runtime
+   manifest names is that manifest's Engine, with the same proof (if that proof fails, the pin is
+   refused). A pin that no manifest names is trusted with request content from whatever answers
+   it, but never with a session token fetched on another connection: each new connection fetches
+   `GET /api/mcp/token` on itself first, and a request carries only that connection's token.
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a

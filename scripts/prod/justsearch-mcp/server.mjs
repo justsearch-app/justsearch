@@ -64,12 +64,15 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
 }
 
 /**
- * The Engine discovery selected: { port, engine }, engine being the manifest candidate (null for
- * --port / JUSTSEARCH_API_PORT, the operator's choice). Every request goes through
- * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS says
- * its server end belongs to the manifest pid; a refusal comes back as error.message
- * 'engine_gone', which parseJsonResponse turns into ENGINE_GONE. No handler, and no follow-up
- * request inside one tool call, can reach an endpoint that is not that Engine.
+ * The Engine discovery selected: { port, engine, token, pin }, engine being the manifest
+ * candidate (null for a pinned port no manifest names), token its session token, pin the
+ * operator's pin ('--port <n>' / 'JUSTSEARCH_API_PORT=<n>') when there is one. Every request goes
+ * through engine-discovery.cjs engineRequest(), which writes nothing on a new connection until
+ * the OS says its server end belongs to the manifest pid, or, for a pin no manifest names, until
+ * the connection has fetched its own token (the only token a credentialed request on it carries).
+ * A refusal comes back as error.message 'engine_gone', which parseJsonResponse turns into
+ * ENGINE_GONE. No handler, and no follow-up request inside one tool call, can reach an endpoint
+ * that is not that Engine with the session token.
  */
 let engineTarget = null;
 
@@ -80,9 +83,17 @@ function transportFailure(err) {
 }
 
 function engineGoneError(res) {
+  const pin = engineTarget?.pin ? `, pinned by ${engineTarget.pin}` : '';
+  if (!engineTarget?.engine) {
+    return makeError(
+      'ENGINE_GONE',
+      `No connection to port ${engineTarget?.port}${pin} could fetch its own session token (${res.error.detail}). ` +
+        'No token was sent. Check what is serving that port, or restart the MCP server.',
+    );
+  }
   return makeError(
     'ENGINE_GONE',
-    `The JustSearch Engine this server connected to (pid ${engineTarget?.engine?.pid}, port ${engineTarget?.port}) ` +
+    `The JustSearch Engine this server connected to (pid ${engineTarget.engine.pid}, port ${engineTarget.port}${pin}) ` +
       `is no longer the one serving that port (${res.error.detail}). Nothing was sent. Restart the MCP server to reconnect.`,
   );
 }
@@ -91,7 +102,7 @@ function engineGoneError(res) {
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
-function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
+function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {}, credential = false }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -113,6 +124,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
         path: u.pathname + u.search,
         timeoutMs,
         headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers },
+        credential,
       },
       (res) => {
         const statusCode = typeof res.statusCode === 'number' ? res.statusCode : null;
@@ -150,7 +162,6 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
       req.destroy(new Error('timeout'));
     });
     req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
-    req.end();
   });
 }
 
@@ -158,7 +169,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
  * HTTP POST with JSON body, size limiting, and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:164-237.
  */
-function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
+function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {}, credential = false }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -189,6 +200,8 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
           'User-Agent': 'justsearch-mcp/0.1.0',
           ...headers,
         },
+        body: bodyStr,
+        credential,
       },
       (res) => {
         const statusCode = typeof res.statusCode === 'number' ? res.statusCode : null;
@@ -226,8 +239,6 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
       req.destroy(new Error('timeout'));
     });
     req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
-    req.write(bodyStr);
-    req.end();
   });
 }
 
@@ -448,18 +459,16 @@ export async function main() {
   // Discover backend
   const backend = await discover({ port: args.port, verbose: args.verbose });
   const { baseUrl, token } = backend;
-  engineTarget = { port: backend.port, engine: backend.engine || null };
+  engineTarget = { port: backend.port, engine: backend.engine || null, token, pin: backend.pin || null };
 
   ensureLoopbackUrl(baseUrl, 'baseUrl');
   log(`Backend: ${baseUrl}`);
   // token is:
-  //   non-empty string → prod mode, include in POST headers
+  //   non-empty string → prod mode, sent on requests made with credential: true
   //   "" (empty string) → dev mode, no token enforcement (POST works without header)
   //   null              → endpoint not available (old JustSearch), POST may fail
-  log(`Token: ${token ? 'available (prod mode)' : token === '' ? 'empty (dev mode)' : 'unavailable (old version?)'}`);
-
-  // Build header helpers — include token header only when we have a real token
-  const tokenHeaders = token ? { 'X-JustSearch-Session': token } : {};
+  //   undefined         → a pin no manifest names: each connection carries the token it fetched
+  log(`Token: ${token === undefined ? 'per connection (pinned port)' : token ? 'available (prod mode)' : token === '' ? 'empty (dev mode)' : 'unavailable (old version?)'}`);
 
   function requireToken() {
     // In dev mode (token === ""), POST works without a token — don't block.
@@ -523,7 +532,7 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        headers: tokenHeaders,
+        credential: true,
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -560,7 +569,7 @@ export async function main() {
             { field: 'entity_persons_raw', size: 5 },
             { field: 'entity_organizations_raw', size: 5 },
           ]},
-        }, { timeoutMs: 5_000, maxBytes: 100_000, headers: tokenHeaders });
+        }, { timeoutMs: 5_000, maxBytes: 100_000, credential: true });
         const facetParsed = facetRes?.statusCode === 200 ? JSON.parse(facetRes.body) : null;
         if (facetParsed?.facets) {
           answerFacets = normalizeEntityFacetKeys(facetParsed.facets);
@@ -608,7 +617,7 @@ export async function main() {
           const citRes = await httpPostJsonLimited(citUrl, citBody, {
             timeoutMs: 10_000,
             maxBytes: 1_000_000,
-            headers: tokenHeaders,
+            credential: true,
           });
           const { parsed: citParsed } = parseJsonResponse(citRes);
           if (citParsed) {
@@ -701,7 +710,7 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        headers: tokenHeaders,
+        credential: true,
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -807,7 +816,8 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 30_000,
         maxBytes: 2_000_000,
-        headers: { ...tokenHeaders, 'X-JustSearch-Transport': 'MCP' },
+        headers: { 'X-JustSearch-Transport': 'MCP' },
+        credential: true,
       });
       if (res.error?.message === 'engine_gone') return engineGoneError(res);
 

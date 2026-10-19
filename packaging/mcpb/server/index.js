@@ -19,7 +19,11 @@
  * guess, so an unrelated service is never picked up. Every request to the Engine goes through
  * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS
  * says its server end is the manifest pid's; when that fails, the bridge selects again (fetching
- * that Engine's own token) and retries once.
+ * that Engine's own token) and retries once. A JUSTSEARCH_API_PORT pin that a manifest names is
+ * that manifest Engine, with the same proof (a manifest naming it that is not proven refuses the
+ * pin); a pin no manifest names answers over token-bound connections, each sending only the
+ * session token it fetched itself, so whatever takes the port never gets a token from another
+ * connection (it does get request content: that is what the pin trusts).
  *
  * Fully offline by design: zero dependencies, Node builtins only, and no
  * network access beyond 127.0.0.1 — this bridge never downloads anything.
@@ -27,7 +31,7 @@
 
 'use strict';
 
-const { describeTried, engineRequest, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
+const { describeTried, engineRequest, selectEngine, selectPinned, standardCandidates } = require('./engine-discovery.cjs');
 
 const HEALTH_TIMEOUT_MS = 2500;
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
@@ -62,9 +66,9 @@ function actionableUnreachableMessage(tried) {
   ].join('\n');
 }
 
-/** The Engine the bridge talks to (engineRequest target). */
+/** The Engine the bridge talks to (engineRequest target), replaced only as a whole. */
 function target() {
-  return { port: state.port, engine: state.engine };
+  return state.target;
 }
 
 function healthy(port) {
@@ -75,20 +79,21 @@ function healthy(port) {
     });
     req.on('timeout', () => req.destroy(new Error('timeout')));
     req.on('error', () => resolve(false));
-    req.end();
   });
 }
 
 /**
- * Fetch the desktop session token (GET /api/mcp/token). In prod mode the API
+ * Fetch the desktop session token (GET /api/mcp/token) of a manifest Engine. In prod mode the API
  * requires it on non-GET requests (X-JustSearch-Session); GETs are always
  * allowed, which is exactly what lets a local MCP client bootstrap. Returns
- * null when absent/empty (dev mode / enforcement disabled).
+ * null when absent/empty (dev mode / enforcement disabled), and for a pin no manifest names,
+ * whose connections each fetch their own.
  */
-function fetchSessionToken() {
+function fetchSessionToken(found) {
+  if (!found.engine) return Promise.resolve(null);
   return new Promise((resolve) => {
     const req = engineRequest(
-      target(),
+      found,
       { path: '/api/mcp/token', timeoutMs: HEALTH_TIMEOUT_MS },
       (res) => {
         let raw = '';
@@ -106,21 +111,32 @@ function fetchSessionToken() {
     );
     req.on('timeout', () => req.destroy(new Error('timeout')));
     req.on('error', () => resolve(null));
-    req.end();
   });
 }
 
 /**
  * Returns { port, engine } or null; appends one line per location tried to triedOut.
- * Order: JUSTSEARCH_API_PORT pin (engine null: the operator named the port), then validated
- * runtime manifests (engine-discovery.cjs; engine is the selected candidate).
+ * Order: JUSTSEARCH_API_PORT pin (the manifest Engine naming that port, or engine null when no
+ * manifest names it), then validated runtime manifests (engine-discovery.cjs; engine is the
+ * selected candidate).
  */
 async function discoverEngine(triedOut) {
   const tried = triedOut || [];
   const envPort = Number.parseInt(process.env.JUSTSEARCH_API_PORT || '', 10);
   if (Number.isInteger(envPort) && envPort > 0) {
-    if (await healthy(envPort)) return { port: envPort, engine: null };
-    tried.push(`JUSTSEARCH_API_PORT=${envPort} (not responding)`);
+    const pin = `JUSTSEARCH_API_PORT=${envPort}`;
+    const { selected, tried: named } = await selectPinned(standardCandidates(), envPort);
+    if (selected) {
+      log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${envPort}, pinned by ${pin})`);
+      return { port: envPort, engine: selected };
+    }
+    if (named.length > 0) {
+      tried.push(...describeTried(named).map((line) => `${pin}: refused, the manifest naming this port is not proven (${line})`));
+    } else if (await healthy(envPort)) {
+      return { port: envPort, engine: null };
+    } else {
+      tried.push(`${pin} (not responding)`);
+    }
   }
   const { selected, tried: folders } = await selectEngine(standardCandidates());
   tried.push(...describeTried(folders.filter((f) => !f.ok)));
@@ -136,9 +152,11 @@ async function discoverEngine(triedOut) {
 // ---------------------------------------------------------------------------
 
 const state = {
-  port: null,
-  engine: null, // the validated manifest candidate behind port (null for a JUSTSEARCH_API_PORT pin)
-  apiToken: null, // desktop session token (X-JustSearch-Session), if enforced
+  // { port, engine, token }: engine is the validated manifest candidate behind port (null for a
+  // JUSTSEARCH_API_PORT pin no manifest names), token its desktop session token
+  // (X-JustSearch-Session) if enforced. Replaced as a whole once the next one is complete, so a
+  // request never pairs one Engine's token with another target.
+  target: null,
   sessionId: null, // Mcp-Session-Id from the server, if it assigns one
   protocolVersion: null, // negotiated during initialize
   initializeParams: null, // cached client initialize params (for re-init)
@@ -195,11 +213,10 @@ function postToServer(message, intercept) {
     };
     if (state.sessionId) headers['mcp-session-id'] = state.sessionId;
     if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
-    if (state.apiToken) headers['x-justsearch-session'] = state.apiToken;
 
     const req = engineRequest(
       target(),
-      { method: 'POST', path: '/mcp', headers, timeoutMs: REQUEST_TIMEOUT_MS },
+      { method: 'POST', path: '/mcp', headers, timeoutMs: REQUEST_TIMEOUT_MS, body, credential: true },
       (res) => {
         const status = res.statusCode || 0;
         const newSession = res.headers['mcp-session-id'];
@@ -262,8 +279,6 @@ function postToServer(message, intercept) {
       err.retryable = true;
       reject(err);
     });
-    req.write(body);
-    req.end();
   });
 }
 
@@ -294,7 +309,6 @@ function openGetStream() {
     }
   );
   req.on('error', () => {}); // purely best-effort
-  req.end();
   state.getStream = req;
 }
 
@@ -305,8 +319,6 @@ function openGetStream() {
  * Throws if JustSearch is unreachable.
  */
 async function recoverConnection() {
-  state.apiToken = null; // the old token never goes to whatever is found next
-  state.engine = null;
   const tried = [];
   const found = await discoverEngine(tried);
   if (found === null) {
@@ -314,11 +326,9 @@ async function recoverConnection() {
     err.tried = tried;
     throw err;
   }
-  const { port } = found;
-  state.port = port;
-  state.engine = found.engine;
+  // The token rotates per app start; it is fetched from (and only ever sent to) the Engine found.
+  state.target = { port: found.port, engine: found.engine, token: await fetchSessionToken(found) };
   state.sessionId = null;
-  state.apiToken = await fetchSessionToken(); // token rotates per app start
   if (!state.initializeParams) return; // nothing to re-establish yet
 
   state.reinitCounter += 1;
@@ -336,7 +346,7 @@ async function recoverConnection() {
   }
   await postToServer({ jsonrpc: '2.0', method: 'notifications/initialized' });
   openGetStream();
-  log(`reconnected to http://127.0.0.1:${state.port}/mcp (new session)`);
+  log(`reconnected to http://127.0.0.1:${state.target.port}/mcp (new session)`);
 }
 
 /** Handle one client->server message, with one transparent reconnect+retry. */
@@ -393,11 +403,9 @@ async function main() {
     process.stderr.write(`${actionableUnreachableMessage(tried)}\n`);
     process.exit(1);
   }
-  const { port } = found;
-  state.port = port;
-  state.engine = found.engine;
-  state.apiToken = await fetchSessionToken();
-  log(`bridging stdio <-> http://127.0.0.1:${port}/mcp${state.apiToken ? ' (session token attached)' : ''}`);
+  state.target = { port: found.port, engine: found.engine, token: await fetchSessionToken(found) };
+  const tokenNote = state.target.token ? ' (session token attached)' : found.engine ? '' : ' (pinned port: each connection fetches its own token)';
+  log(`bridging stdio <-> http://127.0.0.1:${found.port}/mcp${tokenNote}`);
 
   let stdinBuffer = '';
   process.stdin.setEncoding('utf8');
