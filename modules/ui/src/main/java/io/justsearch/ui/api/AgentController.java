@@ -160,6 +160,7 @@ final class AgentController {
    * by {@code ToolIteratingShapeRunner.translate}.
    */
   void handleRunStream(Context ctx) {
+    if (StoreIdRequest.rejectBody(ctx, bodyOrEmpty(ctx))) return;
     if (!agentService().isAvailable()) {
       ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, "Agent capability is not available", telemetry, ApiErrorHandler.routeOf(ctx)));
       return;
@@ -330,7 +331,9 @@ final class AgentController {
           "callId is required", telemetry, ApiErrorHandler.routeOf(ctx)));
       return;
     }
-    var approval = agentService().pendingToolApproval(ctx.queryParam("sessionId"), callId);
+    String sessionId = ctx.queryParam("sessionId");
+    if (sessionId != null && StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    var approval = agentService().pendingToolApproval(sessionId, callId);
     if (approval.isEmpty() && workflowGateRegistry != null) {
       approval = workflowGateRegistry.pendingToolApproval(callId);
     }
@@ -377,6 +380,7 @@ final class AgentController {
       var body = MAPPER.readTree(ctx.body());
       String callId = body.path("callId").asText();
       String sessionId = body.path("sessionId").asText(null);
+      if (sessionId != null && StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
       String reason = body.path("reason").asText("User rejected");
       boolean handled = resolveApprovalGate(sessionId, callId, approved, reason);
       if (!handled) {
@@ -415,7 +419,9 @@ final class AgentController {
    */
   void handleAutonomy(Context ctx) {
     handleControl(ctx, "Failed to set session autonomy", body -> {
-      agentService().setSessionAutonomy(body.path("sessionId").asText(), body.path("level").asText());
+      String sessionId = body.path("sessionId").asText();
+      if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+      agentService().setSessionAutonomy(sessionId, body.path("level").asText());
       ctx.json(Map.of("status", "ok"));
     });
   }
@@ -469,6 +475,7 @@ final class AgentController {
   void handleRaiseBudget(Context ctx) {
     handleControl(ctx, "Failed to raise session budget", body -> {
       String sessionId = body.path("sessionId").asText();
+      if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
       int addTokens = body.path("addTokens").asInt(0);
       if (sessionId.isBlank() || addTokens <= 0) {
         ctx.status(400).json(Map.of("error", "sessionId and a positive addTokens are required"));
@@ -491,6 +498,7 @@ final class AgentController {
   void handleBudgetDecision(Context ctx) {
     handleControl(ctx, "Failed to resolve budget gate", body -> {
       String sessionId = body.path("sessionId").asText();
+      if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
       String decision = body.path("decision").asText();
       if (sessionId.isBlank() || decision.isBlank()) {
         ctx.status(400).json(Map.of("error", "sessionId and decision are required"));
@@ -512,6 +520,7 @@ final class AgentController {
   void handleContextDecision(Context ctx) {
     handleControl(ctx, "Failed to resolve context gate", body -> {
       String sessionId = body.path("sessionId").asText();
+      if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
       String decision = body.path("decision").asText();
       if (sessionId.isBlank() || decision.isBlank()) {
         ctx.status(400).json(Map.of("error", "sessionId and decision are required"));
@@ -536,6 +545,7 @@ final class AgentController {
    */
   void handleAttachStream(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     sseWriter.initSseHeaders(ctx, "/api/chat/agent/attach");
     try {
       // Tempdoc 834 §1.6 — the resume cursor is the CHANNEL sequence, read from ?sinceSeq=. The
@@ -579,6 +589,7 @@ final class AgentController {
    */
   void handleAgUiAttachStream(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     sseWriter.initSseHeaders(ctx, "/api/chat/agent/ag-ui");
     try {
       long sinceSeq = parseSinceSeq(ctx.queryParam(RunStreamWriter.CURSOR_PARAM));
@@ -641,6 +652,7 @@ final class AgentController {
   void handleSteeringDirective(Context ctx) {
     handleControl(ctx, "Failed to inject steering directive", body -> {
       String sessionId = body.path("sessionId").asText();
+      if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
       String text = body.path("text").asText();
       if (sessionId.isBlank() || text.isBlank()) {
         ctx.status(400).json(Map.of("error", "sessionId and text are required"));
@@ -686,6 +698,8 @@ final class AgentController {
    * addressed by id.
    */
   void handleResumeSessionStream(Context ctx) {
+    String sessionId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     if (!agentService().isAvailable()) {
       ctx.status(503)
           .json(
@@ -696,7 +710,6 @@ final class AgentController {
                   ApiErrorHandler.routeOf(ctx)));
       return;
     }
-    String sessionId = ctx.pathParam("id");
     sseWriter.initSseHeaders(ctx, "/api/chat/sessions/{id}/resume");
     try {
       withHeartbeat(
@@ -720,6 +733,8 @@ final class AgentController {
    * streaming shape but has no resume-state gate.
    */
   void handleForkSessionStream(Context ctx) {
+    String sessionId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     if (!agentService().isAvailable()) {
       ctx.status(503)
           .json(
@@ -730,7 +745,6 @@ final class AgentController {
                   ApiErrorHandler.routeOf(ctx)));
       return;
     }
-    String sessionId = ctx.pathParam("id");
     sseWriter.initSseHeaders(ctx, "/api/chat/sessions/{id}/fork");
     String editedMessage = "";
     try {
@@ -760,6 +774,7 @@ final class AgentController {
   /** DELETE /api/chat/sessions/{id} - Cancel an agent session. */
   void handleCancelSession(Context ctx) {
     String sessionId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     agentService().cancelSession(sessionId);
     ctx.json(Map.of("status", "cancelled"));
   }

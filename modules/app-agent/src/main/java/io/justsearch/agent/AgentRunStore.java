@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.configuration.persistence.StoreIds;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.agent.api.encryption.StoreCipher;
@@ -89,11 +90,12 @@ public final class AgentRunStore {
    * conversation exactly like a workflow run (§15.C — the run-event store is already multi-shape, so
    * this is a third shape sharing the same store, not a new persistence substrate). Returns the
    * persisted event's projected wire id (the same id {@link AgentInteractionMapper#fromRunEvent}
-   * derives for it), or {@code null} if the store is disabled, {@code conversationId} is blank, or the
-   * write failed.
+   * derives for it), or {@code null} if the store is disabled or the write failed.
+   * Unsafe ids are rejected before any store access.
    */
   public synchronized String appendSearchEvent(String conversationId, Map<String, Object> attributes) {
-    if (!isEnabled() || conversationId == null || conversationId.isBlank()) {
+    StoreIds.requireValid(conversationId);
+    if (!isEnabled()) {
       return null;
     }
     String sessionId = java.util.UUID.randomUUID().toString();
@@ -134,6 +136,7 @@ public final class AgentRunStore {
 
   synchronized void startRun(
       String sessionId, AgentRequest request, List<Map<String, Object>> messages, int initialBudget) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -232,6 +235,7 @@ public final class AgentRunStore {
       int toolCallsExecuted,
       int totalTokensUsed,
       String resumeNote) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -268,6 +272,7 @@ public final class AgentRunStore {
    */
   synchronized void setHandoffState(
       String sessionId, String activeAgentId, List<Map<String, Object>> handoffHistory) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -298,6 +303,7 @@ public final class AgentRunStore {
    * {@code cancelTrigger} (nullable) fields.
    */
   synchronized void setTerminationReason(String sessionId, TerminationReason terminationReason) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -333,6 +339,7 @@ public final class AgentRunStore {
   }
 
   void appendEvent(String sessionId, AgentEvent event) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 565 §15.C — map the AgentEvent to the generic (eventType, payload) and persist through the
     // shape-agnostic event log (which writes the record on disk before firing listeners, so the ledger
     // projection can never get ahead of the durable record). The agent vocabulary mapping stays here.
@@ -362,9 +369,7 @@ public final class AgentRunStore {
    * id). Tempdoc 415 follow-up (C20).
    */
   public synchronized Map<String, Object> readSnapshot(String sessionId) {
-    if (sessionId == null || sessionId.isBlank()) {
-      return null;
-    }
+    StoreIds.requireValid(sessionId);
     return readMeta(sessionId);
   }
 
@@ -542,7 +547,8 @@ public final class AgentRunStore {
    * everything. Irreversible: the run's meta AND its event log go with the directory.
    */
   public synchronized int deleteConversationRuns(String conversationId) {
-    if (!isEnabled() || conversationId == null || conversationId.isBlank()) {
+    StoreIds.requireValid(conversationId);
+    if (!isEnabled()) {
       return 0;
     }
     int deleted = 0;
@@ -564,7 +570,8 @@ public final class AgentRunStore {
    * completed run is no longer checkpointed, so marking after completion is stable.
    */
   public synchronized void markBackground(String sessionId) {
-    if (!isEnabled() || sessionId == null || sessionId.isBlank()) {
+    StoreIds.requireValid(sessionId);
+    if (!isEnabled()) {
       return;
     }
     try {
@@ -594,7 +601,8 @@ public final class AgentRunStore {
    * re-unlock can all run the pass safely. Returns whether this call stamped the run.
    */
   public synchronized boolean markInterrupted(String sessionId, Instant at) {
-    if (!isEnabled() || sessionId == null || sessionId.isBlank()) {
+    StoreIds.requireValid(sessionId);
+    if (!isEnabled()) {
       return false;
     }
     try {
@@ -668,7 +676,8 @@ public final class AgentRunStore {
    * sorts all events by their own timestamps.
    */
   public synchronized List<String> listRunIdsByConversation(String conversationId) {
-    if (!isEnabled() || conversationId == null || conversationId.isBlank()) {
+    StoreIds.requireValid(conversationId);
+    if (!isEnabled()) {
       return List.of();
     }
     try (var stream = Files.list(rootDir)) {
@@ -743,6 +752,7 @@ public final class AgentRunStore {
 
   /** Tempdoc 565 §15.C — delegate to the shape-agnostic event log (incl. the legacy-payload upcast). */
   synchronized List<Map<String, Object>> readEvents(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return events.readEvents(sessionId);
   }
 
@@ -909,7 +919,7 @@ public final class AgentRunStore {
   }
 
   private Path runDir(String sessionId) {
-    return rootDir.resolve(sessionId);
+    return StoreIds.resolve(rootDir, sessionId);
   }
 
   private Path metaPath(String sessionId) {

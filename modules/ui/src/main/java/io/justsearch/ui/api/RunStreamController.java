@@ -116,6 +116,7 @@ public final class RunStreamController {
           .json(ApiErrorHandler.toResponse(ApiErrorCode.BAD_REQUEST, message(malformed)));
       return;
     }
+    if (StoreIdRequest.rejectBody(ctx, body)) return;
     Optional<ConversationShapeRef> shapeId = shapeIdOf(body);
     if (shapeId.isEmpty()) {
       ctx.status(400)

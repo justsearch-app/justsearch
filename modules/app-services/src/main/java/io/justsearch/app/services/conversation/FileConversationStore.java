@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.configuration.persistence.StoreIds;
 import io.justsearch.agent.api.conversation.BranchesPreventDeletionException;
 import io.justsearch.agent.api.conversation.ConversationStore;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
@@ -68,6 +69,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<Map<String, Object>> loadHistory(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return loadHistory(sessionId, new java.util.HashSet<>());
   }
 
@@ -190,6 +192,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void appendMessage(String sessionId, String shapeId, Map<String, Object> message) {
+    StoreIds.requireValid(sessionId);
     Path sessionDir = resolveSessionDir(sessionId);
     try {
       Files.createDirectories(sessionDir);
@@ -317,6 +320,8 @@ public final class FileConversationStore implements ConversationStore {
   @Override
   public void branchFrom(
       String parentSessionId, String branchPointMessageId, String newSessionId) {
+    StoreIds.requireValid(parentSessionId);
+    StoreIds.requireValid(newSessionId);
     Objects.requireNonNull(parentSessionId, "parentSessionId");
     Objects.requireNonNull(branchPointMessageId, "branchPointMessageId");
     Objects.requireNonNull(newSessionId, "newSessionId");
@@ -362,6 +367,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public Optional<SessionSummary> getSessionMeta(String sessionId) {
+    StoreIds.requireValid(sessionId);
     Map<String, Object> meta = readMeta(sessionId);
     if (meta == null) return Optional.empty();
     String metaShape = (String) meta.getOrDefault("shapeId", "");
@@ -391,6 +397,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void setContextFloor(String sessionId, String floorMessageId) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 Phase C — persist (or clear) the effective-context floor in
     // meta.json, atomically, mirroring the branchFrom meta-write pattern.
     Path sessionDir = resolveSessionDir(sessionId);
@@ -420,6 +427,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void setTitle(String sessionId, String title, String titleSource) {
+    StoreIds.requireValid(sessionId);
     synchronized (titleWrites) {
       writeTitle(sessionId, readMeta(sessionId), title, titleSource);
     }
@@ -427,6 +435,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public boolean setTitleIfUntitled(String sessionId, String title, String titleSource) {
+    StoreIds.requireValid(sessionId);
     if (title == null || title.isBlank()) return false;
     synchronized (titleWrites) {
       Map<String, Object> existing = readMeta(sessionId);
@@ -462,6 +471,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void compactContext(String sessionId, String floorMessageId, String summaryText) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 Phase D — like setContextFloor, but attach the summary of the
     // messages above the floor. loadEffectiveContext prepends it.
     if (floorMessageId == null || floorMessageId.isBlank()) {
@@ -485,6 +495,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void excludeMessage(String sessionId, String messageId, boolean excluded) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 §E.3 — toggle a message id in the meta.json excludedMessageIds list. Excluded
     // messages stay in the transcript (loadHistory) but are dropped from loadEffectiveContext.
     toggleStringInMeta(sessionId, "excludedMessageIds", messageId, excluded);
@@ -492,11 +503,13 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<String> excludedMessageIds(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return readStringList(sessionId, "excludedMessageIds");
   }
 
   @Override
   public void excludeSource(String sessionId, String sourceId, boolean excluded) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 §J.3 — toggle a retrieved-source id in the meta.json excludedSourceIds list. The
     // engine seeds these onto each turn's context; the Worker drops the matching chunks pre-search.
     toggleStringInMeta(sessionId, "excludedSourceIds", sourceId, excluded);
@@ -504,17 +517,16 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<String> excludedSourceIds(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return readStringList(sessionId, "excludedSourceIds");
   }
 
   @Override
   public void setTurnOpen(String sessionId, boolean open) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 834 §4.3 — one boolean on meta.json, written through the same atomic path the floor
     // and exclusion toggles use. Written only for sessions that already exist (a turn cannot be
     // open on a conversation with no record); clearing an unknown session is a no-op.
-    if (sessionId == null || sessionId.isBlank()) {
-      return;
-    }
     Map<String, Object> existing = readMeta(sessionId);
     if (existing == null && !open) {
       return;
@@ -532,6 +544,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public boolean isTurnOpen(String sessionId) {
+    StoreIds.requireValid(sessionId);
     Map<String, Object> meta = readMeta(sessionId);
     return meta != null && Boolean.TRUE.equals(meta.get("turnOpen"));
   }
@@ -588,6 +601,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<Map<String, Object>> loadEffectiveContext(String sessionId) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 Phase C/D — the prompt history: the full resolved history
     // trimmed to start at the context floor (floor message inclusive), with the
     // compaction summary (if any) prepended as a synthetic system message. No
@@ -735,6 +749,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void deleteSession(String sessionId) {
+    StoreIds.requireValid(sessionId);
     Path sessionDir = resolveSessionDir(sessionId);
     if (!Files.isDirectory(sessionDir)) return;
     // Slice 515 FIX-3 — block deletion when child branches exist. The
@@ -765,10 +780,7 @@ public final class FileConversationStore implements ConversationStore {
   }
 
   private Path resolveSessionDir(String sessionId) {
-    // Session dirs are stored flat under rootDir; shapeId is in meta.json.
-    // But for listSessions we need shapeId-based directories. Let the meta
-    // carry it and use shapeId subdirs.
-    return rootDir.resolve(sessionId);
+    return StoreIds.resolve(rootDir, sessionId);
   }
 
   private Path resolveMessagesFile(String sessionId) {

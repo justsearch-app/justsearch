@@ -85,6 +85,7 @@ final class AgentSessionController {
   /** GET /api/chat/sessions/{id}/events - Replay persisted session events for debug. */
   void handleSessionEvents(Context ctx) {
     String sessionId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     List<Map<String, Object>> events = queries().sessionEvents(sessionId);
     if (events == null || events.isEmpty()) {
       ctx.status(404).json(ApiErrorHandler.toResponse(ApiErrorCode.NOT_FOUND, "No events found for session " + sessionId, telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -217,6 +218,7 @@ final class AgentSessionController {
    */
   void handleSessionDetail(Context ctx) {
     String sessionId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     var snapshot = queries().sessionSnapshot(sessionId);
     if (snapshot == null || snapshot.isEmpty()) {
       ctx.status(404)
@@ -238,6 +240,7 @@ final class AgentSessionController {
    */
   void handleSessionTranscript(Context ctx) {
     String sessionId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     var meta = queries().sessionSnapshot(sessionId);
     if (meta == null || meta.isEmpty()) {
       ctx.status(404)
