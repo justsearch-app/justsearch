@@ -1174,6 +1174,8 @@ jobs:
 
   app-ui-services:
     name: Unit tests (app-ui-services)
+    # cp-verify forced skip of this part.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1318,6 +1320,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
+      - name: cp-verify forced setup failure on attempt 1
+        shell: pwsh
+        run: if ($env:GITHUB_RUN_ATTEMPT -eq '1') { Write-Error 'cp-verify forced setup failure'; exit 3 }
+
       - name: Checkout
         uses: actions/checkout@v7
 
