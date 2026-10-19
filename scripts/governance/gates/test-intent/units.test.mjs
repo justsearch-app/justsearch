@@ -100,6 +100,31 @@ test('rust: cfg(test) items are extracted; production is not', () => {
   assert.ok(!out.text.includes('fn b'));
 });
 
+test('rust: function-local cfg(test) stays inside its enclosing function', () => {
+  const nested = '#[cfg(test)] mod nested_tests { #[test] fn nested() {} }';
+  const top = '#[cfg(test)] mod tests { #[test] fn top() {} }';
+  const src = `
+struct Callback { call: fn() }
+pub(crate) fn bound_exec() {
+    #[cfg(test)]
+    set_bundle_dir();
+}
+mod production {
+    fn helper() { #[cfg(test)] let value = 1; }
+    ${nested}
+}
+${top}
+`;
+  const out = extractTestItems(src);
+  assert.deepEqual(out.items.map(item => item.text), [nested, top]);
+  let retained = src;
+  for (const item of [...out.items].reverse()) {
+    retained = retained.slice(0, item.start) + retained.slice(item.end);
+  }
+  assert.ok(retained.includes('#[cfg(test)]\n    set_bundle_dir();'));
+  assert.ok(retained.includes('fn helper() { #[cfg(test)] let value = 1; }'));
+});
+
 test('rust: free #[test] fns, #[tokio::test] and #![cfg(test)] files', () => {
   const free = extractTestItems('fn p() {}\n#[test]\nfn one() {}\n#[tokio::test]\nasync fn two() {}\n');
   assert.equal(free.items.length, 2);
