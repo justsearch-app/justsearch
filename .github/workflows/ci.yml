@@ -61,7 +61,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -713,7 +713,7 @@ jobs:
 
       - name: Setup Node
         # Only for the lock-drift guard below; no npm install happens in this job.
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -779,7 +779,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -857,7 +857,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -875,7 +875,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -912,7 +912,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -923,7 +923,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -986,7 +986,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Setup runtime client minimum Node version
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
@@ -1097,7 +1097,7 @@ jobs:
           fetch-depth: ${{ matrix.fetch_depth }}
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -1111,7 +1111,7 @@ jobs:
       # resolve UI imports such as zod. skipWebBuild skips the web build, not these dependencies.
       - name: Setup Node for frontend HTTP probes
         if: matrix.lane == 'app-ui'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -1189,7 +1189,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1213,7 +1213,7 @@ jobs:
       # do not mean the same thing on Linux. The trigger coverage B9 asked for is unchanged: this
       # job runs on the same `pull_request` and `push` as that one. Recorded in B.md §0.1.
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -1313,7 +1313,7 @@ jobs:
           workspaces: modules/shell/src-tauri
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1396,7 +1396,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -1407,7 +1407,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node (for the real Engine supervisor regression)
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1454,7 +1454,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -1465,7 +1465,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1515,7 +1515,7 @@ jobs:
           "${RUNNER_TEMP}/gitleaks" version
 
       - name: Set up Node for privacy guards
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1587,7 +1587,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1603,7 +1603,7 @@ jobs:
       # into test CPU vs framework overhead. continue-on-error so a cancelled lane
       # (no artifact) degrades to "no breakdown" instead of failing this advisory job.
       - name: Download unit-test attributions (for the test-vs-overhead split)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           pattern: unit-test-attribution-*
