@@ -124,3 +124,14 @@ test execution. No acceptance record is written by this builder.
   "note": "Independently verified: vite.config.js change is incidental to tests (529 files/6884 tests pass on base and candidate); live LAN refusal and non-local Host 403 confirmed, base fails both."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "acceptor-vite-ci-codex",
+  "verdict": "accept",
+  "digest": "sha256:a0ed2ee3bf8bc192b8410771f202e43677e1b8f995aad4b8724a1f1a97df8622",
+  "note": "Independently checked ci.yml adds only the Windows ui-web install; hosted 39194249581 fails on missing vite.js and 39196753913 passes identical 54-file selection including both unchanged Vite tests; hosted inputs match c09f856cf and whole changeset remains accurate."
+}
+```
