@@ -1569,7 +1569,7 @@ jobs:
     # budget: `report-ci-walltime-attribution.mjs` drops any job with no end time, so an
     # attribution taken while the ~6.5-minute suite still runs would omit it entirely and
     # `report-ci-walltime-budget.mjs` would warn `missing-required-lane` on every run.
-    needs: [public-claims, license-and-notices, build, unit-tests, windows-native-tests, shell-rust-tests, integration-tests, secret-scan, jseval-suite]
+    needs: [public-claims, license-and-notices, build, unit-tests, windows-native-tests, shell-rust-tests, integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite]
     if: always()
     steps:
       - name: Checkout
