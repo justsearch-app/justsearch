@@ -9,7 +9,7 @@
  *   justsearch://surface/<surfaceId>[?key=value&...]    → Navigation
  *   justsearch://op/<opId>[?argName=value&...]          → Invocation
  *   justsearch://query?q=<text>[&key=value&...]        → Query
- *   justsearch://answer?q=<prompt>[&shape=<id>]        → Answer
+ *   justsearch://answer?q=<prompt>[&shape=<id>][&key=value&...] → Answer
  *
  * Rules:
  *   - scheme must be `justsearch:`
