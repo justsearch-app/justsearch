@@ -313,32 +313,42 @@ const SESSION_HEADER = 'x-justsearch-session';
 function tokenBoundConnection(options, done) {
   const socket = connect(options);
   let settled = false;
-  const fail = (err) => {
+  let timer = null;
+  const settle = (err) => {
     if (settled) return;
     settled = true;
-    socket.destroy();
-    done(err);
+    clearTimeout(timer);
+    socket.removeListener('error', settle);
+    socket.removeListener('close', closed);
+    if (err) {
+      socket.destroy();
+      done(err);
+    } else {
+      done(null, socket);
+    }
   };
-  const closed = () => fail(notProven('no-token', `the connection to port ${options.port} closed before it answered a token`));
-  socket.once('error', fail);
+  const closed = () => settle(notProven('no-token', `the connection to port ${options.port} closed before it answered a token`));
+  socket.once('error', settle);
   socket.once('close', closed);
+  // One bound for connecting and the token answer; past it the connection is never handed out.
+  timer = setTimeout(
+    () => settle(notProven('no-token', `port ${options.port} did not answer GET /api/mcp/token within ${PROBE_TIMEOUT_MS} ms`)),
+    PROBE_TIMEOUT_MS,
+  );
   socket.once('connect', () => {
     // The token request is written on this socket alone (no agent, so no pool can lend the
     // socket to anyone else); keep-alive, so that once it is answered the socket is 'free' and
     // goes to the pin's agent with the token it answered.
     let token = null;
     socket.once('free', () => {
-      if (settled || socket.destroyed) return;
-      settled = true;
-      socket.removeListener('error', fail);
-      socket.removeListener('close', closed);
+      if (socket.destroyed) return;
       socket[SOCKET_TOKEN] = token;
-      done(null, socket);
+      settle(null);
     });
     const req = send(
       undefined,
       options.port,
-      { path: '/api/mcp/token', headers: { accept: 'application/json', connection: 'keep-alive' }, timeoutMs: PROBE_TIMEOUT_MS, createConnection: () => socket },
+      { path: '/api/mcp/token', headers: { accept: 'application/json', connection: 'keep-alive' }, createConnection: () => socket },
       (res) => {
         const chunks = [];
         let size = 0;
@@ -357,8 +367,7 @@ function tokenBoundConnection(options, done) {
         });
       },
     );
-    req.on('timeout', () => req.destroy(new Error(`no token answer within ${PROBE_TIMEOUT_MS} ms`)));
-    req.on('error', (e) => fail(notProven('no-token', `port ${options.port}: ${e.message}`)));
+    req.on('error', (e) => settle(notProven('no-token', `port ${options.port}: ${e.message}`)));
     req.end();
   });
   return undefined;
@@ -408,20 +417,25 @@ function send(agent, port, { method = 'GET', path: urlPath, headers = {}, timeou
  * The only way the clients send a request to an Engine: send() through agentFor(target), and the
  * request is ended here with body. target is { port, engine, token }: engine is the manifest
  * candidate ({ dataDir, pid, instanceId, port }), or null for a pinned port no manifest names.
- * credential: true adds the session token (X-JustSearch-Session): for a manifest Engine
- * target.token (fetched over its proven connections), for a pin the token of the connection the
- * request is written on, read once the request has its connection. Returns the
+ * The request's connection token is target.token for a manifest Engine (fetched over its proven
+ * connections), and for a pin the token the connection it is written on fetched itself, read
+ * once the request has its connection; it is left on the request as req.connectionToken.
+ * credential: true adds that token (X-JustSearch-Session). session ({ id, token }) adds
+ * Mcp-Session-Id only when the session was opened under that same connection token, so a
+ * session never goes to an endpoint other than the one that opened it. Returns the
  * http.ClientRequest; a failed proof surfaces as its 'error' with err.code 'ENGINE_NOT_PROVEN'
  * (and err.status, err.detail).
  */
-function engineRequest(target, { method = 'GET', path: urlPath, headers = {}, timeoutMs, body, credential = false }, onResponse) {
+function engineRequest(target, { method = 'GET', path: urlPath, headers = {}, timeoutMs, body, credential = false, session = null }, onResponse) {
   const engine = target.engine || null;
   const req = send(agentFor(target), engine ? engine.port : target.port, { method, path: urlPath, headers, timeoutMs }, onResponse);
   const finish = (token) => {
+    req.connectionToken = token;
     if (credential && token) req.setHeader(SESSION_HEADER, token);
+    if (session && session.token === token) req.setHeader('mcp-session-id', session.id);
     req.end(body);
   };
-  if (credential && !engine) req.once('socket', (socket) => finish(socket[SOCKET_TOKEN]));
+  if ((credential || session) && !engine) req.once('socket', (socket) => finish(socket[SOCKET_TOKEN]));
   else finish(target.token);
   return req;
 }
@@ -514,7 +528,7 @@ function readManifest(candidate) {
     return reject(candidate, 'malformed', `manifest API port ${JSON.stringify(port)} is not a port`);
   }
   if (pidState(pid) === false) {
-    return reject(candidate, 'stale', `pid ${pid} is not running (port ${port})`);
+    return Object.assign(reject(candidate, 'stale', `pid ${pid} is not running (port ${port})`), { port });
   }
   return { manifest, pid, instanceId, port };
 }
@@ -591,11 +605,11 @@ async function selectEngine(candidates, options = {}) {
 }
 
 /**
- * The Engine behind a pinned port: the first candidate whose manifest (complete, pid not known
- * dead) names port and passes validateCandidate. Result: { selected, tried }; tried lists the
- * candidates whose manifest named the port. selected null with tried non-empty is a refusal:
- * the port belongs to a manifest Engine that is not proven, and the pin must not be used
- * without that proof. Both empty: no manifest names the port (token-bound connections).
+ * The Engine behind a pinned port: the first candidate whose manifest names port and passes
+ * validateCandidate. Result: { selected, tried }; tried lists the candidates whose manifest named
+ * the port, including a stale one (its pid is gone). selected null with tried non-empty is a
+ * refusal: the port belongs to a manifest Engine that is not proven, and the pin must not be
+ * used without that proof. Both empty: no manifest names the port (token-bound connections).
  */
 async function selectPinned(candidates, port, options = {}) {
   const seen = [];
@@ -608,6 +622,12 @@ async function selectPinned(candidates, port, options = {}) {
     if (seen.some((dataDir) => sameFolder(dataDir, candidate.dataDir))) continue;
     seen.push(candidate.dataDir);
     const read = readManifest(candidate);
+    if (read.ok === false && read.status === 'stale' && read.port === port) {
+      // A manifest whose Engine is gone still names the port: whatever answers there now is not
+      // that Engine, and the pin is not one no manifest names.
+      tried.push({ ...read, detail: `${manifestPathFor(candidate.dataDir)} names this port, but its ${read.detail}` });
+      continue;
+    }
     if (read.ok === false || read.port !== port) continue;
     const result = await validateCandidate(candidate, options);
     tried.push(result);

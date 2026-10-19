@@ -49,7 +49,7 @@ export function resolveDataDir() {
 /**
  * Validate that a JustSearch instance is responding on a pinned port no manifest names.
  * Issues GET /api/status (over a token-bound connection, engine-discovery.cjs) and confirms the
- * response contains status: "ok".
+ * response contains status: "ok". Result: { ok: true } or { ok: false, detail }.
  */
 export function validatePort(port, timeoutMs = 2000) {
   return new Promise((resolve) => {
@@ -59,17 +59,17 @@ export function validatePort(port, timeoutMs = 2000) {
       (res) => {
         if (res.statusCode !== 200) {
           res.resume();
-          return resolve(false);
+          return resolve({ ok: false, detail: `GET /api/status answered ${res.statusCode}` });
         }
         const chunks = [];
         res.on('data', (chunk) => chunks.push(chunk));
-        res.on('error', () => resolve(false));
+        res.on('error', (e) => resolve({ ok: false, detail: e.message }));
         res.on('end', () => {
           try {
             const json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-            resolve(json.status === 'ok');
+            resolve(json.status === 'ok' ? { ok: true } : { ok: false, detail: 'GET /api/status is not a JustSearch status' });
           } catch {
-            resolve(false);
+            resolve({ ok: false, detail: 'GET /api/status is not JSON' });
           }
         });
       },
@@ -77,7 +77,7 @@ export function validatePort(port, timeoutMs = 2000) {
     req.on('timeout', () => {
       req.destroy(new Error('timeout'));
     });
-    req.on('error', () => resolve(false));
+    req.on('error', (e) => resolve({ ok: false, detail: e.message }));
   });
 }
 
@@ -136,9 +136,11 @@ export function engineCandidates({env = process.env, cwd = process.cwd()} = {}) 
  * names it, the pin is that manifest Engine, with the same proof as discovery; a manifest that
  * names it but is not proven is a refusal (recorded in attempts), never a fallback. When none
  * does, the pin answers over token-bound connections: token is undefined, because each
- * connection carries the token it fetched itself (engine-discovery.cjs).
+ * connection carries the token it fetched itself (engine-discovery.cjs). requireManifest: the pin
+ * was accepted through a manifest, so with none naming it now it is refused as well (server.mjs
+ * re-selects this way after the Engine restarts on the pinned port).
  */
-async function pinnedEngine(port, label, attempts, log) {
+export async function pinnedEngine(port, label, attempts, log, { requireManifest = false } = {}) {
   const { selected, tried } = await selectPinned(engineCandidates(), port);
   if (selected) {
     const token = await fetchToken({ port, engine: selected });
@@ -152,11 +154,16 @@ async function pinnedEngine(port, label, attempts, log) {
     attempts.push(...describeTried(tried).map((line) => `${label}: refused, the manifest naming this port is not proven (${line})`));
     return null;
   }
-  if (await validatePort(port)) {
+  if (requireManifest) {
+    attempts.push(`${label}: refused, a runtime manifest named this port when it was accepted and none does now`);
+    return null;
+  }
+  const live = await validatePort(port);
+  if (live.ok) {
     log(`Connected on ${label}: no manifest names this port; each connection fetches its own token`);
     return { port, baseUrl: `http://127.0.0.1:${port}`, token: undefined, pin: label };
   }
-  attempts.push(`${label} (not responding)`);
+  attempts.push(`${label} (not responding: ${live.detail})`);
   return null;
 }
 

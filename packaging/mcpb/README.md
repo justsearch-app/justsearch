@@ -46,15 +46,21 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    If a proof fails, nothing is sent: the bridge drops the token and re-runs discovery, so a
    token never reaches whatever took the port. A `JUSTSEARCH_API_PORT` pin that a runtime
    manifest names is that manifest's Engine, with the same proof (if that proof fails, the pin is
-   refused). A pin that no manifest names is trusted with request content from whatever answers
+   refused). A stale manifest (its pid is gone) that names the pinned port is a refusal, and so
+   is a pin accepted through a manifest that is later deleted or corrupted. A pin that no
+   manifest names is trusted with request content from whatever answers
    it, but never with a session token fetched on another connection: each new connection fetches
-   `GET /api/mcp/token` on itself first, and a request carries only that connection's token.
+   `GET /api/mcp/token` on itself first (within 2 s, or the connection is refused), and a request
+   carries only that connection's token.
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a
-   different port mid-session, the bridge re-runs that discovery,
-   re-initializes the session with the cached `initialize` params, and replays
-   the failed call once before giving up.
+   different port mid-session, the bridge re-runs that discovery, drops the old
+   `Mcp-Session-Id`, and re-initializes the session with the cached `initialize`
+   params. The failed call is sent again once only if it surely did not reach the
+   app (it never had a connection, or the app answered 400/404 for its session);
+   otherwise it fails with an error saying its outcome is unknown, so a mutating
+   call never runs twice. Closing stdin stops the bridge, also during discovery.
 
 The bridge is **dependency-free** (Node builtins only) and never touches the
 network beyond `127.0.0.1` — no npx fetches, no downloads, ever. That is

@@ -12,7 +12,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-import { discover } from './discovery.mjs';
+import { discover, pinnedEngine } from './discovery.mjs';
 import { engineRequest } from '../../../packaging/mcpb/server/engine-discovery.cjs';
 import {
   AnswerInputSchema,
@@ -82,6 +82,44 @@ function transportFailure(err) {
     : { message: err?.message || String(err) };
 }
 
+/**
+ * Run one request (run(target) → the http*Once result). A pin accepted through a manifest whose
+ * Engine is no longer the one on the port (engine_gone: refused before anything was written) is
+ * selected again from the manifests, as at startup but with no fallback to a pin no manifest
+ * names; if a proven Engine now serves the pin (it restarted on the same port), the request,
+ * which was never sent, is sent to it with its own token. Anything else is returned as it is,
+ * so nothing that may have reached an Engine is sent twice.
+ */
+async function withReselect(run) {
+  const target = engineTarget;
+  const res = await run(target);
+  if (res.error?.message !== 'engine_gone' || !target.pin || !target.engine) return res;
+  const next = await reselectPin(target);
+  return next ? run(next) : res;
+}
+
+let reselecting = null;
+
+function reselectPin(stale) {
+  if (engineTarget !== stale) return Promise.resolve(engineTarget);
+  if (!reselecting) {
+    const attempts = [];
+    reselecting = pinnedEngine(stale.port, stale.pin, attempts, () => {}, { requireManifest: true })
+      .then((found) => {
+        if (!found) {
+          log(`${stale.pin}: no proven Engine on the pinned port (${attempts.join('; ')})`);
+          return null;
+        }
+        if (engineTarget === stale) engineTarget = { port: found.port, engine: found.engine, token: found.token, pin: stale.pin };
+        return engineTarget;
+      })
+      .finally(() => {
+        reselecting = null;
+      });
+  }
+  return reselecting;
+}
+
 function engineGoneError(res) {
   const pin = engineTarget?.pin ? `, pinned by ${engineTarget.pin}` : '';
   if (!engineTarget?.engine) {
@@ -102,7 +140,11 @@ function engineGoneError(res) {
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
-function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {}, credential = false }) {
+function httpGetTextLimited(urlStr, options) {
+  return withReselect((target) => httpGetOnce(target, urlStr, options));
+}
+
+function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {}, credential = false }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -119,7 +161,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {}, credent
     };
 
     const req = engineRequest(
-      engineTarget,
+      target,
       {
         path: u.pathname + u.search,
         timeoutMs,
@@ -169,7 +211,11 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {}, credent
  * HTTP POST with JSON body, size limiting, and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:164-237.
  */
-function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {}, credential = false }) {
+function httpPostJsonLimited(urlStr, body, options) {
+  return withReselect((target) => httpPostOnce(target, urlStr, body, options));
+}
+
+function httpPostOnce(target, urlStr, body, { timeoutMs, maxBytes, headers = {}, credential = false }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -188,7 +234,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {}, 
     };
 
     const req = engineRequest(
-      engineTarget,
+      target,
       {
         method: 'POST',
         path: u.pathname + u.search,
@@ -456,8 +502,23 @@ export async function main() {
 
   log('Starting JustSearch production MCP server...');
 
+  // Closing stdin stops startup too: read it during discovery, keeping what arrives for the
+  // stdio transport, which takes over the stream once the backend is found.
+  const early = [];
+  const keepEarly = (chunk) => early.push(chunk);
+  const endEarly = () => {
+    log('stdin closed during startup — exiting');
+    process.exit(0);
+  };
+  process.stdin.on('data', keepEarly);
+  process.stdin.on('end', endEarly);
+
   // Discover backend
   const backend = await discover({ port: args.port, verbose: args.verbose });
+  process.stdin.off('data', keepEarly);
+  process.stdin.off('end', endEarly);
+  process.stdin.pause();
+  for (const chunk of early.reverse()) process.stdin.unshift(chunk);
   const { baseUrl, token } = backend;
   engineTarget = { port: backend.port, engine: backend.engine || null, token, pin: backend.pin || null };
 
@@ -949,6 +1010,7 @@ export async function main() {
   // -------------------------------------------------------------------------
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);
+  process.stdin.resume(); // paused after discovery; what arrived meanwhile is read first
 
   log('Server started. Waiting for MCP messages on stdio...');
 }

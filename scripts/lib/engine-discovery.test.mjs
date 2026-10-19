@@ -204,13 +204,15 @@ let instanceCounter = 0;
 async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null, requireToken = false, mcpSessions = false, stream = false, keepAliveMs } = {}) {
   const id = instanceId || `instance-${process.pid}-${++instanceCounter}`;
   const requests = [];
-  // hold(url): the next request to url is answered only when its release(body) is called (a slow
-  // Engine call). holdUrl holds the first one from the start (arrived/release below).
+  // hold(url, { rpc }): the next request to url (with rpc: a POST /mcp of that JSON-RPC method) is
+  // answered only when its release(body) is called (a slow Engine call), or never: destroy() drops
+  // its connection unanswered. holdUrl holds the first one from the start (arrived/release below).
   const holds = [];
-  const hold = (url) => {
-    const h = { url, held: null };
+  const hold = (url, { rpc } = {}) => {
+    const h = { url, rpc, held: null, socket: null };
     h.arrived = new Promise((resolve) => (h.signal = resolve));
     h.release = (answer) => h.held?.(answer);
+    h.destroy = () => h.socket?.destroy();
     holds.push(h);
     return h;
   };
@@ -227,8 +229,16 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
         res.writeHead(status, { 'content-type': 'application/json', ...headers, ...(closing ? { connection: 'close' } : {}) });
         res.end(JSON.stringify(obj));
       };
-      const h = holds.find((x) => x.url === req.url && !x.held);
+      const rpcOf = () => {
+        try {
+          return JSON.parse(body).method;
+        } catch {
+          return undefined;
+        }
+      };
+      const h = holds.find((x) => x.url === req.url && !x.held && (!x.rpc || (req.method === 'POST' && rpcOf() === x.rpc)));
       if (h) {
+        h.socket = req.socket;
         // Answered only on release(); the listener is gone by then, so the connection closes with
         // this answer, as a stopping Engine's does: the client's next request needs a new
         // connection to the port. release(fn) answers fn(request body).
@@ -923,6 +933,7 @@ test('D9: after initialize the Engine goes away and a foreign server takes its p
   const session = await bridgeInteractive(m, bundle(root), async () => {
     await handshakeDone(engine);
     await engine.close();
+    await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
     impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   });
   assert.equal(session.messages.find((x) => x.id === 1)?.result?.serverInfo?.name, `engine ${engine.instanceId}`, session.stderr);
@@ -946,6 +957,7 @@ test('D9: when the Engine restarts on a new port, the bridge re-proves it and us
   const session = await bridgeInteractive(m, bundle(root), async () => {
     await handshakeDone(first);
     await first.close();
+    await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
     second = await startService(t, { token: 'token-second' });
     writeManifest(m.desktop, manifestFor(second));
   });
@@ -1119,6 +1131,7 @@ async function bridgeReconnectSwap(t, holdUrl, answer) {
   const session = await bridgeInteractive(m, bundle(root), async () => {
     await handshakeDone(first, { stream: true }); // the bridge's own requests after initialize are over
     await first.close();
+    await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
     second = await startService(t, { token: 'token-second', holdUrl });
     writeManifest(m.desktop, manifestFor(second));
     swap = takeOverWhileHeld(t, second, answer); // runs while the bridge reconnects for the next call
@@ -1464,6 +1477,7 @@ test('P5: bridge pinned to a port a manifest names — after the Engine goes and
   const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(engine.port) } }, bundle(root), async () => {
     await handshakeDone(engine);
     await engine.close();
+    await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
     impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   });
   const seen = await impostor.settled();
@@ -1521,6 +1535,170 @@ test('P5/P7: bridge pinned to a port no manifest names — the Engine restarts t
   assert.deepEqual(posts, ['tools/call', 'initialize', 'notifications/initialized', 'tools/call'], 'refused in the old session, re-initialized, replayed once');
   assert.match(session.stderr, /reconnected to/);
 });
+
+// ---------------------------------------------------------------------------
+// Round 2: the token fetch is bounded; a manifest-accepted or stale-manifest pin is refused;
+// nothing that may have been sent is sent again; an MCP session stays with its endpoint; a
+// manifest-pinned Engine that restarts on its port is selected again
+// ---------------------------------------------------------------------------
+
+const INIT_LINE = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } } })}\n`;
+
+/**
+ * Start a client pinned to port (production MCP: --port; bundle: JUSTSEARCH_API_PORT) and write
+ * initialize, leaving stdin open. exited resolves to the exit code; messages and stderr fill in.
+ */
+function startPinnedClient(client, m, root, port, envExtra = {}) {
+  const [entry, args, env] = client === 'production MCP'
+    ? [PROD_MCP_ENTRY, ['--port', String(port)], {}]
+    : [bundle(root), [], { JUSTSEARCH_API_PORT: String(port) }];
+  const child = spawnNode([entry, ...args], { env: { ...m.env, ...env, ...envExtra }, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] }, 'stdin');
+  const out = { child, messages: [], stderr: '' };
+  let buf = '';
+  child.stdout.on('data', (d) => {
+    buf += d;
+    let nl;
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (line) out.messages.push(JSON.parse(line));
+    }
+  });
+  child.stderr.on('data', (d) => (out.stderr += d));
+  child.stdin.on('error', () => {});
+  out.exited = new Promise((resolve) => child.once('exit', resolve));
+  child.stdin.write(INIT_LINE);
+  return out;
+}
+
+test('P3 (bound): the pin accepts the token request and never answers it — both clients refuse within the probe bound, naming it, with stdin still open', async (t) => {
+  for (const client of ['production MCP', 'bundle']) {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const engine = await startService(t, { holdUrl: '/api/mcp/token' }); // never released
+    const t0 = Date.now();
+    const run = startPinnedClient(client, m, root, engine.port);
+    const code = await within(run.exited, 7000, `${client}: a refusal while the token answer never comes\n${run.stderr}`);
+    const elapsed = Date.now() - t0;
+    assert.notEqual(code, 0, `${client}: refused\n${run.stderr}`);
+    assert.match(run.stderr, /did not answer GET \/api\/mcp\/token within 2000 ms/, `${client}: the error says why`);
+    assert.ok(elapsed < 6000, `${client}: no slower than the bound (${elapsed} ms)`);
+    assert.ok(engine.requests.every((r) => r.url === '/api/mcp/token'), `${client}: nothing but the token request was written`);
+  }
+});
+
+test('P3 (bound): closing stdin stops either client while discovery still waits (an Engine starting at /api/health 503)', async (t) => {
+  for (const client of ['production MCP', 'bundle']) {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const engine = await startService(t, { healthStatus: 503 });
+    writeManifest(m.desktop, manifestFor(engine));
+    const run = startPinnedClient(client, m, root, engine.port);
+    await until(() => engine.requests.some((r) => r.url === '/api/health'), 10000, `${client}: discovery reaching the starting Engine`);
+    run.child.stdin.end();
+    const code = await within(run.exited, 3000, `${client}: exit after stdin closed during discovery (the startup wait is 30 s)\n${run.stderr}`);
+    assert.equal(code, 0, `${client}: ${run.stderr}`);
+  }
+});
+
+test('P1b/P5 (bundle): the manifest accepted for the pin is deleted, or corrupted, and a replacement copying the identity binds — the bridge writes nothing there and fails the call; no token-bound downgrade', async (t) => {
+  for (const change of ['deleted', 'corrupted']) {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const engine = await startService(t);
+    writeManifest(m.desktop, manifestFor(engine));
+    let impostor = null;
+    const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(engine.port) } }, bundle(root), async () => {
+      await handshakeDone(engine);
+      const manifest = path.join(m.desktop, 'runtime', 'manifest.json');
+      if (change === 'deleted') fs.rmSync(manifest);
+      else fs.writeFileSync(manifest, '{"pid": 1, "instanceId": "trunc');
+      await engine.close();
+      await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
+      impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
+    });
+    const seen = await impostor.settled();
+    assert.deepEqual(seen.requests, [], `${change}: nothing, and no token, reaches the replacement\n${session.stderr}`);
+    const call = session.messages.find((x) => x.id === 2);
+    assert.ok(call?.error, `${change}: the call fails: ${JSON.stringify(call)}\n${session.stderr}`);
+    assert.ok(
+      session.stderr.includes(`JUSTSEARCH_API_PORT=${engine.port}: refused, a runtime manifest named this port when it was accepted and none does now`),
+      `${change}: the refusal says why\n${session.stderr}`,
+    );
+  }
+});
+
+test('P7 (bundle): the connection drops after a mutating call was sent — it is not sent again, and the error says its outcome is unknown', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine));
+  const session = await bridgeInteractive(m, bundle(root), async () => {
+    await handshakeDone(engine);
+    const lost = engine.hold('/mcp', { rpc: 'tools/call' });
+    lost.arrived.then(() => lost.destroy()); // the Engine got the call; its answer never comes
+  });
+  const calls = engine.requests.filter((r) => r.url === '/mcp' && r.method === 'POST' && JSON.parse(r.body).method === 'tools/call');
+  assert.equal(calls.length, 1, `the call reached the Engine once and was not sent again\n${session.stderr}`);
+  const call = session.messages.find((x) => x.id === 2);
+  assert.match(call?.error?.message ?? '', /outcome is unknown, so it was not sent again/, `${JSON.stringify(call)}\n${session.stderr}`);
+});
+
+test('P1b (stale): a manifest whose pid is gone names the pinned port and something else answers there — both clients refuse, write nothing to it, and name the manifest', async (t) => {
+  for (const client of ['production MCP', 'bundle']) {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const impostor = await startImpostor(t, { pid: 2147483647, instanceId: 'gone-instance' });
+    writeManifest(m.desktop, { schemaVersion: 2, pid: await deadPid(), instanceId: 'gone-instance', lifecycle: 'LIFECYCLE_STATE_READY', head: { apiPort: impostor.port } });
+    const res = client === 'production MCP'
+      ? await prodDiscover(m, { port: impostor.port })
+      : await bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(impostor.port) });
+    const seen = await impostor.settled();
+    assert.deepEqual(seen.requests, [], `${client}: nothing is written to what answers the port\n${res.stderr}`);
+    assert.notEqual(res.code, 0, `${client}: refused\n${res.stderr}`);
+    const manifest = path.join(m.desktop, 'runtime', 'manifest.json');
+    assert.ok(res.stderr.includes(`refused, the manifest naming this port is not proven`) && res.stderr.includes(`${manifest} names this port, but its pid`), `${client}: ${res.stderr}`);
+  }
+});
+
+test('P5 (bundle): a pin no manifest names is restarted with a new token — the old Mcp-Session-Id is never sent to the new endpoint', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t, { token: 'token-first', mcpSessions: true, stream: true });
+  let second = null;
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+    await handshakeDone(first, { stream: true });
+    await first.close();
+    await pause(300); // the idle bridge handles the close
+    second = await startService(t, { port: first.port, token: 'token-second', mcpSessions: true, stream: true });
+  });
+  const oldSession = `session-${first.instanceId}`;
+  const carried = second.requests.filter((r) => r.headers['mcp-session-id'] === oldSession).map((r) => `${r.method} ${r.url}`);
+  assert.deepEqual(carried, [], `the old session stays with the endpoint that opened it\n${session.stderr}`);
+  const call = session.messages.find((x) => x.id === 2);
+  assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
+});
+
+for (const kind of Object.keys(PINS)) {
+  test(`P7 (${kind}): production MCP pinned to a manifest Engine — the Engine restarts on the port with a new manifest and token; the next call is proven there and succeeds, sent once, with only the new token`, async (t) => {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const first = await startService(t, { token: 'token-first', requireToken: true });
+    writeManifest(m.desktop, manifestFor(first));
+    const prod = await startProdMcp(t, m, PINS[kind](first.port));
+    const ingest = { paths: [path.join(root, 'doc.txt')] };
+    first.lastAnswers(); // no idle connection is left to the first Engine
+    assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${first.instanceId}`), prod.stderr);
+    await first.close();
+    const second = await startService(t, { port: first.port, token: 'token-second', requireToken: true });
+    writeManifest(m.desktop, manifestFor(second));
+    const next = await prod.call('justsearch_ingest', ingest);
+    assert.match(next, new RegExp(`ingest by ${second.instanceId}`), `${next}\n${prod.stderr}`);
+    const tokens = second.requests.map((r) => r.headers['x-justsearch-session']).filter(Boolean);
+    assert.ok(tokens.length > 0 && tokens.every((x) => x === 'token-second'), `only the new token reaches the restarted Engine: ${tokens}`);
+    assert.equal(second.requests.filter((r) => r.url === '/api/knowledge/ingest').length, 1, 'the call is sent once');
+  });
+}
 
 test('D1: a Windows-style lazily resolved folder (the OS-reported Roaming folder) is tried after the home-folder guess', async (t) => {
   const root = tempRoot(t);
