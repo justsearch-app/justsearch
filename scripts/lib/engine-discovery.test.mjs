@@ -201,6 +201,9 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
   const requests = [];
   // holdUrl: a request to it is answered only when release(body) is called (a slow Engine call).
   let held = null;
+  // lastAnswers(): from then on every answer closes its connection, as a stopping Engine's does,
+  // so the client keeps no idle connection to reuse once the Engine is gone.
+  let closing = false;
   let heldArrived;
   const arrived = new Promise((resolve) => (heldArrived = resolve));
   const server = http.createServer((req, res) => {
@@ -209,7 +212,7 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
     req.on('end', () => {
       requests.push({ method: req.method, url: req.url, headers: req.headers, body, health: healthStatus });
       const json = (status, obj) => {
-        res.writeHead(status, { 'content-type': 'application/json' });
+        res.writeHead(status, { 'content-type': 'application/json', ...(closing ? { connection: 'close' } : {}) });
         res.end(JSON.stringify(obj));
       };
       if (holdUrl && req.url === holdUrl && !held) {
@@ -276,7 +279,10 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
   /** Stop listening but keep open connections (a held response can still be sent). */
   const stopListening = () => new Promise((resolve) => server.close(resolve) && resolve());
   const release = (obj) => held(obj);
-  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth, arrived, release, stopListening, stats };
+  const lastAnswers = () => {
+    closing = true;
+  };
+  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth, arrived, release, stopListening, lastAnswers, stats };
 }
 
 /** Resolve once the service has received the client's notifications/initialized (its handshake is done). */
@@ -962,13 +968,19 @@ test('D9: production MCP stops sending its token once the Engine no longer holds
   writeManifest(m.desktop, manifestFor(engine));
   const prod = await startProdMcp(t, m);
   const ingest = { paths: [path.join(root, 'doc.txt')] };
+  // The Engine's last answer closes its connection, so the next call opens a new one to the port and
+  // meets the proof. Without it the client may reuse its idle connection before it notices the
+  // Engine closed it: that call fails with a reset (NOT_CONNECTED) and never tries the port.
+  engine.lastAnswers();
   assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${engine.instanceId}`), prod.stderr);
   assert.equal(engine.requests.find((r) => r.url === '/api/knowledge/ingest')?.headers['x-justsearch-session'], engine.token);
 
   await engine.close();
   const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   assert.match(await prod.call('justsearch_ingest', ingest), /ENGINE_GONE/, prod.stderr);
-  assert.deepEqual((await impostor.settled()).requests, [], 'nothing, and no token, reaches the foreign server');
+  const seen = await impostor.settled();
+  assert.deepEqual(seen.requests, [], 'nothing, and no token, reaches the foreign server');
+  assert.ok(seen.connections > 0, `the call tried the port and was refused there\n${prod.stderr}`);
 });
 
 test('D9: production MCP re-proves the Engine before each request inside one answer call (port taken over while retrieve-context is pending, old process alive)', async (t) => {
@@ -1003,13 +1015,16 @@ test('D9: production MCP status and operation outcome never contact a replacemen
   const prod = await startProdMcp(t, m);
   assert.match(await prod.call('justsearch_status', {}), /"ok":true/, prod.stderr);
   assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), new RegExp(engine.instanceId), prod.stderr);
+  engine.lastAnswers(); // the next calls need a new connection to the port (see the ingest case)
   assert.match(await prod.call('justsearch_status', {}), /"ok":true/, prod.stderr);
   assert.equal(engine.stats.connections, 1, 'discovery, the token and every call share one proven connection');
   await engine.stopListening();
   const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   assert.match(await prod.call('justsearch_status', {}), /ENGINE_GONE/, prod.stderr);
   assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), /ENGINE_GONE/, prod.stderr);
-  assert.deepEqual((await impostor.settled()).requests, [], 'neither call contacts the replacement');
+  const seen = await impostor.settled();
+  assert.deepEqual(seen.requests, [], 'neither call contacts the replacement');
+  assert.ok(seen.connections > 0, `the calls tried the port and were refused there\n${prod.stderr}`);
 });
 
 /**
