@@ -116,3 +116,14 @@ in an agreement step, so each source is a delegated choice.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-help-round2-506ee9529-20261019",
+  "verdict": "accept",
+  "digest": "sha256:879f61956e05a394a0ed7088845cf588ba62e7d61fca69ad5e1fcd00b6ed6638",
+  "note": "Reviewed final 506ee9529 test changes: New and Adaptation entries preserve existing assertions and match delegated H1/H2; deferred forced-ingest check fails on 9ab5a0428 and passes on candidate. Product H1 AND wording still fails independently."
+}
+```

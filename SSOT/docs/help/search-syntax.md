@@ -19,10 +19,14 @@ quarterly report 2025
   words, and match them more strongly, rank higher.
 - **The last word can be partial.** The final word of your query also matches
   longer words that start with it, so `justsearc` finds "justsearch".
-- **Uppercase `AND` and `NOT` are operators.** `budget AND forecast` keeps
-  only documents that contain both words, and `NOT` before a word works
-  against documents that contain it. `OR` is what the search bar does
-  anyway. Typed in lowercase, these are ordinary words.
+- **Uppercase `AND` and `NOT` are read as operators, but they are not a strict
+  filter.** `budget AND forecast` favours documents that contain both words,
+  and `NOT` before a word works against documents that contain it. Because
+  the last word also matches on its own as a partial word, `budget AND
+  forecast` can still show a document that contains only "forecast", and
+  `budget NOT forecast` can still show documents that contain "forecast".
+  `OR` is what the search bar does anyway. Typed in lowercase, these are
+  ordinary words.
 - **Other symbols are taken literally.** Quotes, wildcards, and `field:value`
   have no special meaning in the search bar; they are searched as ordinary
   text. Typing `"machine learning pipeline"` finds documents with those words,
