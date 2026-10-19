@@ -93,7 +93,7 @@ export class MemorySurface extends JfElement {
    *
    *  806 W1: `mutationError` settles the same way — it reports ONE attempt, so it must not outlive the
    *  navigation that ended it (a stale "nothing was saved" beside a list that has since reloaded). */
-  static override transientState = { busy: false, mutationError: '' };
+  static override transientState = { busy: false, mutationError: '', loading: false, loadError: '' };
 
   private base(): string {
     return this.apiBase || '';
