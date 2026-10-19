@@ -45,7 +45,4 @@ not build-enforced (the gates that enforced them were retired, tempdoc 563).
 
 The historical `C-001 … C-018` conflict family was authored during the
 frontend-rewrite kernel work (the retired `421` draft, ~2026-05) and was retired
-with that draft on 2026-06-09. Those rows are preserved in git history; the
-substrate-discipline lessons they produced live on as named principles in
-`docs/reference/contributing/agent-postmortems.md`
-(`independent-reviewer-required`, `substrate-without-consumer-flavors`, etc.).
+with that draft on 2026-06-09. Those rows are preserved in git history.

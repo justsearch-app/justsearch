@@ -190,7 +190,7 @@ needs an NVIDIA driver, a CUDA-enabled llama-server built from the project's pin
 version (`b8571`), and the ORT CUDA 12 libraries. Export the regular executable as
 `JUSTSEARCH_SERVER_EXE`; make it executable and put its required shared libraries on the loader's
 search path. Keep ORT's CUDA 12 dependencies available even if llama-server uses another CUDA
-version. See [the development runtime guide](docs/agent-knowledge/inference-runtime.md).
+version.
 
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
 Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). First run

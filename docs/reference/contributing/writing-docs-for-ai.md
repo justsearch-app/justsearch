@@ -7,7 +7,7 @@ description: "How to keep docs agent-friendly."
 
 # Writing Docs for AI
 
-**ATTENTION AI AGENTS:** JustSearch’s documentation is written to be **agent-friendly** by default.
+JustSearch’s documentation is written to be **agent-friendly** by default.
 The canonical, must-not-drift docs live under:
 - `docs/explanation/`
 - `docs/reference/`
@@ -17,7 +17,7 @@ The canonical, must-not-drift docs live under:
 Noncanonical notes/ideas that may drift live under:
 - `docs/tempdocs/`
 
-Current LLMs consume documentation differently than humans. We scan, chunk, and embed. We do not "read" linearly. Therefore, when you write documentation in this repo—whether for humans or for other agents—you must follow these **LLM-Optimization Standards**.
+Current LLMs consume documentation through scanning, chunking, and embedding. The following **LLM-Optimization Standards** make documentation useful to both humans and agents.
 
 ---
 
@@ -98,9 +98,6 @@ Canonical docs follow a [Diataxis](https://diataxis.fr/)-inspired structure. Eac
 **Altitude within a type — write the invariant, not the parameter.** The *type* (above) picks the directory; the *altitude* decides what survives. Within an explanation doc, state what is **invariantly true** — the model, the boundary laws, the named seams and classes — not the parameter values the current implementation happened to choose. Parameter-level facts (caps, thresholds, operator lists, error-string discriminants, method signatures) belong in **reference**, where detail and versioning are expected; the dated narrative of *how* a change arrived belongs in its **tempdoc** (`tempdocs-are-dated-history`). The operational test: **would the newest tempdoc in this area have falsified this sentence?** If yes, it is parameter-level — move it to reference, or let the enforcing gate/type be its own source of truth. If no, it is invariant-level and earns its place in explanation. A tell that this went wrong: an explanation doc that opens "records the conventions that emerged from tempdoc N" — that is a reference catalog wearing an explanation `type:`, and it will rot at the next N.
 
 ADR conventions (template, numbering, append-only rules) are in `docs/decisions/README.md`.
-
-Prompt-surface ownership rules (historical, superseded) are in
-[Agent Prompt Surface Governance](agent-prompt-surface-governance.md).
 
 ---
 

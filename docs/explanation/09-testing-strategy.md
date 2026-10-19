@@ -125,8 +125,8 @@ retired TS e2e tier described below:
   captures one surface; `jseval ui-a11y-gate` / `ui-proportion-gate` gate regressions
   (`ui-a11y-gate` also runs on PRs as the advisory `Measured axe` job — ADR-0026 amendment
   2026-09-05; `ui-proportion-gate` stays local-only);
-  `jseval ui-diff` / `ui-critic` / `ui-fuzz` are deeper situational passes. Load the `/ui-check`
-  skill for the full reference.
+  `jseval ui-diff` / `ui-critic` / `ui-fuzz` are deeper situational passes. For fixture-based checks, run
+  `jseval ui-a11y-gate --fixtures` and `jseval ui-proportion-gate --fixtures`.
 
 > **Removed (tempdoc 742):** the TypeScript `@playwright/test` e2e tier — `modules/ui-web/e2e/`
 > (~15 specs covering search filters/pagination, preview highlighting, auto-discovery, AI meta
@@ -180,7 +180,7 @@ remains the source of pass/fail truth.
 
 ## Deterministic UI evidence (EvidenceBundle v1)
 
-> **Removed (tempdoc 638):** the EBv1 capture harness (`modules/ui-web/scripts/capture-evidence-bundle.mjs`) was deleted. For screenshot-driven UI/UX verification, use the `jseval ui-shot` harness (load the `/ui-check` skill). This section is retained as historical design context only.
+> **Removed (tempdoc 638):** the EBv1 capture harness (`modules/ui-web/scripts/capture-evidence-bundle.mjs`) was deleted. For screenshot-driven UI/UX verification, use the `jseval ui-shot` harness. This section is retained as historical design context only.
 
 For screenshot-driven UI/UX verification without committing pixel baselines, `modules/ui-web` could capture a deterministic EvidenceBundle v1 scenario (`ui_screenshots`) whose output landed under `tmp/agent-evidence/ui_screenshots/<timestamp>/`. The bundle was validated (structure + determinism budget) and avoided flaky timing via explicit UI state waits and demo-mode knobs.
 

@@ -256,8 +256,7 @@ ever shows up, the raw value is kept as-is and the session is flagged
 otlp` correspondingly reports `total_cost_usd: null` (not `$0`) with `reason: 'no_cost_metric'`
 for a session that has token records but no harness-computed dollar metric (every Codex
 session today — Codex has no `claude_code.cost.usage` equivalent), excluded from the printed
-total rather than silently priced free. See `docs/how-to/wire-codex-cli-into-the-otlp-sink.md`
-for pointing Codex CLI's own `[otel]` exporter at this sink.
+total rather than silently priced free.
 
 **Volume tradeoff:** the normalised twin roughly **doubles** `metrics.ndjson` volume for every
 mapped data point, and `RETENTION["metrics"]` is `None` (never pruned — metrics is the sole

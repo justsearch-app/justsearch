@@ -197,7 +197,7 @@ function main() {
     "",
     "## Key Documentation",
     "",
-    "### Start here (agents)",
+    "### Development",
     formatEntry(agentGuide),
     "",
     "### Explanation (Understanding the Architecture)",

@@ -11,8 +11,6 @@ The `justsearch-dev-mcp` server is the agent-facing control surface for the loca
 
 This file is the **canonical inventory** of that surface: the tool list, the `fetch_api_json` endpoint keys, and the `api_call` allowlist. `scripts/ci/check-dev-mcp-doc-sync.mjs` asserts all three against the running server, so a drift between this page and `scripts/dev/justsearch-dev-mcp/server.mjs` fails the build instead of quietly misleading an agent (tempdoc 844 §6.3 measured four inventories, all wrong at once).
 
-For the operational side — shared-stack ownership and contention, worktree FE serving, troubleshooting — load the `/dev-stack` skill. It links here rather than restating the inventory.
-
 ## Bootstrap and availability
 
 `justsearch-dev` is a required, revision-local server. It must initialize from a freshly checked-out
@@ -426,11 +424,9 @@ On Windows, creating the Engine's job and reading its root identity consume the 
 
 `quick_health.ownership.opLeases[]` (added tempdoc 542) surfaces the active critical op-leases on the holder so an agent can see what would be interrupted before requesting takeover.
 
-The ownership/contention model those codes belong to — verdicts, leases, takeover policy, `distFrom`, campaign-length holds — lives in the `/dev-stack` skill, which is also where troubleshooting and worktree-FE serving live.
-
 ## Agent Identity: Known Limitations
 
-Ownership compares owner keys: the caller's nearest harness process (Claude Code or Codex), keyed by pid and creation time (`scripts/dev/lib/agent-identity.cjs`; the rule is in the `/dev-stack` skill). The dev MCP server hands its caller's identity to the dev-runner it spawns in `JUSTSEARCH_AGENT_IDENTITY_HANDOFF`. Known limits:
+Ownership compares owner keys: the caller's nearest harness process (Claude Code or Codex), keyed by pid and creation time (`scripts/dev/lib/agent-identity.cjs`). The dev MCP server hands its caller's identity to the dev-runner it spawns in `JUSTSEARCH_AGENT_IDENTITY_HANDOFF`. Known limits:
 
 - **Codex MCP servers get no thread id.** Codex starts its MCP servers without `CODEX_THREAD_ID`, so a stack started from Codex through the dev MCP server has an owner key but no readable label: `holder.agentSessionId` is `null`. The dev-runner then gives the backend the owner key as `JUSTSEARCH_AGENT_SESSION_ID`, so the backend's operation leases still name the owner. No label is invented for merge attribution: a Codex session's merges are attributed from its shell, which does have the thread id.
 - **Codex in its default `workspace-write` sandbox cannot read the process table.** Its shell commands therefore resolve as `unknown`: they have no takeover rights, so `stop`, `cleanup` and `start` over another session's live stack are refused with `OWNER_CONFLICT`, and helpers they register carry no owner.

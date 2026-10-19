@@ -14,8 +14,7 @@ description: "Demo mode (no backend), real backend mode, and frontend verificati
 > In practice: **view/chrome work needs only a served frontend (no backend); search/inspector/AI need the dev
 > stack running** (AI also needs `ai_activate`). Re-wiring `?demo=true` into `resolveApiEndpoint` to restore a
 > no-backend data mode is a worthwhile follow-up, but it does NOT work today. The demo-mode sections below are
-> kept as the (currently non-functional) spec; for the live verification workflow + the measurement companion,
-> load the **`/ui-check` skill**.
+> kept as the (currently non-functional) spec. For live verification, see [Capture UI Evidence](capture-ui-evidence.md).
 
 ## Quick start — no backend needed (CHROME/LAYOUT ONLY — demo DATA is orphaned, see notice above)
 

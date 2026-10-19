@@ -134,8 +134,7 @@ long-lived credential on disk for no benefit the manifest re-read does not alrea
 The status quo before this ADR: the only production launch path always supplies a token, so the
 fail-open branch is unreachable. **Rejected** — "unreachable today" is a property of one caller, not
 of the code. The next launch path (a service wrapper, a test harness promoted to prod, an installer
-variant) inherits a silent downgrade. See `docs/reference/contributing/agent-postmortems.md`
-(`green-masked-destructive`) for the pattern.
+variant) inherits a silent downgrade.
 
 ## Reassess When
 

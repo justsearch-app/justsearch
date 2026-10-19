@@ -2,8 +2,6 @@
 
 Evaluation and profiling toolkit for JustSearch. Install/usage: `pyproject.toml`,
 `requirements.lock.txt`; CLI entry point `python -m jseval` (`jseval/cli.py`).
-Agent-facing operating guide: the `/jseval` skill.
-
 ## Data policy
 
 `scripts/jseval` is a *toolkit* directory, not a data store. Three rules decide
