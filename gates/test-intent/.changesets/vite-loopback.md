@@ -82,3 +82,16 @@ test execution. No acceptance record is written by this builder.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-vite-loopback-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:36f632e5f481c3125aad9d594a6318f456ae5964788c0d3d80aee36b7e336d49",
+  "note": "Independently verified: vite.config.js change is incidental to tests (529 files/6884 tests pass on base and candidate); live LAN refusal and non-local Host 403 confirmed, base fails both."
+}
+```
