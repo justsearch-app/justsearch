@@ -93,7 +93,7 @@ public MigrationStartResponse startMigration(MigrationStartRequest request, Call
 }
 ```
 
-(Verbatim shape: `modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java:431`.)
+(Verbatim shape: `modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java:1022`.)
 
 **Important**: catch blocks must be INSIDE the MdcContext scope. In Java try-with-resources, the resource closes BEFORE catch clauses on the same try. Use a nested try/catch to ensure MDC is active during error logging.
 
@@ -121,7 +121,9 @@ log.info("Search request: query={}", new SensitiveQuery(queryText));
 // Output: Search request: query=[REDACTED]
 ```
 
-This pattern is used in `KnowledgeSearchController` and `SearchOrchestrator`.
+`KnowledgeSearchController` uses a `SensitiveQuery` wrapper with a `redact()` helper at the
+HTTP boundary. Index-half services do not use that wrapper; `SearchExecutor` logs failed query
+text only at TRACE.
 
 ## File Paths
 
