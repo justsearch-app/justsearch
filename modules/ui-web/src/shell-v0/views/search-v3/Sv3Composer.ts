@@ -961,6 +961,40 @@ export class Sv3Composer extends JfElement {
         transform: none;
       }
 
+      /* Forced colors (Windows High Contrast). The frame's focus hand-off already survives — '--ring'
+         is Highlight there (sv3-tokens) — but at 1px it is a hairline, so it doubles. The primary
+         action is a filled circle with no edge, and forced colors erase the fill, so it gets a
+         ButtonText edge; disabled, it reads GrayText instead of fading to 30% of an already thin glyph.
+         The checked menu item is fill-only, so it takes the selection pair — with
+         'forced-color-adjust: none', or the browser paints a Canvas backplate behind its text — and
+         its INSET focus ring turns HighlightText to stay visible on that fill. */
+      @media (forced-colors: active) {
+        .glass:has(textarea:focus-visible)::after {
+          border-width: 2px;
+        }
+        button.stop,
+        button.send {
+          box-sizing: border-box;
+          border: 1px solid ButtonText;
+        }
+        button.send:disabled {
+          opacity: 1;
+          border-color: GrayText;
+          color: GrayText;
+        }
+        button.menu-item[aria-checked='true'] {
+          forced-color-adjust: none;
+          background: Highlight;
+          color: HighlightText;
+        }
+        button.menu-item[aria-checked='true'] * {
+          color: HighlightText;
+        }
+        button.menu-item[aria-checked='true']:focus-visible {
+          outline-color: HighlightText;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         /* The fade survives, the transform does not — the spec keeps whichever half still carries
            the meaning. */

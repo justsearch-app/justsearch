@@ -92,7 +92,7 @@ and C2 section12 without a dated reason. Per-item commits compile on their own; 
 least hourly. Proof inventory and full-run summary are committed and large artifacts
 remain accessible with retention. Close only after all named checks and final review.
 
-First review-batch raw inventory is committed in raw-evidence-sha256.json: 194 citations,
+First review-batch raw inventory is committed in [raw-evidence-sha256.json](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/evidence/C2/raw-evidence-sha256.json): 194 citations,
 12,912 available files (about1.47GB). Unresolved shorthand citations remain explicit
 and are R10 work, not silently counted as proof. latest-full-run-summary.json retains
 full744 at its original revision; it does not certify this correction batch.

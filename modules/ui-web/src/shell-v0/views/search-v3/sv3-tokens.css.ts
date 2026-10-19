@@ -478,4 +478,22 @@ export const sv3Tokens = css`
     --app-scrollbar-thumb: rgb(217 217 217);
     --app-scrollbar-thumb-hover: rgb(191 191 191);
   }
+
+  /* ── Forced colors (Windows High Contrast) ─────────────────────────────────
+     The browser replaces every colour above with the user's system palette, except a SYSTEM colour,
+     which it keeps — also when it arrives through a custom property. So the ring is re-pointed at
+     Highlight, and every focus mark that reads '--ring' (the composer frame, the grips' line, the
+     control rings) stays distinct from the CanvasText edges around it. Both theme selectors are
+     named because the light block restates '--ring' at a higher specificity. Blur is already off:
+     tokens.css zeroes the inherited '--glass-blur-scale' under the same query. The selected source
+     card's strong edge is the one selection mark carried by a token, so it is re-pointed here too.
+     The other selected and active states are fills, which forced colors erase, so each component
+     restates its own in system colours. */
+  @media (forced-colors: active) {
+    :host,
+    :host([theme='light']) {
+      --ring: Highlight;
+      --sv3-selected-edge-strong: Highlight;
+    }
+  }
 `;

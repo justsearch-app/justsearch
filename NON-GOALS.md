@@ -28,7 +28,8 @@ they're not judgments about other tools.
 - **No correctness or compliance guarantees.** Answers are grounded in your documents and cited — always check
   the citation. Like any AI it can be wrong; the guarantee here is *privacy*, not infallibility, so don't act on
   an unverified answer in high-stakes work. No warranty (see [LICENSE](LICENSE)).
-- **Windows-only.** macOS and Linux are **not in the current scope** — not ruled out forever, but not planned now.
+- **Windows and Linux only.** The installer is Windows-only; on Linux JustSearch runs from source. macOS is **not in
+  the current scope** — not ruled out forever, but not planned now.
 
 ### Engineering scope
 - **No per-language search levers.** Analysis is locale-invariant by design (one multilingual pipeline); we

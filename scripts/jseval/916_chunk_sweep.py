@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Tempdoc 916 — chunk-size sweep driver (12 arms, every arm a full reindex).
 
-Sibling of `916_collapse_ab.py`, and deliberately the same shape: argparse
+Sibling of `916_collapse_ab.py` (preserved under the archive tag
+`archive/machinery-cleanup-base`), and deliberately the same shape: argparse
 `run`/`analyze`, a machine `signature()` before AND after every arm, `child_env()`,
 an `arm()`-style subprocess wrapper writing a per-arm log, and the SAME
 admissibility rule — an arm counts only if `ce_coverage.verdict == "ok"` AND

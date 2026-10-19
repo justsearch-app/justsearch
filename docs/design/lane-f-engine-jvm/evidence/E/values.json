@@ -271,8 +271,8 @@
         }
       },
       "sourceRecords": [
-        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64.json",
-        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac.json"
+        "https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/evidence/E/e2-e3-load/main/2026-10-01T16-42-58-581Z-b4fbca64.json",
+        "https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/evidence/E/e2-e3-load/main/2026-10-01T17-05-11-968Z-6b4848ac.json"
       ]
     },
     "warmStartBudgetMs": 12600,

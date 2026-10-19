@@ -272,11 +272,6 @@ jobs:
       - name: ui-web gate runner parses the whole recipe
         run: node scripts/ci/run-ui-web-gates.test.mjs
 
-      # Tempdoc 872: the observations inbox is retired; a shard from a session still on the
-      # old brief would otherwise land unread. Fail legibly, with the routing remedy.
-      - name: no observations shards (inbox retired)
-        run: node scripts/ci/check-no-observations-shards.mjs
-
       # Tempdoc 879. Both gates below existed only as manual pre-merge rows, which is the same
       # defect they check for: a mechanism nothing runs cannot contradict anything. The store
       # register's gate was in fact RED on main for ~90 commits (an unclassified persistence

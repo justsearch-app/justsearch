@@ -21,10 +21,8 @@ load-bearing discipline:
 > originally flagged it.** Single-agent self-validation rests on the same blind
 > spots as the implementation.
 
-This protocol is defined in full in
-[`slice-execution.md`](slice-execution.md) (§"closure protocol"); a conflict row
-here is one of the override artifacts that doc requires (alongside the commit
-message naming the verdict and a committed follow-up slice id). Both
+The retired slice-execution methodology required a conflict row here alongside the
+commit message naming the verdict and a committed follow-up slice id. Both
 `independent-reviewer-required` and `ux-audit-closure` are honor-system rules,
 not build-enforced (the gates that enforced them were retired, tempdoc 563).
 

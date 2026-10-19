@@ -2,7 +2,7 @@
 title: "ADR-0028: Scoped Reverse Path-Hash Lookup"
 type: decision
 status: accepted
-description: "Refines the tempdoc-410 ingestion-ledger privacy contract. Raw paths still never appear in any operator-visible export, telemetry stream, or support-bundle generation. They may now be returned by a single dedicated Worker RPC reachable only from one HTTP endpoint, invoked in direct response to a user's 'show filename' click in the local UI. Backed by a new internal-only `path_resolution` table and an ArchUnit guard."
+description: "Refines the tempdoc-410 ingestion-ledger privacy contract. Raw paths still never appear in any operator-visible export, telemetry stream, or support-bundle generation. They may now be returned by a single index call (originally a Worker RPC, now the in-process `IngestServiceCalls#lookupPathByHash`) reachable only from one HTTP endpoint, invoked in direct response to a user's 'show filename' click in the local UI. Backed by an internal-only `path_resolution` table and an ArchUnit guard."
 date: 2026-04-26
 probes:
   - adr-0028-one-http-resolver-caller

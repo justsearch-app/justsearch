@@ -403,8 +403,8 @@ gate:
 
 - `docs-lint.yml` after edits under `docs/**`, `scripts/docs/**`, or
   `scripts/architecture/module-deps.mjs` if you need remote docs verification.
-- `codeql.yml` when you need semantic code scanning outside GitHub's managed
-  security surfaces.
+- `codeql.yml` when you need semantic code scanning before its weekly run
+  (Mondays, ADR-0052).
 - `build-installer.yml --ref <vX.Y.Z>` for installer/release attach validation.
 - `update-preserves-models.yml` after editing NSIS hooks, `tauri.conf.json`
   bundle resources, or sidecar staging — it installs a published release, seeds

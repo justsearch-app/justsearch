@@ -2,7 +2,7 @@
 title: "ADR-0038: Wire contract as a first-class artifact"
 type: decision
 status: accepted - mechanism superseded by tempdoc 564
-description: "The FE↔backend wire contract is a first-class, versioned artifact; hand-written per-language mirrors are forbidden; every consumer-side type is mechanically generated."
+description: "The FE↔backend wire contract is a first-class, versioned artifact with one authority (since tempdoc 564, the Java record); hand-written per-language mirrors are forbidden and consumer-side types are meant to be generated from it. Migration is incomplete: named mirrors remain as declared exceptions (amended 2026-09-02), and the probe cannot see unmarked ones."
 date: 2026-06-09
 probes:
   - adr-0038-no-unregistered-fe-mirror

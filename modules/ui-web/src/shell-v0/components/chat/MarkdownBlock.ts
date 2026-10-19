@@ -17,6 +17,7 @@ import { html, css, type TemplateResult, type PropertyValues } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
 import { FrameLatch } from '../../primitives/frameLatch.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { keyed } from 'lit/directives/keyed.js';
 import { createMarkdownRenderer } from '../markdown/markdownRenderer.js';
 import { markdownCodeHighlight, markdownTypography } from '../markdown/markdownStyles.js';
 import { highlightCodeBlocks } from '../markdown/markdownHighlight.js';
@@ -777,7 +778,7 @@ export class MarkdownBlock extends JfElement {
    * handler: there is nothing to open.
    */
   private neutralizePseudoCitations(): void {
-    const root = this.shadowRoot?.querySelector('.md-content');
+    const root = this.renderRoot.querySelector('.md-content');
     if (!root) return;
     const note = 'Citation-shaped text in an answer that is not grounded in your files';
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -1005,6 +1006,15 @@ export class MarkdownBlock extends JfElement {
       background: var(--md-cite-selected-bg, var(--accent-tint));
       box-shadow: inset 0 0 0 1px var(--md-cite-selected-edge, transparent);
     }
+    /* Forced colors (Windows High Contrast) erase the wash and drop the inset edge, and the tier
+       colours are gone with every other author colour, so the selected mark takes the selection pair. */
+    @media (forced-colors: active) {
+      .cite-ref.cite-selected {
+        forced-color-adjust: none;
+        background: Highlight;
+        color: HighlightText;
+      }
+    }
     /* Tempdoc 577 §2.12 Move 3 — a citation-shaped token in an UNGROUNDED answer: muted inline text
        (NOT the accent superscript of a real cite-ref), so it cannot pose as a verifiable reference.
        Non-interactive by construction (a plain span, no handlers). Tempdoc 867 §7 — that frame is
@@ -1051,7 +1061,9 @@ export class MarkdownBlock extends JfElement {
     // StreamingTextBlock's job — no markdown styling, whitespace preserved); `markdown` parses GFM.
     // The citation weave (decorateCitations) walks text nodes either way, so both modes get marks.
     if (this.format === 'plain') {
-      return html`<div class="md-content plain">${stripped}</div>${cursor}`;
+      // The citation passes split and wrap text nodes. A new value must replace the part rather
+      // than update the original text node, which may now be detached or only hold a fragment.
+      return html`<div class="md-content plain">${keyed(stripped, stripped)}</div>${cursor}`;
     }
     const source = this.isStreaming ? mendMarkdown(stripped) : stripped;
     return html`<div class="md-content">${unsafeHTML(md.render(source))}</div>${cursor}`;
@@ -1081,7 +1093,7 @@ export class MarkdownBlock extends JfElement {
     // freshly parsed or already correct for the inputs it is being asked about.
     if (root.querySelector('.cite-ref')) return;
 
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
     const ranges: Array<{ node: Text; start: number; end: number }> = [];
     // Tempdoc 869 F3 — the flattened offsets of the text nodes that render VERBATIM content. The
     // walks in `matchWordRun` read one string spanning the whole answer, so this is the only thing
@@ -1090,6 +1102,11 @@ export class MarkdownBlock extends JfElement {
     let full = '';
     let tn: Node | null;
     while ((tn = walker.nextNode())) {
+      // A hard break separates words within one sentence, without owning any text-node offsets.
+      if (tn.nodeType === Node.ELEMENT_NODE) {
+        if ((tn as Element).tagName === 'BR') full += ' ';
+        continue;
+      }
       const t = tn as Text;
       const start = full.length;
       full += t.data;
@@ -1165,8 +1182,9 @@ export class MarkdownBlock extends JfElement {
         inCode,
       );
       if (!run) continue; // graceful skip — tier 2 or tier 3 decides what happens next
-      cursor = run.lastTok + 1;
       const endIndex = this.clampToBlock(root, ranges, run.startIndex, run.endIndex);
+      // Only the clamped text was used: a legacy key may match across several list items.
+      while (cursor < domToks.length && domToks[cursor]!.start < endIndex) cursor++;
       const key = `${endIndex}:${Number(cite.label)}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -1201,10 +1219,13 @@ export class MarkdownBlock extends JfElement {
       if (endOffset > endRange.node.data.length) continue;
       // Tempdoc 565 §15.B / 847 §2.1e — insert the tier-colored `[n]` marks at the sentence
       // boundary, ascending by label, in ONE split (a sentence two sources support gets both).
-      const tail = endRange.node.splitText(endOffset);
+      const code = inCode(endIndex - 1) ? endRange.node.parentElement?.closest('code') : null;
+      const inlineCode = code && !code.closest('pre') ? code : null;
+      const parent = inlineCode ? inlineCode.parentNode : endRange.node.parentNode;
+      const tail = inlineCode ? inlineCode.nextSibling : endRange.node.splitText(endOffset);
       const ordered = [...cites].sort((a, b) => Number(a.label) - Number(b.label));
       for (const cite of ordered) {
-        endRange.node.parentNode?.insertBefore(this.makeMarker(cite, 'sentence'), tail);
+        parent?.insertBefore(this.makeMarker(cite, 'sentence'), tail);
         insertedLabels.add(Number(cite.label));
       }
       // …then color the cited sentence body by its grounding tier (the union with the retired

@@ -354,7 +354,7 @@ def build_ledger_rows(records):
     return out
 
 
-ROTATE_BYTES = 20 * 1024 * 1024  # rotate a stream file past 20 MB (mirrors event-writer)
+ROTATE_BYTES = 20 * 1024 * 1024  # rotate a stream file past 20 MB
 
 # Per-stream archive retention: int = max archived generations kept (oldest
 # pruned first), None = keep every archive forever. Measured on this machine

@@ -45,7 +45,7 @@ requires --unidiff-zero and avoids storing trailing-space context markers. Evide
 `tmp/c2-review-r10-held-reconstruction864.json` and
 `tmp/c2-review-r10-source-and-held871.json`.
 
-raw-evidence-sha256.json inventories every literal raw-path citation in the C2 evidence
+[raw-evidence-sha256.json](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/evidence/C2/raw-evidence-sha256.json) inventories every literal raw-path citation in the C2 evidence
 Markdown, expanding documented braces/globs and hashing directory contents. The R10
 citation repairs name the existing artifacts explicitly instead of relying on prose
 suffixes. No unavailable path is silently treated as proof. The inventory is refreshed

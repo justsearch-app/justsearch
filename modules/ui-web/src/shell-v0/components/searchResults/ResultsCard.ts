@@ -877,7 +877,7 @@ export class ResultsCard extends JfElement {
         color: var(--text-primary);
         border-color: var(--border-subtle);
         background: var(--surface-hover);
-        outline: none;
+        outline: 2px solid transparent;
       }
       /* Search Thread S4-final — the frozen-card frame: a bordered card distinguishes a committed
          snapshot from the live card it sits above in the retrieve tier's flow. */
@@ -930,7 +930,7 @@ export class ResultsCard extends JfElement {
       .provenance-fork:focus-visible {
         color: var(--text-primary);
         border-color: var(--accent-tint);
-        outline: none;
+        outline: 2px solid transparent;
       }
       .snapshot-rows .row {
         cursor: pointer;
@@ -954,7 +954,7 @@ export class ResultsCard extends JfElement {
       .excerpt-collapse:focus-visible {
         color: var(--text-primary);
         border-color: var(--accent-tint);
-        outline: none;
+        outline: 2px solid transparent;
       }
       .snapshot-empty-note {
         padding: 0.5rem 1.25rem 0.75rem;
@@ -980,7 +980,7 @@ export class ResultsCard extends JfElement {
       .results-card-excerpt:focus-visible {
         background: var(--surface-secondary);
         color: var(--text-primary);
-        outline: none;
+        outline: 2px solid transparent;
       }
     `,
   ];
