@@ -78,18 +78,39 @@ fn birth(pid: u32) -> io::Result<Identity> {
 }
 
 pub(crate) fn capture(pid: u32) -> io::Result<(Identity, PathBuf)> {
-    let before = birth(pid)?;
-    let executable = match std::fs::read_link(format!("/proc/{pid}/exe")) {
+    capture_with(pid, birth, |pid| {
+        std::fs::read_link(format!("/proc/{pid}/exe"))
+    })
+}
+
+fn capture_with(
+    pid: u32,
+    mut read_birth: impl FnMut(u32) -> io::Result<Identity>,
+    mut read_executable: impl FnMut(u32) -> io::Result<PathBuf>,
+) -> io::Result<(Identity, PathBuf)> {
+    let before = read_birth(pid)?;
+    let executable = match read_executable(pid) {
         Ok(executable) => executable,
         Err(error) => {
             // A missing exe link alone is not evidence that the process ended.
-            birth(pid)?;
+            // A dying process can lose its executable link before becoming a zombie.
+            let deadline = std::time::Instant::now() + std::time::Duration::from_millis(250);
+            loop {
+                if read_birth(pid)? != before {
+                    return Err(io::Error::other("process changed during identity read"));
+                }
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                std::thread::sleep(remaining.min(std::time::Duration::from_millis(5)));
+            }
             return Err(io::Error::other(format!(
                 "process executable unreadable: {error}"
             )));
         }
     };
-    let after = birth(pid)?;
+    let after = read_birth(pid)?;
     if before != after || !executable.is_absolute() {
         return Err(io::Error::other("process changed during identity read"));
     }
@@ -228,6 +249,47 @@ mod tests {
         let mut candidate = identity;
         candidate.pid = u32::MAX;
         assert!(!candidate.valid(candidate.pid));
+    }
+
+    #[test]
+    fn unreadable_executable_then_exit_is_ended() {
+        let (identity, _) = capture(std::process::id()).unwrap();
+        let mut births = [
+            Ok(identity.clone()),
+            Ok(identity.clone()),
+            Err(io::Error::new(io::ErrorKind::NotFound, "process ended")),
+        ]
+        .into_iter();
+        let error = capture_with(
+            identity.pid,
+            |_| births.next().expect("unexpected birth read"),
+            |_| Err(io::Error::new(io::ErrorKind::NotFound, "missing exe")),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        assert_eq!(error.to_string(), "process ended");
+        assert!(births.next().is_none());
+    }
+
+    #[test]
+    fn unreadable_executable_still_present_after_window_is_unknown() {
+        let (identity, _) = capture(std::process::id()).unwrap();
+        let mut birth_reads = 0;
+        let error = capture_with(
+            identity.pid,
+            |_| {
+                birth_reads += 1;
+                Ok(identity.clone())
+            },
+            |_| Err(io::Error::new(io::ErrorKind::NotFound, "missing exe")),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert_eq!(
+            error.to_string(),
+            "process executable unreadable: missing exe"
+        );
+        assert!(birth_reads > 2, "matching identity must be rechecked");
     }
 
     #[test]
