@@ -8,13 +8,12 @@
  * specifics removed (runId, NDJSON logging, process lifecycle, evidence capture).
  */
 
-import http from 'node:http';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { discover } from './discovery.mjs';
-import { confirmEngine } from '../../../packaging/mcpb/server/engine-discovery.cjs';
+import { engineRequest } from '../../../packaging/mcpb/server/engine-discovery.cjs';
 import {
   AnswerInputSchema,
   AnswerOutputSchema,
@@ -65,48 +64,34 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
 }
 
 /**
- * The Engine discovery selected through its runtime manifest (null for --port /
- * JUSTSEARCH_API_PORT, which are the operator's choice and are not re-checked).
+ * The Engine discovery selected: { port, engine }, engine being the manifest candidate (null for
+ * --port / JUSTSEARCH_API_PORT, the operator's choice). Every request goes through
+ * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS says
+ * its server end belongs to the manifest pid; a refusal comes back as error.message
+ * 'engine_gone', which parseJsonResponse turns into ENGINE_GONE. No handler, and no follow-up
+ * request inside one tool call, can reach an endpoint that is not that Engine.
  */
-let selectedEngine = null;
+let engineTarget = null;
 
-/**
- * Every request to the Engine goes through httpGetTextLimited / httpPostJsonLimited, and both
- * first repeat the owner proof (engine-discovery.cjs confirmEngine: same manifest identity, and
- * the OS still reports that pid as the port's owner; no network). A refusal comes back as a
- * transport result with error.message 'engine_gone', so no handler, and no continuation request
- * inside one tool call, reaches an endpoint that is no longer that Engine.
- */
-async function engineGone() {
-  if (!selectedEngine) return null;
-  const check = await confirmEngine(selectedEngine);
-  if (check.ok) return null;
-  return { ok: false, statusCode: null, text: null, error: { message: 'engine_gone', detail: `${check.status}: ${check.detail}` } };
+function transportFailure(err) {
+  return err?.code === 'ENGINE_NOT_PROVEN'
+    ? { message: 'engine_gone', detail: `${err.status}: ${err.detail}` }
+    : { message: err?.message || String(err) };
 }
 
 function engineGoneError(res) {
   return makeError(
     'ENGINE_GONE',
-    `The JustSearch Engine this server connected to (pid ${selectedEngine?.pid}, port ${selectedEngine?.port}) ` +
+    `The JustSearch Engine this server connected to (pid ${engineTarget?.engine?.pid}, port ${engineTarget?.port}) ` +
       `is no longer the one serving that port (${res.error.detail}). Nothing was sent. Restart the MCP server to reconnect.`,
   );
-}
-
-/** HTTP GET to the Engine, after the owner proof (see engineGone). */
-async function httpGetTextLimited(urlStr, options) {
-  return (await engineGone()) ?? sendGetTextLimited(urlStr, options);
-}
-
-/** HTTP POST to the Engine, after the owner proof (see engineGone). */
-async function httpPostJsonLimited(urlStr, body, options) {
-  return (await engineGone()) ?? sendPostJsonLimited(urlStr, body, options);
 }
 
 /**
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
-function sendGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
+function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -122,13 +107,11 @@ function sendGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
       resolve(payload);
     };
 
-    const req = http.request(
+    const req = engineRequest(
+      engineTarget,
       {
-        hostname: u.hostname,
-        port: Number(u.port),
         path: u.pathname + u.search,
-        method: 'GET',
-        timeout: timeoutMs,
+        timeoutMs,
         headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers },
       },
       (res) => {
@@ -166,9 +149,7 @@ function sendGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
     req.on('timeout', () => {
       req.destroy(new Error('timeout'));
     });
-    req.on('error', (err) =>
-      finish({ ok: false, statusCode: null, text: null, error: { message: err?.message || String(err) } }),
-    );
+    req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
     req.end();
   });
 }
@@ -177,7 +158,7 @@ function sendGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
  * HTTP POST with JSON body, size limiting, and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:164-237.
  */
-function sendPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
+function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -195,13 +176,12 @@ function sendPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
       resolve(payload);
     };
 
-    const req = http.request(
+    const req = engineRequest(
+      engineTarget,
       {
-        hostname: u.hostname,
-        port: Number(u.port),
-        path: u.pathname + u.search,
         method: 'POST',
-        timeout: timeoutMs,
+        path: u.pathname + u.search,
+        timeoutMs,
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(bodyStr),
@@ -245,9 +225,7 @@ function sendPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
     req.on('timeout', () => {
       req.destroy(new Error('timeout'));
     });
-    req.on('error', (err) =>
-      finish({ ok: false, statusCode: null, text: null, error: { message: err?.message || String(err) } }),
-    );
+    req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
     req.write(bodyStr);
     req.end();
   });
@@ -470,7 +448,7 @@ export async function main() {
   // Discover backend
   const backend = await discover({ port: args.port, verbose: args.verbose });
   const { baseUrl, token } = backend;
-  selectedEngine = backend.engine || null;
+  engineTarget = { port: backend.port, engine: backend.engine || null };
 
   ensureLoopbackUrl(baseUrl, 'baseUrl');
   log(`Backend: ${baseUrl}`);

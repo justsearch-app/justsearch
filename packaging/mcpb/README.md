@@ -17,9 +17,9 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    `runtime/manifest.json` in `JUSTSEARCH_DATA_DIR` when set → the same file in the
    desktop app's data folder (`%APPDATA%\io.justsearch.shell` on Windows;
    `$XDG_DATA_HOME/io.justsearch.shell`, or `~/.local/share/io.justsearch.shell`, on Linux).
-   A manifest counts only if its pid is alive, the operating system reports that pid as the
-   owner of the listening socket on its `head.apiPort` (Linux `/proc`, Windows `netstat -ano`),
-   the service there answers `GET /api/runtime/live` with the same pid and instance id, and
+   A manifest counts only if its pid is alive, the service on its `head.apiPort`, over a
+   connection the operating system reports as that pid's (Linux `/proc`, Windows `netstat -ano`;
+   see 3.), answers `GET /api/runtime/live` with the same pid and instance id, and
    `GET /api/health` answers 200 (a proven Engine still starting, 503, is re-checked for up to
    30 s, so starting the host and the app together works); there is no default-port guess. On Windows, when `%APPDATA%`
    is unset in its environment, it also asks Windows for the Roaming folder. The bridge never
@@ -38,11 +38,14 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
 3. It also fetches the desktop session token (`GET /api/mcp/token`) and sends
    it as `X-JustSearch-Session` on every POST, so the bridge keeps working if
    the packaged app enforces the token on non-GET requests
-   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Before every request to
-   the Engine (each message's POST and the GET stream) it re-checks, without contacting the port, that the manifest still names the same
-   Engine and that the OS still reports it as the port's owner; if not, it drops the
-   token and re-runs discovery, so the old token never reaches whatever took the port
-   (a `JUSTSEARCH_API_PORT` pin is the operator's choice and is not re-checked).
+   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Every request to the Engine
+   (probes, token, each message's POST, the GET stream) goes through one function
+   (`engineRequest` in `server/engine-discovery.cjs`) whose keep-alive connections carry
+   nothing until the manifest still names the same Engine and the OS reports that pid as the
+   owner of the server end of that very connection; a reused connection needs no new proof.
+   If a proof fails, nothing is sent: the bridge drops the token and re-runs discovery, so a
+   token never reaches whatever took the port (a `JUSTSEARCH_API_PORT` pin is the operator's
+   choice and is used as given).
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a

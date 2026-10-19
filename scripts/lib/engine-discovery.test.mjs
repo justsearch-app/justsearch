@@ -113,6 +113,17 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(obj));
       };
+      if (holdUrl && req.url === holdUrl && !held) {
+        // Answered only on release(); the listener is gone by then, so the connection closes with
+        // this answer, as a stopping Engine's does: the client's next request needs a new
+        // connection to the port. release(fn) answers fn(request body).
+        held = (answer) => {
+          res.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
+          res.end(JSON.stringify(typeof answer === 'function' ? answer(body) : answer));
+        };
+        heldArrived();
+        return undefined;
+      }
       if (req.url === '/api/health') return json(healthStatus, { ok: healthStatus === 200 });
       if (req.url === '/api/status') return json(200, { status: 'ok' });
       if (kind === 'foreign') return json(404, { error: 'not found' });
@@ -135,16 +146,6 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
         });
       }
       if (req.url === '/mcp') return json(405, {});
-      if (holdUrl && req.url === holdUrl) {
-        // The listener is gone by then, so the connection closes with this answer, as a stopping
-        // Engine's does; the client's next request needs a new connection to the port.
-        held = (obj) => {
-          res.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
-          res.end(JSON.stringify(obj));
-        };
-        heldArrived();
-        return undefined;
-      }
       if (req.url === '/api/knowledge/status') return json(200, { state: 'READY', ready: true, docCount: 1, healthy: true });
       if (req.url.startsWith('/api/operation-history/')) return json(200, { state: 'completed', by: id });
       if (req.url === '/api/knowledge/retrieve-context') return json(200, { context: `context by ${id}`, total_found: 0, chunks: [], quality: {} });
@@ -154,6 +155,8 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
       return json(404, {});
     });
   });
+  const stats = { connections: 0 };
+  server.on('connection', () => stats.connections++);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', resolve);
@@ -174,14 +177,15 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
   /** Stop listening but keep open connections (a held response can still be sent). */
   const stopListening = () => new Promise((resolve) => server.close(resolve) && resolve());
   const release = (obj) => held(obj);
-  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth, arrived, release, stopListening };
+  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth, arrived, release, stopListening, stats };
 }
 
 /** Resolve once the service has received the client's notifications/initialized (its handshake is done). */
-async function handshakeDone(service) {
-  while (!service.requests.some((r) => r.url === '/mcp' && r.body.includes('notifications/initialized'))) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
+async function handshakeDone(service, { stream = false } = {}) {
+  const done = () =>
+    service.requests.some((r) => r.url === '/mcp' && r.body.includes('notifications/initialized')) &&
+    (!stream || service.requests.some((r) => r.url === '/mcp' && r.method === 'GET'));
+  while (!done()) await new Promise((resolve) => setTimeout(resolve, 10));
 }
 
 /** A live process that serves nothing (it only sleeps): an unrelated live pid. */
@@ -861,11 +865,87 @@ test('D9: production MCP status and operation outcome never contact a replacemen
   const prod = await startProdMcp(t, m);
   assert.match(await prod.call('justsearch_status', {}), /"ok":true/, prod.stderr);
   assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), new RegExp(engine.instanceId), prod.stderr);
+  assert.match(await prod.call('justsearch_status', {}), /"ok":true/, prod.stderr);
+  assert.equal(engine.stats.connections, 1, 'discovery, the token and every call share one proven connection');
   await engine.stopListening();
   const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   assert.match(await prod.call('justsearch_status', {}), /ENGINE_GONE/, prod.stderr);
   assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), /ENGINE_GONE/, prod.stderr);
   assert.deepEqual(impostor.requests, [], 'neither call contacts the replacement');
+});
+
+/**
+ * Once service has received its held request: stop its listener (the process stays alive), let a
+ * different process bind the same port, then answer the held request. Resolves to that process.
+ */
+async function takeOverWhileHeld(t, service, answer) {
+  await service.arrived;
+  await service.stopListening();
+  const impostor = await startImpostor(t, { port: service.port, pid: service.pid, instanceId: service.instanceId });
+  service.release(answer);
+  return impostor;
+}
+
+test('D9: the port is taken while /api/health is pending — neither client sends the token bootstrap (or anything) to the replacement', async (t) => {
+  const reached = {};
+  for (const client of ['production MCP', 'bundle']) {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const engine = await startService(t, { holdUrl: '/api/health' });
+    writeManifest(m.desktop, manifestFor(engine));
+    const run = client === 'production MCP' ? prodDiscover(m) : bridgeSession(m, bundle(root));
+    const [res, impostor] = await Promise.all([run, takeOverWhileHeld(t, engine, { ok: true })]);
+    reached[client] = { requests: impostor.requests, answersFromIt: /impostor/.test(JSON.stringify(res.result ?? res.messages)) };
+  }
+  const none = { requests: [], answersFromIt: false };
+  assert.deepEqual(reached, { 'production MCP': none, bundle: none }, 'nothing reaches the process that took the port, and nothing from it is used');
+});
+
+async function bridgeReconnectSwap(t, holdUrl, answer) {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t, { token: 'token-first' });
+  writeManifest(m.desktop, manifestFor(first));
+  let second = null;
+  let swap = null;
+  const session = await bridgeInteractive(m, bundle(root), async () => {
+    await handshakeDone(first, { stream: true }); // the bridge's own requests after initialize are over
+    await first.close();
+    second = await startService(t, { token: 'token-second', holdUrl });
+    writeManifest(m.desktop, manifestFor(second));
+    swap = takeOverWhileHeld(t, second, answer); // runs while the bridge reconnects for the next call
+  });
+  const impostor = await swap;
+  assert.deepEqual(impostor.requests, [], `no request, and neither token, reaches the process that took the port\n${session.stderr}`);
+  const call = session.messages.find((x) => x.id === 2);
+  assert.ok(call?.error, `the call fails instead of reaching the replacement: ${JSON.stringify(call)}\n${session.stderr}`);
+}
+
+test('D9: bridge reconnect — the restarted Engine\'s port is taken while its token response is pending', async (t) => {
+  await bridgeReconnectSwap(t, '/api/mcp/token', { token: 'token-second' });
+});
+
+test('D9: bridge reconnect — the restarted Engine\'s port is taken while the re-initialize response is pending', async (t) => {
+  await bridgeReconnectSwap(t, '/mcp', (body) => ({
+    jsonrpc: '2.0',
+    id: JSON.parse(body).id,
+    result: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'engine second', version: '0' } },
+  }));
+});
+
+test('D9: no code path reaches the Engine except engineRequest (one http.request, behind the proving agent)', () => {
+  const clients = ['packaging/mcpb/server/index.js', 'scripts/prod/justsearch-mcp/server.mjs', 'scripts/prod/justsearch-mcp/discovery.mjs'];
+  const direct = /\brequire\(\s*['"](node:)?(http|https|net)['"]\s*\)|\bfrom\s+['"](node:)?(http|https|net)['"]|\bfetch\s*\(|\bhttp\.(request|get)\s*\(|\bnet\.(connect|createConnection)\s*\(/;
+  for (const rel of clients) {
+    const src = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+    assert.doesNotMatch(src, direct, `${rel} must send through engine-discovery.cjs engineRequest`);
+    assert.match(src, /engineRequest\(/, rel);
+  }
+  const shared = fs.readFileSync(ENGINE_DISCOVERY, 'utf8');
+  assert.equal(shared.match(/\bhttp\.(request|get)\s*\(/g)?.length, 1, 'one http.request, in engineRequest');
+  assert.match(shared, /function engineRequest[\s\S]*?http\.request\([\s\S]*?agent: agentFor\(engine\)/, 'it always uses the proving agent');
+  assert.equal(shared.match(/\bnet\.connect\s*\(/g)?.length, 1, 'one net.connect, in provenConnection');
+  assert.doesNotMatch(shared, /\bfetch\s*\(/);
 });
 
 test('D1: a Windows-style lazily resolved folder (the OS-reported Roaming folder) is tried after the home-folder guess', async (t) => {

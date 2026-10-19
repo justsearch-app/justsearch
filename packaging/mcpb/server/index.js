@@ -14,11 +14,12 @@
  * (runtime/manifest.json) in JUSTSEARCH_DATA_DIR when set, then in the desktop app's data folder
  * (Windows: %APPDATA%\io.justsearch.shell; Linux: $XDG_DATA_HOME or ~/.local/share, then
  * io.justsearch.shell — see engine-discovery.cjs). A manifest counts only if its pid is alive, the
- * OS says that pid holds the listening socket on its port, the service there reports the same pid
- * and instance (GET /api/runtime/live) and /api/health answers 200; there is no default-port
- * guess, so an unrelated service is never picked up. Before each message that carries the session
- * token, the bridge re-checks (without network) that the same Engine still holds the port, and
- * selects again — fetching that Engine's own token — when it does not.
+ * service on its port, over a connection the OS says is that pid's, reports the same pid and
+ * instance (GET /api/runtime/live) and /api/health answers 200; there is no default-port
+ * guess, so an unrelated service is never picked up. Every request to the Engine goes through
+ * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS
+ * says its server end is the manifest pid's; when that fails, the bridge selects again (fetching
+ * that Engine's own token) and retries once.
  *
  * Fully offline by design: zero dependencies, Node builtins only, and no
  * network access beyond 127.0.0.1 — this bridge never downloads anything.
@@ -26,8 +27,7 @@
 
 'use strict';
 
-const http = require('http');
-const { confirmEngine, describeTried, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
+const { describeTried, engineRequest, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
 
 const HEALTH_TIMEOUT_MS = 2500;
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
@@ -62,22 +62,21 @@ function actionableUnreachableMessage(tried) {
   ].join('\n');
 }
 
-function httpGet(port, urlPath, timeoutMs) {
-  return new Promise((resolve) => {
-    const req = http.get(
-      { host: '127.0.0.1', port, path: urlPath, timeout: timeoutMs },
-      (res) => {
-        res.resume(); // drain
-        resolve(res.statusCode || 0);
-      }
-    );
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', () => resolve(0));
-  });
+/** The Engine the bridge talks to (engineRequest target). */
+function target() {
+  return { port: state.port, engine: state.engine };
 }
 
-async function healthy(port) {
-  return (await httpGet(port, '/api/health', HEALTH_TIMEOUT_MS)) === 200;
+function healthy(port) {
+  return new Promise((resolve) => {
+    const req = engineRequest({ port, engine: null }, { path: '/api/health', timeoutMs: HEALTH_TIMEOUT_MS }, (res) => {
+      res.resume(); // drain
+      resolve(res.statusCode === 200);
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', () => resolve(false));
+    req.end();
+  });
 }
 
 /**
@@ -86,10 +85,11 @@ async function healthy(port) {
  * allowed, which is exactly what lets a local MCP client bootstrap. Returns
  * null when absent/empty (dev mode / enforcement disabled).
  */
-function fetchSessionToken(port) {
+function fetchSessionToken() {
   return new Promise((resolve) => {
-    const req = http.get(
-      { host: '127.0.0.1', port, path: '/api/mcp/token', timeout: HEALTH_TIMEOUT_MS },
+    const req = engineRequest(
+      target(),
+      { path: '/api/mcp/token', timeoutMs: HEALTH_TIMEOUT_MS },
       (res) => {
         let raw = '';
         res.setEncoding('utf8');
@@ -106,6 +106,7 @@ function fetchSessionToken(port) {
     );
     req.on('timeout', () => req.destroy(new Error('timeout')));
     req.on('error', () => resolve(null));
+    req.end();
   });
 }
 
@@ -196,15 +197,9 @@ function postToServer(message, intercept) {
     if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
     if (state.apiToken) headers['x-justsearch-session'] = state.apiToken;
 
-    const req = http.request(
-      {
-        host: '127.0.0.1',
-        port: state.port,
-        path: '/mcp',
-        method: 'POST',
-        headers,
-        timeout: REQUEST_TIMEOUT_MS,
-      },
+    const req = engineRequest(
+      target(),
+      { method: 'POST', path: '/mcp', headers, timeoutMs: REQUEST_TIMEOUT_MS },
       (res) => {
         const status = res.statusCode || 0;
         const newSession = res.headers['mcp-session-id'];
@@ -263,7 +258,8 @@ function postToServer(message, intercept) {
     req.on('timeout', () => req.destroy(new Error('request timeout')));
     req.on('error', (e) => {
       const err = new Error(`connection failed: ${e.message}`);
-      err.retryable = true; // ECONNREFUSED etc: app restarted / port moved
+      // ECONNREFUSED etc: app restarted / port moved; ENGINE_NOT_PROVEN: nothing was sent
+      err.retryable = true;
       reject(err);
     });
     req.write(body);
@@ -272,15 +268,10 @@ function postToServer(message, intercept) {
 }
 
 /**
- * Best-effort server->client stream (GET /mcp), opened only after the owner proof
- * (ensureSameEngine). Optional per spec; if the server answers 405 or the stream drops, or the
- * Engine cannot be confirmed, we simply go without it.
+ * Best-effort server->client stream (GET /mcp). Optional per spec; if the server answers 405,
+ * the stream drops or its connection is not proven, we simply go without it.
  */
 function openGetStream() {
-  ensureSameEngine().then(openGetStreamNow, () => {});
-}
-
-function openGetStreamNow() {
   if (state.getStream) {
     state.getStream.destroy();
     state.getStream = null;
@@ -288,8 +279,9 @@ function openGetStreamNow() {
   const headers = { accept: 'text/event-stream' };
   if (state.sessionId) headers['mcp-session-id'] = state.sessionId;
   if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
-  const req = http.request(
-    { host: '127.0.0.1', port: state.port, path: '/mcp', method: 'GET', headers },
+  const req = engineRequest(
+    target(),
+    { path: '/mcp', headers },
     (res) => {
       if (res.statusCode !== 200) {
         res.resume();
@@ -326,7 +318,7 @@ async function recoverConnection() {
   state.port = port;
   state.engine = found.engine;
   state.sessionId = null;
-  state.apiToken = await fetchSessionToken(port); // token rotates per app start
+  state.apiToken = await fetchSessionToken(); // token rotates per app start
   if (!state.initializeParams) return; // nothing to re-establish yet
 
   state.reinitCounter += 1;
@@ -347,36 +339,6 @@ async function recoverConnection() {
   log(`reconnected to http://127.0.0.1:${state.port}/mcp (new session)`);
 }
 
-/**
- * Before every request to the Engine (sendToEngine, openGetStream): the Engine selected earlier
- * must still be the one the OS says holds its port, under the same manifest (confirmEngine; no
- * network). Otherwise select again, which re-proves the endpoint and fetches its own token, before
- * anything is sent. Concurrent requests share one check. Only recoverConnection's re-initialize,
- * sent right after its own proof, uses postToServer directly. A JUSTSEARCH_API_PORT pin is the
- * operator's choice and is not re-checked.
- */
-let pendingCheck = null;
-function ensureSameEngine() {
-  if (!state.engine) return Promise.resolve();
-  if (!pendingCheck) {
-    pendingCheck = (async () => {
-      const check = await confirmEngine(state.engine);
-      if (check.ok) return;
-      log(`the Engine on port ${state.port} changed (${check.status}: ${check.detail}) — re-checking where JustSearch is running...`);
-      await recoverConnection();
-    })().finally(() => {
-      pendingCheck = null;
-    });
-  }
-  return pendingCheck;
-}
-
-/** POST to the Engine after the owner proof; throws (err.tried) if the app is gone. */
-async function sendToEngine(message, intercept) {
-  await ensureSameEngine();
-  return postToServer(message, intercept);
-}
-
 /** Handle one client->server message, with one transparent reconnect+retry. */
 async function handleClientMessage(message) {
   const isInitialize = message && message.method === 'initialize';
@@ -387,7 +349,7 @@ async function handleClientMessage(message) {
 
   const send = () =>
     isInitialize
-      ? sendToEngine(message, (msg) => {
+      ? postToServer(message, (msg) => {
           if (msg && msg.id === message.id && msg.result) {
             if (typeof msg.result.protocolVersion === 'string') {
               state.protocolVersion = msg.result.protocolVersion;
@@ -398,7 +360,7 @@ async function handleClientMessage(message) {
           }
           emit(msg);
         })
-      : sendToEngine(message);
+      : postToServer(message);
 
   try {
     await send();
@@ -434,7 +396,7 @@ async function main() {
   const { port } = found;
   state.port = port;
   state.engine = found.engine;
-  state.apiToken = await fetchSessionToken(port);
+  state.apiToken = await fetchSessionToken();
   log(`bridging stdio <-> http://127.0.0.1:${port}/mcp${state.apiToken ? ' (session token attached)' : ''}`);
 
   let stdinBuffer = '';

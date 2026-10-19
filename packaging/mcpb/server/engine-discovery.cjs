@@ -9,14 +9,20 @@
  *     app.path().app_data_dir() — the `discovery.desktopAppDataDir` entry of
  *     contracts/platform-paths/spec.v1.json (fixtures there; test: engine-discovery.test.mjs).
  *  2. selectEngine(): read each candidate folder's runtime/manifest.json and accept it only when
- *     its pid is alive, the operating system says that pid holds the listening socket on the
- *     recorded port, the service there reports the manifest's pid and instanceId
- *     (GET /api/runtime/live) and /api/health answers 200. The first valid candidate wins; every
- *     rejected one is reported. confirmEngine() repeats the no-network part before a client sends
- *     credentials again.
+ *     its pid is alive, the service on the recorded port, over a connection proven to be that
+ *     pid's (below), reports the manifest's pid and instanceId (GET /api/runtime/live) and
+ *     /api/health answers 200. The first valid candidate wins; every rejected one is reported.
+ *  3. engineRequest(): the one way both clients send anything to an Engine. For a manifest
+ *     Engine it uses a keep-alive agent whose every new TCP connection is handed to the request
+ *     only after (a) the manifest still names the same pid, instance and port and (b) the OS
+ *     says the server end of this exact connection (127.0.0.1:<port> <-> our local port) is a
+ *     socket of that pid. Otherwise the socket is destroyed with nothing written, and the request
+ *     fails with err.code 'ENGINE_NOT_PROVEN'. A reused connection needs no new proof: a process
+ *     that binds the port later cannot take over an established connection. So there is no gap
+ *     between a check and the request it guards, and the OS is asked once per connection.
  *
  * Why the socket owner: whatever answers on the port can claim any pid and instanceId, so only
- * the OS's record of who holds the listening socket ties the endpoint to the manifest's process.
+ * the OS's record of who holds the connection ties the endpoint to the manifest's process.
  * This closes a service of another user (or any other process) that binds the port after the
  * Engine released it, or answers on a reused port, however well it copies the identity. It does
  * not close a process of the same user: that one can already read the data folder, the manifest
@@ -30,6 +36,7 @@
 const { execFile } = require('child_process');
 const fs = require('fs');
 const http = require('http');
+const net = require('net');
 const os = require('os');
 const path = require('path');
 
@@ -56,6 +63,8 @@ function startupWaitMs(env = process.env) {
 }
 const PROBE_MAX_BYTES = 64 * 1024;
 const OS_QUERY_TIMEOUT_MS = 10000;
+/** The server may not have accepted a fresh connection yet; it is looked up again this often. */
+const PROOF_RETRY_MS = 10;
 
 function platformKey(platform) {
   const p = platform || process.platform;
@@ -145,83 +154,188 @@ async function roamingAppDataFromOs() {
   return folder && path.win32.isAbsolute(folder) ? folder : null;
 }
 
-/** Listening TCP sockets on port (Linux): their inodes from /proc/net/tcp and tcp6. */
-function linuxListenerInodes(port) {
-  const inodes = new Set();
+/** A /proc/net/tcp{,6} address (hex, kernel byte order) as dotted IPv4, or null if not IPv4. */
+function procIPv4(hex) {
+  const v4 = hex.length === 8 ? hex : hex.length === 32 && hex.startsWith('0000000000000000FFFF0000') ? hex.slice(24) : null;
+  return v4 ? [6, 4, 2, 0].map((i) => parseInt(v4.slice(i, i + 2), 16)).join('.') : null;
+}
+
+/** A socket or netstat address without brackets or the IPv4-mapped prefix. */
+function plainAddress(address) {
+  return String(address || '').replace(/^\[|\]$/g, '').replace(/^::ffff:/i, '');
+}
+
+/**
+ * Linux: the server end of the connection is the established row whose local end is
+ * server and whose remote end is client; it must be one of pid's open sockets (/proc/<pid>/fd).
+ * Another user's process cannot be read, so it never passes. { pending: true } while the server
+ * has not accepted it yet (no row, or inode 0).
+ */
+function linuxServerEnd(server, client, pid) {
+  let inode = null;
   for (const file of ['tcp', 'tcp6']) {
     let text;
     try {
       text = fs.readFileSync(`/proc/net/${file}`, 'utf8');
     } catch (e) {
       if (e.code === 'ENOENT') continue; // no IPv6
-      throw e;
+      return { ok: false, status: 'owner-unknown', detail: `cannot read the TCP table: ${e.code || e.message}` };
     }
     for (const row of text.trim().split('\n').slice(1)) {
       const f = row.trim().split(/\s+/);
-      const local = f[1] || '';
-      if (f[3] === '0A' && parseInt(local.slice(local.lastIndexOf(':') + 1), 16) === port) inodes.add(f[9]);
+      if (f[3] !== '01') continue; // ESTABLISHED
+      const [la, lp] = (f[1] || '').split(':');
+      const [ra, rp] = (f[2] || '').split(':');
+      if (parseInt(lp, 16) !== server.port || parseInt(rp, 16) !== client.port) continue;
+      if (procIPv4(la) !== server.address || procIPv4(ra) !== client.address) continue;
+      inode = f[9];
     }
   }
-  return inodes;
+  if (!inode || inode === '0') return { pending: true };
+  let fds;
+  try {
+    fds = fs.readdirSync(`/proc/${pid}/fd`);
+  } catch (e) {
+    return { ok: false, status: 'owner-mismatch', detail: `cannot read pid ${pid}'s sockets (${e.code || e.message}); the connection to port ${server.port} is not proven to be its` };
+  }
+  const wanted = `socket:[${inode}]`;
+  for (const fd of fds) {
+    try {
+      if (fs.readlinkSync(`/proc/${pid}/fd/${fd}`) === wanted) return { ok: true };
+    } catch {
+      /* fd closed meanwhile */
+    }
+  }
+  return { ok: false, status: 'owner-mismatch', detail: `the connection to port ${server.port} is held by a process other than pid ${pid}` };
 }
 
 /**
- * Does the OS say that pid, and only pid, holds every listening socket on port? Never contacts
- * the port. Result: { ok: true } or { ok: false, status, detail }.
- *  - Linux: every LISTEN inode on the port (any address, IPv4 and IPv6) must be one of pid's
- *    open sockets (/proc/<pid>/fd). Another user's process cannot be read, so it never passes.
- *  - Windows: every LISTENING row for the port in the TCP table (netstat -ano, which lists the
- *    owning pid of every user's sockets without elevation) must name pid. Listening rows are
- *    told apart by their foreign port 0, so the localized state column is not read.
- *  - Elsewhere the owner cannot be checked and the candidate is refused.
+ * Windows: the row of the TCP table (netstat -ano, which lists the owning pid of every user's
+ * sockets without elevation) whose local end is server and foreign end is client must name pid.
+ * The localized state column is not read.
  */
-async function portOwnedBy(port, pid) {
-  if (process.platform === 'linux') {
-    let inodes;
-    try {
-      inodes = linuxListenerInodes(port);
-    } catch (e) {
-      return { ok: false, status: 'owner-unknown', detail: `cannot read the TCP table: ${e.code || e.message}` };
-    }
-    if (inodes.size === 0) return { ok: false, status: 'not-responding', detail: `nothing listens on port ${port}` };
-    const held = new Set();
-    let fds;
-    try {
-      fds = fs.readdirSync(`/proc/${pid}/fd`);
-    } catch (e) {
-      return { ok: false, status: 'owner-mismatch', detail: `cannot read pid ${pid}'s sockets (${e.code || e.message}); port ${port} is not proven to be its` };
-    }
-    for (const fd of fds) {
-      try {
-        const m = /^socket:\[(\d+)\]$/.exec(fs.readlinkSync(`/proc/${pid}/fd/${fd}`));
-        if (m) held.add(m[1]);
-      } catch {
-        /* fd closed meanwhile */
-      }
-    }
-    const foreign = [...inodes].filter((inode) => !held.has(inode));
-    return foreign.length === 0
+async function windowsServerEnd(server, client, pid) {
+  const res = await runTool(windowsTool('NETSTAT.EXE'), ['-ano']);
+  if (!res.stdout) return { ok: false, status: 'owner-unknown', detail: `netstat failed: ${res.error}` };
+  const end = (field) => {
+    const i = field.lastIndexOf(':');
+    return { address: plainAddress(field.slice(0, i)), port: Number(field.slice(i + 1)) };
+  };
+  const same = (a, b) => a.address === b.address && a.port === b.port;
+  for (const line of res.stdout.split(/\r?\n/)) {
+    const f = line.trim().split(/\s+/);
+    if (f.length < 5 || f[0] !== 'TCP' || !same(end(f[1]), server) || !same(end(f[2]), client)) continue;
+    const owner = Number(f[f.length - 1]);
+    return owner === pid
       ? { ok: true }
-      : { ok: false, status: 'owner-mismatch', detail: `port ${port} is held by a process other than pid ${pid}` };
+      : { ok: false, status: 'owner-mismatch', detail: `the connection to port ${server.port} is held by pid ${owner}, manifest says pid ${pid}` };
   }
-  if (process.platform === 'win32') {
-    const res = await runTool(windowsTool('NETSTAT.EXE'), ['-ano']);
-    if (!res.stdout) return { ok: false, status: 'owner-unknown', detail: `netstat failed: ${res.error}` };
-    const owners = new Set();
-    for (const line of res.stdout.split(/\r?\n/)) {
-      const f = line.trim().split(/\s+/);
-      // TCP <local> <foreign> <state> <pid>; the state may be localized, so it is not read.
-      if (f.length < 5 || f[0] !== 'TCP') continue;
-      if (Number(f[1].slice(f[1].lastIndexOf(':') + 1)) !== port || !/:0$/.test(f[2])) continue;
-      owners.add(Number(f[f.length - 1]));
+  return { pending: true };
+}
+
+/** Does the OS say the server end of this connected socket belongs to pid? */
+async function connectionOwnedBy(socket, pid) {
+  const server = { address: plainAddress(socket.remoteAddress), port: socket.remotePort };
+  const client = { address: plainAddress(socket.localAddress), port: socket.localPort };
+  const lookUp = process.platform === 'linux' ? linuxServerEnd : process.platform === 'win32' ? windowsServerEnd : null;
+  if (!lookUp) return { ok: false, status: 'owner-unknown', detail: `cannot check who holds a connection on ${process.platform}` };
+  const deadline = Date.now() + PROBE_TIMEOUT_MS;
+  for (;;) {
+    const result = await lookUp(server, client, pid);
+    if (!result.pending) return result;
+    if (Date.now() >= deadline) {
+      return { ok: false, status: 'owner-mismatch', detail: `the OS lists no server end for the connection to port ${server.port}` };
     }
-    if (owners.size === 0) return { ok: false, status: 'not-responding', detail: `nothing listens on port ${port}` };
-    const others = [...owners].filter((owner) => owner !== pid);
-    return others.length === 0
-      ? { ok: true }
-      : { ok: false, status: 'owner-mismatch', detail: `port ${port} is held by pid ${others.join(', ')}, manifest says pid ${pid}` };
+    await new Promise((resolve) => setTimeout(resolve, PROOF_RETRY_MS));
   }
-  return { ok: false, status: 'owner-unknown', detail: `cannot check who holds port ${port} on ${process.platform}` };
+}
+
+function notProven(status, detail) {
+  return Object.assign(new Error(`not proven to be the Engine (${status}: ${detail})`), { code: 'ENGINE_NOT_PROVEN', status, detail });
+}
+
+/**
+ * http.Agent createConnection for a manifest Engine: connect, prove, and only then hand the
+ * socket to the agent (which then writes the request). Nothing is written before the proof.
+ */
+function provenConnection(engine, options, done) {
+  const read = readManifest(engine);
+  if (read.ok === false) return done(notProven(read.status, read.detail));
+  if (read.pid !== engine.pid || read.instanceId !== engine.instanceId || read.port !== engine.port) {
+    return done(notProven('replaced', `the manifest now names pid ${read.pid} on port ${read.port}`));
+  }
+  const socket = net.connect({ host: options.host, port: options.port });
+  let settled = false;
+  const settle = (err) => {
+    if (settled) return;
+    settled = true;
+    socket.removeListener('error', settle);
+    if (err) {
+      socket.destroy();
+      done(err);
+    } else {
+      done(null, socket);
+    }
+  };
+  socket.once('error', settle);
+  socket.once('connect', () => {
+    connectionOwnedBy(socket, engine.pid).then(
+      (proof) => settle(proof.ok ? null : notProven(proof.status, proof.detail)),
+      (e) => settle(notProven('owner-unknown', e.message)),
+    );
+  });
+  return undefined;
+}
+
+const pinnedAgent = new http.Agent({ keepAlive: true });
+const engineAgents = new Map();
+
+function engineKey(engine) {
+  return [engine.dataDir, engine.pid, engine.instanceId, engine.port].join('\0');
+}
+
+/** One keep-alive agent per manifest Engine, whose connections are proven (provenConnection). */
+function agentFor(engine) {
+  if (!engine) return pinnedAgent;
+  const key = engineKey(engine);
+  let agent = engineAgents.get(key);
+  if (!agent) {
+    agent = new http.Agent({ keepAlive: true });
+    agent.createConnection = (options, done) => provenConnection(engine, options, done);
+    engineAgents.set(key, agent);
+  }
+  return agent;
+}
+
+/** Close the connections to a candidate that was not selected. */
+function forgetEngine(engine) {
+  const key = engineKey(engine);
+  const agent = engineAgents.get(key);
+  if (agent) agent.destroy();
+  engineAgents.delete(key);
+}
+
+/**
+ * The only way the clients send a request to an Engine: http.request to 127.0.0.1 through
+ * agentFor(target.engine). target is { port, engine }: engine is the manifest candidate
+ * ({ dataDir, pid, instanceId, port }), or null for a port the operator named (--port,
+ * JUSTSEARCH_API_PORT), which is used as given. Returns the http.ClientRequest; a failed proof
+ * surfaces as its 'error' with err.code 'ENGINE_NOT_PROVEN' (and err.status, err.detail).
+ */
+function engineRequest(target, { method = 'GET', path: urlPath, headers = {}, timeoutMs }, onResponse) {
+  const engine = target.engine || null;
+  return http.request(
+    {
+      host: '127.0.0.1',
+      port: engine ? engine.port : target.port,
+      path: urlPath,
+      method,
+      headers,
+      timeout: timeoutMs,
+      agent: agentFor(engine),
+    },
+    onResponse,
+  );
 }
 
 /** true alive, false dead, null unknown. EPERM means it exists under another user. */
@@ -236,8 +350,8 @@ function pidState(pid) {
   }
 }
 
-/** GET http://127.0.0.1:<port><urlPath> as JSON; never throws. */
-function getJson(port, urlPath, timeoutMs) {
+/** GET <urlPath> from target (engineRequest) as JSON; never throws. A failed proof is in .proof. */
+function getJson(target, urlPath, timeoutMs) {
   return new Promise((resolve) => {
     let settled = false;
     const done = (value) => {
@@ -246,8 +360,9 @@ function getJson(port, urlPath, timeoutMs) {
         resolve(value);
       }
     };
-    const req = http.get(
-      { host: '127.0.0.1', port, path: urlPath, timeout: timeoutMs, headers: { accept: 'application/json' } },
+    const req = engineRequest(
+      target,
+      { path: urlPath, timeoutMs, headers: { accept: 'application/json' } },
       (res) => {
         const chunks = [];
         let size = 0;
@@ -273,7 +388,8 @@ function getJson(port, urlPath, timeoutMs) {
       },
     );
     req.on('timeout', () => req.destroy(new Error(`no answer within ${timeoutMs} ms`)));
-    req.on('error', (e) => done({ status: 0, error: e.message }));
+    req.on('error', (e) => done({ status: 0, error: e.message, proof: e.code === 'ENGINE_NOT_PROVEN' ? e : null }));
+    req.end();
   });
 }
 
@@ -318,61 +434,46 @@ function readManifest(candidate) {
 
 /**
  * Validate one candidate folder. Accepts only when the manifest is complete, its pid is alive
- * (or cannot be checked), the OS says that pid holds the listening socket on head.apiPort, the
- * service there answers /api/runtime/live with the manifest's pid and instanceId, and
+ * (or cannot be checked), the service on head.apiPort, over a connection the OS says is that
+ * pid's (engineRequest), answers /api/runtime/live with the manifest's pid and instanceId, and
  * /api/health answers 200. A proven Engine that answers 503 (starting) is re-checked for up to
- * startupWaitMs, the owner proof repeated before each attempt; anything else is rejected at once.
- * Nothing is sent to the port before the owner check, and no credentials are sent at all.
+ * startupWaitMs; anything else is rejected at once. Nothing is written to a connection before
+ * its proof, and no credentials are sent at all.
  */
 async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS, startupWaitMs: waitMs = startupWaitMs() } = {}) {
   const read = readManifest(candidate);
   if (read.ok === false) return read;
   const { manifest, pid, instanceId, port } = read;
-  const owner = await portOwnedBy(port, pid);
-  if (!owner.ok) return reject(candidate, owner.status, owner.detail);
-  const live = await getJson(port, '/api/runtime/live', timeoutMs);
+  const engine = { dataDir: candidate.dataDir, pid, instanceId, port };
+  const target = { port, engine };
+  const refuse = (status, detail) => {
+    forgetEngine(engine);
+    return reject(candidate, status, detail);
+  };
+  const live = await getJson(target, '/api/runtime/live', timeoutMs);
+  if (live.proof) return refuse(live.proof.status, live.proof.detail);
   if (live.status !== 200) {
     const why = live.error ? live.error : `HTTP ${live.status} from /api/runtime/live`;
-    return reject(candidate, 'not-responding', `port ${port}: ${why}`);
+    return refuse('not-responding', `port ${port}: ${why}`);
   }
   const body = live.body;
   if (!body || body.alive !== true || body.pid !== pid || body.instanceId !== instanceId) {
     const seen = body && typeof body === 'object' ? `pid ${body.pid}, instance ${body.instanceId}` : 'no identity';
-    return reject(
-      candidate,
-      'identity-mismatch',
-      `port ${port} answers as ${seen}, manifest says pid ${pid}, instance ${instanceId}`,
-    );
+    return refuse('identity-mismatch', `port ${port} answers as ${seen}, manifest says pid ${pid}, instance ${instanceId}`);
   }
   const deadline = Date.now() + waitMs;
   for (;;) {
-    const health = await getJson(port, '/api/health', timeoutMs);
+    const health = await getJson(target, '/api/health', timeoutMs);
+    if (health.proof) return refuse(health.proof.status, health.proof.detail);
     if (health.status === 200) break;
     const why = health.error ? health.error : `HTTP ${health.status}`;
     if (health.status !== 503 || Date.now() + STARTUP_RETRY_MS > deadline) {
       const waited = health.status === 503 ? ` after waiting ${Math.round(waitMs / 1000)} s` : '';
-      return reject(candidate, 'unhealthy', `pid ${pid} on port ${port} is not ready${waited}: /api/health ${why}`);
+      return refuse('unhealthy', `pid ${pid} on port ${port} is not ready${waited}: /api/health ${why}`);
     }
     await new Promise((resolve) => setTimeout(resolve, STARTUP_RETRY_MS));
-    const still = await portOwnedBy(port, pid);
-    if (!still.ok) return reject(candidate, still.status, still.detail);
   }
-  return { ...candidate, ok: true, status: 'ok', port, pid, instanceId, lifecycle: manifest.lifecycle || null };
-}
-
-/**
- * Before credentials go to a previously selected Engine again: its manifest still names the same
- * pid, instance and port, the pid is alive and the OS says it still holds the port. Never
- * contacts the port. Result: { ok: true } or a rejection; on a rejection, select again.
- */
-async function confirmEngine(selected) {
-  const read = readManifest(selected);
-  if (read.ok === false) return read;
-  if (read.pid !== selected.pid || read.instanceId !== selected.instanceId || read.port !== selected.port) {
-    return reject(selected, 'replaced', `the manifest now names pid ${read.pid} on port ${read.port}`);
-  }
-  const owner = await portOwnedBy(selected.port, selected.pid);
-  return owner.ok ? { ok: true } : reject(selected, owner.status, owner.detail);
+  return { ...candidate, ok: true, status: 'ok', ...engine, lifecycle: manifest.lifecycle || null };
 }
 
 function sameFolder(a, b) {
@@ -434,8 +535,8 @@ module.exports = {
   startupWaitMs,
   desktopAppDataDir,
   validateCandidate,
-  confirmEngine,
   selectEngine,
+  engineRequest,
   roamingAppDataFromOs,
   standardCandidates,
   describeTried,

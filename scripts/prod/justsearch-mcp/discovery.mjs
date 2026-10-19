@@ -7,11 +7,10 @@
  * bridge.
  */
 
-import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import {devDataDirCandidates, isPidAlive, resolveDataDir as resolveUserDataDir} from '../../lib/platform-paths.mjs';
-import {describeTried, selectEngine, standardCandidates} from '../../../packaging/mcpb/server/engine-discovery.cjs';
+import {describeTried, engineRequest, selectEngine, standardCandidates} from '../../../packaging/mcpb/server/engine-discovery.cjs';
 
 /**
  * Resolve the JustSearch data directory.
@@ -53,15 +52,9 @@ export function resolveDataDir() {
  */
 export function validatePort(port, timeoutMs = 2000) {
   return new Promise((resolve) => {
-    const req = http.request(
-      {
-        hostname: '127.0.0.1',
-        port,
-        path: '/api/status',
-        method: 'GET',
-        timeout: timeoutMs,
-        headers: { Accept: 'application/json' },
-      },
+    const req = engineRequest(
+      { port, engine: null },
+      { path: '/api/status', timeoutMs, headers: { Accept: 'application/json' } },
       (res) => {
         if (res.statusCode !== 200) {
           res.resume();
@@ -89,20 +82,15 @@ export function validatePort(port, timeoutMs = 2000) {
 }
 
 /**
- * Fetch the session token from GET /api/mcp/token.
- * Returns the token string, empty string (dev mode), or null (endpoint not available).
+ * Fetch the session token from GET /api/mcp/token of target ({ port, engine }, engine-discovery.cjs
+ * engineRequest: a manifest Engine's connection is proven first).
+ * Returns the token string, empty string (dev mode), or null (endpoint not available or not proven).
  */
-export function fetchToken(port, timeoutMs = 3000) {
+export function fetchToken(target, timeoutMs = 3000) {
   return new Promise((resolve) => {
-    const req = http.request(
-      {
-        hostname: '127.0.0.1',
-        port,
-        path: '/api/mcp/token',
-        method: 'GET',
-        timeout: timeoutMs,
-        headers: { Accept: 'application/json' },
-      },
+    const req = engineRequest(
+      target,
+      { path: '/api/mcp/token', timeoutMs, headers: { Accept: 'application/json' } },
       (res) => {
         if (res.statusCode !== 200) {
           res.resume();
@@ -150,17 +138,17 @@ export function engineCandidates({env = process.env, cwd = process.cwd()} = {}) 
  * Priority:
  * 1. Explicit port (--port CLI arg)
  * 2. JUSTSEARCH_API_PORT env var
- * 3. The first runtime manifest, in engineCandidates() order, whose pid is alive and holds the
- *    listening socket on its port (as the OS reports it), whose port answers GET /api/runtime/live
- *    with the manifest's pid and instanceId, and whose /api/health answers 200.
+ * 3. The first runtime manifest, in engineCandidates() order, whose pid is alive and whose port,
+ *    over a connection the OS reports as that pid's (engine-discovery.cjs engineRequest), answers
+ *    GET /api/runtime/live with the manifest's pid and instanceId and /api/health with 200.
  *
  * There is no port probe: a port with no validated manifest behind it is never used unless the
  * operator named it. Once selected, fetches the session token via GET /api/mcp/token.
  *
  * @param {{ port?: number, verbose?: boolean }} opts
  * @returns {Promise<{ port: number, baseUrl: string, token: string | null, instanceId?: string, dataDir?: string, source?: string, engine?: object }>}
- *   engine: the validated manifest candidate (absent for --port / JUSTSEARCH_API_PORT); pass it to
- *   engine-discovery.cjs confirmEngine() before sending the token again.
+ *   engine: the validated manifest candidate (absent for --port / JUSTSEARCH_API_PORT); every
+ *   request to it goes through engine-discovery.cjs engineRequest({ port, engine }).
  */
 export async function discover({ port: explicitPort, verbose } = {}) {
   const log = verbose ? (msg) => process.stderr.write(`[justsearch-mcp] ${msg}\n`) : () => {};
@@ -170,7 +158,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   if (explicitPort != null) {
     log(`Trying explicit port ${explicitPort}...`);
     if (await validatePort(explicitPort)) {
-      const token = await fetchToken(explicitPort);
+      const token = await fetchToken({ port: explicitPort, engine: null });
       log(`Connected on port ${explicitPort}, token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
       return { port: explicitPort, baseUrl: `http://127.0.0.1:${explicitPort}`, token };
     }
@@ -182,7 +170,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   if (Number.isFinite(envPort) && envPort > 0) {
     log(`Trying JUSTSEARCH_API_PORT=${envPort}...`);
     if (await validatePort(envPort)) {
-      const token = await fetchToken(envPort);
+      const token = await fetchToken({ port: envPort, engine: null });
       log(`Connected on port ${envPort}, token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
       return { port: envPort, baseUrl: `http://127.0.0.1:${envPort}`, token };
     }
@@ -194,7 +182,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   attempts.push(...describeTried(tried.filter((t) => !t.ok)));
   if (selected) {
     const { port } = selected;
-    const token = await fetchToken(port);
+    const token = await fetchToken({ port, engine: selected });
     process.stderr.write(
       `[justsearch-mcp] Using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${port})\n`,
     );
