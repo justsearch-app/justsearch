@@ -22,7 +22,7 @@ Partial candidate, blocked on baseline fixture placement. Execution evidence is 
         {
           "kind": "owner-words",
           "quote": "The ORT optimized-model test cache directory (JvmBaseConventionsPlugin.kt ~141) is decided at execution time, not from the daemon's java.io.tmpdir at configuration time, and by default is not under /tmp on Linux",
-          "location": "task build-hygiene user request WB1"
+          "location": "task build-hygiene request"
         }
       ],
       "assessment": {
@@ -42,7 +42,7 @@ Partial candidate, blocked on baseline fixture placement. Execution evidence is 
         {
           "kind": "owner-words",
           "quote": "gradle.properties: drop -XX:+UseLargePages; correct the stale test-gate comments",
-          "location": "task build-hygiene user request WB3"
+          "location": "task build-hygiene request"
         }
       ],
       "assessment": {
