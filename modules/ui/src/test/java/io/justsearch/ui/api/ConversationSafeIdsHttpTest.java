@@ -71,7 +71,7 @@ class ConversationSafeIdsHttpTest {
         app.start(0);
         try (var client = HttpClient.newHttpClient()) {
           for (Route route : routes) {
-            for (String id : List.of("a%2Fb", "a%5Cb", "%2E%2E", "..%5C..", "a%00b", "a%2F..%5Cb", "C%3Aoutside", "%20", "%2E", "%2Fabsolute", "%5C%5Chost%5Cshare", "a%0Ab")) {
+            for (String id : List.of("a%2Fb", "a%5Cb", "%2E%2E", "..%5C..", "a%00b", "a%2F..%5Cb", "C%3Aoutside", "%20", "%2E", "%2Fabsolute", "%5C%5Chost%5Cshare", "a%0Ab", "...", "a.", "a%20", "CON", "nul.txt")) {
               String path = route.path().replace("{sessionId}", id).replace("{id}", id);
               var request = HttpRequest.newBuilder(URI.create("http://localhost:" + app.port() + path))
                   .header("Content-Type", "application/json")
@@ -128,7 +128,7 @@ class ConversationSafeIdsHttpTest {
       app.post("/tool-result", tools::handleVirtualToolResult);
       app.start(0);
       try (var client = HttpClient.newHttpClient()) {
-        for (String id : List.of("", " ", "..", "../outside", "..\\..", "C:outside", "x\u0000y", "a/b", "a\\b")) {
+        for (String id : List.of("..", "../outside", "..\\..", "C:outside", "x\u0000y", "a/b", "a\\b")) {
           String body = JsonMapper.builder().build().writeValueAsString(java.util.Map.of(
               "sessionId", id, "conversationId", id, "shapeId", "core.free-chat",
               "callId", "c", "prompt", "hello"));

@@ -268,6 +268,7 @@ final class AgentSessionController {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "toolName and executionId are required", telemetry, ApiErrorHandler.routeOf(ctx)));
         return;
       }
+      if (StoreIdRequest.rejectUnsafe(ctx, executionId)) return;
       var result = queries().undoOperation(toolName, executionId, RequestEngineContext.agent(ctx));
       ctx.json(Map.of(
           "success", result.success(),
@@ -311,6 +312,7 @@ final class AgentSessionController {
   /** GET /api/chat/agent/history/{batchId} — Get full batch detail. */
   void handleHistoryDetail(Context ctx) {
     String batchId = ctx.pathParam("batchId");
+    if (StoreIdRequest.rejectUnsafe(ctx, batchId)) return;
     var detail = queries().operationDetail(batchId);
     if (detail == null) {
       ctx.status(404).json(ApiErrorHandler.toResponse(ApiErrorCode.NOT_FOUND, "Batch not found: " + batchId, telemetry, ApiErrorHandler.routeOf(ctx)));

@@ -28,8 +28,16 @@ final class StoreIdRequest {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, key + " must be a string"));
         return true;
       }
-      if (rejectUnsafe(ctx, id)) return true;
+      if (!id.isBlank() && rejectUnsafe(ctx, id)) return true;
     }
+    normalizeOptionalIds(body);
     return false;
+  }
+
+  /** Parsed request maps are mutable; blank optional ids have the same meaning as absence. */
+  static void normalizeOptionalIds(Map<String, Object> body) {
+    for (String key : new String[] {"sessionId", "conversationId"}) {
+      if (body.get(key) instanceof String id && id.isBlank()) body.remove(key);
+    }
   }
 }

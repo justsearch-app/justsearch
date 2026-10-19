@@ -305,7 +305,9 @@ public final class RunStreamController {
     if (ctx == null || ctx.body() == null || ctx.body().isEmpty()) {
       return Map.of();
     }
-    return MAPPER.readValue(ctx.body(), Map.class);
+    Map<String, Object> body = MAPPER.readValue(ctx.body(), Map.class);
+    StoreIdRequest.normalizeOptionalIds(body);
+    return body;
   }
 
   private static Map<String, Object> errorBody(String message, ApiErrorCode code) {

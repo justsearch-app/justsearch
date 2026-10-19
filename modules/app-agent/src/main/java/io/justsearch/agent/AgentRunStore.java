@@ -91,9 +91,10 @@ public final class AgentRunStore {
    * this is a third shape sharing the same store, not a new persistence substrate). Returns the
    * persisted event's projected wire id (the same id {@link AgentInteractionMapper#fromRunEvent}
    * derives for it), or {@code null} if the store is disabled or the write failed.
-   * Unsafe ids are rejected before any store access.
+   * An absent conversation id returns null; unsafe ids are rejected before any store access.
    */
   public synchronized String appendSearchEvent(String conversationId, Map<String, Object> attributes) {
+    if (conversationId == null || conversationId.isBlank()) return null;
     StoreIds.requireValid(conversationId);
     if (!isEnabled()) {
       return null;

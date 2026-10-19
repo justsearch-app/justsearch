@@ -40,18 +40,46 @@ class RunStoresSafeIdsTest {
           () -> store.appendEvent(id, new AgentEvent.SessionStarted(id)),
           () -> store.markBackground(id), () -> store.markInterrupted(id, Instant.EPOCH),
           () -> store.listRunIdsByConversation(id), () -> store.deleteConversationRuns(id),
-          () -> store.appendSearchEvent(id, Map.of()),
           () -> events.appendEvent(id, "core.agent-run", "done", Map.of()),
           () -> events.appendRawEvents(id, List.of(Map.of("eventType", "done"))),
           () -> events.appendRawEvents(id, List.of()),
           () -> events.readEvents(id), () -> events.writeRunMeta(id, Map.of()),
           () -> events.runDir(id), () -> events.eventsPath(id), () -> events.metaPath(id));
+      if (id.isBlank()) assertNull(store.appendSearchEvent(id, Map.of()));
+      else assertThrows(IllegalArgumentException.class, () -> store.appendSearchEvent(id, Map.of()));
       for (var operation : operations) {
         assertThrows(IllegalArgumentException.class, operation, "unsafe id: " + id);
         assertFalse(Files.exists(root), "no store root created by refusal");
         assertEquals("keep", Files.readString(next));
         assertEquals("keep", Files.readString(above));
       }
+    }
+  }
+
+  @Test
+  void appendSearchEventWithoutConversationCreatesNoFiles() {
+    Path root = tmp.resolve("runs");
+    var store = new AgentRunStore(root);
+    for (String id : java.util.Arrays.asList(null, "", " \t")) {
+      assertNull(assertDoesNotThrow(() -> store.appendSearchEvent(id, Map.of("query", "hello"))));
+      assertFalse(Files.exists(root));
+    }
+  }
+
+  @Test
+  void refusesWindowsAliasesBeforeRunOrEventAccess() {
+    Path root = tmp.resolve("runs");
+    var store = new AgentRunStore(root);
+    var events = store.runEvents();
+    for (String id : List.of("...", "a.", "a ", "CON", "con.txt", "PrN", "AUX", "NUL", "nul.txt",
+        "COM1", "com9.ext", "LPT1", "lpt9.ext")) {
+      assertAll(id,
+          () -> assertThrows(IllegalArgumentException.class, () -> store.readSnapshot(id)),
+          () -> assertThrows(IllegalArgumentException.class, () -> store.deleteConversationRuns(id)),
+          () -> assertThrows(IllegalArgumentException.class, () -> store.appendSearchEvent(id, Map.of())),
+          () -> assertThrows(IllegalArgumentException.class, () -> events.readEvents(id)),
+          () -> assertThrows(IllegalArgumentException.class, () -> events.writeRunMeta(id, Map.of())),
+          () -> assertFalse(Files.exists(root)));
     }
   }
 

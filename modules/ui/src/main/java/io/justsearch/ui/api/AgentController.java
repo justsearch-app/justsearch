@@ -185,6 +185,7 @@ final class AgentController {
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = MAPPER.readValue(ctx.body(), Map.class);
+      StoreIdRequest.normalizeOptionalIds(body);
       Audience audience = readAudience(ctx);
       ConversationShapeRef shapeRef = resolveShapeRef(body);
       withHeartbeat(
@@ -261,6 +262,7 @@ final class AgentController {
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> parsed = MAPPER.readValue(ctx.body(), Map.class);
+      StoreIdRequest.normalizeOptionalIds(parsed);
       body = parsed;
       shapeRef = resolveShapeRef(body);
     } catch (Exception ignored) {
@@ -380,6 +382,7 @@ final class AgentController {
       var body = MAPPER.readTree(ctx.body());
       String callId = body.path("callId").asText();
       String sessionId = body.path("sessionId").asText(null);
+      if (sessionId != null && sessionId.isBlank()) sessionId = null;
       if (sessionId != null && StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
       String reason = body.path("reason").asText("User rejected");
       boolean handled = resolveApprovalGate(sessionId, callId, approved, reason);

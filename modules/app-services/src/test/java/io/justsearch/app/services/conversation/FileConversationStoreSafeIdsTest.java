@@ -14,6 +14,24 @@ class FileConversationStoreSafeIdsTest {
   @TempDir Path tmp;
 
   @Test
+  void refusesWindowsAliasesBeforeConversationAccess() throws Exception {
+    Path root = tmp.resolve("conversations");
+    var store = new FileConversationStore(root);
+    try (var indexer = new io.justsearch.app.services.agenthistory.AgentHistoryIndexer(
+        new io.justsearch.core.execution.TestEngineExecutors(), tmp.resolve("history"), () -> null)) {
+      for (String id : List.of("...", "a.", "a ", "CON", "con.txt", "PrN", "AUX", "NUL", "nul.txt",
+          "COM1", "com9.ext", "LPT1", "lpt9.ext")) {
+        assertAll(id,
+            () -> assertThrows(IllegalArgumentException.class, () -> store.loadHistory(id)),
+            () -> assertThrows(IllegalArgumentException.class, () -> store.deleteSession(id)),
+            () -> assertThrows(IllegalArgumentException.class, () -> store.appendMessage(id, "core.free-chat", Map.of())),
+            () -> assertThrows(IllegalArgumentException.class, () -> indexer.reindexRestoredRun(id, List.of())),
+            () -> assertFalse(Files.exists(root)));
+      }
+    }
+  }
+
+  @Test
   void refusesUnsafeIdsBeforeAnyOperationAndPreservesSentinels() throws Exception {
     Path parent = Files.createDirectories(tmp.resolve("parent"));
     Path root = parent.resolve("conversations");

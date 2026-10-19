@@ -139,10 +139,10 @@ class AgentRunStoreTest {
   }
 
   @Test
-  void appendSearchEventRefusesBlankConversationId() {
+  void appendSearchEventReturnsNullForBlankConversationId() {
     var store = new AgentRunStore(tempDir.resolve("agent-runs"));
-    assertThrows(IllegalArgumentException.class, () -> store.appendSearchEvent("", Map.of("query", "x")));
-    assertThrows(IllegalArgumentException.class, () -> store.appendSearchEvent(null, Map.of("query", "x")));
+    assertEquals(null, store.appendSearchEvent("", Map.of("query", "x")));
+    assertEquals(null, store.appendSearchEvent(null, Map.of("query", "x")));
   }
 
   @Test
