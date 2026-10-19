@@ -52,9 +52,11 @@ or separate acceptance record. All of these conditions must hold:
   only adding a test case or changing an expected value.
 - It is a regular file, not a symbolic link in either Git's index or the working tree. This applies
   to frontend test sources too, including checkouts that materialize Git symlinks as regular files.
-- The path must not equal, after Unicode NFC normalization and ignoring letter case, any path at
-  the base or any other changed path. This keeps additions that can collide on case-insensitive
-  or Unicode-normalizing filesystems gated.
+- Every path component contains only ASCII letters, digits, `.`, `_` or `-`. Each prefix (every
+  ancestor folder and the full path) must not collide, ignoring ASCII letter case, with any file
+  or ancestor folder at the base or elsewhere in the change. Only shared folders with identical
+  spelling are allowed. Non-ASCII names and file/folder collisions stay gated. The existing NFC
+  normalization check still applies to move handling.
 - No in-scope test file, test-owned data, watched baseline, listed helper or Rust source is deleted
   in the diff. Deletion plus addition could be an edited move; the gate cannot prove isolation.
   An exact copy of any deleted file is also ineligible. Existing byte-identical move handling

@@ -116,10 +116,35 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   // Check the base as well as the diff: case-only or Unicode-normalization-only additions can
   // replace existing files on some filesystems, even when the base path is deleted in this change.
   const casePaths = new Map();
-  for (const p of new Set([...baseBlobs.keys(), ...changedPaths])) {
+  const allPaths = new Set([...baseBlobs.keys(), ...changedPaths]);
+  const prefixes = new Map();
+  const folders = new Set();
+  for (const p of allPaths) {
     const key = pathCollisionKey(p);
     casePaths.set(key, (casePaths.get(key) ?? 0) + 1);
+    const parts = p.split('/');
+    for (let i = 1; i <= parts.length; i++) {
+      const prefix = parts.slice(0, i).join('/');
+      const key = pathCollisionKey(prefix);
+      if (!prefixes.has(key)) prefixes.set(key, new Set());
+      prefixes.get(key).add(prefix);
+      if (i < parts.length) folders.add(prefix);
+    }
   }
+  // Lowercasing cannot prove arbitrary Unicode names safe across filesystems (for example long
+  // s versus ASCII s). Exempt only plain ASCII components, with no file/folder or spelling
+  // collision at any prefix. Identically spelled shared folders are legitimate.
+  const isolatedPath = (rel) => {
+    const parts = rel.split('/');
+    if (parts.some((part) => !/^[A-Za-z0-9._-]+$/.test(part))) return false;
+    for (let i = 1; i <= parts.length; i++) {
+      const prefix = parts.slice(0, i).join('/');
+      const matches = prefixes.get(pathCollisionKey(prefix));
+      if (matches.size !== 1 || !matches.has(prefix)) return false;
+      if (i < parts.length ? allPaths.has(prefix) : folders.has(prefix)) return false;
+    }
+    return true;
+  };
   const changeStatus = new Map(changes.map((c) => [c.path, c.status]));
   const readBase = (rel) => readAtRef(base.ref, rel, repoRoot);
   const readNow = (rel) => readWorking(rel, repoRoot);
@@ -294,7 +319,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     if (c.status === 'A' && c.before === null && c.kind === 'test-code'
       && !deletedTest && !deleted.some((d) => d.before === c.after)
       && !contextMoves.has(c.path) && !testSupport.has(c.path) && !rustTestFiles.has(c.path)
-      && casePaths.get(pathCollisionKey(c.path)) === 1
+      && isolatedPath(c.path)
       && regularSource(c.path)
       && !buildConfigKind(c.path) && isStandaloneTestSource(c.path)
       && (!/\.(java|kt)$/.test(c.path) || uniqueJvmType(c.path))) {

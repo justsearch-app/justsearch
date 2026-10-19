@@ -1235,6 +1235,42 @@ export const CASES = [
     scenario: { main: BASE, branch: [{ write: { 'modules/ui-web/src/views/LIST.test.ts': BASE[P.uiTest] } }] },
     expect: 'fail', rules: ['uncovered'], flagged: ['modules/ui-web/src/views/LIST.test.ts'],
   },
+  ...[
+    ['n01 long-s filename', 'modules/ui-web/src/activity/idleSurfaces.test.ts', 'modules/ui-web/src/activity/idleSurface\u017f.test.ts'],
+    ['n02 folder collides with file', 'modules/ui-web/src/activity/presenceSignal.test.ts', 'modules/ui-web/src/activity/presencesignal.test.ts/probe.test.ts'],
+    ['folder case collision', 'modules/ui-web/src/Activity/existing.ts', 'modules/ui-web/src/activity/probe.test.ts'],
+    ['file collides with folder', 'modules/ui-web/src/Probe.test.ts/existing.ts', 'modules/ui-web/src/probe.test.ts'],
+  ].flatMap(([label, existing, added]) => ['base', 'change'].map((side) => ({
+    name: `isolated-new preservation: ${label} at ${side} stays gated`,
+    scenario: {
+      main: { ...BASE, ...(side === 'base' ? { [existing]: BASE[P.uiTest] } : {}) },
+      branch: [{ write: { [added]: BASE[P.uiTest], ...(side === 'change' ? { [existing]: BASE[P.uiTest] } : {}) } }],
+    },
+    expect: 'fail', rules: ['uncovered'],
+    check: (r) => {
+      assert.ok(r.flagged.some((f) => f.id === added));
+      assert.deepEqual(r.exempt, label.startsWith('n01') && side === 'change' ? [existing] : []);
+    },
+  }))),
+  ...[
+    'modules/ui-web/src/caf\u00e9/probe.test.ts',
+    'modules/ui-web/src/with space/probe.test.ts',
+    'modules/ui-web/src/probe+.test.ts',
+  ].map((file) => ({
+    name: `isolated-new preservation: non-ASCII or unsupported path component ${file} stays gated`,
+    scenario: { main: BASE, branch: [{ write: { [file]: BASE[P.uiTest] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [file],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  })),
+  {
+    name: 'isolated-new: identical shared folders and plain ASCII punctuation allow new tests',
+    scenario: { main: BASE, branch: [{ write: {
+      'modules/ui-web/src/views/new_folder-2.0/one.test.ts': BASE[P.uiTest],
+      'modules/ui-web/src/views/new_folder-2.0/two.test.ts': BASE[P.uiTest],
+    } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.equal(r.exempt.length, 2),
+  },
   ...['base', 'change'].flatMap((side) => ['normalization', 'normalization and case'].map((kind) => {
     const existing = 'modules/ui-web/src/views/caf\u00e9.test.ts';
     const added = `modules/ui-web/src/views/${kind === 'normalization' ? 'cafe\u0301' : 'CAFE\u0301'}.test.ts`;
