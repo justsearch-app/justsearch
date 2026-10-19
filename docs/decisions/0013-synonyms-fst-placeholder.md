@@ -2,7 +2,7 @@
 title: "ADR-0013: Synonyms FST Placeholder"
 type: decision
 status: accepted - partially superseded by ADR-0043
-description: "Use deterministic text placeholders for synonym FST artifacts until a Java Lucene FST compiler is built."
+description: "The synonym FST placeholder is moot: per-language synonyms, SynonymsCompiler and ssotCompileSynonyms were removed (ADR-0043). The live part is the analyzer fingerprinting algorithm: SHA-256 over a sorted-key JSON descriptor, pinned by SsotValidatorFingerprintTest."
 date: 2025-10-15
 probes: none - partially superseded by ADR-0043, which owns the surviving question; the placeholder artifacts are covered by the language-agnostic-analysis check through 0043.
 last_reviewed: 2026-09-02

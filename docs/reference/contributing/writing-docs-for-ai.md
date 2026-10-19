@@ -127,7 +127,8 @@ description: "Lucene internals, schema (SSOT), and locking strategies."
 **Status behavior:**
 - `stable` and `in-progress` → included in `llms.txt`
 - `advisory` → included in `llms.txt`; describes planned/G0 contracts not yet enforced
-- `draft` → excluded from `llms.txt`
+- `accepted` or `accepted - …` on a decision under `docs/decisions/` → included in `llms.txt` (a live ADR)
+- `draft`, `superseded`, `deprecated`, `rejected - …` and any other status → excluded from `llms.txt`
 - Missing `status` → CI error (build fails)
 
 ---

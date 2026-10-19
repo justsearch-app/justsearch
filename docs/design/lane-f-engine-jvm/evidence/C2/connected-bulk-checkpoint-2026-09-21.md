@@ -1,6 +1,6 @@
 # Historical connected bulk checkpoint, 2026-09-21
 
-Superseded current-state snapshot; use [handoff](../../handoff.md) for next actions.
+Superseded current-state snapshot; use [handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md) for next actions.
 
 ## Current state (2026-09-21)
 

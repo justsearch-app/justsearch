@@ -866,7 +866,7 @@ ANN recall and any later product-collapse design remain with 639. No retrieval b
   signature recorded before and after (`nvidia-smi` + game-process scan); **every cited arm ran with
   0 game processes**. Hard admissibility per arm: `ce_coverage.verdict == "ok"` AND
   `per_mode.<mode>.comparable`. A void arm is re-run and never cited — the filter is committed at
-  `scripts/jseval/916_collapse_ab.py`, not hidden in a gitignored script.
+  `scripts/jseval/916_collapse_ab.py` under the archive tag `archive/machinery-cleanup-base`.
 
 **Campaign 1 (916 §G) — λ=0.3, multiplier ×5, one build per corpus.** legal-clerc-200 nDCG +0.0010 /
 R@10 +0.0050 / leak −0.0050; enron-qa nDCG −0.0053 / R@10 −0.0067 / leak +0.0033; scifact (short
@@ -981,7 +981,8 @@ on the leak clause independently of the R@10 noise floor (0.0068). The single po
   turns out to be.
 - **Evidence:** every claim above carries its `2026MMDDTHHMMSS_<corpus>` run id. Run trees are
   gitignored; this entry and tempdoc 916 §G/§I/§J are the durable record, and the A/B driver with its
-  admissibility filter is committed at `scripts/jseval/916_collapse_ab.py`. **No throughput or
+  admissibility filter is preserved at `scripts/jseval/916_collapse_ab.py` under the archive tag
+  `archive/machinery-cleanup-base`. **No throughput or
   latency number from any of these campaigns is cited as evidence anywhere** — §G's index build was
   contended, so those numbers are void by construction.
 

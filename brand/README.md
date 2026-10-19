@@ -8,7 +8,8 @@ surface is how a product ends up with five slightly different logos and no way t
 The mark is **"The Slot"**: a sealed mass with one slot cut through its wall, an answer-line standing
 *outside* it, and a superscript footnote square. It draws the product's sentence — nothing leaves the
 machine but the answer, and the answer leaves cited. Design record (directions A–D, the comparison
-sheet, the self-critique): [`docs/ui-explorations/2026-08-06-brand-identity/`](../docs/ui-explorations/2026-08-06-brand-identity/).
+sheet, the self-critique), archived at the `archive/machinery-cleanup-base` tag:
+[`docs/ui-explorations/2026-08-06-brand-identity/`](https://github.com/justsearch-app/justsearch/tree/archive/machinery-cleanup-base/docs/ui-explorations/2026-08-06-brand-identity).
 Implementation record: [`docs/tempdocs/815-visual-identity-kernel.md`](../docs/tempdocs/815-visual-identity-kernel.md).
 
 ## What derives from what
