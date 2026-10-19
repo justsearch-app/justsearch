@@ -102,9 +102,17 @@ public sealed interface AgentEvent {
    * before that. {@code directiveId} ties the reports of one direction together, so a consumer must
    * let the final report win whatever order the two arrive in. Records written before WP6.2 carry
    * only {@code directiveText}; such an acknowledgement says nothing about whether the model saw it.
+   * The {@link #QUEUED} report also echoes the {@code clientRequestId} its sender gave the send
+   * (null when it gave none, and on every other report), so the sender can tell which of several
+   * sends with the same text produced it.
    */
   record DirectiveAcknowledged(
-      String directiveText, String directiveId, String outcome, String reason, TraceContext trace)
+      String directiveText,
+      String directiveId,
+      String outcome,
+      String reason,
+      String clientRequestId,
+      TraceContext trace)
       implements AgentEvent {
     public static final String QUEUED = "queued";
     public static final String APPLIED = "applied";
@@ -121,7 +129,7 @@ public sealed interface AgentEvent {
 
     public DirectiveAcknowledged(
         String directiveText, String directiveId, String outcome, String reason) {
-      this(directiveText, directiveId, outcome, reason, TraceContext.none());
+      this(directiveText, directiveId, outcome, reason, null, TraceContext.none());
     }
   }
 

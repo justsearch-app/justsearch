@@ -30,7 +30,8 @@ final class AgentEventTracing {
       case AgentEvent.ToolCallApproved e -> new AgentEvent.ToolCallApproved(e.callId(), trace);
       case AgentEvent.DirectiveAcknowledged e ->
           new AgentEvent.DirectiveAcknowledged(
-              e.directiveText(), e.directiveId(), e.outcome(), e.reason(), trace);
+              e.directiveText(), e.directiveId(), e.outcome(), e.reason(), e.clientRequestId(),
+              trace);
       case AgentEvent.ToolExecutionStarted e ->
           new AgentEvent.ToolExecutionStarted(e.callId(), e.toolName(), trace);
       case AgentEvent.ToolExecutionCompleted e ->

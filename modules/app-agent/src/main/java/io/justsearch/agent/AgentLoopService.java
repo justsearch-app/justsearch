@@ -853,7 +853,12 @@ public final class AgentLoopService implements AgentService {
 
   @Override
   public boolean injectSteeringDirective(String sessionId, String text) {
-    return sessionRegistry.injectSteeringDirective(sessionId, text);
+    return injectSteeringDirective(sessionId, text, null);
+  }
+
+  @Override
+  public boolean injectSteeringDirective(String sessionId, String text, String clientRequestId) {
+    return sessionRegistry.injectSteeringDirective(sessionId, text, clientRequestId);
   }
 
   @Override

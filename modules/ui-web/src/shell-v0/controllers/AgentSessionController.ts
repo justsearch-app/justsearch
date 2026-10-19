@@ -150,6 +150,8 @@ export interface ConversationEntry {
   /** WP6.2 — a `steer-directive` entry's id and what became of it ('queued'|'applied'|'not_applied'). */
   directiveId?: string;
   directiveOutcome?: string;
+  /** WP6.2 — the request id of the steer send that produced a `steer-directive`, as its queued report echoes it. */
+  clientRequestId?: string;
   /** WP6.2 — why a direction was not applied ('run_finished', 'run_stopped', …). */
   directiveReason?: string;
   timestamp: number;
@@ -180,6 +182,15 @@ import type {
   AgentSentenceCite,
 } from '../../api/generated/shape-handlers/shared.js';
 export type { AgentSource, AgentSentenceCite };
+
+/** WP6.2 — one steer send, for matching the run's report of the direction it produced. */
+interface UnconfirmedSteer {
+  text: string;
+  /** Sent with the direction and echoed in its queued report. */
+  clientRequestId: string;
+  /** Directions the run had reported before this send began. */
+  reportedBefore: ReadonlySet<string>;
+}
 
 /**
  * Tempdoc 577 §2.14 Root III — one agent tool as the authority-space projection reads it (the rich
@@ -621,8 +632,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private liveWatchdogFired = false;
   private pendingAutoApprovals: string[] = [];
   // WP6.2 S8.2 — steer sends whose outcome is unknown (answer lost or a status that can follow the run
-  // queueing the direction): the note shown for each, until the run reports a direction with its text.
-  private unconfirmedSteers: Array<{ noteId: string; text: string; reportedBefore: ReadonlySet<string> }> = [];
+  // queueing the direction): the note shown for each, until the run reports the direction that send produced.
+  private unconfirmedSteers: Array<UnconfirmedSteer & { noteId: string }> = [];
+  // WP6.2 — how often this run was sent each direction text, so a report that echoes no request id
+  // (a server from before the echo) settles an unconfirmed send only while its text is unambiguous.
+  private steerSends = new Map<string, number>();
   // 543-fwd #6 — causation: the previous agent tool-call's journal entry id in
   // the CURRENT turn. The bridge chains each tool-call to it so the journal
   // records a per-turn causation chain (real-agent causation was empty before —
@@ -700,15 +714,21 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       this.steerFailureNote('Could not send your direction — the run has not started yet. Try again in a moment.');
       return false;
     }
-    // Directions the run has already reported, so a report for THIS send can be told from an earlier
-    // direction with the same text.
-    const reportedBefore = new Set(this.conversation.flatMap((e) => (e.directiveId ? [e.directiveId] : [])));
+    // WP6.2 — this send's own id: the run echoes it in the queued report of the direction it produces,
+    // so two sends with the same words are told apart. The directions the run has already reported
+    // tell a report for THIS send from an earlier one where the server echoes no id.
+    const send: UnconfirmedSteer = {
+      text: trimmed,
+      clientRequestId: crypto.randomUUID(),
+      reportedBefore: new Set(this.conversation.flatMap((e) => (e.directiveId ? [e.directiveId] : []))),
+    };
+    this.steerSends.set(trimmed, (this.steerSends.get(trimmed) ?? 0) + 1);
     let failure: string;
     try {
       const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/steer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: this.sessionId, text: trimmed }),
+        body: JSON.stringify({ sessionId: this.sessionId, text: trimmed, clientRequestId: send.clientRequestId }),
       });
       if (res.ok) return true;
       // Tempdoc 565 §33 — a failed steer must NOT be silent. WP6.2 — and must not claim more than it
@@ -726,28 +746,37 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     // WP6.2 S8.2 — any other failure can follow the run queueing it (the handler maps a failure after
     // queueing to 400; a proxy can answer 5xx; the answer itself can be lost), so the outcome is unknown
     // and the run's own reports for this direction decide what is shown. One that already arrived
-    // settles it now; otherwise the note says the outcome is unconfirmed until a report removes it. The
-    // text is not handed back to re-send: the run may already have applied it.
-    if (this.reportedSince(trimmed, reportedBefore)) return false;
+    // (the report can come over the stream before the answer) settles it now; otherwise the note says
+    // the outcome is unconfirmed until a report removes it. The text is not handed back to re-send: the
+    // run may already have applied it.
+    if (this.reportedFor(send)) return false;
     this.steerFailureNote(`${failure} If it did, it shows here as your direction.`);
-    this.unconfirmedSteers.push({
-      noteId: this.conversation[this.conversation.length - 1]!.id,
-      text: trimmed,
-      reportedBefore,
-    });
+    this.unconfirmedSteers.push({ ...send, noteId: this.conversation[this.conversation.length - 1]!.id });
     return false;
   }
 
-  /** WP6.2 — whether the run reported a direction with this text that was not reported before. */
-  private reportedSince(text: string, reportedBefore: ReadonlySet<string>): boolean {
+  /**
+   * WP6.2 — whether the run reported the direction this send produced: the report that echoes the
+   * send's request id. A report that echoes none (a server from before the echo) is matched by text,
+   * first reported after the send began, and only while the run was sent that text once — otherwise
+   * it may be another send's.
+   */
+  private reportedFor(send: UnconfirmedSteer): boolean {
     return this.conversation.some(
-      (e) => e.type === 'steer-directive' && e.content === text && !!e.directiveId && !reportedBefore.has(e.directiveId),
+      (e) =>
+        e.type === 'steer-directive' &&
+        (e.clientRequestId
+          ? e.clientRequestId === send.clientRequestId
+          : e.content === send.text &&
+            !!e.directiveId &&
+            !send.reportedBefore.has(e.directiveId) &&
+            this.steerSends.get(send.text) === 1),
     );
   }
 
   /** WP6.2 — a run report for a direction whose send was unconfirmed replaces the unconfirmed note. */
   private settleUnconfirmedSteers(): void {
-    const settled = this.unconfirmedSteers.filter((u) => this.reportedSince(u.text, u.reportedBefore));
+    const settled = this.unconfirmedSteers.filter((u) => this.reportedFor(u));
     if (settled.length === 0) return;
     this.unconfirmedSteers = this.unconfirmedSteers.filter((u) => !settled.includes(u));
     const notes = new Set(settled.map((u) => u.noteId));
@@ -894,6 +923,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private resetRunState(): void {
     this.conversation = [];
     this.unconfirmedSteers = [];
+    this.steerSends = new Map();
     this.toolCalls = {};
     this.streamingText = '';
     this.lastStreamedAnswer = '';
@@ -1826,12 +1856,19 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     if (!text || !directiveId) return;
     const outcome = typeof d.outcome === 'string' ? d.outcome : undefined;
     const reason = typeof d.reason === 'string' ? d.reason : undefined;
+    const clientRequestId = typeof d.clientRequestId === 'string' ? d.clientRequestId : undefined;
     const shown = this.conversation.findIndex((e) => e.type === 'steer-directive' && e.directiveId === directiveId);
     if (shown >= 0) {
-      if (outcome === 'queued') return;
       const conversation = [...this.conversation];
-      conversation[shown] = { ...conversation[shown]!, directiveOutcome: outcome, directiveReason: reason };
+      if (outcome === 'queued') {
+        // A queued report after the final one only adds the request id it echoes.
+        if (!clientRequestId || conversation[shown]!.clientRequestId) return;
+        conversation[shown] = { ...conversation[shown]!, clientRequestId };
+      } else {
+        conversation[shown] = { ...conversation[shown]!, directiveOutcome: outcome, directiveReason: reason };
+      }
       this.conversation = conversation;
+      this.settleUnconfirmedSteers();
       this.notify();
       return;
     }
@@ -1845,6 +1882,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         directiveId,
         ...(outcome ? { directiveOutcome: outcome } : {}),
         ...(reason ? { directiveReason: reason } : {}),
+        ...(clientRequestId ? { clientRequestId } : {}),
         timestamp: Date.now(),
       },
     ];

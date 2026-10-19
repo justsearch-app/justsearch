@@ -28,6 +28,8 @@ Review history: a second independent verifier failed 30d55b804 on two regression
 
 Review history (round 3: lost-response false certainty): a third independent verifier failed 31053095f on S8.2 because a steer whose response was lost after the Engine had accepted it (HTTP 200, direction applied once) was reported as "It was not applied" in the old window, and beside "Steered" in Search v3 while live; it rejected the two controller checks that pinned that claim for a connection failure and for an HTTP status other than 404. The steer handler (AgentController.handleSteeringDirective) answers 404 only when AgentSessionRegistry.injectSteeringDirective finds no session or AgentSession.submitDirection refuses a closed one, before anything is queued; a 400 can also follow queueing (handleControl maps an exception from publishing the queued report to 400), and a proxy can answer 5xx after forwarding, so only 404 is a known refusal. The controller now keeps "the run already finished" for 404 only; for any other failure it says the direction could not be confirmed and lets the run's own reports decide: a report for that text first seen after the send began removes the note (or prevents it), so the windows show only the run's outcome; the text is not handed back to re-send, as before. The two rejected checks are rewritten to assert only the honest diagnosis, and three new checks cover acceptance before a lost response, a 5xx followed by the run's report, and an earlier same-text direction not settling the note; all five are in uiux-agent-steering-ui.json (fail-before on 485fe86b8) and in uiux-agent-steering-ui-review3.json, run with --before 92a21116f (the candidate this verifier failed), where each fails by assertion. A new preservation check pins the 404 wording in both windows.
 
+Review history (round 4: identical-text sends): a fourth independent verifier failed 4314760ee on S8.2 because a send blocked before it reached the server lost its "could not confirm" note as soon as the user's identical second send was reported, in both windows: the window matched the run's reports to unconfirmed sends by text, and neither the steer answer nor the direction's report named the send that produced it (the report can also arrive over the stream before the answer). Decided by the orchestrator (2026-10-19): an exact, additive link. The window now sends a fresh clientRequestId with each steer; AgentController.handleSteeringDirective validates it (1-64 letters, digits, '-' or '_'; absent or null stays valid for older windows) and hands it with the direction to AgentSession.submitDirection, whose queued DirectiveAcknowledged report echoes it (an optional clientRequestId field in the event schema, the generated payload type and the saved event; final reports and every record written before carry none, so their meaning is unchanged). An unconfirmed send is settled only by the report carrying its own request id; a report without one still settles by text only while the window sent that text once. The unconfirmed note is not saved, so reload shows only the run's own reports, as before. The new checks are in uiux-agent-steering-ui.json (fail-before on 485fe86b8) and, run with --before e0a1ddd7a (the candidate this verifier failed), in uiux-agent-steering-ui-review4.json and uiux-agent-steering-java-review4.json, where each repaired check fails by assertion. The Java before-run applies uiux-agent-steering-review4-compat.patch, which only adds the three-argument AgentService.injectSteeringDirective overload delegating to the existing one (ignoring the request id) so the checks compile; acceptsADirectionWithoutARequestId passes there, as a preservation check should. The earlier frontend evidence files were re-run unchanged because AgentSessionController.test.ts changed.
+
 No acceptance record is supplied by the builder.
 
 ```json
@@ -646,6 +648,101 @@ No acceptance record is supplied by the builder.
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a lost answer to a direction the run took shows only the run report, in both windows",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a 5xx answer is settled by the run report that follows it, in both windows",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#an unconfirmed send is not settled by an earlier direction with the same text"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 4. Two steer sends with the same text are two sends, each settled only by the run's report of the direction it produced: the window sends a fresh clientRequestId with each send and the run's queued report echoes it. A send blocked before it reached the server keeps its 'could not confirm' note when a later identical send is taken and applied, and the applied direction shows once ('Steered' in Search v3, the old window's applied chip); the same holds when an earlier identical send was taken but its queued report arrives only after the second send failed; of two unconfirmed identical sends, the one the run reports (queued during its lost request) shows only its report while the other keeps its note. A report that echoes no request id (a server from before the echo) still settles a note by its text only while the window sent that text once; after two identical sends it settles neither.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AN4",
+          "quote": "Search v3 Delegate and the old window's agent view show steering as before for applied directions.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui-review4.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send keeps its note when an identical later send is reported, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send is not settled by an earlier identical send reported after it failed, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#two unconfirmed identical sends are each settled only by their own report, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a report without a request id does not settle a note when the same text was sent twice"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRequestIdTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/AgentControllerSteerTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 4. Through the production agent loop: two directions with the same text sent with request ids req-1 and req-2 and one sent without stay three directions; each queued report echoes its own send's clientRequestId (none for the send without one), and the applied reports, tied to the queued one by directiveId, repeat none. Through AgentController.handleSteeringDirective (POST /api/chat/agent/steer): a valid clientRequestId reaches the agent service with the direction and the answer is 200 {status: injected}; an empty, too long (65 characters), space- or markup-containing, numeric or object clientRequestId is refused with 400 naming clientRequestId and queues nothing.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-java-review4.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRequestIdTest.java#queuedReportEchoesTheRequestIdOfItsOwnSendOnly",
+        "modules/ui/src/test/java/io/justsearch/ui/api/AgentControllerSteerTest.java#handsTheRequestIdToTheRunWithTheDirection",
+        "modules/ui/src/test/java/io/justsearch/ui/api/AgentControllerSteerTest.java#refusesAnInvalidRequestIdWithoutQueueingTheDirection"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/AgentControllerSteerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A steer body without clientRequestId, or with clientRequestId null (a window from before the request id), is accepted as before: 200 {status: injected}, and the direction reaches the agent service with no request id.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-java-review4.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/AgentControllerSteerTest.java#acceptsADirectionWithoutARequestId"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-agent-api/src/test/java/io/justsearch/agent/api/AgentEventPayloadsCoverageTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/AgentEventPayloadConformanceTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Review 4. AgentEvent.DirectiveAcknowledged gained the component clientRequestId (before trace), which base() emits only when set. The two payload-key tests build their maximal DirectiveAcknowledged through the canonical constructor with clientRequestId set as well as reason, as their comments require for conditional keys, so base() emits every key the event can carry. The assertions (every component appears as a payload key; every payload key is declared in the schema) are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        }
       ]
     }
   ]

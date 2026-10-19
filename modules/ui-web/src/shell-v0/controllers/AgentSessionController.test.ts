@@ -1358,6 +1358,93 @@ describe('AgentSessionController interaction methods', () => {
     ]);
   });
 
+  // WP6.2 S8.2 (review 4) — two sends with the same words are two sends: the run's queued report
+  // echoes the request id of the send that produced it, and only that send's report settles it.
+  const LOST =
+    'Could not confirm your direction reached the run — the connection to JustSearch failed. If it did, it shows here as your direction.';
+
+  /** A steer POST that never reaches the server. */
+  const blockedSteer = (): typeof fetch =>
+    vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+
+  /** A steer POST the server takes: it reports the direction queued, then answers 200 (or the answer is lost). */
+  function takenSteer(c: AgentSessionController, directiveId: string, answer: 'ok' | 'lost'): typeof fetch {
+    return vi.fn((_url: string, init?: RequestInit) => {
+      const { text, clientRequestId } = JSON.parse(String(init?.body)) as { text: string; clientRequestId?: string };
+      c.onDirectiveAcknowledged({ directiveText: text, directiveId, outcome: 'queued', clientRequestId });
+      return answer === 'ok'
+        ? Promise.resolve(new Response(JSON.stringify({ status: 'injected' }), { status: 200 }))
+        : Promise.reject(new TypeError('Failed to fetch'));
+    }) as unknown as typeof fetch;
+  }
+
+  it('a blocked send keeps its note when an identical later send is reported, in both windows', async () => {
+    ctrl.sessionId = 'sess-f2';
+    globalThis.fetch = blockedSteer();
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    globalThis.fetch = takenSteer(ctrl, 'd1', 'ok');
+    expect(await ctrl.steer('Answer in French.')).toBe(true);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
+      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('a blocked send is not settled by an earlier identical send reported after it failed, in both windows', async () => {
+    ctrl.sessionId = 'sess-f2r';
+    // The first send is taken, but its queued report reaches the window only after the second failed.
+    let firstRequestId: string | undefined;
+    globalThis.fetch = vi.fn((_url: string, init?: RequestInit) => {
+      firstRequestId = (JSON.parse(String(init?.body)) as { clientRequestId?: string }).clientRequestId;
+      return Promise.resolve(new Response(JSON.stringify({ status: 'injected' }), { status: 200 }));
+    }) as unknown as typeof fetch;
+    expect(await ctrl.steer('Answer in French.')).toBe(true);
+    globalThis.fetch = blockedSteer();
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    ctrl.onDirectiveAcknowledged({
+      directiveText: 'Answer in French.',
+      directiveId: 'd1',
+      outcome: 'queued',
+      clientRequestId: firstRequestId,
+    });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
+      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('two unconfirmed identical sends are each settled only by their own report, in both windows', async () => {
+    ctrl.sessionId = 'sess-two';
+    globalThis.fetch = blockedSteer();
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    globalThis.fetch = takenSteer(ctrl, 'd2', 'lost');
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'applied' });
+    // The second send's report settles the second send only; the first's note stays.
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
+      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  // A server that does not echo request ids cannot tell identical sends apart, so its report settles
+  // a note only while this window sent that text once.
+  it('a report without a request id does not settle a note when the same text was sent twice', async () => {
+    ctrl.sessionId = 'sess-old-server';
+    globalThis.fetch = blockedSteer();
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    globalThis.fetch = mockFetchJson({ status: 'injected' });
+    expect(await ctrl.steer('Answer in French.')).toBe(true);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
+      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
   // The steer handler answers 404 only when no live run took the direction, so it is the one failure
   // that is a known refusal, still named as the run having finished.
   it('a 404 refusal of a direction still says the run already finished, in both windows', async () => {

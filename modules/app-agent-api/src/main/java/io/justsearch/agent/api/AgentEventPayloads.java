@@ -108,6 +108,9 @@ public final class AgentEventPayloads {
         if (e.reason() != null) {
           m.put("reason", e.reason());
         }
+        if (e.clientRequestId() != null) {
+          m.put("clientRequestId", e.clientRequestId());
+        }
         yield m;
       }
       case AgentEvent.ToolExecutionStarted e ->

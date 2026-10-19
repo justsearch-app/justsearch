@@ -93,7 +93,8 @@ public final class AgentRunShape {
               EventField.string("gateBehavior").asOptional()),
           EventDescriptor.ofTraced("tool_call_approved", EventField.string("callId")),
           // Tempdoc 565 §30 — the DIRECTION authority's mid-run steer acknowledgement. WP6.2: one
-          // direction is reported queued, then applied or not_applied (with a reason), by id.
+          // direction is reported queued, then applied or not_applied (with a reason), by id; the
+          // queued report echoes the sender's clientRequestId when the send carried one.
           EventDescriptor.ofTraced(
               "directive_acknowledged",
               EventField.string("directiveText"),
@@ -113,7 +114,8 @@ public final class AgentRunShape {
                           AgentEvent.DirectiveAcknowledged.REASON_STEP_LIMIT,
                           AgentEvent.DirectiveAcknowledged.REASON_BUDGET_LIMIT,
                           AgentEvent.DirectiveAcknowledged.REASON_RUN_INTERRUPTED))
-                  .asOptional()),
+                  .asOptional(),
+              EventField.string("clientRequestId").asOptional()),
           EventDescriptor.ofTraced(
               "tool_exec_started", EventField.string("callId"), EventField.string("toolName")),
           EventDescriptor.ofTraced(

@@ -109,11 +109,12 @@ final class AgentSessionRegistry {
    * input). Directions queue in the order sent; the loop drains them all at the next step boundary
    * and each is reported applied once the model accepts a request carrying it (WP6.2). Returns false (404) for an
    * unknown/finished session, including one that has stopped taking directions. Mirrors {@link
-   * #setSessionAutonomy} — both write a per-run control input the loop reads between steps.
+   * #setSessionAutonomy} — both write a per-run control input the loop reads between steps. The
+   * window's {@code clientRequestId} (or null) is echoed in the direction's queued report.
    */
-  boolean injectSteeringDirective(String sessionId, String text) {
+  boolean injectSteeringDirective(String sessionId, String text, String clientRequestId) {
     var session = sessions.get(sessionId);
-    return session != null && session.submitDirection(text);
+    return session != null && session.submitDirection(text, clientRequestId);
   }
 
   /**

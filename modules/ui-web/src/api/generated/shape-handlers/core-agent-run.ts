@@ -67,6 +67,7 @@ export interface CoreAgentRunDirectiveAcknowledgedPayload {
   directiveId: string;
   outcome: 'queued' | 'applied' | 'not_applied';
   reason?: 'run_finished' | 'run_stopped' | 'run_failed' | 'step_limit' | 'budget_limit' | 'run_interrupted';
+  clientRequestId?: string;
   trace?: TracePayload;
 }
 

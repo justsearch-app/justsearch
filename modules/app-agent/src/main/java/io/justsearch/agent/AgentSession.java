@@ -343,10 +343,12 @@ final class AgentSession {
   }
 
   /**
-   * Queue a direction and report it queued. False once the run has stopped taking directions (the
-   * caller reports the run as finished); a blank text is ignored but not refused.
+   * Queue a direction and report it queued, echoing the sender's {@code clientRequestId} (null when
+   * it sent none) so the sender can tell its own direction from another with the same text. False
+   * once the run has stopped taking directions (the caller reports the run as finished); a blank text
+   * is ignored but not refused.
    */
-  boolean submitDirection(String text) {
+  boolean submitDirection(String text, String clientRequestId) {
     if (text == null || text.isBlank()) {
       return true;
     }
@@ -360,7 +362,12 @@ final class AgentSession {
       if (sink != null) {
         sink.accept(
             new AgentEvent.DirectiveAcknowledged(
-                direction.text(), direction.id(), AgentEvent.DirectiveAcknowledged.QUEUED, null));
+                direction.text(),
+                direction.id(),
+                AgentEvent.DirectiveAcknowledged.QUEUED,
+                null,
+                clientRequestId,
+                io.justsearch.agent.api.TraceContext.none()));
       }
     }
     return true;

@@ -66,12 +66,15 @@ final class AgentEventPayloadsCoverageTest {
           new AgentEvent.ToolCallRejected("c1", "no"),
           new AgentEvent.ToolExecutionStarted("c1", "tool"),
           new AgentEvent.ToolCallVirtual("c1", "wire", "args"),
-          // reason is set here for the same reason as below: base() omits it when null.
+          // reason and clientRequestId are set here for the same reason as below: base() omits each
+          // when null (a real report carries a reason only when not applied, a request id only queued).
           new AgentEvent.DirectiveAcknowledged(
               "focus",
               "d1",
               AgentEvent.DirectiveAcknowledged.NOT_APPLIED,
-              AgentEvent.DirectiveAcknowledged.REASON_RUN_FINISHED),
+              AgentEvent.DirectiveAcknowledged.REASON_RUN_FINISHED,
+              "req-1",
+              TraceContext.none()),
           new AgentEvent.ContextCompacted(4),
           // Lane F PR 0b: the three applied-sampling components are POPULATED here on purpose.
           // base() omits each when null (so an un-echoed session_started stays byte-identical to

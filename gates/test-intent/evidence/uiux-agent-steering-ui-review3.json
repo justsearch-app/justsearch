@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-19T19:03:04.836Z",
-  "revision": "92a21116f9475e854a759a539e52f81c9cf37cbf",
-  "tree": "7887fbf36af79b892f49f74c1cb93676af9617fb",
+  "createdAt": "2026-10-19T19:37:54.095Z",
+  "revision": "e0a1ddd7abca9ee1e4ee19f6c122d330e4209473",
+  "tree": "071c5849e9454b6c54b78feb3404a97102a83b45",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/controllers/AgentSessionController.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-vitest-359696-1792436580663.json\"",
+      "command": "npx vitest run \"src/shell-v0/controllers/AgentSessionController.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/tmpdir/test-intent-vitest-1552573-1792438667754.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1441
+      "durationMs": 2292
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names a connection failure as such, not as a finished run, without claiming non-application",
       "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ed9f54b378f432ac6966e9d683a1bd175fa534d09baa258c3d1fdf6e0b3d650",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names an HTTP error other than 404 by its status, without claiming non-application",
       "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ed9f54b378f432ac6966e9d683a1bd175fa534d09baa258c3d1fdf6e0b3d650",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a lost answer to a direction the run took shows only the run report, in both windows",
       "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ed9f54b378f432ac6966e9d683a1bd175fa534d09baa258c3d1fdf6e0b3d650",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a 5xx answer is settled by the run report that follows it, in both windows",
       "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ed9f54b378f432ac6966e9d683a1bd175fa534d09baa258c3d1fdf6e0b3d650",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#an unconfirmed send is not settled by an earlier direction with the same text",
       "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ed9f54b378f432ac6966e9d683a1bd175fa534d09baa258c3d1fdf6e0b3d650",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,40 +108,40 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/controllers/AgentSessionController.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-vitest-359696-1792436583287.json\"",
+        "command": "npx vitest run \"src/shell-v0/controllers/AgentSessionController.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/tmpdir/test-intent-vitest-1552573-1792438671447.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1398,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-vitest-359696-1792436583287.json\n\n"
+        "durationMs": 2425,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/tmpdir/test-intent-vitest-1552573-1792438671447.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names a connection failure as such, not as a finished run, without claiming non-application",
         "classification": "assertion",
-        "detail": "AgentSessionController interaction methods steer names a connection failure as such, not as a finished run, without claiming non-application:  AssertionError: expected 'Could not send your direction — the c…' not to match /not applied|finished/i\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-before-QECJn9/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1294:35"
+        "detail": "AgentSessionController interaction methods steer names a connection failure as such, not as a finished run, without claiming non-application:  AssertionError: expected 'Could not send your direction — the c…' not to match /not applied|finished/i\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-XvHrAr/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1294:35"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names an HTTP error other than 404 by its status, without claiming non-application",
         "classification": "assertion",
-        "detail": "AgentSessionController interaction methods steer names an HTTP error other than 404 by its status, without claiming non-application:  AssertionError: expected 'Could not send your direction (HTTP 5…' not to match /not applied|finished/i\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-before-QECJn9/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1304:35"
+        "detail": "AgentSessionController interaction methods steer names an HTTP error other than 404 by its status, without claiming non-application:  AssertionError: expected 'Could not send your direction (HTTP 5…' not to match /not applied|finished/i\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-XvHrAr/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1304:35"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a lost answer to a direction the run took shows only the run report, in both windows",
         "classification": "assertion",
-        "detail": "AgentSessionController interaction methods a lost answer to a direction the run took shows only the run report, in both windows:  AssertionError: expected { …(2) } to deeply equal { v3: [ [ 'Steered', …(1) ] ], …(1) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-before-QECJn9/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1329:31\n    at file:///ho"
+        "detail": "AgentSessionController interaction methods a lost answer to a direction the run took shows only the run report, in both windows:  AssertionError: expected { …(2) } to deeply equal { v3: [ [ 'Steered', …(1) ] ], …(1) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-XvHrAr/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1329:31\n    at file:///ho"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a 5xx answer is settled by the run report that follows it, in both windows",
         "classification": "assertion",
-        "detail": "AgentSessionController interaction methods a 5xx answer is settled by the run report that follows it, in both windows:  AssertionError: expected { …(2) } to deeply equal { v3: [ [ 'Steered', …(1) ] ], …(1) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-before-QECJn9/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1343:31\n    at file:///ho"
+        "detail": "AgentSessionController interaction methods a 5xx answer is settled by the run report that follows it, in both windows:  AssertionError: expected { …(2) } to deeply equal { v3: [ [ 'Steered', …(1) ] ], …(1) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-XvHrAr/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1343:31\n    at file:///ho"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#an unconfirmed send is not settled by an earlier direction with the same text",
         "classification": "assertion",
-        "detail": "AgentSessionController interaction methods an unconfirmed send is not settled by an earlier direction with the same text:  AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r3/tmpdir/test-intent-before-QECJn9/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1356:41\n    at file:///home/elias/dev/justsear"
+        "detail": "AgentSessionController interaction methods an unconfirmed send is not settled by an earlier direction with the same text:  AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-XvHrAr/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1356:41\n    at file:///home/elias/dev/justsear"
       }
     ]
   },
-  "digest": "sha256:a92a7ef145a37ad1d1f57c0a2b5ebdd61fc61d642c81dba61b713bc801b952b4"
+  "digest": "sha256:0d8f4c046ff42c84238bb73cc2f0c70f8a6ad66efaad6852d32006040240060d"
 }

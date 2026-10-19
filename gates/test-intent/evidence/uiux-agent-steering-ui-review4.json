@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T19:35:16.859Z",
+  "revision": "e0a1ddd7abca9ee1e4ee19f6c122d330e4209473",
+  "tree": "3926da6f83703793c4d2bb3699f05a1db76c0a96",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/controllers/AgentSessionController.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/tmpdir/test-intent-vitest-1476690-1792438510539.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2370
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send keeps its note when an identical later send is reported, in both windows",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController interaction methods a blocked send keeps its note when an identical later send is reported, in both windows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send is not settled by an earlier identical send reported after it failed, in both windows",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController interaction methods a blocked send is not settled by an earlier identical send reported after it failed, in both windows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#two unconfirmed identical sends are each settled only by their own report, in both windows",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController interaction methods two unconfirmed identical sends are each settled only by their own report, in both windows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a report without a request id does not settle a note when the same text was sent twice",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d20164cdeb98bdfe83e1acc29b6fe69254c22ad5c6932f47384ff44d80eaf190",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController interaction methods a report without a request id does not settle a note when the same text was sent twice",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e0a1ddd7a",
+    "revision": "e0a1ddd7abca9ee1e4ee19f6c122d330e4209473",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/controllers/AgentSessionController.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/tmpdir/test-intent-vitest-1476690-1792438514198.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2495,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/tmpdir/test-intent-vitest-1476690-1792438514198.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send keeps its note when an identical later send is reported, in both windows",
+        "classification": "assertion",
+        "detail": "AgentSessionController interaction methods a blocked send keeps its note when an identical later send is reported, in both windows:  AssertionError: expected { v3: [ [ 'Steered', …(1) ] ], …(1) } to deeply equal { …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-8YUKFZ/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1388:31\n    at file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send is not settled by an earlier identical send reported after it failed, in both windows",
+        "classification": "assertion",
+        "detail": "AgentSessionController interaction methods a blocked send is not settled by an earlier identical send reported after it failed, in both windows:  AssertionError: expected { v3: [ [ 'Steered', …(1) ] ], …(1) } to deeply equal { …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-8YUKFZ/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1412:31\n    at file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#two unconfirmed identical sends are each settled only by their own report, in both windows",
+        "classification": "assertion",
+        "detail": "AgentSessionController interaction methods two unconfirmed identical sends are each settled only by their own report, in both windows:  AssertionError: expected { v3: [ [ 'Steered', …(1) ] ], …(1) } to deeply equal { …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-8YUKFZ/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1426:31\n    at file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a report without a request id does not settle a note when the same text was sent twice",
+        "classification": "assertion",
+        "detail": "AgentSessionController interaction methods a report without a request id does not settle a note when the same text was sent twice:  AssertionError: expected { v3: [ [ 'Steered', …(1) ] ], …(1) } to deeply equal { …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r4/before/test-intent-before-8YUKFZ/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1442:31\n    at file:///ho"
+      }
+    ]
+  },
+  "digest": "sha256:a01334fc5239ddc87faad437d3d8cac956e513932003e472c1ade8ec37a953ae"
+}
