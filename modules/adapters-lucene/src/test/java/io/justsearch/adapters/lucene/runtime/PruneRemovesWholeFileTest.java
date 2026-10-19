@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.lucene.document.FeatureField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper;
@@ -282,6 +283,41 @@ class PruneRemovesWholeFileTest extends LuceneExecutorTestBase {
     assertTrue(uncertain.get(), "precondition: the file became uncertain before the batch");
     assertEquals(4, currentRows(path), "a file whose absence cannot be told keeps its rows");
     assertEquals(List.of(), marks, "a file whose absence cannot be told gets no deletion mark");
+    assertEquals(PruneOps.Completion.INCOMPLETE, result.completion());
+  }
+
+  @Test
+  void aRootSwappedWhileTheBatchIsCheckedAgainRemovesNothing() throws Exception {
+    Path file = createFile("swapped.txt");
+    String path = key(file);
+    writeFile(path, "swapped", 3);
+    commitAndRefresh();
+    Files.delete(file);
+    AtomicInteger rootChecks = new AtomicInteger();
+    AtomicBoolean swapped = new AtomicBoolean();
+    PruneOps.PresenceGuard guard = new PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() {
+        rootChecks.incrementAndGet();
+        return !swapped.get() && PathPresence.isReadableDirectory(scope);
+      }
+
+      @Override public PathPresence presence(Path probed) {
+        PathPresence seen = PathPresence.probe(probed);
+        // The scan's looks come after the prune's first root check; the batch's look at the file
+        // comes after the batch's root check: the root is replaced while that look is taken.
+        if (rootChecks.get() >= 2) {
+          swapped.set(true);
+        }
+        return seen;
+      }
+    };
+    List<String> marks = new ArrayList<>();
+
+    PruneOps.PruneResult result = prune(guard, marks);
+
+    assertTrue(swapped.get(), "precondition: the root changed during the batch's last check");
+    assertEquals(4, currentRows(path), "nothing is removed on the strength of a changed root");
+    assertEquals(List.of(), marks, "no deletion mark on the strength of a changed root");
     assertEquals(PruneOps.Completion.INCOMPLETE, result.completion());
   }
 
