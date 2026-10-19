@@ -9,7 +9,7 @@ setup-walk ownership collision escaping the producer future to the fatal handler
 that separate correction and the three installed crash cuts are in progress.
 Final integrated stress and corrected hosted proof remain open. Earlier entries
 below are historical evidence, not the current execution queue; the
-[handoff](../../handoff.md) owns current next actions. Installed INGEST/SETTINGS
+[handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md) owns current next actions. Installed INGEST/SETTINGS
 proof does not discharge bulk acceptance. No amendment transfers C2's row, plan,
 resume or processing-history/gaps obligations to D1.
 

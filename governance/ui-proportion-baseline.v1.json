@@ -93,6 +93,24 @@
       "maxScrollableRegions": 1
     },
     {
+      "$comment": "WP1.1 S1.12 — Search mode's result list stays reachable beside the floating composer at a narrow width with a long list. Captured at 760x720 with the `sv3-results` fixtures variant (24 hits), scrolled to the end; the step itself fails if the list did not overflow and reach its end, so the overlap row cannot pass on a list that never scrolled. NON-VACUITY per this register's occlusionNote: both selectors carry a `minHeightPx` floor. CALIBRATED against the first `--fixtures` capture: card h=1947 with its bottom at 581, dock h=99 at y=593 (bottom 692), scroller delta 1499 — a 12px gap between the last row and the glass. The card floor (600) is far under the measurement but over anything a short list or a stub renders; `maxBottomPx` is 700, not the 720 viewport, so it asserts something about the dock.",
+      "uiShotStep": "sv3-search-results",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 600,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-dock\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-dock\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 700
+        }
+      ],
+      "minScrollableRegions": 1,
+      "maxScrollableRegions": 1
+    },
+    {
       "uiShotStep": "chat-bands",
       "elements": [
         {

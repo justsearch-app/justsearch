@@ -269,6 +269,29 @@ export class Sv3Palette extends JfElement {
         background: color-mix(in srgb, var(--foreground) 9%, transparent);
         color: var(--foreground);
       }
+      /* Forced colors (Windows High Contrast) erase both fills, so the two states are restated in
+         system colours: the keyboard's row takes the selection pair (with 'forced-color-adjust: none',
+         or the browser paints a Canvas backplate behind its text), the current choice an edge. The
+         field gets a ring here after all: forced colors flatten the popup to the same CanvasText
+         frame every other box has, so the popup no longer says where focus is. */
+      @media (forced-colors: active) {
+        input:focus-visible {
+          outline: 2px solid Highlight;
+          outline-offset: -2px;
+        }
+        .item[data-selected]:not([data-highlighted]) {
+          outline: 1px solid Highlight;
+          outline-offset: -1px;
+        }
+        .item[data-highlighted] {
+          forced-color-adjust: none;
+          background: Highlight;
+          color: HighlightText;
+        }
+        .item[data-highlighted] * {
+          color: HighlightText;
+        }
+      }
 
       .item-label {
         min-width: 0;

@@ -478,6 +478,39 @@ export class Sv3SessionRow extends JfElement {
       }
       input.rename:focus {
         border-color: var(--foreground);
+        /* Transparent, not none: forced colors repaint it, and there the border change is erased. */
+        outline: 2px solid transparent;
+        outline-offset: -2px;
+      }
+
+      /* Forced colors (Windows High Contrast) erase the fill ladder above, so the claimed rows restate
+         theirs in system colours: the active row takes the selection pair, the selected one an edge.
+         'forced-color-adjust: none' keeps the browser from painting its Canvas backplate behind the
+         row's text, which would put HighlightText on Canvas; the descendants are given HighlightText
+         by hand for the same reason. The focus ring on the active row turns HighlightText, because
+         it is drawn INSET, on the fill. */
+      @media (forced-colors: active) {
+        :host([active]) button.row,
+        :host([active]) button.act {
+          forced-color-adjust: none;
+          background: Highlight;
+          color: HighlightText;
+        }
+        :host([active]) button.row * {
+          color: HighlightText;
+        }
+        :host([active]) button.row:focus-visible,
+        :host([active]) button.act:focus-visible {
+          outline-color: HighlightText;
+        }
+        :host([selected]:not([active])) button.row {
+          outline: 1px solid Highlight;
+          outline-offset: -1px;
+        }
+        :host([selected]:not([active])) button.row:focus-visible {
+          outline-width: 2px;
+          outline-offset: -2px;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {

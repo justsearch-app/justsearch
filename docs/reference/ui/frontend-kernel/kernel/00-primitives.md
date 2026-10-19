@@ -2,7 +2,7 @@
 title: "Frontend kernel — primitives"
 type: reference
 status: stable
-description: "The three FE registry primitives (Operation/Resource/Prompt) and how surfaces project from them."
+description: "The four FE registry primitives (Operation/Resource/Prompt/DiagnosticChannel) and how surfaces project from them."
 date: 2026-06-09
 ---
 

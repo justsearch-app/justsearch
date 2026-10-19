@@ -251,6 +251,8 @@ afterEach(() => {
 async function mount(): Promise<Mounted> {
   const el = document.createElement('jf-sv3-window') as Mounted;
   document.body.appendChild(el);
+  // WP1.1 — a fresh window starts in Search mode; these cases are about Ask, so they choose it.
+  (el as unknown as { tier: string }).tier = 'ask';
   await el.updateComplete;
   await settle(el);
   return el;

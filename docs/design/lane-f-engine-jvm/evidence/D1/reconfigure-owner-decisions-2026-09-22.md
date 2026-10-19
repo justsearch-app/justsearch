@@ -32,7 +32,7 @@ C2 settings owner. These decisions preserve the acceptance scope.
 
 Next: close the outstanding D1-5 candidate-context integrated/installed/hosted
 proof at runtime code22800c842, then implement the [selected publication and teardown
-protocol](publication-and-lifetime-design-2026-09-23.md). The [continuation brief](../../continuation-brief.md)
+protocol](publication-and-lifetime-design-2026-09-23.md). The [continuation brief](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/continuation-brief.md)
 defines these first two batches. Candidate/rollback code and focused proof exist;
 no D1-4 dispatch implementation or completion is claimed by this decision record.
 

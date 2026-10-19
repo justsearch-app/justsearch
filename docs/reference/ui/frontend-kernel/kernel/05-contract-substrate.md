@@ -192,10 +192,7 @@ fixtures). It is *not* the substrate's primary runtime-continuous
 mechanism; consumers that need cross-version detection subscribe to
 the capability Resource, not to per-envelope tags.
 
-The choice of layer-of-discharge is governed by the slice-execution
-methodology's **Pass-6 layer-of-discharge check**
-(`docs/reference/contributing/slice-execution.md` §"Layer-of-discharge
-check for substrate commitments"). Resource-layer expression is the
+Resource-layer expression is the
 default; transport-layer mechanisms are admissible only when the
 Resource-layer expression provably fails. Three production-validated
 Resource-layer channel shapes (LSP capability-registration, Envoy

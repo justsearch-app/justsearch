@@ -67,7 +67,7 @@ export const composerStyles: CSSResult = css`
     min-height: 0;
   }
   .composer textarea:focus {
-    outline: none;
+    outline: 2px solid transparent;
     border-color: var(--accent-tint);
   }
   .composer button {

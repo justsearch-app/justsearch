@@ -157,6 +157,7 @@ export class ResultsCard extends JfElement {
     askAvailability: { attribute: false },
     copyText: { attribute: false },
     variant: { type: String },
+    selectionMode: { type: String, attribute: 'selection-mode' },
     refinedStampVisible: { state: true },
     // Search Thread S4-final — the frozen-card identity (who/what/when); required for
     // 'snapshot'/'excerpt', ignored for 'live'.
@@ -177,6 +178,14 @@ export class ResultsCard extends JfElement {
   /** 'live' — the active search. 'snapshot' — a committed frozen record (full render, collapsible
    *  rows). 'excerpt' — the one-line collapsed form of a snapshot (expands in place). */
   declare variant: 'live' | 'snapshot' | 'excerpt';
+  /**
+   * 'replace' (default) — a plain click replaces the selection with the row and opens it.
+   * 'explicit' — opening and choosing are separate acts (Search v3, WP1.1): a plain click or the
+   * menu's "Open document" only OPENS, so reading a hit never throws away a multi-file choice;
+   * Ctrl/⌘ and Shift only CHOOSE; and the row menu carries a choose/unchoose entry, which is the
+   * keyboard's way to build a choice (the rows themselves are not tab stops).
+   */
+  declare selectionMode: 'replace' | 'explicit';
   declare refinedStampVisible: boolean;
   declare provenance: SearchProvenance | null;
   declare expanded: boolean;
@@ -203,6 +212,7 @@ export class ResultsCard extends JfElement {
     this.selectedIds = new Set<string>();
     this.askAvailability = null;
     this.variant = 'live';
+    this.selectionMode = 'replace';
     this.refinedStampVisible = false;
     this.provenance = null;
     this.expanded = false;
@@ -278,7 +288,16 @@ export class ResultsCard extends JfElement {
     }
     const hits = this.snapshot?.results ?? [];
     const clickedIndex = hits.findIndex((h) => h.id === hit.id);
-    recordOpenDisposition(hit.id);
+    const explicit = this.selectionMode === 'explicit';
+    const choosing = event.shiftKey || event.ctrlKey || event.metaKey;
+    if (explicit && !choosing) {
+      // Open only. The anchor still moves, so a following Shift-click ranges from the row read last.
+      this.anchorIndex = clickedIndex;
+      recordOpenDisposition(hit.id);
+      this.emitCard('card-open', { id: hit.id });
+      return;
+    }
+    if (!explicit) recordOpenDisposition(hit.id);
     const rowEl = event.currentTarget as HTMLElement | null;
     if (rowEl) {
       const rect = rowEl.getBoundingClientRect();
@@ -309,17 +328,30 @@ export class ResultsCard extends JfElement {
       primaryId: hit.id,
       primaryIndex: clickedIndex,
     });
-    this.emitCard('card-open', { id: hit.id });
+    if (!explicit) this.emitCard('card-open', { id: hit.id });
   }
 
   private async openResultMenu(hit: CardHit, anchor: { x: number; y: number }): Promise<void> {
     const addressable = { kind: 'search-result' as const, id: hit.id, payload: hit };
+    const explicit = this.selectionMode === 'explicit';
+    const chosen = this.selectedIds.has(hit.id);
     const result = await openContextMenu({
       actions: [
         { id: 'open-document', label: 'Open document', icon: 'layers', category: 'system', enabled: true },
         // Search Thread S3 (tempdoc D5) — scope the thread to this file: hosts add a
         // scope chip constraining both the instant-search floor and AI retrieval.
         { id: 'ask-about-this', label: 'Ask about this file', icon: 'message-square', category: 'system', enabled: true },
+        ...(explicit
+          ? [
+              {
+                id: 'toggle-chosen',
+                label: chosen ? 'Remove from chosen files' : 'Add to chosen files',
+                icon: 'check-circle-2' as const,
+                category: 'system' as const,
+                enabled: true,
+              },
+            ]
+          : []),
       ],
       anchor,
       context: 'search-result-row',
@@ -328,6 +360,24 @@ export class ResultsCard extends JfElement {
     });
     if (result === 'ask-about-this') {
       this.emitCard('card-scope-file', { id: hit.id, path: hit.path, title: hit.title });
+      return;
+    }
+    const hits = this.snapshot?.results ?? [];
+    const index = hits.findIndex((h) => h.id === hit.id);
+    if (result === 'toggle-chosen') {
+      const next = new Set(this.selectedIds);
+      if (chosen) next.delete(hit.id);
+      else next.add(hit.id);
+      this.anchorIndex = index;
+      this.emitCard<CardSelectionDetail>('card-selection', {
+        ids: [...next],
+        primaryId: hit.id,
+        primaryIndex: index,
+      });
+      return;
+    }
+    if (result === 'open-document' && explicit) {
+      this.emitCard('card-open', { id: hit.id });
       return;
     }
     if (result === 'open-document') {
@@ -877,7 +927,7 @@ export class ResultsCard extends JfElement {
         color: var(--text-primary);
         border-color: var(--border-subtle);
         background: var(--surface-hover);
-        outline: none;
+        outline: 2px solid transparent;
       }
       /* Search Thread S4-final — the frozen-card frame: a bordered card distinguishes a committed
          snapshot from the live card it sits above in the retrieve tier's flow. */
@@ -930,7 +980,7 @@ export class ResultsCard extends JfElement {
       .provenance-fork:focus-visible {
         color: var(--text-primary);
         border-color: var(--accent-tint);
-        outline: none;
+        outline: 2px solid transparent;
       }
       .snapshot-rows .row {
         cursor: pointer;
@@ -954,7 +1004,7 @@ export class ResultsCard extends JfElement {
       .excerpt-collapse:focus-visible {
         color: var(--text-primary);
         border-color: var(--accent-tint);
-        outline: none;
+        outline: 2px solid transparent;
       }
       .snapshot-empty-note {
         padding: 0.5rem 1.25rem 0.75rem;
@@ -980,7 +1030,7 @@ export class ResultsCard extends JfElement {
       .results-card-excerpt:focus-visible {
         background: var(--surface-secondary);
         color: var(--text-primary);
-        outline: none;
+        outline: 2px solid transparent;
       }
     `,
   ];

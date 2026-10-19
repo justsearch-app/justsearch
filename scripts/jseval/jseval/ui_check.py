@@ -196,6 +196,10 @@ class Step:
     # (unchanged behavior for every existing step); an isolated step that needs a specific
     # deterministic data/readiness state (e.g. `chat-proportion` needing `degraded`) sets this.
     fixtures_variant: str = "default"
+    # Playwright's `forced_colors` context emulation ("active" | "none"); None leaves the browser
+    # default. "active" is the CSS `forced-colors: active` state Windows High Contrast produces in
+    # WebView2 (Chromium), so a step can capture the UI as a High Contrast user sees it.
+    forced_colors: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -291,8 +295,8 @@ def _demo_url(ui_url: str, **extra: str) -> str:
 
 
 async def _type_and_search(page, query: str = "justsearch") -> None:
-    # Search v3 owns retrieval. Its composer does not use the retired `search-input` testid and a
-    # draft is not a search until the command palette's explicit "Search this text" action runs.
+    # Search v3 owns retrieval. Its composer opens in Search mode (WP1.1): typing lists matching
+    # documents and Enter runs the full search at once, on the shared results card.
     await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
     await page.evaluate("() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }")
     window = page.locator(S.CSS_SV3_WINDOW)
@@ -300,11 +304,8 @@ async def _type_and_search(page, query: str = "justsearch") -> None:
     inp = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
     await inp.wait_for(state="visible", timeout=10_000)
     await inp.fill(query)
-    await window.get_by_role("button", name="Open command palette", exact=True).click()
     async with page.expect_response("**/api/knowledge/search", timeout=30_000):
-        await page.locator(S.CSS_SV3_PALETTE).get_by_role(
-            "option", name="Search this text", exact=True
-        ).click()
+        await inp.press("Enter")
     await page.locator(S.CSS_SV3_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
 
 
@@ -969,13 +970,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await window.wait_for(state="visible", timeout=15_000)
         composer = window.locator("jf-sv3-composer textarea")
         await composer.fill("failure presentation check")
-        await window.get_by_role("button", name="Open command palette", exact=True).click()
         async with page.expect_response("**/api/knowledge/search", timeout=15_000) as response:
-            await window.locator("jf-sv3-palette").get_by_role(
-                "option", name="Search this text", exact=True
-            ).click()
+            await composer.press("Enter")
         assert (await response.value).status == 502
-        alert = page.locator('[data-testid="sv3-main-unreachable"]')
+        alert = page.locator('jf-sv3-results [data-testid="sv3-results-failed"]')
         await alert.wait_for(state="visible", timeout=15_000)
         text = await alert.inner_text()
         assert "The search index is not available." in text, text
@@ -1269,6 +1267,106 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 if (s) s.scrollTop = s.scrollHeight;
             }"""
         )
+        if cooldown_ms > 0:
+            await asyncio.sleep(cooldown_ms / 1000)
+
+    # --- Forced colors (Windows High Contrast): the Search v3 states a High Contrast reader meets ---
+    # Each capture ends with a KEYBOARD focus on screen, because under forced colors box-shadows are
+    # dropped and author colours replaced, so the focus indicator is the thing most likely to vanish.
+    async def _settle_focus_marks(page):
+        # Focus marks here are transitions (the composer frame, the grips' line), and a transition
+        # only starts on a rendered frame: without one, the capture IS the first frame and shows the
+        # mark at its starting colour. Two animation frames start it; the cooldown then lets it land.
+        await page.evaluate(
+            "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
+        )
+        if cooldown_ms > 0:
+            await asyncio.sleep(cooldown_ms / 1000)
+
+    async def _open_sv3_window(page):
+        # Hidden DEEPLINK surface, dev audience, no rail entry — the hash route is the only way in.
+        await page.evaluate(
+            "() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }"
+        )
+        await page.locator(S.CSS_SV3_WINDOW).first.wait_for(state="visible", timeout=20_000)
+        await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.wait_for(
+            state="visible", timeout=15_000
+        )
+
+    async def setup_sv3_hero_forced_colors(page):
+        await _open_sv3_window(page)
+        await page.locator("jf-sv3-window jf-sv3-composer[state='hero']").wait_for(
+            state="visible", timeout=15_000
+        )
+        await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.focus()
+        await _settle_focus_marks(page)
+
+    async def setup_sv3_docked_forced_colors(page):
+        # The `sv3-sources` variant restores a thread, so the window lands DOCKED over a transcript.
+        await _open_sv3_window(page)
+        await page.locator('[data-testid="sv3-turn-sources"]').first.wait_for(
+            state="visible", timeout=20_000
+        )
+        await page.locator("jf-sv3-window jf-sv3-composer[state='docked']").wait_for(
+            state="visible", timeout=15_000
+        )
+        await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.focus()
+        await _settle_focus_marks(page)
+
+    async def setup_sv3_palette_forced_colors(page):
+        await _open_sv3_window(page)
+        await page.locator(S.CSS_SV3_WINDOW).get_by_role(
+            "button", name="Open command palette", exact=True
+        ).click()
+        await page.locator(S.CSS_SV3_PALETTE).get_by_role("option").first.wait_for(
+            state="visible", timeout=10_000
+        )
+        # Move the highlight off the selected option, so the capture shows the selected and the
+        # highlighted option as two different rows.
+        await page.keyboard.press("ArrowDown")
+        await _settle_focus_marks(page)
+
+    _settings_setup = _view_setup("settings")
+
+    async def setup_settings_forced_colors(page):
+        await _settings_setup(page)
+        await page.keyboard.press("Tab")
+        await _settle_focus_marks(page)
+
+    async def setup_sv3_search_results(page):
+        # WP1.1 S1.12 — Search mode's result list stays reachable beside the floating composer, at a
+        # narrow width and with a long list. DETERMINISTIC: the `sv3-results` fixtures variant
+        # answers any search with 24 hits, which overflows the pinned 760x720 viewport; a fresh
+        # window opens in Search, so Enter in the composer is the whole path in.
+        #
+        # Measured at MAX SCROLL for the same reason as `sv3-composer-occlusion`: at rest the end of
+        # the list is nowhere near the dock, and "the card does not run under the glass" only means
+        # something where "scrolled to the end" is claimed to mean "the last row is above it".
+        await page.set_viewport_size({"width": 760, "height": 720})
+        await page.goto(demo, wait_until="domcontentloaded", timeout=timeout_ms)
+        await page.evaluate(
+            "() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }"
+        )
+        await page.locator(S.CSS_SV3_WINDOW).first.wait_for(state="visible", timeout=20_000)
+        composer = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
+        await composer.wait_for(state="visible", timeout=10_000)
+        await composer.fill("notes")
+        await composer.press("Enter")
+        rows = page.locator(S.CSS_SV3_RESULT_ROW)
+        await rows.nth(23).wait_for(state="attached", timeout=20_000)
+        # The refined pass settles the card's meta line; wait for it so the capture is not mid-pass.
+        await page.locator('jf-sv3-results [data-testid="meta-refining"]').first.wait_for(
+            state="detached", timeout=10_000
+        )
+        # Through a shadow-piercing locator: the window mounts inside the shell's shadow root, so a
+        # `document.querySelector('jf-sv3-window')` walk finds nothing and would scroll nothing.
+        scroller = page.locator('jf-sv3-window [data-testid="sv3-main-scroller"]').first
+        at_end = await scroller.evaluate(
+            "(s) => { s.scrollTop = s.scrollHeight;"
+            " return s.scrollHeight - s.scrollTop - s.clientHeight <= 1 && s.scrollTop > 0; }"
+        )
+        if not at_end:
+            raise AssertionError("sv3-search-results: the result list did not overflow and scroll to its end")
         if cooldown_ms > 0:
             await asyncio.sleep(cooldown_ms / 1000)
 
@@ -2311,6 +2409,20 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # record with populated `attributes.citations`, which is all the Sources panel ever needed.
         Step("sv3-composer-occlusion", setup=setup_sv3_composer_occlusion, isolated=True,
              fixtures_variant="sv3-sources"),
+        # --- Forced colors (Windows High Contrast, CSS `forced-colors: active`) ---
+        # The states a High Contrast reader meets first, each with a keyboard focus on screen.
+        Step("sv3-hero-forced-colors", setup=setup_sv3_hero_forced_colors, isolated=True,
+             forced_colors="active"),
+        Step("sv3-docked-forced-colors", setup=setup_sv3_docked_forced_colors, isolated=True,
+             fixtures_variant="sv3-sources", forced_colors="active"),
+        Step("sv3-palette-forced-colors", setup=setup_sv3_palette_forced_colors, isolated=True,
+             forced_colors="active"),
+        Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
+             forced_colors="active"),
+        # WP1.1 S1.12 — Search mode's long result list at a narrow width, scrolled to the end, under
+        # the floating composer. The `sv3-results` variant serves the 24 hits that make it overflow.
+        Step("sv3-search-results", setup=setup_sv3_search_results, isolated=True,
+             fixtures_variant="sv3-results"),
         # --- Tempdoc 813 §4/§5: the ENRICHING tier (folder rows + the aggregate card) ---
         # The one deterministic capture of the drained-but-enriching state: both folder arms (percent
         # caveat / "fully searchable") and the index-wide aggregate card, from the `enriching`
@@ -2478,6 +2590,7 @@ async def _run_isolated_step(
             ctx = await browser.new_context(
                 viewport={"width": 1280, "height": 720},
                 color_scheme=step.color_scheme,
+                forced_colors=step.forced_colors,
             )
             if fixtures:
                 await ui_fixtures.install_fixtures(
