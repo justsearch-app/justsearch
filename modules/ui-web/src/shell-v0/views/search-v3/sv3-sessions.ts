@@ -163,6 +163,14 @@ export interface Sv3Turn {
   readonly question: string;
   /** Accumulated answer text. Whatever streamed before a halt is KEPT — it was really received. */
   readonly answer: string;
+  /**
+   * The answer as the RECORD saved it: each assistant message of the turn, oldest first, with its
+   * id; {@link answer} is their texts joined. The floor and the exclusions name MESSAGES, and one
+   * turn can hold several, so a follow-up's context is built from these, message by message (S2.0).
+   * Set only by the record projection (`sv3-record.ts`); absent on a live turn, whose answer is the
+   * one message the store has not numbered yet.
+   */
+  readonly answerMessages?: readonly Sv3AnswerMessage[];
   readonly status: Sv3TurnStatus;
   /**
    * The evidence the backend minted for this answer — `null` until it reports any, which is not the
@@ -238,6 +246,12 @@ export interface Sv3Turn {
    * controller to ask.
    */
   readonly evidencePaths?: readonly string[];
+}
+
+/** One saved assistant message of a turn's answer: its record id and its text. */
+export interface Sv3AnswerMessage {
+  readonly id: string;
+  readonly content: string;
 }
 
 /**

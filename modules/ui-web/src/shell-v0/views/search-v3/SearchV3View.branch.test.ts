@@ -27,7 +27,7 @@
  * rendered no pager, had no editor, and called the non-cascade `deleteConversation`. Where a case
  * pins something subtler than "the feature exists", its own comment says what.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { assert, describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
 import { ReasoningController } from '../../controllers/ReasoningController.js';
 
@@ -126,6 +126,8 @@ interface Backend {
   holdHistoryFor: Set<string>;
   /** How many branches have been minted, so each gets its own id. */
   minted: number;
+  /** When set, the next branch response waits for this gate — availability can change meanwhile. */
+  branchGate: Promise<void> | null;
 }
 let backend: Backend;
 
@@ -234,6 +236,7 @@ function stubFetch(): void {
       const fromMsgId = decodeURIComponent(href.slice(href.indexOf('fromMsgId=') + 'fromMsgId='.length));
       backend.branches.push({ parent, fromMsgId });
       if (backend.refuse.has('branch')) return { ok: false, status: 500 };
+      if (backend.branchGate !== null) await backend.branchGate;
       backend.minted += 1;
       const child = `${parent}-branch-${backend.minted}`;
       // The child's record REALLY carries the inherited prefix, up to and including `fromMsgId` —
@@ -355,6 +358,7 @@ beforeEach(() => {
     heldHistories: new Map(),
     holdHistoryFor: new Set(),
     minted: 0,
+    branchGate: null,
   };
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
@@ -477,7 +481,9 @@ const turnsIn = (main: Updatable): HTMLElement[] =>
 
 /** Press a `jf-control` / `jf-button` the way a reader does: through the native button inside it. */
 async function press(host: Element | null | undefined): Promise<void> {
-  if (!host) throw new Error('press: no control');
+  // An assertion, not a throw: a control the scenario needs and the window does not offer is the
+  // failure under test.
+  assert(host, 'press: no control');
   await (host as Updatable).updateComplete;
   const button = host.shadowRoot?.querySelector('button');
   if (button) {
@@ -503,7 +509,7 @@ async function chooseFromTurnMenu(el: Mounted, index: number, label: string): Pr
   const item = [...(menu.shadowRoot?.querySelectorAll<HTMLButtonElement>('button.item') ?? [])].find(
     (b) => (b.textContent ?? '').includes(label),
   );
-  if (!item) throw new Error(`no menu entry ${label}`);
+  assert(item, `no menu entry ${label}`);
   item.click();
   await settle(el);
 }
@@ -667,6 +673,34 @@ describe('the version pager', () => {
     expect(
       main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim(),
     ).toBe('2 / 2');
+  });
+
+  it('re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openConversation(el);
+    await editTurn(el, 1, 'and what about the third?');
+    expect(el.sessions.activeId).toBe('uc-branch-branch-1');
+    // The branch's own turn, as the store recorded it.
+    backend.threads['uc-branch-branch-1']!.events.push(
+      wireEvent(storedId(6), 'USER_MESSAGE', 'and what about the third?'),
+      wireEvent(storedId(7), 'ASSISTANT_MESSAGE', 'A third lock.'),
+    );
+    await openConversation(el);
+    await openConversation(el, 'branched');
+    expect(el.sessions.activeId).toBe('uc-branch-branch-1');
+
+    await editTurn(el, 1, 'and what about the fourth?');
+
+    expect(backend.branches).toEqual([
+      { parent: 'uc-branch', fromMsgId: storedId(1) },
+      { parent: 'uc-branch', fromMsgId: storedId(1) },
+    ]);
+    expect(el.sessions.activeId).toBe('uc-branch-branch-2');
+    const main = await region(el, 'jf-sv3-main');
+    expect(
+      main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim(),
+    ).toBe('3 / 3');
   });
 
   it('renders NO pager on a root conversation nothing forked from', async () => {
@@ -1068,9 +1102,64 @@ describe('Retry and Edit on a Delegate turn run the agent again, in a new versio
 
     await editTurn(el, 1, 'draft a formal letter');
 
-    // The fork key of a branch's first own turn is the branch point it was itself forked at.
-    expect(backend.branches).toEqual([{ parent: 'uc-child', fromMsgId: storedId(1) }]);
+    // The fork key of a branch's first own turn is the branch point it was itself forked at, and the
+    // fork is taken from the conversation it was forked FROM — a sibling, not a branch of the branch.
+    expect(backend.branches).toEqual([{ parent: 'uc-root', fromMsgId: storedId(1) }]);
     expect(ctrl.send.mock.calls.map((c) => c[0])).toEqual(['draft a formal letter']);
+  });
+
+  it('re-edits a retry’s own first turn as a third version of the original, not a branch of the retry', async () => {
+    delegateFirst();
+    // `uc-delegate-retry` is a Retry of the first question: an empty-prefix fork of the original,
+    // whose own first turn the agent answered — reopened after a reload.
+    backend.conversations.push(
+      conversationRow('uc-delegate-retry', 'retried', {
+        parentSessionId: 'uc-delegate',
+        branchPointMessageId: EMPTY_PREFIX_SENTINEL,
+      }),
+    );
+    backend.threads['uc-delegate-retry'] = {
+      conversationId: 'uc-delegate-retry',
+      events: [
+        wireEvent(storedId(6), 'USER_MESSAGE', 'draft the renewal letter', AGENT),
+        wireEvent(storedId(7), 'ASSISTANT_MESSAGE', 'Drafted again.', AGENT),
+      ],
+    };
+    backend.histories['uc-delegate-retry'] = {
+      sessionId: 'uc-delegate-retry',
+      messages: [],
+      parentSessionId: 'uc-delegate',
+      branchPointMessageId: EMPTY_PREFIX_SENTINEL,
+    };
+    const el = await mount();
+    await openConversation(el, 'retried');
+    let main = await region(el, 'jf-sv3-main');
+    expect(
+      main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim(),
+    ).toBe('2 / 2');
+
+    await editTurn(el, 0, 'draft a shorter renewal letter');
+
+    // Forked from the ORIGINAL at the empty prefix — a sibling of the retry, not a child of it.
+    expect(backend.branches).toEqual([{ parent: 'uc-delegate', fromMsgId: EMPTY_PREFIX_SENTINEL }]);
+    expect(ctrl.send.mock.calls.map((c) => c[0])).toEqual(['draft a shorter renewal letter']);
+    expect(backend.dispatches).toEqual([]);
+    expect(el.sessions.activeId).toBe('uc-delegate-branch-1');
+    backend.threads['uc-delegate-branch-1'] = {
+      conversationId: 'uc-delegate-branch-1',
+      events: [
+        wireEvent(storedId(8), 'USER_MESSAGE', 'draft a shorter renewal letter', AGENT),
+        wireEvent(storedId(9), 'ASSISTANT_MESSAGE', 'Drafted, shorter.', AGENT),
+      ],
+    };
+    // All three versions of the first question, paged from the original…
+    await openConversation(el, 'draft the renewal letter');
+    main = await region(el, 'jf-sv3-main');
+    expect(
+      main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim(),
+    ).toBe('1 / 3');
+    // …and the original is unchanged.
+    expect(backend.threads['uc-delegate']?.events).toHaveLength(2);
   });
 
   it('keeps Ask turns re-running as Ask, even when the composer shows Delegate', async () => {
@@ -1132,6 +1221,40 @@ describe('when the agent cannot run, a Delegate Retry/Edit says why and never as
       '[data-testid="sv3-turn-edit-input"]',
     );
     expect(input?.value).toBe('draft a shorter renewal letter');
+  });
+
+  it('keeps the edited text and says why when the agent becomes unavailable during the fork', async () => {
+    askThenDelegate();
+    const el = await mount();
+    await openConversation(el);
+    let release!: () => void;
+    backend.branchGate = new Promise<void>((resolve) => (release = resolve));
+    const seen = toasts();
+
+    // Edit is pressed with the agent available; the fork is still in flight…
+    await editTurn(el, 1, 'draft a shorter renewal letter');
+    expect(backend.branches).toEqual([{ parent: 'uc-delegate', fromMsgId: storedId(1) }]);
+    // …when chat becomes unavailable, and only then does the fork land.
+    __feedForTest({
+      inference: { mode: 'unknown', available: false } as never,
+      status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot,
+    });
+    __feedContactForTest();
+    await settle(el);
+    release();
+    await settle(el);
+
+    // Neither the agent nor an Ask ran.
+    expect(ctrl.send).not.toHaveBeenCalled();
+    expect(backend.dispatches).toEqual([]);
+    // The reader is told why…
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toBe('');
+    // …and the edited text waits in the new version's composer, still a Delegate.
+    expect(el.sessions.activeId).toBe('uc-delegate-branch-1');
+    const composer = (await region(el, 'jf-sv3-composer')) as Updatable & { draft: string };
+    expect(composer.draft).toBe('draft a shorter renewal letter');
+    expect(composer.getAttribute('tier')).toBe('delegate');
   });
 
   it('refuses while another run is active, and says so', async () => {

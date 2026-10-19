@@ -22,7 +22,7 @@
  * rendered no context affordance. Where a case pins something subtler than "the feature exists",
  * its own comment says what.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { assert, describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
 import { ReasoningController } from '../../controllers/ReasoningController.js';
 
@@ -83,6 +83,7 @@ import {
   CONTEXT_MENU_EXCLUDE,
   CONTEXT_MENU_INCLUDE,
   CONTEXT_MENU_RESET,
+  CONTEXT_RESTORE_FAILED,
 } from './fixtures.js';
 
 type Mounted = SearchV3View & { updateComplete: Promise<unknown> };
@@ -442,7 +443,9 @@ const turnsIn = (main: Updatable): HTMLElement[] =>
 
 /** Press a `jf-control` the way a reader does: through the native button inside it. */
 async function press(host: Element | null | undefined): Promise<void> {
-  if (!host) throw new Error('press: no control');
+  // An assertion, not a throw: a control the scenario needs and the window does not offer is the
+  // failure under test.
+  assert(host, 'press: no control');
   await (host as Updatable).updateComplete;
   const button = host.shadowRoot?.querySelector('button');
   if (!button) throw new Error('press: the control rendered no button');
@@ -461,7 +464,7 @@ async function chooseFromTurnMenu(el: Mounted, index: number, label: string): Pr
   const item = [...(menu.shadowRoot?.querySelectorAll<HTMLButtonElement>('button.item') ?? [])].find(
     (b) => (b.textContent ?? '').includes(label),
   );
-  if (!item) throw new Error(`no menu entry ${label}`);
+  assert(item, `no menu entry ${label}`);
   item.click();
   await settle(el);
 }
@@ -1088,11 +1091,128 @@ describe('a follow-up ask is sent WITH the conversation (S2.0)', () => {
 
     await ask(el, 'and the third?');
 
+    // Each saved message is sent as itself, the way the store holds it.
     expect(backend.dispatches[0]?.context).toEqual([
-      { role: 'assistant', content: 'The same lock.\n\nIt was never released.' },
+      { role: 'assistant', content: 'The same lock.' },
+      { role: 'assistant', content: 'It was never released.' },
     ]);
     const main = await region(el, 'jf-sv3-main');
     expect(turnsIn(main)[0]?.hasAttribute('data-out-of-context')).toBe(true);
+  });
+
+  /** The second turn's answer is THREE saved messages; only the last is the turn's own handle. */
+  function combinedAnswerConversation(): void {
+    backend.conversations = [conversationRow('uc-ctx', 'why did the renewal fail?')];
+    backend.threads['uc-ctx'] = {
+      conversationId: 'uc-ctx',
+      events: [
+        wireEvent(storedId(0), 'USER_MESSAGE', 'why did the renewal fail?'),
+        wireEvent(storedId(1), 'ASSISTANT_MESSAGE', 'The lock held.'),
+        wireEvent(storedId(3), 'USER_MESSAGE', 'and the second one?'),
+        wireEvent(storedId(4), 'ASSISTANT_MESSAGE', 'The same lock.'),
+        wireEvent(storedId(5), 'ASSISTANT_MESSAGE', 'Its key was SECRET-7.'),
+        wireEvent(storedId(6), 'ASSISTANT_MESSAGE', 'It was never released.'),
+      ],
+    };
+    backend.histories['uc-ctx'] = {
+      sessionId: 'uc-ctx',
+      messages: [
+        { role: 'user', content: 'why did the renewal fail?', id: storedId(0) },
+        { role: 'assistant', content: 'The lock held.', id: storedId(1) },
+        { role: 'user', content: 'and the second one?', id: storedId(3) },
+        { role: 'assistant', content: 'The same lock.', id: storedId(4) },
+        { role: 'assistant', content: 'Its key was SECRET-7.', id: storedId(5) },
+        { role: 'assistant', content: 'It was never released.', id: storedId(6) },
+      ],
+    };
+  }
+
+  it('leaves out a hidden message from INSIDE a combined answer, as the bar counts it', async () => {
+    combinedAnswerConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(5)];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const bar = await region(el, 'jf-sv3-context-bar');
+    expect(
+      bar.shadowRoot?.querySelector('[data-testid="sv3-context-hidden-unseen"]')?.textContent?.trim(),
+    ).toBe('1 hidden message not shown here');
+
+    await ask(el, 'and the third?');
+
+    const sent = backend.dispatches[0]?.context as Array<{ content: string }>;
+    expect(sent.map((m) => m.content)).toEqual([
+      'why did the renewal fail?',
+      'The lock held.',
+      'and the second one?',
+      'The same lock.',
+      'It was never released.',
+    ]);
+    expect(JSON.stringify(sent)).not.toContain('SECRET-7');
+  });
+
+  it('starts at a floor set INSIDE a combined answer, sending nothing saved before it', async () => {
+    combinedAnswerConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(5);
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+
+    expect(backend.dispatches[0]?.context).toEqual([
+      { role: 'assistant', content: 'Its key was SECRET-7.' },
+      { role: 'assistant', content: 'It was never released.' },
+    ]);
+  });
+
+  it('starts at a floor on the LAST message of a combined answer, sending only that message', async () => {
+    combinedAnswerConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(6);
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+
+    expect(backend.dispatches[0]?.context).toEqual([
+      { role: 'assistant', content: 'It was never released.' },
+    ]);
+  });
+
+  it('does not send older turns before the conversation’s context settings have arrived', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(3);
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(4)];
+    // The transcript arrives; the floor and the exclusion do not, yet.
+    backend.holdHistoryFor.add('uc-ctx');
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    expect(el.sessions.sessions[0]?.history ?? null).toBeNull();
+
+    await ask(el, 'and the third?');
+    // Nothing went out with more than the saved settings allow — at most, nothing went out yet.
+    for (const sent of backend.dispatches) {
+      expect(sent.context).toEqual([{ role: 'user', content: 'and the second one?' }]);
+    }
+    backend.heldHistories.get('uc-ctx')?.();
+    await settle(el);
+
+    expect(backend.dispatches).toHaveLength(1);
+    expect(backend.dispatches[0]?.context).toEqual([
+      { role: 'user', content: 'and the second one?' },
+    ]);
+  });
+
+  it('sends no older turns when the conversation’s context settings cannot be read', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(1)];
+    backend.failHistoryFor.add('uc-ctx');
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+
+    expect(backend.dispatches).toHaveLength(1);
+    expect(backend.dispatches[0]?.question).toBe('and the third?');
+    expect(backend.dispatches[0]?.context).toBeUndefined();
   });
 
   it('shows in the inspector exactly the messages it sends — one hidden answer, not its turn', async () => {
@@ -1349,6 +1469,29 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
     expect(backend.histories['uc-ctx']?.contextFloor).toBeUndefined();
     const after = await region(el, 'jf-sv3-context-bar');
     expect(after.shadowRoot?.querySelector('[data-testid="sv3-context-floor-unseen"]')).toBeNull();
+  });
+
+  it('leaves the bar on the saved floor when Restore is refused AND its reload fails', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = 'gone-floor';
+    backend.histories['uc-ctx']!.contextFloorSummary = 'An older thread, summarized.';
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    backend.refuse.add('clear');
+    backend.failHistoryFor.add('uc-ctx');
+    const seen = toasts();
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-restore"]'));
+    await settle(el);
+
+    expect(seen).toEqual([CONTEXT_RESTORE_FAILED]);
+    expect(backend.histories['uc-ctx']?.contextFloor).toBe('gone-floor');
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBe('gone-floor');
+    expect(el.sessions.sessions[0]?.history?.contextFloorSummary).toBe('An older thread, summarized.');
+    const after = await region(el, 'jf-sv3-context-bar');
+    expect(
+      after.shadowRoot?.querySelector('[data-testid="sv3-context-floor-unseen"]')?.textContent,
+    ).toContain('Context starts at a message not shown here');
   });
 
   it('keeps the conversation the reader moved to on ITS saved state while the undo finishes', async () => {

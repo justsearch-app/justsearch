@@ -41,7 +41,12 @@ import type {
 } from '../../../api/generated/shape-handlers/shared.js';
 import type { Sv3RunFeedItem } from './sv3-run.js';
 import { sv3RecordItemStopsRun, sv3WasHalted } from './sv3-honesty.js';
-import { isSv3StoreMessageId, type Sv3Turn, type Sv3TurnEvidence } from './sv3-sessions.js';
+import {
+  isSv3StoreMessageId,
+  type Sv3AnswerMessage,
+  type Sv3Turn,
+  type Sv3TurnEvidence,
+} from './sv3-sessions.js';
 
 /**
  * The label a non-prose record item carries. Deliberately the same closed vocabulary
@@ -290,7 +295,10 @@ interface Building {
    */
   stopRequested: boolean;
   /** The record opened this turn on a `user` item, rather than on whatever arrived first. */
-  openedByUser: boolean;  /**
+  openedByUser: boolean;
+  /** Every assistant message of the turn, in record order, with its id — the answer as saved. */
+  answerMessages: Sv3AnswerMessage[];
+  /**
    * The follow-up's rewritten question (the "Interpreted as" note), off the turn's outcome row —
    * `''` when the record carries none (not rewritten, or a record written before it was persisted).
    */
@@ -320,6 +328,7 @@ const open = (
   disposition: null,
   stopRequested: false,
   assistantId: null,
+  answerMessages: [],
   standaloneQuestion: '',
 });
 
@@ -412,6 +421,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     });
     if (item.kind === 'assistant') {
       turn.answers.push(item.content);
+      turn.answerMessages.push({ id: item.id, content: item.content });
       turn.activity.push({ kind: 'text', id: item.id, text: item.content });
       if (isSv3StoreMessageId(item.id)) turn.assistantId = item.id;
       const evidence = recordEvidenceOf(item);
@@ -520,6 +530,8 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       kind: agent ? 'agent' : 'ask',
       question: turn.question,
       answer: turn.answers.join('\n\n'),
+      // The same messages, kept apart: what a follow-up's context is built from (S2.0).
+      answerMessages: turn.answerMessages,
       // Live audit 2026-08-25 (D3) — ONE vocabulary for one run. A cancelled run logs an error entry
       // on its way down, so deriving the status from `errored` alone made the record call it `failed`
       // while the live tail called it `stopped by you` — the same run telling the reader two stories,

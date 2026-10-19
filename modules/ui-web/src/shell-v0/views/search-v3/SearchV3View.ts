@@ -199,6 +199,7 @@ import {
   loadConversations,
   restoreActiveConversation,
   resumeConversation,
+  type ResumedConversation,
   setActiveConversation,
   setContextFloor,
   setConversationApiBase,
@@ -399,6 +400,19 @@ const openControlMenuInPath = (event: KeyboardEvent): boolean =>
     // through to the window would take the composer back to hero with it.
     return el.effortMenuOpen === true || el.tierMenuOpen === true;
   });
+
+/** What a `/history` read says about the conversation's context and lineage, as the window keeps it. */
+const sv3HistoryOf = (history: ResumedConversation): Sv3SessionHistory => ({
+  parentSessionId: history.parentSessionId,
+  branchPointMessageId: history.branchPointMessageId,
+  parentFirstUserMessage: history.parentFirstUserMessage,
+  contextFloor: history.contextFloor,
+  contextFloorSummary: history.contextFloorSummary,
+  excludedMessageIds: history.excludedMessageIds,
+  excludedSourceIds: history.excludedSourceIds,
+  messageIds: history.messages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : [])),
+  locked: history.locked,
+});
 
 export class SearchV3View extends JfElement {
   static styles = [
@@ -1445,17 +1459,7 @@ export class SearchV3View extends JfElement {
     if (this.historyAbort === abort) this.historyAbort = null;
     if (this.sessions.activeId !== conversationId) return false;
     if (history.failed === true) return false;
-    this.sessions = applySv3History(this.sessions, conversationId, {
-      parentSessionId: history.parentSessionId,
-      branchPointMessageId: history.branchPointMessageId,
-      parentFirstUserMessage: history.parentFirstUserMessage,
-      contextFloor: history.contextFloor,
-      contextFloorSummary: history.contextFloorSummary,
-      excludedMessageIds: history.excludedMessageIds,
-      excludedSourceIds: history.excludedSourceIds,
-      messageIds: history.messages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : [])),
-      locked: history.locked,
-    });
+    this.sessions = applySv3History(this.sessions, conversationId, sv3HistoryOf(history));
     return true;
   }
 
@@ -1570,16 +1574,21 @@ export class SearchV3View extends JfElement {
         );
         return;
       }
-      case 'restore':
+      case 'restore': {
         // Restore clears the floor and its summary — and only those: what the reader hid message by
-        // message stays hidden.
+        // message stays hidden. Only a Restore the store ACCEPTED is applied to the window's copy
+        // when the reload fails; a refused one changed nothing, so the bar keeps the saved floor.
+        const cleared = await clearContextFloor(sessionId);
         await this.settleContextWrite(
           sessionId,
-          await clearContextFloor(sessionId),
+          cleared,
           CONTEXT_RESTORE_FAILED,
-          (history) => ({ ...history, contextFloor: undefined, contextFloorSummary: undefined }),
+          cleared
+            ? (history) => ({ ...history, contextFloor: undefined, contextFloorSummary: undefined })
+            : undefined,
         );
         return;
+      }
       case 'compact': {
         const messageId = turn?.floorMessageId ?? null;
         if (messageId === null || this.compacting) return;
@@ -1755,7 +1764,7 @@ export class SearchV3View extends JfElement {
         if (lineage.forkKey === null || question === '') return;
         if (!this.canRerun(tier)) return;
         await this.branchInto(
-          session.id,
+          lineage.forkFromId,
           lineage.forkKey,
           question,
           tier,
@@ -1768,7 +1777,7 @@ export class SearchV3View extends JfElement {
         if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
         if (!this.canRerun(tier)) return;
         await this.branchInto(
-          session.id,
+          lineage.forkFromId,
           lineage.forkKey,
           text,
           tier,
@@ -1833,8 +1842,19 @@ export class SearchV3View extends JfElement {
     // The same ORDER for both tiers: the branch is claimed first, so the re-run lands in it.
     // An ask re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this
     // window did not limit, asks all files, which is what its Retry/Edit said it would do.
-    if (tier === 'delegate') this.delegate(resend);
-    else await this.runAsk(resend, scope);
+    if (tier === 'delegate') {
+      // The agent can stop being able to run while the fork is in flight (S2.6). The fork stands —
+      // it is the new version — and the text waits in its composer, in Delegate, saying why; it is
+      // never run as an Ask and never dropped.
+      if (!this.canRerun(tier)) {
+        this.tier = 'delegate';
+        this.writeDraft(resend);
+        return true;
+      }
+      this.delegate(resend);
+    } else {
+      await this.runAsk(resend, scope);
+    }
     return true;
   }
 
@@ -2756,12 +2776,27 @@ export class SearchV3View extends JfElement {
    * The conversation a follow-up in `sessionId` carries — its turns before `turnId`, through the
    * conversation's own `/history` (floor, exclusions, summary). Empty for a conversation's first
    * question.
+   *
+   * Only ever under the SAVED settings (S2.0): while the window holds no `/history` for the
+   * conversation — its read is still in flight, or it failed — the settings are read now, before
+   * anything is sent. A follow-up whose settings cannot be read carries no earlier turns: sending
+   * them unfiltered could send what the reader hid.
    */
-  private followUpContext(sessionId: string, turnId: string): ReturnType<typeof sv3FollowUpContext> {
+  private async followUpContext(
+    sessionId: string,
+    turnId: string,
+  ): Promise<ReturnType<typeof sv3FollowUpContext>> {
     const session = sessionById(this.sessions, sessionId);
     if (session === null) return [];
     const earlier = session.turns.filter((turn) => turn.id !== turnId);
-    return sv3FollowUpContext(earlier, projectSv3TurnContexts(earlier, session.history), session.history);
+    if (earlier.length === 0) return [];
+    let history = session.history;
+    if (history === null) {
+      const read = await resumeConversation(sessionId, SV3_ASK_SHAPE_ID, { claim: false });
+      if (read.failed === true || read.locked === true) return [];
+      history = sv3HistoryOf(read);
+    }
+    return sv3FollowUpContext(earlier, projectSv3TurnContexts(earlier, history), history);
   }
 
   /**
@@ -2779,10 +2814,10 @@ export class SearchV3View extends JfElement {
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
     // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
-    // The follow-up's conversation (S2.0), read as of THIS send and before anything streams: every
-    // earlier turn of the conversation the question went into, through the same floor, exclusions
-    // and summary the transcript and the bar draw. The new turn itself is the question, not context.
-    const context = this.followUpContext(ref.sessionId, ref.turnId);
+    // The follow-up's conversation (S2.0), taken as of THIS send: every earlier turn of the
+    // conversation the question went into, through the same floor, exclusions and summary the
+    // transcript and the bar draw. The new turn itself is the question, not context.
+    const pendingContext = this.followUpContext(ref.sessionId, ref.turnId);
     this.claimConversation(ref.sessionId);
     this.composer?.clearDraft();
     void this.setComposerState('docked');
@@ -2836,6 +2871,8 @@ export class SearchV3View extends JfElement {
         this.settleAiActivity();
       }
     };
+    // Usually at once; when the conversation's settings had not been read yet, after they are.
+    const context = await pendingContext;
     await sv3Ask(
       {
         apiBase: this.apiBase,

@@ -600,7 +600,6 @@ final class FileConversationStoreTest {
   }
 
   @Test
-  @DisplayName("Excluding the floor message itself does not bring the history above the floor back")
   void excludingTheFloorMessageKeepsTheFloor(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
     store.appendMessage("s", "core.free-chat", userMsg("q1"));

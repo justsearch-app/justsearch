@@ -115,6 +115,11 @@ export interface Sv3TurnContext {
    */
   readonly questionInContext: boolean;
   readonly answerInContext: boolean;
+  /**
+   * The texts of the turn's saved answer messages that are in the next prompt, oldest first — the
+   * same per-message rule, applied to each message of an answer the record saved as several (S2.0).
+   */
+  readonly answerTextsInContext: readonly string[];
 }
 
 const EMPTY_IDS: readonly string[] = [];
@@ -129,14 +134,32 @@ const messageIdsOf = (turn: Sv3Turn): readonly string[] => {
 };
 
 /**
+ * A turn's answer as its saved messages — the record's, or, for a live turn the store has not
+ * numbered yet, its one answer under the id it has (none).
+ */
+const answerPartsOf = (turn: Sv3Turn): readonly { readonly id: string | null; readonly content: string }[] =>
+  turn.answerMessages !== undefined && turn.answerMessages.length > 0
+    ? turn.answerMessages
+    : [{ id: sv3TurnMessageIds(turn).assistantMsgId, content: turn.answer }];
+
+/** Every saved message id of a turn, in saved order: the question, then each answer message. */
+const savedIdsOf = (turn: Sv3Turn): readonly string[] => {
+  const { userMsgId } = sv3TurnMessageIds(turn);
+  const ids = answerPartsOf(turn).flatMap((part) => (part.id === null ? [] : [part.id]));
+  return userMsgId === null ? ids : [userMsgId, ...ids];
+};
+
+/**
  * Where the floor sits among the turns on screen: the turn it starts in, and the ids in that turn
  * that come BEFORE it (and so are cut with the turns above). `null` = no floor in force.
  *
- * A floor that names a turn's own message resolves by id ({@link sv3TurnByMessageId}). A floor on a
- * message no turn names — an inner assistant row of a multi-message turn, say — is placed by the
- * order `/history` saved the messages in, which is the order the store trims by. A floor `/history`
- * does not hold at all is no floor, exactly as `FileConversationStore.loadEffectiveContext` treats a
- * stale one (it fails safe to the whole history); the bar still says it is there.
+ * A floor on one of a turn's saved messages — its question, its answer's handle, or an inner
+ * message of an answer saved as several — is placed on that message, by id; only the first two are
+ * ON SCREEN (a divider can carry them, {@link sv3TurnByMessageId}). A floor on a message no turn
+ * holds is placed by the order `/history` saved the messages in, which is the order the store trims
+ * by. A floor `/history` does not hold at all is no floor, exactly as
+ * `FileConversationStore.loadEffectiveContext` treats a stale one (it fails safe to the whole
+ * history); the bar still says it is there.
  */
 function placeFloor(
   turns: readonly Sv3Turn[],
@@ -144,19 +167,22 @@ function placeFloor(
 ): { readonly index: number; readonly onScreen: boolean; readonly cut: ReadonlySet<string> } | null {
   const floor = history?.contextFloor ?? '';
   if (floor === '') return null;
-  const named = sv3TurnByMessageId(turns, floor);
-  if (named !== null) {
-    // A floor on the answer of a turn that also has a question cuts that question.
-    const { userMsgId, assistantMsgId } = sv3TurnMessageIds(named);
-    const cut = assistantMsgId === floor && userMsgId !== null ? [userMsgId] : [];
-    return { index: turns.indexOf(named), onScreen: true, cut: new Set(cut) };
+  const holder = turns.findIndex((turn) => savedIdsOf(turn).includes(floor));
+  if (holder >= 0) {
+    // Everything the turn saved before the floor message is cut with the turns above.
+    const ids = savedIdsOf(turns[holder]!);
+    return {
+      index: holder,
+      onScreen: sv3TurnByMessageId(turns, floor) !== null,
+      cut: new Set(ids.slice(0, ids.indexOf(floor))),
+    };
   }
   const order = history?.messageIds ?? [];
   const floorRank = order.indexOf(floor);
   if (floorRank < 0) return null;
   const rank = (id: string): number => order.indexOf(id);
   for (let index = 0; index < turns.length; index++) {
-    const ids = messageIdsOf(turns[index]!);
+    const ids = savedIdsOf(turns[index]!);
     const kept = ids.filter((id) => rank(id) >= floorRank);
     if (kept.length > 0) {
       return { index, onScreen: false, cut: new Set(ids.filter((id) => !kept.includes(id))) };
@@ -164,7 +190,7 @@ function placeFloor(
   }
   // Every stored message on screen is above the floor: the turns still in context are the ones the
   // store has not numbered yet (a live turn).
-  const firstUnnumbered = turns.findIndex((turn) => messageIdsOf(turn).length === 0);
+  const firstUnnumbered = turns.findIndex((turn) => savedIdsOf(turn).length === 0);
   return { index: firstUnnumbered < 0 ? turns.length : firstUnnumbered, onScreen: false, cut: new Set() };
 }
 
@@ -187,10 +213,13 @@ export function projectSv3TurnContexts(
     const messageIds = messageIdsOf(turn);
     const excludedIds = messageIds.filter((id) => excluded.has(id));
     const outOfContext = floor !== null && index < floor.index;
-    const { userMsgId, assistantMsgId } = sv3TurnMessageIds(turn);
+    const { userMsgId } = sv3TurnMessageIds(turn);
     const kept = (id: string | null): boolean =>
       !outOfContext &&
       (id === null || (!excluded.has(id) && !(floor !== null && index === floor.index && floor.cut.has(id))));
+    const answerTextsInContext = answerPartsOf(turn)
+      .filter((part) => kept(part.id))
+      .map((part) => part.content);
     return {
       turnId: turn.id,
       messageIds,
@@ -201,7 +230,8 @@ export function projectSv3TurnContexts(
       excludedIds,
       hasExcluded: excludedIds.length > 0,
       questionInContext: kept(userMsgId),
-      answerInContext: kept(assistantMsgId),
+      answerInContext: answerTextsInContext.length > 0,
+      answerTextsInContext,
     };
   });
 }
@@ -279,9 +309,8 @@ export const SV3_CONTEXT_SUMMARY_PREFIX = 'Summary of earlier conversation:\n';
  * sent. The ask shape is ephemeral — the backend loads no history for it — so this IS the model's
  * memory of the conversation.
  *
- * HONEST LIMIT: a turn's answer is all of its assistant messages joined; a message hidden from
- * inside a multi-message answer cannot be cut out of it here (only the turn's last one is
- * addressable), so it is still sent.
+ * An answer the record saved as several messages is sent message by message, as saved, so a
+ * message hidden from inside it — or saved before a floor set inside it — is left out like any other.
  */
 export function sv3FollowUpContext(
   turns: readonly Sv3Turn[],
@@ -298,8 +327,9 @@ export function sv3FollowUpContext(
     if (turn.question.trim() !== '' && (context?.questionInContext ?? true)) {
       out.push({ role: 'user', content: turn.question });
     }
-    if (turn.answer.trim() !== '' && (context?.answerInContext ?? true)) {
-      out.push({ role: 'assistant', content: turn.answer });
+    const answers = context === undefined ? [turn.answer] : context.answerTextsInContext;
+    for (const answer of answers) {
+      if (answer.trim() !== '') out.push({ role: 'assistant', content: answer });
     }
   });
   return out;

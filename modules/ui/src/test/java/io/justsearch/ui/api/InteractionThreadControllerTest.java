@@ -459,7 +459,6 @@ final class InteractionThreadControllerTest {
   }
 
   @Test
-  @DisplayName("A turn's persisted standalone question is lifted onto its thread event, answer or error")
   void surfacesTheStandaloneQuestionFromTheRecord() {
     ConversationStore conversationStore = mock(ConversationStore.class);
     when(conversationStore.loadHistory("conv-s"))
@@ -488,13 +487,12 @@ final class InteractionThreadControllerTest {
         .thenReturn(ThreadProjection.of(List.of()));
 
     JsonNode events = invokeGet(newController(conversationStore, agentService), "conv-s").get("events");
-    assertEquals(
-        "What does the second report say?",
-        events.get(0).get("attributes").get("standaloneQuestion").asString());
+    JsonNode answerNote = events.get(0).get("attributes").get("standaloneQuestion");
+    JsonNode errorNote = events.get(1).get("attributes").get("standaloneQuestion");
+    assertTrue(answerNote != null && errorNote != null, "each rewritten turn carries its note");
+    assertEquals("What does the second report say?", answerNote.asString());
     assertEquals("ERROR", events.get(1).get("kind").asString());
-    assertEquals(
-        "What does the third report say?",
-        events.get(1).get("attributes").get("standaloneQuestion").asString());
+    assertEquals("What does the third report say?", errorNote.asString());
     assertTrue(
         events.get(2).get("attributes").get("standaloneQuestion") == null,
         "an unrevised turn carries no key");

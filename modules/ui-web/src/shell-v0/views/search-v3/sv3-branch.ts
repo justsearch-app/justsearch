@@ -89,6 +89,13 @@ export interface Sv3TurnLineage {
    * and this turn came from the parent), or a previous turn whose answer is not a store message.
    */
   readonly forkKey: string | null;
+  /**
+   * The conversation Edit and Retry fork at {@link forkKey}: this one, except at a BRANCH's first own
+   * turn. There the key is the point the branch was itself forked at, so the fork is taken from the
+   * PARENT — the re-run is one more version of the same turn, a sibling of this branch. Forking this
+   * conversation instead would nest a branch inside it, and the versions would split across pagers.
+   */
+  readonly forkFromId: string;
   /** This turn's question can be rewritten and re-sent: it names a store message and has a fork key. */
   readonly canEdit: boolean;
   /** The versions of this turn, or `null` when this turn is not a divergence point with more than one. */
@@ -137,6 +144,8 @@ export function projectSv3TurnLineage(
   conversations: readonly Conversation[],
 ): readonly Sv3TurnLineage[] {
   const firstOwn = sv3FirstOwnTurnIndex(turns, history);
+  const parent = history?.parentSessionId ?? '';
+  const point = history?.branchPointMessageId ?? '';
   return turns.map((turn, index) => {
     const own = index >= firstOwn;
     const { userMsgId, assistantMsgId } = sv3TurnMessageIds(turn);
@@ -152,6 +161,7 @@ export function projectSv3TurnLineage(
       turnId: turn.id,
       branchFromId: own ? assistantMsgId : null,
       forkKey,
+      forkFromId: index === firstOwn && parent !== '' && point !== '' ? parent : sessionId,
       canEdit: own && userMsgId !== null && forkKey !== null,
       versions: versionsAt(turns, index, firstOwn, history, sessionId, conversations),
     };

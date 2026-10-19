@@ -159,7 +159,6 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("A rewritten follow-up records the standalone question on its answer")
   void rewrittenFollowUpPersistsTheStandaloneQuestion() {
     var injector = rewritingInjector("What does the second report say?", false);
     var store = new RecordingStore();
@@ -176,7 +175,6 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("A follow-up that was not rewritten carries no standaloneQuestion key")
   void unrevisedTurnCarriesNoStandaloneQuestion() {
     var injector = rewritingInjector(null, false);
     var store = new RecordingStore();
@@ -188,7 +186,6 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("A rewrite followed by a retrieval failure records the note on the error row")
   void rewriteThenRetrievalFailureKeepsTheNote() {
     var injector = rewritingInjector("What does the second report say?", true);
     var store = new FileConversationStore(retrievalStoreDir);
@@ -203,7 +200,46 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("A rewrite followed by a generation failure (or Stop) records the note on the error row")
+  void rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote() {
+    // The production retriever, whose search fails outright: it ends the turn with RETRIEVAL_FAILED
+    // and reports no retrieval metadata, so nothing but the rewrite says what the turn was.
+    var docs = org.mockito.Mockito.mock(io.justsearch.app.api.DocumentService.class);
+    org.mockito.Mockito.when(docs.retrieveContext(
+            org.mockito.ArgumentMatchers.any(io.justsearch.app.api.RetrieveContextParams.class),
+            org.mockito.ArgumentMatchers.any()))
+        .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(
+            new IllegalStateException("worker retrieval unavailable")));
+    var rag = new io.justsearch.app.services.conversation.spi.RAGContext(docs, java.time.Duration.ofMillis(500));
+    var rewrite = new ContextInjector() {
+      @Override public String id() { return "core.test-rewrite"; }
+      @Override public io.justsearch.agent.api.conversation.InjectorResult inject(ConversationContext ctx) {
+        ctx.attributes().put(
+            io.justsearch.app.services.conversation.spi.QueryRewriteInjector.ATTR_STANDALONE_QUESTION,
+            "What does the second report say?");
+        return new io.justsearch.agent.api.conversation.InjectorResult(List.of(),
+            List.of(new SseEvent("rag.rewrite", Map.of("standalone", "What does the second report say?"))),
+            Optional.empty());
+      }
+    };
+    var store = new FileConversationStore(retrievalStoreDir);
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(rewrite.id(), rag.id()), List.of()),
+        List.of(), List.of(rewrite, rag), List.of(), List.of(), new ScriptedAi(List.of("unused")), store);
+    var live = new ArrayList<SseEvent>();
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "and the second one?"),
+        Audience.USER, live::add, io.justsearch.app.services.TestEngineContexts.internal());
+    assertTrue(live.stream().anyMatch(e -> "error".equals(e.name())
+        && "RETRIEVAL_FAILED".equals(e.payload().get("errorCode"))), live.toString());
+    assertTrue(live.stream().noneMatch(e -> "rag.meta".equals(e.name())), live.toString());
+
+    var history = new FileConversationStore(retrievalStoreDir).loadHistory("conv-1");
+    assertEquals(2, history.size(), "the question and its outcome survive a reload");
+    assertEquals("and the second one?", history.get(0).get("content"));
+    assertEquals(true, history.get(1).get("terminalError"));
+    assertEquals("RETRIEVAL_FAILED", history.get(1).get("errorCode"));
+    assertEquals("What does the second report say?", history.get(1).get("standaloneQuestion"));
+  }
+
+  @Test
   void rewriteThenGenerationFailureKeepsTheNote() {
     var injector = rewritingInjector("What does the second report say?", false);
     var store = new FileConversationStore(retrievalStoreDir);
@@ -218,7 +254,6 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("Forwarded conversation context is counted as conversation, not as documents")
   void forwardedContextCountsAsConversationInTheBreakdown() {
     var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
     var store = new RecordingStore();
@@ -245,7 +280,6 @@ final class SubstrateDrivenEngineTest {
   // one system message, first.
 
   @Test
-  @DisplayName("A compacted persistent conversation sends one system message, first, with the summary")
   void compactionSummaryFoldsIntoTheLeadingSystemMessage() {
     var store = new FileConversationStore(retrievalStoreDir);
     store.appendMessage("conv-1", SHAPE_ID.value(), Map.of("role", "user", "content", "old question"));
@@ -271,7 +305,6 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("A RAG ask whose forwarded context holds a summary sends one system message, first")
   void forwardedSummaryFoldsIntoTheLeadingSystemMessage() {
     var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
     var contributor = new RecordingContributor("core.test-contrib", "SYS", 10);
@@ -303,7 +336,6 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("A context without system messages reaches the model unchanged")
   void contextWithoutSystemMessagesIsUnchanged() {
     var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
     var contributor = new RecordingContributor("core.test-contrib", "SYS", 10);
@@ -329,7 +361,6 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
-  @DisplayName("With no system prompt, a context summary still becomes the one leading system message")
   void summaryWithoutSystemPromptLeadsTheList() {
     var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
     var llm = new ScriptedAi(List.of("answer"));

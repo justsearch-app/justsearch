@@ -559,8 +559,12 @@ public final class ConversationEngine {
     String standalone = standaloneQuestion(ctx);
     String retrievalRecordId = sessionId != null ? sessionId : threadId;
     if (injectorRun.terminated) {
+      // A turn whose retrieval reported what it did, or whose question was rewritten (the reader saw
+      // "Interpreted as" live), is saved with its outcome even though it ends here: a retrieval that
+      // could not run at all reports no metadata, and the rewrite is then all that says what it was.
       if (retrievalRecordId != null && conversationStore != null
-          && !injectorRun.retrievalMetadata.isEmpty() && injectorRun.terminalError != null) {
+          && (!injectorRun.retrievalMetadata.isEmpty() || standalone != null)
+          && injectorRun.terminalError != null) {
         conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
         persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
             String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
@@ -1132,7 +1136,10 @@ public final class ConversationEngine {
   private void persistRetrievalError(String recordId, ConversationShape shape,
       Map<String, Object> retrievalMetadata, String standaloneQuestion, String message,
       Object errorCode) {
-    if (recordId == null || conversationStore == null || retrievalMetadata.isEmpty()) return;
+    if (recordId == null || conversationStore == null
+        || (retrievalMetadata.isEmpty() && standaloneQuestion == null)) {
+      return;
+    }
     var error = new LinkedHashMap<String, Object>();
     error.put("role", "assistant");
     error.put("content", message);
@@ -1217,7 +1224,7 @@ public final class ConversationEngine {
     List<Map<String, Object>> rest = new ArrayList<>(contextMessages.size());
     for (Map<String, Object> message : contextMessages) {
       if ("system".equals(message.get("role"))) {
-        String text = java.util.Objects.toString(message.get("content"), "");
+        String text = Objects.toString(message.get("content"), "");
         if (!text.isBlank()) {
           if (!systemText.isEmpty()) systemText.append("\n\n");
           systemText.append(text);
