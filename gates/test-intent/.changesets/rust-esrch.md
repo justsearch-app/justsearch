@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: rust-esrch
 author-role: builder
-author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
+author-session: 01a155a7-afea-7f03-9f1e-4aaaf9b8db8b
 ---
 
 # Linux process exit races
