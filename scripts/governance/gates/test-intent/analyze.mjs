@@ -63,6 +63,7 @@ const RUST_ITEM_SUFFIX = '#cfg(test)';
 const TEST_EFFICACY_CHANGESETS = 'gates/test-efficacy/.changesets/';
 const nonEmpty = (v) => typeof v === 'string' && v.trim().length > 0;
 const hashText = (t) => (t === null ? null : sha256(normalizeText(t)));
+const pathCollisionKey = (p) => p.normalize('NFC').toLowerCase();
 
 function finding(rule, level, message, uri) {
   return { ruleId: `test-intent/${rule}`, level, message, ...(uri ? { uri } : {}) };
@@ -112,11 +113,11 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
 
   const { changes, baseBlobs } = diffWorkingTree(base.ref, repoRoot);
   const changedPaths = new Set(changes.map((c) => c.path));
-  // Check the base as well as the diff: a case-only addition can replace an existing file on
-  // case-insensitive filesystems, even when that base path is deleted in this change.
+  // Check the base as well as the diff: case-only or Unicode-normalization-only additions can
+  // replace existing files on some filesystems, even when the base path is deleted in this change.
   const casePaths = new Map();
   for (const p of new Set([...baseBlobs.keys(), ...changedPaths])) {
-    const key = p.toLowerCase();
+    const key = pathCollisionKey(p);
     casePaths.set(key, (casePaths.get(key) ?? 0) + 1);
   }
   const changeStatus = new Map(changes.map((c) => [c.path, c.status]));
@@ -270,7 +271,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   for (const d of wholeFile.filter((c) => c.status === 'D')) {
     const from = executionContext(d.path);
     const same = added.filter((a) => !paired.has(a.path) && a.after === d.before
-      && casePaths.get(a.path.toLowerCase()) === 1);
+      && casePaths.get(pathCollisionKey(a.path)) === 1);
     const match = from === null ? undefined : same.find((a) => executionContext(a.path) === from);
     if (match) {
       paired.add(match.path).add(d.path);
@@ -293,7 +294,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     if (c.status === 'A' && c.before === null && c.kind === 'test-code'
       && !deletedTest && !deleted.some((d) => d.before === c.after)
       && !contextMoves.has(c.path) && !testSupport.has(c.path) && !rustTestFiles.has(c.path)
-      && casePaths.get(c.path.toLowerCase()) === 1
+      && casePaths.get(pathCollisionKey(c.path)) === 1
       && regularSource(c.path)
       && !buildConfigKind(c.path) && isStandaloneTestSource(c.path)
       && (!/\.(java|kt)$/.test(c.path) || uniqueJvmType(c.path))) {

@@ -52,13 +52,14 @@ or separate acceptance record. All of these conditions must hold:
   only adding a test case or changing an expected value.
 - It is a regular file, not a symbolic link in either Git's index or the working tree. This applies
   to frontend test sources too, including checkouts that materialize Git symlinks as regular files.
-- The path must not equal, ignoring letter case, any path at the base or any other changed path.
-  This keeps additions that can collide on case-insensitive filesystems gated.
+- The path must not equal, after Unicode NFC normalization and ignoring letter case, any path at
+  the base or any other changed path. This keeps additions that can collide on case-insensitive
+  or Unicode-normalizing filesystems gated.
 - No in-scope test file, test-owned data, watched baseline, listed helper or Rust source is deleted
   in the diff. Deletion plus addition could be an edited move; the gate cannot prove isolation.
   An exact copy of any deleted file is also ineligible. Existing byte-identical move handling
-  remains for paths without case collisions: a move within the same execution context needs no
-  entry; a move across contexts does.
+  remains for paths without case or Unicode normalization collisions: a move within the same
+  execution context needs no entry; a move across contexts does.
 - It is product test code, outside `modules/test-support`, `modules/app-api-tck` and
   `modules/system-tests`. Files under `__fixtures__`, `__snapshots__`, `resources`, `testFixtures`,
   `mocks` or `__test-setup__` are ineligible. A helper listed at either the base or the head,
@@ -95,8 +96,11 @@ that expectations have sources, named checks actually executed and passed withou
 repair checks fail on the before-state for the asserted reason. Compile or environment failures
 do not establish fail-before. The verifier must also check that the file changes nothing outside
 itself: no shadowed types and no JVM-wide or global state left changed, such as the default locale,
-time zone, system properties or `globalThis`. The gate cannot detect state changes made in test
-methods or lifecycle hooks. The gate no longer enforces those duties for exempt files.
+time zone, system properties or `globalThis`. The verifier must check that no existing test reads
+the new file as input, including source scanners, ArchUnit/class-scanning tests, and tests that
+use file globs or walk directories. The gate cannot detect those input dependencies or state
+changes made in test methods, lifecycle hooks, Java static field initializers or Kotlin companion
+object properties. The gate no longer enforces those duties for exempt files.
 
 Existing or in-flight entries may still name an exempt file. Such entries keep all their source,
 evidence, digest and acceptance checks; no changeset or acceptance record needs rewriting merely

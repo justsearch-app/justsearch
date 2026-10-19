@@ -1235,6 +1235,29 @@ export const CASES = [
     scenario: { main: BASE, branch: [{ write: { 'modules/ui-web/src/views/LIST.test.ts': BASE[P.uiTest] } }] },
     expect: 'fail', rules: ['uncovered'], flagged: ['modules/ui-web/src/views/LIST.test.ts'],
   },
+  ...['base', 'change'].flatMap((side) => ['normalization', 'normalization and case'].map((kind) => {
+    const existing = 'modules/ui-web/src/views/caf\u00e9.test.ts';
+    const added = `modules/ui-web/src/views/${kind === 'normalization' ? 'cafe\u0301' : 'CAFE\u0301'}.test.ts`;
+    return {
+      name: `isolated-new preservation: own9 Unicode ${kind} collision with ${side} path stays gated`,
+      scenario: {
+        main: { ...BASE, ...(side === 'base' ? { [existing]: BASE[P.uiTest] } : {}) },
+        branch: [{ write: { [added]: BASE[P.uiTest], ...(side === 'change' ? { [existing]: BASE[P.uiTest] } : {}) } }],
+      },
+      expect: 'fail', rules: ['uncovered'], flagged: side === 'base' ? [added] : [existing, added],
+      check: (r) => assert.deepEqual(r.exempt, []),
+    };
+  })),
+  {
+    name: 'isolated-new preservation: own9 Unicode normalization byte-identical move stays gated',
+    scenario: {
+      main: { ...BASE, 'modules/ui-web/src/views/caf\u00e9.test.ts': BASE[P.uiTest] },
+      branch: [{ move: [['modules/ui-web/src/views/caf\u00e9.test.ts', 'modules/ui-web/src/views/cafe\u0301.test.ts']] }],
+    },
+    expect: 'fail', rules: ['uncovered'],
+    flagged: ['modules/ui-web/src/views/caf\u00e9.test.ts', 'modules/ui-web/src/views/cafe\u0301.test.ts'],
+    check: (r) => { assert.deepEqual(r.exempt, []); assert.deepEqual(r.moves, []); },
+  },
   ...[
     ['missing package', 'class CalcNegTest {}'],
     ['mismatched package', 'package io.other; class CalcNegTest {}'],
