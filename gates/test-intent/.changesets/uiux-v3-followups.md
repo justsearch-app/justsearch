@@ -1102,3 +1102,14 @@ No acceptance record is supplied by the builder.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-h_2y980p",
+  "verdict": "accept",
+  "digest": "sha256:789f4010581c01a4d54422e9908467b31f2c2e0a5dc0321debcfc3ab171fb4f4",
+  "note": "Reviewed baseline tests, agreed FS/FN sources, then candidate diff. Independent rerun: all 92 checks pass; all 77 repaired checks fail by assertion on 117e89be9, and 15 preservation checks pass there. Compatibility patch declares only inert before-state Stop types. Test-intent accepted; shipped-model live verification remains separate."
+}
+```
