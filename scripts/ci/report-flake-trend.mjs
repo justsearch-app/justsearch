@@ -220,15 +220,15 @@ export function ensureRunRecord(ghBin, repo, run, laneMap, cacheDir) {
     const scratchDir = path.join(cacheDir, '_scratch', String(run.id), laneName);
     const job = jobs.find((j) => j.name === `Unit tests (${laneName})`);
     const candidates = artifacts.filter((a) => !a.expired && (a.name === artifact
-      || (a.name.startsWith(`${artifact}-attempt-`) && (!job?.run_attempt || a.name === `${artifact}-attempt-${job.run_attempt}`))));
+      || (a.name.startsWith(`${artifact}-attempt-`) && (job?.run_attempt && a.name === `${artifact}-attempt-${job.run_attempt}`))));
     candidates.sort((a, b) => Number(b.name.split('-attempt-')[1] || 0) - Number(a.name.split('-attempt-')[1] || 0));
     const selected = candidates[0]?.name || artifact;
     const json = downloadAndReadJson(ghBin, repo, run.id, selected, file, scratchDir);
     fs.rmSync(scratchDir, { recursive: true, force: true });
     if (json && Array.isArray(json.flakyTests)) {
-      lanes[laneName] = { hasData: true, flakyTests: json.flakyTests };
+      lanes[laneName] = { hasData: true, artifact: selected, runAttempt: job?.run_attempt || null, flakyTests: json.flakyTests };
     } else {
-      lanes[laneName] = { hasData: false, flakyTests: null };
+      lanes[laneName] = { hasData: false, artifact: selected, runAttempt: job?.run_attempt || null, flakyTests: null };
     }
   }
 
