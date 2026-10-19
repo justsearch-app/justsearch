@@ -313,7 +313,7 @@ export function buildReport({ root, lane = null, top = 20, runner = runnerInfo({
           .map((testcase) => ({ name: testcase.name, message: testcase.skipMessage }));
         const issues = executed ? [] : ['no tests executed'];
         for (const skip of skipped) {
-          if (required.allowedSkips && !required.allowedSkips.some((allowed) =>
+          if (!(required.allowedSkips ?? []).some((allowed) =>
             allowed.name === skip.name && skip.message.includes(allowed.messageIncludes))) {
             issues.push(`unexpected skip: ${skip.name}: ${skip.message}`);
           }

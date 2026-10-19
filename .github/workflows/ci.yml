@@ -1583,11 +1583,11 @@ jobs:
         run: node scripts/ci/report-unit-test-attribution.mjs --lane integration-tests --runner-label windows-latest --out-json build/ci/integration-test-attribution.json --out-md build/ci/integration-test-attribution.md --top 20 --allow-empty
 
       - name: Collect E2E child process logs
-        if: failure()
+        if: always()
         run: node scripts/ci/collect-e2e-child-logs.mjs
 
       - name: Upload E2E child process logs
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: integration-tests-child-logs-attempt-${{ github.run_attempt }}
@@ -1604,6 +1604,7 @@ jobs:
             modules/system-tests/build/test-results/integrationTest/TEST-*.xml
             modules/system-tests/build/reports/tests/integrationTest/**
             modules/system-tests/build/reports/isolated-backend/**
+            tmp/lane-f-takeover/writer-junit-*/**
             build/ci/integration-test-attribution.json
             build/ci/integration-test-attribution.md
           if-no-files-found: warn
@@ -1639,11 +1640,11 @@ jobs:
         run: ./gradlew.bat :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain
 
       - name: Collect E2E child process logs
-        if: failure()
+        if: always()
         run: node scripts/ci/collect-e2e-child-logs.mjs
 
       - name: Upload E2E child process logs
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: lifecycle-integration-tests-child-logs-attempt-${{ github.run_attempt }}
@@ -1659,7 +1660,7 @@ jobs:
           path: |
             modules/system-tests/build/test-results/lifecycleIntegrationTest/TEST-*.xml
             modules/system-tests/build/reports/tests/lifecycleIntegrationTest/**
-            modules/system-tests/build/reports/isolated-backend/**
+            tmp/lane-f-takeover/writer-junit-*/**
           if-no-files-found: warn
 
   # Runs the MIT-licensed gitleaks CLI directly instead of gitleaks/gitleaks-action.

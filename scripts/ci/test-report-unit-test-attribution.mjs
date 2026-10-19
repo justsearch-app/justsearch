@@ -245,6 +245,27 @@ withTempRoot((root) => {
   const run = () => spawnSync(process.execPath, [scriptPath, '--results-root', root,
     '--require-windows-classes', '--json'], { encoding: 'utf8' });
   assert.equal(run().status, 0);
+  const atomic = requiredClasses[0];
+  const atomicCases = Array.from({ length: 12 }, (_, i) =>
+    `<testcase classname="${atomic.name}" name="case${i}">`
+    + (i ? '<skipped message="unlisted skip"/>' : '') + '</testcase>').join('');
+  write(resultPath(atomic.name), `<testsuite name="${atomic.name}" tests="12" skipped="11">`
+    + atomicCases + '</testsuite>');
+  const unlisted = run();
+  assert.equal(unlisted.status, 1, 'one executed case must not excuse eleven unlisted skips');
+  const atomicCoverage = JSON.parse(unlisted.stdout).requiredClassCoverage.find((entry) => entry.name === atomic.name);
+  assert.equal(atomicCoverage.executed, 1);
+  assert.equal(atomicCoverage.issues.length, 11);
+  assert.match(unlisted.stderr, /AtomicFileWritesTest: unexpected skip: case1: unlisted skip/);
+  write(resultPath(atomic.name), suiteXml({ name: atomic.name, tests: 1, skipped: 0 }));
+
+  // The newest hosted Windows XML has an empty <skipped/> for this Linux-only case.
+  const contended = requiredClasses.find((entry) => entry.name.endsWith('.ContendedFileReadsTest'));
+  const rotation = contended.allowedSkips[0];
+  write(resultPath(contended.name), `<testsuite name="${contended.name}" tests="2" skipped="1">`
+    + `<testcase classname="${contended.name}" name="portableCase()"/>`
+    + `<testcase classname="${contended.name}" name="${rotation.name}"><skipped/></testcase></testsuite>`);
+  assert.equal(run().status, 0, 'preserve the named @EnabledOnOs(OS.LINUX) skip');
   const prune = requiredClasses.at(-1);
   const allowed = prune.allowedSkips[0];
   const skip = (name, message) => testcase(name, `<skipped message="${message}"/>`);

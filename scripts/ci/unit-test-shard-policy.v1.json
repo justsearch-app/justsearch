@@ -195,7 +195,14 @@
           "name": "io.justsearch.configuration.persistence.AtomicFileWritesTest"
         },
         {
-          "name": "io.justsearch.configuration.persistence.ContendedFileReadsTest"
+          "name": "io.justsearch.configuration.persistence.ContendedFileReadsTest",
+          "allowedSkips": [
+            {
+              "name": "reopensAfterContentionWhenWriterRotatesThePathBeforePublishingReplacement()",
+              "messageIncludes": "",
+              "reason": "@EnabledOnOs(OS.LINUX): this rotation case runs only on Linux; Gradle records an empty <skipped/> on Windows (run 39334194117)."
+            }
+          ]
         },
         {
           "name": "io.justsearch.configuration.PlatformPathsTest"
@@ -232,11 +239,13 @@
           "allowedSkips": [
             {
               "name": "aDifferentVolumeAtTheSameLetterAfterARestartPrunesNothing()",
-              "messageIncludes": "needs a second volume besides"
+              "messageIncludes": "needs a second volume besides",
+              "reason": "The test requires a second volume besides the temporary directory; its assumption reports needs a second volume besides."
             },
             {
               "name": "aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere()",
-              "messageIncludes": "needs a second volume besides"
+              "messageIncludes": "needs a second volume besides",
+              "reason": "The test requires a second volume besides the temporary directory; its assumption reports needs a second volume besides."
             }
           ]
         }

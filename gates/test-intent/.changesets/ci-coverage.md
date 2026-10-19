@@ -33,9 +33,12 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
       "whatMoved": "Add the explicitly named cross-platform/windows class tags from CC4. All assertions, OS guards, assumptions, prerequisites and timeouts remain byte-identical. Canonicalize AppInstanceLockFailureTest\u2019s temporary directory before each test so FileChannel.open injection matches the production toRealPath path on Windows as well as Linux. Portable classes retain their normal Linux coverage; native-only classes keep their OS-specific prerequisites. Windows scheduling expands to configuration and indexer-worker.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
-          "location": "task ci-coverage request"
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
+          "label": "agent choice"
         }
       ]
     },
@@ -72,9 +75,12 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
       "whatMoved": "Retain all test bodies and assertions except lifecycle cleanup additions: explicit unavailable-backend fetch fixtures replace accidental real HTTP requests in render/event tests; per-test transport overrides still win. Cancel pending search work, including Shell URL-restore staging, before restoring transport fixtures, restore real timers, and await the Shell click persistence queue before its fixture is removed. No tests, expected values, fault injections or selection filters are removed.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
-          "location": "task ci-coverage request"
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
+          "label": "agent choice"
         }
       ]
     },
@@ -87,12 +93,15 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Schedule the complete existing ui-web Vitest and lockdown suites as blocking steps in app-ui-ui. Add configuration/indexer-worker Windows test tasks and match the task inventory; Linux Gradle task lists and all timeouts stay unchanged. Both frontend steps use four workers; the Windows Gradle invocation uses --continue so independent modules execute after a failure. Failure-only E2E collection replaces whole fixture-tree uploads with bounded Engine, embedded-worker, supervisor, fixture, rotated gzip, crash and run-report evidence. Both always-run tier uploads retain the curated isolated-backend report tree, which bypasses the collector. The Windows attribution reporter blocks if any of the thirteen policy classes executes no tests; only the two named second-volume prune cases may skip for the missing-volume prerequisite, reported by name. The preflight reproduction inventory includes both frontend commands.",
+      "whatMoved": "Schedule the complete existing ui-web Vitest and lockdown suites as blocking steps in app-ui-ui. Add configuration/indexer-worker Windows tasks and match the task inventory; Linux Gradle lists and all timeouts stay unchanged. Frontend steps use four workers; Windows Gradle uses --continue. Restore both original E2E upload steps exactly from pinned main, including whole writer-junit fixture trees, under always(). The bounded child-log artifact is additional; collection and its upload also use always(). Pinned upload-path/condition checks prevent loss of existing diagnostics. The Windows reporter requires execution in every listed class and rejects every unnamed skip. Only the named Linux-only ContendedFileReadsTest rotation and the two explicit missing-second-volume prune cases may skip. The preflight inventory includes both frontend commands.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
-          "location": "task ci-coverage request"
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
+          "label": "agent choice"
         }
       ]
     },
@@ -107,9 +116,12 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
       "whatMoved": "Shared Vitest cleanup waits for pending dynamic imports with vi.dynamicImportSettled before disposing each test environment. Preserve the production selectionState lazy dependency graph from main instead of making it static. No exception is ignored or filtered and every existing assertion is retained.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Fix the causes: work still running or importing after a test ends.",
-          "location": "task ci-coverage request"
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Fix the causes: work still running or importing after a test ends.",
+          "label": "agent choice"
         }
       ]
     },
@@ -121,9 +133,12 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
       "class": "New",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Fix the causes: work still running or importing after a test ends.",
-          "location": "task ci-coverage request"
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Fix the causes: work still running or importing after a test ends.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "A detached dynamic import and its completion callback finish before the test environment is disposed; deliberately delayed module evaluation must complete before the next test starts.",
@@ -271,3 +286,29 @@ Independent verification remains outstanding. No acceptance record is authored h
 - The merge-base test-intent run moves both root and ui-web node_modules aside for
   its duration and restores them afterward. Its only error is the expected absent
   independent acceptance record; all changeset entries and existing evidence validate.
+
+## Round six
+
+- Merged origin/main f9bd104d2 via merge commit 905ec372f. No local Gradle runs: the
+  shared lock is heavily contended, and these repairs are checked at Node level and in CI.
+- Restore the original integration/lifecycle upload steps byte-for-byte from main,
+  including the complete writer-junit fixture tree and always() condition. The filtered
+  collector is additional evidence only; collection and child-log uploads also run always().
+  Its caps no longer replace or limit any existing diagnostic artifact.
+- Pin main's upload path lists and conditions at f9bd104d228c80173d58068cfe0f24c6d9ced149
+  in scripts/ci/e2e-upload-policy.v1.json. Both preservation cases fail on aae3c6d9f
+  for changed/missing paths, pass on pinned main, and pass after restoration.
+- Before tightening the guard, inspect the latest Windows XML (run 39334194117).
+  Its only skip is ContendedFileReadsTest's named rotation case: @EnabledOnOs(OS.LINUX),
+  recorded by Gradle as an empty skipped element. Explicitly name it and document that
+  reason. Preserve the two existing missing-second-volume exceptions by name and reason.
+  An omitted allowed-skip list now means no skips are allowed. A synthetic AtomicFileWritesTest
+  result with one executed case and eleven unlisted skips passes the old guard and fails
+  the repaired guard. The repaired guard still passes all actual latest Windows XML.
+- Every scenario source formerly quoting the orchestrator as owner words is now an
+  agent choice under the owner's quoted delegation. The author-session remains unchanged.
+- Complete logs, before/main shared clones, source fixtures and hosted results for this
+  round are under tmp/ci-coverage/round6/. Independent acceptance remains absent.
+
+- The owner authorized a valid task-citation prefix for the gate. Each delegationLocation
+  begins with task t-20261018-6108b0 request; the complete supplied citation follows verbatim.

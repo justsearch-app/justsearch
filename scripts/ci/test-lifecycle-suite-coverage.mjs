@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { load } from 'js-yaml';
 import { workflowJobs } from './check-governance-ci-coverage.mjs';
 
 const read = (p) => fs.readFileSync(new URL('../../' + p, import.meta.url), 'utf8');
@@ -37,18 +38,28 @@ test('fullTestSuite includes the separately owned lifecycle tier', () => {
   assert.match(aggregate, /dependsOn\([^\n]*tasks.named\("lifecycleIntegrationTest"\)/);
 });
 
-// Failure artifacts must contain bounded child output, never whole data/model trees.
-test('both installed Engine tiers collect and upload child logs on failure', () => {
+const uploadPolicy = JSON.parse(read('scripts/ci/e2e-upload-policy.v1.json'));
+for (const expected of uploadPolicy.uploads) {
+  test(`${expected.job}: preserve main upload paths and conditions`, () => {
+    const jobs = load(workflow).jobs;
+    const matches = jobs[expected.job].steps.filter((step) => step.name === expected.step);
+    assert.equal(matches.length, 1, `${expected.job}: expected exactly one ${expected.step}`);
+    const step = matches[0];
+    assert.deepEqual({ uses: step.uses, condition: step.if,
+      paths: step.with.path.trim().split('\n') },
+    { uses: expected.uses, condition: expected.condition, paths: expected.paths },
+    `${expected.job}: preserve uploads pinned from ${uploadPolicy.sourceRef}:${uploadPolicy.sourcePath}`);
+  });
+}
+
+// Bounded child logs supplement the existing complete fixture artifacts.
+test('both installed Engine tiers always collect and upload additional child logs', () => {
   for (const id of ['integration-tests', 'lifecycle-integration-tests']) {
     const job = workflowJobs(workflow).find((entry) => entry.id === id);
     const collection = job.runs.find((run) => run.text === 'node scripts/ci/collect-e2e-child-logs.mjs');
-    assert.equal(collection?.step?.if, 'failure()', id);
-    assert.match(job.text, /name: Upload E2E child process logs\n        if: failure\(\)/);
+    assert.equal(collection?.step?.if, 'always()', id);
+    assert.match(job.text, /name: Upload E2E child process logs\n        if: always\(\)/);
     assert.match(job.text, /path: build\/ci\/e2e-child-logs\/\*\*/);
     assert.match(job.text, /retention-days: 3/);
-    assert.ok(!job.text.includes('writer-junit-*/**'));
-    assert.match(job.text,
-      /name: Upload (?:integration|lifecycle)-test results\n        if: always\(\)[\s\S]*?modules\/system-tests\/build\/reports\/isolated-backend\/\*\*/,
-      `${id} must always upload the curated failure evidence directly`);
   }
 });
