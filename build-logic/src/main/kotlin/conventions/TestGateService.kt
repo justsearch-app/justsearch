@@ -5,8 +5,8 @@ import org.gradle.api.services.BuildServiceParameters
 
 /**
  * A shared build service that gates test task parallelism.
- * With maxParallelUsages=1, only one Test task runs at a time
- * even when org.gradle.parallel=true, preventing heavyweight
- * test JVM memory contention.
+ * JvmBaseConventionsPlugin defaults maxParallelUsages to 3 locally and 1 in CI,
+ * limiting concurrent Test tasks even when org.gradle.parallel=true to prevent
+ * heavyweight test JVM memory contention. Override with -PtestParallelism=N.
  */
 abstract class TestGateService : BuildService<BuildServiceParameters.None>

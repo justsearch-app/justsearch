@@ -129,12 +129,20 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
               parameters.overrideDir.set(
                   project.providers.environmentVariable("JUSTSEARCH_EMBED_ONNX_MODEL_PATH").orElse(""))
             })
-        // Tests that build real ORT sessions must not write optimized graphs into the
-        // developer's per-machine store (tempdoc 958). A short temp-based root keeps store paths
-        // under Windows MAX_PATH even from deep worktree checkouts (a build-dir root reached
-        // 269 characters), so tests exercise caching rather than the long-path fallback.
-        environment("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR",
-            java.io.File(System.getProperty("java.io.tmpdir"), "js-ort-test-" + project.name).absolutePath)
+        // Keep optimized test graphs out of the developer's per-machine store (tempdoc 958).
+        // Linux /tmp may be RAM-backed, so use the build directory there. Windows retains its
+        // short temp-based path to stay under MAX_PATH in deep worktrees. Resolve at execution
+        // time so the daemon's tmpdir is not a configuration-cache input.
+        val optimizedCacheDir = project.layout.buildDirectory.dir("ort-optimized")
+        val optimizedCacheName = "js-ort-test-" + project.name
+        doFirst { task ->
+          val cacheDir = if (isWindowsHost) {
+            java.io.File(System.getProperty("java.io.tmpdir"), optimizedCacheName)
+          } else {
+            optimizedCacheDir.get().asFile
+          }
+          (task as Test).environment("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR", cacheDir.absolutePath)
+        }
         // Retry flaky tests in CI; surface them with failOnPassedAfterRetry.
         // The retry extension is registered by the Develocity plugin (settings.gradle.kts).
         // Accessed via reflection because the type is shaded inside the Develocity plugin.

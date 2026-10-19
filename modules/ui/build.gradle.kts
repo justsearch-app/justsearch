@@ -337,16 +337,23 @@ val headlessDistDir = layout.buildDirectory.dir("headless-dist")
 // older version often won — alpha.18's binary-incompatible
 // VariantSelector.select signature change surfaced this as
 // `NoSuchMethodError` on `/api/status` (round-9 sandbox finding).
+abstract class DistributionFileOperations {
+    @get:javax.inject.Inject
+    abstract val fileSystem: org.gradle.api.file.FileSystemOperations
+}
+
 val headlessDist by tasks.registering(Copy::class) {
     group = "distribution"
     description = "Assemble the headless application distribution"
+    val fileSystem = objects.newInstance<DistributionFileOperations>().fileSystem
+    val libJars = fileTree(headlessDistDir.map { it.dir("lib") }) {
+        include("**/*.jar")
+    }
     doFirst {
         // Tempdoc 374 alpha.19 Bug K: purge stale module jars from previous
         // version bumps. Only lib/*.jar — `normalizeHeadlessJar`'s stable-name
         // output at the destination root is preserved.
-        delete(fileTree(headlessDistDir.get().asFile.resolve("lib")) {
-            include("**/*.jar")
-        })
+        fileSystem.delete { delete(libJars) }
     }
     from(headlessJar)
     from(configurations.runtimeClasspath) {
@@ -878,6 +885,7 @@ val stageLlamaServerFromPrebuilt by tasks.registering(Sync::class) {
   val zipFile = llamaPrebuiltZip.get().asFile
   val stageRoot = llamaStageDir.get().asFile
   val runtimeStamp = "llama.cpp $llamaPrebuiltVersion prebuilt\n"
+  val serverName = windowsLlamaServerName
   outputs.dir(stageRoot)
   // This task is cheap and must be correct. Don't allow stale staged payloads to persist.
   outputs.upToDateWhen { false }
@@ -903,7 +911,7 @@ val stageLlamaServerFromPrebuilt by tasks.registering(Sync::class) {
     relativePath = org.gradle.api.file.RelativePath(true, name)
   }
   doLast {
-    val serverExe = stageRoot.resolve(windowsLlamaServerName)
+    val serverExe = stageRoot.resolve(serverName)
     if (!serverExe.exists()) {
       throw GradleException("Staged llama-server.exe not found after prebuilt extract: ${serverExe.absolutePath}")
     }
@@ -1594,8 +1602,9 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
     from(installed.map { it.destinationDir.resolve("native") }) {
       into("native")
     }
+    val boundExec = boundExecRelative
     doLast {
-      check(destinationDir.resolve(boundExecRelative).canExecute()) {
+      check(destinationDir.resolve(boundExec).canExecute()) {
         "Linux sidecar is missing its executable bound-exec helper from installDist"
       }
     }

@@ -78,7 +78,7 @@ public final class NvmlService {
           false,
           attemptedPath,
           loadedPath,
-          "Failed to load nvml.dll: " + safeMsg(t),
+          "Failed to load " + NativeTargets.current().libraryName("nvml") + ": " + safeMsg(t),
           null,
           null,
           null,
