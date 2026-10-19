@@ -44,7 +44,7 @@ async function checkLogFailure(logPath) {
   assert.equal(output.stdout, 'stdout first\nstdout later\n');
   const lines = output.stderr.trimEnd().split('\n');
   assert.equal(lines.length, 2, output.stderr);
-  assert.match(lines[0], /supervisor log.*(ENOENT|EACCES|ENOSPC)/);
+  assert.match(lines[0], /supervisor log.*(ENOENT|EACCES|EPERM|ENOSPC)/);
   assert.equal(lines[1], 'stderr line');
   console.log(`PASS: unwritable log preserves both consoles and reports failure once: ${logPath}`);
 }
@@ -55,9 +55,10 @@ async function checkUnwritableLogs() {
   fs.writeFileSync(readOnly, '');
   fs.chmodSync(readOnly, 0o444);
   try {
-    // Root can write mode 0444: do not claim an EACCES check unless the OS enforces it.
+    // Root can write mode 0444: do not claim a read-only check unless the OS enforces it.
+    // POSIX refuses with EACCES, Windows with EPERM.
     let refused = false;
-    try { fs.appendFileSync(readOnly, 'probe'); } catch (error) { assert.equal(error.code, 'EACCES'); refused = true; }
+    try { fs.appendFileSync(readOnly, 'probe'); } catch (error) { assert.ok(['EACCES', 'EPERM'].includes(error.code), error.code); refused = true; }
     if (refused) await checkLogFailure(readOnly);
     else console.log('SKIP: OS does not enforce read-only mode for this user');
   } finally { fs.chmodSync(readOnly, 0o644); }
