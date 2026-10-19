@@ -147,3 +147,14 @@ The gate also reports its existing reconsider-rate warning (2 disagreements, 0 a
 ## Acceptance records
 
 Pending independent verification; no acceptance record written by the builder.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-g-status-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:a7a2a1cbe7d4b397b09596b0b3cb25c22380d3f85192ec7e3dd9a9a24b90efe2",
+  "note": "ST1-ST5 pass on 8aa5200fe (test code identical in 6b1bbabbe); accepted trade-off: lane aging uses the injected clock, so a real-clock watchdog defect (M3) is no longer caught"
+}
+```
