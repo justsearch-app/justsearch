@@ -387,3 +387,25 @@ Coverage limits: these files exercise component DOM and Search v3 turn/run props
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-oop6krk6",
+  "verdict": "accept",
+  "digest": "sha256:9f4327ecc38c391fb51902d94e531b684d7c653392b7b6c32a8561cc3f875a07",
+  "note": "Provisional class before reading the diff: New, repaired:true for CS1-CS5 checks, New preservation for clauses that held at 2bd086488; entries match. All 14 entries cite owner-adopted scenarios (CS1-CS5, CN3-CN6, quotes verbatim from the agreed list); each behaviour statement is asserted by its checks and no entry claims coverage the tests lack (Summarize/old-window/clipboard limits are disclosed). Independent re-run with --maxWorkers=4: candidate 30/30 pass; baseline 2bd086488 with the two test files transplanted (no overlays) fails exactly the 22 repaired checks by AssertionError for the reason under test (item 2/3 lost mark, mark inside code, no mark across hard break, stale plain text, marks and highlighting during streaming) and passes the 8 preservation checks, matching the evidence classification. Round-1 findings resolved: status-and-evidence is preservation and passes before; halted/failed/other-conversation use non-null evidence with positive controls. Existing chat MarkdownBlock/citation and search-v3 suites: 1284 pass on both states. Notes, not omissions: CN6 frame/sourceCount fail before via the CS5 stale-text defect; the CS3 check expects one sentence wrapper per line; the reload half of CS1 compares detail with the production resolver output (labels are checked independently); recorded vitest commands omit the launcher's --maxWorkers=4, as disclosed."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "agent-session-enb_poc5",
+  "verdict": "reject",
+  "digest": "sha256:9f4327ecc38c391fb51902d94e531b684d7c653392b7b6c32a8561cc3f875a07",
+  "note": "Audit reject. Evidence re-run by run-evidence.mjs to a scratch path reproduces the committed file (30 checks pass on candidate; same 23 assertion fail-befores, same 7 before-passes); quotes match the agreed scenarios verbatim. Omissions: (1) Entry for \"status only\" / \"evidence during streaming\" (repaired, CS4/CN3/CN5): the tests assert block.isStreaming true then false (Sv3Main.citations.test.ts:67,80), an implementation property no cited source states, and assert code has no data-hl highlighting at all while streaming (lines 66,74), whereas CS4 only says highlighting \"does not churn\"; with no text deltas in the test, highlighting once is not churn. The recorded fail-before of \"evidence during streaming\" is exactly this assertion (line 66, expected true to be false), so its repaired classification rests on an expectation the cited sources do not state. Either cite a source for highlight-only-at-settlement and the streaming-mode pin (e.g. a delegated-choice quoting the owner design agreement and the specific agreed design), or drop those assertions so the fail-before lands on marks/[n] (a behaviour-only probe with real text deltas fails before on marks mid-stream and passes after). (2) Entries for halted/failed and another-conversation: the positive controls assert a mark DOES appear on a terminal sentence of a halted/failed run and of another completed conversation; the only cited source, CS4 (\"no wrong marks\"), does not support a mark appearing; cite CN3 (same marks as before), which these before-passing controls preserve. Minor, not blocking: the list entry says live and reloaded are \"compared\", but the test checks each separately and the reloaded click is checked against its own resolved detail (a probe confirmed the resolver maps each item to its own source)."
+}
+```
