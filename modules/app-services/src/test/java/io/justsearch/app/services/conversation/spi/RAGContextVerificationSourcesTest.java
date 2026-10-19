@@ -71,8 +71,9 @@ final class RAGContextVerificationSourcesTest {
   @DisplayName("S7.1/S7.3/S7.6: a short document's passage is scored; its tail fact verifies, an"
       + " unsupported sentence does not")
   void shortDocumentPassageIsVerified(int length) {
-    // Every length here is a CHUNKLESS document: under 2,000 chars, or above it but split into a
-    // single chunk — indexing stored no chunk for any of them, so retrieval synthesized the passage.
+    // Each length is modelled as one passage that retrieval synthesized from the whole document
+    // (chunk 0 of 1). Which real lengths the indexer stores without chunks is pinned by the
+    // Worker's ShortDocumentPassageVerificationTest, not here.
     String content = shortDocument(length);
     var worker = new WorkerModel();
     ContextResult retrieval =
