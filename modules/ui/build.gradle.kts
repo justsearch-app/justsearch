@@ -1082,14 +1082,15 @@ val aotTrainingJvmFlags = listOf("-XX:+UseG1GC", "-XX:+UseCompactObjectHeaders")
 val generateHeadAotCache by tasks.registering {
   group = "distribution"
   description = "Generate JDK 25 AOT cache for the Head process"
-  notCompatibleWithConfigurationCache("Spawns external JVM processes for AOT training")
   dependsOn(headlessDist, createHeadlessRuntime, copyJavawToRuntime)
+  val trainingJvmFlags = aotTrainingJvmFlags
   val runtimeDir = headlessRuntimeImageDir.map { it.asFile }
   val headDistDirProp = headlessDistDir.map { it.asFile }
   val aotDir = aotCacheDir.map { it.dir("head").asFile }
   outputs.dir(aotDir)
 
   doLast {
+    val aotTrainingJvmFlags = trainingJvmFlags
     val isWindows = HostPlatform.isWindows
     val java = runtimeDir.get().resolve("bin").resolve(if (isWindows) "java.exe" else "java").absolutePath
     val headDist = headDistDirProp.get()

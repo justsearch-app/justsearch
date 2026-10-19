@@ -135,13 +135,13 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         // time so the daemon's tmpdir is not a configuration-cache input.
         val optimizedCacheDir = project.layout.buildDirectory.dir("ort-optimized")
         val optimizedCacheName = "js-ort-test-" + project.name
-        doFirst { task ->
+        doFirst {
           val cacheDir = if (isWindowsHost) {
             java.io.File(System.getProperty("java.io.tmpdir"), optimizedCacheName)
           } else {
             optimizedCacheDir.get().asFile
           }
-          (task as Test).environment("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR", cacheDir.absolutePath)
+          (this as Test).environment("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR", cacheDir.absolutePath)
         }
         // Retry flaky tests in CI; surface them with failOnPassedAfterRetry.
         // The retry extension is registered by the Develocity plugin (settings.gradle.kts).
