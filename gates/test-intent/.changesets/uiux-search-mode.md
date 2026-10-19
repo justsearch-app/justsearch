@@ -635,3 +635,25 @@ is unchanged.
   "note": "Reject: entry 3 does not keep the whole oracle: exact observed count-label equality became startsWith, the count probe reads expected text, and visible path text became a title attribute. Missing retirement source/classification or restored assertions. Entry 5 lacks a source banning every AI/model mention (SM1 only forbids a no-AI claim). Entry 9 lacks sources for first-seen path order and Set object identity (SM6 specifies membership). Entries 18/19 lack sources forbidding HTTP 404 beside a missing-file explanation and requiring literal HTTP 503 for other failures. All 57 declared checks reran successfully; repaired check assertion-failed on merge-base. Conflict search repeated; Obsolete entries warranted. Test intent only."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-fm8hn22l",
+  "verdict": "reject",
+  "digest": "sha256:2d5de91617ec56bff76c37dfb5311929fed53037fb09c129ae0fe827cc2b4a6e",
+  "note": "Reject New SM7 scope-lifetime entry: SearchV3View.searchMode.test.ts Retry of a scoped answer keeps the same files, and says so still requires display order \"2 files: a.md, b.md\" (lines 845–847) and ordered docIds [a,b] on both sends (lines 859–862). SM7 requires the same files; SM6 defines chosen membership and count, not path/name order. Missing: a specific intent source requiring those orders, or order-insensitive assertions. An identical fixed set in b,a order satisfies the cited scenarios but fails these new expectations (evidence/order-counterexample.mjs in this verifier session). Exact observed count-label equality is restored; other Adaptation/Obsolete entries reviewed and conflict search repeated. Evidence digests validate; run-evidence sample passed, including the repaired missing-file check failing by assertion on merge-base a562090f8 and passing after."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "agent-session-brxp4nl6",
+  "verdict": "reject",
+  "digest": "sha256:2d5de91617ec56bff76c37dfb5311929fed53037fb09c129ae0fe827cc2b4a6e",
+  "note": "Reject two missing intent warrants. (1) New entry 5, sv3-search.test.ts:29-30, requires Search/Ask/Delegate in exactly that menu order; cited SM1 specifies the three modes and SM2 the default, neither fixes menu order, and no delegated-choice source is attached. (2) New entry 10, SearchV3View.searchMode.test.ts:845-846 and 859-862, still requires the scope label \"2 files: a.md, b.md\" and ordered docIds arrays on original Ask and Retry; SM7 requires the same files, not their order. A Retry with the identical file set reversed is compliant with the source but fails this oracle. Cite a valid prior source for each extra constraint or compare membership/count and visible scope without pinning order. Other reviewed adaptations retain their oracle, including restored observed exact count-label equality. Repeated decision-record conflict search found none relevant. Rerun run-evidence passed all 58 listed checks; repaired missing-file check assertion-failed at merge-base a562090f8 and passed at candidate 920199789 (tree-identical to c1dd8ef4d). Existing suites passed before 401/401 and after 407/407. This is test-intent audit, not live product acceptance."
+}
+```
