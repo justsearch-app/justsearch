@@ -589,3 +589,14 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-qplvm1o4",
+  "verdict": "accept",
+  "digest": "sha256:dc2c2d82c9a428c5f5cb26fc2a06f336ef5ee1fb4f931b26e80a2cf129cb9b96",
+  "note": "Sources and obsolete entries checked; conflict search repeated. Count prefix preserves the numeric oracle while allowing shared-card metadata. All 57 checks reran successfully. This accepts test intent only; narrow-pane S1.12 needs an owner decision."
+}
+```
