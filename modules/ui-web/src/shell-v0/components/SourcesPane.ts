@@ -255,7 +255,7 @@ export class SourcesPane extends JfElement {
     .open-all:focus-visible {
       color: var(--text-primary);
       background: var(--surface-hover);
-      outline: none;
+      outline: 2px solid transparent;
     }
     .empty-state {
       flex: 1;
@@ -277,13 +277,20 @@ export class SourcesPane extends JfElement {
     .source:focus-visible {
       background: var(--surface-hover);
       border-color: var(--accent-command);
-      outline: none;
+      outline: 2px solid transparent;
     }
     /* Tempdoc 565 §12.3.E — the cross-surface selection: this card is the source the user focused
        (via an inline [n] mark or this card), highlighted in sync with the matching answer citation. */
     .source.selected {
       background: var(--surface-hover);
       border-color: var(--accent-command);
+    }
+    /* Forced colors (Windows High Contrast) repaint every card edge CanvasText and erase the fill, so
+       the selected card's edge is restated as Highlight, a system colour forced colors keep. */
+    @media (forced-colors: active) {
+      .source.selected {
+        border-color: Highlight;
+      }
     }
     .source-head {
       display: flex;
@@ -314,7 +321,7 @@ export class SourcesPane extends JfElement {
     .source-hide:focus-visible {
       color: var(--text-primary);
       background: var(--surface-hover);
-      outline: none;
+      outline: 2px solid transparent;
     }
     .source.hidden-source {
       opacity: 0.5;

@@ -149,6 +149,6 @@ export const whyThisResultStyles: CSSResult = css`
   .hit-why-explain:focus-visible {
     color: var(--text-primary);
     border-color: var(--accent-command);
-    outline: none;
+    outline: 2px solid transparent;
   }
 `;
