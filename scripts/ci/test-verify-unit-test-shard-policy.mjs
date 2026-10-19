@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import { validateUnitTestShardPolicy } from './verify-unit-test-shard-policy.mjs';
 
@@ -166,4 +167,25 @@ console.log('test-verify-unit-test-shard-policy: PASS');
     text.replace('  two:\n', '  two:\n    continue-on-error: true\n'),
     text.replace('  two:\n', '  two:\n    if: false\n'),
   ]) assert.equal(check(altered).ok, false, altered);
+}
+
+// Every Windows command and task remains owned exactly once after the split.
+{
+  const read = (file) => fs.readFileSync(new URL('../../' + file, import.meta.url), 'utf8');
+  const policyDoc = JSON.parse(read('scripts/ci/unit-test-shard-policy.v1.json'));
+  const signalDoc = JSON.parse(read('scripts/ci/workflow-signal-policy.v1.json'));
+  const original = read('.github/workflows/ci.yml');
+  const check = (workflowText) => validate({ policyDoc, signalDoc, workflowText });
+  assert.equal(check(original).ok, true, check(original).issues.join('\n'));
+  for (const part of policyDoc.windowsParts) {
+    for (const command of part.commands) {
+      const start = original.indexOf(`  ${part.jobId}:\n`);
+      const altered = original.slice(0, start) + original.slice(start).replace(command, '# omitted by counterexample');
+      assert.notEqual(altered, original, command);
+      assert.equal(check(altered).ok, false, command);
+    }
+  }
+  const windowsTask = original.indexOf('      - name: Windows coverage');
+  const omitted = original.slice(0, windowsTask) + original.slice(windowsTask).replace(':modules:app-api:test ', '');
+  assert.equal(check(omitted).ok, false, 'omitting a Windows module must fail ownership');
 }
