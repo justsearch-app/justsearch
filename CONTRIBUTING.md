@@ -69,8 +69,7 @@ package the desktop application for Linux, mount models, or require a GPU.
   auto-provisions Temurin JDK 25 for the build, independent of the wrapper client's ambient Java. Keeping
   `JAVA_HOME` and `PATH` on JDK 25 is still recommended so direct `java`/`javac` use and non-Gradle tooling
   agree; the dev-runner also resolves a suitable JDK explicitly for the Engine JVM.
-- Node.js 24 (what CI and the dev container use; the locked frontend and docs tooling need at least
-  22.13) — `scripts/setup/bootstrap-node-win.ps1` can install it for you
+- Node.js 24, what CI and the dev container use — `scripts/setup/bootstrap-node-win.ps1` can install it for you
 - Python 3.13+ for the repository's Python-backed checks and evaluation tooling
 - Rust stable only when working on the optional Tauri shell under `modules/shell`; its absence does
   not block core Java/web contribution
