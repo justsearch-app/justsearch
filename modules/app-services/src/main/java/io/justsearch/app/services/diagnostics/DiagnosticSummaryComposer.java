@@ -30,7 +30,7 @@ final class DiagnosticSummaryComposer {
 
   private static final long MAX_CRASH_REPORT_BYTES = 64L * 1024L;
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Set<String> CRASH_PROCESSES = Set.of("head", "worker");
+  private static final Set<String> CRASH_PROCESSES = Set.of("head", "worker", "engine");
   private static final Set<String> GPU_VENDORS = Set.of("NVIDIA", "AMD", "INTEL", "APPLE");
   private static final Set<String> GPU_CAPABILITY_TIERS =
       Set.of("CUDA_FUNCTIONAL", "CUDA_AVAILABLE", "GPU_AVAILABLE");
@@ -117,7 +117,11 @@ final class DiagnosticSummaryComposer {
       return null;
     }
     CrashMetadata latest = null;
-    try (DirectoryStream<Path> reports = Files.newDirectoryStream(crashDir, "crash-*.json")) {
+    try (DirectoryStream<Path> reports = Files.newDirectoryStream(crashDir, path -> {
+      String name = path.getFileName().toString();
+      return (name.startsWith("crash-") && name.endsWith(".json"))
+          || (name.startsWith("hs_err_pid") && name.endsWith(".log"));
+    })) {
       for (Path report : reports) {
         CrashMetadata candidate = readCrash(report);
         if (candidate != null && isLater(candidate, latest)) {
@@ -132,10 +136,17 @@ final class DiagnosticSummaryComposer {
 
   private static CrashMetadata readCrash(Path report) {
     try {
-      if (!Files.isRegularFile(report)) {
+      if (!Files.isRegularFile(report, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         return null;
       }
       try (InputStream input = Files.newInputStream(report)) {
+        if (report.getFileName().toString().startsWith("hs_err_pid")) {
+          String header = new String(input.readNBytes((int) MAX_CRASH_REPORT_BYTES), StandardCharsets.UTF_8);
+          String type = header.lines().limit(64).map(String::trim)
+              .filter(line -> line.matches("#  (SIG[A-Z0-9_]+|EXCEPTION_[A-Z0-9_]+).*"))
+              .map(line -> line.substring(3).split("[ (]", 2)[0]).findFirst().orElse(null);
+          return type == null ? null : new CrashMetadata(Files.getLastModifiedTime(report).toInstant(), "engine", type);
+        }
         return readCrash(input);
       }
     } catch (IOException | RuntimeException ignored) {

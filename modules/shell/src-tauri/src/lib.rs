@@ -6,13 +6,14 @@ mod engine_host;
 mod engine_probe;
 #[allow(dead_code)]
 mod exit_ledger;
-mod platform_paths;
-mod native_targets;
 #[cfg(target_os = "linux")]
 mod linux_process;
+mod native_targets;
+mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
+mod recovery;
 mod session_window;
 mod shell_actuator;
 mod supervisor;
@@ -722,7 +723,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("plugins")
         .join("pipeline-stage-plugins.v1.json");
 
-    let crash_dir = app_data_dir.join("crashes");
+    let crash_options = recovery::jvm_options(&app_data_dir)?;
     let mut cmd = containment::engine_command(&java_bin).map_err(|e| e.to_string())?;
     // Use AOT cache if present (JEP 514 — built at compile time, bundled in aot/).
     let aot_cache = headless_dir.join("aot").join("head.aot");
@@ -777,13 +778,9 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         cmd.arg(format!("-XX:AOTCache={}", aot_cache.to_string_lossy()));
     }
     cmd
-        // JVM crash diagnostics — write to <dataDir>/crashes/
-        .arg(format!(
-            "-XX:ErrorFile={}/hs_err_pid%p.log",
-            crash_dir.to_string_lossy()
-        ))
+        // One argument per JVM option also preserves Windows paths containing spaces.
+        .args(crash_options)
         .arg("-XX:+HeapDumpOnOutOfMemoryError")
-        .arg(format!("-XX:HeapDumpPath={}/", crash_dir.to_string_lossy()))
         // Lane F stage B item B1. Without this an OutOfMemoryError reaches the default
         // uncaught-exception handler and the JVM exits 1 — the same code as a boot failure, so the
         // supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
@@ -834,7 +831,10 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("native-bin")
         .join("onnxruntime")
         .join("cuda12");
-    if ort_cuda_dir.join(native_targets::library_name("ort-cuda")).exists() {
+    if ort_cuda_dir
+        .join(native_targets::library_name("ort-cuda"))
+        .exists()
+    {
         cmd.env("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", &ort_cuda_dir);
         cmd.env("JUSTSEARCH_GPU_ENABLED", "true");
     }
@@ -1008,7 +1008,11 @@ fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), Strin
                 return Err("Incomplete managed child identity".into());
             }
             #[cfg(target_os = "linux")]
-            if !child.identity.as_ref().is_some_and(|id| id.valid(child.pid)) {
+            if !child
+                .identity
+                .as_ref()
+                .is_some_and(|id| id.valid(child.pid))
+            {
                 return Err("Incomplete Linux managed child identity".into());
             }
             Ok(child)
@@ -1081,7 +1085,10 @@ try {
 #[cfg(target_os = "linux")]
 fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) -> Result<(), String> {
     linux_process::terminate(
-        child.identity.as_ref().ok_or("Missing Linux managed child identity")?,
+        child
+            .identity
+            .as_ref()
+            .ok_or("Missing Linux managed child identity")?,
         std::path::Path::new(&child.executable),
     )
 }
@@ -1120,25 +1127,31 @@ pub(crate) fn start_supervision(
     app: &tauri::AppHandle,
     state: Arc<BackendState>,
 ) -> Result<(), String> {
-    let Ok(data_dir) = resolve_app_data_dir(app) else {
-        return Err("supervisor: no app data dir; the Engine will not be supervised".into());
-    };
+    let data_dir = resolve_app_data_dir(app)
+        .map_err(|error| format!("Cannot resolve the Engine data directory: {error}"))?;
     let host = state.host.clone();
     let spawn_app = app.clone();
     let event_app = app.clone();
-    let mut actuator = shell_actuator::ShellActuator::new(
-        host.clone(),
-        data_dir,
-        move || {
-            state.reset_for_restart()?;
-            spawn_headless_backend(&spawn_app, state.clone())?;
-            Ok(state.child_pid().unwrap_or(0))
-        },
-        move |record| {
-            let _ = event_app.emit(EVENT_SUPERVISOR_STATE, record);
-        },
-    );
+    let exhausted_data_dir = data_dir.clone();
+    let actor_host = host.clone();
     host.start_supervisor(move || {
+        let mut actuator = shell_actuator::ShellActuator::new(
+            actor_host,
+            data_dir,
+            move || {
+                state.reset_for_restart()?;
+                spawn_headless_backend(&spawn_app, state.clone())?;
+                Ok(state.child_pid().unwrap_or(0))
+            },
+            move |record| {
+                // Exhaustion now owns an interruptible wait, so retain the terminal helper cleanup
+                // at that transition rather than delaying it until this actor eventually exits.
+                if record.state == "exhausted" && record.retry_at.is_some() {
+                    cleanup_registered_children_for_terminal(&exhausted_data_dir);
+                }
+                let _ = event_app.emit(EVENT_SUPERVISOR_STATE, record);
+            },
+        );
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);
         let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
@@ -1201,6 +1214,17 @@ fn update_tray_tooltip(state: &BackendState, tooltip: &str) {
     if let Some(tray) = app.tray_by_id(&id) {
         let _ = tray.set_tooltip(Some(tooltip));
     }
+}
+
+#[tauri::command]
+fn restart_engine(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    if state.host.request_manual_restart()? {
+        return Ok(());
+    }
+    start_supervision(&app, (*state).clone())
 }
 
 #[tauri::command]
@@ -1519,6 +1543,7 @@ pub fn run() {
         .manage(update_coordinator.clone())
         .invoke_handler(tauri::generate_handler![
             supervisor_state,
+            restart_engine,
             api_port,
             session_token,
             smoke_run_id,
@@ -1789,17 +1814,29 @@ mod tests {
         let manifest = serde_json::json!({ "schemaVersion": 2, "children": [{
             "pid": record.pid, "startedAt": record.started_at, "executable": record.executable
         }] });
-        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        fs::write(
+            dir.path().join("runtime/manifest.json"),
+            manifest.to_string(),
+        )
+        .unwrap();
         cleanup_after_supervision(&supervisor::Outcome::NoEngine, dir.path());
         assert!(child.try_wait().unwrap().is_none());
         // Q15-I1: this manifest may belong to the incumbent holding the data directory.
-        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
-            reason: "DATA_DIR_LOCKED".into(), exit_code: 2,
-        }, dir.path());
+        cleanup_after_supervision(
+            &supervisor::Outcome::Exhausted {
+                reason: "DATA_DIR_LOCKED".into(),
+                exit_code: 2,
+            },
+            dir.path(),
+        );
         assert!(child.try_wait().unwrap().is_none());
-        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
-            reason: "restart budget exhausted".into(), exit_code: 1,
-        }, dir.path());
+        cleanup_after_supervision(
+            &supervisor::Outcome::Exhausted {
+                reason: "restart budget exhausted".into(),
+                exit_code: 1,
+            },
+            dir.path(),
+        );
         assert!(child.try_wait().unwrap().is_some());
     }
 
@@ -1815,7 +1852,11 @@ mod tests {
             { "pid": record.pid, "startedAt": record.started_at, "executable": record.executable },
             { "pid": mismatch.pid, "startedAt": mismatch.started_at, "executable": mismatch.executable }
         ] });
-        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        fs::write(
+            dir.path().join("runtime/manifest.json"),
+            manifest.to_string(),
+        )
+        .unwrap();
         let host = EngineHost::default();
         let error = host
             .admit(PreparedCommand {
@@ -1863,13 +1904,22 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::create_dir(dir.path().join("runtime")).unwrap();
         let path = dir.path().join("runtime/manifest.json");
-        for bad in ["null", "{}", r#"{"schemaVersion":3,"children":[]}"#,
-            r#"{"schemaVersion":2}"#, r#"{"schemaVersion":2,"children":null}"#,
-            r#"{"schemaVersion":2,"children":{}}"#, r#"{"schemaVersion":2,"children":[{}]}"#] {
+        for bad in [
+            "null",
+            "{}",
+            r#"{"schemaVersion":3,"children":[]}"#,
+            r#"{"schemaVersion":2}"#,
+            r#"{"schemaVersion":2,"children":null}"#,
+            r#"{"schemaVersion":2,"children":{}}"#,
+            r#"{"schemaVersion":2,"children":[{}]}"#,
+        ] {
             fs::write(&path, bad).unwrap();
             assert!(reconcile_registered_children(dir.path()).is_err(), "{bad}");
         }
-        for good in [r#"{"schemaVersion":1}"#, r#"{"schemaVersion":2,"children":[]}"#] {
+        for good in [
+            r#"{"schemaVersion":1}"#,
+            r#"{"schemaVersion":2,"children":[]}"#,
+        ] {
             fs::write(&path, good).unwrap();
             reconcile_registered_children(dir.path()).unwrap();
         }

@@ -50,7 +50,7 @@ export class EngineRecovery extends JfElement {
     }
     section { max-width: 36rem; margin: 4rem auto; }
     h1 { font-size: var(--font-size-xl); }
-    p { line-height: 1.6; }
+    p { line-height: 1.6; overflow-wrap: anywhere; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
   `;
 
@@ -80,11 +80,33 @@ export class EngineRecovery extends JfElement {
     }
   }
 
+  private async restartEngine(): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    this.error = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('restart_engine');
+    } catch (error) {
+      this.error = String(error);
+    } finally { this.busy = false; }
+  }
+
+  private async openCrashFolder(): Promise<void> {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const paths = await invoke<{ home: string }>('justsearch_paths');
+      await invoke('reveal_in_explorer', { path: `${paths.home}/crashes` });
+    } catch (error) { this.error = String(error); }
+  }
+
   override render() {
     const terminal = isTerminal(this.supervisor);
     const status = this.status;
+    const cause = (this.supervisor?.reason ?? this.supervisor?.lastExit?.reason ?? 'unknown')
+      .replace(/^ENGINE_RESTART_EXHAUSTED:/, '').replace(/^(?:spawn_failed|restart_failed):/, '');
     const available = status?.state === 'available';
-    const updating = this.busy || [
+    const updating = [
       'checking', 'downloading', 'preparing', 'prepared', 'head_stopped', 'engine_unrecoverable',
       'install_launching', 'install_launched', 'reconciling',
     ].includes(status?.state ?? '');
@@ -94,20 +116,30 @@ export class EngineRecovery extends JfElement {
           ? reasonFor('engine.restart_exhausted').wording
           : this.supervisor?.lastExit?.reason === 'escalated_restart'
             ? reasonFor('engine.escalated_restart').wording
-            : 'Connecting to JustSearch'}</h1>
+            : this.supervisor?.notReady ? 'The search engine is running but not ready' : 'Connecting to JustSearch'}</h1>
         <p role="status">${terminal
-          ? 'You can check for an update or try connecting again.'
+          ? 'You can restart JustSearch or check for an update.'
           : 'JustSearch is starting or recovering. Update controls are available while you wait.'}</p>
+        ${this.supervisor?.notReady ? html`<p role="status">${this.supervisor.notReady}</p>` : nothing}
+        ${terminal ? html`<p>The search engine stopped ${this.supervisor?.recentExits?.count ?? this.supervisor?.restartCount ?? 0} times in the last 24 hours.
+          Last cause: ${cause}.
+          ${this.supervisor?.lastExit ? `Exit ${this.supervisor.lastExit.code}.` : ''}</p>` : nothing}
+        ${this.supervisor?.lastExit?.code === 2 ? html`<p>The data folder is in use by another process. Close the other instance before restarting.</p>` : nothing}
+        ${this.supervisor?.crashFile ? html`<p>${this.supervisor.crashFile.exception}
+          ${this.supervisor.crashFile.problematicFrame} (${this.supervisor.crashFile.name}, ${this.supervisor.crashFile.at})</p>` : nothing}
+        ${this.supervisor?.retryAt ? html`<p>Automatic retry at ${new Date(this.supervisor.retryAt).toLocaleTimeString()}.</p>` : nothing}
         ${available ? html`<p>JustSearch ${status.availableVersion ?? 'update'} is available.</p>` : nothing}
         ${status?.state === 'up_to_date' ? html`<p>You have the latest version.</p>` : nothing}
         ${status?.state === 'repair_required' ? html`<p>The last update needs repair. Automatic restart may be paused until the update is recovered.</p>` : nothing}
+        ${this.busy && !updating ? html`<p role="status">Please wait…</p>` : nothing}
         ${updating ? html`<p role="status">${status?.state === 'checking' ? 'Checking for updates…' : 'Updating JustSearch…'}</p>` : nothing}
         ${this.error || status?.state === 'error' ? html`<p role="alert">${this.error
           || 'The update could not finish. Try checking for updates again.'}</p>` : nothing}
         <div class="actions">
-          <jf-button .disabled=${updating} .onActivate=${() => this.onRetry()}>Try connecting again</jf-button>
-          <jf-button .disabled=${updating} .onActivate=${() => this.runUpdateAction(false)}>Check for updates</jf-button>
-          ${available ? html`<jf-button variant="primary" .disabled=${updating}
+          <jf-button .disabled=${this.busy || updating} .onActivate=${() => terminal ? this.restartEngine() : this.onRetry()}>${terminal ? 'Restart JustSearch' : 'Try connecting again'}</jf-button>
+          ${this.supervisor?.crashFile ? html`<jf-button .onActivate=${() => this.openCrashFolder()}>Open crash folder</jf-button>` : nothing}
+          <jf-button .disabled=${this.busy || updating} .onActivate=${() => this.runUpdateAction(false)}>Check for updates</jf-button>
+          ${available ? html`<jf-button variant="primary" .disabled=${this.busy || updating}
             .onActivate=${() => this.runUpdateAction(true)}>Install update</jf-button>` : nothing}
         </div>
       </section>

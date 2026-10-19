@@ -109,6 +109,7 @@ pub(crate) struct EngineHost {
 
 #[derive(Default)]
 struct Control {
+    manual_restart: bool,
     pending: Option<supervisor::HostQuit>,
     active: Option<String>,
     upgrade: Option<(String, String)>,
@@ -151,7 +152,7 @@ impl EngineHost {
         create_job: impl FnOnce(u64) -> Result<IncarnationJob, containment::ContainmentError>,
     ) -> Result<AdmittedChild, String> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
-        if inner.closing {
+        if inner.closing || self.control.lock().unwrap().active.as_deref() == Some("quit") {
             return Err("Engine host is closing; launch refused".into());
         }
         if inner.replacement_held {
@@ -195,7 +196,9 @@ impl EngineHost {
         };
         *self.exit_observed.0.lock().unwrap() = None;
         #[cfg(target_os = "linux")]
-        { inner.exit_signal = None; }
+        {
+            inner.exit_signal = None;
+        }
         let pid = child.id();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -412,7 +415,10 @@ impl EngineHost {
 
     #[cfg(target_os = "linux")]
     pub(crate) fn exit_signal(&self) -> Option<i32> {
-        self.inner.lock().expect("engine host mutex poisoned").exit_signal
+        self.inner
+            .lock()
+            .expect("engine host mutex poisoned")
+            .exit_signal
     }
 
     fn end_owned(inner: &mut HostInner, owned: OwnedChild) -> Child {
@@ -537,6 +543,8 @@ impl EngineHost {
         budget: Duration,
     ) -> Result<(), String> {
         let now = self.now_ms();
+        // Serialize the stop intent with admission: no process can spawn after quit wins.
+        let _admission = self.inner.lock().unwrap();
         let mut control = self.control.lock().unwrap();
         if control.active.as_deref() == Some("quit") {
             return if reason == "quit" {
@@ -562,12 +570,47 @@ impl EngineHost {
         self.wake.notify_all();
         Ok(())
     }
+    /// Return true when the existing actor owns the request, false when a new actor is needed.
+    pub(crate) fn request_manual_restart(&self) -> Result<bool, String> {
+        let actor = self.supervisor.lock().unwrap();
+        let inner = self.inner.lock().unwrap();
+        let mut control = self.control.lock().unwrap();
+        if inner.closing || matches!(control.active.as_deref(), Some("quit" | "upgrade")) {
+            return Err("Quit or upgrade is in progress; restart refused".into());
+        }
+        if inner.replacement_held {
+            return Err("An update holds Engine replacement; restart refused".into());
+        }
+        let record = inner
+            .latest_record
+            .as_ref()
+            .ok_or("Engine has no terminal state; restart refused")?;
+        if !matches!(record.state.as_str(), "exhausted" | "stopped") {
+            return Err("The Engine is already starting or running; restart refused".into());
+        }
+        if matches!(record.reason.as_deref(), Some("quit" | "upgrade")) {
+            return Err("Engine was stopped for quit or upgrade; restart refused".into());
+        }
+        if actor.as_ref().is_some_and(|actor| !actor.is_finished()) {
+            if record.state != "exhausted" || record.retry_at.is_none() {
+                return Err("The previous supervision generation is finishing; try again".into());
+            }
+            control.manual_restart = true;
+            self.wake.notify_all();
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+    pub(crate) fn take_manual_restart(&self) -> bool {
+        std::mem::take(&mut self.control.lock().unwrap().manual_restart)
+    }
     pub(crate) fn take_host_quit(&self) -> Option<supervisor::HostQuit> {
         self.control.lock().unwrap().pending.take()
     }
     pub(crate) fn wait_or_wake(&self, ms: u64) {
         let control = self.control.lock().unwrap();
-        if control.pending.is_none() {
+        if control.pending.is_none() && !control.manual_restart {
             let _ = self
                 .wake
                 .wait_timeout(control, Duration::from_millis(ms))
@@ -614,8 +657,11 @@ impl EngineHost {
         }
         self.post_stop("upgrade", None, timeout)?;
         let deadline = Instant::now() + timeout;
-        let mut control = self.control.lock().unwrap();
         loop {
+            // Admission and stop intents lock inner before control. Never invert that order
+            // while waiting for an upgrade receipt.
+            let child_gone = self.child_pid().is_none();
+            let mut control = self.control.lock().unwrap();
             if let Some(receipt) = control.receipt.take() {
                 return receipt;
             }
@@ -624,23 +670,23 @@ impl EngineHost {
             }
             // Only a still-pending request can take the pre-commit dead-Engine path.
             // take_upgrade consumes it before HTTP; a crash after that still needs receipts.
-            if control.upgrade.is_some() && self.child_pid().is_none() {
+            if control.upgrade.is_some() && child_gone {
                 control.upgrade = None;
                 return Err("Engine exited before upgrade commit request".into());
             }
             if Instant::now() >= deadline {
                 return Err("Upgrade commit receipt timed out".into());
             }
-            control = self
-                .wake
-                .wait_timeout(control, Duration::from_millis(50))
-                .unwrap()
-                .0;
+            drop(
+                self.wake
+                    .wait_timeout(control, Duration::from_millis(50))
+                    .unwrap(),
+            );
         }
     }
     pub(crate) fn quit_started(&self) -> bool {
-        self.control.lock().unwrap().active.as_deref() == Some("quit")
-            || self.inner.lock().unwrap().closing
+        let quitting = self.control.lock().unwrap().active.as_deref() == Some("quit");
+        quitting || self.inner.lock().unwrap().closing
     }
     pub(crate) fn reject_upgrade(&self) {
         let mut control = self.control.lock().unwrap();
@@ -723,9 +769,19 @@ impl EngineHost {
         before_spawn: impl FnOnce(),
     ) -> Result<(), String> {
         let mut supervisor = self.supervisor.lock().expect("supervisor mutex poisoned");
-        if self.inner.lock().unwrap().closing {
-            return Err("Engine host is closed; supervision refused".into());
-        }
+        let mut control = {
+            let inner = self.inner.lock().unwrap();
+            if inner.closing || (inner.replacement_held && inner.child.is_none()) {
+                return Err(
+                    "Engine host is closed or held by an update; supervision refused".into(),
+                );
+            }
+            let control = self.control.lock().unwrap();
+            if control.active.as_deref() == Some("quit") {
+                return Err("Quit is in progress; supervision refused".into());
+            }
+            control
+        };
         if supervisor.as_ref().is_some_and(|h| !h.is_finished()) {
             return Err("A supervision generation is already installed".into());
         }
@@ -733,7 +789,8 @@ impl EngineHost {
             let _ = old.join();
         }
         *self.terminal.0.lock().unwrap() = None;
-        self.control.lock().unwrap().active = None;
+        control.active = None;
+        control.manual_restart = false;
         before_spawn();
         *supervisor = Some(thread::spawn(run));
         Ok(())
@@ -942,6 +999,23 @@ mod tests {
     }
 
     #[test]
+    fn manual_restart_refuses_quit_and_update_holds_without_admitting_a_child() {
+        let host = EngineHost::default();
+        host.publish_state(None, &terminal_record("native crash"), |_| {});
+        assert_eq!(host.request_manual_restart(), Ok(false));
+        host.acquire_replacement_hold(Duration::ZERO).unwrap();
+        assert!(host
+            .request_manual_restart()
+            .unwrap_err()
+            .contains("update"));
+        host.release_replacement_hold().unwrap();
+        host.post_stop("quit", None, Duration::ZERO).unwrap();
+        assert!(host.request_manual_restart().unwrap_err().contains("Quit"));
+        assert!(host.admit(sleeper()).unwrap_err().contains("closing"));
+        assert!(host.child_pid().is_none());
+    }
+
+    #[test]
     fn hold_linearizes_with_supervisor_installation_and_joins_that_generation() {
         let host = Arc::new(EngineHost::default());
         let (entered_tx, entered_rx) = std::sync::mpsc::channel();
@@ -1020,6 +1094,10 @@ mod tests {
 
     fn terminal_record(reason: &str) -> StateRecord {
         StateRecord {
+            retry_at: None,
+            not_ready: None,
+            recent_exits: None,
+            crash_file: None,
             schema_version: 1,
             kind: "engine-supervisor-state.v1".into(),
             supervisor: "tauri".into(),
@@ -2030,7 +2108,9 @@ mod tests {
         let (result_tx, result_rx) = std::sync::mpsc::channel();
         let stop_host = host.clone();
         let waiter = thread::spawn(move || {
-            result_tx.send(stop_host.stop_owned_engine(Duration::ZERO)).unwrap();
+            result_tx
+                .send(stop_host.stop_owned_engine(Duration::ZERO))
+                .unwrap();
         });
         accounted_rx.recv_timeout(Duration::from_secs(10)).unwrap();
         assert!(host.wait_for_exit(Duration::ZERO));
@@ -2040,13 +2120,30 @@ mod tests {
             containment::JOB_TERMINATE_CONFIRM_MS + 250,
         ));
         release_tx.send(()).unwrap();
-        let result = early.unwrap_or_else(|_| result_rx.recv_timeout(Duration::from_secs(10)).unwrap());
+        let result =
+            early.unwrap_or_else(|_| result_rx.recv_timeout(Duration::from_secs(10)).unwrap());
         waiter.join().unwrap();
-        host.supervisor.lock().unwrap().take().unwrap().join().unwrap();
-        assert_eq!(result, Ok(Some(pid)), "the accounted upgrade must permit handoff");
+        host.supervisor
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap()
+            .join()
+            .unwrap();
+        assert_eq!(
+            result,
+            Ok(Some(pid)),
+            "the accounted upgrade must permit handoff"
+        );
         assert!(host.child_pid().is_none());
         assert!(host.predecessor_job_empty());
-        assert_eq!(actor_records(dir.path()).iter().filter(|r| r["type"] == "engine-exit").count(), 1);
+        assert_eq!(
+            actor_records(dir.path())
+                .iter()
+                .filter(|r| r["type"] == "engine-exit")
+                .count(),
+            1
+        );
     }
 
     #[test]

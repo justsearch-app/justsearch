@@ -62,6 +62,7 @@ const HARNESS_FLAG = 'JUSTSEARCH_SUPERVISOR_HARNESS';
 
 /** Overridable parameter -> its env var. Only these; the restart BUDGET is never overridable. */
 const OVERRIDE_ENV = Object.freeze({
+  exhaustedRetryDelayMs: 'JUSTSEARCH_SUPERVISOR_EXHAUSTED_RETRY_DELAY_MS',
   quitDeadlineMs: 'JUSTSEARCH_SUPERVISOR_QUIT_DEADLINE_MS',
   dataDirLockedWaitMs: 'JUSTSEARCH_SUPERVISOR_DATA_DIR_LOCKED_WAIT_MS',
   stabilityWindowMs: 'JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS',
@@ -86,6 +87,7 @@ function loadPolicy({ env = process.env, repoRoot, reload } = {}) {
   const declared = row.policy;
   const policy = {
     maxRestartAttempts: declared.maxRestartAttempts,
+    exhaustedRetryDelayMs: declared.exhaustedRetryDelayMs,
     cooldownIncrementMs: declared.cooldownIncrementMs,
     maxCooldownMs: declared.maxCooldownMs,
     stabilityWindowMs: declared.stabilityWindowMs,
@@ -318,12 +320,14 @@ function createSuspendAwareClock({
   let suspendedMs = 0;
   let resumedAt = null;
   let openSuspend = null;
+  let resumed = false;
   return {
+    takeResumed() { const value = resumed; resumed = false; return value; },
     now: () => (openSuspend ?? monotonic()) - suspendedMs,
     notePower(kind, at = monotonic()) {
       if (kind === 'suspend' && openSuspend === null) openSuspend = at;
       if (kind === 'resume' && openSuspend !== null) {
-        suspendedMs += Math.max(0, at - openSuspend); openSuspend = null; resumedAt = at;
+        suspendedMs += Math.max(0, at - openSuspend); openSuspend = null; resumedAt = at; resumed = true;
       }
     },
     /** Times one wait: `await clock.measureWait(() => waitOrWake(tickMs))`; returns the suspend seen. */
@@ -440,6 +444,13 @@ function createSupervisionLoop({
     hostQuitActive: false,
     hostQuitDetail: null,
     outcome: null,
+    retryAt: null,
+    exhaustedUntil: null,
+    manualRestart: false,
+    replacementHeld: false,
+    notReady: null,
+    notReadySince: null,
+    probeGeneration: 0,
   };
 
   let resolveFirstReady;
@@ -461,6 +472,8 @@ function createSupervisionLoop({
     lastExit: s.lastExit,
     requestedReason: s.requestedReason,
     readyAt: s.readyAt,
+    retryAt: s.retryAt,
+    notReady: s.notReady,
   });
 
   const emit = (state, extra = {}) => {
@@ -491,12 +504,18 @@ function createSupervisionLoop({
   const spawnIncarnation = async (cause) => {
     s.incarnation += 1;
     s.requestedReason = null;
+    s.manualRestart = false;
     // A manifest left by any earlier incarnation can never be taken for this one's.
-    s.predecessorInstanceId = s.instanceId;
+    s.predecessorInstanceId = s.instanceId ?? s.predecessorInstanceId;
     s.phase = 'spawned';
     s.startTimeout = null;
     s.healthInFlight = false;
     s.healthResult = null;
+    s.probeGeneration += 1;
+    s.notReady = null;
+    s.notReadySince = null;
+    s.essentialReadySince = null;
+    s.essentialEpoch = null;
     s.nextHealthAt = 0;
     s.stopKind = null;
     s.stopReasonLabel = null;
@@ -506,7 +525,7 @@ function createSupervisionLoop({
     s.forced = false;
     s.harnessRequestFired = s.incarnation !== 1;
     io.clearStaleDiscoveryFiles();
-    const port = s.firstReadyDone ? s.apiPort : requestedApiPort;
+    const port = s.firstReadyDone ? (s.apiPort ?? requestedApiPort) : requestedApiPort;
     // Creating the Windows job and publishing its root are part of this same startup budget.
     // Arm before the synchronous spawn so that a slow host cannot reset the discovery deadline.
     startDeadlines();
@@ -559,6 +578,7 @@ function createSupervisionLoop({
     if (action.action !== ACTIONS.ENTER_RUNNING) return;
     s.readyAt = new Date(wallClock()).toISOString();
     s.runningSince = clockNow();
+    s.notReadySince = s.runningSince;
     s.consecutiveMisses = 0;
     s.essentialReadySince = null;
     s.essentialEpoch = null;
@@ -608,10 +628,13 @@ function createSupervisionLoop({
     if (!s.healthInFlight && clockNow() >= s.nextHealthAt) {
       s.healthInFlight = true;
       const n = s.incarnation;
+      const generation = s.probeGeneration;
       io.probeHealth(s.apiPort, READY_PROBE_TIMEOUT_MS).then((ok) => ok, () => false).then((ok) => {
-        s.healthInFlight = false;
-        s.healthResult = { n, ok };
-        actuator.wake();
+        if (n === s.incarnation && generation === s.probeGeneration) {
+          s.healthInFlight = false;
+          s.healthResult = { n, ok };
+          actuator.wake();
+        }
       });
     }
   };
@@ -648,7 +671,17 @@ function createSupervisionLoop({
         if (epoch === null) {
           s.essentialReadySince = null;
           s.essentialEpoch = null;
+          s.notReadySince ??= result.at;
+          if (result.at - s.notReadySince >= policy.startDeadlineMs) {
+            const index = result.status?.readiness?.engineComponents?.index;
+            const safe = value => String(value ?? '').replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 256);
+            const reason = index ? `Index: ${safe(index.state)} (${safe(index.reasonCode ?? index.reason ?? 'readiness not reported')})`
+              : 'The Engine answers, but index status is unavailable';
+            if (reason !== s.notReady) { s.notReady = reason; await emit(STATES.RUNNING); }
+          }
         } else {
+          s.notReadySince = null;
+          if (s.notReady !== null) { s.notReady = null; await emit(STATES.RUNNING); }
           if (epoch !== s.essentialEpoch) {
             s.essentialEpoch = epoch;
             s.essentialReadySince = result.at;
@@ -683,15 +716,17 @@ function createSupervisionLoop({
     if (!s.hangInFlight && clockNow() >= s.nextHangAt) {
       s.hangInFlight = true;
       s.nextHangAt = clockNow() + policy.hangPollIntervalMs;
-      const tag = { n: s.incarnation, instanceId: s.instanceId, port: s.apiPort };
+      const tag = { n: s.incarnation, instanceId: s.instanceId, port: s.apiPort, generation: s.probeGeneration };
       (async () => {
         const alive = await io.probeAlive(tag.port, HANG_PROBE_TIMEOUT_MS).catch(() => false);
         const status = alive ? await io.fetchStatus(tag.port, HANG_PROBE_TIMEOUT_MS).catch(() => null) : null;
         return { ...tag, alive, status, at: clockNow() };
       })().then((result) => {
-        s.hangInFlight = false;
-        s.hangResult = result;
-        actuator.wake();
+        if (result.generation === s.probeGeneration && result.n === s.incarnation && result.instanceId === s.instanceId) {
+          s.hangInFlight = false;
+          s.hangResult = result;
+          actuator.wake();
+        }
       });
     }
   };
@@ -760,6 +795,11 @@ function createSupervisionLoop({
       s.requestedReason = exitHandoffReason(io.readRawManifest(), s.pid, s.instanceId);
     }
     const code = exit.code;
+    if (exit.error) {
+      const decision = { action: ACTIONS.EXHAUSTED, reason: `spawn_failed:${exit.error}`, exitClass: 'NON_TRANSIENT', counted: false };
+      await actuator.recordExit({ exit, phase, decision });
+      return finish(STATES.EXHAUSTED, null, `ENGINE_RESTART_EXHAUSTED:${decision.reason}`);
+    }
     let decision = decide({ event: 'exit', exitCode: code, requestedReason: s.requestedReason,
       restartCount: s.restartCount, state: s.state }, policy);
     if (code === 2 && phase === 'STARTING' && predecessorExitAt !== null &&
@@ -795,10 +835,22 @@ function createSupervisionLoop({
       + `${ledger ? ` ledger=${ledger.exitClass}${ledger.forced ? '/forced' : ''}` : ''}`
       + `${reported?.engineLog ? ` engineLog=${reported.engineLog}` : ''}`);
     if (decision.action === ACTIONS.STOP) {
-      return finish(s.hostQuitActive ? STATES.STOPPED : STATES.STOPPING, code, decision.reason);
+      return finish(STATES.STOPPED, code, decision.reason);
     }
     if (decision.action === ACTIONS.EXHAUSTED) {
-      return finish(STATES.EXHAUSTED, code, `ENGINE_RESTART_EXHAUSTED:${decision.reason}`);
+      if (decision.exitClass !== 'TRANSIENT') {
+        return finish(STATES.EXHAUSTED, code, `ENGINE_RESTART_EXHAUSTED:${decision.reason}`);
+      }
+      await io.waitForRelease({ pid: exit.pid });
+      s.pid = null;
+      s.apiPort = null;
+      s.predecessorInstanceId = s.instanceId;
+      s.instanceId = null;
+      s.exhaustedUntil = clockNow() + policy.exhaustedRetryDelayMs;
+      s.retryAt = new Date(wallClock() + policy.exhaustedRetryDelayMs).toISOString();
+      s.notReady = null;
+      await emit(STATES.EXHAUSTED, { reason: `ENGINE_RESTART_EXHAUSTED:${decision.reason}` });
+      return null;
     }
     if (s.hostQuitActive) {
       // Unreachable through `decide` (a quit request always stops), kept so a quit can never restart.
@@ -834,20 +886,23 @@ function createSupervisionLoop({
     // The caller may hold a restart back while it is still publishing the run that the last ready
     // started (its run record must exist before a replacement can be reported running).
     if (typeof hooks.restartReady === 'function' && !hooks.restartReady()) return;
-    await spawnIncarnation('RESTART');
+    if (s.replacementHeld || s.hostQuitActive || s.pendingHostQuit) return;
+    try { await spawnIncarnation('RESTART'); }
+    catch (error) { return finish(STATES.EXHAUSTED, 1, `ENGINE_RESTART_EXHAUSTED:restart_failed:${error.message ?? error}`); }
   };
 
   /** T10, T10b, T11. */
   const takeHostQuit = async () => {
     const quit = s.pendingHostQuit;
     s.pendingHostQuit = null;
-    if ([STATES.EXHAUSTED, STATES.STOPPED].includes(s.state) || s.outcome) return null;
+    if (s.outcome) return s.outcome;
     const already = s.hostQuitActive;
     s.hostQuitActive = true;
     if (!already) s.hostQuitDetail = quit.detail ?? null;
     const deadlineMs = Math.max(0, (quit.deadlineMs ?? quitDeadlineMs) - forceMarginMs);
     const deadlineEpochMs = wallClock() + (quit.deadlineMs ?? quitDeadlineMs);
-    if (s.state === STATES.RESTARTING) {
+    if ([STATES.RESTARTING, STATES.EXHAUSTED].includes(s.state)) {
+      s.retryAt = null;
       // T11: no incarnation is alive; cancel the cooldown and spawn nothing.
       return finish(STATES.STOPPED, s.lastExit?.code ?? null, 'quit');
     }
@@ -892,7 +947,13 @@ function createSupervisionLoop({
 
   const run = async () => {
     await actuator.reconcile();
-    await spawnIncarnation('INITIAL');
+    while (s.replacementHeld && !s.pendingHostQuit && !s.hostQuitActive) await actuator.waitOrWake(tickMs);
+    if (s.pendingHostQuit || s.hostQuitActive) {
+      s.hostQuitActive = true;
+      return finish(STATES.STOPPED, null, 'quit');
+    }
+    try { await spawnIncarnation(s.incarnation === 0 ? 'INITIAL' : 'RESTART'); }
+    catch (error) { return finish(STATES.EXHAUSTED, 1, `ENGINE_RESTART_EXHAUSTED:spawn_failed:${error.message ?? error}`); }
     for (;;) {
       const exit = actuator.pollExit();
       if (exit) {
@@ -901,10 +962,40 @@ function createSupervisionLoop({
         if (done) return done;
         continue;
       }
+      if (harnessActive && typeof io.takeRecoveryCommand === 'function') {
+        const command = io.takeRecoveryCommand();
+        if (command) {
+          let result;
+          try {
+            if (command.action === 'restart-quit-race') {
+              let accepted = 0;
+              for (let i = 0; i < 5; i++) { try { controller.restartEngine(); accepted++; } catch { /* automatic retry may have won */ } }
+              void controller.hostQuit();
+              let refused = false;
+              try { controller.restartEngine(); } catch { refused = true; }
+              io.recoveryCommandResult(command, { ok: true, accepted, quitRefusedRestart: refused });
+              continue;
+            }
+            if (command.action === 'restart') controller.restartEngine();
+            else if (command.action === 'hold') controller.setReplacementHold(true);
+            else if (command.action === 'release') controller.setReplacementHold(false);
+            else if (command.action === 'quit') void controller.hostQuit();
+            else if (command.action === 'suspend' || command.action === 'resume') suspendClock.notePower(command.action);
+            else throw new Error('Unsupported recovery command');
+            result = { ok: true };
+          } catch (error) { result = { ok: false, error: String(error.message ?? error) }; }
+          io.recoveryCommandResult(command, result);
+        }
+      }
       if (s.pendingHostQuit) {
         // eslint-disable-next-line no-await-in-loop
         const done = await takeHostQuit();
         if (done) return done;
+      }
+      clockNow();
+      if (suspendClock.takeResumed()) {
+        s.essentialReadySince = null; s.essentialEpoch = null; s.consecutiveMisses = 0;
+        s.probeGeneration += 1; s.hangResult = null; s.hangInFlight = false;
       }
       if (s.state === STATES.STOPPING && s.requestDeadlineAt !== null && clockNow() >= s.requestDeadlineAt) {
         // eslint-disable-next-line no-await-in-loop
@@ -916,14 +1007,32 @@ function createSupervisionLoop({
         // eslint-disable-next-line no-await-in-loop
         else if (s.state === STATES.RUNNING) await tickRunning();
       }
+      if (s.state === STATES.EXHAUSTED && !s.replacementHeld && !s.hostQuitActive && !s.pendingHostQuit
+          && (s.manualRestart || (s.exhaustedUntil !== null && clockNow() >= s.exhaustedUntil))) {
+        s.restartCount = 0;
+        s.manualRestart = false;
+        s.exhaustedUntil = null;
+        s.retryAt = null;
+        s.requestedReason = null;
+        s.releasePending = false;
+        s.cooldownUntil = clockNow();
+        lockedRetried = false;
+        await emit(STATES.RESTARTING);
+      }
       if (s.state === STATES.RESTARTING && !s.pendingHostQuit) {
         // eslint-disable-next-line no-await-in-loop
-        await tickRestarting();
+        const done = await tickRestarting();
+        if (done) return done;
       }
       // eslint-disable-next-line no-await-in-loop
       const suspended = await suspendClock.measureWait(() => actuator.waitOrWake(tickMs));
       if (suspended > 0) {
         s.consecutiveMisses = 0;
+        s.essentialReadySince = null;
+        s.essentialEpoch = null;
+        s.probeGeneration += 1;
+        s.hangInFlight = false;
+        s.hangResult = null;
         log(`the machine was suspended for about ${Math.round(suspended)}ms; deadlines are extended by it and `
           + `health misses are not counted for ${RESUME_GRACE_MS}ms.`);
       }
@@ -931,19 +1040,42 @@ function createSupervisionLoop({
   };
 
   let running = null;
-  return {
+  const controller = {
     /** Starts the loop once; resolves with the terminal outcome. */
     run() {
       if (!running) running = run();
       return running;
     },
     firstReady,
+    restartEngine() {
+      if (s.hostQuitActive || s.pendingHostQuit || ['quit', 'upgrade'].includes(s.requestedReason)) {
+        throw new Error('Quit or upgrade is in progress; restart refused');
+      }
+      if (s.replacementHeld) throw new Error('An update holds Engine replacement; restart refused');
+      if (![STATES.EXHAUSTED, STATES.STOPPED].includes(s.state)) {
+        throw new Error('The Engine is already starting or running; restart refused');
+      }
+      if (s.outcome) {
+        s.outcome = null;
+        s.state = STATES.STARTING;
+        s.restartCount = 0;
+        s.retryAt = null;
+        s.exhaustedUntil = null;
+        running = run();
+      } else { s.manualRestart = true; }
+      actuator.wake();
+    },
+    setReplacementHold(held) {
+      if (s.hostQuitActive || s.pendingHostQuit) throw new Error('Quit is in progress');
+      s.replacementHeld = held;
+      actuator.wake();
+    },
     /**
      * Post a host quit (stop, takeover, interruption, reap). Resolves with the loop's terminal
      * outcome; every caller of a quit waits on the same outcome, and only the loop acts.
      */
     hostQuit({ detail = null, deadlineMs = quitDeadlineMs } = {}) {
-      if (s.outcome) return Promise.resolve(s.outcome);
+      if (s.outcome) { s.hostQuitActive = true; s.requestedReason = 'quit'; return Promise.resolve(s.outcome); }
       const waiter = new Promise((resolve) => quitWaiters.push(resolve));
       if (!s.pendingHostQuit && !s.hostQuitActive) s.pendingHostQuit = { detail, deadlineMs };
       actuator.wake();
@@ -952,6 +1084,7 @@ function createSupervisionLoop({
     snapshot,
     outcome: () => s.outcome,
   };
+  return controller;
 }
 
 module.exports = {

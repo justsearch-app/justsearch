@@ -178,6 +178,7 @@
       "driftCheckNote": "Not in SupervisionContractTest, unlike the brain row, and the reason is a module edge: that test lives in app-services, and the dependency runs app-engine -> app-services (modules/app-engine/build.gradle.kts). A test-only edge back would invert it. SupervisionContractTest.everyLiveProcessHasADriftCheck therefore requires a live row to EITHER be checked in that class or name a resolvable driftCheck here, which keeps 'cannot be skipped by omission' without inverting the edge.",
       "policy": {
         "maxRestartAttempts": 3,
+        "exhaustedRetryDelayMs": 1800000,
         "cooldownIncrementMs": 1000,
         "maxCooldownMs": 5000,
         "stabilityWindowMs": 300000,
@@ -194,6 +195,7 @@
       "harnessOverrides": {
         "flag": "JUSTSEARCH_SUPERVISOR_HARNESS",
         "overridable": [
+          "exhaustedRetryDelayMs",
           "stabilityWindowMs",
           "maxCooldownMs",
           "cooldownIncrementMs",
@@ -283,6 +285,267 @@
         }
       ],
       "conformanceCases": [
+        {
+          "id": "recovery-manual-retry-races-deadline-and-quit",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "action": "stop"
+          },
+          "why": "E5: repeated manual clicks racing the automatic deadline and quit admit at most one replacement and no child after quit.",
+          "faultMode": "clean-exit"
+        },
+        {
+          "id": "recovery-first-spawn-failure-reason",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "failSpawnAt": 1,
+          "expect": {
+            "action": "exhausted"
+          },
+          "why": "E6: the missing executable path is retained for the first spawn.",
+          "faultMode": "partial-boot"
+        },
+        {
+          "id": "recovery-replacement-spawn-failure-reason",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "failSpawnAt": 2,
+          "expect": {
+            "action": "exhausted"
+          },
+          "why": "E6: the missing executable path is retained for a replacement spawn.",
+          "faultMode": "partial-boot"
+        },
+        {
+          "id": "recovery-status-failure-and-resume",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "honour",
+              "controlEssentialReadiness": true
+            }
+          ],
+          "expect": {
+            "action": "reset-budget"
+          },
+          "why": "E21: failed status probes and a suspend/resume interrupt the continuous readiness window.",
+          "faultMode": "partial-boot"
+        },
+        {
+          "id": "recovery-delayed-retry",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "action": "recover"
+          },
+          "why": "E3-E5: exhaustion is observable; one owner handles delayed/manual retry, quit and update holds.",
+          "faultMode": "clean-exit"
+        },
+        {
+          "id": "recovery-manual-restart-and-update-hold",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "action": "recover"
+          },
+          "why": "E3-E5: exhaustion is observable; one owner handles delayed/manual retry, quit and update holds.",
+          "faultMode": "clean-exit"
+        },
+        {
+          "id": "recovery-quit-during-delayed-retry",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "action": "recover"
+          },
+          "why": "E3-E5: exhaustion is observable; one owner handles delayed/manual retry, quit and update holds.",
+          "faultMode": "clean-exit"
+        },
+        {
+          "id": "recovery-update-hold-blocks-delayed-retry",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 250
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "action": "recover"
+          },
+          "why": "E3-E5: exhaustion is observable; one owner handles delayed/manual retry, quit and update holds.",
+          "faultMode": "clean-exit"
+        },
+        {
+          "id": "recovery-index-never-ready",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "healthStatus": 503,
+              "controlEssentialReadiness": true
+            }
+          ],
+          "expect": {
+            "action": "explain-not-ready"
+          },
+          "why": "E20: a responsive Engine with no READY index must explain the outage within the startup deadline.",
+          "faultMode": "partial-boot"
+        },
+        {
+          "id": "recovery-long-loop-remains-visible",
+          "drives": [
+            "actuator"
+          ],
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "controlExit": true
+            },
+            {
+              "mode": "honour",
+              "controlExit": true
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "action": "retain-count"
+          },
+          "why": "E19: sustained readiness refills the budget but does not erase the 24-hour crash count.",
+          "faultMode": "clean-exit"
+        },
         {
           "id": "escalated-restart",
           "faultMode": "clean-exit",

@@ -1,3 +1,4 @@
+import { runRecoveryCase } from '../recovery-scenario.mjs';
 import { runLifecycle } from '../lifecycle.mjs';
 import { engineRecords } from './dev-runner.mjs';
 import { signalLinuxProcess } from '../../dev/lib/process-identity.cjs';
@@ -66,10 +67,12 @@ const RESTART_CASES = new Set([
   'requested-restart-completion-failure-is-counted',
 ]);
 
-export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
+export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason, stopOnExhausted = true, failSpawnAt = 0 }) {
   const child = spawn(
     binary,
     [
+      '--fail-spawn-at', String(failSpawnAt),
+      '--stop-on-exhausted', String(stopOnExhausted),
       '--data-dir', dataDir,
       '--fake-engine', io.fakeEngine,
       '--plan', planPath,
@@ -93,6 +96,7 @@ export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAft
 }
 
 export async function runCase({ testCase, policy, io }) {
+  if (testCase.id.startsWith('recovery-')) return runRecoveryCase({ name, testCase, policy, io });
   if (String(testCase.probe).startsWith('updater-')) return runUpdaterHold({ testCase, policy, io });
   if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   const problems = [];
@@ -309,10 +313,10 @@ export async function runCase({ testCase, policy, io }) {
     }
 
     if (testCase.expect.action === 'exhausted') {
-      if (summary.outcome?.kind !== 'exhausted') {
+      if (summary.outcome?.kind !== 'exhausted' && summary.checkpoint?.state !== 'exhausted') {
         problems.push(`outcome ${JSON.stringify(summary.outcome)}, expected exhausted`);
       }
-      if (!String(summary.outcome?.reason ?? '').startsWith('ENGINE_RESTART_EXHAUSTED')) {
+      if (!String(summary.checkpoint?.reason ?? summary.outcome?.reason ?? '').startsWith('ENGINE_RESTART_EXHAUSTED')) {
         problems.push(`terminal reason ${summary.outcome?.reason}, expected ENGINE_RESTART_EXHAUSTED:<why>`);
       }
       if (testCase.id === 'non-transient-2-exhausts-at-once') {

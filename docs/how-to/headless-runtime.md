@@ -98,3 +98,58 @@ curl -s http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
 - Agent clients connect over the production MCP endpoint (`POST /mcp`); which tools a lite
   deployment exposes is governed separately (see the MCP production server reference).
 - This is a launch mode, not a separate build — the same `ui-headless.jar` runs every mode.
+
+## Restart after a crash
+
+Headless runs one Engine JVM. It has no desktop supervisor, cooldown retry, or
+"Restart JustSearch" button. Run it under an OS supervisor if it must recover
+unattended. Exit **2** means another process holds the data directory; leave that
+stopped and resolve the lock instead of repeatedly launching another Engine.
+
+For a Linux user service, save this as
+`~/.config/systemd/user/justsearch.service`, replacing the absolute paths:
+
+```ini
+[Unit]
+Description=JustSearch headless Engine
+
+[Service]
+Type=simple
+Environment=JUSTSEARCH_MODE=headless
+Environment=JUSTSEARCH_DATA_DIR=/absolute/path/to/engine-data
+Environment=JUSTSEARCH_HOME=/absolute/path/to/ai-assets
+ExecStart=/absolute/path/to/ui/bin/ui
+Restart=on-failure
+RestartPreventExitStatus=2
+RestartSec=30
+
+[Install]
+WantedBy=default.target
+```
+
+Run `systemctl --user daemon-reload` and
+`systemctl --user enable --now justsearch.service`. A clean exit stays stopped.
+Use `journalctl --user -u justsearch.service` to inspect a failure.
+
+On Windows, Task Scheduler's **Restart the task if it fails** setting needs a
+launcher that reports exit 2 as success, so the scheduler leaves a locked profile
+alone. Save the following as a `.ps1` file and use it as the task's action with
+`powershell.exe -NoProfile -File "C:\path with spaces\run-justsearch.ps1"`:
+
+```powershell
+$env:JUSTSEARCH_DATA_DIR = 'C:\JustSearch\data'
+$env:JUSTSEARCH_HOME = 'C:\JustSearch\assets'
+& 'C:\Program Files\JustSearch\justsearch-headless.ps1' -Mode headless
+$engineExit = $LASTEXITCODE
+if ($engineExit -eq 2) { exit 0 }
+exit $engineExit
+```
+
+Configure the task to restart after failure (for example, every minute, up to
+three attempts) and **Do not start a new instance** if it is already running.
+A Windows service host can use the same policy: restart after failure, but
+exclude Engine exit 2. Point it at the Engine launcher and preserve the exit code.
+
+Poison-file quarantine belongs inside the Engine and does not depend on the
+shell. Its implementation is a separate change; these OS restart policies do
+not themselves identify or quarantine a crashing file.
