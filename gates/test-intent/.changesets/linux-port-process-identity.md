@@ -18,6 +18,8 @@ R9 script checks (governance self-tests are outside the gate's D4 runner scope):
 
 R10 also strengthens the existing Node helper-census suite (scripts are outside this gate's flagged product-test scope): independent owner and incarnation mismatch checks cover both the shared receipt comparator and stop result; contested logical keys, mismatched tracked obligations, uninventoried PIDs and a matching positive control remain explicit. Two additional cases require duplicate helper starts, with and without native birth, to remain unproven and incomplete. The shared identity proof now requires exactly one helper start; the census no longer collapses separate records. No PID-only kill or Windows accounting rule is added. Evidence: tmp/r10/helper-before-worktree.log, mutation-{owner,incarnation,unique-key}.log, helper-final.log and dev-runner-final.log. Owner source: task t-20261017-9a5f5a user turn 10 items 3–4. These are new durable assertions; no prior assertion is removed or relaxed.
 
+R11 adds one durable New case to the same Node helper-census entry above: a matching rapid-helper exit plus a second exit for the same helper key naming another PID is contested evidence. The helper remains unproven, its tracked obligation unresolved, and stop accounting incomplete. This targets !contested independently of the existing duplicate-start, exact-owner and exact-incarnation guards. Source: task t-20261017-9a5f5a user turn 11 item 3, “an exit for the same key with a different pid”. Removing only !contested in an isolated worktree fails this new assertion (tmp/r11/contested-mutant.log); the restored product passes all 46 cases (tmp/r11/helper-census.log). No existing assertion or production receipt rule changes. Scripts remain outside the gate's flagged product-test scope; this prose records their intent and direct execution evidence.
+
 ```json
 {
   "entries": [
@@ -362,5 +364,16 @@ Independent acceptance pending on the final candidate.
   "verdict": "reject",
   "digest": "sha256:9d4650b6385e98ae0ec16a0938f3d9d62db59585d50f794a5591e2f71061ba9d",
   "note": "Entry 2 (structural rule kept) says no test moves tier and every Windows assertion is retained, but HelperFlushRetryTest (dos:readonly force failure) and LateWindowExitTest (native Windows creation identities) lose @Tag(windows). The Windows-native CI lane (ci.yml windows-native-tests) runs only @Tag(\"windows\") tests via -PwindowsOnly=true, and every other unit lane runs on ubuntu. Removing @Tag(\"windows\") therefore removes these tests' Windows execution from CI: their Windows branches now run in no CI lane. Shown by running the lane's selection on base and candidate: -PwindowsOnly=true selects DrainAndCloseTest, BrowseToolTest, SearchToolTest, AppInstanceLockTest, WindowsPowerStatusTest on 37e0957c9 and none on the candidate; for app-api, --tests HelperFlushRetryTest/LateWindowExitTest with -PwindowsOnly=true succeeds on the base and fails 'No tests found' on the candidate (evidence tmp/verifier-final/32-*). The entry does not say this and claims execution is not moved; rework: keep the Windows tag (e.g. on the Windows-path methods) or state the lane change plainly with a source. The New Linux entries (LinuxChildLifetime, ReapingRace with assertDoesNotThrow, IdentityEncoding, ReapedSpawn, ContainmentBoot, ExitLedgerWriter) and the fixture Adaptation I found accurate; all executed and passed in my run."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-r10-claude",
+  "verdict": "accept",
+  "digest": "sha256:913940c6ecdca22aafc3365a9dfc5b684b4323be7a1ccfd7c81a2416f18b2bf1",
+  "note": "HelperFlushRetryTest and LateWindowExitTest had class-level @Tag(windows) on 37e0957c9; both now carry cross-platform, are selected by the Windows-lane command (dry run) and ran and passed in the default Linux app-api task. Census claims hold: on ce9052fa8 the two duplicate-start cases fail (starts collapsed to one) and pass on acd91ec92; my own behaviour checks show two identical starts with one exit are incomplete after and complete before, and a single proven start stays accounted. My mutants of the unique-key rule, the rapid-branch owner and incarnation match and receiptEnded owner/incarnation/every are caught. Not claimed and not covered: dropping the owner check in nativeHelperWrittenByOwner, the birth-branch incarnation check, !contested in the rapid branch, and isEnded every->some survive the census file (reported separately). Evidence paths under tmp/r10 are the builder's, not in the repository."
 }
 ```

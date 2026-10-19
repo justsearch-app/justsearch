@@ -407,3 +407,18 @@ for (const missingBirth of [false, true]) test('duplicate helper starts remain u
     assert.ok(result.exitAccountingGaps.some(g => g.pid === f.view.helpers[0].pid));
   } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
 });
+
+test('a rapid helper receipt contested by another exit PID leaves the stop incomplete', { skip: !linux }, () => {
+  const f = rapidFixture(x => {
+    x.children.push({ ...x.children[1], seq: 40, pid: 2399999 });
+  }); try {
+    const helper = f.view.helpers[0];
+    assert.equal(helper.proof, null, 'a matching exit cannot override a contradicting exit of the same key');
+    const resolution = census.ledgerResolution(f.view);
+    assert.equal(resolution.isEnded({ ...helper, role: 'native-helper' }), false);
+    assert.ok(resolution.unproven.some(p => p.pid === helper.pid));
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    assert.equal(result.exitAccountingComplete, false, 'the contested receipt must keep the stop incomplete');
+    assert.ok(result.exitAccountingGaps.some(g => g.pid === helper.pid));
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});

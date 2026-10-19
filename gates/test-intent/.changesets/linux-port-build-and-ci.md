@@ -18,7 +18,7 @@ These entries cover the whole Linux port relative to origin/main, including prio
       ],
       "class": "Structural rule kept",
       "rule": "The Windows-native lane keeps every baseline-selected class and the default Linux tasks retain portable cases; neither host loses a unit assertion or moves it to a later tier.",
-      "whySurvives": "The host predicate is shared through HostPlatform. Windows-only selection now includes the union of windows and cross-platform, the latter applied only to the eight formerly Windows-tagged classes ported to Linux. Linux default selection still excludes only windows. R10 baseline/candidate discovery selects the same 24 classes for the complete Windows lane, with zero added or missing classes. This repairs the intermediate loss of Windows lane coverage while preserving Linux coverage.",
+      "whySurvives": "The host predicate is shared through HostPlatform. Windows-only selection now includes the union of windows and cross-platform, the latter applied only to the eight classes containing formerly Windows-tagged tests ported to Linux. Linux default selection still excludes only windows. R10 baseline/candidate discovery selects the same 24 classes for the complete Windows lane, with zero added or missing classes. This repairs the intermediate loss of Windows lane coverage while preserving Linux coverage. Class selection matches baseline; method selection expands for DrainAndCloseTest, whose single method-level windows tag became a class-level cross-platform tag: all five existing methods now run in the Windows lane, four more than baseline.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -221,6 +221,21 @@ These entries cover the whole Linux port relative to origin/main, including prio
           "location": "task t-20261017-9a5f5a user turn 10"
         }
       ]
+    },
+    {
+      "items": [
+        "scripts/ci/test-evidence-policy.v1.json"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Every JUnit evidence tag declares a truthful owner, purpose and cadence; registration does not skip or defer any unit test.",
+      "whySurvives": "Register cross-platform beside windows to describe the existing Windows-native union selector and default Linux unit execution. This repairs the missing policy declaration; no CI skip, tag filter, test selection or per-test assertion changes. Windows-only methods retain their windows tag and OS prerequisites. The policy fails before with the missing tag and passes after registration.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261017-9a5f5a user turn 11",
+          "quote": "Register the tag in scripts/ci/test-evidence-policy.v1.json (follow how \"windows\" is described there) and run the check that reads it locally until it passes"
+        }
+      ]
     }
   ]
 }
@@ -238,5 +253,16 @@ Independent acceptance pending on the final candidate.
   "verdict": "accept",
   "digest": "sha256:00679b4bf38d46025889bf19d3b0756c58254fe9ea0029f4b97dfc62c62d65cb",
   "note": "Read base JvmBaseConventionsPlugin/test tasks and shard policy first. HostPlatform.isWindows is the same os.name contains-windows predicate; windows-tag exclusion, windowsOnly includeTags, TestGate and every lane test coordinate are unchanged; added items are a Linux cc helper task, a configuration test output declaration, descriptor packaging and an eval JavaExec contract moved to scripts/dev/lib/eval-launch.cjs (same env/sysprops, JFR, ORT profiling, GPU default when ORT path found). Note: the build files themselves keep lane selection, but other changesets remove @Tag(windows) from test classes; see those rejections."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-r10-claude",
+  "verdict": "accept",
+  "digest": "sha256:ed110d7e8a922c502337a4d52d8422ed83f41d5f33311ece22209eaa7f22046c",
+  "note": "Checked against the diff from 257aa8e1b and from ce9052fa8. windowsOnly now includes windows and cross-platform; default (non-windowsOnly) selection is textually unchanged. My dry-run discovery of the exact Windows-lane Gradle command selects 24 classes on 37e0957c9 and the same 24 on acd91ec92 (no missing class or method; DrainAndCloseTest grows 1->5 methods), and default-mode discovery is identical to ce9052fa8 (1709 classes, 10330 methods). Shell Rust job: Windows leg keeps the exact name and its conformance steps; the Linux leg runs cargo test --lib with GTK deps and the staged bound-exec helper (150 passed locally and in hosted run 39179433000, all 7 Linux-only cfg tests ran). app-ui cap 35->45 is the only timeout change. Windows execution of the lane itself was still pending in hosted CI when accepted."
 }
 ```

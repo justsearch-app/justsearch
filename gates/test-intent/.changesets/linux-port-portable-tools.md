@@ -108,3 +108,14 @@ Independent acceptance pending on the final candidate.
   "note": "BrowseToolTest and SearchToolTest lose @Tag(windows); their Windows path-literal assertions (drive letters, not-an-absolute-path reason) are now selected by nativeText only on a Windows host. The Windows-native CI lane (ci.yml windows-native-tests) runs only @Tag(\"windows\") tests via -PwindowsOnly=true, and every other unit lane runs on ubuntu. Removing @Tag(\"windows\") therefore removes these tests' Windows execution from CI: their Windows branches now run in no CI lane. Shown by running the lane's selection on base and candidate: -PwindowsOnly=true selects DrainAndCloseTest, BrowseToolTest, SearchToolTest, AppInstanceLockTest, WindowsPowerStatusTest on 37e0957c9 and none on the candidate; for app-api, --tests HelperFlushRetryTest/LateWindowExitTest with -PwindowsOnly=true succeeds on the base and fails 'No tests found' on the candidate (evidence tmp/verifier-final/32-*). The entry does not say this and claims execution is not moved; rework: keep the Windows tag (e.g. on the Windows-path methods) or state the lane change plainly with a source. Otherwise the Linux branch and the /how-to outside-root reason look right (the entry says /docs; the case is /how-to)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-r10-claude",
+  "verdict": "accept",
+  "digest": "sha256:1969c5b5f1bdc66a27f76180cd4d14c490c7a6ae380cebf798703060b875ccde",
+  "note": "BrowseToolTest and SearchToolTest had class-level @Tag(windows) on 37e0957c9 and now carry class-level cross-platform; dry-run discovery of the Windows-lane command selects both classes with the same 31 and 54 cases as the baseline, and the default Linux app-agent task ran and passed all 31 and 54 (my run). The negative case is /how-to (BrowseToolTest line 280), as the entry now says. Tier stays unit; lane statement matches."
+}
+```

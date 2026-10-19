@@ -22,7 +22,7 @@ These entries cover the whole Linux port relative to origin/main, including prio
       ],
       "class": "Structural rule kept",
       "rule": "Retain every original assertion in the unit tier; restore baseline Windows-native lane membership and add Linux unit-lane execution for portable OS branches.",
-      "whySurvives": "The intermediate port removed class-level windows tags and unintentionally lost Windows CI execution. R10 adds the shared cross-platform tag to DrainAndCloseTest, WindowsPowerNotificationsTest, AppInstanceLockTest and WindowsPowerStatusTest, and the Windows lane selects its union with windows. The lane again selects exactly the baseline class set, while default Linux tasks retain these portable cases. Windows-only native notification methods keep their windows tag and OS preconditions. NoDeviceTokenizerCacheTest retains its existing model/CUDA preconditions. No behavioral assertion is removed or loosened; no case moves to a later tier.",
+      "whySurvives": "The intermediate port removed class-level windows tags from WindowsPowerNotificationsTest, AppInstanceLockTest and WindowsPowerStatusTest. DrainAndCloseTest instead had a method-level windows tag only on drainAndCloseWaitsForInFlightWriter; its other four methods were untagged. R10 applies cross-platform at class level to all four classes, selected alongside windows by the Windows-native lane and left enabled by default Linux tasks. The lane selects the same baseline class set, but not the same method set: DrainAndCloseTest now contributes five Windows-lane methods instead of one, so its other four existing methods gain Windows CI execution. This expands host coverage within the unit tier; no behavioral assertion is removed or loosened and no case moves to a later tier. Windows-only native notification methods keep their windows tag and OS preconditions. NoDeviceTokenizerCacheTest retains its existing model/CUDA preconditions.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -56,6 +56,11 @@ These entries cover the whole Linux port relative to origin/main, including prio
           "kind": "owner-words",
           "quote": "Restore Windows execution of every class that ran in that lane on the baseline, keep them running on Linux, and fix it generally (the selection rule, not a per-class exception)",
           "location": "task t-20261017-9a5f5a user turn 10"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261017-9a5f5a user turn 11",
+          "quote": "for DrainAndCloseTest the tag was on one method only, and four more of its methods now run in the Windows lane"
         }
       ]
     },
@@ -435,5 +440,16 @@ Independent acceptance pending on the final candidate.
   "verdict": "reject",
   "digest": "sha256:4015e75cb0acde68debfac9516fc4bd623f8e3eb69633ab882514383342210a3",
   "note": "Entry 1 (DrainAndCloseTest, AppInstanceLockTest, WindowsPowerStatusTest) says tests are not moved to another tier. The Windows-native CI lane (ci.yml windows-native-tests) runs only @Tag(\"windows\") tests via -PwindowsOnly=true, and every other unit lane runs on ubuntu. Removing @Tag(\"windows\") therefore removes these tests' Windows execution from CI: their Windows branches now run in no CI lane. Shown by running the lane's selection on base and candidate: -PwindowsOnly=true selects DrainAndCloseTest, BrowseToolTest, SearchToolTest, AppInstanceLockTest, WindowsPowerStatusTest on 37e0957c9 and none on the candidate; for app-api, --tests HelperFlushRetryTest/LateWindowExitTest with -PwindowsOnly=true succeeds on the base and fails 'No tests found' on the candidate (evidence tmp/verifier-final/32-*). The entry does not say this and claims execution is not moved; rework: keep the Windows tag (e.g. on the Windows-path methods) or state the lane change plainly with a source. WindowsPowerStatusTest is a pure truth table, so only the lane is wrong there; AppInstanceLockTest's Windows process-liveness branch and DrainAndCloseTest on the Windows filesystem lose Windows CI coverage. The other entries (fake executable mode, statusOwner fixture, Tesseract C fixture, tuple fixtures, BgeM3 resolver) I found accurate."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-r10-claude",
+  "verdict": "reject",
+  "digest": "sha256:b12d808d19639bc59bcc38a13bc4fb4caac0dcb8f1b9769a481952a91a60b1a8",
+  "note": "Selection repair verified (dry-run discovery of the Windows-lane command: same 24 classes as 37e0957c9; the four classes run and pass in default Linux tasks). But the entry says the intermediate port removed class-level windows tags and that the lane again selects exactly the baseline set. For DrainAndCloseTest the baseline tag was on one method (drainAndCloseWaitsForInFlightWriter) only; the port removed that method tag and R10 tags the whole class cross-platform, so the Windows-native lane now runs 5 methods where the baseline ran 1. That CI-lane expansion is not stated. Rework: say DrainAndCloseTest's Windows tag was method-level and that its other four methods now also run in the Windows-native lane. The other three classes and NoDeviceTokenizerCacheTest are described accurately."
 }
 ```
