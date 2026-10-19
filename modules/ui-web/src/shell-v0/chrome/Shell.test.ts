@@ -46,6 +46,7 @@ import { subscribeMemberTab } from '../router/memberTabIntent.js';
 import {
   restoreSearch,
   serializeSearch,
+  resetSearchState,
 } from '../state/searchState.js';
 import { getInspectorState, resetInspectorState } from '../state/inspectorState.js';
 import type { SettingsWindow } from './SettingsWindow.js';
@@ -186,6 +187,7 @@ describe('Shell — slice 492 substrate integration', () => {
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    resetSearchState();
     __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();

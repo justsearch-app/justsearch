@@ -30,7 +30,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Add the explicitly named cross-platform/windows class tags from CC4. All assertions, OS guards, assumptions, prerequisites and timeouts remain byte-identical. Canonicalize AppInstanceLockFailureTest’s temporary directory before each test so FileChannel.open injection matches the production toRealPath path on Windows as well as Linux. Portable classes retain their normal Linux coverage; native-only classes keep their OS-specific prerequisites. Windows scheduling expands to configuration and indexer-worker.",
+      "whatMoved": "Add the explicitly named cross-platform/windows class tags from CC4. All assertions, OS guards, assumptions, prerequisites and timeouts remain byte-identical. Canonicalize AppInstanceLockFailureTest\u2019s temporary directory before each test so FileChannel.open injection matches the production toRealPath path on Windows as well as Linux. Portable classes retain their normal Linux coverage; native-only classes keep their OS-specific prerequisites. Windows scheduling expands to configuration and indexer-worker.",
       "sources": [
         {
           "kind": "owner-words",
@@ -69,7 +69,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Retain all test bodies and assertions except lifecycle cleanup additions: explicit unavailable-backend fetch fixtures replace accidental real HTTP requests in render/event tests; per-test transport overrides still win. Cancel pending search work before restoring transport fixtures, restore real timers, and await the Shell click persistence queue before its fixture is removed. No tests, expected values, fault injections or selection filters are removed.",
+      "whatMoved": "Retain all test bodies and assertions except lifecycle cleanup additions: explicit unavailable-backend fetch fixtures replace accidental real HTTP requests in render/event tests; per-test transport overrides still win. Cancel pending search work, including Shell URL-restore staging, before restoring transport fixtures, restore real timers, and await the Shell click persistence queue before its fixture is removed. No tests, expected values, fault injections or selection filters are removed.",
       "sources": [
         {
           "kind": "owner-words",
@@ -95,6 +95,43 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
           "location": "task ci-coverage request"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/__test-setup__/streamViaHostSuppress.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Shared Vitest cleanup waits for pending dynamic imports with vi.dynamicImportSettled before disposing each test environment. Preserve the production selectionState lazy dependency graph from main instead of making it static. No exception is ignored or filtered and every existing assertion is retained.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Fix the causes: work still running or importing after a test ends.",
+          "location": "task ci-coverage request"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/__test-setup__/dynamicImportLifetime.test.ts",
+        "modules/ui-web/src/__test-setup__/__fixtures__/delayedImport.ts"
+      ],
+      "class": "New",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Fix the causes: work still running or importing after a test ends.",
+          "location": "task ci-coverage request"
+        }
+      ],
+      "behaviour": "A detached dynamic import and its completion callback finish before the test environment is disposed; deliberately delayed module evaluation must complete before the next test starts.",
+      "repaired": true,
+      "newChecks": [
+        "modules/ui-web/src/__test-setup__/dynamicImportLifetime.test.ts"
+      ],
+      "evidence": "gates/test-intent/evidence/ci-coverage-import-lifetime.json"
     }
   ]
 }
@@ -116,8 +153,8 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
 - Network tracing identified incidental conversation/live-run, feedback/settings, condition-index,
   schema, source-content and session reads in render tests, plus pending search timers and a queued
   Shell mode write. Explicit transport fixtures and cleanup keep their existing unavailable-backend
-  path without opening sockets. The selection registry is loaded with selectionState, preserving
-  deferred projection with a microtask instead of a late dynamic import.
+  path without opening sockets. The initial candidate loaded the selection registry with selectionState; round four supersedes
+  that production change with shared test cleanup, preserving main’s lazy import graph.
 - Fourteen CI inventory/guard/reporter tests and checks pass. Collector tests pass 2/2, covering
   Engine/embedded-worker, supervisor, fixture and isolated boot logs; tail and total size bounds;
   omitted files; and symlink/junction exclusion. No separate Worker process exists on this baseline.
@@ -172,5 +209,38 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
 - Against the merge-base, the dead-code gate reports two remaining unused exports (both retained
   source callers above). The test-intent entries all validate; independent acceptance is absent
   as instructed. Neither gate's baseline nor enforcement is changed.
+
+## Round four
+
+- Knip config is unchanged from the merge-base: explicit mock/script entries plus Vite/Vitest plugin
+  entry points; src/** is the project inventory, not a promise to count imports from unused files.
+  Both coreSelectionActions.ts and SelectionActionsMenu.ts are whole-file-unused findings on main
+  and this branch. Their imports therefore do not consume reachable exports.
+- Main’s import(...).then(...) is opaque to installed Knip: imports.js handleImportExpression
+  sets IMPORT_FLAGS.OPAQUE, and graph-explorer/operations/is-referenced.js treats that as a
+  reference to every export. The static named import removed that opaque reference and exposed
+  the two existing unreachable exports. Reports and unchanged config comparisons are retained
+  under tmp/ci-coverage/round4/. Main’s dead-code gate exits 0; the preceding candidate exits 1.
+- Restore selectionState.ts byte-for-byte to the merge-base, preserving the existing production
+  lazy dependency and cycle boundary. Fix the test lifetime at its owner: shared afterEach waits
+  for dynamic imports, including nested work, before environment disposal. A delayed-import
+  regression fails before that cleanup and passes after. No Knip allowlist, configuration,
+  baseline or enforcer change is made.
+- Repository-wide base/current searches find no external consumers of unregisterSelectionAction,
+  __resetSelectionActionsForTest or SelectionActionPresentation. The first two stay removed;
+  SelectionActionPresentation remains an internal interface. Both used value exports are retained.
+
+- The evidence runner records an assertion failure before cleanup and both new lifecycle cases
+  passing after it. Its focused runs used VITEST_MAX_WORKERS=4 (the installed Vitest configuration
+  maps that environment variable to maxWorkers). A separate deliberate rejected-import probe
+  still exits 1 with one unhandled error while its test passes: cleanup does not suppress errors.
+- Local typecheck and lint pass. The dead-code gate passes; test-intent has only the expected
+  missing independent acceptance record. All flagged changes and new evidence validate.
+
+- The one final local full run exits 0: 530 files / 6,888 tests, zero teardown errors.
+  It exposed a staged search timer left by Shell’s URL-restore test: one real socket to
+  localhost:3000/api/knowledge/search produced two logged AggregateErrors. Cancel that search
+  through resetSearchState in the owning Shell cleanup before restoring fetch. Focused verification after the timer cleanup passes all 23 files / 471 tests with zero socket
+  connections, connection errors or teardown errors. The full suite is not repeated locally.
 
 Independent verification remains outstanding. No acceptance record is authored here.
