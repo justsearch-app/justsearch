@@ -166,6 +166,8 @@ console.log('test-verify-unit-test-shard-policy: PASS');
     text.replace(' = success && test "$TWO_RESULT" = success', ' = success || true'),
     text.replace('  two:\n', '  two:\n    continue-on-error: true\n'),
     text.replace('  two:\n', '  two:\n    if: false\n'),
+    text.replace('      - run: true', '      - run: true\n        continue-on-error: true'),
+    text.replace('      - run: true', '      - run: true\n        if: false'),
   ]) assert.equal(check(altered).ok, false, altered);
 }
 
