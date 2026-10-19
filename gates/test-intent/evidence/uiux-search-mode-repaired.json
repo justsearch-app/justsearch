@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T16:20:23.363Z",
+  "revision": "23aec3f3b863c6b1f4c71f5d78c7368219f11613",
+  "tree": "08bc7421d33f91da6317743d10d46a96fb123d46",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-3aiusjcn/tmp/test-intent-vitest-2889322-1792426819543.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1231
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#says the file is no longer in the index, not a bare status code",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d7e07d1886b54ce3b164eec0cb3e9fb861f6e5593c905739db3684476c53da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DocumentPane — a document the index no longer has (WP1.1 S1.5) says the file is no longer in the index, not a bare status code",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c933b207fd03",
+    "revision": "c933b207fd035b1c301aab5c33fc57db9af1a57a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-3aiusjcn/tmp/test-intent-vitest-2889322-1792426821999.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1209,
+        "output": "JSON report written to /home/elias/.cache/agent-method/sessions/agent-session-3aiusjcn/tmp/test-intent-vitest-2889322-1792426821999.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#says the file is no longer in the index, not a bare status code",
+        "classification": "assertion",
+        "detail": "DocumentPane — a document the index no longer has (WP1.1 S1.5) says the file is no longer in the index, not a bare status code:  AssertionError: expected 'HTTP 404' to contain 'no longer in your index'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-search-mode/tmp/evidence-work/test-intent-before-gzpKrj/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts:278:32\n    at runNextTicks (node:internal"
+      }
+    ]
+  },
+  "digest": "sha256:eb49794c64d39a8e7bed91682d5abe07fc8013de2512b6346a7617c068bf64a5"
+}

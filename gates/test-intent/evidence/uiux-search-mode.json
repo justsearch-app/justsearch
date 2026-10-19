@@ -1,0 +1,871 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T16:20:12.708Z",
+  "revision": "23aec3f3b863c6b1f4c71f5d78c7368219f11613",
+  "tree": "8656beb18db0f535a9dbc53ef1df5ce9474f12bd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.tier.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-3aiusjcn/tmp/test-intent-vitest-2884340-1792426808896.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3802
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#starts in Search, says so to assistive tech, and words what Enter does",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing starts in Search, says so to assistive tech, and words what Enter does",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#restores the draft into the composer without searching, asking or delegating",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing restores the draft into the composer without searching, asking or delegating",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps Shift+Enter a newline and an IME Enter the IME’s, in Search mode too",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing keeps Shift+Enter a newline and an IME Enter the IME’s, in Search mode too",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not search a half-composed IME string, and searches once composition ends",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing does not search a half-composed IME string, and searches once composition ends",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#sends the quick pass while typing and the refined pass on settle, through the one intent seam",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.3 — the same staged searches the default window sends, and no turn sends the quick pass while typing and the refined pass on settle, through the one intent seam",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#runs the full pass at once on Enter, superseding the staged ones",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.3 — the same staged searches the default window sends, and no turn runs the full pass at once on Enter, superseding the staged ones",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#typing in Ask mode issues no search at all",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.3 — the same staged searches the default window sends, and no turn typing in Ask mode issues no search at all",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#types, lists, selects and opens; Ask keeps the query and states the reason",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.4 — with chat unavailable, Search works and every ask says why it cannot types, lists, selects and opens; Ask keeps the query and states the reason",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#renders the shared card, opens a hit in the pane, and keeps a multi-file choice",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.5 — results use the shared results card and open in the document pane renders the shared card, opens a hit in the pane, and keeps a multi-file choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#sends the chosen documents as paths, each document once",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files sends the chosen documents as paths, each document once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#fixes the set when asked: a later re-rank or filter does not change it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files fixes the set when asked: a later re-rank or filter does not change it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a chosen row that a new result list no longer holds — visibly",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files drops a chosen row that a new result list no longer holds — visibly",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#offers no ask about an empty choice, and never sends an empty set as a whole-index ask",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files offers no ask about an empty choice, and never sends an empty set as a whole-index ask",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#scopes \"Ask about this file\" from the card menu to that one document",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files scopes \"Ask about this file\" from the card menu to that one document",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not carry the files into a later ordinary Ask",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later does not carry the files into a later ordinary Ask",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a prepared scope on New session",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later drops a prepared scope on New session",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#Retry of a scoped answer keeps the same files, and says so",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later Retry of a scoped answer keeps the same files, and says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#after a reload the turn does not look scoped, and Retry/Edit say they search all files",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later after a reload the turn does not look scoped, and Retry/Edit say they search all files",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#leaves a streaming answer streaming, in the sidebar, and reopens it with one click",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.8 — a search shows results and keeps the conversation one click away leaves a streaming answer streaming, in the sidebar, and reopens it with one click",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#never steers a live delegated run",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.8 — a search shows results and keeps the conversation one click away never steers a live delegated run",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#stops showing the previous rows the moment the query changes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.9 — an older query’s results are never shown as the current ones stops showing the previous rows the moment the query changes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows nothing for a cleared query, even when the earlier request answers late",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.9 — an older query’s results are never shown as the current ones shows nothing for a cleared query, even when the earlier request answers late",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#says \"no documents matched\" and \"search failed\" in different words",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.9 — an older query’s results are never shown as the current ones says \"no documents matched\" and \"search failed\" in different words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows a scope chip the default window pinned, and removing it re-runs the search unrestricted",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — nothing restricts results invisibly shows a scope chip the default window pinned, and removing it re-runs the search unrestricted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps a facet filter removable when it leaves zero hits",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — nothing restricts results invisibly keeps a facet filter removable when it leaves zero hits",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows a date range set elsewhere, and clears it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — nothing restricts results invisibly shows a date range set elsewhere, and clears it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#follows a search made in the other window when the reader comes back",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query follows a search made in the other window when the reader comes back",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows the shared query on a first entry, in the composer and in the list",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query shows the shared query on a first entry, in the composer and in the list",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#returns to the list with the shared query after a conversation, too",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query returns to the list with the shared query after a conversation, too",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#never overwrites an unsent Ask draft; Search mode then searches what the composer holds",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query never overwrites an unsent Ask draft; Search mode then searches what the composer holds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps a restored draft on a first entry and shows no list it would contradict",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query keeps a restored draft on a first entry and shows no list it would contradict",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#has no developer \"Search this text\" entry, and \"Search everything\" shows results",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.11 — the palette’s search uses Search mode has no developer \"Search this text\" entry, and \"Search everything\" shows results",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps the results, the query and the chosen scope with the results, and none in the conversation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b0035cf64ef79c81a9d5af587243cbdd2a4f5387c4cc4417db1aa45ad7dc610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.13 — Back and Forward between results and a conversation keeps the results, the query and the chosen scope with the results, and none in the conversation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#lists Search, Ask and Delegate, in that order",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 — the composer offers three modes, Search first and by default lists Search, Ask and Delegate, in that order",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#starts a fresh window in Search (S1.2) and badges it as the default",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 — the composer offers three modes, Search first and by default starts a fresh window in Search (S1.2) and badges it as the default",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#labels Search by what it does and claims nothing about AI",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 — the composer offers three modes, Search first and by default labels Search by what it does and claims nothing about AI",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is always the search control, even while a run holds a decision or is running",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends is always the search control, even while a run holds a decision or is running",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the standing stop beside it while something is running — a search stops nothing",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends keeps the standing stop beside it while something is running — a search stops nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#names the delegate chord only when the chord would actually delegate",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends names the delegate chord only when the chord would actually delegate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#says a scoped Ask asks about the chosen files, and that the delegate chord leaves them behind",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends says a scoped Ask asks about the chosen files, and that the delegate chord leaves them behind",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#counts several hits from one document once, in first-seen order",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set counts several hits from one document once, in first-seen order",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#takes only chosen rows, never the rest of the list",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set takes only chosen rows, never the rest of the list",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#refuses an empty choice, ids that are not on screen, and hits with no path",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set refuses an empty choice, ids that are not on screen, and hits with no path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#drops chosen rows that left the list, and keeps the same set when nothing left",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set drops chosen rows that left the list, and keeps the same set when nothing left",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#words the act and the scope by document count",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set words the act and the scope by document count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the same files when the turn carries its scope, and says all files when it does not",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.7 — a re-send says what it will search keeps the same files when the turn carries its scope, and says all files when it does not",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is stale while the store holds a newer query than the one its rows answered",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6433829c3daf8b3a1bdc90056f24f4252f0aa79b5591cf537329eb97d4d68f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.9 — results of an older query are never the current ones is stale while the store holds a newer query than the one its rows answered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#a plain click opens and leaves the selection alone",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:42593ddc439c053b3408994af2d2863d41c486e3b53a0a63b03154459ae182c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ResultsCard — selection-mode=\"explicit\": opening a hit never discards the choice (WP1.1 S1.5) a plain click opens and leaves the selection alone",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#Ctrl and Shift choose without opening, and Shift ranges from the row read last",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:42593ddc439c053b3408994af2d2863d41c486e3b53a0a63b03154459ae182c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ResultsCard — selection-mode=\"explicit\": opening a hit never discards the choice (WP1.1 S1.5) Ctrl and Shift choose without opening, and Shift ranges from the row read last",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#the row menu opens without choosing, and offers choosing to the keyboard",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:42593ddc439c053b3408994af2d2863d41c486e3b53a0a63b03154459ae182c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ResultsCard — selection-mode=\"explicit\": opening a hit never discards the choice (WP1.1 S1.5) the row menu opens without choosing, and offers choosing to the keyboard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#keeps the status for any other failure",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d7e07d1886b54ce3b164eec0cb3e9fb861f6e5593c905739db3684476c53da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DocumentPane — a document the index no longer has (WP1.1 S1.5) keeps the status for any other failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#lights no row for a search — a search is not a turn, and leaves the conversation one click away",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52136b8daaf4aee0aa30b339c4a4faa2404a033bb2515b7fc87b86d88f5afee2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the in-motion dot belongs to the running session alone lights no row for a search — a search is not a turn, and leaves the conversation one click away",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#searches on the default tier — no ask, no agent — and asks on the ask tier",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c4f1642ab02a7426168eee4cfdf5af8a764e0a592803049567ea29ab85c857f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the control and the chord are the same act searches on the default tier — no ask, no agent — and asks on the ask tier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#sends plain Enter at the CHOSEN tier — the mode governs the default key",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c4f1642ab02a7426168eee4cfdf5af8a764e0a592803049567ea29ab85c857f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the accelerator keeps its meaning sends plain Enter at the CHOSEN tier — the mode governs the default key",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#names the key that now runs, in every mode",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c4f1642ab02a7426168eee4cfdf5af8a764e0a592803049567ea29ab85c857f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the routing explanation follows the mode names the key that now runs, in every mode",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#yields the ask tier reason for the delegate tier when the mode changes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c4f1642ab02a7426168eee4cfdf5af8a764e0a592803049567ea29ab85c857f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the notice states the CHOSEN tier availability yields the ask tier reason for the delegate tier when the mode changes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:7c04cacb12eb47dd45e6419a35a17faf9b4bdbd97f7f1c1762c60dab5c30024b"
+}
