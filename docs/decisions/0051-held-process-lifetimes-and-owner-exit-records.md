@@ -2,7 +2,7 @@
 title: "ADR-0051: Held process lifetimes and owner-recorded exits"
 type: decision
 status: stable
-description: "Every service process lives inside its owner's kill-on-close job, so nothing outlives the process that started it; the chat server is no longer adopted across Engine restarts; every stop is recorded by its owner with a reason before it happens, and instruments classify exits from those records instead of from exit codes."
+description: "Every service process is bound to its owner's lifetime, so nothing outlives the process that started it: on Windows through the owner's kill-on-close job, on Linux through PR_SET_PDEATHSIG set by the bound-exec helper. The chat server is no longer adopted across Engine restarts; every stop is recorded by its owner with a reason before it happens, and instruments classify exits from those records instead of from exit codes."
 date: 2026-10-05
 amends:
   - "0049-one-engine-jvm-and-the-boundaries-that-survive.md"

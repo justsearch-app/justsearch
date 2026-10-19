@@ -179,7 +179,7 @@ Accepted publication `agent-utility-hero-2026-07-28` (record `c5a75457b264`, pol
 
 > Prereqs to **build + test**: **JDK 25** (the Gradle toolchain auto-resolves it) and **Node.js 24** (for the
 > `modules/ui-web` frontend). Building/contributing needs **no GPU, no Rust toolchain, and no model
-> download**; the ~9 GB models below are runtime-only (fetched on first *run* of the app).
+> download**; the ~9 GB models below are runtime-only (the installed app downloads them with your consent).
 
 ```bash
 git clone https://github.com/justsearch-app/justsearch && cd justsearch
@@ -194,9 +194,11 @@ search path. Keep ORT's CUDA 12 dependencies available even if llama-server uses
 version.
 
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
-Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). First run
-downloads the models once (**~9 GB** — the ~5.9 GB local chat model dominates; fetched from GitHub Releases +
-HuggingFace), then runs fully offline.
+Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). The installed
+app downloads the models once on first launch, with your consent (**~9 GB** — the ~5.9 GB local chat model
+dominates; fetched from GitHub Releases + HuggingFace), then runs fully offline. Running from source does
+not download them: keyword search works without models, and `node scripts/dev/doctor.mjs` names the step
+to the next tier.
 
 ## Architecture
 
