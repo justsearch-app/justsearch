@@ -607,3 +607,14 @@ No acceptance record is supplied by the builder.
   "note": "Reviewed sources and baseline tests before the diff; fresh execution evidence matches committed results. Test-intent acceptance only; the independent live-recovery regression is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-np0ocnyn",
+  "verdict": "reject",
+  "digest": "sha256:c69ca94d31270767c08b568499a9609c89e70b05eece9fd50c607a177014b759",
+  "note": "Reject the New entry for AgentSessionController.test.ts: steer names a connection failure as such, not as a finished run, and steer names an HTTP error other than 404 by its status both require the unsupported final claim It was not applied. AS2 requires honest outcomes; a failed response does not establish non-application. The real API/browser loss-of-response probe accepts the direction with HTTP 200 and applies it once, while the UI emits that false claim. Missing coverage and intent warrant: acceptance before response loss, and an uncertain response outcome. The HTTP-500-after-acceptance variation was not exercised live. Earlier acceptance is superseded by this independently discovered counterexample; other evidence classifications still match."
+}
+```
