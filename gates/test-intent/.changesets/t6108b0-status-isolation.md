@@ -158,3 +158,14 @@ Pending independent verification; no acceptance record written by the builder.
   "note": "ST1-ST5 pass on 8aa5200fe (test code identical in 6b1bbabbe); accepted trade-off: lane aging uses the injected clock, so a real-clock watchdog defect (M3) is no longer caught"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-g-status-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:a7a2a1cbe7d4b397b09596b0b3cb25c22380d3f85192ec7e3dd9a9a24b90efe2",
+  "note": "Adaptation agreed; own stale-lane direct-RPC mutant killed in 7/7; stated trade-off confirmed: real-clock 15 s watchdog mutant killed by old test, survives new"
+}
+```
