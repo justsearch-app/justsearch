@@ -7,7 +7,7 @@ author-session: 01a155b0-4bce-7aa0-bf6f-a919b0071e8e
 
 # Test-intent entries
 
-All expectations below come from the supplied builder assignment's user-adopted scenarios.
+All expectations below come from the supplied builder assignment's scenarios chosen by the orchestrator under the owner's written delegation.
 Existing expectations remain intact. Repair evidence includes assertion failures on the starting origin/main (892243645459);
 preservation checks also run in a shared baseline clone (external build log in the handover).
 Before-state evidence uses isolated shared clones through a temporary git adapter, with no
@@ -24,24 +24,41 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "Incomplete, undecryptable and unreadable loads refuse mutations and reads without changing the file; each access retries once; recovery restores all fields and same/new-ID cardinality. A symlink loop is indeterminate existence; removing it proves first-run absence.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, no read presents a partial or empty set as complete.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, no read presents a partial or empty set as complete.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Key publication before the listener runs: neither a mutation nor a read in that window persists or reports a partial or empty set. Both orderings are exercised with barriers, then a reload compares content. Concurrent lock or unlock completes within a bound, with no deadlock between the key manager's monitor and the store's.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Key publication before the listener runs: neither a mutation nor a read in that window persists or reports a partial or empty set. Both orderings are exercised with barriers, then a reload compares content. Concurrent lock or unlock completes within a bound, with no deadlock between the key manager's monitor and the store's.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "defect-source",
+          "safeguard": "no data loss",
+          "reproduction": "A memory.json with one valid record followed by a record missing its ID leaves a partial cache after unlock; subsequent mutations must not persist that cache over the existing file. gates/test-intent/evidence/memory-load-store.json, failBefore.checks: FileMemoryStoreAvailabilityTest#failedPartialLoadRefusesEveryAccessAndRecovers records an assertion failure because an access did not throw."
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-store.json",
@@ -63,34 +80,57 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "Real DataKeyManager transitions reject failed loads and automatically recover. Barriers exercise read-first and write-first access before the listener while unlock owns its monitor, bounded futures catch deadlocks, and disk reload preserves old and new records. Repeated unlock fires no listener.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, no read presents a partial or empty set as complete.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, no read presents a partial or empty set as complete.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Key publication before the listener runs: neither a mutation nor a read in that window persists or reports a partial or empty set. Both orderings are exercised with barriers, then a reload compares content. Concurrent lock or unlock completes within a bound, with no deadlock between the key manager's monitor and the store's.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Key publication before the listener runs: neither a mutation nor a read in that window persists or reports a partial or empty set. Both orderings are exercised with barriers, then a reload compares content. Concurrent lock or unlock completes within a bound, with no deadlock between the key manager's monitor and the store's.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Every transition into unlocked holds M1-M3: unlock with the passphrase, unlock with the recovery key, setup with existing plaintext memories, and a passphrase change while locked. A repeated unlock while already unlocked does not fire listeners, so it is not a recovery path.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Every transition into unlocked holds M1-M3: unlock with the passphrase, unlock with the recovery key, setup with existing plaintext memories, and a passphrase change while locked. A repeated unlock while already unlocked does not fire listeners, so it is not a recovery path.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Lock, unlock and lock again: no mutation while locked, and nothing written on lock.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Lock, unlock and lock again: no mutation while locked, and nothing written on lock.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "defect-source",
+          "safeguard": "no data loss",
+          "reproduction": "Publish the real DataKeyManager key while its listener is paused, then remember a new ID before the listener runs and reload the file. gates/test-intent/evidence/memory-load-services.json, failBefore.checks: MemoryUnlockAvailabilityTest#writeFirstBeforeListenerLoadsExistingMemories records an assertion failure comparing the expected old and new records with the reloaded records. The same evidence records a failed refusal after unlock in #everyUnlockTransitionGuardsFailedLoads."
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-services.json",
@@ -109,19 +149,33 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "Concurrent automatic extraction after a partial load completes without throwing, logs one unavailable warning, preserves bytes, and core_remember fails. A recovery through a different caller starts a fresh log episode.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, no read presents a partial or empty set as complete.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, no read presents a partial or empty set as complete.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "A chat whose automatic extraction is refused still completes normally. The refusal is logged once per unavailable episode, a new episode starts after a successful recovery, and repeated or concurrent chat turns do not spam the log.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "A chat whose automatic extraction is refused still completes normally. The refusal is logged once per unavailable episode, a new episode starts after a successful recovery, and repeated or concurrent chat turns do not spam the log.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "defect-source",
+          "safeguard": "no data loss",
+          "reproduction": "After a partial memory load fails, run concurrent automatic extraction and core_remember and compare memory.json with its original bytes. gates/test-intent/evidence/memory-load-services.json, failBefore.checks: MemoryExtractionConsumerTest#failedLoadSkipsExtractionOncePerEpisodeAndToolRefuses records the assertion failure expected: <1> but was: <0> for the unavailable warning; the check also asserts that extraction and core_remember leave the original file unchanged."
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-services.json",
@@ -138,24 +192,41 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "The actual memory backup source and restore sink refuse a partial failed cache (including colliding IDs), preserve the file, recover on next access and retain the skip-existing collision policy.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, no read presents a partial or empty set as complete.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, no read presents a partial or empty set as complete.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "defect-source",
+          "safeguard": "no data loss",
+          "reproduction": "Unlock with a memory.json containing a valid record followed by an invalid record, then export and restore through the registered memory backup source and sink, including a colliding ID. gates/test-intent/evidence/memory-load-services.json, failBefore.checks: HeadAssemblyTest#memoryBackupRefusesFailedCacheAndRecovers records the assertion failure \"export cannot use a failed cache\" because export did not throw; the check also asserts restore refusal and unchanged file bytes."
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-services.json",
@@ -172,19 +243,33 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "The memory HTTP handlers return 503 with MEMORIES_UNAVAILABLE for list/remember/forget after a partial failed load, without success or memory payloads or disk changes. A later list recovers all stored records.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, every mutation is refused and memory.json stays byte-for-byte unchanged.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "While unavailable, no read presents a partial or empty set as complete.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "While unavailable, no read presents a partial or empty set as complete.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Automatic recovery: the next memory access after the cause is removed loads all memories without a restart, and later mutations then work. A new ID persists N+1; a same-ID replacement persists N. Repeated accesses during the failure retry the load at most once per access; there are no background loops.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "defect-source",
+          "safeguard": "no data loss",
+          "reproduction": "After a partial memory load fails, invoke the real list, remember and forget HTTP handlers and compare memory.json with its original bytes. gates/test-intent/evidence/memory-load-http.json, failBefore.checks: MemoryControllerTest#failedLoadReturnsUnavailableForListRememberAndForget records the assertion failure expected: <503> but was: <200>; the check also asserts unchanged file bytes."
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-http.json",
@@ -201,9 +286,12 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "The browser Memory surface shows unavailable on first opening and on revisiting a failed GET, disables writes, hides stale content and never claims an empty store. Reopening after recovery displays memories.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "The Memory page in the browser shows that memories are unavailable, both on first opening and on revisiting during the failure, and never shows \"No learned memory yet\". After recovery it shows the memories.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "The Memory page in the browser shows that memories are unavailable, both on first opening and on revisiting during the failure, and never shows \"No learned memory yet\". After recovery it shows the memories.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-ui.json",
@@ -221,14 +309,20 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "A failed persistence rolls back the cache; forget and clear survive a restart with encryption disabled.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Encryption off: unchanged, including a corrupt file at construction staying fatal and first-run creation when the file is absent.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Encryption off: unchanged, including a corrupt file at construction staying fatal and first-run creation when the file is absent.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-preservation.json",
@@ -244,9 +338,12 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "Actual registered memory backup export/restore preserves every record field and skips IDs already present.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-preservation.json",
@@ -262,9 +359,12 @@ production-code overlays and no source-repository worktree metadata writes.
       "behaviour": "HTTP remember replaces an existing ID, listing preserves all authored fields, and restart and deletion preserve the durable result.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
-          "location": "task t-20261019-f0a7d3 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "\"i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\" plus \"you can work autonomously, no need to ask me for these type of thigns\"",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "A successful load behaves as today. Preserved: every field (id, kind, content, sourceConversationId, actor, createdAt), legacy-array loading, same-ID replacement, newest-first ordering, forget and clear surviving a restart, the cache rolled back after a persistence failure, and HTTP listing and backup export/restore round trips with ID collisions.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/memory-load-preservation.json",
