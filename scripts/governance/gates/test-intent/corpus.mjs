@@ -676,7 +676,7 @@ export const CASES = [
   },
 
   // S8 execution evidence.
-  { name: 's8 a New entry with script evidence passes', scenario: newCase(), expect: 'pass', flagged: [NEW_TEST] },
+  { name: 's8 a New entry with script evidence passes', scenario: newCase(), expect: 'pass', flagged: [] },
   {
     name: 's8 a New entry without evidence fails',
     scenario: newCase({ entry: newEntry({ evidence: undefined }) }),
@@ -1123,7 +1123,201 @@ export const CASES = [
     scenario: { main: BASE, branch: [{ write: { [P.oracle]: BASE[P.oracle].replace('0.8', '0.6') } }] },
     expect: 'fail', rules: ['uncovered'], flagged: [P.oracle],
   },
+
+  // Isolated additions: no changeset or acceptance record is required.
+  {
+    name: 'isolated-new: added JVM Test.java needs no entry',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.match(formatReport(r), /\[exempt\].*CalcNegTest\.java/),
+  },
+  {
+    name: 'isolated-new: added frontend .test.ts needs no entry',
+    scenario: { main: BASE, branch: [{ write: { 'modules/ui-web/src/new.test.ts': BASE[P.uiTest] } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.match(formatReport(r), /\[exempt\].*new\.test\.ts/),
+  },
+  {
+    name: 'isolated-new preservation: adding a case to an existing file stays gated',
+    scenario: { main: BASE, branch: [{ write: { [P.test]: TEST_V1.replace('  @Test void ratio()', '  @Test void zero() { assertEquals(0, Calc.add(0, 0)); }\n  @Test void ratio()') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new: a new test never excuses an existing weakened assertion',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT, [P.test]: edit('0.001', '0.5') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: delete-plus-add with different content stays gated',
+    scenario: { main: BASE, branch: [{ delete: [P.test], write: { [NEW_TEST]: NEW_TEST_TEXT } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test, NEW_TEST],
+  },
+  {
+    name: 'isolated-new preservation: byte-identical delete-plus-add across modules stays gated',
+    scenario: { main: BASE, branch: [{ delete: [P.test], write: { 'modules/other/src/test/java/io/x/CalcTest.java': TEST_V1 } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test, 'modules/other/src/test/java/io/x/CalcTest.java'],
+  },
+  ...[
+    ['JVM helper without a test name', 'modules/core/src/test/java/io/x/Helper.java', 'class Helper {}\n'],
+    ['test-named resource', 'modules/core/src/test/resources/ResourceTest.java', 'class ResourceTest {}\n'],
+    ['fixture', 'modules/ui-web/src/__fixtures__/new.test.ts', 'export const rows = [];\n'],
+    ['snapshot', 'modules/ui-web/src/__snapshots__/new.test.ts.snap', 'snapshot\n'],
+    ['testFixtures source', 'modules/core/src/testFixtures/java/io/x/HelperTest.java', 'class HelperTest {}\n'],
+    ['modules/test-support source', 'modules/test-support/src/test/java/io/x/HelperTest.java', 'class HelperTest {}\n'],
+    ['app-api TCK source', 'modules/app-api-tck/src/test/java/io/x/HelperTest.java', 'class HelperTest {}\n'],
+    ['mock with a test name', 'modules/ui-web/src/mocks/new.test.ts', 'export const rows = [];\n'],
+    ['setup with a test name', 'modules/ui-web/src/__test-setup__/new.test.ts', 'export {};\n'],
+    ['system-tests source', 'modules/system-tests/src/test/java/io/x/JudgeTest.java', 'class JudgeTest {}\n'],
+    ['unselected frontend source', 'modules/ui-web/e2e/new.test.ts', BASE[P.uiTest]],
+    ['Rust integration test', 'modules/shell/src-tauri/tests/new.rs', '#[test]\nfn new_test() {}\n'],
+    ['Rust integration helper', 'modules/shell/src-tauri/tests/common/mod.rs', 'pub fn helper() {}\n'],
+    ['JUnit dry-run resource', 'modules/core/src/test/resources/junit-platform.properties', 'junit.platform.execution.dryRun.enabled=true\n'],
+    ['build configuration', 'modules/other/build.gradle.kts', 'tasks.withType<Test> { enabled = false }\n'],
+    ['test selection configuration', 'modules/ui-web/vitest.config.new.ts', 'export default { test: { exclude: ["**/*"] } };\n'],
+    ['test-named build configuration', 'modules/ui-web/src/vitest.config.test.ts', 'export default { test: { exclude: ["**/*"] } };\n'],
+    ['baseline', 'gates/dead-code/baseline.txt', 'modules/ui-web/src/unused.ts\n'],
+  ].flatMap(([label, file, content]) => [
+    {
+      name: `isolated-new preservation: added ${label} stays gated`,
+      scenario: { main: BASE, branch: [{ write: { [file]: content } }] },
+      expect: 'fail', rules: ['uncovered'], flagged: [file],
+    },
+    {
+      name: `isolated-new preservation: changed ${label} stays gated`,
+      scenario: { main: { ...BASE, [file]: content }, branch: [{ write: { [file]: content + (label === 'build configuration' ? 'tasks.withType<Test> { enabled = true }\n' : '// changed\n') } }] },
+      expect: 'fail', rules: ['uncovered'], flagged: [file],
+    },
+  ]),
+  ...['base', 'head'].map((side) => {
+    const file = 'modules/ui-web/src/listed.test.ts';
+    return {
+      name: `isolated-new preservation: test-named helper listed at ${side} stays gated`,
+      scenario: {
+        main: { ...BASE, ...(side === 'base' ? { [P.supportList]: renderTestSupportList([file], 'corpus') } : {}) },
+        branch: [{ write: { [file]: BASE[P.uiTest], ...(side === 'head' ? { [P.supportList]: renderTestSupportList([P.uiHelper, file], 'corpus') } : {}) } }],
+      },
+      expect: 'fail', rules: ['uncovered'], flagged: [file, ...(side === 'head' ? [P.supportList] : [])],
+    };
+  }),
+  {
+    name: 'isolated-new preservation: added embedded Rust test stays gated',
+    scenario: { main: BASE, branch: [{ write: { 'modules/shell/src-tauri/src/new.rs': '#[cfg(test)]\nmod tests { #[test] fn check() {} }\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/shell/src-tauri/src/new.rs#cfg(test)'],
+  },
+  {
+    name: 'isolated-new preservation: added Rust test module stays gated',
+    scenario: { main: { ...BASE, [P.rustUpdater]: BASE[P.rustUpdater] + '#[cfg(test)]\n#[path = "extra.rs"]\nmod extra;\n' }, branch: [{ write: { 'modules/shell/src-tauri/src/extra.rs': '#[test]\nfn check() {}\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/shell/src-tauri/src/extra.rs'],
+  },
+  {
+    name: 'isolated-new preservation: new logic-seam register stays gated',
+    scenario: { main: { README: 'scratch\n' }, branch: [{ write: { [P.seams]: BASE[P.seams] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [`${P.seams}#law-targetTests`],
+  },
+  ...['local', 'pull_request', 'merge_group', 'push', 'workflow_dispatch'].flatMap((name) => [
+    {
+      name: `isolated-new: ${name} exempts additions`,
+      scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }], event: { name } },
+      expect: 'pass', flagged: [],
+    },
+    {
+      name: `isolated-new preservation: ${name} still gates weakened assertions`,
+      scenario: { main: BASE, branch: [{ write: { [P.test]: edit('0.001', '0.5') } }], event: { name } },
+      expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+    },
+  ]),
+  ...[
+    ['JVM Tests.java', 'modules/core/src/test/java/io/x/CalcTests.java'],
+    ['JVM integration IT.java', 'modules/core/src/integrationTest/java/io/x/CalcIT.java'],
+    ['Kotlin Test.kt', 'modules/core/src/test/kotlin/io/x/CalcTest.kt'],
+    ['Kotlin Tests.kt', 'modules/core/src/test/kotlin/io/x/CalcTests.kt'],
+    ['Kotlin integration IT.kt', 'modules/core/src/integrationTest/kotlin/io/x/CalcIT.kt'],
+    ['frontend spec.tsx', 'modules/ui-web/src/new.spec.tsx'],
+    ['frontend lockdown', 'modules/ui-web/src/new-lockdown.test.ts'],
+  ].map(([label, file]) => ({
+    name: `isolated-new: added ${label} needs no entry`,
+    scenario: { main: BASE, branch: [{ write: { [file]: '// new test\n' } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.deepEqual(r.exempt, [file]),
+  })),
+  {
+    name: 'isolated-new: untracked JVM test needs no entry',
+    scenario: { main: BASE, uncommitted: { write: { [NEW_TEST]: NEW_TEST_TEXT } } },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.deepEqual(r.exempt, [NEW_TEST]),
+  },
+  {
+    name: 'isolated-new: exact move from production is not a new test',
+    scenario: { main: { ...BASE, 'modules/core/src/main/java/io/x/CalcNegTest.java': NEW_TEST_TEXT }, branch: [{ move: [['modules/core/src/main/java/io/x/CalcNegTest.java', NEW_TEST]] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  },
+  {
+    name: 'isolated-new: a separate deletion remains ambiguous even after pairing another move',
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/test/java/io/x/MovedTest.java']], write: { [NEW_TEST]: NEW_TEST_TEXT } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  },
+  {
+    name: 'isolated-new: rebase keeping item content preserves an existing accepted entry',
+    scenario: { ...newCase(), mainMoves: [contractEdit], rebase: true },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.deepEqual(r.exempt, [NEW_TEST]),
+  },
+  {
+    name: 'isolated-new preservation: rebase changing before content stales existing acceptance',
+    scenario: { ...newCase(), mainMoves: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }], rebase: true },
+    expect: 'fail', rules: ['acceptance-stale'], flagged: [],
+  },
+  {
+    name: 'isolated-new preservation: an added file becomes existing at the rebased base',
+    scenario: {
+      main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }],
+      mainMoves: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }], rebase: true,
+      uncommitted: { write: { [NEW_TEST]: NEW_TEST_TEXT.replace('-3', '-4') } },
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  },
+  {
+    name: 'isolated-new preservation: removing a test stays gated',
+    scenario: { main: BASE, branch: [{ delete: [P.test] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: weakening an assertion stays gated',
+    scenario: { main: BASE, branch: [{ write: { [P.test]: edit('assertEquals(3, Calc.add(1, 2))', 'assertNotNull(Calc.add(1, 2))') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: changing an expected value stays gated',
+    scenario: { main: BASE, branch: [{ write: { [P.test]: edit('assertEquals(3,', 'assertEquals(4,') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: new tests never cover a weakened existing assertion',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT, [P.test]: edit('0.001', '0.5') } }] },
+    expect: 'fail', rules: ['uncovered'],
+    check: (r) => assert.ok(r.uncovered.some((f) => f.id === P.test)),
+  },
+  {
+    name: 'isolated-new preservation: changing embedded Rust tests stays gated',
+    scenario: { main: BASE, branch: [{ replaceIn: { [P.rustLib]: ['assert_eq!(add(1, 2), 3)', 'assert_eq!(add(1, 2), 4)'] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [`${P.rustLib}#cfg(test)`],
+  },
+  ...['environment', 'compile'].map((classification) => ({
+    name: `isolated-new preservation: an existing entry rejects ${classification} fail-before`,
+    scenario: newCase({
+      entry: newEntry({ repaired: true }),
+      evidence: evidenceText({ checks: [{ id: NEW_CHECK, content: NEW_TEST_TEXT }], failBefore: { ref: 'main', checks: [{ id: NEW_CHECK, classification }] } }),
+    }),
+    expect: 'fail', rules: ['evidence-invalid'],
+  })),
 ];
+
+// The same preservation cases exercise each real CI base, without changing their assertions.
+// Local-only rebases are checked above; the explicit event cases already cover their own event.
+const preservation = CASES.filter((c) => c.name.startsWith('isolated-new preservation:') && !c.scenario.rebase && !c.scenario.event);
+for (const name of ['pull_request', 'merge_group', 'push', 'workflow_dispatch']) {
+  CASES.push(...preservation.map((c) => ({ ...c, name: `${c.name} (${name})`, scenario: { ...c.scenario, event: { name } } })));
+}
 
 /** Assert one case's outcome; throws with a readable message. */
 export function assertCase(c, result, root) {

@@ -8,9 +8,11 @@ description: "Agent-facing rules for the test-intent gate: what it flags, the en
 # Test Intent Rules
 
 Every expected outcome that enters, changes or leaves the product test suite names a source of
-intent and carries an acceptance record from someone other than its author. The `test-intent` gate
-enforces this on every PR in the required "Public claims" job. This page is what the gate's failure
-output points to. The design is tempdoc 966 (D1 to D4, D8).
+intent. Except for isolated new test files below, it also carries an acceptance record from someone
+other than its author. The `test-intent` gate enforces this on every PR in the required "Public
+claims" job. For exempt files, the change's independent verifier checks the expectations and
+execution evidence. This page is what the gate's failure output points to. The design is tempdoc
+966 (D1 to D4, D8).
 
 The rule behind it: an expectation comes from the owner's intent, never from what the code
 currently does. Where no source exists, the existing expectation stays. A missing source never
@@ -19,7 +21,8 @@ licenses a change.
 ## What the gate flags
 
 The first increment is conservative and file-level. Every added, deleted, renamed or modified file
-in scope is one flagged item. Annotations, tags, assumptions, conditional disables, class-level
+in scope is one flagged item, except for isolated new test files below. Annotations, tags,
+assumptions, conditional disables, class-level
 configuration, imports and setup are file changes, so they are flagged too.
 
 | In scope | Item |
@@ -39,6 +42,47 @@ configuration, imports and setup are file changes, so they are flagged too.
 | Any `junit-platform.properties`, on any change | the file |
 | Any `META-INF/services/org.junit.platform.*` (launcher listeners, post-discovery filters), on any change | the file |
 | `.github/workflows/*.yml` and `*.yaml`, when a changed line runs or selects tests (see below) | the file |
+
+### Isolated new test files
+
+The gate reports `[exempt]` for a wholly new, isolated test source. It needs no test-intent entry
+or separate acceptance record. All of these conditions must hold:
+
+- The path is added and absent at the resolved base. Existing files stay gated, including when
+  only adding a test case or changing an expected value.
+- No in-scope test file, test-owned data, watched baseline, listed helper or Rust source is deleted
+  in the diff. Deletion plus addition could be an edited move; the gate cannot prove isolation.
+  An exact copy of any deleted file is also ineligible. Existing byte-identical move handling
+  remains: a move within the same execution context needs no entry; a move across contexts does.
+- It is product test code, outside `modules/test-support`, `modules/app-api-tck` and
+  `modules/system-tests`. Files under `__fixtures__`, `__snapshots__`, `resources`, `testFixtures`,
+  `mocks` or `__test-setup__` are ineligible. A helper listed at either the base or the head,
+  a Rust test module file, or any path recognised as build/test-runner configuration is ineligible,
+  even if it has a test-like name.
+- Its path matches one of the recognised execution contexts and source names:
+  JVM `modules/<m>/src/{test,integrationTest,systemTest}/java/**/*{Test,Tests,IT}.java`, or the
+  corresponding `kotlin/**/*{Test,Tests,IT}.kt`, where `<m>` is a JVM module (not `ui-web` or
+  `shell`); or a `modules/ui-web` frontend test in the default or lockdown vitest selection
+  described below. Other source sets, frontend modules and unselected extensions stay gated.
+
+Rust integration tests stay gated too: even a top-level `tests/*.rs` can be imported through
+`mod`, `#[path]` or `include!`. The existing path classification cannot prove that it is isolated.
+Embedded Rust tests remain gated. Unknown classifications get no exemption.
+
+An added test alongside a weakened existing test exempts only the added file. The existing file
+still needs an accepted entry. The rule uses each event's resolved base, including manual dispatch
+(the local merge-base rule), and is re-evaluated after a rebase.
+
+This deliberately removes digest-bound independent acceptance and mechanical fail-before
+enforcement for exempt files without entries. The independent verifier of the change must check
+that expectations have sources, named checks actually executed and passed without skips, and
+repair checks fail on the before-state for the asserted reason. Compile or environment failures
+do not establish fail-before. The gate no longer enforces those duties for exempt files.
+
+Existing or in-flight entries may still name an exempt file. Such entries keep all their source,
+evidence, digest and acceptance checks; no changeset or acceptance record needs rewriting merely
+because its item now qualifies for exemption. Audit, rejection, tie-break and reconsider-rate rules
+continue over the entries that remain.
 
 ### Test-only frontend helpers
 

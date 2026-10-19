@@ -49,6 +49,7 @@ import {
   executionContext,
   isOutOfScopeTestLike,
   isRustSource,
+  isStandaloneTestSource,
 } from './scope.mjs';
 import { buildConfigChange, buildConfigKind } from './build-config.mjs';
 import { validateSource } from './sources.mjs';
@@ -104,7 +105,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   } catch (e) {
     if (!(e instanceof BaseResolutionError)) throw e;
     findings.push(finding('base-unresolved', 'error', `${e.message} The gate fails closed.`));
-    return { verdict: 'fail', findings, base: null, flagged: [], moves: [], outOfScope: [], changesets: [], uncovered: [] };
+    return { verdict: 'fail', findings, base: null, flagged: [], exempt: [], moves: [], outOfScope: [], changesets: [], uncovered: [] };
   }
 
   const { changes, baseBlobs } = diffWorkingTree(base.ref, repoRoot);
@@ -165,6 +166,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   // ---- 1. flag ----------------------------------------------------------------------------------
   const wholeFile = [];
   const flagged = [];
+  const exempt = [];
   const outOfScope = [];
   for (const c of changes) {
     if (c.path === LOGIC_SEAMS_PATH) {
@@ -245,8 +247,21 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
       findings.push(finding('move-changes-execution', 'note', `${note}; both sides need an entry`, to.path));
     }
   }
+  // An edited move is indistinguishable from a deletion plus an unrelated addition. Keep all
+  // additions gated if test scope loses a file, even when byte-identical move pairing succeeded.
+  // Also reject exact copies of deleted files outside test scope as exemption candidates.
+  const deleted = changes.filter((c) => c.status === 'D');
+  const deletedTest = deleted.some((c) => isTestPath(c.path) || rustTestFiles.has(c.path) || isRustSource(c.path));
   for (const c of wholeFile) {
     if (paired.has(c.path)) continue;
+    if (c.status === 'A' && c.before === null && c.kind === 'test-code'
+      && !deletedTest && !deleted.some((d) => d.before === c.after)
+      && !contextMoves.has(c.path) && !testSupport.has(c.path) && !rustTestFiles.has(c.path)
+      && !buildConfigKind(c.path) && isStandaloneTestSource(c.path)) {
+      exempt.push(c.path);
+      findings.push(finding('isolated-new-test', 'note', `${c.path}: isolated new test source; no entry needed`, c.path));
+      continue;
+    }
     const reason = contextMoves.has(c.path) ? `${c.reason}; ${contextMoves.get(c.path)}` : c.reason;
     flagged.push({ id: c.path, path: c.path, status: c.status, kind: c.kind, before: c.before, after: c.after, reason });
   }
@@ -364,7 +379,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   findings.push(finding('out-of-scope', 'note',
     `${OUT_OF_SCOPE_STATEMENT}${outOfScope.length ? ` Changed here and not flagged: ${outOfScope.length} file(s).` : ''}`));
   if (flagged.length === 0) {
-    findings.push(finding('no-flagged-items', 'note', 'Nothing in the product test scope changed; no test-intent entry is needed.'));
+    findings.push(finding('no-flagged-items', 'note', 'No product test changes need a test-intent entry.'));
   }
   for (const item of flagged) {
     findings.push(finding('flagged-item', 'note', `${item.id} (${item.status}, ${item.reason}) — ${item.coverage}`, item.path));
@@ -394,6 +409,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     findings,
     base,
     flagged,
+    exempt,
     moves,
     outOfScope,
     changesets,
@@ -524,6 +540,7 @@ export function formatReport(result) {
     for (const f of result.flagged) lines.push(`  [${f.coverage ?? '?'}] ${f.status} ${f.id} — ${f.reason}`);
   }
   for (const m of result.moves) lines.push(`  [move] ${m.from} -> ${m.to} (byte-identical, no entry needed)`);
+  for (const p of result.exempt) lines.push(`  [exempt] ${p} (isolated new test source, no entry needed)`);
   const errors = result.findings.filter((f) => f.level === 'error');
   if (errors.length) {
     lines.push(`Problems (${errors.length}):`);

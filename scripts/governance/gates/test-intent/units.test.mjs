@@ -24,7 +24,7 @@ import {
   buildConfigChange, buildConfigKind, changedLineIndices, identifierParts, packageTestProjection, rootScriptResolver, scanBlocks,
   scanWorkflow, workflowLineRunsTests,
 } from './build-config.mjs';
-import { classifyPath, executionContext, isOutOfScopeTestLike, UI_WEB_VITEST_SELECTIONS } from './scope.mjs';
+import { classifyPath, executionContext, isOutOfScopeTestLike, isStandaloneTestSource, UI_WEB_VITEST_SELECTIONS } from './scope.mjs';
 import { validateSource } from './sources.mjs';
 import {
   TEST_SUPPORT_PATHS_FILE, globToRegExp, importSpecifiers, parseTestSupportList, renderTestSupportList,
@@ -88,6 +88,40 @@ test('scope: out of scope paths', () => {
   assert.ok(isOutOfScopeTestLike('scripts/ci/x.test.mjs'));
   assert.ok(isOutOfScopeTestLike('scripts/jseval/run.py'));
   assert.ok(!isOutOfScopeTestLike('modules/ui-web/src/a.test.ts'));
+});
+
+test('scope: standalone test sources use known names and execution contexts', () => {
+  for (const p of [
+    'modules/core/src/test/java/io/x/CalcTest.java',
+    'modules/core/src/integrationTest/java/io/x/CalcIT.java',
+    'modules/core/src/systemTest/java/io/x/CalcTests.java',
+    'modules/core/src/test/kotlin/io/x/CalcTest.kt',
+    'modules/core/src/integrationTest/kotlin/io/x/CalcIT.kt',
+    'modules/core/src/test/kotlin/io/x/CalcTests.kt',
+    'modules/ui-web/src/a.test.ts',
+    'modules/ui-web/src/views/a.spec.tsx',
+    'modules/ui-web/src/a-lockdown.test.ts',
+  ]) assert.ok(isStandaloneTestSource(p), p);
+  for (const p of [
+    'modules/core/src/test/java/io/x/Helper.java',
+    'modules/core/src/test/resources/CalcTest.java',
+    'modules/core/src/testFixtures/java/io/x/HelperTest.java',
+    'modules/core/src/unknown/java/io/x/CalcTest.java',
+    'modules/core/src/main/java/io/x/CalcTest.java',
+    'modules/test-support/src/test/java/io/x/HelperTest.java',
+    'modules/app-api-tck/src/test/java/io/x/HelperTest.java',
+    'modules/system-tests/src/test/java/io/x/JudgeTest.java',
+    'modules/ui-web/src/__fixtures__/a.test.ts',
+    'modules/ui-web/src/__snapshots__/a.test.ts',
+    'modules/ui-web/src/mocks/a.test.ts',
+    'modules/ui-web/src/__test-setup__/a.test.ts',
+    'modules/ui-web/src/a.test.jsx',
+    'modules/ui-web/e2e/a.test.ts',
+    'modules/shell/src/a.test.ts',
+    'modules/shell/src-tauri/tests/a.rs',
+    'modules/shell/src-tauri/tests/common/mod.rs',
+    'modules/shell/src-tauri/src/a.rs',
+  ]) assert.equal(isStandaloneTestSource(p), false, p);
 });
 
 // ---- Rust ----------------------------------------------------------------------------------------
