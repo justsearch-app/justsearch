@@ -27,7 +27,7 @@ import {
   __resetAiStateForTest,
 } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
-import { SV3_COMMAND_SEARCH_TEXT } from './fixtures.js';
+import { SV3_COMMAND_SEARCH } from './fixtures.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
@@ -145,6 +145,8 @@ afterEach(() => {
 async function mount(): Promise<SearchV3View & Mounted> {
   const el = document.createElement('jf-sv3-window') as SearchV3View & Mounted;
   document.body.appendChild(el);
+  // WP1.1 — a fresh window starts in Search mode; these cases are about Ask, so they choose it.
+  (el as unknown as { tier: string }).tier = 'ask';
   await el.updateComplete;
   return el;
 }
@@ -450,11 +452,10 @@ describe('the in-motion dot belongs to the running session alone', () => {
     expect(pingingOf(await rowsOf(el))).toHaveLength(0);
   });
 
-  it('still shows it for a palette search that refines BEHIND displayed results', async () => {
-    // The store suppresses `isSearching` for a refined pass that runs behind results
-    // (`state/searchState.ts:611`), so a dot wired to `isSearching` alone would go dark for exactly
-    // the case a claimed session most needs it. The search axis is palette-only since F1, so this is
-    // driven through that command — the seam, and this subtlety, are still live.
+  it('lights no row for a search — a search is not a turn, and leaves the conversation one click away', async () => {
+    // WP1.1 (S1.8): a search shows its results in the window's own place, outside every
+    // conversation, so the store's busy flag — which cannot say who asked — belongs to no session.
+    // The conversation that was open stays in the sidebar, resting, ready to reopen.
     const el = await mount();
     await ask(el, 'first question');
 
@@ -466,7 +467,10 @@ describe('the in-motion dot belongs to the running session alone', () => {
     release = router.holdSearch({ results: [hit('a/2.md')], totalHits: 1, matchCount: 1 });
     await searchByPalette(el, 'freight again');
     await el.updateComplete;
-    expect(pingingOf(await rowsOf(el)).map((r) => r.label)).toEqual(['first question']);
+    const rows = await rowsOf(el);
+    expect(rows.map((r) => r.label)).toEqual(['first question']);
+    expect(rows.filter((r) => r.active)).toHaveLength(0);
+    expect(pingingOf(rows)).toHaveLength(0);
     release();
     await settle(el);
     expect(pingingOf(await rowsOf(el))).toHaveLength(0);
@@ -488,7 +492,7 @@ describe('the in-motion dot belongs to the running session alone', () => {
     await palette.show(null);
     await palette.updateComplete;
     palette.shadowRoot
-      ?.querySelector<HTMLElement>(`#sv3-palette-item-${SV3_COMMAND_SEARCH_TEXT}`)
+      ?.querySelector<HTMLElement>(`#sv3-palette-item-${SV3_COMMAND_SEARCH}`)
       ?.click();
     await el.updateComplete;
   }
