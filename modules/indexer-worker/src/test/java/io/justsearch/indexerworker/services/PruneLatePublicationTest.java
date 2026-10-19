@@ -28,6 +28,7 @@ import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.PathMapping;
 import io.justsearch.ipc.PruneRequest;
 import io.justsearch.ipc.SyncDirectoryRequest;
@@ -35,6 +36,7 @@ import io.justsearch.ipc.UpdatePathsRequest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -342,7 +344,21 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
         .getWatching(), "precondition: the person added the file's first root");
     Files.move(original, destination);
 
-    // The prune's first hold of the fence, which on an empty root is its last, stays held.
+    assertEquals(1, renameWhileThePruneHoldsItsLastFence(service, kind, root, from, to,
+        destination), "the rename is settled: the file is gone from both paths");
+
+    assertEquals(0, committedRows(to),
+        "a rename that resumes after the prune's last pass moves no row to a deleted file");
+    assertEquals(0, committedRows(from), "nor leaves the rows of a file gone from both paths");
+  }
+
+  /**
+   * Holds {@code kind}'s prune of {@code prefix} at its first hold of the fence, which on a prefix
+   * with no row is its last (or lets it finish, when it takes none); admits the rename of {@code from} to {@code to}, which waits for the
+   * fence; deletes {@code destination}; then releases both and returns the rename's count.
+   */
+  private int renameWhileThePruneHoldsItsLastFence(WorkerIngestService service, Prune kind,
+      Path prefix, String from, String to, Path destination) throws Exception {
     java.util.concurrent.atomic.AtomicReference<Thread> pruner =
         new java.util.concurrent.atomic.AtomicReference<>();
     CountDownLatch pruneHolds = new CountDownLatch(1);
@@ -366,16 +382,16 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
       });
     }).when(loop).withFileMutationFence(any());
     if (kind == Prune.REPLAY) {
-      assertTrue(jobQueue.putSwitchBuffer("prune_prefix:" + root, "PRUNE_PREFIX",
-          root.toString()));
+      assertTrue(jobQueue.putSwitchBuffer("prune_prefix:" + prefix, "PRUNE_PREFIX",
+          prefix.toString()));
     }
     var pruning = FenceRace.start("prune-under-test", () -> {
       pruner.set(Thread.currentThread());
       return switch (kind) {
         case SYNC -> service.syncDirectory(SyncDirectoryRequest.newBuilder()
-            .setRootPath(root.toString()).build(), CallContext.none()).getError();
+            .setRootPath(prefix.toString()).build(), CallContext.none()).getError();
         case DIRECT -> service.pruneMissing(PruneRequest.newBuilder()
-            .setPathPrefix(root.toString()).build(), CallContext.none()).getError();
+            .setPathPrefix(prefix.toString()).build(), CallContext.none()).getError();
         case REPLAY -> {
           KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
               new KnowledgeServerMigrationOps.DrainSwitchBufferContext(jobQueue, runtime, null,
@@ -388,8 +404,14 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
       };
     });
     try {
-      assertTrue(pruneHolds.await(30, TimeUnit.SECONDS),
-          "precondition: the prune holds the fence for its last pass");
+      // A prune that takes no fence on a prefix with no row finishes instead.
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      while (pruneHolds.getCount() > 0 && !pruning.task().isDone()
+          && System.nanoTime() < deadline) {
+        Thread.sleep(2);
+      }
+      assertTrue(pruneHolds.getCount() == 0 || pruning.task().isDone(),
+          "precondition: the prune holds the fence for its last pass, or has finished");
       var rename = FenceRace.start("late-rename", () -> service.updateDocumentPaths(
           UpdatePathsRequest.newBuilder().addMappings(PathMapping.newBuilder()
               .setOldPath(from).setNewPath(to)).build(), CallContext.none()).getUpdatedCount());
@@ -398,16 +420,12 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
       Files.delete(destination);
       release.countDown();
       assertEquals("", pruning.get(), "the prune reports no error");
-      assertEquals(1, rename.get(), "the rename is settled: the file is gone from both paths");
+      if (kind == Prune.REPLAY) {
+        assertTrue(jobQueue.listSwitchBufferOpsStrict().isEmpty(), "the replayed prune completed");
+      }
+      return rename.get();
     } finally {
       release.countDown();
-    }
-
-    assertEquals(0, committedRows(to),
-        "a rename that resumes after the prune's last pass moves no row to a deleted file");
-    assertEquals(0, committedRows(from), "nor leaves the rows of a file gone from both paths");
-    if (kind == Prune.REPLAY) {
-      assertTrue(jobQueue.listSwitchBufferOpsStrict().isEmpty(), "the replayed prune completed");
     }
   }
 
@@ -424,5 +442,58 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
   @Test
   void aRenameAdmittedDuringAReplayedPrunesLastPassMovesNoRowToADeletedFile() throws Exception {
     renamedInWhileThePruneHoldsItsLastFence(Prune.REPLAY);
+  }
+
+  /**
+   * RP5 / RP10 (preserve): a file in the root whose chunk names another, live file as its
+   * explicit path is moved into a subfolder; a prune of that subfolder holds its last fence while
+   * the rename waits, and the destination is deleted. The rename's cleanup judges each row by its
+   * own backing path, as a prune does: the chunk of the live file stays.
+   */
+  private void aRenameCleanupKeepsAChunkWhoseOwnFileIsLive(Prune kind) throws Exception {
+    Path original = Files.writeString(root.resolve("original.txt"), "original");
+    Path folder = Files.createDirectory(root.resolve("destination"));
+    Path destination = folder.resolve("renamed.txt");
+    Path live = Files.writeString(root.resolve("live-explicit-child.txt"), "live child");
+    String from = PathNormalizer.normalizeKey(original);
+    String to = PathNormalizer.normalizeKey(destination);
+    String child = from + "#explicit-child";
+    String content = "parent content";
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, from, SchemaFields.DOC_UID, from + "#uid", SchemaFields.PATH, from,
+        SchemaFields.CONTENT, content)));
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, child, SchemaFields.DOC_UID, child + "#uid",
+        SchemaFields.PATH, PathNormalizer.normalizeKey(live), SchemaFields.IS_CHUNK, "true",
+        SchemaFields.PARENT_DOC_ID, from, SchemaFields.CONTENT, "live child",
+        SchemaFields.CHUNK_START_CHAR, "0", SchemaFields.CHUNK_END_CHAR, "6",
+        SchemaFields.CHUNK_CONTENT, "parent",
+        SchemaFields.CHUNK_PARENT_CONTENT_SHA256,
+        io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(content))));
+    assertEquals(1, committedRows(child), "precondition: the chunk of the live file is indexed");
+    var service = service();
+    Files.move(original, destination);
+
+    renameWhileThePruneHoldsItsLastFence(service, kind, folder, from, to, destination);
+
+    assertTrue(Files.exists(live), "precondition: the chunk's own file is still there");
+    assertEquals(1, committedRows(child),
+        "a rename's cleanup removes no row whose own backing file is live");
+  }
+
+  @Test
+  void aRenameCleanupAfterAPrunesLastPassKeepsAChunkWhoseOwnFileIsLive() throws Exception {
+    aRenameCleanupKeepsAChunkWhoseOwnFileIsLive(Prune.DIRECT);
+  }
+
+  @Test
+  void aRenameCleanupAfterASyncsLastPassKeepsAChunkWhoseOwnFileIsLive() throws Exception {
+    aRenameCleanupKeepsAChunkWhoseOwnFileIsLive(Prune.SYNC);
+  }
+
+  @Test
+  void aRenameCleanupAfterAReplayedPrunesLastPassKeepsAChunkWhoseOwnFileIsLive()
+      throws Exception {
+    aRenameCleanupKeepsAChunkWhoseOwnFileIsLive(Prune.REPLAY);
   }
 }

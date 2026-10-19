@@ -462,6 +462,40 @@ public final class PruneOps {
     }
   }
 
+  /**
+   * Removes the rows whose own backing path is {@code filePath}, by the rules a prune of a folder
+   * holding it applies: once the file is confirmed absent beneath a listable folder up to {@code
+   * boundary}, with {@code guard}'s root vouching for it before and after that check. A row of
+   * another file is never removed through its parent, so a chunk whose explicit path names a live
+   * file keeps its row. Applied inside {@code writerFence}; nothing is committed.
+   *
+   * @return the number of rows removed
+   */
+  public int pruneFile(String filePath, Path boundary, PresenceGuard guard, WriterFence writerFence) {
+    Objects.requireNonNull(guard, "guard");
+    Objects.requireNonNull(writerFence, "writerFence");
+    Path file;
+    try {
+      file = Path.of(filePath);
+    } catch (InvalidPathException unparseable) {
+      return 0;
+    }
+    LifecycleSnapshot snap = session.snapshot;
+    SearcherManager mgr = snap != null ? snap.searcherManager() : null;
+    if (mgr == null) {
+      throw new IllegalStateException("SearcherManager not available (runtime closed?)");
+    }
+    Batch batch = new Batch(guard, ignored -> {}, writerFence, mgr, filePath,
+        session.fieldMapper.idField(), boundary);
+    batch.candidates.add(new Candidate(filePath, filePath, file));
+    try {
+      batch.flush();
+    } catch (IOException e) {
+      throw new IndexRuntimeIOException(classifyIOException(e), "Prune of a file failed", e);
+    }
+    return batch.pruned;
+  }
+
   private record Candidate(String docId, String filePath, Path file) {}
 
   /** One indexed row, the backing path that decides it, and the stored fields the scan matches. */

@@ -415,26 +415,33 @@ public final class WorkerIngestService {
   }
 
   /**
-   * A rename's Lucene half, inside the fence. A destination confirmed absent here was deleted
-   * after the move, possibly after a prune already judged it: its rows are not moved, and the
-   * moved file's rows go too when its old path is confirmed absent as well. Otherwise the rows
+   * A rename's Lucene half, inside the fence (the caller holds it, so the cleanup below takes no
+   * fence of its own). A destination confirmed absent here was deleted after the move, possibly
+   * after a prune already judged it: no row is moved, and the old path's rows are removed as a
+   * prune removes them, each only when its own backing file is confirmed absent. Otherwise the rows
    * move, and the new path is reported to a running prune even when the move fails part way,
    * because rows it wrote before failing still reach a commit.
    *
    * @return whether the rename is settled in Lucene: rows moved, or the file is gone from both
-   *     paths and its rows were removed
+   *     paths and rows of it were removed
    */
   private boolean moveRowsUnderFence(String oldPath, String newPath) {
     if (confirmedGone(newPath)) {
       // Renames are refused during a candidate build, so there is no serving copy to project to.
-      if (confirmedGone(oldPath)) {
-        ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(oldPath);
-        log.info("updateDocumentPaths: {} was moved to {} and deleted; its rows are removed",
-            oldPath, newPath);
-        return true;
+      // Each row of the old path is judged as a prune judges it, by its own backing path: a
+      // chunk whose explicit path names a live file keeps its row.
+      Path oldRoot;
+      try {
+        oldRoot = pruneRootFor(oldPath);
+      } catch (InvalidPathException invalid) {
+        return false;
       }
-      log.info("updateDocumentPaths: {} is gone; rows of {} are not moved", newPath, oldPath);
-      return false;
+      int removed = ingestLifecycle.pruneOps().pruneFile(
+          oldPath, oldRoot, pruneGuard(oldRoot),
+          io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE);
+      log.info("updateDocumentPaths: {} is gone; rows of {} are not moved, {} removed",
+          newPath, oldPath, removed);
+      return removed > 0;
     }
     try {
       return ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath) > 0;
