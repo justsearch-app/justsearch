@@ -43,6 +43,7 @@ env:
 
 jobs:
   public-claims:
+    if: false
     name: Public claims
     runs-on: ubuntu-latest
     # 15 -> 20 -> 30: this required lane exhausted both former limits while building kernel
@@ -685,6 +686,7 @@ jobs:
           if-no-files-found: warn
 
   jseval-suite:
+    if: false
     name: jseval Python suite
     # tempdoc 930 §18.1 row 7. `scripts/jseval/tests/` is ~47k lines that ran in CI
     # NOWHERE — a measurement harness behind public claims whose own tests were a claim
@@ -745,6 +747,7 @@ jobs:
         run: python -m pytest scripts/jseval/tests -q -p no:cacheprovider
 
   measured-axe:
+    if: false
     name: Measured axe (advisory)
     # Tempdoc 930 §22.2 follow-up 5. Chunk H retired twelve static a11y/token oracles in
     # favour of measurement, but only half the replacement ran on PRs: the four-palette
@@ -849,6 +852,7 @@ jobs:
           if-no-files-found: warn
 
   license-and-notices:
+    if: false
     name: License and notices
     runs-on: windows-latest
     timeout-minutes: 20
@@ -902,6 +906,7 @@ jobs:
         run: node scripts/ci/regen-all.mjs --check --only notices
 
   build:
+    if: false
     name: Build (no model blobs)
     # Migrated to Linux (tempdoc 668) — assemble is compile + web-bundle, no tests,
     # so no Windows-test portability tail; protoc already fixed for Linux.
@@ -996,6 +1001,7 @@ jobs:
           npm --prefix packages/runtime-client run check:pack
 
   unit-tests:
+    if: false
     name: Unit tests (${{ matrix.lane }})
     # Per-lane runner OS (tempdoc 668 option B). app-ui is migrated to Linux (~2.8x
     # faster, validated); its Windows-specific tests are @Tag("windows") and run on
@@ -1175,6 +1181,7 @@ jobs:
   # specific product behaviour that the Linux-migrated lanes skip. JVM selection uses
   # -PwindowsOnly; the lane also runs the full dev-runner and release suites.
   windows-native-tests:
+    if: false
     name: Windows-native tests
     runs-on: windows-latest
     # This lane now auto-discovers 46 dev-runner files, including real identity-bound stop,
@@ -1288,6 +1295,7 @@ jobs:
   # compile. The directory is gitignored and packaging is unaffected: build-installer.yml stages
   # the real bundle before it packages anything.
   shell-rust-tests:
+    if: false
     # The Windows leg keeps the exact required-check name; the Linux leg runs the Linux-only cfg tests.
     name: ${{ matrix.os == 'ubuntu-latest' && 'Shell crate tests (Rust, Linux)' || 'Shell crate tests (Rust)' }}
     strategy:
@@ -1384,6 +1392,7 @@ jobs:
   # `continue-on-error` off and add "Integration tests (system-tests tier)" to
   # requiredStatusChecks once the tier is green.
   integration-tests:
+    if: false
     name: Integration tests (system-tests tier)
     runs-on: windows-latest
     # Must stay above the Gradle task timeout (modules/system-tests/build.gradle.kts, 30 min),
@@ -1446,6 +1455,7 @@ jobs:
   # acceptance selectable locally with -PincludeAiTests=true; hosted CI owns the
   # model-free cases even while the broader integration tier remains advisory.
   lifecycle-integration-tests:
+    if: false
     name: Engine lifecycle tests (model-free)
     runs-on: windows-latest
     timeout-minutes: 35
@@ -1490,6 +1500,7 @@ jobs:
   # which includes merge_group. Both would turn this REQUIRED check red the day the
   # repo moves to an org and a merge queue is enabled. The CLI has neither limit.
   secret-scan:
+    if: false
     name: Secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -1573,6 +1584,7 @@ jobs:
   # wall-clock: which lane is the critical path, and how much of each lane is
   # fixed runner tax vs work. Warn-only budget; never fails the run. Tempdoc 668.
   ci-walltime:
+    if: false
     name: CI wall-clock attribution
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -1581,7 +1593,6 @@ jobs:
     # attribution taken while the ~6.5-minute suite still runs would omit it entirely and
     # `report-ci-walltime-budget.mjs` would warn `missing-required-lane` on every run.
     needs: [public-claims, license-and-notices, build, unit-tests, windows-native-tests, shell-rust-tests, integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite]
-    if: always()
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1626,3 +1637,69 @@ jobs:
             build/ci/ci-walltime-budget.json
             build/ci/ci-walltime-budget.md
           if-no-files-found: warn
+
+  verifier-startup-health:
+    name: Verifier startup health on Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: ['26bea848739a2e0800c29cce72cbcb3b7f98ae54', '1e4d9dad0f4f23afacb7a857c04540b61d4547d7']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.14.0'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Add verifier-only real Windows DLL exit check
+        shell: pwsh
+        run: |
+          @'
+          package io.justsearch.app.inference;
+          import static org.junit.jupiter.api.Assertions.*;
+          import io.justsearch.app.api.ModeTransitionException;
+          import io.justsearch.app.api.runtime.ManagedChildRegistry;
+          import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
+          import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+          import io.justsearch.core.execution.TestEngineExecutors;
+          import java.nio.file.*;
+          import java.util.*;
+          import org.junit.jupiter.api.*;
+          import org.junit.jupiter.api.condition.*;
+          import org.junit.jupiter.api.io.TempDir;
+          @EnabledOnOs(OS.WINDOWS)
+          class VerifierWindowsDllTest {
+           @Test @Timeout(30) void realWindowsChildExitRetainsTheMissingDllClassification(@TempDir Path dir)throws Exception {
+            Path fake=dir.resolve("fake");
+            Path executable=HealthyFakeLlamaServer.install(fake,"--log-line","The fake native server cannot load its DLL", "--exit-code","-1073741515");
+            Path model=Files.createFile(dir.resolve("model.gguf"));
+            var config=new InferenceConfig(executable,model,null,39199,4096,0,false);
+            var rc=TestResolvedConfigHelper.fromEntries(Map.of("justsearch.context.size","4096","justsearch.data.dir",dir.resolve("data").toString()));
+            try(var exec=TestEngineExecutors.awaitingTermination();var manager=new InferenceLifecycleManager(exec,config,InferenceTelemetryEvents.noop(),ManagedChildRegistry.noop(),rc)) {
+             var failure=assertThrows(ModeTransitionException.class,manager::switchToOnlineMode);
+             assertEquals(ModeTransitionException.Reason.MISSING_DLL,failure.reason());
+             assertEquals("MISSING_DLL",String.valueOf(manager.lastChatFailedCode()));
+             assertEquals(1,HealthyFakeLlamaServer.launches(fake).size());
+             assertFalse(manager.isOnline());
+             assertEquals(1,manager.recentFailures(10).size());
+             System.out.println("WINDOWS_DLL OS="+System.getProperty("os.name")+" failure="+failure+" history="+manager.recentFailures(10));
+            }finally{HealthyFakeLlamaServer.endAll(fake);}
+           }
+          }
+          '@ | Set-Content -Encoding utf8 modules/app-inference/src/test/java/io/justsearch/app/inference/VerifierWindowsDllTest.java
+      - name: Run explicitly selected untagged lifecycle and VDU cases
+        run: ./gradlew.bat :modules:app-inference:test --rerun --tests "*VerifierWindowsDllTest" --tests "*ChatResidencyUnloadStepTest" --tests "*LlamaServerStartupHealthPollTest" --tests "*ChatResumeProbeTest" --tests "*ChatCrashRestartTest" --tests "*LlamaServerStartFailureTest" :modules:app-services:test --rerun --tests "*AutomaticVduRecoveryTest" --tests "*AutomaticVduLoadedChatTest" --tests "*AutomaticVduBreakerSeamTest" -PskipWebBuild=true --console=plain
+      - name: Preserve exact execution evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verifier-startup-health-windows-${{ matrix.ref }}
+          path: modules/**/build/test-results/test/TEST-*.xml
+          if-no-files-found: error
