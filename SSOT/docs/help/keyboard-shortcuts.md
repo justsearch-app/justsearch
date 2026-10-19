@@ -9,8 +9,9 @@
 | Ctrl+Shift+Z | Redo |
 | Esc | Close an open menu, popover, or dialog |
 
-The command palette (Ctrl+K) is the fastest way to reach anything that does
-not have its own shortcut: open it and type the name of a view or action.
+The command palette (Ctrl+K) lists the app's actions and a "Go to" entry for
+the main views: open it and type a name, such as "Go to Library". Help is not
+in the palette; open it with the **?** button.
 
 ## When you are not typing in a text field
 

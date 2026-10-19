@@ -1,7 +1,7 @@
 # Search Syntax
 
-The search bar takes plain words. There are no special operators to learn:
-type what you are looking for.
+The search bar takes plain words. You do not need any operators: type what
+you are looking for.
 
 ## Basic search
 
@@ -19,13 +19,16 @@ quarterly report 2025
   words, and match them more strongly, rank higher.
 - **The last word can be partial.** The final word of your query also matches
   longer words that start with it, so `justsearc` finds "justsearch".
-- **Symbols are taken literally.** Quotes, `AND`/`OR`/`NOT`, wildcards, and
-  `field:value` have no special meaning in the search bar; they are searched
-  as ordinary text. Typing `"machine learning pipeline"` finds documents with
-  those words, not only the exact phrase.
+- **Uppercase `AND` and `NOT` are operators.** `budget AND forecast` keeps
+  only documents that contain both words, and `NOT` before a word works
+  against documents that contain it. `OR` is what the search bar does
+  anyway. Typed in lowercase, these are ordinary words.
+- **Other symbols are taken literally.** Quotes, wildcards, and `field:value`
+  have no special meaning in the search bar; they are searched as ordinary
+  text. Typing `"machine learning pipeline"` finds documents with those words,
+  not only the exact phrase.
 
-AI tools connected over MCP can ask for exact-phrase and boolean
-(AND/OR/NOT) queries instead.
+AI tools connected over MCP can also ask for exact-phrase queries.
 
 ## How ranking works
 

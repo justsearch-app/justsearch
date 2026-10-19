@@ -1,7 +1,7 @@
 # AI Features
 
 JustSearch includes optional AI capabilities that run entirely on your
-machine. No data is sent to external servers.
+machine. JustSearch itself sends none of your data to external servers.
 
 ## What gets installed
 
@@ -68,16 +68,23 @@ on your machine.
 
 For multi-step requests, choose "Delegate — the agent works multi-step" below
 the search bar. The agent can search your index, browse indexed folders,
-request ingestion of new files, and perform approved file operations. Anything
-that makes a change is gated — you approve it, and it is logged.
+request ingestion of new files, perform file operations, and remember facts
+and preferences for later conversations. Ingesting files and file operations
+wait for your approval; saving something to the agent's memory does not ask
+first.
 
 ## Use JustSearch from other AI tools (MCP)
 
 JustSearch can act as a private retrieval backend for external AI agents over
 the **Model Context Protocol (MCP)**. Tools like Claude Code, Cursor, and
 Claude Desktop can connect to your running instance and search, retrieve
-context, and ask questions over your files — without your data leaving your
-machine. This works with or without the AI models installed.
+context, and ask questions over your files. This works with or without the AI
+models installed.
+
+JustSearch listens only on your own machine and uploads nothing itself, but
+the passages it returns go to the client you connected. A cloud-hosted
+assistant, such as Claude Code or Claude Desktop, forwards them to its model
+provider like any other tool result.
 
 ## Requirements
 

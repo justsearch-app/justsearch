@@ -8,7 +8,7 @@ author-session: agent-a3d964ccf0b121268
 # Test-intent entries
 
 Help accuracy v3: the in-app help (SSOT/docs/help and the Help view) corrected against the live UI, and
-HELP_FILES_VERSION bumped to v3. Fail-before evidence ran against origin/main (abe1aff3a).
+HELP_FILES_VERSION bumped to v3. Fail-before evidence ran against origin/main (b823d22f2).
 The scenarios were drafted by the orchestrator under the owner's overnight delegation, not agreed
 in an agreement step, so each source is a delegated choice.
 
@@ -36,6 +36,30 @@ in an agreement step, so each source is a delegated choice.
       "evidence": "gates/test-intent/evidence/help-accuracy-v3.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java#v2MarkerReingestsOnceAndWritesV3"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DeferredForcedIngestTest.java"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "On a real KnowledgeServer booted over an existing index (an upgrade), the Worker is still read-only when the Head ingests the help with force_reindex. That forced submit is accepted instead of failing with a null indexing loop, and once the writer upgrade runs, the loop it creates re-extracts the file even though its modification time equals the indexed copy's, so the new help text replaces the old one.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18 ~21:20 UTC",
+          "delegationScope": "all remaining work of that night, which included landing worktree-help-content-accuracy (kept in task t-20261018-9feb50 to land after the Linux port); the owner validates in the morning",
+          "choice": "Scenario H2 of task t-20261019-b24879: After upgrade, the Engine re-ingests the help once; help search shows the new text and no stale copy",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/help-accuracy-v3.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DeferredForcedIngestTest.java#forcedSubmitWhileDeferredSucceedsAndReachesTheUpgradedLoop"
       ],
       "repaired": true
     },

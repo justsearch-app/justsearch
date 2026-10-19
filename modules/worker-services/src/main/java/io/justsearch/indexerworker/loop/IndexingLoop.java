@@ -222,7 +222,9 @@ public class IndexingLoop implements Closeable {
   // delivers — dropped enqueue, deleted file, cancelled scan — is retained for the process
   // lifetime. Tempdoc 821 §3-C3 made whole-root force-reindex scans a routine producer here
   // (previously only explicit submitBatch calls were), so the residue now scales with root size.
-  private final Set<String> forcedPaths = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  // Supplied by IndexingLoopOptions: a loop created by a deferred writer upgrade receives the set
+  // its read-only predecessor marked into while no loop existed.
+  private final Set<String> forcedPaths;
 
   // Tempdoc 798: memoization for the pending-ingest probe (see PENDING_INGEST_PROBE_TTL_MS).
   private volatile long pendingIngestProbedAtMs = 0L;
@@ -365,6 +367,7 @@ public class IndexingLoop implements Closeable {
     this.documentIdentityStore = opts.documentIdentityStore();
     this.migrationActiveSupplier = opts.migrationActiveSupplier();
     this.commitMetadataSupplier = opts.commitMetadataSupplier();
+    this.forcedPaths = opts.forcedPaths();
     if (opts.detailedTracing()) {
       log.info("Indexing pipeline tracing: enabled");
     }
