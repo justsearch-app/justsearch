@@ -97,6 +97,13 @@ final class ChatControllerLifecycleSeamTest {
     await(seam::noneAlive, "every launched server to end");
     assertNotNull(background(stopped::switchToOnlineMode).get(30, TimeUnit.SECONDS),
         "a terminal manager refuses a later start");
+    // Executor shutdown cannot witness an independent launcher spawned by close(). Observe the
+    // real launch log for 2.5 s: the two-second counterexample also needs time to start its child.
+    long observationEnd = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2_500);
+    while (System.nanoTime() < observationEnd) {
+      assertEquals(1, seam.models().size(), "nothing relaunches after quit");
+      Thread.sleep(20);
+    }
     assertEquals(1, seam.models().size(), "nothing relaunches after quit");
     assertTrue(seam.noneAlive());
   }

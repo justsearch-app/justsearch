@@ -95,8 +95,13 @@ The ten suites and independent-interrupt fixture keep their original executions 
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "B5: The real child fake records entry to health and holds its response on an explicit file signal. X/A/B/C ordering uses accepted-controller-wait stack witnesses, then releases health. Quit awaits startup completion and child exit and probes refusal of a later start. Health and drain lock probes run while the relevant response/lease is held. All original outcomes, identities, counts and cleanup remain; other fake users retain their configured startup delay.",
+      "whatMoved": "B5: The real child fake records entry to health and holds its response on an explicit file signal. X/A/B/C ordering uses accepted-controller-wait stack witnesses, then releases health. Quit awaits startup completion and child exit and probes refusal of a later start, then continuously checks the real launch log for 2.5 seconds. Existing controller/registered-executor shutdown barriers do not cover an independent launcher thread spawned by close(), as in audit M3b. The exact 800-ms mutation and its two-second variant each failed all five runs, while the clean candidate passed all five. The observation allows 500 ms beyond the two-second variant for scheduling and child startup; a launch first recorded after that window (including a delayed or starved launcher) can escape. The other B5 cases retain their completed-request and held health/drain witnesses; no additional absence window was removed there. Health and drain lock probes run while the relevant response/lease is held. All original outcomes, identities, counts and cleanup remain; other fake users retain their configured startup delay.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "The test must fail for the auditor's 800 ms mutation and for a 2 s variant, 5 of 5 each.",
+          "location": "task slow-tests-b user turn 6 (2026-10-19 Builder round 4, B5 quit)"
+        },
         {
           "kind": "owner-words",
           "quote": "For each suite: remove the waiting by the mechanism named (completion signal, latch, witness, existing clock), keep every execution and every assertion's meaning, and keep the real thing real (real HTTP, real lock deadline, real expiry where the test is about expiry).",
