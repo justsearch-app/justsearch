@@ -22,7 +22,7 @@
  *   event:       { name: local|pull_request|merge_group|push|workflow_dispatch, pr?, fork? }
  *   shallow:     true                                      run in a depth-1 clone
  *   step:        { write?: {path: content}, delete?: [path], move?: [[from, to]],
- *                  replaceIn?: {path: [from, to]}, message? }
+ *                  replaceIn?: {path: [from, to]}, symlink?: {path: target}, message? }
  */
 
 import { execFileSync } from 'node:child_process';
@@ -61,6 +61,11 @@ function applyStep(root, step) {
     const abs = path.join(root, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content, 'utf8');
+  }
+  for (const [rel, target] of Object.entries(step.symlink ?? {})) {
+    const abs = path.join(root, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.symlinkSync(target, abs);
   }
   for (const [rel, [from, to]] of Object.entries(step.replaceIn ?? {})) {
     const abs = path.join(root, rel);

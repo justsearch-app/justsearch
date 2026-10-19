@@ -61,6 +61,7 @@ export function isIsolatedJvmTestSource(rel, text) {
   if (match[3] !== (kotlin ? 'kt' : 'java')) return false;
   const parts = match[2].split('/');
   const name = parts.pop();
+  if (parts[0] !== 'io' || parts[1] !== 'justsearch') return false;
   if (parts.length === 0 || ![name, ...parts].every((p) => IDENTIFIER.test(p))) return false;
   const tokens = tokensOf(text, kotlin);
   if (!tokens) return false;
@@ -127,4 +128,26 @@ export function isIsolatedJvmTestSource(rel, text) {
   // Java permits an empty top-level declaration after the class.
   if (!kotlin) while (tokens[i] === ';') i++;
   return i === tokens.length;
+}
+
+/**
+ * Conservative collision check across arbitrary JVM sources, including ones the structural
+ * scanner cannot parse. Match the package with optional trivia/backticks and any mention of the
+ * simple type name, rather than trusting filenames or trying to parse every Java/Kotlin form.
+ * References, comments and literals can over-report collisions; uncertainty keeps the file gated.
+ */
+export function mayDeclareJvmType(text, qualifiedName) {
+  if (typeof text !== 'string') return true;
+  text = text.replace(/\r\n?/g, '\n');
+  // Java expands eligible Unicode escapes before tokenizing. Checking both forms also covers
+  // ineligible escapes and Kotlin strings without having to decide their lexical context.
+  const decoded = text.replace(/\\u+([0-9a-f]{4})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\r\n?/g, '\n');
+  const parts = qualifiedName.split('.');
+  const name = parts.pop().replace(/[$]/g, '\\$&');
+  const trivia = '(?:\\s|/\\*[\\s\\S]*\\*/|//[^\\r\\n]*(?:\\r?\\n|$))*';
+  const pkg = parts.map((p) => '`?' + p.replace(/[$]/g, '\\$&') + '`?').join(`${trivia}\\.${trivia}`);
+  const packagePattern = new RegExp(`\\bpackage${trivia}${pkg}(?![A-Za-z0-9_$])`, 'i');
+  const namePattern = new RegExp(`(?<![A-Za-z0-9_$])${name}(?![A-Za-z0-9_$])`, 'i');
+  return [text, decoded].some((source) => packagePattern.test(source) && namePattern.test(source));
 }

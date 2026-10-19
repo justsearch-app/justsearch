@@ -50,6 +50,8 @@ or separate acceptance record. All of these conditions must hold:
 
 - The path is added and absent at the resolved base. Existing files stay gated, including when
   only adding a test case or changing an expected value.
+- It is a regular file, not a symbolic link in either Git's index or the working tree. This applies
+  to frontend test sources too, including checkouts that materialize Git symlinks as regular files.
 - The path must not equal, ignoring letter case, any path at the base or any other changed path.
   This keeps additions that can collide on case-insensitive filesystems gated.
 - No in-scope test file, test-owned data, watched baseline, listed helper or Rust source is deleted
@@ -70,6 +72,10 @@ or separate acceptance record. All of these conditions must hold:
 - A Java or Kotlin source must declare exactly one top-level class, named after its file, with an
   explicit package matching its directory under the `java/` or `kotlin/` source root. Extra types,
   Kotlin top-level functions, properties or objects, and missing or mismatched packages stay gated.
+  Both the package and directory must be within `io.justsearch`. The fully qualified type name
+  must not collide, ignoring letter case, with a type at the base or elsewhere in the change in
+  any module or source set, including checked-in generated sources. The collision scan is
+  conservative: potential declarations, including name mentions in the same package, stay gated.
   Java static initializer blocks and Kotlin `init` blocks (including companion object initializers)
   stay gated. The conservative scanner recognises ordinary comments, literals, imports, annotations
   and class declarations; unsupported declarations or lexical forms (including Unicode escapes,

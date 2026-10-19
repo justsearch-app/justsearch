@@ -20,7 +20,8 @@
  *      the current content, plus the audit record on audit-selected PRs.
  */
 
-import { relative } from 'node:path';
+import { lstatSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 
 import { loadChangesets } from '../../lib/changeset-loader.mjs';
 import { TEST_EFFICACY_CLASSIFICATIONS } from '../test-efficacy/classifications.mjs';
@@ -39,7 +40,7 @@ import { computeDigest, entryItems, normalizeText, parseChangeset, sha256 } from
 import { validateEvidence } from './evidence.mjs';
 import { BaseResolutionError, diffWorkingTree, git, readAtRef, readWorking, resolveBase } from './git-diff.mjs';
 import { RustScanError, extractTestItems, testModuleFiles } from './rust-tests.mjs';
-import { isIsolatedJvmTestSource } from './jvm-test-source.mjs';
+import { isIsolatedJvmTestSource, mayDeclareJvmType } from './jvm-test-source.mjs';
 import {
   LOGIC_SEAMS_ITEM,
   LOGIC_SEAMS_PATH,
@@ -121,6 +122,32 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   const changeStatus = new Map(changes.map((c) => [c.path, c.status]));
   const readBase = (rel) => readAtRef(base.ref, rel, repoRoot);
   const readNow = (rel) => readWorking(rel, repoRoot);
+
+  // Check index mode as well as the filesystem: core.symlinks=false may materialize a link as a
+  // regular file. Untracked links are caught by lstat. Unreadable/non-regular entries fail closed.
+  const indexedSymlinks = new Set(git(['ls-files', '--stage', '-z'], repoRoot).split('\0')
+    .filter((r) => r.startsWith('120000 ')).map((r) => r.slice(r.indexOf('\t') + 1)));
+  const regularSource = (rel) => {
+    if (indexedSymlinks.has(rel)) return false;
+    try { return lstatSync(resolve(repoRoot, rel)).isFile(); } catch { return false; }
+  };
+  let jvmSources;
+  const uniqueJvmType = (rel) => {
+    if (!isIsolatedJvmTestSource(rel, readNow(rel))) return false;
+    // Include all source sets/modules and checked-in generated sources, not only test scope.
+    // Deleted and modified base declarations still count, as do added/untracked declarations.
+    if (!jvmSources) {
+      const isJvmSource = (p) => /^modules\/.*\.(java|kt)$/i.test(p);
+      jvmSources = [...baseBlobs.keys()].filter(isJvmSource).map((p) => ({
+        path: p, text: changedPaths.has(p) ? readBase(p) : readNow(p),
+      }));
+      for (const c of changes) {
+        if (c.status !== 'D' && isJvmSource(c.path)) jvmSources.push({ path: c.path, text: readNow(c.path) });
+      }
+    }
+    const name = rel.split('/').slice(5).join('.').replace(/\.(java|kt)$/, '');
+    return !jvmSources.some((s) => s.path !== rel && mayDeclareJvmType(s.text, name));
+  };
 
   // Rust: files a test-only `mod` declaration loads are test code as a whole.
   const rustTestFiles = new Set();
@@ -267,8 +294,9 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
       && !deletedTest && !deleted.some((d) => d.before === c.after)
       && !contextMoves.has(c.path) && !testSupport.has(c.path) && !rustTestFiles.has(c.path)
       && casePaths.get(c.path.toLowerCase()) === 1
+      && regularSource(c.path)
       && !buildConfigKind(c.path) && isStandaloneTestSource(c.path)
-      && (!/\.(java|kt)$/.test(c.path) || isIsolatedJvmTestSource(c.path, readNow(c.path)))) {
+      && (!/\.(java|kt)$/.test(c.path) || uniqueJvmType(c.path))) {
       exempt.push(c.path);
       findings.push(finding('isolated-new-test', 'note', `${c.path}: isolated new test source; no entry needed`, c.path));
       continue;
