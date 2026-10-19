@@ -1,6 +1,10 @@
 'use strict';
 /**
- * Start a dev tool's process so that every process it starts can be ended, without parent links.
+ * Start a dev tool with the platform's lifetime binding and recorded cleanup authority.
+ *
+ * Linux binds the direct child to this process's main thread through bound-exec. Descendants
+ * observed while that child lives are recorded by birth for normal stop; uninstrumented forks
+ * do not inherit this binding. This backend deliberately reports contained:false.
  *
  * On Windows the command runs under job-host.ps1: the root is created suspended inside a new job
  * whose only limit is KILL_ON_JOB_CLOSE (no breakaway), as WindowsEngineJob contains the Engine's
@@ -17,7 +21,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
+const { isMainThread } = require('node:worker_threads');
 const { spawn, spawnSync } = require('node:child_process');
+const { linuxIdentity, readLinuxProcess, readLinuxChildren, signalLinuxProcess, boundExecPath } = require('./process-identity.cjs');
 const { captureSpawnedIdentity } = require('./engine-actuator.cjs');
 
 const HOST_SCRIPT = path.join(__dirname, 'job-host.ps1');
@@ -65,8 +71,66 @@ function recordDirectory(env = process.env) {
  * @returns {{ child: import('child_process').ChildProcess, recordPath: string|null,
  *   host: {pid: number, creationFileTimeUtc: string}|null, contained: boolean }}
  */
+function spawnBoundChild(command, args, options = {}) {
+  if (!isMainThread) throw new Error('Linux bound children must be launched from the process-lifetime main thread');
+  const helper = boundExecPath();
+  fs.accessSync(helper, fs.constants.X_OK);
+  return (options.spawnImpl ?? spawn)(helper, ['exec', String(process.pid), '--', command, ...args], { ...options, shell: false });
+}
+
 function startInJob({ command, args = [], cwd, env = process.env, stdio, label = 'run', newProcessGroup = false,
   holdAfterRoot = false, recordDir = null, platform = process.platform, spawnImpl = spawn, capture = captureSpawnedIdentity } = {}) {
+  if (platform === 'linux') {
+    const dir = recordDir ?? recordDirectory(env);
+    fs.mkdirSync(dir, { recursive: true });
+    const recordPath = path.join(dir, `${label}-${process.pid}-${crypto.randomUUID()}.json`);
+    // Keep console events on the owner when requested, as the Windows backend does. A
+    // new POSIX session keeps PDEATHSIG: the helper still binds to this creating process.
+    const child = spawnBoundChild(command, args, { cwd, env, stdio, spawnImpl,
+      ...(newProcessGroup ? { detached: true } : {}) });
+    const host = capture(child);
+    const record = { backend: 'linux-bound-child-v1', pid: child.pid, root: host, state: 'running', members: host ? [host] : [] };
+    const write = () => {
+      const temporary = `${recordPath}.tmp`;
+      const fd = fs.openSync(temporary, 'w');
+      try { fs.writeFileSync(fd, JSON.stringify(record)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+      fs.renameSync(temporary, recordPath);
+      const directory = fs.openSync(dir, 'r');
+      try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
+    };
+    write();
+    // Observe descendants while the original child is alive, and record birth identities before
+    // stop. A stop never discovers kill authority through a fresh ancestry scan.
+    const observe = () => {
+      const root = readLinuxProcess(child.pid);
+      if (!root?.present || !host?.processIdentity || root.processIdentity?.startTicks !== host.processIdentity.startTicks) return;
+      const pending = [root.processIdentity], visited = new Set();
+      let changed = false;
+      while (pending.length) {
+        const parent = pending.shift();
+        if (visited.has(parent.pid)) continue;
+        visited.add(parent.pid);
+        const observed = readLinuxChildren(parent);
+        if (!observed.ok) continue;
+        for (const row of observed.children) {
+          const id = row.processIdentity;
+          pending.push(id);
+          if (!record.members.some(member => member.processIdentity?.bootId === id.bootId && member.pid === id.pid
+            && member.processIdentity?.startTicks === id.startTicks)) {
+            changed = true;
+            record.members.push({ pid: id.pid, processIdentity: id, executable: row.executable, cmdlineFingerprint: row.commandLine });
+          }
+        }
+      }
+      if (changed) write();
+    };
+    const timer = setInterval(observe, 100);
+    timer.unref();
+    child.once('exit', (code, signal) => { clearInterval(timer); record.state = 'root-exited'; record.rootExitCode = code;
+      record.rootSignal = signal; if (fs.existsSync(recordPath)) write(); });
+    child.once('error', () => { clearInterval(timer); record.state = 'start-failed'; if (fs.existsSync(recordPath)) write(); });
+    return { child, recordPath, host, contained: false, backend: record.backend };
+  }
   if (platform !== 'win32') {
     return { child: spawnImpl(command, args, { cwd, env, stdio, shell: false }), recordPath: null, host: null, contained: false };
   }
@@ -97,6 +161,32 @@ function readRunRecord(run) {
  * @returns {{ ok: boolean, outcome: string, survivors?: object[] }}
  */
 function stopJobRunSync(run, { code = NON_DISTINCTIVE_KILL_CODE, waitMs = 10000, exec = spawnSync, endedIdentities = [] } = {}) {
+  const linux = linuxIdentity(run?.host);
+  if (linux) {
+    const record = readRunRecord(run);
+    if (record?.backend !== 'linux-bound-child-v1' || record.root?.processIdentity?.bootId !== linux.bootId
+      || record.root?.processIdentity?.startTicks !== linux.startTicks || record.root?.pid !== linux.pid) return { ok: false, outcome: 'unknown-identity' };
+    const members = record.members ?? [];
+    const state = member => {
+      const seen = readLinuxProcess(member.pid), id = linuxIdentity(member);
+      if (!id || !seen) return 'unknown';
+      if (!seen.present) return 'ended';
+      const actual = linuxIdentity(seen);
+      if (!actual) return 'unknown';
+      return actual.bootId !== id.bootId || actual.startTicks !== id.startTicks ? 'ended' : 'alive';
+    };
+    // Root first. The Engine's own orderly stop handles its helpers before this fallback.
+    const terminated = [];
+    for (const member of members) if (state(member) === 'alive' && signalLinuxProcess(member).ok) terminated.push(member);
+    const end = performance.now() + waitMs, pause = new Int32Array(new SharedArrayBuffer(4));
+    let survivors;
+    do {
+      survivors = members.filter(member => state(member) !== 'ended');
+      if (!survivors.length) { fs.rmSync(run.recordPath, { force: true }); return { ok: true, outcome: 'gone', survivors: [], endedByJob: terminated }; }
+      Atomics.wait(pause, 0, 0, Math.min(20, Math.max(0, end - performance.now())));
+    } while (performance.now() < end);
+    return { ok: false, outcome: 'incomplete', survivors };
+  }
   if (!run?.recordPath || !run.host?.pid || !/^[1-9]\d{0,19}$/.test(String(run.host.creationFileTimeUtc ?? ''))) {
     return { ok: false, outcome: 'unknown-identity' };
   }
@@ -221,7 +311,7 @@ function rootAsChild(run, record, { spawnfile, pollMs = 25 } = {}) {
 }
 
 module.exports = {
-  startInJob, stopJobRunSync, readRunRecord, retireRunRecord, settleRunRecord, waitForRootSync, rootAsChild,
+  spawnBoundChild, startInJob, stopJobRunSync, readRunRecord, retireRunRecord, settleRunRecord, waitForRootSync, rootAsChild,
   windowsCommand, quoteArgument,
   recordDirectory, NON_DISTINCTIVE_KILL_CODE, HOST_SCRIPT, STOP_SCRIPT,
 };

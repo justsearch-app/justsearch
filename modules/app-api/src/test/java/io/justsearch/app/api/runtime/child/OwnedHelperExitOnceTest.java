@@ -20,7 +20,7 @@ import org.junit.jupiter.api.condition.OS;
  * reason, on real Windows processes. The same assertions run on b599d4d7e, where the OS exit
  * notification raced the owner's wait and wrote a second record.
  */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class OwnedHelperExitOnceTest {
   private final List<Map<String, Object>> records = new CopyOnWriteArrayList<>();
 
@@ -32,8 +32,9 @@ final class OwnedHelperExitOnceTest {
       return true;
     }, new EngineIdentity(ProcessHandle.current().pid(),
         ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()), "exit-once"));
-    return OwnedHelper.start(new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive",
-        "-Command", command).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+    return OwnedHelper.start(new ProcessBuilder(java.io.File.separatorChar != '\\'
+        ? FakeChild.argv(command.startsWith("exit") ? "exit:0:0" : "sleep")
+        : List.of("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command)).redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .redirectError(ProcessBuilder.Redirect.DISCARD), purpose);
   }
 

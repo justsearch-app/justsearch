@@ -320,15 +320,15 @@ cleanup failure was rerun in the worktree and is excluded from regression proof.
 ```powershell
 # For each module: app-services, app-agent, app-api, app-engine,
 # app-observability, configuration, ui, worker-core
-./gradlew.bat :modules:<module>:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:<module>:spotlessApply -PskipWebBuild=true --offline
 # Common installed-JDK option described above was present on every successful run.
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreMigrationBackupTest -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-engine:test --tests io.justsearch.app.engine.DataVersionMarkerTest -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStorePersistenceModeTest -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRecoveryEvidenceTest -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRevisionTest -PskipWebBuild=true --offline
-./gradlew.bat :modules:ui:test --tests io.justsearch.ui.SettingsWriterArchitectureTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreMigrationBackupTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:test --tests io.justsearch.app.engine.DataVersionMarkerTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStorePersistenceModeTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRecoveryEvidenceTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRevisionTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:test --tests io.justsearch.ui.SettingsWriterArchitectureTest -PskipWebBuild=true --offline
 node scripts/ci/check-store-recoverability.mjs
 node scripts/ci/check-runtime-manifest-closure.mjs
 node scripts/ci/check-readiness-reason-codes.mjs
@@ -440,42 +440,42 @@ this additional toolchain argument (no dependency or lockfile changes):
 Commands and summary lines (each command executed separately):
 
 ```text
-./gradlew.bat :modules:app-api:spotlessApply -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-engine:spotlessApply -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-launcher:spotlessApply -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-services:spotlessApply -PskipWebBuild=true --offline
-./gradlew.bat :modules:configuration:spotlessApply -PskipWebBuild=true --offline
-./gradlew.bat :modules:ui:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-api:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:configuration:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:spotlessApply -PskipWebBuild=true --offline
 # All six: BUILD SUCCESSFUL
-./gradlew.bat :modules:app-launcher:test --tests io.justsearch.applauncher.LauncherDataVersionMarkerTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:test --tests io.justsearch.applauncher.LauncherDataVersionMarkerTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 4 tests, 0 failures/errors
-./gradlew.bat :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesCreateOnceTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesCreateOnceTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 3 tests, 0 failures/errors
-./gradlew.bat :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 12 tests, 0 failures/errors
-./gradlew.bat :modules:app-engine:test --tests io.justsearch.app.engine.DataVersionMarkerTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:test --tests io.justsearch.app.engine.DataVersionMarkerTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 8 tests, 0 failures/errors
-./gradlew.bat :modules:app-engine:test --tests io.justsearch.app.engine.DefaultEngineProcessResourcesTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:test --tests io.justsearch.app.engine.DefaultEngineProcessResourcesTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 3 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreMigrationBackupTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreMigrationBackupTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 3 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 8 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStorePersistenceModeTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStorePersistenceModeTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 44 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRecoveryEvidenceTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRecoveryEvidenceTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 5 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRevisionTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRevisionTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 13 tests, 0 failures/errors
-./gradlew.bat :modules:app-launcher:test --tests io.justsearch.app.launcher.BoundaryRulesTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:test --tests io.justsearch.app.launcher.BoundaryRulesTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 1 tests, 0 failures/errors
-./gradlew.bat :modules:app-launcher:test --tests io.justsearch.app.launcher.LayeringEnforcementTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:test --tests io.justsearch.app.launcher.LayeringEnforcementTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 14 tests, 0 failures/errors
-./gradlew.bat :modules:app-launcher:test --tests io.justsearch.applauncher.LauncherEnvironmentCloseTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:test --tests io.justsearch.applauncher.LauncherEnvironmentCloseTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 12 tests, 0 failures/errors
-./gradlew.bat :modules:app-api:test --tests io.justsearch.app.api.ArchitectureRulesTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-api:test --tests io.justsearch.app.api.ArchitectureRulesTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 3 tests, 0 failures/errors
-./gradlew.bat :modules:ui:test --tests io.justsearch.ui.SettingsWriterArchitectureTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:test --tests io.justsearch.ui.SettingsWriterArchitectureTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 4 tests, 0 failures/errors
 # Total green: 137 tests across 15 focused classes, 0 failures/errors
 # First two focused commands also ran with the temporary negative controls:
@@ -552,26 +552,26 @@ temp setup from the preceding proof were reused.
 Exact focused commands and summary lines (same toolchain argument as above):
 
 ```text
-./gradlew.bat :modules:configuration:spotlessApply -PskipWebBuild=true --offline
-./gradlew.bat :modules:app-services:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:configuration:spotlessApply -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:spotlessApply -PskipWebBuild=true --offline
 # Both: BUILD SUCCESSFUL
-./gradlew.bat :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesCreateOnceTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesCreateOnceTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 4 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreMigrationBackupTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreMigrationBackupTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 4 tests, 0 failures/errors
-./gradlew.bat :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test --tests io.justsearch.configuration.persistence.AtomicFileWritesTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 12 tests, 0 failures/errors
-./gradlew.bat :modules:configuration:test --tests io.justsearch.configuration.persistence.ContendedFileReadsTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test --tests io.justsearch.configuration.persistence.ContendedFileReadsTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 7 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 8 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStorePersistenceModeTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStorePersistenceModeTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 44 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRecoveryEvidenceTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRecoveryEvidenceTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 5 tests, 0 failures/errors
-./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRevisionTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRevisionTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 13 tests, 0 failures/errors
-./gradlew.bat :modules:ui:test --tests io.justsearch.ui.SettingsWriterArchitectureTest -PskipWebBuild=true --offline
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:test --tests io.justsearch.ui.SettingsWriterArchitectureTest -PskipWebBuild=true --offline
 # BUILD SUCCESSFUL; 4 tests, 0 failures/errors
 # Total: 101 tests, 0 failures/errors
 node scripts/ci/check-store-recoverability.mjs

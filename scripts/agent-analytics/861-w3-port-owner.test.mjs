@@ -15,10 +15,13 @@
  */
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { resolveListenerPidWindows } = require('../dev/lib/port-owner.cjs');
+const { resolveListenerPidWindows, resolveListenerPid } = require('../dev/lib/port-owner.cjs');
 
 let passed = 0;
 const failures = [];
@@ -39,6 +42,25 @@ function fakeExec(stdout, status = 0) {
 // actually shell out to PowerShell, so it is safe (and REQUIRED, since this CI job runs on
 // ubuntu-latest) to force `platform: 'win32'` explicitly rather than trust `process.platform`.
 const WIN32 = { platform: 'win32' };
+
+check('Linux socket inodes identify a unique listener; missing, shared and unreadable owners stay unknown', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'port-owner-'));
+  const opts = { platform: 'linux', procRoot: root };
+  try {
+    fs.mkdirSync(path.join(root, 'net')); fs.mkdirSync(path.join(root, '101', 'fd'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'net', 'tcp'), 'header\n 0: 0100007F:1447 00000000:0000 0A 0 0 0 0 0 777\n');
+    fs.writeFileSync(path.join(root, 'net', 'tcp6'), 'header\n');
+    fs.symlinkSync('socket:[777]', path.join(root, '101', 'fd', '3'));
+    assert.deepEqual(resolveListenerPid(5191, opts), { ok: true, pid: 101 });
+    assert.equal(resolveListenerPid(5192, opts).ok, false);
+    fs.mkdirSync(path.join(root, '102', 'fd'), { recursive: true });
+    fs.symlinkSync('socket:[777]', path.join(root, '102', 'fd', '4'));
+    assert.equal(resolveListenerPid(5191, opts).ok, false, 'a shared socket never chooses one owner');
+    fs.rmSync(path.join(root, 'net', 'tcp'));
+    assert.equal(resolveListenerPid(5191, opts).ok, false);
+    assert.equal(resolveListenerPid(0, opts).ok, false);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
 
 check('resolves the OwningProcess pid from well-formed JSON', () => {
   const result = resolveListenerPidWindows(5191, { ...WIN32, exec: fakeExec('{"OwningProcess":4321}') });

@@ -31,9 +31,9 @@ def run_rag_eval(
     timeout_sec: float = 3600,
 ) -> dict:
     """Run the RAG quality evaluation Gradle test and return the artifact."""
-    gradlew = "./gradlew.bat"
+    gradlew = str(REPO_ROOT / "scripts" / "lib" / "tool-invoker.cjs")
     args = [
-        gradlew,
+        "node", gradlew, "gradle",
         ":modules:system-tests:integrationTest",
         "--tests", "*RagQualityEvalTest",
     ]

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.ModelPathSource;
 import io.justsearch.configuration.SystemAccess;
@@ -527,12 +528,17 @@ public record InferenceConfig(
     if (envPath != null && !envPath.isBlank()) {
       Path p = Path.of(envPath);
       log.debug("  JUSTSEARCH_SERVER_EXE set to: {}", envPath);
-      if (Files.exists(p)) {
+      if (Files.isRegularFile(p) && (io.justsearch.configuration.PlatformPaths.isWindows() || Files.isExecutable(p))) {
         log.debug("  Found via environment variable: {}", p);
         return p;
-      } else {
-        log.warn("  JUSTSEARCH_SERVER_EXE path does not exist: {}", p);
       }
+      if (!Files.notExists(p)) {
+        throw new IllegalStateException("Configured server executable must name a regular executable file: " + p);
+      }
+      // A saved runtime may have been removed. Preserve the target's bundled fallback policy;
+      // targets without one keep the missing path so availability reports the actual missing file.
+      if (!NativeTargets.current().hasCpuBaselineRuntime()) return p;
+      log.debug("  Configured executable is missing; trying bundled runtime: {}", p);
     } else {
       log.debug("  JUSTSEARCH_SERVER_EXE not set");
     }
@@ -575,7 +581,7 @@ public record InferenceConfig(
     log.debug("  Searching in: {} (exists: {})", nativeBin, Files.isDirectory(nativeBin));
 
     // 1. Check canonical baseline path FIRST (deterministic, preferred in release builds)
-    Path directPath = nativeBin.resolve("llama-server.exe");
+    Path directPath = nativeBin.resolve(NativeTargets.current().executableName("llama-server"));
     if (Files.exists(directPath)) {
       log.debug("  Found baseline at canonical path: {}", directPath);
       // If GPU requested, still check for CUDA variant which is better
@@ -605,7 +611,7 @@ public record InferenceConfig(
             .filter(d -> !"variants".equalsIgnoreCase(d.getFileName().toString()))
             .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
             .peek(d -> log.debug("    Checking subdirectory: {}", d))
-            .map(d -> d.resolve("llama-server.exe"))
+            .map(d -> d.resolve(NativeTargets.current().executableName("llama-server")))
             .filter(Files::exists)
             .findFirst();
         if (found.isPresent()) {
@@ -634,11 +640,11 @@ public record InferenceConfig(
    */
   private static Path findCudaVariant(Path nativeBin) {
     Path variantsDir = nativeBin.resolve("variants");
-    if (!Files.isDirectory(variantsDir)) {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() || !Files.isDirectory(variantsDir)) {
       return null;
     }
     // Prefer cuda12 explicitly (deterministic, no scanning ambiguity)
-    Path cuda12 = variantsDir.resolve("cuda12").resolve("llama-server.exe");
+    Path cuda12 = variantsDir.resolve("cuda12").resolve(NativeTargets.current().executableName("llama-server"));
     if (Files.exists(cuda12)) {
       log.debug("  Found CUDA variant: {}", cuda12);
       return cuda12;
@@ -648,7 +654,7 @@ public record InferenceConfig(
   }
 
   private static Path canonicalServerExecutable(Path baseDir) {
-    Path directPath = baseDir.resolve("native-bin").resolve("llama-server").resolve("llama-server.exe");
+    Path directPath = baseDir.resolve("native-bin").resolve("llama-server").resolve(NativeTargets.current().executableName("llama-server"));
     log.debug("  Using fallback path: {} (exists: {})", directPath, Files.exists(directPath));
     return directPath;
   }

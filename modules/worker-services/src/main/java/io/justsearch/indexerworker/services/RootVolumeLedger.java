@@ -64,7 +64,7 @@ final class RootVolumeLedger {
   private static final String PENDING_COMMENT =
       "Roots awaiting their one-time upgrade seeding (task t-20261013-ef3c41)";
   private static final String AWAITING = "awaiting";
-  /** A recorded volume: a lower-case scheme, a colon and a hexadecimal serial. */
+  /** Legacy serial records retain their exact representation; Linux UUID tuples are versioned. */
   private static final Pattern VOLUME = Pattern.compile("[a-z][a-z0-9-]*:[0-9a-f]+");
   private static final Logger log = LoggerFactory.getLogger(RootVolumeLedger.class);
 
@@ -420,7 +420,8 @@ final class RootVolumeLedger {
       String folder = !pendingEntries && name.startsWith(FILE_FOLDER_PREFIX)
           ? name.substring(FILE_FOLDER_PREFIX.length()) : name;
       boolean wellFormed = absoluteFolder(folder)
-          && (pendingEntries ? AWAITING.equals(value) : VOLUME.matcher(value).matches());
+          && (pendingEntries ? AWAITING.equals(value) : ((!value.startsWith("linux-volume-") && VOLUME.matcher(value).matches())
+              || LinuxRootIdentityLease.validVolume(value)));
       if (!wellFormed) {
         throw new CorruptRecordException(target, "an entry is not a folder with "
             + (pendingEntries ? "its seeding state" : "a volume"));

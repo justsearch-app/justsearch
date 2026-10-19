@@ -31,7 +31,7 @@ update it before closing.
 - When your work opens a new question, add it to Open Questions.
 - Keep entries terse. Evidence lives in tempdocs; this file is the index.
 - After ORT/session concurrency changes, run the stress-tagged Gradle tests
-  explicitly with `./gradlew.bat test -PincludeStress=true --tests "*Stress*"`.
+  explicitly with `./gradlew test -PincludeStress=true --tests "*Stress*"`.
   There is no scheduled stress cadence, so runtime agents touching
   `NativeSessionHandle` or `SessionHandle` are one trigger point for this
   opt-in verification.
@@ -371,7 +371,7 @@ Design choices in the current inference runtime, with rationale.
 - **Rationale:** All encoders used identical session options (`kSameAsRequested` arena, no CUDA graph, device allocator for initializers, no memory pattern optimization). The factory encoded these once.
 - **Evidence:** tempdoc 349 (factory extraction), tempdoc 352 (module split), tempdoc 359 (`OrtSessionManager`), tempdoc 360 (Worker co-location), tempdoc 397 (factory absorbed into assembler + handle; closure property §6).
 - **Current shape:** See D-007 below. The identical-session-options claim is now enforced by `SessionOptionsApplier` walking `RuntimePolicy` records (tempdoc 397 §14.24 FA) rather than by a shared factory class.
-- **Verification:** `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path>` task — routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (§14.24 FA).
+- **Verification:** `./gradlew :modules:worker-core:verifyModel -Pmodel=<path>` task — routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (§14.24 FA).
 
 ### D-005: Model file manifest convention (`model_manifest.json`) — SHIPPED
 
@@ -965,7 +965,7 @@ Entries are `<root>/<ortVersion>/<cpu|cuda>-<optLevel>/<sha256>/model.onnx` plus
 
 Hits update `lastUsed`; after publication, the store counts committed graph and metadata bytes across providers in the current ORT version and evicts least-recently-used entries to the cap (path order breaks ties). Cleanup/eviction failures are logged and non-fatal, so this is a best-effort bound, not a reservation before optimization. First initialization per root/version in a JVM removes other root children (old version namespaces), refusing linked paths. Any `*.onnx_data` sibling or tensor external-data declaration, including nested tensor-bearing fields, excludes a model from disk caching; failed inspection/store preparation falls back to in-memory optimization. Each session load attempts deletion of exactly the four legacy regular-file siblings `.optimized`, `.opt-meta`, `.cuda.optimized`, `.cuda.opt-meta`, refusing symlinks/junctions and directories. These graphs are registered as derived, regenerable storage in `governance/store-recoverability.v1.json` (`ort-optimized-models`); see [D-012](../reference/inference-runtime-register.md#d-012-ort-optimized-graphs-one-content-keyed-per-machine-store--shipped).
 
-Model file verification: `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path> -Pgpu=true`
+Model file verification: `./gradlew :modules:worker-core:verifyModel -Pmodel=<path> -Pgpu=true`
 
 ### 4. Reranker GPU Coordination (index-half, default enabled)
 
@@ -1458,3 +1458,18 @@ The removed deep-dive material described these obsolete implementation concepts:
 This breadcrumb section exists so older tempdocs, ADRs, and commit messages remain intelligible without making the deprecated architecture look current.
 
 <!-- generated:end -->
+
+## Linux operator runtime
+
+Linux development requires JDK 25, Node 24, `cc`, Tesseract, an NVIDIA driver and a CUDA
+llama-server built from the pinned llama.cpp `b8571` sources. Set `JUSTSEARCH_SERVER_EXE` to
+that regular executable file and grant execute permission. Resolve its shared-library dependencies
+with the system loader (for example, an operator-managed `LD_LIBRARY_PATH`). ONNX Runtime also
+requires CUDA 12 libraries; these are separate from llama-server's CUDA dependencies.
+
+Doctor, dev preflight and launch use the same override. An invalid override is an error. An omitted
+`ai_activate` variant selects the override through the `default` variant; explicit `cuda12` retains
+its Windows runtime meaning. Linux runtime packs are not provisioned by the Windows download task.
+To replace the operator runtime, stop/deactivate it, replace the executable and adjacent dependencies,
+check execute permission and shared-library resolution, and activate again. Keep the configured path
+stable across restarts, or update the override before starting the next stack.

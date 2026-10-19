@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 import { logWarn } from './log.mjs';
+import { resolveDevRunnerStateRoot } from './paths.mjs';
 
 function tail(str, maxChars) {
   const s = String(str || '');
@@ -168,7 +169,7 @@ export async function runCliJson({ repoRoot, devRunnerPath, args, timeoutMs, mod
 }
 
 export async function readRunJson({ repoRoot, runId }) {
-  const p = path.join(repoRoot, 'tmp', 'dev-runner', 'runs', runId, 'run.json');
+  const p = path.join(resolveDevRunnerStateRoot(repoRoot), 'runs', runId, 'run.json');
   const raw = await fsp.readFile(p, 'utf8');
   return JSON.parse(raw);
 }

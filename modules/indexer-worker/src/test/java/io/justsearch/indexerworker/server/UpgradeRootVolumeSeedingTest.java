@@ -72,7 +72,7 @@ final class UpgradeRootVolumeSeedingTest {
   private static final List<String> RECORD_FILES =
       List.of("root-volumes.properties", "root-volumes-pending.properties");
 
-  @TempDir Path tempDir;
+  @TempDir(factory = io.justsearch.indexerworker.services.VolumeIdentityTempDirFactory.class) Path tempDir;
   private Path otherVolume;
   private String letter;
   private LetterLock letterLock;
@@ -106,9 +106,9 @@ final class UpgradeRootVolumeSeedingTest {
 
   @Test
   void anUpgradeWithTheSameDrivesRecordsEveryRootOnEvidenceAndKeepsItsIndex() throws Exception {
-    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
-    // (NoVolumeIdentityExtension, round 9).
-    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+    // Native volume identity is required; the no-volume-identity campaign covers its absence.
+    assumeTrue((WINDOWS || io.justsearch.indexerworker.services.VolumeIdentityTempDirFactory.hasLinuxVolumeIdentity(tempDir))
+        && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
         "a volume is recorded only where the platform exposes a volume identity");
     Path letters = Files.createDirectories(tempDir.resolve("letters"));
     Path photos = Files.createDirectories(tempDir.resolve("photos"));
@@ -138,9 +138,9 @@ final class UpgradeRootVolumeSeedingTest {
 
   @Test
   void anUpgradeRecordsARootWithNothingIndexedLikeAnAdd() throws Exception {
-    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
-    // (NoVolumeIdentityExtension, round 9).
-    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+    // Native volume identity is required; the no-volume-identity campaign covers its absence.
+    assumeTrue((WINDOWS || io.justsearch.indexerworker.services.VolumeIdentityTempDirFactory.hasLinuxVolumeIdentity(tempDir))
+        && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
         "a volume is recorded only where the platform exposes a volume identity");
     Path letters = Files.createDirectories(tempDir.resolve("letters"));
     Path empty = Files.createDirectories(tempDir.resolve("empty"));
@@ -296,7 +296,8 @@ final class UpgradeRootVolumeSeedingTest {
 
   /** The folders at or under {@code folder} that the Worker's volume record names. */
   private List<String> recordedVolumesUnder(Path folder) throws IOException {
-    String key = folder.toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
+    String nativeKey = folder.toAbsolutePath().normalize().toString();
+    String key = WINDOWS ? nativeKey.toLowerCase(Locale.ROOT) : nativeKey;
     List<String> recorded = new ArrayList<>();
     try (Stream<Path> files = Files.walk(layout.dataDir())) {
       for (Path file : files.filter(p -> p.getFileName().toString()
@@ -306,8 +307,8 @@ final class UpgradeRootVolumeSeedingTest {
           entries.load(in);
         }
         for (String name : entries.stringPropertyNames()) {
-          String lower = name.toLowerCase(Locale.ROOT);
-          if (lower.equals(key) || lower.startsWith(key + "\\")) {
+          String lower = WINDOWS ? name.toLowerCase(Locale.ROOT) : name;
+          if (lower.equals(key) || lower.startsWith(key + (WINDOWS ? "\\" : "/"))) {
             recorded.add(name);
           }
         }

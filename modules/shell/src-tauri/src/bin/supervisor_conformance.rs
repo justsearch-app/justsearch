@@ -46,6 +46,12 @@ mod containment;
 #[allow(dead_code)]
 mod exit_ledger;
 
+#[cfg(target_os = "linux")]
+#[path = "../linux_process.rs"]
+mod linux_process;
+#[path = "../native_targets.rs"]
+#[allow(dead_code)]
+mod native_targets;
 #[path = "../quit.rs"]
 mod quit;
 #[path = "../session_window.rs"]
@@ -89,7 +95,7 @@ fn start_supervision(_: &tauri::AppHandle, _: Arc<BackendState>) -> Result<(), S
     Err("conformance must keep its original actor".into())
 }
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use supervisor::{Actuator, Outcome};
@@ -100,6 +106,10 @@ fn arg(name: &str) -> Option<String> {
         .and_then(|i| args.get(i + 1).cloned())
 }
 fn main() {
+    #[cfg(target_os = "linux")]
+    linux_process::set_bundle_dir(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/build/install/ui"),
+    );
     let data_dir = PathBuf::from(arg("--data-dir").expect("data dir"));
     let fake_engine = PathBuf::from(arg("--fake-engine").expect("fake engine"));
     let plan = PathBuf::from(arg("--plan").expect("plan"));
@@ -127,7 +137,7 @@ fn main() {
         data_dir.clone(),
         move || {
             spawn_host.reset_for_successor()?;
-            let mut command = Command::new(&node);
+            let mut command = containment::engine_command(&node).map_err(|e| e.to_string())?;
             command
                 .arg(&fake_engine)
                 .env("JUSTSEARCH_DATA_DIR", &spawn_dir)
@@ -190,6 +200,17 @@ fn main() {
                 if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
                     let _ = std::fs::remove_file(control_dir.join("shell-control.json"));
                     match value["action"].as_str() {
+                        Some("session-query") => {
+                            trigger_coordinator.begin(quit::QuitCause::SessionEnd {
+                                close_app: false,
+                            });
+                        }
+                        Some("session-end") => {
+                            let ticket = trigger_coordinator.begin(quit::QuitCause::SessionEnd {
+                                close_app: false,
+                            });
+                            let _ = trigger_coordinator.wait(ticket);
+                        }
                         Some("triggers") => {
                             trigger_coordinator.begin(quit::QuitCause::TrayQuit);
                             trigger_coordinator.begin(quit::QuitCause::Drop);

@@ -542,7 +542,7 @@ export function subsetMismatch(want, actual, where) {
  * this one; otherwise a record belongs to `runId`. A forced kill that fell back to taskkill (dev only,
  * recorded `codeDistinctive: false`) leaves code 1 instead of JS_ENGINE_STOP and is accepted as such.
  */
-export function ledgerMismatch(records, expected, { runId, previousRunId }) {
+export function ledgerMismatch(records, expected, { runId, previousRunId, adapter = 'dev-runner' }) {
   // The Engine names itself by process, not incarnation (Spec B §6.1): a self-intent belongs to the
   // incarnation of this run whose engine-start, written before it, has the same pid.
   const byPid = new Map();
@@ -570,12 +570,23 @@ export function ledgerMismatch(records, expected, { runId, previousRunId }) {
       problems.push(`${where}: session ${got.incarnation?.session}, expected the previous run ${previousRunId}`);
     }
     const compared = { ...fields };
-    if (type === 'engine-exit' && compared.code === JS_ENGINE_STOP && got.codeDistinctive === false) {
+    if (type === 'engine-exit' && compared.code === JS_ENGINE_STOP && process.platform === 'linux') {
+      // POSIX reports the terminating signal, not a Windows DWORD exit code. Keep forced-stop
+      // provenance and its deadline asserted. The shell also proves its prior owner intent;
+      // the dev-runner retains its conservative UNKNOWN classification.
+      compared.code = null;
+      compared.exitClass = adapter === 'tauri' ? 'REQUESTED' : 'UNKNOWN';
+      if (adapter === 'tauri') { compared.signal = 9; compared.ownerIntentBeforeSignal = true; }
+      compared.codeDistinctive = false;
+      compared.forced = true;
+      if (!Number.isFinite(Date.parse(got.terminateCalledAt))) problems.push(`${where}: missing forced-stop timestamp`);
+      if (got.exitedAt !== null) problems.push(`${where}: fabricated OS exit timestamp`);
+    } else if (type === 'engine-exit' && compared.code === JS_ENGINE_STOP && got.codeDistinctive === false) {
       // The documented dev fallback (Spec F §5.2): taskkill /F, code 1, recorded as such.
       compared.code = 1;
     }
     problems.push(...subsetMismatch(compared, got, where));
-    if (type === 'engine-exit' && got.codeDistinctive === false && got.code !== 1) {
+    if (type === 'engine-exit' && got.codeDistinctive === false && got.code !== (process.platform === 'linux' ? null : 1)) {
       problems.push(`${where}: codeDistinctive false with code ${got.code}`);
     }
   });

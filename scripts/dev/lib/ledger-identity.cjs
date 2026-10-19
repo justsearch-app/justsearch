@@ -25,12 +25,16 @@
  *                 dev runner, dev CLI), that Engine itself (its PID, started its millisecond) or a
  *                 writer that recorded the start (`ctx.startWriters`: role, PID and start instant).
  *                 Any other record must carry and agree on every field the start carries.
+ *                 A helper with no birth can instead be proven only by its unique logical key,
+ *                 exact owner/incarnation, same creator writer and an observed integer exit code;
+ *                 this receipt proves an exit, never an OS identity or signal authority.
  *   'contradicts' some field both carry disagrees (a record about another process of the same key).
  *   'exact'       one start: the same fields, each equal, the births to the tick.
  *   'native'      one process by PID and birth alone, for pairing records whose other fields describe
  *                 different relations (a receipt's creator, a witness's Engine); never a proof.
  * The precision and ordering helpers live here too, so no consumer compares a PID or a birth itself. */
 'use strict';
+const { linuxIdentity } = require('./process-identity.cjs');
 const { knownTimestamp } = require('./exit-ledger.cjs');
 
 const EPOCH_FILETIME = 116444736000000000n;
@@ -58,8 +62,8 @@ const incarnationOf = (inc) => (inc && typeof inc === 'object'
 // place) is read again, never answered with the value of what it was.
 const derived = new WeakMap();
 const ownerField = (x) => x.owner ?? x.previousOwner;
-const sourceOf = (x) => [x.pid, x.ProcessId, x.creationFileTimeUtc, x.creationFileTime, x.CreationFileTimeUtc, x.birthTick,
-  x.creationTimeSource, x.childId, x.witnessId, x.instanceId, x.owner, x.previousOwner, x.incarnation, x.incarnation?.session,
+const sourceOf = (x) => [x.processIdentity, x.processIdentity?.kind, x.processIdentity?.pid, x.processIdentity?.bootId, x.processIdentity?.startTicks, x.pid, x.ProcessId, x.creationFileTimeUtc, x.creationFileTime, x.CreationFileTimeUtc, x.birthTick,
+  x.creationTimeSource, x.childId, x.helperId, x.witnessId, x.instanceId, x.owner, x.previousOwner, x.incarnation, x.incarnation?.session,
   x.incarnation?.n];
 const unchanged = (hit, x) => {
   const now = sourceOf(x);
@@ -75,32 +79,34 @@ const unchanged = (hit, x) => {
  * `defaultTick` (the microsecond, CIM's, for a birth whose clock is not named).
  */
 function identityOf(x, { tick = null, source = null, kind = null, defaultTick = TICK.MICROSECOND, owner, incarnation,
-  childId, witnessId } = {}) {
+  childId, helperId, witnessId } = {}) {
   if (x?.[IDENTITY]) return x;
   if (x?.identity?.[IDENTITY]) return x.identity;
   if (!x || typeof x !== 'object') return null;
   const plain = tick === null && source === null && kind === null && owner === undefined && incarnation === undefined
-    && childId === undefined && witnessId === undefined;
+    && childId === undefined && helperId === undefined && witnessId === undefined;
   if (plain) {
     const hit = derived.get(x)?.get(String(defaultTick));
     if (hit && unchanged(hit, x)) return hit.value;
   }
-  const value = build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, witnessId });  if (plain) {
+  const value = build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, helperId, witnessId });  if (plain) {
     if (!derived.has(x)) derived.set(x, new Map());
     derived.get(x).set(String(defaultTick), { value, source: sourceOf(x) });
   }
   return value;
 }
 
-function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, witnessId }) {
-  const birth = birthField(x);
+function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId, helperId, witnessId }) {
+  const linux = linuxIdentity(x);
+  const birth = x.processIdentity && !linux ? null : birthField(x);
   // A reconciliation names the owner it found dead as `previousOwner`.
   const ownerValue = owner !== undefined ? owner : ownerField(x);
   const value = {
     [IDENTITY]: true,
     pid: validPid(x.pid ?? x.ProcessId),
-    birth: isFileTime(birth) ? birth : null,
-    rawBirth: birth,
+    processIdentity: linux,
+    birth: linux ? linux.startTicks : isFileTime(birth) ? birth : null,
+    rawBirth: linux ? `linux-proc-v1/${linux.bootId}/${linux.startTicks}` : x.processIdentity ? `invalid:${JSON.stringify(x.processIdentity)}` : birth,
     // A birth read natively (GetProcessTimes) is exact whatever tick a record declares beside it: two
     // native FILETIMEs are compared to the tick, never at a coarser declaration (round 9).
     tick: String(tick ?? (x.creationTimeSource === 'native' ? TICK.EXACT : null) ?? tickOf(x.birthTick)
@@ -108,6 +114,7 @@ function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId
     source: source ?? x.creationTimeSource ?? null,
     kind: kind ?? null,
     childId: (childId !== undefined ? childId : x.childId) ?? null,
+    helperId: (helperId !== undefined ? helperId : x.helperId) ?? null,
     witnessId: (witnessId !== undefined ? witnessId : x.witnessId) ?? null,
     instanceId: x.instanceId ?? null,
     owner: ownerValue && typeof ownerValue === 'object' ? identityOf(ownerValue, { defaultTick: TICK.EXACT }) : null,
@@ -125,7 +132,7 @@ function build(x, { tick, source, kind, defaultTick, owner, incarnation, childId
 function startIdentity(fields) {
   return identityOf(fields, { tick: fields.tick ?? TICK.EXACT, source: fields.source ?? 'ledger', kind: fields.kind ?? null,
     owner: fields.owner ?? null, incarnation: fields.incarnation ?? null, childId: fields.childId ?? null,
-    witnessId: fields.witnessId ?? null });
+    helperId: fields.helperId ?? null, witnessId: fields.witnessId ?? null });
 }
 
 /** Records later metadata that disagrees with a start's identity, without changing the identity. */
@@ -136,15 +143,18 @@ function noteConflict(identity, conflict) {
 }
 
 const coarser = (a, b) => { const x = BigInt(a.tick), y = BigInt(b.tick); return x > y ? x : y; };
-const birthsAgree = (a, b, tick = coarser(a, b)) => a.birth !== null && b.birth !== null
-  && BigInt(a.birth) / tick === BigInt(b.birth) / tick;
+const birthsAgree = (a, b, tick = coarser(a, b)) => {
+  if (a.processIdentity || b.processIdentity) return Boolean(a.processIdentity && b.processIdentity)
+    && a.processIdentity.bootId === b.processIdentity.bootId && a.processIdentity.startTicks === b.processIdentity.startTicks;
+  return a.birth !== null && b.birth !== null && BigInt(a.birth) / tick === BigInt(b.birth) / tick;
+};
 const sameIncarnation = (a, b) => a.session === b.session && a.n === b.n;
 const both = (a, b, f) => a[f] != null && b[f] != null;
 
 /** Two values name one process (rule 'same'). */
 function same(A, B) {
   if (!A || !B || A.pid === null || B.pid === null || A.pid !== B.pid || !birthsAgree(A, B)) return false;
-  for (const f of ['childId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return false;
+  for (const f of ['childId', 'helperId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return false;
   if (both(A, B, 'owner') && !same(A.owner, B.owner)) return false;
   if (both(A, B, 'incarnation') && !sameIncarnation(A.incarnation, B.incarnation)) return false;
   return true;
@@ -155,7 +165,7 @@ function contradicts(A, B) {
   if (!A || !B) return false;
   if (both(A, B, 'pid') && A.pid !== B.pid) return true;
   if (A.rawBirth != null && B.birth !== null && !birthsAgree(A, B)) return true;
-  for (const f of ['childId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return true;
+  for (const f of ['childId', 'helperId', 'witnessId', 'instanceId']) if (both(A, B, f) && A[f] !== B[f]) return true;
   if (both(A, B, 'owner') && contradicts(A.owner, B.owner)) return true;
   if (both(A, B, 'incarnation') && !sameIncarnation(A.incarnation, B.incarnation)) return true;
   return false;
@@ -184,6 +194,7 @@ function writerIsOwner(writer, owner, { unknownBirth = false } = {}) {
   const O = identityOf(owner, { defaultTick: TICK.EXACT });
   if (!writer || writer.role !== 'engine' || !O || O.pid === null) return false;
   if (validPid(writer.pid) !== O.pid) return false;
+  if (O.processIdentity) return compareIdentity(writer, O, 'native');
   const startedMs = Number.isFinite(writer.startedAt) ? writer.startedAt : knownTimestamp(writer.startedAt);
   if (startedMs == null) return unknownBirth;
   return O.birth !== null && birthMs(O) === startedMs;
@@ -196,7 +207,8 @@ const writerOfThisProcess = (w) => validPid(w?.pid) === process.pid;
 /** The same writer: one role, one PID, one start instant, all recorded. */
 const sameWriter = (a, b) => Boolean(a && b) && typeof a.role === 'string' && a.role === b.role
   && validPid(a.pid) !== null && validPid(a.pid) === validPid(b.pid)
-  && writerStartedMs(a) !== null && writerStartedMs(a) === writerStartedMs(b);
+  && writerStartedMs(a) !== null && writerStartedMs(a) === writerStartedMs(b)
+  && (!(a.processIdentity || b.processIdentity) || compareIdentity(a, b, 'native'));
 
 /**
  * Ledger record line `line` (its writer `writer`) proves start `S` (rule 'proves'). `startWriters`:
@@ -206,12 +218,22 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
   if (!line || !S) return false;
   const R = identityOf(line, { defaultTick: TICK.EXACT, owner: line.owner ?? line.previousOwner ?? null });
   if (S.conflicts.length) return false;
+  // A logical helper key identifies one start, including when both starts carry a birth.
+  if (family === 'helper' && keyStarts !== 1) return false;
   const engine = (family ?? S.kind) === 'engine';
+  // A helper's creator can observe its own held Process exit before /proc birth capture.
+  // This proves only the unique logical helper start; it never identifies a PID for signalling.
+  if (family === 'helper' && S.rawBirth === null && R.rawBirth === null) {
+    return S.pid !== null && !contested && Number.isInteger(line.code)
+      && S.helperId !== null && S.incarnation !== null && exact(R, S)
+      && startWriters.some(w => sameWriter(writer, w));
+  }
+
   // Without its birth an Engine record is about its incarnation (the dev runner's engine-owner-died
   // names the PID beside it, which must then agree); a child record without PID, birth or incarnation
   // is about its childId.
-  const keyOnly = engine ? line.creationFileTime == null
-    : line.pid == null && line.creationFileTime == null && line.incarnation == null;
+  const keyOnly = engine ? line.creationFileTime == null && !linuxIdentity(line)
+    : line.pid == null && line.creationFileTime == null && !linuxIdentity(line) && line.incarnation == null;
   // An Engine record proves only from a writer bound to that start, whatever identity it names (round
   // 11): the Engine itself (an Engine writer with the start's own PID, started the start's
   // millisecond), the writer that recorded the start (its role, PID and start instant), or a stop's own
@@ -230,7 +252,7 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
     return writerIsOwner(writer, S.owner);
   }
   if (S.pid === null || R.pid !== S.pid || S.birth === null || !birthsAgree(R, S)) return false;
-  for (const f of ['childId', 'witnessId']) if (S[f] != null && R[f] !== S[f]) return false;
+  for (const f of ['childId', 'helperId', 'witnessId']) if (S[f] != null && R[f] !== S[f]) return false;
   if (S.owner && !ownerCarries(R.owner, S.owner)) return false;
   if (S.incarnation && !(R.incarnation && sameIncarnation(R.incarnation, S.incarnation))) return false;
   return true;
@@ -249,7 +271,7 @@ function native(A, B) {
 /** One start: the same fields, each equal, births to the tick (rule 'exact'). */
 function exact(A, B) {
   if (!A || !B || A.pid !== B.pid || A.rawBirth !== B.rawBirth) return false;
-  for (const f of ['childId', 'witnessId', 'instanceId']) if ((A[f] ?? null) !== (B[f] ?? null)) return false;
+  for (const f of ['childId', 'helperId', 'witnessId', 'instanceId']) if ((A[f] ?? null) !== (B[f] ?? null)) return false;
   if (Boolean(A.owner) !== Boolean(B.owner) || (A.owner && !exact(A.owner, B.owner))) return false;
   if (Boolean(A.incarnation) !== Boolean(B.incarnation)
     || (A.incarnation && !sameIncarnation(A.incarnation, B.incarnation))) return false;
@@ -282,12 +304,12 @@ const hasPid = (x, pid) => { const v = identityOf(x); return v?.pid !== null && 
 /** A birth as milliseconds since the epoch (null when unknown). */
 function birthMs(x) {
   const v = identityOf(x);
-  return v?.birth ? Number((BigInt(v.birth) - EPOCH_FILETIME) / 10000n) : null;
+  return v?.birth && !v.processIdentity ? Number((BigInt(v.birth) - EPOCH_FILETIME) / 10000n) : null;
 }
 /** A birth as a BigInt FILETIME (null when unknown), for comparing with instants. */
 function birthFileTime(x) {
   const v = identityOf(x);
-  return v?.birth ? BigInt(v.birth) : null;
+  return v?.birth && !v.processIdentity ? BigInt(v.birth) : null;
 }
 /**
  * The order of two births at `tick` (default: the coarser of their two), -1, 0 or 1, or null when
@@ -296,6 +318,11 @@ function birthFileTime(x) {
 function birthOrder(a, b, tick = null) {
   const A = identityOf(a), B = identityOf(b);
   if (!A?.birth || !B?.birth) return null;
+  if (A.processIdentity || B.processIdentity) {
+    if (!A.processIdentity || !B.processIdentity || A.processIdentity.bootId !== B.processIdentity.bootId) return null;
+    const x = BigInt(A.birth), y = BigInt(B.birth);
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
   const t = tick ?? coarser(A, B);
   const x = BigInt(A.birth) / t, y = BigInt(B.birth) / t;
   return x < y ? -1 : x > y ? 1 : 0;

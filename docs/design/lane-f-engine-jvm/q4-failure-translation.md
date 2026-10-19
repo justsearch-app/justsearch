@@ -106,10 +106,10 @@ Incomplete cleanup retains durable membership and an explicit retry repeats clea
 ## Q4n2 build handoff
 
 ```text
-./gradlew.bat :modules:app-services:test --tests '*SubstrateDrivenEngineTest' --tests '*DocAccessTest' --tests '*BatchDocAccessTest' --tests '*SelectionContextInjectorTest' --tests '*HierarchicalShapeRunnerTest' --tests '*RootLifecycleOpsConcurrencyTest' --tests '*RootLifecycleOpsIdempotencyTest'
-./gradlew.bat :modules:app-engine:test --tests '*EngineRootRetirementTest' --tests '*EngineQueuedRootOwnershipTest' --tests '*EngineIndexingWorkflowTest'
-./gradlew.bat :modules:app-services:test :modules:app-engine:test
-./gradlew.bat :modules:app-services:spotlessCheck :modules:app-engine:spotlessCheck
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests '*SubstrateDrivenEngineTest' --tests '*DocAccessTest' --tests '*BatchDocAccessTest' --tests '*SelectionContextInjectorTest' --tests '*HierarchicalShapeRunnerTest' --tests '*RootLifecycleOpsConcurrencyTest' --tests '*RootLifecycleOpsIdempotencyTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:test --tests '*EngineRootRetirementTest' --tests '*EngineQueuedRootOwnershipTest' --tests '*EngineIndexingWorkflowTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test :modules:app-engine:test
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:spotlessCheck :modules:app-engine:spotlessCheck
 ```
 
 Observed Q4n2 checks: `git diff --check` passed; Java 25 compiler parsing reported
@@ -133,10 +133,10 @@ Q4n2 changed files:
 ## Q4n build handoff
 
 ```text
-./gradlew.bat :modules:app-engine:test --tests '*EngineRootRetirementTest' --tests '*RecordedIngestionCoordinatorTest' --tests '*EngineRecordedIngestionProducerTest' --tests '*EngineRecordedProducerExitTest' --tests '*EngineKnowledgeClientServingViewLifetimeTest' --tests '*EngineSyncDirectoryTest'
-./gradlew.bat :modules:app-services:test --tests '*RootLifecycleOpsConcurrencyTest' --tests '*RootLifecycleOpsIdempotencyTest' --tests '*SyncOps*'
-./gradlew.bat :modules:app-engine:test :modules:app-services:test
-./gradlew.bat :modules:app-engine:spotlessCheck :modules:app-services:spotlessCheck
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:test --tests '*EngineRootRetirementTest' --tests '*RecordedIngestionCoordinatorTest' --tests '*EngineRecordedIngestionProducerTest' --tests '*EngineRecordedProducerExitTest' --tests '*EngineKnowledgeClientServingViewLifetimeTest' --tests '*EngineSyncDirectoryTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests '*RootLifecycleOpsConcurrencyTest' --tests '*RootLifecycleOpsIdempotencyTest' --tests '*SyncOps*'
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:test :modules:app-services:test
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:spotlessCheck :modules:app-services:spotlessCheck
 ```
 
 Gradle/JUnit execution remains with the orchestrator. Signature inspection and compiler parsing
@@ -163,10 +163,10 @@ test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java; this handoff doc
 Focused checks first:
 
 ```powershell
-./gradlew.bat :modules:app-services:test --tests '*RootLifecycleOps*Test' --tests '*RootCompletionMembershipTest' --tests '*WatchedRootsStateTest' --tests '*SyncOpsReconcileVerificationTest' --tests '*WatchedRootScanCollectionTest' --tests '*RemoteDocumentServiceRefusalTest' --tests '*WorkerPortRefusalTest' --tests '*EngineRefusalHandlersTest' --tests '*RemoveWatchedRootHandlerTest' --tests '*ExcludePatternsResolutionTest' --tests '*RAGContextTest' --tests '*SubstrateDrivenEngineTest'
-./gradlew.bat :modules:ui:test --tests '*KnowledgeSuggestSaturationTest' --tests '*IndexingControllerSaturationTest' --tests '*IndexingControllerFailureTest' --tests '*KnowledgeSearchControllerExecutorRefusalTest' --tests '*ApiErrorHandlerResolveTest' --tests '*OperationsControllerTest' --tests '*McpProtocolHandlerTest'
-./gradlew.bat :modules:app-services:test :modules:ui:test
-./gradlew.bat :modules:app-services:spotlessCheck :modules:ui:spotlessCheck
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test --tests '*RootLifecycleOps*Test' --tests '*RootCompletionMembershipTest' --tests '*WatchedRootsStateTest' --tests '*SyncOpsReconcileVerificationTest' --tests '*WatchedRootScanCollectionTest' --tests '*RemoteDocumentServiceRefusalTest' --tests '*WorkerPortRefusalTest' --tests '*EngineRefusalHandlersTest' --tests '*RemoveWatchedRootHandlerTest' --tests '*ExcludePatternsResolutionTest' --tests '*RAGContextTest' --tests '*SubstrateDrivenEngineTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:test --tests '*KnowledgeSuggestSaturationTest' --tests '*IndexingControllerSaturationTest' --tests '*IndexingControllerFailureTest' --tests '*KnowledgeSearchControllerExecutorRefusalTest' --tests '*ApiErrorHandlerResolveTest' --tests '*OperationsControllerTest' --tests '*McpProtocolHandlerTest'
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:test :modules:ui:test
+node scripts/lib/tool-invoker.cjs gradle :modules:app-services:spotlessCheck :modules:ui:spotlessCheck
 ```
 
 Observed checks: `git diff --check 409b1926b` passed; temporary JDK compiler parse

@@ -24,13 +24,46 @@ function note(row) {
   if (log) fs.appendFileSync(log, JSON.stringify({ ...row, at: new Date().toISOString() }) + '\n');
 }
 function record(child) {
-  if (process.platform !== 'win32' || !child?.pid) return child;
+  if (!child?.pid) return child;
+  if (process.platform === 'linux') {
+    const seen = require('./process-identity.cjs').readLinuxProcess(child.pid);
+    records.set(child, { pid: child.pid,
+      processIdentity: seen?.present && seen.processIdentity ? { ...seen.processIdentity } : null });
+    if (seen?.present && seen.processIdentity) child.recordedIdentity = { pid: child.pid,
+      processIdentity: seen.processIdentity, executable: seen.executable };
+    return child;
+  }
+  if (process.platform !== 'win32') return child;
   // Synchronous query before the event loop can release the original child's Windows handle.
   const r = spawnSync(identityExecutable(), [String(child.pid)], { encoding: 'utf8', windowsHide: true });
   const birth = r.stdout.trim();
   if (r.status !== 0 || !/^\d+$/.test(birth)) throw new Error('Fixture spawn birth unavailable: ' + child.pid);
   records.set(child, birth); child.recordedIdentity = { pid: child.pid, creationFileTimeUtc: birth };
   note({ event: 'spawn', pid: child.pid, creationFileTimeUtc: birth }); return child;
+}
+if (process.platform === 'linux') {
+  cp.spawn = function(...args) { return record(spawn.apply(this, args)); };
+  cp.fork = function(...args) { return record(fork.apply(this, args)); };
+  cp.execFile = function(...args) { return record(execFile.apply(this, args)); };
+  cp.ChildProcess.prototype.kill = function(signal = 'SIGTERM') {
+    if (!this.pid || this.exitCode !== null || this.signalCode !== null) return false;
+    const original = records.get(this);
+    if (original?.pid !== this.pid) throw new Error('Fixture stop without a spawn-recorded identity refused: ' + this.pid);
+    const identity = original.processIdentity;
+    const result = identity ? require('./process-identity.cjs').signalLinuxProcess(identity, signal)
+      : { reason: 'Fixture stop without a spawn-recorded identity refused: ' + this.pid };
+    if (![0, 3].includes(result.status)) {
+      // A failed product stop must remain a failure, but cannot strand this test's own child.
+      // Only an original spawn object reaches this path; never signal a discovered PID or a
+      // copied identity. Force cleanup even if the requested soft signal would be ignored.
+      const failure = new Error('Fixture identity-bound stop failed: ' + this.pid + ' ' + result.reason);
+      process.exitCode = 1;
+      console.error(failure.message);
+      originalKill.call(this, 'SIGKILL');
+      throw failure;
+    }
+    return result.status === 0;
+  };
 }
 if (process.platform === 'win32') {
   // Compile before any fixture is launched, not while its startup deadline is running.

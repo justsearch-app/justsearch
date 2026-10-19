@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -35,6 +36,20 @@ import org.junit.jupiter.api.io.TempDir;
  * ({@code RuntimeSpecStore}); the self-test is stubbed at the package-private seam.
  */
 final class RuntimeActivationChatSwitchTest {
+  private String nativeFixtureOs;
+
+  @BeforeEach
+  void selectWindowsNativeFixture() {
+    nativeFixtureOs = System.getProperty("os.name");
+    System.setProperty("os.name", "Windows 11");
+  }
+
+  @AfterEach
+  void restoreNativeFixtureOs() {
+    if (nativeFixtureOs == null) System.clearProperty("os.name");
+    else System.setProperty("os.name", nativeFixtureOs);
+  }
+
 
   @TempDir Path tmp;
 

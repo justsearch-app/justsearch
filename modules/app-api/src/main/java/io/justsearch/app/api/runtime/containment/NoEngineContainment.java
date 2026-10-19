@@ -5,8 +5,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * No Engine job: {@link Status#NOT_APPLICABLE} off Windows, or {@link Status#UNAVAILABLE} where a
- * job cannot be attempted (a 32-bit JVM) or was never installed in this process.
+ * No active lifetime backend: {@link Status#NOT_APPLICABLE} on an unsupported platform, or
+ * {@link Status#UNAVAILABLE} when initialization failed or was never attempted.
  */
 public final class NoEngineContainment implements EngineContainment {
   private final Status status;

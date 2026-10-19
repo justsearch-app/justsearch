@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.app.api.runtime.child.OwnedHelper;
 
 import io.justsearch.configuration.EnvRegistry;
@@ -110,7 +111,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    * just reset the connection is the cheapest thing to avoid, so a retry escalates instead.
    */
   private boolean download(String url, Path destPartial, ProgressCallback callback, int tier) {
-    if (usesBits(tier) && isWindows()) {
+    if (usesBits(tier) && io.justsearch.configuration.PlatformPaths.isWindows()) {
       try {
         boolean ok = downloadWithBits(url, destPartial, callback);
         if (ok) {
@@ -306,7 +307,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    */
   private boolean resumeBitsJob(String jobId, ProgressCallback callback) throws Exception {
     if (jobId == null || jobId.isBlank()) return false;
-    if (!isWindows()) return false;
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) return false;
     String script =
         "$ErrorActionPreference='Stop'; "
             + "Get-BitsTransfer -JobId '"
@@ -511,7 +512,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    */
   static List<String> curlCommand(String url, Path destPartial, boolean forceHttp11) {
     List<String> cmd = new ArrayList<>();
-    cmd.add("curl.exe");
+    cmd.add(NativeTargets.current().executableName("curl"));
     cmd.add("--fail");
     cmd.add("--location");
     cmd.add("--silent");
@@ -790,7 +791,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    * Windows is a no-op.
    */
   static int sweepOrphanedBitsJobs(Collection<String> claimedJobIds) {
-    if (!isWindows()) return 0;
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) return 0;
     List<String> enumerated;
     try {
       enumerated = enumerateBitsJobIdsByDisplayName();
@@ -924,9 +925,6 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
 
   // -- Utilities --------------------------------------------------------------
 
-  private static boolean isWindows() {
-    return System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows");
-  }
 
   private static String psEscape(String raw) {
     if (raw == null) return "";

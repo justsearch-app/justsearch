@@ -23,11 +23,11 @@ const detLib = require("./lib/determinism-budget.cjs");
 const jobRun = require("../../../scripts/dev/lib/job-run.cjs");
 const engineActuator = require("../../../scripts/dev/lib/engine-actuator.cjs");
 const devDataFolder = require("../../../scripts/dev/lib/dev-data-folder.cjs");
+const devRuntime = require("../../../scripts/dev/lib/dev-runtime.cjs");
+const { toolInvocation } = require("../../../scripts/lib/tool-invoker.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const uiWebDir = path.resolve(rootDir, "modules", "ui-web");
-const gradleCmd = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-const gradlePath = path.resolve(rootDir, gradleCmd);
 const basePort = Number(process.env.JUSTSEARCH_API_PORT || 33221);
 /** The Engine's quit deadline plus a margin for the Gradle run around it to end. */
 const QUIT_WAIT_MS = engineActuator.QUIT_DEADLINE_MS + 2000;
@@ -105,18 +105,17 @@ function cleanDataDir(dir) {
 function resolveAiDevEnv() {
   const env = {};
 
-  // Backend scripts historically set these for dev; mirror that here so
-  // `npm run dev:all` is a complete single-command workflow.
-  if (!process.env.JUSTSEARCH_SERVER_EXE) {
-    const winExe = path.join(rootDir, "native-bin", "llama-server", "llama-server.exe");
-    const unixExe = path.join(rootDir, "native-bin", "llama-server", "llama-server");
-    if (fs.existsSync(winExe)) env.JUSTSEARCH_SERVER_EXE = winExe;
-    else if (fs.existsSync(unixExe)) env.JUSTSEARCH_SERVER_EXE = unixExe;
+  const mainRoot = devRuntime.resolveMainRepoRoot(rootDir);
+  const runtime = devRuntime.resolveDevRuntime(rootDir, mainRoot);
+  if (runtime.source === "override" && !runtime.valid) {
+    throw new Error("JUSTSEARCH_SERVER_EXE must name a regular executable file");
   }
-
+  if (runtime.valid) env.JUSTSEARCH_SERVER_EXE = runtime.path;
   if (!process.env.JUSTSEARCH_MODELS_DIR) {
-    const modelsDir = path.join(rootDir, "models");
-    if (fs.existsSync(modelsDir)) env.JUSTSEARCH_MODELS_DIR = modelsDir;
+    const mainModels = path.join(mainRoot, "models");
+    const localModels = path.join(rootDir, "models");
+    if (fs.existsSync(mainModels)) env.JUSTSEARCH_MODELS_DIR = mainModels;
+    else if (fs.existsSync(localModels)) env.JUSTSEARCH_MODELS_DIR = localModels;
   }
 
   return env;
@@ -169,11 +168,11 @@ function startOwnedChild(command, args, options) {
 function terminateChild(proc) {
   if (!proc) return null;
 
-  if (process.platform === "win32") {
+  const run = childRuns.get(proc);
+  if (run?.recordPath) {
     // The recorded run: its host (PID plus creation time) and, through the host's job, every
     // process started below it. Never a tree through parent links. A run that already ended is
     // verified and its record removed.
-    const run = childRuns.get(proc);
     const options = { code: jobRun.NON_DISTINCTIVE_KILL_CODE };
     const result = proc.exitCode != null || proc.signalCode != null
       ? jobRun.settleRunRecord(run, options) : jobRun.stopJobRunSync(run, options);
@@ -214,9 +213,12 @@ async function startBackend(port) {
     };
 
     const aiEnv = resolveAiDevEnv();
-    backend = startOwnedChild(
-      gradlePath,
+    const invocation = toolInvocation("gradle",
       ["--no-daemon", "--no-configuration-cache", "-PskipWebBuild=true", ":modules:ui:runHeadless"],
+      { repoRoot: rootDir });
+    backend = startOwnedChild(
+      invocation.command,
+      invocation.args,
       {
         cwd: rootDir,
         env: {

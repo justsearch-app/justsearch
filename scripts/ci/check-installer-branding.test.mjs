@@ -10,6 +10,7 @@ import {
   checkFaviconWiring,
   checkFullPageBranding,
   checkWizardImages,
+  runCheck,
 } from './check-installer-branding.mjs';
 
 const failures = [];
@@ -278,6 +279,25 @@ test('a lingering vite.svg reference fails', () => {
 
 test('dropping the favicon link entirely fails', () => {
   assert.equal(checkFaviconWiring('<head><title>JustSearch</title></head>').length, 1);
+});
+
+test('the full gate checks Windows overlay artwork and preserves base branding', () => {
+  const base = structuredClone(ASSET_CONF);
+  delete base.bundle.windows;
+  const files = {
+    'modules/shell/src-tauri/tauri.conf.json': JSON.stringify(base),
+    'modules/shell/src-tauri/tauri.windows.conf.json': JSON.stringify({ bundle: { windows: ASSET_CONF.bundle.windows } }),
+    'modules/shell/src-tauri/nsis/installer-hooks.nsh': CLEAN_NSH,
+    'modules/ui-web/index.html': CLEAN_INDEX_HTML,
+  };
+  const assets = cleanAssets();
+  const check = () => runCheck('', file => files[file],
+    file => assets.get(file.replace('modules/shell/src-tauri/', '')) ?? null);
+  assert.deepEqual(check(), []);
+  const overlay = JSON.parse(files['modules/shell/src-tauri/tauri.windows.conf.json']);
+  overlay.bundle.windows.nsis.headerImage = 'nsis/missing.bmp';
+  files['modules/shell/src-tauri/tauri.windows.conf.json'] = JSON.stringify(overlay);
+  assert.equal(check().length, 1, 'missing artwork selected by the overlay still fails');
 });
 
 if (failures.length > 0) {

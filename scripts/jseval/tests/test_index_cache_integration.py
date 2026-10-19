@@ -32,12 +32,14 @@ def boot_mocks(tmp_path, monkeypatch):
     """Patch backend.py's boot/wipe internals; yield the data_dir + mocks.
 
     Short-circuits the models-dir default (so shared_models_dir isn't probed) and
-    returns a MagicMock Popen so no real Gradle process is spawned.
+    stubs distribution staging and returns a MagicMock Popen so no process is spawned.
     """
     monkeypatch.setenv("JUSTSEARCH_MODELS_DIR", str(tmp_path / "models"))
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    with patch("jseval.backend.subprocess.Popen") as popen, \
+    with patch("jseval.backend._install_distribution"), \
+         patch("jseval.backend.subprocess.Popen") as popen, \
+         patch("jseval.backend.run_register.register_backend"), \
          patch("jseval.backend._wait_for_health", return_value=True), \
          patch("jseval.backend._clean_data_dir") as clean, \
          patch("jseval.backend.stop_backend") as stop:

@@ -286,8 +286,8 @@ public final class DefaultChildControl implements ChildControl {
     }
     Process process;
     try {
-      process = CHAT_SERVER_KINDS.contains(spec.kind()) && java.io.File.separatorChar == '\\'
-          ? WindowsEngineJob.createChat(builder) : builder.start();
+      process = CHAT_SERVER_KINDS.contains(spec.kind()) && io.justsearch.configuration.PlatformPaths.isWindows()
+          ? WindowsEngineJob.createChat(builder) : BoundChildProcess.start(builder);
     } catch (IOException | RuntimeException failure) {
       recordStartFailure(childId, spec.kind(), "spawn_failed");
       throw failure;
@@ -524,6 +524,9 @@ public final class DefaultChildControl implements ChildControl {
           manifest.declaredConfigHash() != null ? manifest.declaredConfigHash()
               : argvHash(held.spec.argv()),
           argvHash(held.spec.argv()));
+      if (held.os.processIdentity().isPresent()
+          && !held.os.processIdentity().equals(Optional.ofNullable(entry.processIdentity())))
+        throw new IOException("Linux child identity changed before registration");
       registry.register(entry);
       boolean exitedWhileRegistering;
       synchronized (held) {
@@ -1133,6 +1136,7 @@ public final class DefaultChildControl implements ChildControl {
     ownerFields.put("pid", owner.pid());
     ownerFields.put("creationFileTime", owner.creationFileTime());
     ownerFields.put("instanceId", owner.instanceId());
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) ownerFields.put("processIdentity", LinuxProcessIdentity.read(owner.pid()));
     Map<String, Object> fields = new LinkedHashMap<>();
     fields.put("childId", childId);
     fields.put("kind", spec.kind());
@@ -1153,6 +1157,7 @@ public final class DefaultChildControl implements ChildControl {
     fields.put("pid", held.pid);
     fields.put("processStartedAt", startedAt);
     fields.put("creationFileTime", held.os.creationFileTime());
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) fields.put("processIdentity", held.os.processIdentity());
     fields.put("executable", executable);
     fields.put("argvHash", argvHash(held.spec.argv()));
     // Spec B §2.10: whether the child is in the Engine's job; null when there is no job to ask.

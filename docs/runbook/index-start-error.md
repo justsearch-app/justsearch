@@ -24,6 +24,18 @@ The indexer failed to start. The Engine was unable to bring the index half (the 
 
 ## Diagnostics
 
+The PowerShell examples below apply to Windows. On Linux, take the actual data
+folder from the runtime manifest (`dataDir`); the desktop shell uses its platform
+app-data folder under `XDG_DATA_HOME`, while headless launches can select a data
+folder explicitly. With that path assigned to `data_dir` in Bash:
+
+```sh
+df -h "$data_dir"
+find "$data_dir" -type f \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' \) -ls
+tail -n 500 "$data_dir/logs/engine.log"
+```
+
+
 1. Read the embedded error detail in the `AssertedCondition` body - the Engine records the index startup cause there.
 2. Read the most recent Knowledge Server bootstrap attempt in the Engine log. Item A13 deleted the Worker's own logback config, so there is no separate `worker.log` file (retired filename); the index half logs into the one Engine log:
 
@@ -38,9 +50,16 @@ The indexer failed to start. The Engine was unable to bring the index half (the 
    Get-ChildItem .\modules\ui\build\install\ui\lib -Filter 'indexer-worker-*.jar'
    ```
 
+   Linux distribution checks, from the repository root:
+
+   ```sh
+   test -x modules/ui/build/install/ui/bin/ui
+   ls modules/ui/build/install/ui/lib/indexer-worker-*.jar
+   ```
+
 ## Remediation
 
-- **Missing distribution** - run `./gradlew.bat :modules:ui:installDist`.
+- **Missing distribution** - run `node scripts/lib/tool-invoker.cjs gradle :modules:ui:installDist`.
 - **Models directory missing** - set `JUSTSEARCH_MODELS_DIR` to a populated directory (default is the repo's `models/`).
 - **Native dep failure** - check the loaded library list in the Engine bootstrap log; common causes are CUDA driver mismatch or a stale ORT cache.
 
@@ -48,4 +67,4 @@ The indexer failed to start. The Engine was unable to bring the index half (the 
 
 - `index.unavailable` - once the index half is up but unhealthy (see [`index-unavailable.md`](index-unavailable.md)).
 - Engine lifecycle: `docs/explanation/01-system-overview.md`.
-- Stale-distribution pitfall: `installDist` is now wired into `assemble`, so a fresh `./gradlew.bat build` produces a runnable Engine.
+- Stale-distribution pitfall: `installDist` is now wired into `assemble`, so a fresh `node scripts/lib/tool-invoker.cjs gradle build` produces a runnable Engine.

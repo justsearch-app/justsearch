@@ -25,7 +25,7 @@ import './lib/test-fixture-processes.cjs';
 //
 // Hermetic: the state root is a temp directory (JUSTSEARCH_DEV_RUNNER_STATE_ROOT), the stacks are the
 // supervisor-conformance fake Engine and a stand-in frontend, and every other process is a child this
-// test spawns. Windows only (identity checks read CreationFileTimeUtc). Env MUST be set before
+// test spawns. Native identity checks use FILETIME on Windows and boot/start ticks on Linux. Env MUST be set before
 // requiring dev-runner.cjs (its state paths are load-time).
 
 import fs from 'node:fs';
@@ -38,8 +38,8 @@ import assert from 'node:assert/strict';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
 
-if (process.platform !== 'win32') {
-  console.log('test-dev-runner-stop-ownership: SKIP (identity-checked stop is Windows-only)');
+if (!['win32', 'linux'].includes(process.platform)) {
+  console.log('test-dev-runner-stop-ownership: SKIP (native identity backend unavailable (requires Windows or Linux))');
   process.exit(0);
 }
 
@@ -66,7 +66,7 @@ function track(child) { children.push(child); return child; }
 function sleeper() {
   return track(spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' }));
 }
-function alive(pid) { try { process.kill(pid, 0); return true; } catch { return false; } }
+function alive(pid) { if (process.platform === 'linux') return require('./lib/process-identity.cjs').readLinuxProcess(pid)?.present !== false; try { process.kill(pid, 0); return true; } catch { return false; } }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(what, fn, timeoutMs, diag = () => '') {
   const deadline = Date.now() + timeoutMs;
@@ -82,7 +82,7 @@ async function until(what, fn, timeoutMs, diag = () => '') {
 function readJson(file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } }
 async function birthOf(pid) {
   const seen = (await engineActuator.lookupProcessIdentities([pid]))?.get(pid);
-  assert.ok(seen?.present && seen.creationFileTime, `identity of ${pid} must be readable`);
+  assert.ok(seen?.present && (seen.creationFileTime || seen.processIdentity), `identity of ${pid} must be readable`);
   return seen;
 }
 const noCensus = async () => ({ finish: async () => ({}) });
@@ -140,6 +140,10 @@ function startHarnessStack(name, plan) {
 
 /** Freezes a process (NtSuspendProcess): it keeps running in name and answers nothing. */
 function suspend(pid) {
+  if (process.platform === 'linux') {
+    const result = require('./lib/process-identity.cjs').signalLinuxProcess(children.find(p => p.pid === pid)?.recordedIdentity, 'SIGSTOP');
+    assert.equal(result.ok, true, JSON.stringify(result)); return;
+  }
   const script = "$s='[DllImport(\"ntdll.dll\")] public static extern int NtSuspendProcess(IntPtr h);';"
     + 'Add-Type -MemberDefinition $s -Name Nt -Namespace StopOwnershipFreeze;'
     + `$p=[Diagnostics.Process]::GetProcessById(${pid}); [StopOwnershipFreeze.Nt]::NtSuspendProcess($p.Handle)`;
@@ -193,7 +197,8 @@ const tests = [
         const a = readJson(activePath);
         return a?.phase === 'starting' ? a : null;
       }, 30_000, stack.output);
-      assert.ok(Number.isInteger(first.runner?.pid) && /^\d+$/.test(String(first.runner?.creationFileTimeUtc)),
+      assert.ok(Number.isInteger(first.runner?.pid) && (process.platform === 'linux'
+        ? first.runner?.processIdentity?.kind === 'linux-proc-v1' : /^\d+$/.test(String(first.runner?.creationFileTimeUtc))),
         `the starting record names the runner's identity: ${JSON.stringify(first.runner)}`);
       const runDir = path.join(STATE, 'runs', first.runId);
       const starting = readJson(path.join(runDir, 'run.json'));
@@ -255,16 +260,19 @@ const tests = [
       assert.equal(exits.length, 1, `one exit record for the stopped Engine: ${lines}`);
       const exit = exits[0].line;
       assert.equal(exit.writer.role, 'dev-cli');
-      assert.equal(exit.exitClass, 'REQUESTED', lines);
+      assert.equal(exit.exitClass, process.platform === 'linux' ? 'UNKNOWN' : 'REQUESTED', lines);
       assert.equal(exit.reason, 'QUIT');
       assert.equal(exit.forced, true);
-      assert.equal(exit.code, 0, 'a process ended by its job closing exits 0');
+      if (process.platform === 'win32') assert.equal(exit.code, 0, 'a process ended by its job closing exits 0');
+      else assert.equal(exit.code, null, 'pidfd confirms exit without inventing a non-child exit status');
       assert.equal(exit.codeDistinctive, false);
       assert.equal(exit.phase, 'STOPPING');
-      assert.equal(exit.runnerJobClose?.pid, runnerPid);
-      assert.equal(exit.runnerJobClose?.osCheck, 'GONE');
+      if (process.platform === 'win32') {
+        assert.equal(exit.runnerJobClose?.pid, runnerPid);
+        assert.equal(exit.runnerJobClose?.osCheck, 'GONE');
+      } else assert.equal(exit.runnerJobClose, null, 'Linux has no Job Object close receipt');
       const receipt = r.json.processExits.find(e => e.pid === enginePid && e.role === 'engine');
-      assert.equal(receipt?.expectedTermination, true, JSON.stringify(r.json));
+      assert.equal(receipt?.expectedTermination, process.platform === 'win32', JSON.stringify(r.json));
       assert.deepEqual(r.json.exitAccountingGaps.filter(g => g.pid === enginePid), []);
       const intents = mine.filter((rec) => rec.type === 'engine-intent' && rec.line.writer.role === 'dev-cli');
       assert.deepEqual(intents.map((rec) => [rec.line.reason, rec.line.mode, rec.line.channel]),
@@ -291,9 +299,9 @@ const tests = [
     const runId = 'run-REPORT';
     ledgerLib.createLedgerWriter({ ledgerDir: ledgerLib.ledgerDirectory(dataDir), family: 'engine',
       writer: { role: 'dev-runner', pid: runner.pid, startedAt: Date.now() } })
-      .append('engine-start', { incarnation: { session: runId, n: 1 }, pid: engine.pid, creationFileTime: seenEngine.creationFileTime,
+      .append('engine-start', { incarnation: { session: runId, n: 1 }, pid: engine.pid, creationFileTime: seenEngine.creationFileTime, ...(seenEngine.processIdentity ? { processIdentity: seenEngine.processIdentity } : {}),
         executable: seenEngine.executable, processStartedAt: new Date(), cause: 'START', supervisorKind: 'dev-runner' });
-    const identity = (p, seen) => ({ pid: p.pid, creationFileTimeUtc: seen.creationFileTime, executable: seen.executable });
+    const identity = (p, seen) => ({ pid: p.pid, creationFileTimeUtc: seen.creationFileTime, ...(seen.processIdentity ? { processIdentity: seen.processIdentity } : {}), executable: seen.executable });
     const target = craftRun(runId, { dataDir, incarnation: 1, control: { stopRequest: 1 },
       pids: { runnerPid: runner.pid, backendRootPid: engine.pid, frontendRootPid: null },
       identities: { runner: identity(runner, seenRunner), backend: identity(engine, seenEngine), frontend: null } });
@@ -304,14 +312,15 @@ const tests = [
     assert.ok(res.killedPids.includes(engine.pid), JSON.stringify(res));
     const exits = engineExits(dataDir);
     assert.deepEqual(exits.map((r) => [r.line.exitClass, r.line.code, r.line.observedBy]),
-      [['REQUESTED', ledgerLib.JS_ENGINE_STOP, 'census']], 'the ledger has the Engine exit, as observed by the census');
+      process.platform === 'win32' ? [['REQUESTED', ledgerLib.JS_ENGINE_STOP, 'census']] : [['UNKNOWN', null, 'dev-cli']],
+      'the ledger records the available OS observation without inventing an exit code');
     const report = readJson(path.join(target.dir, 'stop-report.json'));
     const row = report?.processExits?.find((e) => e.role === 'engine' && e.pid === engine.pid);
     assert.deepEqual([row?.ledgerClass, row?.ledgerCode, row?.expectedTermination],
-      ['REQUESTED', ledgerLib.JS_ENGINE_STOP, true], `the report classifies the exit the stop wrote: ${JSON.stringify(report?.processExits)}`);
+      process.platform === 'win32' ? ['REQUESTED', ledgerLib.JS_ENGINE_STOP, true] : ['UNKNOWN', null, false], `the report classifies the exit the stop wrote: ${JSON.stringify(report?.processExits)}`);
     assert.deepEqual((report.exitAccountingGaps ?? []).filter((g) => g.pid === engine.pid), [],
       JSON.stringify(report.exitAccountingGaps));
-    assert.equal(report.ledgerSummary?.requested, 1, JSON.stringify(report.ledgerSummary));
+    assert.equal(report.ledgerSummary?.[process.platform === 'win32' ? 'requested' : 'unknown'], 1, JSON.stringify(report.ledgerSummary));
   }],
 
   ['the dev-cli Engine exit takes the census code when there is one: a crash during the stop stays UNEXPECTED, an unobserved quit is UNKNOWN, one exit per incarnation (S15)', async () => {
@@ -349,7 +358,7 @@ const tests = [
       pids: { runnerPid: null, backendRootPid: null, frontendRootPid: other.pid },
       identities: { runner: null, backend: null,
         // The recorded frontend was born one hour before the process that now has its pid.
-        frontend: { pid: other.pid, creationFileTimeUtc: String(BigInt(seen.creationFileTime) - 36_000_000_000n),
+        frontend: { pid: other.pid, ...(seen.processIdentity ? { processIdentity: { ...seen.processIdentity, startTicks: String(BigInt(seen.processIdentity.startTicks) - 1n) } } : {}), creationFileTimeUtc: seen.processIdentity ? null : String(BigInt(seen.creationFileTime) - 36_000_000_000n),
           executable: seen.executable } },
       control: { stopRequest: 1 },
     });
@@ -372,15 +381,16 @@ const tests = [
     const helper = sleeper();
     const seen = new Map();
     for (const p of [runner, engine, frontend, helper]) seen.set(p.pid, await birthOf(p.pid));
-    const recordedBirth = (pid) => String(BigInt(seen.get(pid).creationFileTime) - 36_000_000_000n);
-    const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: recordedBirth(p.pid), executable: seen.get(p.pid).executable });
+    const recordedBirth = (pid) => seen.get(pid).processIdentity ? null : String(BigInt(seen.get(pid).creationFileTime) - 36_000_000_000n);
+    const recordedNative = pid => seen.get(pid).processIdentity ? { processIdentity: { ...seen.get(pid).processIdentity, startTicks: String(BigInt(seen.get(pid).processIdentity.startTicks) - 1n) } } : {};
+    const identity = (p) => ({ pid: p.pid, ...recordedNative(p.pid), creationFileTimeUtc: recordedBirth(p.pid), executable: seen.get(p.pid).executable });
     // The helper's registration names its start an hour before this process's (milliseconds, as the
     // manifest records it); its inspection still reads the registered identity.
     const dataDir = path.join(STATE, 'reused-at-kill');
     fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
-    const helperStartedAt = new Date(engineActuator.fileTimeToMs(String(seen.get(helper.pid).creationFileTime)) - 3_600_000).toISOString();
+    const helperStartedAt = seen.get(helper.pid).processIdentity ? null : new Date(engineActuator.fileTimeToMs(String(seen.get(helper.pid).creationFileTime)) - 3_600_000).toISOString();
     fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ children: [
-      { id: 'llama-server', pid: helper.pid, executable: seen.get(helper.pid).executable, startedAt: helperStartedAt }] }));
+      { id: 'llama-server', pid: helper.pid, ...recordedNative(helper.pid), executable: seen.get(helper.pid).executable, startedAt: helperStartedAt }] }));
     const target = craftRun('run-REUSED-AT-KILL', {
       dataDir,
       control: { stopRequest: 1 },
@@ -393,14 +403,14 @@ const tests = [
       askRunner: async () => ({ outcome: 'no_answer' }),
       lookupIdentities: async (pids) => new Map(pids.map((pid) => {
         inspected.add(pid);
-        return [pid, { present: true, creationFileTime: recordedBirth(pid), executable: seen.get(pid).executable }];
+        return [pid, { present: true, ...recordedNative(pid), creationFileTime: recordedBirth(pid), executable: seen.get(pid).executable }];
       })),
       // The distinctive terminate did not run, so the Engine reaches the fallback kill.
       terminateEngine: async () => ({ ok: false, outcome: 'failed', status: 4 }),
       inspectChild: (pid) => {
         if (pid !== helper.pid) return null;
         inspected.add(pid);
-        return { alive: true, executable: seen.get(pid).executable, startedAt: helperStartedAt };
+        return { alive: true, ...recordedNative(pid), executable: seen.get(pid).executable, startedAt: helperStartedAt };
       },
       portWaitMs: 200 });
     await sleep(500);
@@ -420,7 +430,8 @@ const tests = [
     { stdio: ['ignore', 'pipe', 'ignore'] }));
     const childPid = await new Promise((resolve) => parent.stdout.once('data', (b) => resolve(Number(String(b).trim()))));
     assert.ok(childPid > 0);
-    const parentBirth = (await birthOf(parent.pid)).creationFileTime;
+    const parentSeen = await birthOf(parent.pid);
+    const parentBirth = parentSeen.processIdentity ?? parentSeen.creationFileTime;
     const result = await engineActuator.terminateWithCode(parent.pid, parentBirth, engineActuator.NON_DISTINCTIVE_KILL_CODE);
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.outcome, 'terminated', JSON.stringify(result));
@@ -577,7 +588,7 @@ const tests = [
     fs.rmSync(activePath, { force: true });
     const holder = sleeper();
     const seen = await birthOf(holder.pid);
-    const oldLock = JSON.stringify({ pid: holder.pid, creationFileTimeUtc: seen.creationFileTime,
+    const oldLock = JSON.stringify({ pid: holder.pid, ...(seen.processIdentity ? { processIdentity: seen.processIdentity } : {}), creationFileTimeUtc: seen.creationFileTime,
       acquiredAt: new Date(Date.now() - 200_000).toISOString() });
     fs.writeFileSync(lockPath, oldLock);
     const caller = { harness: 'claude', owner: { harness: 'claude', pid: 900_309, creationTime: '134000000000900309',

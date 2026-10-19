@@ -153,6 +153,9 @@ final class EngineGpuResidencyWitnessTest {
     config.putDefault("justsearch.home", tempDir.toString());
     config.putDefault("justsearch.server.exe", java.nio.file.Files.writeString(
         tempDir.resolve("llama-server.exe"), "fixture").toString());
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      assertTrue(tempDir.resolve("llama-server.exe").toFile().setExecutable(true));
+    }
     config.put("justsearch.llm.model_path", 400, "env_var", "test", java.nio.file.Files.writeString(
         tempDir.resolve("model.gguf"), "fixture").toString());
     config.putDefault("justsearch.inference.external_endpoint", "http://127.0.0.1:9");

@@ -14,7 +14,7 @@ Hosted CI runs most of them again on the pull request and in the merge queue
 ([ADR-0044](../../decisions/0044-public-hosted-ci-fact-lanes.md)). This table moved here from
 the retired root `CLAUDE.md` when JustSearch adopted agent-system (2026-10-05).
 
-Always: `./gradlew.bat build -x test` from the candidate worktree.
+Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candidate worktree.
 
 | Edited subject | Check(s) |
 |---|---|

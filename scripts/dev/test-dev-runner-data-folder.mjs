@@ -51,13 +51,20 @@ function personalFolder(base) {
 /** dev-all in a copy of the repository whose Gradle is a stub that only records it was run. */
 function fakeRepository(name) {
   const fake = path.join(root, name);
-  for (const dir of ['scripts/dev/lib', 'modules/ui-web/scripts']) {
+  for (const dir of ['scripts/dev/lib', 'scripts/lib', 'modules/ui-web/scripts']) {
     fs.cpSync(path.join(repo, dir), path.join(fake, dir), { recursive: true });
   }
-  for (const file of ['governance/store-recoverability.v1.json', 'governance/supervision-contract.v1.json']) {
+  for (const file of ['contracts/native-targets/spec.v1.json', 'governance/store-recoverability.v1.json', 'governance/supervision-contract.v1.json']) {
     if (!fs.existsSync(path.join(repo, file))) continue;
     fs.mkdirSync(path.dirname(path.join(fake, file)), { recursive: true });
     fs.copyFileSync(path.join(repo, file), path.join(fake, file));
+  }
+  if (process.platform === 'linux') {
+    const relative = 'modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec';
+    const target = path.join(fake, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(repo, relative), target);
+    fs.chmodSync(target, 0o755);
   }
   fs.writeFileSync(path.join(fake, 'modules/ui-web/package.json'), JSON.stringify({ name: 'fixture-ui', private: true }));
   fs.writeFileSync(path.join(fake, 'gradlew.bat'), '@echo off\r\necho started>"%~dp0gradle-started.txt"\r\nexit /b 3\r\n');

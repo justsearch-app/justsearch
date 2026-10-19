@@ -169,7 +169,10 @@ try {
 }
 
 async function testWindowsReadHandlePublication() {
-  if (process.platform !== 'win32') return;
+  if (process.platform !== 'win32') {
+    console.log('SKIP Windows FILE_SHARE_DELETE rename refusal; Linux atomic publication is covered by testOverlappingStatePublicationsStayInTransitionOrder');
+    return;
+  }
   const root = tempRoot('reader-rename');
   const target = path.join(root, 'state.json');
   const oldState = { state: 'running', incarnation: 1 };
@@ -491,21 +494,24 @@ async function testTerminalChildCleanupRequiresAllIdentityAxes() {
   try {
     const dataDir = path.join(root, 'data');
     fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+    const recordedExe = process.platform === 'win32' ? 'C:\\bin\\llama.exe' : '/opt/justsearch/llama-server';
+    const observedExe = process.platform === 'win32' ? 'c:\\bin\\llama.exe' : recordedExe;
+    const foreignExe = process.platform === 'win32' ? 'c:\\other\\java.exe' : '/opt/other/java';
     fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({
       schemaVersion: 2,
       children: [
-        { id: 'match', pid: 101, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'reused', pid: 102, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'unrelated', pid: 103, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'near-reuse', pid: 105, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'unknown', pid: 104, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
+        { id: 'match', pid: 101, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'reused', pid: 102, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'unrelated', pid: 103, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'near-reuse', pid: 105, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'unknown', pid: 104, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
       ],
     }));
     const identities = new Map([
-      [101, { alive: true, startedAt: '2026-09-08T10:00:00.0004567Z', executable: 'c:\\bin\\llama.exe' }],
-      [102, { alive: true, startedAt: '2026-09-08T11:00:00.000Z', executable: 'c:\\bin\\llama.exe' }],
-      [103, { alive: true, startedAt: '2026-09-08T10:00:00.000Z', executable: 'c:\\other\\java.exe' }],
-      [105, { alive: true, startedAt: '2026-09-08T10:00:00.999Z', executable: 'c:\\bin\\llama.exe' }],
+      [101, { alive: true, startedAt: '2026-09-08T10:00:00.0004567Z', executable: observedExe }],
+      [102, { alive: true, startedAt: '2026-09-08T11:00:00.000Z', executable: observedExe }],
+      [103, { alive: true, startedAt: '2026-09-08T10:00:00.000Z', executable: foreignExe }],
+      [105, { alive: true, startedAt: '2026-09-08T10:00:00.999Z', executable: observedExe }],
       [104, { alive: true }],
     ]);
     const killed = [];

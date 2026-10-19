@@ -26,15 +26,17 @@ import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class ChatJobAccountingTest {
   @TempDir Path directory;
 
   @Test @Timeout(60)
   void idleChatControlAddsLessThanOnePercentOfACore() throws Exception {
     var cpu = (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-    List<String> ping = List.of(Path.of(System.getenv("SystemRoot"), "System32", "ping.exe").toString(),
-        "-t", "127.0.0.1");
+    List<String> ping = io.justsearch.configuration.PlatformPaths.isWindows()
+        ? List.of(Path.of(System.getenv("SystemRoot"), "System32", "ping.exe").toString(),
+            "-t", "127.0.0.1")
+        : Fixture.argv("idle", directory);
     long without, with;
     try (var control = DefaultChildControl.unrecorded(ManagedChildRegistry.noop())) {
       ChildHandle plain = control.start(spec(ChildKind.EXTRACTION, ping, null, Map.of()));
@@ -89,7 +91,7 @@ final class ChatJobAccountingTest {
     }
   }
 
-  @Test @Timeout(120)
+  @Test @Timeout(120) @EnabledOnOs(OS.WINDOWS)
   void immediateWrapperExitRetainsTheActualSurvivorEveryTime() throws Exception {
     int captured = 0;
     for (int round = 0; round < 20; round++) {
@@ -126,7 +128,7 @@ final class ChatJobAccountingTest {
    * number of quick retries. The lag is injected at the job-accounting call only; the processes
    * and their job are real.
    */
-  @Test @Timeout(60)
+  @Test @Timeout(60) @EnabledOnOs(OS.WINDOWS)
   void membershipSettlesWhileTheJobCountLagsAnExit() throws Exception {
     Class<?> kernel = Class.forName(
         io.justsearch.app.api.runtime.containment.WindowsEngineJob.class.getName() + "$Kernel");
@@ -240,7 +242,7 @@ final class ChatJobAccountingTest {
   public static final class Fixture {
     private Fixture() {}
     static List<String> argv(String mode, Path home) throws Exception {
-      return List.of(Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
+      return List.of(Path.of(System.getProperty("java.home"), "bin", io.justsearch.configuration.PlatformPaths.isWindows() ? "java.exe" : "java").toString(),
           "-cp", Path.of(Fixture.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString(),
           Fixture.class.getName(), mode, home.toString());
     }

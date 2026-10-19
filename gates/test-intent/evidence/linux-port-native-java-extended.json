@@ -1,0 +1,237 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-18T22:05:16.927Z",
+  "revision": "d5e4aa16ae796259c857a7c783be0b5d3f8ad3bf",
+  "tree": "a3568bc031e89650345410e6e5c4419919cb54b7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.currentWriterCarriesNativeIdentityWithoutChangingLegacyWriterRecords\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.malformedNativeWriterIdentityCannotBecomeLegacyAuthority\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1904
+    },
+    {
+      "command": "./gradlew :modules:ort-common:test --tests \"io.justsearch.ort.OrtCudaHelperTest\" --tests \"io.justsearch.ort.OrtCudaSelfCheckTest\" --tests \"io.justsearch.ort.OrtNativePackDetectionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1685
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppServerAutoSelectionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2673
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#currentWriterCarriesNativeIdentityWithoutChangingLegacyWriterRecords",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:efe63a59002ad6fc6f11babb38745f13ccf6aaef4049f97cd604831b168c73f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentWriterCarriesNativeIdentityWithoutChangingLegacyWriterRecords()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#malformedNativeWriterIdentityCannotBecomeLegacyAuthority",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:efe63a59002ad6fc6f11babb38745f13ccf6aaef4049f97cd604831b168c73f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedNativeWriterIdentityCannotBecomeLegacyAuthority()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaHelperTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaHelperTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a077dfd5b23ed4f44902abd9bd357a721628c4868e8a8926530c4440e4201ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "checkMissingCudaDlls reports EP DLLs missing for cuda12 layout (pre-fix behaviour pinned)",
+          "status": "passed"
+        },
+        {
+          "name": "alpha.15+ cuda12 layout (runtime DLLs present, EP DLLs absent) → empty (Bug Q fix)",
+          "status": "passed"
+        },
+        {
+          "name": "cuda12 layout missing cudart64_12.dll → reports it (real failure mode)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaSelfCheckTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaSelfCheckTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9a18dda4c9d63aa9d1327dff054d013b30a6152c0b766250a6cd222188c9956",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notConfigured() produces correct state",
+          "status": "passed"
+        },
+        {
+          "name": "checkMissingCudaDlls identifies the host libraries missing from an empty directory",
+          "status": "passed"
+        },
+        {
+          "name": "released() indicates temporary unavailability",
+          "status": "passed"
+        },
+        {
+          "name": "checkMissingCudaDlls returns empty for non-existent directory",
+          "status": "passed"
+        },
+        {
+          "name": "missingDlls() lists missing files in failure reason",
+          "status": "passed"
+        },
+        {
+          "name": "pending() produces configured-but-not-attempted state",
+          "status": "passed"
+        },
+        {
+          "name": "checkMissingCudaDlls detects missing host libraries",
+          "status": "passed"
+        },
+        {
+          "name": "providerFailed() records failure reason",
+          "status": "passed"
+        },
+        {
+          "name": "toSummary() formats missing DLLs with count",
+          "status": "passed"
+        },
+        {
+          "name": "toSummary() formats ready state with variant",
+          "status": "passed"
+        },
+        {
+          "name": "ready() produces healthy state",
+          "status": "passed"
+        },
+        {
+          "name": "toSummary() formats provider failure with reason",
+          "status": "passed"
+        },
+        {
+          "name": "checkMissingCudaDlls returns empty for null path",
+          "status": "passed"
+        },
+        {
+          "name": "missingDlls list is immutable",
+          "status": "passed"
+        },
+        {
+          "name": "toSummary() formats not configured state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/OrtNativePackDetectionTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/OrtNativePackDetectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b6292593db309150ebc9379faea7c6e0bbbfdc0895f740a41aa64b0bb5ebfd31",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "complete dir + matching version marker + no existing property → SET (normalized path)",
+          "status": "passed"
+        },
+        {
+          "name": "incomplete dir (missing a DLL) → INCOMPLETE naming the missing DLL",
+          "status": "passed"
+        },
+        {
+          "name": "nonexistent pack dir → DIR_ABSENT",
+          "status": "passed"
+        },
+        {
+          "name": "null pack dir → DIR_ABSENT (CPU-only install path)",
+          "status": "passed"
+        },
+        {
+          "name": "applyOrtNativePackProperty: SET writes the property; ALREADY_SET leaves it untouched",
+          "status": "passed"
+        },
+        {
+          "name": "version marker parsing trims whitespace / blank lines",
+          "status": "passed"
+        },
+        {
+          "name": "pre-existing onnxruntime.native.path (user override) → ALREADY_SET_EXTERNALLY, untouched",
+          "status": "passed"
+        },
+        {
+          "name": "complete dir but missing version marker → VERSION_MISMATCH (guards against unmarked pack)",
+          "status": "passed"
+        },
+        {
+          "name": "complete dir but wrong version marker → VERSION_MISMATCH",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppServerAutoSelectionTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppServerAutoSelectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:096cd63ddae8c9a2680a2a2b8f0159a72c6520d8d6d0b57ac0f76f6663ab0cd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resolvedCpuPolicyWinsOverPositiveSettingsDuringDiscovery()",
+          "status": "passed"
+        },
+        {
+          "name": "eligibleCudaDiscoveryReturnsAPathWithoutClaimingJvmAuthority()",
+          "status": "passed"
+        },
+        {
+          "name": "settingsExecutablePreventsAutomaticSelection()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b0f4745ebae59ee9489dcd501bc1f1a4e26092685d09f3b30917d9f12e5a89a5"
+}

@@ -35,7 +35,7 @@ workflows: `docs-lint.yml`, `build-installer.yml`, `codeql.yml`, `cla.yml`, `onr
 After touching any `@Tag("stress")` subject or concurrency-sensitive code, run:
 
 ```bash
-./gradlew.bat test -PincludeStress=true
+./gradlew test -PincludeStress=true
 ```
 
 For a focused run, select only modules containing stress tests and place `--tests`
@@ -72,14 +72,14 @@ have caught: an integration conflict with something that landed while you waited
 ### Test failure
 
 ```bash
-./gradlew.bat :modules:<module>:test              # reproduce
+./gradlew :modules:<module>:test              # reproduce
 # Read the test, understand its intent, fix YOUR code (not the test)
 ```
 
 ### PMD violation
 
 ```bash
-./gradlew.bat pmdAll                              # reproduce (every source set; CI runs this task)
+./gradlew pmdAll                              # reproduce (every source set; CI runs this task)
 # Test sources use config/pmd/ruleset-tests.xml, main uses ruleset.xml. Edited a ruleset?
 #   node scripts/ci/check-pmd-ruleset-sync.mjs
 # Fix the code to satisfy the rule. Do NOT add @SuppressWarnings.
@@ -89,8 +89,8 @@ have caught: an integration conflict with something that landed while you waited
 ### Spotless violation
 
 ```bash
-./gradlew.bat spotlessCheck                       # reproduce
-./gradlew.bat spotlessApply                       # fix
+./gradlew spotlessCheck                       # reproduce
+./gradlew spotlessApply                       # fix
 # Then re-commit the formatted files.
 ```
 
@@ -133,7 +133,7 @@ node scripts/docs/llmstxt-generate.mjs             # fix
 
 ```bash
 # Symptom: "Dependency verification failed" or lock-skew errors
-./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks  # fix
+./gradlew --no-configuration-cache resolveAndLockAll --write-locks  # fix
 node scripts/ci/report-lock-skew.mjs                                    # verify
 ```
 

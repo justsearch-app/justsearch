@@ -165,7 +165,12 @@ for (const compacted of [false, true]) {
     const losses = records.filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST').map(r => r.line);
     assert.ok(losses.some(l => l.evidenceRangeComplete !== true), 'fixture holds a loss with an unknown range');
     const view = { engine: { present: true, records }, children: { present: true, records: [] } };
-    const evicted = Math.max(...losses.map(l => ledger.knownTimestamp(l.at)));
+    // Later evictions can be fully scoped to `old`. A slow disk may put them more than a
+    // second after the torn archive was evicted; they do not bound its unknown evidence.
+    const unknownLosses = losses.filter(l => !l.incarnation?.session && l.scopeComplete !== true
+      && l.evidenceRangeComplete !== true);
+    assert.ok(unknownLosses.length > 0, 'fixture holds an unscoped loss with an unknown range');
+    const evicted = Math.max(...unknownLosses.map(l => ledger.knownTimestamp(l.at)));
     const current = census.exitTargets({ runId: 'new', startedAt: ledger.formatTimestamp(evicted + 1000), pids: {} },
       null, [], view);
     assert.equal(current.gaps.some(g => g.reason === 'evidence_lost'), false,
@@ -178,3 +183,23 @@ for (const compacted of [false, true]) {
     assert.ok(during.gaps.some(g => g.reason === 'evidence_lost'), 'a run older than the eviction stays incomplete');
   });
 }
+
+test('this stop binds its writer to the checked Linux tuple; malformed, foreign and reused identities prove nothing', t => {
+  const dataDir = tmp(t), incarnation = { session: 'linux-stop-binding', n: 1 };
+  const processIdentity = { kind: 'linux-proc-v1', pid: 4242,
+    bootId: '333fd9cf-f547-4117-a537-fc8be3c44466', startTicks: '42' };
+  ledger.createLedgerWriter({ ledgerDir: ledger.ledgerDirectory(dataDir), family: 'engine',
+    writer: { role: 'dev-runner', pid: 100, startedAt: Date.parse(stamp) } })
+    .append('engine-start', { incarnation, pid: 4242, processIdentity, executable: process.execPath });
+  const recorder = actuatorLib.createCliEngineRecorder({ dataDir, incarnation });
+  recorder.intent({ mode: 'NOW', channel: 'TERMINATE' });
+  recorder.exit({ endedBy: 'terminate', terminateCalledAt: Date.now() });
+  const writer = recorder.writerIdentity();
+  const records = census.readRunLedger(dataDir);
+  const binding = { writer, incarnation, checked: { pid: 4242, processIdentity } };
+  const view = b => census.ledgerView(records, incarnation.session, { stopBindings: [b] });
+  assert.equal(view(binding).engines[0].exit?.exitClass, 'UNKNOWN', 'the checked stop owns its truthful unknown-code exit');
+  assert.equal(view({ ...binding, checked: { pid: 4242, processIdentity: { ...processIdentity, startTicks: '43' } } }).engines[0].exit, null);
+  assert.equal(census.stopWriterBinding({ ...binding, checked: { pid: 4242, processIdentity: { ...processIdentity, startTicks: 'unknown' } } }), null);
+  assert.equal(census.stopWriterBinding({ ...binding, writer: { ...writer, pid: process.pid + 1 } }), null);
+});

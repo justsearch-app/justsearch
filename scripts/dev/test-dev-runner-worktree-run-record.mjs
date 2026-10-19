@@ -86,6 +86,10 @@ function spawnAliveProc() {
  */
 function recordedIdentity(pid) {
   // Portable ownership refusals need the live PID, but never a Windows termination identity.
+  if (process.platform === 'linux') {
+    const seen = require('./lib/process-identity.cjs').readLinuxProcess(pid);
+    return seen?.present ? { pid, processIdentity: seen.processIdentity, executable: seen.executable } : null;
+  }
   if (process.platform !== 'win32') return null;
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
@@ -265,7 +269,7 @@ const tests = [
 
 let pass = 0, fail = 0, skipped = 0;
 for (const [name, fn, prerequisite] of tests) {
-  if (prerequisite && process.platform !== 'win32') { skipped++; console.log(`  SKIP  ${name}: ${prerequisite}`); continue; }
+  if (prerequisite && !['win32', 'linux'].includes(process.platform)) { skipped++; console.log(`  SKIP  ${name}: ${prerequisite}`); continue; }
   try { await fn(); console.log(`  PASS  ${name}`); pass++; }
   catch (e) { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
 }

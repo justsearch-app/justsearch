@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
 import {it,expect,vi,afterEach} from 'vitest';
-import fs from 'node:fs';
+import fixture from './__fixtures__/status-response-live.json';
 import {consumeShapeStream} from './streams.ts';
 import {subscribeStatus,__resetStatusPollForTest} from '../shell-v0/utils/statusPoll.ts';
-const fixture=JSON.parse(fs.readFileSync('F:/agent-sandbox/design-b6d536/codex/verify-status3/own-ui/healthy-status.json','utf8'));
 afterEach(()=>{__resetStatusPollForTest();vi.useRealTimers();vi.unstubAllGlobals();});
 it('OWN-REATTACH-READONLY: a resumed read-only execution causes zero fresh reads',async()=>{
  vi.useFakeTimers();const urls:string[]=[];let reads=0;let delivered=0;

@@ -2793,6 +2793,8 @@ public class HeadlessApp {
    * </ol>
    */
   static Path maybeAutoSelectCuda12Variant(UiSettings settings, ConfigStore activeConfigStore) {
+    // cuda12 is the packaged Windows backend. Linux uses the validated operator runtime.
+    if (!PlatformPaths.isWindows()) return null;
     try {
       // Check if GPU acceleration is requested
       int gpuLayers = settings.getGpuLayers();
@@ -2841,7 +2843,7 @@ public class HeadlessApp {
                 .getParent()
                 .resolve("variants")
                 .resolve("cuda12")
-                .resolve("llama-server.exe");
+                .resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
         log.warn("========================================");
         log.warn("GPU ACCELERATION UNAVAILABLE");
         log.warn("GPU requested (gpu_layers={}) but cuda12 variant not found", gpuLayers);
@@ -2853,7 +2855,9 @@ public class HeadlessApp {
 
       // Verify required CUDA DLLs exist in cuda12 variant directory
       Path cuda12Dir = cuda12Exe.getParent();
-      String[] requiredDlls = {"ggml-cuda.dll", "cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll"};
+      var windowsNames = io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64");
+      List<String> requiredDlls = List.of("ggml-cuda", "cudart", "cublas", "cublasLt")
+          .stream().map(windowsNames::libraryName).toList();
       List<String> missingDlls = new java.util.ArrayList<>();
       for (String dll : requiredDlls) {
         if (!Files.isRegularFile(cuda12Dir.resolve(dll))) {
@@ -2900,7 +2904,7 @@ public class HeadlessApp {
         home = PlatformPaths.resolveDataDir();
       }
       if (home != null) {
-        Path exe = home.resolve("native-bin").resolve("llama-server").resolve("llama-server.exe");
+        Path exe = home.resolve("native-bin").resolve("llama-server").resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
         if (Files.isRegularFile(exe)) {
           return exe;
         }
@@ -2913,7 +2917,7 @@ public class HeadlessApp {
     try {
       Path repoRoot = io.justsearch.configuration.RepoRootLocator.findRepoRootOrNull();
       if (repoRoot != null) {
-        Path exe = repoRoot.resolve("native-bin").resolve("llama-server").resolve("llama-server.exe");
+        Path exe = repoRoot.resolve("native-bin").resolve("llama-server").resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
         if (Files.isRegularFile(exe)) {
           return exe;
         }
@@ -2934,7 +2938,7 @@ public class HeadlessApp {
     Path serverDir = serverExe.getParent();
     if (serverDir == null) return false;
 
-    Path ggmlCuda = serverDir.resolve("ggml-cuda.dll");
+    Path ggmlCuda = serverDir.resolve(io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64").libraryName("ggml-cuda"));
     if (!Files.exists(ggmlCuda)) {
       return false; // No CUDA DLL
     }
@@ -2957,7 +2961,7 @@ public class HeadlessApp {
     Path serverDir = serverExe.getParent();
     if (serverDir == null) return false;
 
-    Path ggmlCuda = serverDir.resolve("ggml-cuda.dll");
+    Path ggmlCuda = serverDir.resolve(io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64").libraryName("ggml-cuda"));
     if (!Files.exists(ggmlCuda)) {
       return false; // No CUDA DLL - CPU-only, needs switch
     }
@@ -3014,7 +3018,7 @@ public class HeadlessApp {
     // Check relative to current server: ../variants/cuda12/llama-server.exe
     Path serverDir = currentServerExe.getParent();
     if (serverDir != null) {
-      Path cuda12 = serverDir.resolve("variants").resolve("cuda12").resolve("llama-server.exe");
+      Path cuda12 = serverDir.resolve("variants").resolve("cuda12").resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
       if (Files.isRegularFile(cuda12)) {
         return cuda12;
       }
@@ -3027,7 +3031,7 @@ public class HeadlessApp {
         Path cuda12 = repoRoot
             .resolve("modules").resolve("ui").resolve("native-bin")
             .resolve("llama-server").resolve("variants").resolve("cuda12")
-            .resolve("llama-server.exe");
+            .resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
         if (Files.isRegularFile(cuda12)) {
           return cuda12;
         }

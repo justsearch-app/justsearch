@@ -46,7 +46,7 @@
  */
 
 const fs = require('node:fs');
-const { readProcessTable, readProcessTableAsync, normalizeCreationTime } = require('./process-identity.cjs');
+const { readProcessTable, readProcessTableAsync, normalizeCreationTime, linuxIdentity } = require('./process-identity.cjs');
 
 const ENV_OVERRIDE = 'JUSTSEARCH_AGENT_IDENTITY';
 const ENV_HANDOFF = 'JUSTSEARCH_AGENT_IDENTITY_HANDOFF';
@@ -132,6 +132,9 @@ function classifyHarnessRow(row) {
   const name = String(row?.Name ?? '').trim().toLowerCase();
   if (name === 'claude' || name === 'claude.exe') return 'claude';
   if (name === 'codex' || name === 'codex.exe') return 'codex';
+  // The native Claude installer names its executable by version, not by the CLI symlink.
+  const executable = String(row?.ExecutablePath ?? '').replace(/\\/g, '/');
+  if (/(?:^|\/)claude\/versions\/\d+\.\d+\.\d+$/.test(executable)) return 'claude';
   if (name === 'node' || name === 'node.exe') {
     const cmd = String(row?.CommandLine ?? '');
     if (/@anthropic-ai[\\/]+claude-code/i.test(cmd)) return 'claude';
@@ -163,12 +166,18 @@ function findHarnessAncestor(rows, selfPid) {
     visited.add(ppid);
     const parent = byPid.get(ppid);
     if (!parent) return { ok: true, found: null, broken: true, chain };
+    const childLinux = linuxIdentity(cur), parentLinux = linuxIdentity(parent);
+    if (cur.processIdentity || parent.processIdentity) {
+      if (!childLinux || !parentLinux || childLinux.bootId !== parentLinux.bootId) return { ok: false, reason: 'unreadable ancestry birth' };
+      if (BigInt(parentLinux.startTicks) > BigInt(childLinux.startTicks)) return { ok: true, found: null, broken: true, chain };
+    }
     const childCt = normalizeCreationTime(cur.CreationFileTimeUtc);
     const parentCt = normalizeCreationTime(parent.CreationFileTimeUtc);
     // A parent created after its child is a recycled ppid: the real parent no longer exists.
     if (childCt && parentCt && BigInt(parentCt) > BigInt(childCt)) return { ok: true, found: null, broken: true, chain };
     const harness = classifyHarnessRow(parent);
     if (harness) {
+      if (parentLinux) return { ok: true, found: { harness, pid: ppid, creationTime: null, processIdentity: parentLinux } };
       if (!parentCt) return { ok: false, reason: `harness ancestor pid ${ppid} has no creation time` };
       return { ok: true, found: { harness, pid: ppid, creationTime: parentCt } };
     }
@@ -211,7 +220,9 @@ function detectedIdentity(found, env, source = 'process-ancestry') {
       harness: found.harness,
       pid: found.pid,
       creationTime: found.creationTime,
-      key: ownerKey(found.harness, found.pid, found.creationTime),
+      ...(found.processIdentity ? { processIdentity: found.processIdentity } : {}),
+      key: found.processIdentity ? `${found.harness}-${found.pid}-linux-${found.processIdentity.bootId}-${found.processIdentity.startTicks}`
+        : ownerKey(found.harness, found.pid, found.creationTime),
     }),
     sessionId: labelFor(found.harness, env),
     source,
@@ -231,7 +242,10 @@ function coerceIdentity(raw) {
     const pid = raw.owner.pid == null ? null : Number(raw.owner.pid);
     const creationTime = raw.owner.creationTime == null ? null : normalizeCreationTime(String(raw.owner.creationTime));
     if (pid !== null && !(Number.isInteger(pid) && pid > 0)) return null;
-    owner = Object.freeze({ harness: raw.owner.harness ?? harness, pid, creationTime, key });
+    const processIdentity = linuxIdentity(raw.owner);
+    if (raw.owner.processIdentity && (!processIdentity || processIdentity.pid !== pid)) return null;
+    owner = Object.freeze({ harness: raw.owner.harness ?? harness, pid, creationTime, key,
+      ...(processIdentity ? { processIdentity } : {}) });
   }
   return Object.freeze({ harness, owner, sessionId, source: typeof raw.source === 'string' ? raw.source : 'stored' });
 }

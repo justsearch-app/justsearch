@@ -373,6 +373,8 @@ public final class ExitLedgerWriter {
     writerNode.put("role", writer.role().token());
     writerNode.put("pid", writer.pid());
     writerNode.put("startedAt", LedgerTimestamps.format(writer.startedAt()));
+    if (writer.processIdentity() != null)
+      writerNode.set("processIdentity", JSON.valueToTree(writer.processIdentity()));
     for (Map.Entry<String, ?> field : fields.entrySet()) {
       node.set(field.getKey(), JSON.valueToTree(wire(field.getValue())));
     }

@@ -21,6 +21,8 @@ package io.justsearch.configuration.model;
 public enum SkipCause {
   /** The machine cannot run it: no CUDA, or not enough VRAM for the GGUF floor. */
   HARDWARE("hardware", true),
+  /** Native artifacts for another OS/architecture; operator-provided runtimes are separate. */
+  PLATFORM("platform", false),
   /** The active {@link InstallIntent} does not want this package's capability tier. */
   INTENT("intent", false),
   /** The user declined this component (only possible for a {@link Necessity#userDeclinable} one). */

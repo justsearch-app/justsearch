@@ -23,7 +23,7 @@ import org.junit.jupiter.api.condition.OS;
  * they are forced as a group: within a second while any are pending, and at the window's close.
  * A helper launched outside any window keeps its own forced receipts. Real Windows processes.
  */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class HelperReceiptGroupFlushTest {
   /** One ledger event in order: an append (forced or not) or a group force. */
   private record Event(String type, boolean forced, long atNanos) {}
@@ -64,7 +64,7 @@ final class HelperReceiptGroupFlushTest {
   }
 
   private static void runAwaited(String purpose) throws Exception {
-    Process p = OwnedHelper.start(new ProcessBuilder("cmd.exe", "/c", "exit 0")
+    Process p = OwnedHelper.start(new ProcessBuilder(io.justsearch.configuration.PlatformPaths.isLinux() ? List.of(java.nio.file.Path.of("/bin/true").toRealPath().toString()) : List.of("cmd.exe", "/c", "exit 0"))
         .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD), purpose);
     assertTrue(p.waitFor(15, TimeUnit.SECONDS), purpose + " exited");
   }
@@ -74,7 +74,7 @@ final class HelperReceiptGroupFlushTest {
   }
 
   @Test void receiptsInsideAWindowAreUnforcedAndForcedAsAGroup() throws Exception {
-    var window = OwnedHelper.sharedWindow("cmd.exe", "group flush probe", Duration.ofMinutes(1));
+    var window = OwnedHelper.sharedWindow(io.justsearch.configuration.PlatformPaths.isLinux() ? java.nio.file.Path.of("/bin/true").toRealPath().getFileName().toString() : "cmd.exe", "group flush probe", Duration.ofMinutes(1));
     try (var _ = window.acquire()) {
       for (int i = 0; i < 3; i++) runAwaited("group flush helper " + i);
       List<Event> receipts = events.stream().filter(e -> e.type().startsWith("helper-")

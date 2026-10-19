@@ -112,7 +112,7 @@ final class ActivationPhysicalEncoderCapsTest {
       throws Exception {
     try (var fixture = new Fixture(dir, ChatModelProfile.COMPACT)) {
       fixture.refuseValidation.set(true);
-      fixture.activation.startActivate("cuda12", "standard");
+      fixture.activation.startActivate(io.justsearch.configuration.PlatformPaths.isWindows() ? "cuda12" : null, "standard");
 
       var status = awaitDone(fixture.activation);
       assertEquals("failed", status.state, "validation refuses after physical preparation");
@@ -154,7 +154,7 @@ final class ActivationPhysicalEncoderCapsTest {
     try (var fixture = new Fixture(dir, from)) {
       var expected = caps(ConfigStoreRebuilder.prepare(new UiSettings(), to, null));
       assertNotEquals(caps(fixture.initial), expected, "profiles must reserve different chat footprints");
-      fixture.activation.startActivate("cuda12", to.id());
+      fixture.activation.startActivate(io.justsearch.configuration.PlatformPaths.isWindows() ? "cuda12" : null, to.id());
       var status = awaitDone(fixture.activation);
       assertEquals("completed", status.state, status.message);
       assertEquals(expected, caps(ConfigStore.global().get()), "resolved target plan reached commitment");
@@ -260,9 +260,14 @@ final class ActivationPhysicalEncoderCapsTest {
         property("justsearch." + (role.equals("embed") ? "embed.onnx" : role)
             + ".model_path", model.toString());
       }
-      Path exe = dir.resolve("native-bin/llama-server/variants/cuda12/llama-server.exe");
+      Path exe = dir.resolve("native-bin/llama-server/variants/cuda12/")
+          .resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
       Files.createDirectories(exe.getParent());
       Files.writeString(exe, "self-test executable stand-in");
+      if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+        assertTrue(exe.toFile().setExecutable(true));
+        property("justsearch.server.exe", exe.toString());
+      }
       ConfigStoreRebuilder.rememberAutoDetected(Map.of("justsearch.gpu.layers", "99",
           "justsearch.gpu.enabled", "true"));
       var device = new CudaDevice(0, Optional.empty(), Optional.empty(), Optional.empty(), 12_282L * MIB);

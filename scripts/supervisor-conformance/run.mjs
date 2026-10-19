@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { readLinuxProcess } from '../dev/lib/process-identity.cjs';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -136,7 +137,18 @@ function writeEnginePlan(workDir, incarnations) {
   return target;
 }
 
+function isAlive(pid) {
+  if (process.platform === 'linux') {
+    const observed = readLinuxProcess(pid);
+    if (observed == null) throw new Error(`cannot establish fixture liveness for ${pid}`);
+    return observed.present;
+  }
+  try { process.kill(pid, 0); return true; }
+  catch (err) { if (err.code === 'ESRCH') return false; throw err; }
+}
+
 export const io = {
+  isAlive,
   sleep,
   waitFor,
   readJsonIfPresent,

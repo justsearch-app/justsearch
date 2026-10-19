@@ -22,7 +22,7 @@ update it before closing.
 - When your work opens a new question, add it to Open Questions.
 - Keep entries terse. Evidence lives in tempdocs; this file is the index.
 - After ORT/session concurrency changes, run the stress-tagged Gradle tests
-  explicitly with `./gradlew.bat test -PincludeStress=true --tests "*Stress*"`.
+  explicitly with `node scripts/lib/tool-invoker.cjs gradle test -PincludeStress=true --tests "*Stress*"`.
   There is no scheduled stress cadence, so runtime agents touching
   `NativeSessionHandle` or `SessionHandle` are one trigger point for this
   opt-in verification.
@@ -362,7 +362,7 @@ Design choices in the current inference runtime, with rationale.
 - **Rationale:** All encoders used identical session options (`kSameAsRequested` arena, no CUDA graph, device allocator for initializers, no memory pattern optimization). The factory encoded these once.
 - **Evidence:** tempdoc 349 (factory extraction), tempdoc 352 (module split), tempdoc 359 (`OrtSessionManager`), tempdoc 360 (Worker co-location), tempdoc 397 (factory absorbed into assembler + handle; closure property §6).
 - **Current shape:** See D-007 below. The identical-session-options claim is now enforced by `SessionOptionsApplier` walking `RuntimePolicy` records (tempdoc 397 §14.24 FA) rather than by a shared factory class.
-- **Verification:** `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path>` task — routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (§14.24 FA).
+- **Verification:** `node scripts/lib/tool-invoker.cjs gradle :modules:worker-core:verifyModel -Pmodel=<path>` task — routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (§14.24 FA).
 
 ### D-005: Model file manifest convention (`model_manifest.json`) — SHIPPED
 

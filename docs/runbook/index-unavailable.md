@@ -34,6 +34,18 @@ The system overview defines corruption and schema mismatch in an essential index
 
 ## Diagnostics
 
+The PowerShell examples below apply to Windows. On Linux, take the actual data
+folder from the runtime manifest (`dataDir`); the desktop shell uses its platform
+app-data folder under `XDG_DATA_HOME`, while headless launches can select a data
+folder explicitly. With that path assigned to `data_dir` in Bash:
+
+```sh
+df -h "$data_dir"
+find "$data_dir" -type f \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' \) -ls
+tail -n 500 "$data_dir/logs/engine.log"
+```
+
+
 1. Check `/api/status` and `/api/debug/state`. Record the lane F retained `INDEX_CONTROL_PLANE` and `INDEX_SERVING` states and their dotted reason codes.
 
 2. Check `/api/health` and `/api/health/events/stream` for the lifecycle envelope and condition detail. Treat the PascalCase event reason as a projection; use the dotted status reason when selecting the response above.

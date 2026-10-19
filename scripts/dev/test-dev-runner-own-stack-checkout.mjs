@@ -42,7 +42,7 @@ const REPO_ROOT = path.resolve(HERE, '..', '..');
  */
 class Skip extends Error {}
 const windowsNative = (name, fn) => [name, async () => {
-  if (process.platform !== 'win32') throw new Skip('Windows native identity-bound process stop');
+  if (!['win32', 'linux'].includes(process.platform)) throw new Skip('No native identity-bound process backend');
   await fn();
 }];
 // Test seam: JUSTSEARCH_TEST_SIMULATE_PLATFORM stands in for process.platform in the drive-letter
@@ -66,6 +66,10 @@ function copyCheckout(dest) {
     'scripts/dev/justsearch-dev-mcp.mjs',
     'scripts/dev/justsearch-dev-mcp',
     'scripts/dev/lib',
+    'scripts/lib',
+    'contracts/native-targets/spec.v1.json',
+    ...(process.platform === 'linux' ? ['modules/ui/build/install/ui/'
+      + require('../lib/native-targets.cjs').nativeTarget().paths['bound-exec']] : []),
     'governance/supervision-contract.v1.json',
   ];
   for (const rel of items) {
@@ -119,6 +123,10 @@ function spawnSleeper() {
  */
 function recordedIdentity(pid) {
   // Refusal and path checks need no native identity unless they actually stop the fixture.
+  if (process.platform === 'linux') {
+    const seen = require('./lib/process-identity.cjs').readLinuxProcess(pid);
+    return seen?.present ? { pid, processIdentity: seen.processIdentity, executable: seen.executable } : null;
+  }
   if (process.platform !== 'win32') return null;
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',

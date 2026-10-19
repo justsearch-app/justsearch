@@ -71,7 +71,7 @@ gates/<gate-id>/.changesets/        per-gate escape-hatch directory (changeset .
      to lower the threshold for cheap fixture files).
 5. **Wire CI** by adding/switching a step in `.github/workflows/ci.yml` to
    call `node scripts/governance/run.mjs --gate <id> --mode gate`.
-6. **Optionally wire `./gradlew check`** via an Exec task calling
+6. **Optionally wire `node scripts/lib/tool-invoker.cjs gradle check`** via an Exec task calling
    `run.mjs --gate <id>` (no kernel gate is gradle-wired today — tempdoc 634
    removed the class-size `verifyGovernanceGates` task).
 

@@ -141,7 +141,9 @@ final class HeadlessAppEngineDeviceLossChainTest {
   private static io.justsearch.configuration.resolved.ResolvedConfig inferenceConfig(Path dir) throws IOException {
     var config = new io.justsearch.configuration.resolved.ResolvedConfigBuilder();
     config.putDefault("justsearch.home", dir.toString());
-    config.putDefault("justsearch.server.exe", dir.resolve("missing-server.exe").toString());
+    if (io.justsearch.configuration.PlatformPaths.isWindows()) {
+      config.putDefault("justsearch.server.exe", dir.resolve("missing-server.exe").toString());
+    }
     config.put("justsearch.llm.model_path", 400, "env_var", "test", dir.resolve("missing-model.gguf").toString());
     config.putDefault("justsearch.context.size", "4096"); config.putDefault("justsearch.gpu.layers", "0");
     config.putDefault("justsearch.ai.disabled", "false"); config.putDefault("justsearch.llm.enabled", "true");

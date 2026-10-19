@@ -7,6 +7,9 @@ mod engine_probe;
 #[allow(dead_code)]
 mod exit_ledger;
 mod platform_paths;
+mod native_targets;
+#[cfg(target_os = "linux")]
+mod linux_process;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
@@ -534,11 +537,14 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         ));
     }
 
+    #[cfg(target_os = "linux")]
+    linux_process::set_bundle_dir(&headless_dir);
+
     // Use javaw.exe on Windows to avoid opening a console window (java.exe creates one).
     let java_bin = headless_dir
         .join("runtime")
         .join("bin")
-        .join(if cfg!(windows) { "javaw.exe" } else { "java" });
+        .join(native_targets::executable_name("java-gui"));
     let ui_jar = headless_dir.join("ui-headless.jar");
     let lib_glob = headless_dir.join("lib").join("*");
 
@@ -717,7 +723,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("pipeline-stage-plugins.v1.json");
 
     let crash_dir = app_data_dir.join("crashes");
-    let mut cmd = Command::new(&java_bin);
+    let mut cmd = containment::engine_command(&java_bin).map_err(|e| e.to_string())?;
     // Use AOT cache if present (JEP 514 — built at compile time, bundled in aot/).
     let aot_cache = headless_dir.join("aot").join("head.aot");
     cmd.current_dir(&headless_dir)
@@ -828,7 +834,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("native-bin")
         .join("onnxruntime")
         .join("cuda12");
-    if ort_cuda_dir.join("onnxruntime_providers_cuda.dll").exists() {
+    if ort_cuda_dir.join(native_targets::library_name("ort-cuda")).exists() {
         cmd.env("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", &ort_cuda_dir);
         cmd.env("JUSTSEARCH_GPU_ENABLED", "true");
     }
@@ -836,11 +842,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
     // OCR baseline: make app-owned Tesseract discoverable to Tika's external-process parser.
     // Tika 3.x carries executable/tessdata paths on the parser instance built from process
     // configuration, so the packaged app must project the restored runtime through env.
-    let tesseract_exe = native_tesseract_dir.join(if cfg!(windows) {
-        "tesseract.exe"
-    } else {
-        "tesseract"
-    });
+    let tesseract_exe = native_tesseract_dir.join(native_targets::executable_name("tesseract"));
     let tessdata_dir = native_tesseract_dir.join("tessdata");
     if tesseract_exe.exists() && tessdata_dir.is_dir() {
         cmd.env("TESSDATA_PREFIX", &tessdata_dir);
@@ -959,8 +961,12 @@ pub(crate) fn restart_headless_backend(
 #[serde(rename_all = "camelCase")]
 struct ManagedChildRecord {
     pid: u32,
+    #[serde(default)]
     started_at: String,
     executable: String,
+    #[cfg(target_os = "linux")]
+    #[serde(rename = "processIdentity")]
+    identity: Option<linux_process::Identity>,
 }
 
 /// Terminal fallback reports incomplete ownership; recoverable supervision never calls it.
@@ -996,10 +1002,14 @@ fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), Strin
             let child: ManagedChildRecord = serde_json::from_value(value.clone())
                 .map_err(|error| format!("Malformed managed child identity: {error}"))?;
             if child.pid == 0
-                || child.started_at.trim().is_empty()
+                || (cfg!(windows) && child.started_at.trim().is_empty())
                 || !std::path::Path::new(&child.executable).is_absolute()
             {
                 return Err("Incomplete managed child identity".into());
+            }
+            #[cfg(target_os = "linux")]
+            if !child.identity.as_ref().is_some_and(|id| id.valid(child.pid)) {
+                return Err("Incomplete Linux managed child identity".into());
             }
             Ok(child)
         })
@@ -1068,7 +1078,15 @@ try {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) -> Result<(), String> {
+    linux_process::terminate(
+        child.identity.as_ref().ok_or("Missing Linux managed child identity")?,
+        std::path::Path::new(&child.executable),
+    )
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 fn terminal_kill_if_identity_matches(_child: &ManagedChildRecord) -> Result<(), String> {
     Err("Registered child termination is unsupported on this installer platform".into())
 }
@@ -1319,10 +1337,7 @@ async fn confirm_delete_data(
         _ => return Err("Invalid or expired confirmation token".into()),
     }
 
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("app_data_dir() failed: {e}"))?;
+    let app_data_dir = resolve_app_data_dir(&app)?;
     std::fs::create_dir_all(&app_data_dir).map_err(|e| {
         format!(
             "Failed to create app data dir {}: {e}",
@@ -1341,10 +1356,7 @@ async fn confirm_delete_data(
 
 #[tauri::command]
 async fn justsearch_paths(app: tauri::AppHandle) -> Result<JustSearchPaths, String> {
-    let home = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("app_data_dir() failed: {e}"))?;
+    let home = resolve_app_data_dir(&app)?;
     let models_dir = home.join("models");
     let llama_server_dir = home.join("native-bin").join("llama-server");
     let logs_dir = home.join("logs");
@@ -1405,10 +1417,7 @@ fn read_capped(path: &std::path::Path, max_bytes: u64) -> Result<Option<String>,
 }
 
 fn plugin_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let home = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("app_data_dir() failed: {e}"))?;
+    let home = resolve_app_data_dir(&app)?;
     Ok(home.join("plugins"))
 }
 
@@ -1918,7 +1927,12 @@ mod tests {
 
     #[test]
     fn test_validate_path_rejects_traversal() {
-        let result = validate_user_path("C:\\Users\\..\\etc\\passwd", false);
+        let input = if cfg!(windows) {
+            "C:\\Users\\..\\etc\\passwd"
+        } else {
+            "/home/../etc/passwd"
+        };
+        let result = validate_user_path(input, false);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("traversal"));
     }

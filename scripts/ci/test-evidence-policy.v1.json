@@ -90,6 +90,13 @@
       "cadence": "runs every CI on the windows-native lane; touch when changing Windows OS-integration behavior"
     },
     {
+      "tag": "cross-platform",
+      "tier": "cross-platform-unit-evidence",
+      "owner": "portable OS integration / Windows-native and Linux unit coverage",
+      "reason": "Ported test classes retain Windows OS-branch coverage in the dedicated windows-native-tests lane (selected alongside windows by -PwindowsOnly=true) and run in the default Linux unit lanes. Genuinely Windows-only methods retain their windows tag and OS prerequisites. The tag adds host coverage; it does not exclude or defer unit tests.",
+      "cadence": "runs every CI in the default Linux unit lanes and the windows-native lane; touch when changing portable OS-integration behavior"
+    },
+    {
       "tag": "load-sensitive",
       "tier": "local-timing-evidence",
       "owner": "search/GPL ranking owners (LambdaMartBenchmarkTest); app-services power owners (EnergyStatePollerTest); app-engine (EngineExtractionSandboxChaosTest is the sibling stress tag)",

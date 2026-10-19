@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.runtime.child;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,6 +31,11 @@ public interface ProcessTerminator {
     throw new IOException("predecessor process handles unavailable");
   }
 
+  /** A recorded Linux identity is mandatory when opening a non-child for destructive actions. */
+  default OsProcess open(ProcessHandle process, LinuxProcessIdentity expected) throws IOException {
+    return open(process);
+  }
+
   /** The code a terminate call ends a child with: {@code JS_CHILD_STOP} on Windows. */
   int ourCode();
 
@@ -46,11 +50,12 @@ public interface ProcessTerminator {
 
   /** FFM {@code TerminateProcess} on Windows; the JDK's forcible destroy elsewhere. */
   static ProcessTerminator forCurrentOs() {
-    if (File.separatorChar == '\\') {
+    if (io.justsearch.configuration.PlatformPaths.isWindows()) {
       ProcessTerminator windows = WindowsProcessTerminator.load();
       if (windows != null) return windows;
       return new PosixProcessTerminator(1); // FFM unavailable: the JDK destroy, code 1
     }
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) return new LinuxProcessTerminator();
     return new PosixProcessTerminator(PosixProcessTerminator.SIGKILL_CODE);
   }
 
@@ -58,6 +63,9 @@ public interface ProcessTerminator {
   interface OsProcess {
     /** The child's creation FILETIME as a decimal string; empty where the OS has none. */
     Optional<String> creationFileTime();
+
+    /** Versioned native birth identity on Linux; empty elsewhere or when unavailable. */
+    default Optional<LinuxProcessIdentity> processIdentity() { return Optional.empty(); }
 
     /** Executable observed through this held handle; empty when unavailable. */
     default Optional<String> executable() { return Optional.empty(); }

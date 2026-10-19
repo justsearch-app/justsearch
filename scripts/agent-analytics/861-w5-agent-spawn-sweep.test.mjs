@@ -1,3 +1,4 @@
+import '../dev/lib/test-fixture-processes.cjs';
 /**
  * Tempdoc 861 W5 — the shared assembly (`scripts/dev/lib/agent-spawn-sweep.cjs`) that wires
  * each of §6.4's six reap occasions onto the Phase 4 reaper (`agent-spawn-reaper.cjs`).
@@ -111,8 +112,8 @@ async function identityFor(pid) {
   const row = await findOwnChildRow(pid);
   assert.ok(row, `spawned child pid ${pid} never appeared in the process table`);
   const creationFileTimeUtc = normalizeCreationTime(row.CreationFileTimeUtc);
-  assert.ok(creationFileTimeUtc, `child pid ${pid} has no readable creation time`);
-  return { creationFileTimeUtc, cmdlineFingerprint: '-e', cmdline: row.CommandLine };
+  assert.ok(row.processIdentity || creationFileTimeUtc, `child pid ${pid} has no readable native birth`);
+  return { creationFileTimeUtc, ...(row.processIdentity ? {processIdentity:row.processIdentity} : {}), cmdlineFingerprint: '-e', cmdline: row.CommandLine };
 }
 
 async function withTmpRegister(fn) {
@@ -149,7 +150,7 @@ async function main() {
   // Win32-only: `readProcessTable`/`taskkill` are implemented for win32 only
   // (`process-identity.cjs`), so this is skipped rather than silently passing on CI's Linux
   // runner — the other checks below inject a fake table and are platform-independent.
-  if (process.platform !== 'win32') {
+  if (!['win32', 'linux'].includes(process.platform)) {
     skipped.push('session-start reaps a real, lapsed-and-stale OTHER-session record (real kill): win32-only (readProcessTable/taskkill)');
   } else {
   await check('session-start reaps a real, lapsed-and-stale OTHER-session record (real kill)', async () => {
@@ -163,6 +164,7 @@ async function main() {
           producer: 'test',
           pid: child.pid,
           creationFileTimeUtc: identity.creationFileTimeUtc,
+          ...(identity.processIdentity ? {processIdentity:identity.processIdentity} : {}),
           cmdlineFingerprint: identity.cmdlineFingerprint,
           port: 39999,
           leaseDurationSec: 1,
@@ -795,7 +797,7 @@ async function main() {
   });
 
   // ── F-1 + F-2a/F-3, end to end through the real CLI subprocess (the documented invocation) ──
-  if (process.platform !== 'win32') {
+  if (!['win32', 'linux'].includes(process.platform)) {
     skipped.push('CLI end-to-end (F-1/F-2a/F-3): win32-only (readProcessTable/taskkill)');
   } else {
     await check('CLI end-to-end: no --session-id flag (the documented invocation) resolves the caller from its harness process and reaps its own live spawn', async () => {
@@ -812,6 +814,7 @@ async function main() {
           producer: 'cli-e2e-test',
           pid: child.pid,
           creationFileTimeUtc: identity.creationFileTimeUtc,
+          ...(identity.processIdentity ? {processIdentity:identity.processIdentity} : {}),
           cmdlineFingerprint: identity.cmdlineFingerprint,
           port: 40200,
           leaseDurationSec: 1,

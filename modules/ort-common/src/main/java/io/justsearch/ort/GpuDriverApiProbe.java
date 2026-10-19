@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
+import io.justsearch.configuration.NativeTargets;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -118,8 +119,12 @@ public final class GpuDriverApiProbe {
    * a CUDA-capable NVIDIA driver is installed). On Linux, looks for {@code libcuda.so.1}.
    */
   public static Result probe() {
-    String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-    String lib = os.contains("windows") ? "nvcuda" : "cuda";
+    String lib;
+    try {
+      lib = NativeTargets.current().libraryName("cuda");
+    } catch (IllegalArgumentException unsupported) {
+      return Result.noDevice(NO_DRIVER_LIBRARY, 0, unsupported.getMessage());
+    }
 
     SymbolLookup lookup;
     try (Arena arena = Arena.ofConfined()) {

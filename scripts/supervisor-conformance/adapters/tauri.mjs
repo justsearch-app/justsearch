@@ -1,4 +1,6 @@
 import { runLifecycle } from '../lifecycle.mjs';
+import { engineRecords } from './dev-runner.mjs';
+import { signalLinuxProcess } from '../../dev/lib/process-identity.cjs';
 import { runUpdaterHold } from '../updater-hold.mjs';
 /**
  * Conformance adapter: the production supervisor (the Tauri shell), lane F stage B item B10.
@@ -30,12 +32,11 @@ export const phases = Object.freeze(['start','discovery','quit','kill']);
 
 const CRATE = ['modules', 'shell', 'src-tauri'];
 
-function binaryPath(repoRoot) {
+export function binaryPath(repoRoot) {
+  const suffix = process.platform === 'win32' ? '.exe' : '';
   for (const profile of ['debug', 'release']) {
-    for (const suffix of ['.exe', '']) {
-      const candidate = path.join(repoRoot, ...CRATE, 'target', profile, `supervisor-conformance${suffix}`);
-      if (fs.existsSync(candidate)) return candidate;
-    }
+    const candidate = path.join(repoRoot, ...CRATE, 'target', profile, `supervisor-conformance${suffix}`);
+    if (fs.existsSync(candidate)) return candidate;
   }
   return null;
 }
@@ -119,12 +120,7 @@ export async function runCase({ testCase, policy, io }) {
         || testCase.id === 'supervisor-killed-ends-engine-and-helpers') {
       const helper = await io.waitFor(() => io.readJsonIfPresent(path.join(workDir, 'grandchild-1.json')),
         { what: 'detached helper pid', timeoutMs: 10000 });
-      const alive = (pid) => {
-        try { process.kill(pid, 0); return true; } catch (err) {
-          if (err.code === 'ESRCH') return false;
-          throw err; // lookup failure cannot prove death
-        }
-      };
+      const alive = io.isAlive;
       try {
         assert.equal(alive(helper.pid), true, 'positive control: helper ran before the fault');
         assert.equal(alive(helper.parentPid), true, 'positive control: Engine ran before the fault');
@@ -152,10 +148,20 @@ export async function runCase({ testCase, policy, io }) {
         const manifest = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'manifest.json'));
         const state = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'supervisor.v1.json'));
         // These pids came only from this run's fixture/state; no tree or port sweep.
-        const owned = new Set([helper.pid, helper.parentPid, manifest?.pid, manifest?.head?.pid, state?.pid]);
-        for (const pid of owned) {
-          if (Number.isInteger(pid) && pid > 0 && alive(pid)) {
-            try { process.kill(pid); } catch { /* exited concurrently */ }
+        if (process.platform === 'linux') {
+          const owned = [helper, ...engineRecords(io, dataDir).filter(row => row.type === 'engine-start')];
+          for (const record of owned) {
+            if (!alive(record.pid)) continue;
+            const result = signalLinuxProcess(record.processIdentity, 'SIGKILL');
+            assert(result.ok || result.outcome === 'mismatch',
+              `fixture identity-bound stop failed: ${result.reason}`);
+          }
+        } else {
+          const owned = new Set([helper.pid, helper.parentPid, manifest?.pid, manifest?.head?.pid, state?.pid]);
+          for (const pid of owned) {
+            if (Number.isInteger(pid) && pid > 0 && alive(pid)) {
+              try { process.kill(pid); } catch { /* exited concurrently */ }
+            }
           }
         }
       }
@@ -209,8 +215,23 @@ export async function runCase({ testCase, policy, io }) {
 
     if (summary.forcedKill) {
       const code = engineRow().exitCodes.find((row) => row.name === 'SUPERVISOR_FORCED').code;
-      assert.equal(summary.lastExit?.code, code, 'forced shell stop must record SUPERVISOR_FORCED');
-      assert.equal((summary.checkpoint ?? state)?.lastExit?.code, code, 'the disk state must retain the distinctive forced code');
+      if (process.platform === 'linux') {
+        // SIGKILL has no Windows program exit code. The owner ledger records the
+        // actual signal and the successful force following a cooperative intent.
+        assert.equal(summary.lastExit?.code, -9, 'forced shell stop observes SIGKILL');
+        assert.equal((summary.checkpoint ?? state)?.lastExit?.code, -9,
+          'the disk state must retain the forced signal observation');
+        const exit = engineRecords(io, dataDir).find(row => row.type === 'engine-exit' && row.forced);
+        assert(exit, 'forced shell stop must have a durable exit receipt');
+        assert.equal(exit.code, null);
+        assert.equal(exit.signal, 9);
+        assert.equal(exit.codeDistinctive, false);
+        assert.equal(exit.ownerIntentBeforeSignal, true);
+        assert.equal(exit.exitClass, 'REQUESTED');
+      } else {
+        assert.equal(summary.lastExit?.code, code, 'forced shell stop must record SUPERVISOR_FORCED');
+        assert.equal((summary.checkpoint ?? state)?.lastExit?.code, code, 'the disk state must retain the distinctive forced code');
+      }
     }
 
     if (RESTART_CASES.has(testCase.id)) {

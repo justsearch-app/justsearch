@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.configuration.ConfigPrecedence;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -43,31 +44,11 @@ public final class OrtCudaHelper {
    * CUDA dependency DLLs in load order. cuBLAS depends on cuBLASLt, so cuBLASLt must come first.
    * Version-pinned to CUDA 12 / cuDNN 9 / cuFFT 11. Update this list when upgrading CUDA toolkit.
    */
-  static final List<String> CUDA_DEPENDENCY_DLL_ORDER =
-      List.of(
-          "cudart64_12.dll",
-          "cublasLt64_12.dll",
-          "cublas64_12.dll",
-          "cufft64_11.dll",
-          // Tempdoc 374 alpha.16: providers_cuda.dll's full CUDA 12.x dependency
-          // surface includes cuRand/cuSparse/cuSolver/nvJitLink. The alpha.16
-          // cuda-runtime Install AI package now ships these (curated NVIDIA
-          // redist), so the copy can include them in the ORT temp dir alongside
-          // the rest of the CUDA companions. Missing-from-disk entries are
-          // skipped silently (candidateCudaDependencyDlls filters by Files.exists),
-          // so older installs without these files behave the same as before.
-          "curand64_10.dll",
-          "cusparse64_12.dll",
-          "cusolver64_11.dll",
-          "nvJitLink_120_0.dll",
-          "cudnn64_9.dll",
-          "cudnn_graph64_9.dll",
-          "cudnn_heuristic64_9.dll",
-          "cudnn_ops64_9.dll",
-          "cudnn_cnn64_9.dll",
-          "cudnn_adv64_9.dll",
-          "cudnn_engines_runtime_compiled64_9.dll",
-          "cudnn_engines_precompiled64_9.dll");
+  static List<String> cudaDependencyDllOrder() {
+    return nativeLibraryNames("cudart", "cublasLt", "cublas", "cufft", "curand", "cusparse", "cusolver",
+          "nvJitLink", "cudnn", "cudnn_graph", "cudnn_heuristic", "cudnn_ops", "cudnn_cnn",
+          "cudnn_adv", "cudnn_engines_runtime_compiled", "cudnn_engines_precompiled");
+  }
 
   private static final Set<String> PRELOADED_NATIVE_DLLS = ConcurrentHashMap.newKeySet();
   private static volatile boolean legacyKeyWarningLogged;
@@ -89,7 +70,7 @@ public final class OrtCudaHelper {
   }
 
   /**
-   * Checks for missing core CUDA DLLs on the file system (Windows only, advisory).
+   * Checks for missing core CUDA libraries using the current native target names (advisory).
    *
    * <p><b>Use case:</b> validating an externally-set {@code JUSTSEARCH_NATIVE_PATH} that
    * is supposed to be a self-contained ORT GPU directory — i.e. a directory that
@@ -106,24 +87,14 @@ public final class OrtCudaHelper {
    * the ORT EP DLLs are never in cuda12 — silently disabled the entire fix.
    *
    * @param searchPath directory to check for DLLs
-   * @return list of missing DLL names (empty if all present or not on Windows)
+   * @return list of missing DLL names (empty if all present or the directory is unavailable)
    */
   public static List<String> checkMissingCudaDlls(Path searchPath) {
-    String osName = ConfigPrecedence.envOrProperty(null, "os.name", "");
-    if (!osName.toLowerCase(Locale.ROOT).contains("win")) {
-      return List.of();
-    }
     if (searchPath == null || !Files.isDirectory(searchPath)) {
       return List.of();
     }
     List<String> missing = new ArrayList<>();
-    for (String dll :
-        List.of(
-            "onnxruntime_providers_cuda.dll",
-            "onnxruntime_providers_shared.dll",
-            "cudart64_12.dll",
-            "cublas64_12.dll",
-            "cublasLt64_12.dll")) {
+    for (String dll : nativeLibraryNames("ort-cuda", "ort-shared", "cudart", "cublas", "cublasLt")) {
       if (!Files.exists(searchPath.resolve(dll))) {
         missing.add(dll);
       }
@@ -149,18 +120,14 @@ public final class OrtCudaHelper {
    * {@link #checkMissingCudaDlls} as a precondition guard.
    *
    * @param searchPath directory to check for DLLs
-   * @return list of missing DLL names (empty if all present or not on Windows)
+   * @return list of missing DLL names (empty if all present or the directory is unavailable)
    */
   public static List<String> checkMissingCudaRuntimeDlls(Path searchPath) {
-    String osName = ConfigPrecedence.envOrProperty(null, "os.name", "");
-    if (!osName.toLowerCase(Locale.ROOT).contains("win")) {
-      return List.of();
-    }
     if (searchPath == null || !Files.isDirectory(searchPath)) {
       return List.of();
     }
     List<String> missing = new ArrayList<>();
-    for (String dll : List.of("cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll")) {
+    for (String dll : nativeLibraryNames("cudart", "cublas", "cublasLt")) {
       if (!Files.exists(searchPath.resolve(dll))) {
         missing.add(dll);
       }
@@ -251,12 +218,13 @@ public final class OrtCudaHelper {
    * contain. Setting the property reroutes ALL ORT natives to that dir (tempdoc 772 §J probe:
    * externalizing only the EP DLL fails init because the core libs are then sought there too).
    */
-  static final List<String> ORT_NATIVE_DLL_SET =
-      List.of(
-          "onnxruntime.dll",
-          "onnxruntime4j_jni.dll",
-          "onnxruntime_providers_shared.dll",
-          "onnxruntime_providers_cuda.dll");
+  static List<String> ortNativeDllSet() {
+    return nativeLibraryNames("ort", "ort-jni", "ort-shared", "ort-cuda");
+  }
+
+  private static List<String> nativeLibraryNames(String... ids) {
+    return NativeTargets.currentIfSupported().map(target -> java.util.Arrays.stream(ids).map(target::libraryName).toList()).orElseGet(List::of);
+  }
 
   /** Outcome of {@link #evaluateOrtNativePack(Path, String)}. */
   public enum OrtNativePackStatus {
@@ -266,7 +234,7 @@ public final class OrtCudaHelper {
     ALREADY_SET_EXTERNALLY,
     /** The pack dir is null or not a directory (pack not installed — CPU path). */
     DIR_ABSENT,
-    /** The pack dir exists but is missing one or more of {@link #ORT_NATIVE_DLL_SET}. */
+    /** The pack dir exists but is missing one or more of {@link #ortNativeDllSet()}. */
     INCOMPLETE,
     /** The pack dir is complete but its version marker does not match {@link #EXPECTED_ORT_NATIVE_VERSION}. */
     VERSION_MISMATCH
@@ -300,11 +268,14 @@ public final class OrtCudaHelper {
     if (existingProperty != null && !existingProperty.isBlank()) {
       return new OrtNativePackDecision(OrtNativePackStatus.ALREADY_SET_EXTERNALLY, existingProperty);
     }
+    if (NativeTargets.currentIfSupported().isEmpty()) {
+      return new OrtNativePackDecision(OrtNativePackStatus.DIR_ABSENT, "GPU unavailable: unsupported native target");
+    }
     if (packDir == null || !Files.isDirectory(packDir)) {
       return new OrtNativePackDecision(OrtNativePackStatus.DIR_ABSENT, String.valueOf(packDir));
     }
     List<String> missing = new ArrayList<>();
-    for (String dll : ORT_NATIVE_DLL_SET) {
+    for (String dll : ortNativeDllSet()) {
       if (!Files.exists(packDir.resolve(dll))) {
         missing.add(dll);
       }
@@ -419,7 +390,7 @@ public final class OrtCudaHelper {
       return List.of();
     }
     List<Path> dlls = new ArrayList<>();
-    for (String dllName : CUDA_DEPENDENCY_DLL_ORDER) {
+    for (String dllName : cudaDependencyDllOrder()) {
       Path dllPath = searchPath.resolve(dllName);
       if (Files.exists(dllPath)) {
         dlls.add(dllPath.toAbsolutePath().normalize());
@@ -465,8 +436,7 @@ public final class OrtCudaHelper {
     if (searchPath == null || !Files.isDirectory(searchPath)) {
       return;
     }
-    String osName = ConfigPrecedence.envOrProperty(null, "os.name", "");
-    if (!osName.toLowerCase(Locale.ROOT).contains("win")) {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() || NativeTargets.currentIfSupported().isEmpty()) {
       return;
     }
 
@@ -478,7 +448,7 @@ public final class OrtCudaHelper {
         if (!Files.isDirectory(candidate)) {
           continue;
         }
-        Path ortDll = candidate.resolve("onnxruntime.dll");
+        Path ortDll = candidate.resolve(NativeTargets.current().libraryName("ort"));
         if (!Files.exists(ortDll)) {
           continue;
         }

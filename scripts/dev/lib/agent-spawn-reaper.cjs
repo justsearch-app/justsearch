@@ -72,7 +72,7 @@
 'use strict';
 
 const { spawnSync } = require('node:child_process');
-const { terminateWithCodeSync } = require('./recorded-termination.cjs');
+const { terminateWithCodeSync, formatTerminationCommand } = require('./recorded-termination.cjs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
@@ -87,6 +87,7 @@ const {
   DEFAULT_MAX_TABLE_AGE_MS,
   readProcessTable,
   normalizeCreationTime,
+  linuxIdentity, signalLinuxProcess,
   verifyProcessIdentity,
   isVerifiedMatch,
 } = require('./process-identity.cjs');
@@ -343,11 +344,8 @@ function ownerActivityFromLiveness(owner, { table, now = Date.now(), maxTableAge
 
 /* ── Entry construction ────────────────────────────────────────────────────────────────────── */
 
-function killLineFor(pid, creationFileTimeUtc) {
-  if (!Number.isInteger(pid) || pid <= 0 || !/^[1-9]\d{0,19}$/.test(String(creationFileTimeUtc ?? ''))) {
-    return 'identity unavailable; no safe termination command';
-  }
-  return `powershell.exe -NoProfile -File scripts/dev/lib/terminate-process.ps1 -Pid ${pid} -CreationFileTimeUtc ${creationFileTimeUtc} -Code 1`;
+function killLineFor(pid, creationFileTimeUtc, processIdentity = null) {
+  return formatTerminationCommand({ pid, creationFileTimeUtc, ...(processIdentity ? { processIdentity } : {}) });
 }
 
 /**
@@ -410,7 +408,7 @@ function makeEntry({
       && Boolean(identity?.verdict),
     // Present on every entry, including the reapable ones: a report that names the process but
     // makes the human reconstruct the command is a report that gets ignored.
-    ...(effectivePid !== null ? { killLine: killLineFor(effectivePid, record?.creationFileTimeUtc) } : {}),
+    ...(effectivePid !== null ? { killLine: killLineFor(effectivePid, record?.creationFileTimeUtc, record?.processIdentity) } : {}),
     // What `remove-worktree` needs from the conflict column (861 §6.4): *"refuses to proceed while
     // an unreapable holder remains"*, rather than proceeding into the half-deleted, `.git`-less
     // worktree shell §2-bis (c) documents. So the condition is exactly "a REGISTERED holder this
@@ -773,7 +771,8 @@ async function markRefusals(entries, { dir, now = Date.now() } = {}) {
 
 /* ── The effectful arm ─────────────────────────────────────────────────────────────────────── */
 
-function taskkillByPid(pid, { creationFileTimeUtc, exec = spawnSync, platform = process.platform } = {}) {
+function taskkillByPid(pid, { creationFileTimeUtc, processIdentity, exec = spawnSync, platform = process.platform } = {}) {
+  if (platform === 'linux') return signalLinuxProcess({ pid, processIdentity }, 'SIGKILL', { exec });
   if (platform !== 'win32') {
     return { ok: false, reason: `kill is implemented for win32 only (platform=${platform})`, status: null };
   }
@@ -872,7 +871,7 @@ async function executeReap(entry, {
     };
   }
 
-  const kill = taskkillByPid(record.pid, { creationFileTimeUtc: record.creationFileTimeUtc, exec, platform });
+  const kill = taskkillByPid(record.pid, { creationFileTimeUtc: record.creationFileTimeUtc, processIdentity: record.processIdentity, exec, platform });
 
   // Step 6 — confirm. A MISMATCH here is the success signal: the pid is gone from the table.
   const after = readTable();

@@ -23,6 +23,7 @@
  */
 
 const fs = require('node:fs');
+const processIdentity = require('./process-identity.cjs');
 const path = require('node:path');
 
 const SCHEMA_VERSION = 1;
@@ -228,7 +229,9 @@ function readWriter(node, isIntegral) {
   if (!WRITER_ROLES.includes(role)) return null;
   const started = knownTimestamp(startedAt);
   if (started === null) return null;
-  return { role, pid, startedAt: started };
+  const native = node.processIdentity == null ? null : processIdentity.linuxIdentity(node.processIdentity);
+  if (node.processIdentity != null && (!native || native.pid !== pid)) return null;
+  return { role, pid, startedAt: started, ...(native ? { processIdentity: native } : {}) };
 }
 
 /** Java's String.isBlank (Character.isWhitespace), which differs from JavaScript's \s. */
@@ -720,7 +723,12 @@ function createLedgerWriter({
   if (!(sessionRotateBytes > 0) || hardCapBytes < sessionRotateBytes) {
     throw new RangeError('0 < sessionRotateBytes <= hardCapBytes');
   }
-  const writerBlock = { role: writer.role, pid: writer.pid, startedAt: formatTimestamp(startedAtMs) };
+  const native = writer.processIdentity ?? (process.platform === 'linux' && writer.pid === process.pid
+    ? processIdentity.readLinuxProcess(process.pid)?.processIdentity : null);
+  if (native != null && (!processIdentity.linuxIdentity(native) || native.pid !== writer.pid))
+    throw new TypeError('writer.processIdentity must name the writer PID');
+  const writerBlock = { role: writer.role, pid: writer.pid, startedAt: formatTimestamp(startedAtMs),
+    ...(native ? { processIdentity: native } : {}) };
   const current = currentPath(ledgerDir, family);
   const rotated = rotatedPath(ledgerDir, family);
   /** reason -> {count, since}; written in GAP_REASONS order. */

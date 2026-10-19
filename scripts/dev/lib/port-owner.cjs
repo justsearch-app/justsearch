@@ -22,6 +22,8 @@
 'use strict';
 
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
 /**
  * @param {number} port
@@ -46,7 +48,7 @@ function resolveListenerPidWindows(port, { platform = process.platform, exec = s
         '-NonInteractive',
         '-Command',
         `Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | ` +
-          'Select-Object -First 1 OwningProcess | ConvertTo-Json -Compress',
+          'Select-Object -First 1 OwningProcess,LocalAddress | ConvertTo-Json -Compress',
       ],
       { encoding: 'utf8', maxBuffer: 1024 * 1024 },
     );
@@ -68,7 +70,40 @@ function resolveListenerPidWindows(port, { platform = process.platform, exec = s
   if (!Number.isInteger(pid) || pid <= 0) {
     return { ok: false, reason: `no usable OwningProcess in port-owner output (${JSON.stringify(parsed)})` };
   }
-  return { ok: true, pid };
+  return { ok: true, pid, ...(parsed.LocalAddress ? { address: String(parsed.LocalAddress) } : {}) };
 }
 
-module.exports = { resolveListenerPidWindows };
+// Linux has no portable command-line port-owner utility. Read the kernel socket inode and
+// its owning fd; a missing/unreadable or shared owner stays unknown. This never grants a kill.
+function resolveListenerPid(port, options = {}) {
+  const platform = options.platform ?? process.platform;
+  if (platform !== 'linux') return resolveListenerPidWindows(port, options);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return { ok: false, reason: `invalid port ${JSON.stringify(port)}` };
+  const procRoot = options.procRoot ?? '/proc';
+  try {
+    const inodes = new Set();
+    for (const file of ['tcp', 'tcp6']) {
+      const rows = fs.readFileSync(path.join(procRoot, 'net', file), 'utf8').trim().split('\n').slice(1);
+      for (const row of rows) {
+        const fields = row.trim().split(/\s+/);
+        if (fields[3] === '0A' && parseInt(fields[1]?.split(':').at(-1), 16) === port) inodes.add(fields[9]);
+      }
+    }
+    const owners = new Set();
+    for (const entry of fs.readdirSync(procRoot)) {
+      if (!/^[1-9]\d*$/.test(entry)) continue;
+      let fds;
+      try { fds = fs.readdirSync(path.join(procRoot, entry, 'fd')); } catch { continue; }
+      for (const fd of fds) {
+        try {
+          const inode = fs.readlinkSync(path.join(procRoot, entry, 'fd', fd)).match(/^socket:\[(\d+)\]$/)?.[1];
+          if (inode && inodes.has(inode)) owners.add(Number(entry));
+        } catch { /* fd closed or owner is unreadable */ }
+      }
+    }
+    return owners.size === 1 ? { ok: true, pid: [...owners][0] }
+      : { ok: false, reason: `listener owner unavailable or ambiguous on port ${port}` };
+  } catch (error) { return { ok: false, reason: `port-owner query failed: ${error.message}` }; }
+}
+
+module.exports = { resolveListenerPid, resolveListenerPidWindows };

@@ -5,8 +5,8 @@
   "version": "0.3.0",
   "identifier": "io.justsearch.shell",
   "build": {
-    "beforeDevCommand": "npm --prefix ../ui-web run dev -- --host --port 5173",
-    "beforeBuildCommand": "npm --prefix ../ui-web run build && ..\\..\\gradlew.bat --no-daemon -p ..\\.. -PskipWebBuild=true :modules:ui:bundleSidecar",
+    "beforeDevCommand": "node ../../scripts/lib/tool-invoker.cjs npm --prefix ../ui-web run dev -- --host --port 5173",
+    "beforeBuildCommand": "node ../../scripts/lib/tool-invoker.cjs npm --prefix ../ui-web run build && node ../../scripts/lib/tool-invoker.cjs gradle --no-daemon -p ../.. -PskipWebBuild=true :modules:ui:bundleSidecar",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../../ui-web/dist",
     "removeUnusedCommands": true
@@ -15,24 +15,9 @@
     "active": true,
     "publisher": "Elias Justus",
     "copyright": "JustSearch 0.3.0 - Copyright (c) JustSearch",
-    "targets": [
-      "nsis"
-    ],
     "resources": [
-      "resources/headless/**/*",
-      "resources/vc_redist.x64.exe"
+      "resources/headless/**/*"
     ],
-    "windows": {
-      "allowDowngrades": false,
-      "nsis": {
-        "installMode": "currentUser",
-        "installerHooks": "nsis/installer-hooks.nsh",
-        "installerIcon": "icons/icon.ico",
-        "uninstallerIcon": "icons/icon.ico",
-        "headerImage": "nsis/header.bmp",
-        "sidebarImage": "nsis/sidebar.bmp"
-      }
-    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -45,15 +30,14 @@
     "deep-link": {
       "mobile": [],
       "desktop": {
-        "schemes": ["justsearch"]
+        "schemes": [
+          "justsearch"
+        ]
       }
     },
     "updater": {
       "pubkey": "",
-      "endpoints": [],
-      "windows": {
-        "installMode": "basicUi"
-      }
+      "endpoints": []
     }
   },
   "app": {

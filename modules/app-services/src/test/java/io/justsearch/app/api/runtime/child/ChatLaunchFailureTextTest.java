@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
  * A chat launch that cannot run reads as the JDK's launch of the same command reads: logs and status
  * keep the "Cannot run program" shape, the Windows error number and its system text.
  */
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 final class ChatLaunchFailureTextTest {
   private static final String STRICT = "jdk.lang.Process.allowAmbiguousCommands";
@@ -34,14 +34,15 @@ final class ChatLaunchFailureTextTest {
   @Test
   void aMissingExecutableFailsWithTheJdksText() throws Exception {
     Path missing = directory.resolve("not here").resolve("no-such-server.exe");
-    Path java = Path.of(System.getProperty("java.home"), "bin", "java.exe");
+    Path java = Path.of(System.getProperty("java.home"), "bin", io.justsearch.configuration.PlatformPaths.isWindows() ? "java.exe" : "java");
     Path cwd = Files.createDirectory(directory.resolve("working dir"));
     try (var control = DefaultChildControl.unrecorded(ManagedChildRegistry.noop())) {
       for (Path workingDirectory : new Path[] {null, cwd}) {
         List<String> command = List.of(missing.toString(), "--port", "0");
         String jdk = failure(control, ChildKind.EXTRACTION, command, workingDirectory);
         assertTrue(jdk.startsWith("Cannot run program \"" + missing + "\""), jdk);
-        assertTrue(jdk.contains("CreateProcess error=2, "), jdk);
+        assertTrue(jdk.contains(io.justsearch.configuration.PlatformPaths.isWindows()
+            ? "CreateProcess error=2, " : "execvp failed (errno=2)"), jdk);
         assertEquals(jdk, failure(control, ChildKind.LLAMA_SERVER, command, workingDirectory),
             "the contained launch fails with the JDK's text");
       }
@@ -58,6 +59,7 @@ final class ChatLaunchFailureTextTest {
    * sees under the JDK, and an argument the JDK refuses is refused with the JDK's text.
    */
   @Test
+  @EnabledOnOs(OS.WINDOWS)
   void strictModeLaunchesAndRefusesAsTheJdkDoes() throws Exception {
     Path script = Files.createDirectory(directory.resolve("launcher dir")).resolve("echo-args.cmd");
     Files.writeString(script, "@echo off\r\necho ONE=[%1]\r\necho ALL=[%*]\r\n", StandardCharsets.UTF_8);

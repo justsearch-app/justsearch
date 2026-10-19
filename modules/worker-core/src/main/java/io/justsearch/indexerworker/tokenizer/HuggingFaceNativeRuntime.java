@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.tokenizer;
 
 import ai.djl.util.Platform;
 import ai.djl.util.Utils;
+import io.justsearch.configuration.PlatformPaths;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -11,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Prepares the bundled Windows CPU tokenizer independently of CUDA architecture discovery. */
+/** Prepares bundled CPU tokenizer files independently of CUDA architecture discovery. */
 public final class HuggingFaceNativeRuntime {
   private static final List<String> WINDOWS_LIBRARIES = List.of(
       "libwinpthread-1.dll", "libgcc_s_seh-1.dll", "libstdc++-6.dll", "tokenizers.dll");
@@ -25,7 +26,9 @@ public final class HuggingFaceNativeRuntime {
     if (override != null && !override.isBlank()
         || flavor != null && !flavor.isBlank() && !flavor.equals("cpu")) return;
     Platform platform = Platform.detectPlatform("tokenizers");
-    if (!platform.getOsPrefix().equals("win")) return;
+    if (!PlatformPaths.isWindows() && !PlatformPaths.isLinux()) return;
+    List<String> libraries = PlatformPaths.isWindows() ? WINDOWS_LIBRARIES
+        : List.of(System.mapLibraryName("tokenizers"));
     Path cache = Utils.getEngineCacheDir("tokenizers")
         .resolve(platform.getVersion() + "-cpu-" + platform.getClassifier());
     try {
@@ -34,7 +37,7 @@ public final class HuggingFaceNativeRuntime {
       // After GPU use that destination can contain only an architecture subdirectory, so a
       // subsequent CPU launch cannot load its libraries. Populate each missing CPU file instead;
       // retain architecture directories and files another live process may have loaded.
-      for (String name : WINDOWS_LIBRARIES) {
+      for (String name : libraries) {
         Path target = cache.resolve(name);
         if (Files.isRegularFile(target)) continue;
         String resource = "/native/lib/" + platform.getClassifier() + "/cpu/" + name;

@@ -32,30 +32,10 @@ const processIdentity = require('./lib/process-identity.cjs');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const uiWebDir = path.resolve(repoRoot, 'modules', 'ui-web');
-const gradleCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-const gradlePath = path.resolve(repoRoot, gradleCmd);
+const { runToolSync, toolInvocation } = require('../lib/tool-invoker.cjs');
+const gradlePath = toolInvocation('gradle', [], { repoRoot }).command;
 
-/**
- * Resolve the main repo root, even when running inside a git worktree.
- * In worktrees, `.git` is a file containing `gitdir: <path>` where path
- * points to `<mainRepo>/.git/worktrees/<name>`. We walk up 3 levels to
- * find the main repo. Falls back to `repoRoot` if detection fails.
- */
-function resolveMainRepoRoot() {
-  const gitPath = path.join(repoRoot, '.git');
-  try {
-    const stat = fs.statSync(gitPath);
-    if (stat.isFile()) {
-      const content = fs.readFileSync(gitPath, 'utf8').trim();
-      const match = content.match(/^gitdir:\s*(.+)$/);
-      if (match) {
-        const gitDir = path.resolve(repoRoot, match[1]);
-        return path.resolve(gitDir, '..', '..', '..');
-      }
-    }
-  } catch { /* not a worktree or no .git — fall through */ }
-  return repoRoot;
-}
+const resolveMainRepoRoot = () => require('./lib/dev-runtime.cjs').resolveMainRepoRoot(repoRoot);
 
 const mainRepoRoot = resolveMainRepoRoot();
 // State root defaults to the SHARED main-repo location so all worktrees coordinate on one
@@ -63,9 +43,7 @@ const mainRepoRoot = resolveMainRepoRoot();
 // integration tests and any throwaway stack that must not touch the shared lease (tempdoc 606
 // validation seam). Normally unset in the runner's own env (the runner only EMITS it to the
 // Head child below), so the default holds in production.
-const stateRoot = process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT
-  ? path.resolve(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT)
-  : path.resolve(mainRepoRoot, 'tmp', 'dev-runner');
+const stateRoot = require('./lib/process-record.cjs').resolveRegisterDir(mainRepoRoot, '');
 const runsRoot = path.join(stateRoot, 'runs');
 const activePath = path.join(stateRoot, 'active.json');
 // Tempdoc 542 §B Layer 2: op-leases.json is Head's lease registry. Single Java writer
@@ -590,7 +568,7 @@ function stageSharedCuda12(sharedNativeBin, cudaStageCandidates, exeName) {
  */
 function ensureSharedCuda12Staged() {
   if (process.platform !== 'win32') return; // prebuilt llama-server staging is Windows-only in dev
-  const exeName = 'llama-server.exe';
+  const exeName = require('../lib/native-targets.cjs').executableName('llama-server');
   // The ONE shared runtime location every worktree references (main checkout, gitignored).
   const sharedNativeBin = path.join(mainRepoRoot, 'modules', 'ui', 'native-bin', 'llama-server');
   // Source: a Gradle-built cuda12 stage (main checkout preferred; worktree accepted as a fallback).
@@ -613,25 +591,16 @@ function ensureSharedCuda12Staged() {
  * GPU-only (a CPU 9B fallback DOSes concurrent worktrees). Pure (params + fs only) so it is unit
  * testable; the anti-regression it guards is "a CPU llama-server never gets resolved in dev."
  */
-function resolveCuda12ServerExe(worktreeRoot, sharedRoot, exeName) {
-  const cuda12 = ['modules', 'ui', 'native-bin', 'llama-server', 'variants', 'cuda12', exeName];
-  const candidates = [
-    path.join(worktreeRoot, ...cuda12),   // worktree's own cuda12 (rare — a deliberate local install)
-    path.join(sharedRoot, ...cuda12),     // the shared main-checkout cuda12 (the normal path)
-  ];
-  return candidates.find((p) => fs.existsSync(p)) || null;
-}
+const { resolveCuda12ServerExe } = require('./lib/dev-runtime.cjs');
 
 function resolveAiDevEnv() {
   const env = {};
   // Tempdoc 656: provision the shared cuda12 GPU runtime (once, at the main checkout) so this and
   // every other worktree can reference it. Deliberately NO CPU baseline staging (GPU-only dev).
   ensureSharedCuda12Staged();
-  if (!process.env.JUSTSEARCH_SERVER_EXE) {
-    const exeName = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
-    const found = resolveCuda12ServerExe(repoRoot, mainRepoRoot, exeName);
-    if (found) env.JUSTSEARCH_SERVER_EXE = found;
-  }
+  const runtime = require('./lib/dev-runtime.cjs').resolveDevRuntime(repoRoot, mainRepoRoot);
+  if (runtime.source === 'override' && !runtime.valid) throw new Error('JUSTSEARCH_SERVER_EXE must name a regular executable file');
+  if (runtime.valid) env.JUSTSEARCH_SERVER_EXE = runtime.path;
   if (!process.env.JUSTSEARCH_MODELS_DIR) {
     // Tempdoc 618 §2: prefer the MAIN checkout's models (holds the LFS binaries) over a
     // worktree's models/ (tracked manifests only), so a worktree dev stack finds real models.
@@ -1346,6 +1315,25 @@ async function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectPr
       outcomes.push({ ...record, outcome: 'dead' });
       continue;
     }
+    if (child.processIdentity) {
+      if (!processIdentity.linuxIdentity(child)) { outcomes.push({ ...record, outcome: 'unknown-identity' }); continue; }
+      if (!compareIdentity(child, { pid: child.pid, processIdentity: identity.processIdentity }, 'same')) {
+        outcomes.push({ ...record, outcome: identity.processIdentity ? 'identity-mismatch' : 'unknown-identity' }); continue;
+      }
+      const killAccepted = await terminate(child.pid, { processIdentity: child.processIdentity });
+      const deadline = Date.now() + timeoutMs;
+      let after;
+      do {
+        after = probe();
+        if (after?.alive === false || (after?.processIdentity && !compareIdentity(child,
+          { pid: child.pid, processIdentity: after.processIdentity }, 'same'))) break;
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+      } while (Date.now() < deadline);
+      const gone = after?.alive === false || (after?.processIdentity && !compareIdentity(child,
+        { pid: child.pid, processIdentity: after.processIdentity }, 'same'));
+      outcomes.push({ ...record, processIdentity: child.processIdentity, killAccepted,
+        outcome: gone ? 'terminated' : after ? 'termination-failed' : 'unknown-exit' }); continue;
+    }
     // ProcessHandle stores millisecond starts; Windows StartTime retains sub-ms ticks.
     // Compare their common represented millisecond, with no tolerance across births.
     const expectedStart = Date.parse(child?.startedAt);
@@ -1402,12 +1390,19 @@ async function cleanupTerminalChildren(dataDir, killedPids, errors, inspect, ter
 
 function normalizeExecutable(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const normalized = path.resolve(value).toLowerCase();
+  const absolute = path.resolve(value);
+  const normalized = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
   return normalized;
 }
 
 function inspectProcessIdentity(pid, { platform = process.platform, spawnSync: query = spawnSync } = {}) {
-  if (!Number.isInteger(Number(pid)) || Number(pid) <= 0 || Number(pid) > 2147483647 || platform !== 'win32') return null;
+  if (!Number.isInteger(Number(pid)) || Number(pid) <= 0 || Number(pid) > 2147483647) return null;
+  if (platform === 'linux') {
+    const seen = processIdentity.readLinuxProcess(Number(pid));
+    return !seen ? null : !seen.present ? { alive: false }
+      : { alive: true, processIdentity: seen.processIdentity ?? null, executable: seen.executable ?? null };
+  }
+  if (platform !== 'win32') return null;
   const script = [
     '& { param([int]$targetPid)',
     'try { $p=Get-Process -Id $targetPid -ErrorAction Stop } catch { if ($_.FullyQualifiedErrorId -like "NoProcessFoundForGivenId*") { [pscustomobject]@{alive=$false}|ConvertTo-Json -Compress; exit 0 }; exit 1 }',
@@ -1426,7 +1421,8 @@ function inspectProcessIdentity(pid, { platform = process.platform, spawnSync: q
  * manifest records it) is checked again (Spec F §5.3): the inspection before it never licenses a
  * kill by pid alone.
  */
-async function terminatePid(pid, { startedAtMs } = {}, { terminate = engineActuator.terminateWithCode } = {}) {
+async function terminatePid(pid, { startedAtMs, processIdentity: identity } = {}, { terminate = engineActuator.terminateWithCode } = {}) {
+  if (process.platform === 'linux') return identity?.pid === pid && processIdentity.signalLinuxProcess(identity).ok;
   if (process.platform !== 'win32' || !Number.isFinite(startedAtMs)) return false;
   const creationFileTime = String((BigInt(Math.trunc(startedAtMs)) + 11_644_473_600_000n) * 10_000n);
   const result = await terminate(pid, creationFileTime, engineActuator.NON_DISTINCTIVE_KILL_CODE,
@@ -1933,27 +1929,6 @@ function validatePid(pid) {
   return pid;
 }
 
-async function getPortOwnerWindows(port) {
-  validatePort(port);
-  const cmd = `Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1`;
-  const res = await execPowerShell(cmd);
-  if (!res.ok || !res.stdout.trim()) return null;
-
-  // Parse via ConvertTo-Json to avoid formatting issues.
-  const res2 = await execPowerShell(
-    `Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | ` +
-    `Select-Object -First 1 LocalAddress,LocalPort,OwningProcess | ConvertTo-Json -Compress`,
-  );
-  if (!res2.ok || !res2.stdout.trim()) return null;
-  try {
-    const obj = JSON.parse(res2.stdout.trim());
-    const pid = Number(obj?.OwningProcess);
-    const addr = obj?.LocalAddress ? String(obj.LocalAddress) : null;
-    return { pid: Number.isFinite(pid) && pid > 0 ? pid : null, address: addr };
-  } catch {
-    return null;
-  }
-}
 
 async function getCommandLineWindows(pid) {
   validatePid(pid);
@@ -2009,7 +1984,11 @@ function spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter) 
     spawnArgs = [];
   }
 
-  const child = spawn(spawnCommand, spawnArgs, opts);
+  const linuxRun = process.platform === 'linux' && !shellEnabled
+    ? jobRun.startInJob({ command: spawnCommand, args: spawnArgs, cwd: opts.cwd, env: opts.env, stdio: opts.stdio,
+      recordDir: opts.recordDir, label: 'dev-child' }) : null;
+  const child = linuxRun ? linuxRun.child : spawn(spawnCommand, spawnArgs, opts);
+  if (linuxRun) Object.defineProperty(child, 'jobRun', { value: linuxRun });
 
   const writeChunk = (stream, chunk) => {
     try {
@@ -2047,7 +2026,7 @@ function spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter) 
  */
 function spawnEngineInJob(command, args, opts, stdoutStream, stderrStream, splitter,
   { recordDir, label, startupTimeoutMs = 20000, onStartupFailure = () => {} }) {
-  if (process.platform !== 'win32' || opts?.shell) return spawnLogged(command, args, opts, stdoutStream, stderrStream, splitter);
+  if (process.platform !== 'win32' || opts?.shell) return spawnLogged(command, args, { ...opts, recordDir }, stdoutStream, stderrStream, splitter);
   if (!Number.isFinite(startupTimeoutMs) || startupTimeoutMs <= 0) throw new RangeError('the Engine startup budget must be positive and finite');
   const startedAt = performance.now();
   const remainingMs = () => Math.max(0, startupTimeoutMs - (performance.now() - startedAt));
@@ -2185,8 +2164,8 @@ function earlierReportIdentities(runDir) {
       const report = JSON.parse(fs.readFileSync(path.join(runDir, name), 'utf8').replace(/^\uFEFF/, ''));
       const found = EARLIER_CENSUS_FILE_RE.test(name) ? report?.findings : report?.exitAccountingGaps;
       for (const g of Array.isArray(found) ? found : []) {
-        if (!Number.isInteger(g?.pid) || g.pid <= 0 || typeof g.creationFileTimeUtc !== 'string') continue;
-        identities.push({ pid: g.pid, creationFileTimeUtc: g.creationFileTimeUtc, role: g.role ?? null,
+        if (!Number.isInteger(g?.pid) || g.pid <= 0 || (typeof g.creationFileTimeUtc !== 'string' && !processIdentity.linuxIdentity(g))) continue;
+        identities.push({ pid: g.pid, creationFileTimeUtc: g.creationFileTimeUtc, ...(g.processIdentity ? { processIdentity: g.processIdentity } : {}), role: g.role ?? null,
           ...(g.birthTick != null ? { birthTick: String(g.birthTick) } : {}), ...(g.childId ? { childId: g.childId } : {}) });
       }
     } catch { /* named as unreadable by keepEarlierReports */ }
@@ -2196,14 +2175,15 @@ function earlierReportIdentities(runDir) {
 
 /** A recorded identity the lookup could not read, resolved by its exit in the ledger. */
 function describeResolved(p) {
-  return { pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc), role: p.role ?? null,
+  return { pid: Number(p.pid), creationFileTimeUtc: p.processIdentity || p.creationFileTimeUtc == null ? null : String(p.creationFileTimeUtc), ...(p.processIdentity ? { processIdentity: p.processIdentity } : {}), role: p.role ?? null,
     observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null, basis: 'exit ledger' };
 }
 
 /** The job record's identities in the shape stop reports use. */
 function jobIdentities(list) {
   return (Array.isArray(list) ? list : []).filter((p) => p?.pid)
-    .map((p) => ({ pid: Number(p.pid), creationFileTimeUtc: String(p.creationFileTimeUtc) }));
+    .map((p) => ({ pid: Number(p.pid), ...(p.processIdentity ? { processIdentity: p.processIdentity, creationFileTimeUtc: null }
+      : { creationFileTimeUtc: String(p.creationFileTimeUtc) }) }));
 }
 
 const lockPath = path.join(stateRoot, 'active.lock.json');
@@ -2250,12 +2230,12 @@ function admissionLockHolderLiveness(lock, {
 } = {}) {
   const pid = Number(lock?.pid);
   if (!Number.isInteger(pid) || pid <= 0) return 'unknown';
-  if (!lock.creationFileTimeUtc) {
+  if (!lock.creationFileTimeUtc && !lock.processIdentity) {
     return pidPresence({ pid }) === 'absent' ? 'ended' : 'unknown';
   }
   let rows;
   try { rows = table(); } catch { return 'unknown'; }
-  return ownerPresence.ownerLiveness({ key: 'admission-lock', pid, creationTime: lock.creationFileTimeUtc },
+  return ownerPresence.ownerLiveness({ key: 'admission-lock', pid, creationTime: lock.creationFileTimeUtc, ...(lock.processIdentity ? { processIdentity: lock.processIdentity } : {}) },
     { table: rows }).state;
 }
 
@@ -2275,6 +2255,7 @@ async function acquireAdmission({
   const lockPayload = JSON.stringify({
     pid: process.pid,
     creationFileTimeUtc: runnerIdentity?.creationFileTimeUtc ?? null,
+    ...(runnerIdentity?.processIdentity ? { processIdentity: runnerIdentity.processIdentity } : {}),
     acquiredAt: nowIso(),
   });
   try {
@@ -2454,6 +2435,7 @@ async function selfProcessIdentity({ lookup = engineActuator.lookupProcessIdenti
   return {
     pid: process.pid,
     creationFileTimeUtc: seen?.present ? seen.creationFileTime ?? null : null,
+    ...(seen?.processIdentity ? { processIdentity: seen.processIdentity } : {}),
     executable: seen?.present ? seen.executable ?? process.execPath : process.execPath,
   };
 }
@@ -2543,7 +2525,8 @@ async function cmdStart(opts) {
         takeoverPolicy: 'warn',
         ownershipEpoch,
         phase: 'starting',
-        runner: { pid: runnerIdentity.pid, creationFileTimeUtc: runnerIdentity.creationFileTimeUtc },
+        runner: { pid: runnerIdentity.pid, creationFileTimeUtc: runnerIdentity.creationFileTimeUtc,
+          ...(runnerIdentity.processIdentity ? { processIdentity: runnerIdentity.processIdentity } : {}) },
         lease: leaseBlock(opts.leaseDurationSec, lease.sequence, now),
         updatedAt: now.toISOString(),
       });
@@ -2713,14 +2696,13 @@ async function runAdmittedStart(opts, ctx) {
   // :modules:ui:installDist — so the list names it alone; the cost can only have gone down.
   if (!opts.skipBuild) {
     process.stderr.write(
-      '[dev-runner] Ensuring distribution is up-to-date (assemble + installDist)...\n');
-    const buildResult = spawnSync(
-      gradlePath,
-      ['assemble', ':modules:ui:installDist', '-PskipWebBuild=true'],
+      '[dev-runner] Ensuring distribution is up-to-date (installDist)...\n');
+    const buildResult = runToolSync(
+      'gradle',
+      [':modules:ui:installDist', '-PskipWebBuild=true'],
       // Tempdoc 696: pin a >= 24 JDK so a stale JDK-8 JAVA_HOME can't fail the assemble.
       {
         cwd: repoRoot,
-        shell: process.platform === 'win32',
         stdio: ['ignore', 'pipe', 'inherit'],
         env: { ...process.env, JAVA_HOME: resolveJdkHome() },
       },
@@ -2731,9 +2713,9 @@ async function runAdmittedStart(opts, ctx) {
       // dropping it sent the reader looking for a Gradle failure that never happened.
       throw new Error(
         buildResult.error
-          ? `Gradle assemble + installDist could not be run: ${buildResult.error.message}`
+          ? `Gradle installDist could not be run: ${buildResult.error.message}`
             + `${buildResult.error.code ? ` (${buildResult.error.code})` : ''} — ${gradlePath}`
-          : `Gradle assemble + installDist failed with exit code ${buildResult.status}`
+          : `Gradle installDist failed with exit code ${buildResult.status}`
             + `${buildResult.signal ? ` (killed by ${buildResult.signal})` : ''}`);
     }
   }
@@ -2769,7 +2751,7 @@ async function runAdmittedStart(opts, ctx) {
   // Fail fast if the Head dist doesn't exist (e.g. --skip-build without prior installDist).
   // Without this check, spawn() fails silently and the only feedback is a 60s timeout.
   if (!harnessEngineCommand && !fs.existsSync(startScript)) {
-    const gradleCmd = process.platform === 'win32' ? './gradlew.bat' : './gradlew';
+    const gradleCmd = `./${path.basename(gradlePath)}`;
     const remedy = `node scripts/dev/prepare-worktree.cjs (or: ${gradleCmd} :modules:ui:installDist)`;
     // Tempdoc 844 B2: a fully-understood, recoverable condition with a printed remedy is NOT an
     // unhandled exception. It surfaced as error code UNHANDLED on 16 of 20 observed `start` errors,
@@ -2816,7 +2798,7 @@ async function runAdmittedStart(opts, ctx) {
     : {
       cwd: repoRoot,
       ...engineJavaLaunch({ startScript, javaHome: resolveJdkHome(),
-        javaOpts: engineJavaOpts, uiOpts: process.env.UI_OPTS }),
+        javaOpts: engineJavaOpts, uiOpts: process.env.UI_OPTS, hotReload: devHotReload }),
     };
   if (harnessEngineCommand) {
     process.stderr.write(
@@ -3155,10 +3137,10 @@ async function runAdmittedStart(opts, ctx) {
         // without blocking discovery; written only while this incarnation is still the current one.
         void Promise.resolve(spawned?.identityPromise).then(async (identity) => {
           const latest = runJson ?? startingRun;
-          if (!identity?.creationFileTime || latest.pids.backendRootPid !== pid || latest.incarnation !== n
+          if ((!identity?.creationFileTime && !identity?.processIdentity) || latest.pids.backendRootPid !== pid || latest.incarnation !== n
               || actuator.current() !== spawned || spawned?.n !== n || spawned.exit) return;
           latest.identities = { ...(latest.identities ?? {}),
-            backend: { pid, creationFileTimeUtc: identity.creationFileTime, executable: identity.executable ?? null } };
+            backend: { pid, creationFileTimeUtc: identity.creationFileTime, ...(identity.processIdentity ? { processIdentity: identity.processIdentity } : {}), executable: identity.executable ?? null } };
           await updateRunRecord();
         }).catch(() => {});
       },
@@ -3214,7 +3196,10 @@ async function runAdmittedStart(opts, ctx) {
   // this runner's libuv child, so its own children are in the runner's job.
   stopFrontendTree = async (waitMs = 3000, { asynchronous = false } = {}) => {
     if (!frontend || !frontend.pid) return true;
-    if (frontend.exitCode !== null || frontend.signalCode !== null) return !frontendStopIncomplete;
+    if (frontend.exitCode !== null || frontend.signalCode !== null) {
+      if (process.platform === 'linux' && frontend.jobRun) return jobRun.settleRunRecord(frontend.jobRun).ok;
+      return !frontendStopIncomplete;
+    }
     let onFrontendExit;
     let timer;
     const exited = new Promise((resolve) => {
@@ -3229,13 +3214,14 @@ async function runAdmittedStart(opts, ctx) {
             engineActuator.NON_DISTINCTIVE_KILL_CODE, { timeoutMs: 5000 }) : null;
         frontendStopIncomplete = !result?.ok;
       } else {
-        frontendStopIncomplete = !frontend.kill('SIGTERM');
+        frontendStopIncomplete = !processIdentity.signalLinuxProcess(frontendIdentity, 'SIGTERM').ok;
       }
     } catch (_) { frontendStopIncomplete = true; }
     try {
       const gone = await Promise.race([exited, new Promise((resolve) => {
         timer = setTimeout(() => resolve(false), waitMs);
       })]);
+      if (process.platform === 'linux' && frontend.jobRun) return gone && jobRun.settleRunRecord(frontend.jobRun).ok;
       return gone && !frontendStopIncomplete;
     } finally {
       clearTimeout(timer);
@@ -3340,6 +3326,7 @@ async function runAdmittedStart(opts, ctx) {
     spawnF.args,
     {
       cwd: spawnF.cwd,
+      recordDir: path.join(runDir, 'frontend-jobs'),
       env: applyAgentSessionEnv({
         ...process.env,
         VITE_JUSTSEARCH_API_PORT: String(apiPortActual),
@@ -3358,8 +3345,8 @@ async function runAdmittedStart(opts, ctx) {
   frontendIdentity = frontend.pid
     ? await engineActuator.lookupProcessIdentities([frontend.pid]).then((map) => {
       const seen = map?.get(frontend.pid);
-      return frontend.exitCode === null && frontend.signalCode === null && seen?.present && seen.creationFileTime
-        ? { pid: frontend.pid, creationFileTimeUtc: seen.creationFileTime, executable: seen.executable ?? null } : null;
+      return frontend.exitCode === null && frontend.signalCode === null && seen?.present && (seen.creationFileTime || seen.processIdentity)
+        ? { pid: frontend.pid, creationFileTimeUtc: seen.creationFileTime ?? null, ...(seen.processIdentity ? { processIdentity: seen.processIdentity } : {}), executable: seen.executable ?? null } : null;
     }).catch(() => null)
     : null;
 
@@ -3379,6 +3366,7 @@ async function runAdmittedStart(opts, ctx) {
       frontend: frontendIdentity,
     },
     engineJob: startingRun.engineJob ?? null,
+    ...(frontend.jobRun ? { frontendJob: { recordPath: frontend.jobRun.recordPath, host: frontend.jobRun.host } } : {}),
     apiPortRequested: apiPortRequested,
     apiPortActual,
     uiPortRequested: uiPort,
@@ -3488,7 +3476,8 @@ async function runAdmittedStart(opts, ctx) {
     // Tempdoc 606 Piece 2: provenance of the code this stack actually runs.
     provenance: devStackProvenance,
     phase: 'running',
-    runner: { pid: runnerIdentity.pid, creationFileTimeUtc: runnerIdentity.creationFileTimeUtc },
+    runner: { pid: runnerIdentity.pid, creationFileTimeUtc: runnerIdentity.creationFileTimeUtc,
+          ...(runnerIdentity.processIdentity ? { processIdentity: runnerIdentity.processIdentity } : {}) },
     lease: {
       // Tempdoc 735 G6: opts.leaseDurationSec is pre-clamped to [30, 7200]s at parse time
       // (clampLeaseDurationSec) and defaults to 30 — unchanged behavior when the starter
@@ -3767,12 +3756,13 @@ function recordedProcesses(run, recordWrittenMs) {
     const pid = Number(raw);
     if (!Number.isInteger(pid) || pid <= 0) return { role, pid: null };
     const rec = run?.identities?.[role];
-    const recorded = Boolean(rec && Number(rec.pid) === pid && rec.creationFileTimeUtc);
+    const recorded = Boolean(rec && Number(rec.pid) === pid && (rec.creationFileTimeUtc || processIdentity.linuxIdentity(rec)));
     return {
       role,
       pid,
       basis: recorded ? 'recorded' : 'record-time',
-      creationFileTimeUtc: recorded ? String(rec.creationFileTimeUtc) : null,
+      creationFileTimeUtc: recorded && rec.creationFileTimeUtc ? String(rec.creationFileTimeUtc) : null,
+      ...(recorded && rec.processIdentity ? { processIdentity: rec.processIdentity } : {}),
       executable: recorded ? rec.executable ?? null : null,
       bornNotAfterMs: recorded ? null : recordWrittenMs,
     };
@@ -3814,6 +3804,11 @@ function trackedIdentities() {
   };
 }
 
+/** A native helper's unreadable birth never becomes PID-only stop authority. */
+function unidentifiedHelper(record) {
+  return record?.role === 'native-helper' && !identityOf(record)?.birth;
+}
+
 /**
  * One recorded process against an OS lookup (`lookupProcessIdentities` row, or null when the lookup
  * failed): 'match' (alive, the recorded birth), 'gone', 'reused' (the pid now names another process)
@@ -3821,8 +3816,13 @@ function trackedIdentities() {
  */
 function checkRecordedProcess(recorded, seen) {
   if (!recorded?.pid) return 'gone';
+  if (unidentifiedHelper(recorded)) return 'unknown';
   if (!seen) return 'unknown';
   if (!seen.present) return 'gone';
+  if (recorded.processIdentity) {
+    if (!processIdentity.linuxIdentity(recorded) || !processIdentity.linuxIdentity(seen)) return 'unknown';
+    return compareIdentity(recorded, { pid: recorded.pid, processIdentity: seen.processIdentity }, 'same') ? 'match' : 'reused';
+  }
   if (!seen.creationFileTime) return 'unknown';
   if (recorded.creationFileTimeUtc) {
     // The OS row read for the recorded PID: a CIM read (lookupProcessIdentities, the process table),
@@ -3844,8 +3844,8 @@ function checkRecordedProcess(recorded, seen) {
 function describeUnresolved(p, state) {
   const birth = p.creationFileTimeUtc ?? null;
   const ms = engineActuator.fileTimeToMs(birth ?? p.observedCreationFileTimeUtc);
-  return { pid: p.pid, name: p.name ?? p.observedName ?? (p.executable ? path.win32.basename(p.executable) : 'unknown'), role: p.role,
-    creationFileTimeUtc: birth, bornNotAfterMs: p.bornNotAfterMs ?? null, owned: p.owned,
+  return { ...(p.helperId ? { helperId: p.helperId, owner: p.owner, incarnation: p.incarnation } : {}), pid: p.pid, name: p.name ?? p.observedName ?? (p.executable ? path.win32.basename(p.executable) : 'unknown'), role: p.role,
+    creationFileTimeUtc: birth, ...(p.processIdentity ? { processIdentity: p.processIdentity } : {}), bornNotAfterMs: p.bornNotAfterMs ?? null, owned: p.owned,
     startedAt: ms === null ? p.startedAt ?? 'unknown' : new Date(ms).toISOString(),
     observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null,
     reason: state === 'match' ? p.owned === false
@@ -3870,7 +3870,7 @@ function isRunProcess(pid, processes, rows) {
     visited.add(Number(row.ProcessId));
     const current = row;
     const isRoot = processes.some((p) => hasPid(p, current.ProcessId) && checkRecordedProcess(p,
-      { present: true, creationFileTime: current.CreationFileTimeUtc ?? null, executable: null }) === 'match');
+      { present: true, processIdentity: current.processIdentity, creationFileTime: current.CreationFileTimeUtc ?? null, executable: null }) === 'match');
     if (isRoot) return true;
     const parent = byPid.get(Number(row.ParentProcessId));
     // Each link up is a parent born no later than its child (both read from one process table: exact).
@@ -3888,10 +3888,11 @@ function isRunProcess(pid, processes, rows) {
 async function portOwnerOf(port, processes, { table = () => processIdentity.readProcessTableAsync() } = {}) {
   const listening = port > 0 ? await isTcpListening(port, 500) : false;
   if (!listening) return { port, closed: true };
-  if (process.platform !== 'win32') return { port, closed: false, portOwner: { pid: null, commandLine: null, ownedByRun: null } };
-  const owner = await getPortOwnerWindows(port);
+  const resolved = require('./lib/port-owner.cjs').resolveListenerPid(port);
+  const owner = resolved.ok ? resolved : null;
   const ownerPid = owner?.pid ?? null;
-  const commandLine = ownerPid ? await getCommandLineWindows(ownerPid) : null;
+  const commandLine = ownerPid ? process.platform === 'linux'
+    ? processIdentity.readLinuxProcess(ownerPid)?.commandLine ?? null : await getCommandLineWindows(ownerPid) : null;
   let ownedByRun = null;
   if (ownerPid) {
     const snapshot = await table().catch(() => null);
@@ -4008,7 +4009,7 @@ async function stopRun(opts, {
     }
     return ledgerEnded;
   };
-  const provenEnded = (p) => Boolean(p?.pid) && Boolean(p.creationFileTimeUtc) && Boolean(ledgerResolved?.isEnded(p));
+  const provenEnded = (p) => Boolean(p?.pid) && Boolean(ledgerResolved?.isEnded(p));
   // Each identity resolved by its ledger exit instead of a lookup, once.
   const resolvedByLedger = [];
   const noteResolved = (p) => {
@@ -4025,11 +4026,11 @@ async function stopRun(opts, {
    * marked when the pid names another process by then.
    */
   const terminateRecorded = async (p, row) => {
-    if (process.platform !== 'win32') {
+    if (process.platform !== 'win32' && (process.platform !== 'linux' || !p.processIdentity)) {
       errors.push(`${p.role} pid ${p.pid}: identity-checked termination is unavailable on this platform`);
       return;
     }
-    const result = await Promise.resolve(terminateProcess(p.pid, p.creationFileTimeUtc,
+    const result = await Promise.resolve(terminateProcess(p.pid, p.processIdentity ?? p.creationFileTimeUtc,
       engineActuator.NON_DISTINCTIVE_KILL_CODE))
       .catch(() => ({ ok: false, outcome: 'failed', status: null }));
     if (row) row.termination = result;
@@ -4042,6 +4043,13 @@ async function stopRun(opts, {
 
   const recordWrittenMs = await fsp.stat(runPath).then((s) => s.mtimeMs, () => NaN);
   const savedSnapshot = await readJsonIfExists(trackedPath);
+  // Snapshot only the already-recorded Linux job members before orderly stop retires their files.
+  // This is reporting evidence, never additional cleanup authority or a fresh descendant search.
+  const recordedLinuxHelpers = process.platform === 'linux'
+    ? [run.engineJob, run.frontendJob].flatMap(job => {
+      const record = jobRun.readRunRecord(job);
+      return record?.backend === 'linux-bound-child-v1' ? record.members ?? [] : [];
+    }) : [];
   const processes = recordedProcesses(run, recordWrittenMs);
   const scope = Number(run.incarnation) || 1;
   for (const p of processes) {
@@ -4083,7 +4091,7 @@ async function stopRun(opts, {
   const lookupEndedByPid = new Map();
   const noteLookupEnded = (entries, observedAtMs) => {
     for (const p of entries) {
-      if (!p?.pid || (!p.creationFileTimeUtc && !Number.isFinite(p.bornNotAfterMs)) || provenEnded(p)
+      if (!p?.pid || (!p.creationFileTimeUtc && !p.processIdentity && !Number.isFinite(p.bornNotAfterMs)) || provenEnded(p)
         || !phaseRows?.has(p.pid)) continue;
       const observation = lookupObservation(p, phaseRows.get(p.pid), observedAtMs);
       const bucket = lookupEndedByPid.get(p.pid) ?? [];
@@ -4099,7 +4107,7 @@ async function stopRun(opts, {
       return 'gone';
     }
     const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
-    if (!p.creationFileTimeUtc && row?.present && !Number.isFinite(p.bornNotAfterMs)) {
+    if (!unidentifiedHelper(p) && !p.creationFileTimeUtc && !p.processIdentity && row?.present && !Number.isFinite(p.bornNotAfterMs)) {
       p.bornNotAfterMs = Date.now();
       p.basis = 'first-observed-alive';
     }
@@ -4130,9 +4138,10 @@ async function stopRun(opts, {
     const startMs = Date.parse(child.startedAt);
     return { pid: Number(child.pid), role: 'registered helper', name: child.executable ? path.win32.basename(child.executable) : child.kind,
       executable: child.executable, startedAt: child.startedAt,
-      creationFileTimeUtc: child.creationFileTimeUtc ?? (Number.isFinite(startMs)
+      ...(child.processIdentity ? { processIdentity: child.processIdentity } : {}),
+      creationFileTimeUtc: child.processIdentity ? null : child.creationFileTimeUtc ?? (Number.isFinite(startMs)
         ? String(BigInt(startMs) * 10000n + 116444736000000000n) : null),
-      birthTick: child.creationFileTimeUtc ? 10 : 10000, owned: false };
+      birthTick: child.processIdentity ? null : child.creationFileTimeUtc ? 10 : 10000, owned: false };
   });
   for (const p of helperProcesses) remember(p);
   // <ledger-resolution> Every identity the stop knows of and cannot prove ended is looked up, the
@@ -4149,7 +4158,7 @@ async function stopRun(opts, {
     knownByPid.set(p.pid, [...bucket, p]);
     return false;
   };
-  for (const p of [...processes, ...tracked]) if (p?.pid && p.creationFileTimeUtc) knownAlready(p);
+  for (const p of [...processes, ...tracked]) if (p?.pid && (p.creationFileTimeUtc || p.processIdentity)) knownAlready(p);
   const knownUnproven = [];
   const learnUnprovenFrom = (identities) => {
     const learned = [];
@@ -4242,6 +4251,14 @@ async function stopRun(opts, {
         if (state === 'gone' || state === 'reused') {
           childCleanup.push({ ...record, outcome: state === 'gone' ? 'dead' : 'identity-mismatch' }); continue;
         }
+        if (p.processIdentity) {
+          if (state !== 'match') {
+            childCleanup.push({ ...record, outcome: state === 'unknown' ? 'unknown-identity' : 'identity-mismatch' }); continue;
+          }
+          let accepted = false;
+          try { accepted = await terminateChild(p.pid, { processIdentity: p.processIdentity }); } catch {}
+          pending.push({ ...record, killAccepted: accepted }); continue;
+        }
         const expected = Date.parse(child.startedAt);
         const actual = engineActuator.fileTimeToMs(row?.creationFileTime);
         if (state !== 'match' || !Number.isFinite(expected) || actual === null
@@ -4300,8 +4317,8 @@ async function stopRun(opts, {
       : null;
     // The identity this process checked ('match': the recorded PID and birth against the OS row) before
     // writing; with the writer it then wrote as, it binds this stop's records to that start (round 10).
-    const engineChecked = backendBefore === 'match' && byRole.backend.creationFileTimeUtc
-      ? { pid: byRole.backend.pid, creationFileTimeUtc: byRole.backend.creationFileTimeUtc, birthTick: byRole.backend.birthTick ?? null }
+    const engineChecked = backendBefore === 'match' && (byRole.backend.creationFileTimeUtc || byRole.backend.processIdentity)
+      ? { pid: byRole.backend.pid, ...(byRole.backend.processIdentity ? { processIdentity: byRole.backend.processIdentity } : {}), creationFileTimeUtc: byRole.backend.creationFileTimeUtc, birthTick: byRole.backend.birthTick ?? null }
       : null;
     if (engineRecords) fallback.ledger = [];
     const recordEngine = (kind, fields) => {
@@ -4391,7 +4408,7 @@ async function stopRun(opts, {
       if (verdict === 'match') {
         // 'match' needs a recorded birth (checkRecordedProcess); both kills re-check it on their handle.
         const terminateCalledAt = Date.now();
-        const result = await terminateEngine(p.pid, p.creationFileTimeUtc, ledgerLib.JS_ENGINE_STOP);
+        const result = await terminateEngine(p.pid, p.processIdentity ?? p.creationFileTimeUtc, ledgerLib.JS_ENGINE_STOP);
         if (result?.ok) {
           killedPids.push(p.pid);
           engineEnding = { endedBy: 'terminate', terminateCalledAt };
@@ -4440,7 +4457,8 @@ async function stopRun(opts, {
     const byRunner = runnerAnswer.registeredHelpers.filter((c) => c?.pid);
     childCleanup = childCleanup.map((c) => {
       const earlier = c.outcome === 'dead' && byRunner.find((r) => Number(r.pid) === Number(c.pid)
-        && (r.startedAt ?? null) === (c.startedAt ?? null));
+        && (c.processIdentity ? compareIdentity(r, c, 'same') === true
+          : (r.startedAt ?? null) === (c.startedAt ?? null)));
       return earlier ? { ...c, outcome: earlier.outcome, killAccepted: earlier.killAccepted ?? null, stoppedBy: 'runner' } : c;
     });
     for (const r of byRunner) {
@@ -4465,7 +4483,7 @@ async function stopRun(opts, {
   if (runnerStopped && answeredJob?.state === 'ended') {
     engineJob = { source: 'runner', incarnation: answeredJob.incarnation ?? null, outcome: 'ended',
       endedByJob: jobIdentities(answeredJob.endedByJob), survivors: [] };
-  } else if (recordedJob && process.platform === 'win32') {
+  } else if (recordedJob && ['win32', 'linux'].includes(process.platform)) {
     if (!fs.existsSync(recordedJob.recordPath)
         && (!recordedJob.startupFailure || recordedJob.startupFailure.cleanup?.ok === true)) {
       // Retired by the runner once its host closed the job as `ended`.
@@ -4483,6 +4501,11 @@ async function stopRun(opts, {
       if (!result?.ok) errors.push(`Engine job: ${engineJob.outcome}${engineJob.survivors.length
         ? ` (${engineJob.survivors.map((p) => `pid ${p.pid}`).join(', ')} still running)` : ''}`);
     }
+  }
+  if (process.platform === 'linux' && run.frontendJob) {
+    const result = jobRun.settleRunRecord(run.frontendJob);
+    if (!result.ok) errors.push(`Frontend helpers: ${result.outcome}`);
+    for (const member of result.survivors ?? []) remember({ ...member, role: 'frontend helper', owned: true });
   }
   const jobUnresolved = engineJob && !['ended', 'gone', 'terminated'].includes(engineJob.outcome)
     ? (engineJob.survivors.length ? engineJob.survivors : [{ pid: recordedJob?.host?.pid ?? null,
@@ -4560,7 +4583,7 @@ async function stopRun(opts, {
     ...helpersUnresolved.map(c => ({ ...c, role: 'registered helper', state: c.outcome.includes('unknown') ? 'unknown' : 'match' })),
     ...jobUnresolved]
     .map(p => describeUnresolved(p, p.state));
-  const nextStep = `Check each listed PID and start time in Task Manager; retry stop after it exits. `
+  const nextStep = `Check each listed PID and recorded birth identity; retry stop after it exits. `
     + forgetGuidance(runId);
 
   // Tempdoc 730 B1, re-homed at item A16: snapshot the engine log into this run's own dir, so a
@@ -4581,8 +4604,8 @@ async function stopRun(opts, {
   const lookUpLate = async (unproven) => {
     if (lateLookedUp || opts.forgetUnresolved) return [];
     lateLookedUp = true;
-    const late = (unproven ?? []).filter((u) => u?.pid && !isThisProcess(u)
-      && (u.creationFileTimeUtc || Number.isFinite(u.bornNotAfterMs)) && !provenEnded(u) && !knownAlready(u))
+    const late = (unproven ?? []).filter((u) => u?.pid && (!isThisProcess(u) || unidentifiedHelper(u))
+      && (u.creationFileTimeUtc || u.processIdentity || Number.isFinite(u.bornNotAfterMs) || unidentifiedHelper(u)) && !provenEnded(u) && !knownAlready(u))
       .map((u) => ({ ...u, role: u.role ?? 'recorded identity', name: u.role ?? 'unknown' }));
     if (!late.length) return [];
     const askedAtMs = Date.now();
@@ -4647,6 +4670,14 @@ async function stopRun(opts, {
   const exitAccounting = carryFindings(censusAccounting, kept.earlierFindings,
     { proves: stopProves({ isEnded: endedInLedger, lookupEnded }) });
 
+  const recordedHelpers = recordedLinuxHelpers.map(member => {
+    const seen = processIdentity.readLinuxProcess(member.pid);
+    const actual = seen?.processIdentity;
+    const expected = processIdentity.linuxIdentity(member);
+    const accounted = Boolean(expected && (seen?.present === false || (actual
+      && (actual.bootId !== expected.bootId || actual.startTicks !== expected.startTicks))));
+    return { ...member, accounted, endedObservedBy: accounted ? 'identity-checked lookup' : null };
+  });
   const stopReport = buildStopReport({
     ...exitAccounting,
     runId,
@@ -4676,6 +4707,7 @@ async function stopRun(opts, {
     fallback,
     // Every process the Engine's job ended after the Engine itself, by identity.
     engineJob,
+    ...(process.platform === 'linux' ? { recordedHelpers } : {}),
     // Recorded identities resolved by their exit in the ledger, never looked up or probed.
     ...(resolvedByLedger.length ? { resolvedByLedger } : {}),
     // Recorded identities the first identity-checked lookup found ended before the stop acted (round 11).
@@ -4748,6 +4780,7 @@ async function stopRun(opts, {
     stopReportPath: mainRelativePath(stopReportPath),
     childCleanup,
     engineJob,
+    ...(process.platform === 'linux' ? { recordedHelpers } : {}),
     errors,
     unresolvedProcesses: unresolved,
     ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),

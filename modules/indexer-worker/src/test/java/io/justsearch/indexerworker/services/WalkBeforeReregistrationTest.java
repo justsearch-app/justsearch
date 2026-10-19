@@ -57,7 +57,7 @@ final class WalkBeforeReregistrationTest
   private static final String ROOT_UNAVAILABLE_REASON = "ROOT_NOT_DIRECTORY";
   private static final String RECORD_FILE = "root-volumes.properties";
 
-  @TempDir Path tempDir;
+  @TempDir(factory = VolumeIdentityTempDirFactory.class) Path tempDir;
   private SqliteJobQueue jobQueue;
   private RunningRuntime runtime;
   private IndexGenerationManager.IndexLayout layout;
@@ -86,9 +86,9 @@ final class WalkBeforeReregistrationTest
   @Test
   void aWalkAfterARestartBeforeTheRootsAreRegisteredRecordsAndDeletesNothingThenProceeds()
       throws Exception {
-    // No volume identity off Windows, nor in a run with the no-volume-identity seam on
-    // (NoVolumeIdentityExtension, round 9).
-    assumeTrue(WINDOWS && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
+    // Native volume identity is required; the no-volume-identity campaign covers its absence.
+    assumeTrue((WINDOWS || VolumeIdentityTempDirFactory.hasLinuxVolumeIdentity(tempDir))
+        && !Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
         "a volume is recorded only where the platform exposes a volume identity");
     Path letters = Files.createDirectories(tempDir.resolve("letters")).toAbsolutePath().normalize();
     Path drafts = Files.createDirectories(tempDir.resolve("drafts")).toAbsolutePath().normalize();

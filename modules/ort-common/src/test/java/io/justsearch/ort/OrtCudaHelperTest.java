@@ -2,7 +2,6 @@ package io.justsearch.ort;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.condition.OS.WINDOWS;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,7 +9,6 @@ import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -37,15 +35,14 @@ class OrtCudaHelperTest {
    * Post-fix {@code checkMissingCudaRuntimeDlls} returns empty.
    */
   @Test
-  @EnabledOnOs(WINDOWS)
   @DisplayName("alpha.15+ cuda12 layout (runtime DLLs present, EP DLLs absent) → empty (Bug Q fix)")
   void cuda12Layout_runtimePresent_epAbsent_returnsEmpty() throws IOException {
     Path cuda12 = tmp.resolve("cuda12");
     Files.createDirectories(cuda12);
     // CUDA runtime DLLs (the alpha.15+ cuda-runtime package payload).
-    touch(cuda12.resolve("cudart64_12.dll"));
-    touch(cuda12.resolve("cublas64_12.dll"));
-    touch(cuda12.resolve("cublasLt64_12.dll"));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cudart")));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cublas")));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cublasLt")));
     // Deliberately NOT creating onnxruntime_providers_cuda.dll or
     // onnxruntime_providers_shared.dll — those auto-extract from the JAR at runtime.
 
@@ -66,14 +63,13 @@ class OrtCudaHelperTest {
    * the missing runtime DLL — this is when the post-fix WARN log SHOULD fire.
    */
   @Test
-  @EnabledOnOs(WINDOWS)
   @DisplayName("cuda12 layout missing cudart64_12.dll → reports it (real failure mode)")
   void cuda12Layout_missingRuntimeDll_returnsIt() throws IOException {
     Path cuda12 = tmp.resolve("cuda12-incomplete");
     Files.createDirectories(cuda12);
     // Only 2 of the 3 baseline runtime DLLs.
-    touch(cuda12.resolve("cublas64_12.dll"));
-    touch(cuda12.resolve("cublasLt64_12.dll"));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cublas")));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cublasLt")));
     // cudart64_12.dll deliberately missing.
 
     List<String> missing = OrtCudaHelper.checkMissingCudaRuntimeDlls(cuda12);
@@ -82,7 +78,7 @@ class OrtCudaHelperTest {
         missing.isEmpty(),
         "missing runtime DLL must be reported so the warn log fires");
     assertTrue(
-        missing.contains("cudart64_12.dll"),
+        missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("cudart")),
         "the specific missing runtime DLL must appear in the list");
   }
 
@@ -93,14 +89,13 @@ class OrtCudaHelperTest {
    * using the right one for the right context, not "fixing" the broader helper.
    */
   @Test
-  @EnabledOnOs(WINDOWS)
   @DisplayName("checkMissingCudaDlls reports EP DLLs missing for cuda12 layout (pre-fix behaviour pinned)")
   void preFixHelper_reportsEpDllsMissing_documentingTheGap() throws IOException {
     Path cuda12 = tmp.resolve("cuda12-prefix");
     Files.createDirectories(cuda12);
-    touch(cuda12.resolve("cudart64_12.dll"));
-    touch(cuda12.resolve("cublas64_12.dll"));
-    touch(cuda12.resolve("cublasLt64_12.dll"));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cudart")));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cublas")));
+    touch(cuda12.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("cublasLt")));
 
     List<String> missing = OrtCudaHelper.checkMissingCudaDlls(cuda12);
 
@@ -110,8 +105,8 @@ class OrtCudaHelperTest {
             + " pre-fix call site's misleading behaviour. Documented for clarity; the helper"
             + " itself is correct (per its javadoc), the misuse was at NativeSessionHandle.");
     assertTrue(
-        missing.contains("onnxruntime_providers_cuda.dll")
-            || missing.contains("onnxruntime_providers_shared.dll"),
+        missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("ort-cuda"))
+            || missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("ort-shared")),
         "EP DLLs are reported missing");
   }
 

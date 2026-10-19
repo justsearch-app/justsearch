@@ -1,0 +1,519 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-18T23:59:29.245Z",
+  "revision": "29d5541e2f1425a686e4c21ef9e45471e48ac121",
+  "tree": "648764458dd004ee3c4c2d7afdf6c8e1e367b7d5",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.tools.BrowseToolTest\" --tests \"io.justsearch.agent.tools.SearchToolTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2967
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18969
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppOrtNativePackTest\" --tests \"io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3785
+    },
+    {
+      "command": "./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.splade.SpladeEncoderNativePathTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2116
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/tools/BrowseToolTest.java",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/tools/BrowseToolTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ea18f36ba589c9177257b8f95d8da303c5efe663387b3ab44564e52f72de82e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fileOutput_formatsSizesReadably()",
+          "status": "passed"
+        },
+        {
+          "name": "relativePathRejected_showsRootNames()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithEmptyFoldersUnderParent()",
+          "status": "passed"
+        },
+        {
+          "name": "executeInvalidJson()",
+          "status": "passed"
+        },
+        {
+          "name": "executeListsRootsWhenNoParentPath()",
+          "status": "passed"
+        },
+        {
+          "name": "toRelativePath_noRoots_returnsAbsolute()",
+          "status": "passed"
+        },
+        {
+          "name": "relativeParentPath_resolvedByRootName()",
+          "status": "passed"
+        },
+        {
+          "name": "relativeParentPath_rejected_whenRootsAvailable()",
+          "status": "passed"
+        },
+        {
+          "name": "absolutePathEmptyResults_noHint()",
+          "status": "passed"
+        },
+        {
+          "name": "toRelativePath_rootMatch_returnsRelative()",
+          "status": "passed"
+        },
+        {
+          "name": "executeListsRootsWhenNullArgs()",
+          "status": "passed"
+        },
+        {
+          "name": "outputShowsRelativePaths()",
+          "status": "passed"
+        },
+        {
+          "name": "autoFallback_noFilesCallback_showsNoFolders()",
+          "status": "passed"
+        },
+        {
+          "name": "listFilesExplicit_skipsFolderBrowse()",
+          "status": "passed"
+        },
+        {
+          "name": "listFilesExplicit_withoutParentPath_returnsError()",
+          "status": "passed"
+        },
+        {
+          "name": "autoFallback_emptyFolders_listsFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "relativeParentPath_rootNameOnly_resolvesToRoot()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithParentPath()",
+          "status": "passed"
+        },
+        {
+          "name": "rootSentinelsUseRootsSupplier()",
+          "status": "passed"
+        },
+        {
+          "name": "formatsSizesReadably()",
+          "status": "passed"
+        },
+        {
+          "name": "validRootedParentPath_accepted()",
+          "status": "passed"
+        },
+        {
+          "name": "unixSlashParentPath_rejected_whenRootsAvailable()",
+          "status": "passed"
+        },
+        {
+          "name": "executeMaxFoldersCapped()",
+          "status": "passed"
+        },
+        {
+          "name": "emptyRootsReturnsNoIndexedFolders()",
+          "status": "passed"
+        },
+        {
+          "name": "autoFallback_emptyFoldersAndFiles_showsOriginalHint()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithMaxFolders()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithTruncatedResults()",
+          "status": "passed"
+        },
+        {
+          "name": "absoluteOutOfRootsParentPath_rejected()",
+          "status": "passed"
+        },
+        {
+          "name": "fileOutput_showsRelativePaths()",
+          "status": "passed"
+        },
+        {
+          "name": "rootsDoNotShowFileCountOrSize()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithNullResponse()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/tools/SearchToolTest.java",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/tools/SearchToolTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:07b2f8277cec07b2ad7a8f1895296557ec4229e09ac06b639f71d43bac8b66d7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "executeMissingQueryReturnsFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "executeNullArgumentsReturnsFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "executeEmptyQueryReturnsFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefix_nullOrEmpty_acceptedWithRoots()",
+          "status": "passed"
+        },
+        {
+          "name": "executeNoResults()",
+          "status": "passed"
+        },
+        {
+          "name": "emitsStructuredSearchEvidenceWithoutAFabricatedScore()",
+          "status": "passed"
+        },
+        {
+          "name": "structuredDataCarriesTheExecutedSanitizedQuery()",
+          "status": "passed"
+        },
+        {
+          "name": "feedbackEvidenceCarriesStableUidWithoutChangingRenderedEvidence()",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefix_absoluteButOutOfRoots_rejected()",
+          "status": "passed"
+        },
+        {
+          "name": "parsePipelineArg_fullObject()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithoutDocIdsOrPathPrefix_filtersIsNull()",
+          "status": "passed"
+        },
+        {
+          "name": "executeShowsQueryCorrection()",
+          "status": "passed"
+        },
+        {
+          "name": "modeToPreset_blank_defaultsToHybrid()",
+          "status": "passed"
+        },
+        {
+          "name": "sanitizeFilePathQuery_passesQueryUsedInSearch()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithDocIdsAndPathPrefix_bothFiltersApply()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithLimitAndMode()",
+          "status": "passed"
+        },
+        {
+          "name": "relativePathPrefix_thatMatchesARootName_resolvesInsteadOfBeingRejected()",
+          "status": "passed"
+        },
+        {
+          "name": "executeCallbackError()",
+          "status": "passed"
+        },
+        {
+          "name": "executeMalformedJsonReturnsFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "structuredDataStampsCustomForAFineGrainedPipeline()",
+          "status": "passed"
+        },
+        {
+          "name": "formatResultsUnderASmallCapKeepsEveryHitsIdentity()",
+          "status": "passed"
+        },
+        {
+          "name": "modeToPreset_null_defaultsToHybrid()",
+          "status": "passed"
+        },
+        {
+          "name": "modeToPreset_hybrid()",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefix_relativePathNoMatch_rejected()",
+          "status": "passed"
+        },
+        {
+          "name": "modeToPreset_text()",
+          "status": "passed"
+        },
+        {
+          "name": "executeFormatsContentPreviewFallback_whenNoExcerpts()",
+          "status": "passed"
+        },
+        {
+          "name": "relativePathPrefix_withRootsKnown_isRejectedAndNamesTheRoots()",
+          "status": "passed"
+        },
+        {
+          "name": "sanitizeFilePathQuery_preservesNonPathQuery()",
+          "status": "passed"
+        },
+        {
+          "name": "modeToPreset_vector()",
+          "status": "passed"
+        },
+        {
+          "name": "structuredDataCarriesTheResolvedSearchMode()",
+          "status": "passed"
+        },
+        {
+          "name": "executeFormatsMultipleResults()",
+          "status": "passed"
+        },
+        {
+          "name": "executeNullResponseReturnsFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithValidQuery()",
+          "status": "passed"
+        },
+        {
+          "name": "formatResultsUnderATightCapDropsTheTailAndSaysSo()",
+          "status": "passed"
+        },
+        {
+          "name": "absolutePathPrefix_emptyResults_noHint()",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefix_relativePathResolved_whenRootMatches()",
+          "status": "passed"
+        },
+        {
+          "name": "sanitizeFilePathQuery_convertsPathToKeywords()",
+          "status": "passed"
+        },
+        {
+          "name": "feedbackEvidenceOmitsHitWithoutUidInsteadOfFallingBackToPath()",
+          "status": "passed"
+        },
+        {
+          "name": "parsePipelineArg_emptyObject_allDefaults()",
+          "status": "passed"
+        },
+        {
+          "name": "relativePathPrefix_emptyResults_showsHint()",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefix_validRootedPath_accepted()",
+          "status": "passed"
+        },
+        {
+          "name": "sanitizeFilePathQuery_handlesBackslashes()",
+          "status": "passed"
+        },
+        {
+          "name": "parsePipelineArg_partialObject_onlySparseEnabled()",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefix_noRootsSupplier_fallsBackToHeuristic()",
+          "status": "passed"
+        },
+        {
+          "name": "modeToPreset_caseInsensitive()",
+          "status": "passed"
+        },
+        {
+          "name": "executeEnforcesPerResultCharBudget()",
+          "status": "passed"
+        },
+        {
+          "name": "structuredDataCarriesQueryAndResultCount()",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefix_unixSlashRejected_whenRootsAvailable()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithPathPrefix()",
+          "status": "passed"
+        },
+        {
+          "name": "executeFormatsExcerptsWithSpecialChars()",
+          "status": "passed"
+        },
+        {
+          "name": "modeToPreset_unknown_defaultsToHybrid()",
+          "status": "passed"
+        },
+        {
+          "name": "executeDefaultModeFromConfig()",
+          "status": "passed"
+        },
+        {
+          "name": "executeWithDocIds()",
+          "status": "passed"
+        },
+        {
+          "name": "executeLimitCappedAtMax()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5dc10b1fbc86ca26bfc3fd56e6ccccec576ba7137332c3f6eb01f50fd361f429",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLostVolumeRecordIsSeededAgainOnEvidenceAndTheRootKeepsItsIndex()",
+          "status": "passed"
+        },
+        {
+          "name": "aLostVolumeRecordWhoseDriveIsNotConfirmedReadsUnconfirmedAndDeletesNothing()",
+          "status": "passed"
+        },
+        {
+          "name": "aCorruptVolumeRecordIsDiscardedAndSeededAgainOnEvidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppOrtNativePackTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppOrtNativePackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9637b31c1d72b8248f3de656fdad4474b998aaaa59ea94ed4a60f12c0c2e2cca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an incomplete pack is refused rather than half-applied",
+          "status": "passed"
+        },
+        {
+          "name": "a pack detected after the initial build still reaches ORT",
+          "status": "passed"
+        },
+        {
+          "name": "a malformed exe path is 'no variant', not a boot failure",
+          "status": "passed"
+        },
+        {
+          "name": "the variant id names an ONNX Runtime directory, and it is parsed from the exe path",
+          "status": "passed"
+        },
+        {
+          "name": "boot still CALLS applyOrtNativePack — the defect was an absent call, not a broken one",
+          "status": "passed"
+        },
+        {
+          "name": "a boot with no config at all does not take the Engine down",
+          "status": "passed"
+        },
+        {
+          "name": "no pack installed leaves the property alone (the CPU-only path)",
+          "status": "passed"
+        },
+        {
+          "name": "an installed, version-matched pack sets ORT's native path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/NvidiaSmiAvailabilityHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/NvidiaSmiAvailabilityHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:99af0020d6fb023b7c2fcff3ae79ea5170472de8fd38dc52c6fbc17fdd162ba9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable()",
+          "status": "passed"
+        },
+        {
+          "name": "anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeEncoderNativePathTest.java",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeEncoderNativePathTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5b9f9a8ad358b3486a3640372db2b003df282caca49b6ff089c3d841acc8279",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resolveOrtNativePath_prefersSystemPropertyWhenDirectoryExists()",
+          "status": "passed"
+        },
+        {
+          "name": "resolveOrtNativePath_fallsBackWhenConfiguredDirectoryMissing()",
+          "status": "passed"
+        },
+        {
+          "name": "candidateCudaDependencyDlls_returnsOnlyExistingDllsInStableOrder()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3f401bcd4bfd67553ae2d79e901211eeb2099d654d37b59181003460b66ec60d"
+}

@@ -249,7 +249,7 @@
       "adr": "0024",
       "premise": "The NSIS bundle installs per-user (currentUser), non-elevated — the decision that makes post-install model download into LocalAppData work without UAC.",
       "kind": "json-path",
-      "file": "modules/shell/src-tauri/tauri.conf.json",
+      "file": "modules/shell/src-tauri/tauri.windows.conf.json",
       "pointer": "/bundle/windows/nsis/installMode",
       "expect": {
         "equals": "currentUser"

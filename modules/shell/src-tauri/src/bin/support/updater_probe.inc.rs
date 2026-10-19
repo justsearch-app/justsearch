@@ -113,10 +113,16 @@ pub(super) fn drive(
         },
         compatibility: vec![],
     };
-    let mut command = std::process::Command::new("ping.exe");
-    command
-        .args(["-n", "60", "127.0.0.1"])
-        .stdout(std::process::Stdio::null());
+    let mut command = if cfg!(windows) {
+        let mut command = std::process::Command::new("ping.exe");
+        command.args(["-n", "60", "127.0.0.1"]);
+        command
+    } else {
+        let mut command = crate::containment::engine_command("sleep").unwrap();
+        command.arg("60");
+        command
+    };
+    command.stdout(std::process::Stdio::null());
     let edge = ProbeEdge {
         host,
         action: action.into(),

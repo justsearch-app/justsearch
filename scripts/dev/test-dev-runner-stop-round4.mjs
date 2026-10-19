@@ -110,7 +110,7 @@ testWindows('the batched identity lookup supplies fresh identities across stop p
 });
 let failed = 0, skipped = 0;
 try { for (const [name, fn, prerequisite] of tests) {
-  if (prerequisite && process.platform !== 'win32') { skipped++; console.log('SKIP ' + name + ': ' + prerequisite); continue; }
+  if (prerequisite && !['win32', 'linux'].includes(process.platform)) { skipped++; console.log('SKIP ' + name + ': ' + prerequisite); continue; }
   try { await fn(); console.log('PASS ' + name); }
   catch (e) { failed++; console.error('FAIL ' + name + ': ' + e.stack); } } }
 finally { for (const child of children) child.kill(); fs.rmSync(root, { recursive: true, force: true }); }

@@ -1,3 +1,4 @@
+import '../dev/lib/test-fixture-processes.cjs';
 /**
  * Tempdoc 861 W3 [A3] — `serve-worktree-fe.cjs`'s agent-spawn registration.
  *
@@ -305,8 +306,49 @@ await check('F5: an explicit --port whose listener started AFTER this spawn is r
 
 /* ── [A3] ACCEPTANCE: a REAL disposable process, the shell-shim shape, a real kill ────────── */
 
+if (process.platform === 'linux') {
+  await check('[Linux] native direct listener is registered by tuple, an explicit stranger is refused, and the recorded stop closes only its own listener', async () => {
+    const stateDir = await fsp.mkdtemp(path.join(os.tmpdir(), '861-w3-linux-state-'));
+    const prior = process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT;
+    process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = stateDir;
+    const port = await sw.pickPort(15980);
+    const child = spawn(process.execPath, ['-e', "require('net').createServer().listen(Number(process.argv[1]),'127.0.0.1');process.on('message',()=>process.exit(0));setInterval(()=>{},1000)", String(port), '--port', String(port)], { stdio: ['ignore','ignore','ignore','ipc'] });
+    const own = child.recordedIdentity;
+    try {
+      assert.equal(await sw.waitForPortListening(port, { timeoutMs: 15000 }), true);
+      const refused = await sw.registerServedVite({ port, explicitPort: true, childIdentity: {host:{processIdentity:{...own.processIdentity,startTicks:String(BigInt(own.processIdentity.startTicks)+1n)}}} });
+      assert.equal(refused, null, 'a different spawn birth cannot claim this listener');
+      assert.equal(await sw.waitForPortListening(port, { timeoutMs: 1000 }), true, 'the unowned listener was never killed');
+      const registered = await sw.registerServedVite({ port, explicitPort: true, child, childIdentity: {host:own}, sessionId:'linux-listener-test' });
+      assert.ok(registered, 'a verifiable native listener must register');
+      const file = path.join(registered.dir, registered.recordId+'.json');
+      const record = JSON.parse(await fsp.readFile(file,'utf8'));
+      assert.equal(record.pid,child.pid);
+      assert.deepEqual(record.processIdentity,own.processIdentity);
+      assert.equal(record.cmdlineFingerprint,`--port ${port}`);
+      assert.equal(record.producer,'serve-worktree-fe');
+      assert.equal(verifyProcessIdentity({record,table:readProcessTable()}).verdict,'match');
+      const exit = new Promise(resolve=>child.once('exit',resolve));
+      stopRecordedProcess(own);
+      await exit;
+      assert.equal(await sw.waitForPortListening(port,{timeoutMs:100,intervalMs:20}),false);
+      await fsp.rm(file);
+    } finally {
+      try {
+        if(child.exitCode===null&&child.signalCode===null) {
+          const exit=new Promise(resolve=>child.once('exit',resolve));
+          try { child.kill('SIGKILL'); } finally { await exit; }
+        }
+      } finally {
+        if(prior===undefined)delete process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT;else process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT=prior;
+        await fsp.rm(stateDir,{recursive:true,force:true});
+      }
+    }
+  });
+}
+
 if (process.platform !== 'win32') {
-  console.log('861-w3-serve-worktree-fe: [A3] acceptance test SKIPPED (win32-only)');
+  console.log('861-w3-serve-worktree-fe: [A3] SKIP Windows cmd.exe intermediary survival; Linux counterpart: native direct listener registration below');
 } else {
   await check('[A3] killing the recorded shell intermediate still resolves to the surviving listener', async () => {
     const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), '861-w3-a3-'));

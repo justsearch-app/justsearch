@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { driveCase, watchSupervisor, engineRecords, ledgerMismatch } from './adapters/dev-runner.mjs';
-import { runBinary } from './adapters/tauri.mjs';
+import { binaryPath, runBinary } from './adapters/tauri.mjs';
 import { enginePlanFor } from './contract.mjs';
-const alive = (pid) => { try { process.kill(pid,0);return true; } catch(err) { if(err.code==='ESRCH')return false;throw err; } };
 export async function runLifecycle({ name, testCase, policy, io }) {
+  const alive = io.isAlive;
   const workDir=io.makeWorkDir(`${name}-${testCase.id}`);
   const runs=[];let previousRunId=null;
   const suspendFile=path.join(workDir,'suspend.json');
@@ -23,7 +23,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     if(name==='dev-runner') {const run=await driveCase({testCase,policy,io,workDir,keepWorkDir:true});runs.push(run);return run;}
     const dataDir=path.join(workDir,'data');fs.mkdirSync(path.join(dataDir,'runtime'),{recursive:true});
     const planPath=path.join(workDir,'fake-engine.plan.json');if(!fs.existsSync(planPath))io.writeEnginePlan(workDir,enginePlanFor(testCase));
-    const run=runBinary({binary:path.join(io.repoRoot,'modules/shell/src-tauri/target/debug/supervisor-conformance.exe'),workDir,dataDir,planPath,io,
+    const run=runBinary({binary:binaryPath(io.repoRoot),workDir,dataDir,planPath,io,
       env:{...process.env,...io.harnessOverrides,JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS:String(testCase.startTimeoutMs??4000)},stopAfterIncarnation:0});
     Object.assign(run,{dataDir,statePath:path.join(dataDir,'runtime/supervisor.v1.json'),seen:new Map()});runs.push(run);return run;
   }
@@ -62,6 +62,22 @@ export async function runLifecycle({ name, testCase, policy, io }) {
         assert(engineRecords(io,run.dataDir).some(r=>r.type==='engine-intent'&&r.reason==='TIMEOUT'));
         send(run);await waitState(run,s=>s.state==='stopped');return {problems:[]};
       }
+      if(probe==='session' && process.platform==='linux') {
+        // The Windows case below exercises the native window messages. On Linux
+        // drive the same two coordinator edges through the binary's fixture controls.
+        send(run,'quit','session-query');
+        await io.waitFor(()=>engineRecords(io,run.dataDir).some(r=>r.type==='engine-intent'
+          &&r.reason==='QUIT'&&r.detail==='session_end'),{what:'session query begins quit',timeoutMs:4000,intervalMs:20});
+        send(run,'quit','session-end');
+        assert(await waitState(run,s=>s.state==='stopped'),'session end publishes stopped');
+        const exits=engineRecords(io,run.dataDir).filter(r=>r.type==='engine-exit');
+        assert.equal(exits.length,1);
+        assert.equal(exits[0].exitClass,'REQUESTED');
+        assert.equal(exits[0].reason,'QUIT');
+        assert.equal(exits[0].detail,'session_end');
+        assert(!alive(state.pid),'session end leaves no Engine');
+        return {problems:[]};
+      }
       if(probe==='session') {
         const child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(io.repoRoot,'scripts/dev/test-session-end.ps1'),'-SupervisorPid',String(run.child.pid),'-DataDir',run.dataDir],{windowsHide:true});
         let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b);
@@ -89,10 +105,12 @@ export async function runLifecycle({ name, testCase, policy, io }) {
       else {
         assert.equal(exits.length,1,'one Engine exit record');
         const intents=records.filter(r=>r.type==='engine-intent'&&r.reason==='QUIT'&&r.channel!=='TERMINATE');assert.equal(intents.length,1,'one cooperative QUIT intent');
-        assert.equal(exits[0].exitClass,probe==='crash'?'UNEXPECTED':'REQUESTED');
+        const linuxForced = process.platform==='linux' && ['forced','deadline'].includes(probe);
+        assert.equal(exits[0].exitClass,probe==='crash'?'UNEXPECTED':linuxForced&&name==='dev-runner'?'UNKNOWN':'REQUESTED');
+        if(linuxForced) { assert.equal(exits[0].code,null); assert.equal(exits[0].codeDistinctive,false); if(name==='tauri') { assert.equal(exits[0].signal,9); assert.equal(exits[0].ownerIntentBeforeSignal,true); } }
         if(probe==='forced'||probe==='deadline') {
           assert.equal(exits[0].forced,true);
-          assert(exits[0].code===1246953474 || (name==='dev-runner'&&exits[0].codeDistinctive===false));
+          assert(exits[0].code===1246953474 || ((name==='dev-runner'||linuxForced)&&exits[0].codeDistinctive===false));
           assert(Date.now()-started<=policy.quitDeadlineMs+2000,'quit finishes within the contract bound');
         }
         if(probe==='deadline') {
@@ -111,7 +129,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     if(testCase.expect?.seenPhase) assert([...run.seen.values()].some(s=>s.incarnation===testCase.expect.seenPhase.incarnation&&s.phase===testCase.expect.seenPhase.phase),'discovery phase is published');
     if(testCase.expect?.ledger) {
       const runId=engineRecords(io,run.dataDir).filter(r=>r.type==='engine-start').at(-1)?.incarnation.session;
-      const problems=ledgerMismatch(engineRecords(io,run.dataDir),testCase.expect.ledger,{runId,previousRunId});
+      const problems=ledgerMismatch(engineRecords(io,run.dataDir),testCase.expect.ledger,{runId,previousRunId,adapter:name});
       assert.deepEqual(problems,[],"ledger satisfies the contract");
     }
     return {problems:[]};

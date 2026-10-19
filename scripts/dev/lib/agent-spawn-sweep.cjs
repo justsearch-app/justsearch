@@ -592,7 +592,7 @@ function describeEntry(entry) {
     ? '\n    resolve via sweep: node scripts/dev/agent-spawn-sweep.cjs --occasion session-start'
     : '';
   const kill = entry.killLine
-    ? `\n    force, only if you are certain it is safe (bypasses identity re-verification): ${entry.killLine}`
+    ? `\n    force, only if you are certain it is safe (bypasses ownership policy; rechecks the saved process birth): ${entry.killLine}`
     : '';
   return `${head}${reason}${sweep}${kill}`;
 }

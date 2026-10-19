@@ -1,3 +1,4 @@
+import '../dev/lib/test-fixture-processes.cjs';
 /**
  * Tempdoc 861 W5 — `remove-worktree.cjs`'s `worktree-teardown` occasion, driven end-to-end as a
  * real subprocess against an ISOLATED fixture `agent-spawns/` register
@@ -41,6 +42,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
 let removeWorktreeCli = null;
 const CLI_FILES = [
+  'scripts/lib/native-targets.cjs',
+  'contracts/native-targets/spec.v1.json',
+  'scripts/lib/path-identity.cjs',
   'scripts/dev/remove-worktree.cjs',
   'scripts/dev/lib/process-identity.cjs',
   'scripts/dev/lib/process-record.cjs',
@@ -96,6 +100,13 @@ async function installFixtureRepo(scratch) {
     await fsp.mkdir(path.dirname(destination), { recursive: true });
     await fsp.copyFile(path.join(REPO_ROOT, ...rel.split('/')), destination);
   }
+  if (process.platform === 'linux') {
+    const helper = require('../lib/native-targets.cjs').nativeTarget().paths['bound-exec'];
+    const target = path.join(repo, 'modules/ui/build/install/ui', helper);
+    await fsp.mkdir(path.dirname(target), {recursive:true});
+    await fsp.copyFile(path.join(REPO_ROOT,'modules/ui/build/install/ui',helper),target);
+    await fsp.chmod(target,0o755);
+  }
   return repo;
 }
 
@@ -135,7 +146,7 @@ function runRemoveWorktree(targetDir, { env, sessionIdFlag = 'caller-session' } 
 }
 
 async function main() {
-  if (process.platform !== 'win32') {
+  if (!['win32', 'linux'].includes(process.platform)) {
     console.log('861-w5-remove-worktree-teardown.test: skipped (win32-only surfaces).');
     console.log('861-w5-remove-worktree-teardown.test: 0 passed');
     return;
@@ -154,7 +165,7 @@ async function main() {
     const row = await findOwnChildRow(child.pid);
     assert.ok(row, `spawned child pid ${child.pid} never appeared in the process table`);
     const creationFileTimeUtc = normalizeCreationTime(row.CreationFileTimeUtc);
-    assert.ok(creationFileTimeUtc, 'child has no readable creation time');
+    assert.ok(row.processIdentity || creationFileTimeUtc, 'child has no readable native birth');
 
     const dir = path.join(stateRoot, 'agent-spawns');
     const record = await buildAgentSpawnRecord({
@@ -162,6 +173,7 @@ async function main() {
       producer: 'w5-teardown-test-fixture',
       pid: child.pid,
       creationFileTimeUtc,
+      ...(row.processIdentity ? {processIdentity:row.processIdentity} : {}),
       cmdlineFingerprint: '-e',
       port: 40200,
       leaseDurationSec: 3600, // LIVE — other session, live lease -> CONTENTION -> blocksProceed
@@ -177,10 +189,14 @@ async function main() {
       assert.equal(status, 1, `expected exit 1, got ${status}. Output:\n${output}`);
       assert.match(output, /refusing to remove/i);
       assert.match(output, /w5-teardown-test-fixture/, 'the holder\'s producer should be named');
-      assert.match(output, /terminate-process\.ps1/i, 'an identity-checked remedy line should be printed');
-      assert.ok(output.includes(`-CreationFileTimeUtc ${record.creationFileTimeUtc}`));
+      if (process.platform === 'win32') {
+        assert.match(output, /terminate-process\.ps1/i, 'an identity-checked remedy line should be printed');
+        assert.ok(output.includes(`-CreationFileTimeUtc ${record.creationFileTimeUtc}`));
+      } else {
+        assert.ok(output.includes(`signal ${record.pid} ${record.processIdentity.bootId} ${record.processIdentity.startTicks} SIGKILL`), output);
+      }
       assert.match(output, /agent-spawn-sweep\.cjs/i, 'the safe sweep-CLI remedy should be printed alongside the last-resort kill line');
-      assert.ok(output.indexOf('agent-spawn-sweep.cjs') < output.indexOf('terminate-process.ps1'), 'the sweep remedy must appear before the manual termination line');
+      assert.ok(output.indexOf('agent-spawn-sweep.cjs') < output.indexOf(process.platform === 'win32' ? 'terminate-process.ps1' : 'justsearch-bound-exec'), 'the sweep remedy must appear before the manual termination line');
     });
 
     await check('the target directory is LEFT INTACT after a refusal (the §2-bis (c) fix)', async () => {
@@ -231,7 +247,7 @@ async function main() {
       const row = await findOwnChildRow(ownChild.pid);
       assert.ok(row, `spawned child pid ${ownChild.pid} never appeared in the process table`);
       const creationFileTimeUtc = normalizeCreationTime(row.CreationFileTimeUtc);
-      assert.ok(creationFileTimeUtc);
+      assert.ok(row.processIdentity || creationFileTimeUtc);
 
       const sessionId = `f2a-same-session-${process.pid}`;
       const harness = writeHarnessFixture(path.join(sameSessionRoot, 'identity'));
@@ -241,6 +257,7 @@ async function main() {
         producer: 'w5-f2a-test-fixture',
         pid: ownChild.pid,
         creationFileTimeUtc,
+        ...(row.processIdentity ? {processIdentity:row.processIdentity} : {}),
         cmdlineFingerprint: '-e',
         port: 40210,
         leaseDurationSec: 3600, // live — but SAME session reaps regardless of lease state (§6.3)

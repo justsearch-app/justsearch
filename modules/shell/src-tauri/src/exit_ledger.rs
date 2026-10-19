@@ -412,13 +412,17 @@ fn retain_and_rename(
         let mut losses: Vec<Value> = journal.iter().filter_map(|(_, row)| row.clone()).collect();
         let mut added = Vec::new();
         for row in &rows {
-            if row["pid"].as_u64().is_none() || row["creationFileTime"].as_str().is_none() {
+            if row["pid"].as_u64().is_none()
+                || (row["creationFileTime"].as_str().is_none() && row["processIdentity"]["kind"] != "linux-proc-v1") {
                 continue;
             }
             let mut loss = json!({"schemaVersion":1,"type":"ledger-gap","seq":row["seq"],"at":row["at"],
                 "writer":row["writer"],"reason":"EVIDENCE_LOST","pid":row["pid"],"creationFileTime":row["creationFileTime"],
                 "owner":row["owner"],"incarnation":row["incarnation"],"count":1,"since":row["at"],
                 "droppedFile":file.file_name().unwrap().to_string_lossy(),"droppedBytes":bytes});
+            if let Some(identity) = row.get("processIdentity") {
+                loss["processIdentity"] = identity.clone();
+            }
             loss.as_object_mut().unwrap().extend(
                 evidence_scope(std::slice::from_ref(row))
                     .as_object()
@@ -875,6 +879,27 @@ mod tests {
             "per-file rotation must retain prior generations below the retention bound"
         );
     }
+    #[test]
+    fn retention_keeps_linux_process_identity_in_loss_receipts() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("engine.v1.2.jsonl");
+        let identity = json!({"kind":"linux-proc-v1", "pid":7,
+            "bootId":"4a4a6c93-537e-491c-8a81-a967ce9b4f80", "startTicks":"123456"});
+        let row = json!({"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z",
+            "incarnation":{"session":"old","n":1},"pid":7,"processIdentity":identity});
+        fs::write(&old, format!("{row}\n")).unwrap();
+        fs::OpenOptions::new().write(true).open(&old).unwrap()
+            .set_len(128 * 1024 * 1024 + 1).unwrap();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        let losses: Vec<Value> = fs::read_to_string(dir.path().join("engine.v1.lost.jsonl"))
+            .unwrap().lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+        let loss = losses.iter().find(|r| r["pid"] == 7).expect("retained Linux identity");
+        assert_eq!(loss["processIdentity"], identity);
+        assert_eq!(loss["affectedSessions"], json!(["old"]));
+    }
+
     #[test]
     fn eviction_at_the_retention_bound_records_scoped_loss_first() {
         // Through the production rotation and its real 128 MiB bound: an old archive above the

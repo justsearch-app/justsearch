@@ -20,7 +20,7 @@ fn sleeper() -> PreparedCommand {
         command.args(["-n", "30", "127.0.0.1"]);
         command
     } else {
-        let mut command = std::process::Command::new("sleep");
+        let mut command = crate::containment::engine_command("sleep").unwrap();
         command.arg("30");
         command
     };

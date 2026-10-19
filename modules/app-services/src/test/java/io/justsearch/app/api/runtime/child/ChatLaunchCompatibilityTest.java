@@ -24,7 +24,7 @@ import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
 final class ChatLaunchCompatibilityTest {
   @TempDir Path directory;
 
@@ -34,7 +34,7 @@ final class ChatLaunchCompatibilityTest {
     String argument = "ö with spaces and trailing\\";
     try (var control = DefaultChildControl.unrecorded(ManagedChildRegistry.noop())) {
       var command = new ArrayList<>(List.of(
-          Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
+          Path.of(System.getProperty("java.home"), "bin", io.justsearch.configuration.PlatformPaths.isWindows() ? "java.exe" : "java").toString(),
           "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8", "-cp",
           Path.of(Echo.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString(),
           Echo.class.getName(), argument));
@@ -79,6 +79,7 @@ final class ChatLaunchCompatibilityTest {
    * launch does: the same quoting, run by Windows through {@code cmd.exe} the same way.
    */
   @Test
+  @EnabledOnOs(OS.WINDOWS)
   void aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk() throws Exception {
     Path script = Files.createDirectory(directory.resolve("launcher dir")).resolve("echo-args.cmd");
     Files.writeString(script, "@echo off\r\necho ONE=[%1]\r\necho ALL=[%*]\r\n", StandardCharsets.UTF_8);
@@ -101,7 +102,7 @@ final class ChatLaunchCompatibilityTest {
   @Test
   void embeddedQuotesReachAnExecutableAsUnderTheJdk() throws Exception {
     List<String> command = new ArrayList<>(List.of(
-        Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
+        Path.of(System.getProperty("java.home"), "bin", io.justsearch.configuration.PlatformPaths.isWindows() ? "java.exe" : "java").toString(),
         "-Dstdout.encoding=UTF-8", "-cp",
         Path.of(Args.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString(),
         Args.class.getName()));
@@ -129,8 +130,9 @@ final class ChatLaunchCompatibilityTest {
    */
   @Test
   void aFailureBeforeResumeLeavesNoProcessBehind() throws Exception {
-    List<String> idle = List.of(
-        Path.of(System.getenv("SystemRoot"), "System32", "ping.exe").toString(), "-t", "127.0.0.1");
+    List<String> idle = io.justsearch.configuration.PlatformPaths.isWindows() ? List.of(
+        Path.of(System.getenv("SystemRoot"), "System32", "ping.exe").toString(), "-t", "127.0.0.1")
+        : List.of("/bin/sleep", "600");
     for (ChildKind kind : List.of(ChildKind.EXTRACTION, ChildKind.LLAMA_SERVER)) {
       AtomicReference<ManagedChild> registered = new AtomicReference<>();
       ManagedChildRegistry failing = new ManagedChildRegistry() {
@@ -162,6 +164,7 @@ final class ChatLaunchCompatibilityTest {
    * process is ended through its creation handle and nothing is left behind.
    */
   @Test
+  @EnabledOnOs(OS.WINDOWS)
   void aFailureJoiningTheJobLeavesNoProcessBehind() throws Exception {
     Class<?> kernel = Class.forName(WindowsEngineJob.class.getName() + "$Kernel");
     AtomicReference<ProcessHandle> created = new AtomicReference<>();

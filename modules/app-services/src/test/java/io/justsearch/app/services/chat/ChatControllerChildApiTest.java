@@ -130,6 +130,9 @@ final class ChatControllerChildApiTest {
   private InferenceLifecycleManager manager() throws IOException {
     Path root = Files.createDirectories(tmp.resolve("home"));
     Path server = Files.writeString(root.resolve("llama-server.exe"), "fixture; never launched");
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      assertTrue(server.toFile().setExecutable(true, true));
+    }
     Path model = Files.writeString(root.resolve("model.gguf"), "fixture; never loaded");
     var builder = new ResolvedConfigBuilder();
     builder.putDefault("justsearch.home", root.toString());

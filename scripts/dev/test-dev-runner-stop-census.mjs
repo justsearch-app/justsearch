@@ -19,11 +19,12 @@ const fixtureExecutable = windowsPath => path.resolve('tmp', 'census-fixtures', 
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const linuxFixtureIdentities = new Map();
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'stop-census-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = path.join(scratch, 'state');
 // The owned-process census a stop compares with the ledger: here it observed nothing.
 const scope = path.join(scratch, 'scope.json');
-fs.writeFileSync(scope, JSON.stringify({ processes: [] }));
+fs.writeFileSync(scope, fixtureJson({ processes: [] }));
 process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE = scope;
 const census = require('./lib/stop-exit-census.cjs');
 const ledgerLib = require('./lib/exit-ledger.cjs');
@@ -31,12 +32,26 @@ const jobRun = require('./lib/job-run.cjs');
 const api = require('./dev-runner.cjs').__test;
 const actuator = require('./lib/engine-actuator.cjs');
 const windows = process.platform === 'win32';
+const nativeBackend = windows || process.platform === 'linux';
+// Fixture factories carry the captured tuple beside the legacy field; no FILETIME is synthesized
+// on Linux. An explicitly missing birth remains missing, and explicit stale tuples stay stale.
+function nativeFields(fields) {
+  const id = linuxFixtureIdentities.get(fields?.pid);
+  return process.platform === 'linux' && id && !fields.processIdentity
+    && ['creationFileTime', 'creationFileTimeUtc'].some(key => Object.hasOwn(fields, key) && fields[key] === undefined)
+    ? { ...fields, processIdentity: id } : fields;
+}
+// Only fixture serialization adds a tuple captured by liveChild. Deliberately absent births
+// (null) stay absent; the production reader and every behavioral assertion remain unchanged.
+function fixtureJson(value, _replacer = null, space) {
+  return JSON.stringify(value, (_key, item) => nativeFields(item), space);
+}
 const EPOCH = 116444736000000000n;
 const iso7 = (ft) => {
   const ms = Number((BigInt(ft) - EPOCH) / 10000n);
   return `${new Date(ms).toISOString().slice(0, 19)}.${String((BigInt(ft) - EPOCH) % 10000000n).padStart(7, '0')}Z`;
 };
-const isoMs = (ft) => new Date(Number((BigInt(ft) - EPOCH) / 10000n)).toISOString();
+const isoMs = (ft) => ft == null ? null : new Date(Number((BigInt(ft) - EPOCH) / 10000n)).toISOString();
 let dirs = 0;
 const freshDir = (name) => {
   const dir = path.join(scratch, `${name}-${++dirs}`);
@@ -45,10 +60,13 @@ const freshDir = (name) => {
 };
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-// Windows PIDs are multiples of 4, so a PID that is not names no process, now or later.
+// Windows PIDs are multiples of 4. Linux reserves no such residue; use values above
+// the kernel PID ceiling, including in generated ledgers that reach the real OS lookup.
+const absentPidBase = process.platform === 'linux'
+  ? Number(fs.readFileSync('/proc/sys/kernel/pid_max', 'utf8').trim()) : 0;
 const noProcess = (pid, creationFileTimeUtc) => {
   assert.notEqual(pid % 4, 0);
-  return { pid, creationFileTimeUtc };
+  return { pid: absentPidBase + pid, creationFileTimeUtc };
 };
 
 /**
@@ -128,7 +146,8 @@ async function unreadableProcess(t) {
 /** The run's ledger as its writers write it: the dev runner (engine family), the Engine (children). */
 function runLedger(dataDir, runId, engine, executable) {
   const ledgerDir = ledgerLib.ledgerDirectory(dataDir);
-  const startedAt = Number((BigInt(engine.creationFileTimeUtc) - EPOCH) / 10000n);
+  const startedAt = engine.processIdentity ? Date.parse(engine.recordedAt)
+    : Number((BigInt(engine.creationFileTimeUtc) - EPOCH) / 10000n);
   const runner = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine',
     writer: { role: 'dev-runner', pid: 4000, startedAt: startedAt - 1000 } });
   const engineWriter = ledgerLib.createLedgerWriter({ ledgerDir, family: 'children',
@@ -138,6 +157,7 @@ function runLedger(dataDir, runId, engine, executable) {
   return {
     engineStart() {
       runner.append('engine-start', { incarnation, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc,
+        ...(engine.processIdentity ? { processIdentity: engine.processIdentity } : {}),
         executable, processStartedAt: new Date(startedAt), cause: 'START', supervisorKind: 'dev-runner' });
     },
     engineExit() {
@@ -172,7 +192,7 @@ function runLedger(dataDir, runId, engine, executable) {
   };
 }
 
-test('a job member whose PID now names a process whose birth cannot be read is gone when the ledger records its exit', { skip: !windows && 'Windows job records' }, async (t) => {
+test('a job member whose PID now names a process whose birth cannot be read is gone when the ledger records its exit', { skip: !windows && 'Windows Job Object unreadable-handle probe; Linux: native identity-edge unknown/reuse cases' }, async (t) => {
   const host = noProcess(970401, '134364632930208358');
   const unreadable = await unreadableProcess(t);
   const reused = unreadable.pid;
@@ -180,7 +200,7 @@ test('a job member whose PID now names a process whose birth cannot be read is g
   const member = { pid: reused, creationFileTimeUtc: '134000000000000005' };
   const dir = freshDir('job');
   const recordPath = path.join(dir, 'engine-1.json');
-  const writeRecord = () => fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1',
+  const writeRecord = () => fs.writeFileSync(recordPath, fixtureJson({ schema: 'justsearch-job-run.v1',
     pid: host.pid, creationFileTimeUtc: host.creationFileTimeUtc, root: member, members: [member],
     state: 'ended', rootExitCode: 0 }));
   writeRecord();
@@ -207,10 +227,10 @@ function stopFixture({ runId, dataDir, engine, engineJob = null }) {
   const dir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
   fs.mkdirSync(dir, { recursive: true });
   const run = { runId, pids: { backendRootPid: engine.pid },
-    identities: { backend: { pid: engine.pid, creationFileTimeUtc: engine.creationFileTimeUtc } },
+    identities: { backend: { pid: engine.pid, creationFileTimeUtc: engine.creationFileTimeUtc, ...(engine.processIdentity ? { processIdentity: engine.processIdentity } : {}) } },
     apiPortActual: 1, dataDir, ...(engineJob ? { engineJob } : {}) };
   const runPath = path.join(dir, 'run.json');
-  fs.writeFileSync(runPath, JSON.stringify(run));
+  fs.writeFileSync(runPath, fixtureJson(run));
   const never = (what) => async () => { throw new Error(`${what} must not be called: nothing of this run is running`); };
   return { dir, runPath, io: {
     resolveTarget: async () => ({ run: JSON.parse(fs.readFileSync(runPath, 'utf8')), runPath }),
@@ -220,7 +240,7 @@ function stopFixture({ runId, dataDir, engine, engineJob = null }) {
   } };
 }
 
-test('a stop after the Engine has gone completes when the ledger records the exit of a job member whose PID cannot be read', { skip: !windows && 'Windows job records' }, async (t) => {
+test('a stop after the Engine has gone completes when the ledger records the exit of a job member whose PID cannot be read', { skip: !windows && 'Windows Job Object unreadable-handle probe; Linux: native identity-edge unknown/reuse cases' }, async (t) => {
   const runId = 'stop-census-reused-pid';
   const engine = noProcess(970501, '134364632933610725');
   const host = noProcess(970502 + 1, '134364632930208358');
@@ -236,10 +256,10 @@ test('a stop after the Engine has gone completes when the ledger records the exi
   const fixture = stopFixture({ runId, dataDir, engine, engineJob: null });
   const recordPath = path.join(fixture.dir, 'engine-jobs', 'engine-1.json');
   fs.mkdirSync(path.dirname(recordPath), { recursive: true });
-  fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1', pid: host.pid,
+  fs.writeFileSync(recordPath, fixtureJson({ schema: 'justsearch-job-run.v1', pid: host.pid,
     creationFileTimeUtc: host.creationFileTimeUtc, root: engine, members: [member], state: 'ended', rootExitCode: 0 }));
   const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
-  fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, engineJob: { incarnation: 1, recordPath, host } }));
+  fs.writeFileSync(fixture.runPath, fixtureJson({ ...run, engineJob: { incarnation: 1, recordPath, host } }));
 
   // Exercise the same native seam through stopRun's existing job-stop dependency.
   const out = await api.stopRun({}, { ...fixture.io, stopEngineJob: (job, { ended = [] } = {}) =>
@@ -265,7 +285,7 @@ test('a tracked identity the lookup cannot read stays unresolved unless the ledg
   ledger.jobProcess(tracked, 'j-tracked');
   ledger.engineExit();
   const fixture = stopFixture({ runId, dataDir, engine });
-  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: [tracked, other] }));
+  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), fixtureJson({ processes: [tracked, other] }));
   // Both PIDs are present but their births cannot be read; the Engine is gone.
   const looked = new Set();
   const io = { ...fixture.io, lookupIdentities: async (ids) => {
@@ -292,7 +312,7 @@ test('a retried stop keeps every earlier stop report and names the reports and c
   ledger.engineStart();
   ledger.engineExit();
   const fixture = stopFixture({ runId, dataDir, engine });
-  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: [tracked] }));
+  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), fixtureJson({ processes: [tracked] }));
   const reportPath = (name = 'stop-report.json') => path.join(fixture.dir, name);
   const lookup = (present) => ({ ...fixture.io, lookupIdentities: async (ids) => new Map(ids.map((pid) => [pid,
     pid === tracked.pid && present ? { present: true, creationFileTime: null } : { present: false }])) });
@@ -339,7 +359,7 @@ async function arm(run, dataDir, exitsAtFinish, atFinish = null, options = {}) {
       if (!finished && args && fs.existsSync(flag('-FinishFile'))) {
         finished = true;
         atFinish?.();
-        fs.writeFileSync(flag('-OutputFile'), '\uFEFF' + JSON.stringify({ processExits: exitsAtFinish, gaps: [] }));
+        fs.writeFileSync(flag('-OutputFile'), '\uFEFF' + fixtureJson({ processExits: exitsAtFinish, gaps: [] }));
       }
     },
   });
@@ -399,7 +419,7 @@ test('a stop that finds the Engine already gone completes from the ledger when e
   assert.deepEqual(result.exitAccountingGaps, []);
   assert.equal(result.exitAccountingComplete, true);
   // The Engine quit as asked; its console host is accounted with it.
-  assert.deepEqual(result.processExits.map((e) => [e.pid, e.ledgerClass]).sort(), [[970201, 'REQUESTED'], [970202, 'REQUESTED']]);
+  assert.deepEqual(result.processExits.map((e) => [e.pid, e.ledgerClass]).sort(), [[engine.pid, 'REQUESTED'], [970202, 'REQUESTED']]);
 
   // An identity without its exit record keeps the census incomplete.
   const open = freshDir('open');
@@ -524,7 +544,7 @@ test('an identity whose exit the ledger records is never passed to an OS lookup 
     `the ledger-ended Engine was looked up ${looked.filter((ids) => ids.includes(engine.pid)).length} times: ${JSON.stringify(looked)}`);
   assert.equal(ported.filter((pids) => pids.includes(engine.pid)).length, 0, 'nor offered as a port owner');
   const report = JSON.parse(fs.readFileSync(path.join(fixture.dir, 'stop-report.json'), 'utf8'));
-  assert.ok(report.resolvedByLedger?.some((p) => p.pid === engine.pid && p.creationFileTimeUtc === engine.creationFileTimeUtc),
+  assert.ok(report.resolvedByLedger?.some((p) => p.pid === engine.pid && sameRecordedBirth(p, engine)),
     JSON.stringify(report.resolvedByLedger));
 });
 
@@ -544,7 +564,7 @@ test('a rotation between the stat and the open of a ledger file loses no record:
   // renamed, and a replacement as long as it, holding only a note, takes its name.
   const size = fs.statSync(current).size;
   const note = JSON.stringify({ schemaVersion: 1, type: 'child-note', seq: 99, at: new Date().toISOString(),
-    writer: { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) }, childId: 'c-note', note: 'new file' });
+    writer: { role: 'engine', pid: engine.pid, startedAt: engine.recordedAt ?? isoMs(engine.creationFileTimeUtc) }, childId: 'c-note', note: 'new file' });
   const replacement = note + ' '.repeat(size - Buffer.byteLength(note) - 1) + '\n';
   const stat = fs.statSync;
   let rotated = false;
@@ -597,7 +617,7 @@ test('an Engine a reconciliation found alive (ALIVE_MATCH) is looked up and bloc
   // The stop: the incarnation found alive is still recorded, alive with its birth.
   const fixture = stopFixture({ runId, dataDir, engine });
   fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'),
-    JSON.stringify({ processes: [{ ...live, role: 'engine', owned: false }] }));
+    fixtureJson({ processes: [{ ...live, role: 'engine', owned: false }] }));
   const looked = [];
   const io = { ...fixture.io, lookupIdentities: async (ids) => {
     looked.push([...ids]);
@@ -641,7 +661,7 @@ const by = {
   // The next Engine, reconciling what the run's Engine left open.
   later: { role: 'engine', pid: 971013, startedAt: isoMs(BigInt(proofEngine.creationFileTimeUtc) + 600000000n) },
 };
-const rec = (family, writer, type, fields) => ({ family, writer, type, fields });
+const rec = (family, writer, type, fields) => ({ family, writer, type, fields: nativeFields(fields) });
 const engineStart = rec('engine', by.runner, 'engine-start', { incarnation: proofInc, pid: proofEngine.pid,
   creationFileTime: proofEngine.creationFileTimeUtc, executable: process.execPath, processStartedAt: proofStartedAt,
   cause: 'START', supervisorKind: 'dev-runner' });
@@ -822,8 +842,8 @@ test('a manifest helper is matched to its ledger exit at the millisecond its sta
   ledger.child('c-other', other, true);
   ledger.engineExit();
   const exe = fixtureExecutable('C:\\fixture\\parser.exe');
-  fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ pid: engine.pid, children: [
-    { id: 'c-ended', pid: ended.pid, kind: 'EXTRACTION', startedAt: isoMs(ended.creationFileTimeUtc), executable: exe },
+  fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), fixtureJson({ pid: engine.pid, children: [
+    { id: 'c-ended', pid: ended.pid, kind: 'EXTRACTION', startedAt: ended.recordedAt ?? isoMs(ended.creationFileTimeUtc), executable: exe },
     // One millisecond after its ledger birth: another process under the same PID.
     { id: 'c-other', pid: other.pid, kind: 'EXTRACTION', startedAt: isoMs(BigInt(other.creationFileTimeUtc) + 10000n), executable: exe },
   ] }));
@@ -902,7 +922,7 @@ test('an identity whose records do not prove its exit is looked up, and keeps th
     writeLedger(dataDir, [...setup.filter((r) => kind !== 'engine' || r.type !== 'engine-exit'), ...records,
       ...(kind === 'engine' ? runEngineRecords : [])]);
     const fixture = freshProofRun(dataDir, engineOfRun);
-    fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: [
+    fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), fixtureJson({ processes: [
       { ...subject, role: kind === 'engine' ? 'engine' : 'Engine job member', ...(kind === 'engine' ? { owned: false } : {}) }] }));
     const looked = [];
     // The subject's PID names a process whose birth cannot be read; nothing else is running.
@@ -927,7 +947,7 @@ test('an exact ledger birth matches only the same birth: a native identity one t
   // The tracked identity was read natively (exact, birthTick 1), one tick after the ledger child's birth.
   const neighbour = { pid: proofChild.pid, creationFileTimeUtc: nextTick(proofChild.creationFileTimeUtc), birthTick: '1',
     role: 'Engine job member' };
-  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: [neighbour] }));
+  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), fixtureJson({ processes: [neighbour] }));
   const looked = [];
   const out = await api.stopRun({}, { ...fixture.io, lookupIdentities: async (ids) => {
     looked.push(...ids);
@@ -942,7 +962,7 @@ test('an exact ledger birth matches only the same birth: a native identity one t
   const member = { pid: unreadable.pid, creationFileTimeUtc: '134000000000000006' };
   const dir = freshDir('job-exact');
   const recordPath = path.join(dir, 'engine-1.json');
-  fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1', pid: 971029, creationFileTimeUtc: '134364632930208358',
+  fs.writeFileSync(recordPath, fixtureJson({ schema: 'justsearch-job-run.v1', pid: 971029, creationFileTimeUtc: '134364632930208358',
     root: member, members: [member], state: 'ended', rootExitCode: 0 }));
   const result = unreadable.stop({ recordPath, host: noProcess(971029, '134364632930208358') }, { waitMs: 0,
     endedIdentities: [{ pid: member.pid, creationFileTimeUtc: '134000000000000005', birthTick: '1' }] });
@@ -965,7 +985,7 @@ test('preserved: a ledger birth matches at the coarser precision of the two reco
     { pid: other.pid, creationFileTimeUtc: String(BigInt(other.creationFileTimeUtc) / 10n * 10n), role: 'Engine job member' },
     { pid: proofEngine.pid, creationFileTimeUtc: String(BigInt(proofEngine.creationFileTimeUtc) / 10n * 10n + 3n), birthTick: '1',
       role: 'Engine job member' }];
-  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: tracked }));
+  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), fixtureJson({ processes: tracked }));
   const looked = [];
   const out = await api.stopRun({}, { ...fixture.io, lookupIdentities: async (ids) => {
     looked.push(...ids);
@@ -978,7 +998,7 @@ test('preserved: a ledger birth matches at the coarser precision of the two reco
   const member = { pid: unreadable.pid, creationFileTimeUtc: '134000000000000006' };
   const dir = freshDir('job-micro');
   const recordPath = path.join(dir, 'engine-1.json');
-  fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1', pid: 971029, creationFileTimeUtc: '134364632930208358',
+  fs.writeFileSync(recordPath, fixtureJson({ schema: 'justsearch-job-run.v1', pid: 971029, creationFileTimeUtc: '134364632930208358',
     root: member, members: [member], state: 'ended', rootExitCode: 0 }));
   const result = unreadable.stop({ recordPath, host: noProcess(971029, '134364632930208358') }, { waitMs: 0,
     endedIdentities: [{ pid: member.pid, creationFileTimeUtc: '134000000000000005', birthTick: '10' }] });
@@ -1127,8 +1147,8 @@ test('a rotation that renames the current file and has not yet replaced it, at t
   const armed = await arm({ runId, pids: { backendRootPid: engine.pid } }, dataDir, [], () => {
     // A note written after the census armed, so the verdict opens the current file again; the
     // rotation renames it at that open, and its replacement does not exist yet.
-    fs.appendFileSync(current, JSON.stringify({ schemaVersion: 1, type: 'child-note', seq: 99, at: new Date().toISOString(),
-      writer: { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) }, note: 'after arming' }) + '\n');
+    fs.appendFileSync(current, fixtureJson({ schemaVersion: 1, type: 'child-note', seq: 99, at: new Date().toISOString(),
+      writer: { role: 'engine', pid: engine.pid, startedAt: engine.recordedAt ?? isoMs(engine.creationFileTimeUtc) }, note: 'after arming' }) + '\n');
     hook = atBoundary('open', current, () => fs.renameSync(current, path.join(dir, 'children.v1.1.jsonl')));
   }, { ledgerReader: ledgerLib.createIncrementalReader() });
   let result;
@@ -1162,7 +1182,7 @@ function holdOpen(file, share = 'Read') {
   };
 }
 
-test('a stop report another reader holds open is kept: archived once the reader lets go, or else left untouched beside the new report', { skip: !windows && 'Windows sharing' }, async () => {
+test('a stop report another reader holds open is kept: archived once the reader lets go, or else left untouched beside the new report', { skip: !windows && 'Windows FILE_SHARE_DELETE; Linux: atomic publication and native census carry cases' }, async () => {
   const outcomes = {};
   for (const holdMs of [650, null]) {
     const runId = `stop-census-report-held-${holdMs ?? 'held'}`;
@@ -1240,7 +1260,7 @@ test('every earlier census file is kept and named, one that cannot be read or re
   ledger.engineExit();
   const torn = Buffer.from('{"targets":[TORN');
   fs.writeFileSync(path.join(dataDir, 'exit-targets.json'), torn);
-  fs.writeFileSync(path.join(dataDir, 'process-exits.json'), JSON.stringify({ processExits: [] }));
+  fs.writeFileSync(path.join(dataDir, 'process-exits.json'), fixtureJson({ processExits: [] }));
   const result = await (await arm({ runId, pids: { backendRootPid: engine.pid } }, dataDir, [])).observer.finish();
   assert.deepEqual(result.earlierCensus, ['exit-targets.1.json', 'process-exits.1.json']);
   assert.deepEqual(result.earlierCensusFiles, [{ name: 'exit-targets.1.json', readable: false, archived: true },
@@ -1278,8 +1298,19 @@ test('every earlier census file is kept and named, one that cannot be read or re
 async function liveChild(code = 0) {
   const proc = cp.spawn(process.execPath, ['-e', `process.on('message', () => process.exit(${code})); setTimeout(() => process.exit(${code}), 120000)`],
     { stdio: ['ignore', 'ignore', 'ignore', 'ipc'], windowsHide: true });
-  const exited = new Promise((resolve) => proc.once('exit', resolve));
+  const exited = new Promise((resolve) => proc.once('exit', (code, signal) => resolve(
+    process.platform === 'linux' && signal === 'SIGKILL' ? 137 : code)));
   await new Promise((resolve) => proc.once('spawn', resolve));
+  if (process.platform === 'linux') {
+    const seen = require('./lib/process-identity.cjs').readLinuxProcess(proc.pid);
+    assert.ok(seen?.present && seen.processIdentity, 'capture the real Linux tuple before use');
+    linuxFixtureIdentities.set(proc.pid, seen.processIdentity);
+    return { pid: proc.pid, processIdentity: seen.processIdentity, recordedAt: new Date().toISOString(), exited,
+      end: async () => {
+        if (proc.exitCode === null && proc.signalCode === null) { try { proc.send('end'); } catch {} }
+        return exited;
+      } };
+  }
   const out = cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
     `[Diagnostics.Process]::GetProcessById(${proc.pid}).StartTime.ToUniversalTime().ToFileTimeUtc()`],
     { encoding: 'utf8', windowsHide: true, timeout: 60000 });
@@ -1296,7 +1327,7 @@ const sameMicrosecondNeighbour = (ft) => String(BigInt(ft) % 10n === 9n ? BigInt
 /** One more ledger line, appended as its writer would. */
 let appendedSeq = 10000;
 function appendLedger(dataDir, { family, writer, type, fields }) {
-  fs.appendFileSync(path.join(ledgerLib.ledgerDirectory(dataDir), `${family}.v1.jsonl`), JSON.stringify({ schemaVersion: 1, type,
+  fs.appendFileSync(path.join(ledgerLib.ledgerDirectory(dataDir), `${family}.v1.jsonl`), fixtureJson({ schemaVersion: 1, type,
     seq: ++appendedSeq, at: new Date().toISOString(), writer, ...fields }) + '\n');
 }
 /** The real census, with the real PowerShell observer, of the proof run's ledger in `dataDir`. */
@@ -1431,17 +1462,17 @@ async function sharedChildIdCensus(label, count, ending, childIdOnly = false, ve
   } finally { for (const k of kids) await k.end(); }
 }
 
-test('preserved from b599d4d7e: two running children under one childId, the later ended by its own exit, leave accounting incomplete', { skip: !windows && 'Windows processes' }, async () => {
+test('preserved from b599d4d7e: two running children under one childId, the later ended by its own exit, leave accounting incomplete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   assert.deepEqual(await sharedChildIdCensus('two starts, the later exits by its identity', 2, [1], false, true), []);
 });
 
-test('the real census of running children under one childId: only a start whose own exit is recorded is accounted, and each running one is named', { skip: !windows && 'Windows processes' }, async () => {
+test('the real census of running children under one childId: only a start whose own exit is recorded is accounted, and each running one is named', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   assert.deepEqual(await sharedChildIdCensus('two starts, the later exits by its identity', 2, [1]), []);
   assert.deepEqual(await sharedChildIdCensus('three starts, the middle by its identity, one exit by the childId only', 3, [1], true), []);
   assert.deepEqual(await sharedChildIdCensus('three starts, each exits by its identity', 3, [0, 1, 2]), []);
 });
 
-test('an earlier census another reader holds open is read where it is: its OS disagreement is carried through every retry, and it is listed', { skip: !windows && 'Windows sharing' }, async () => {
+test('an earlier census another reader holds open is read where it is: its OS disagreement is carried through every retry, and it is listed', { skip: !windows && 'Windows FILE_SHARE_DELETE; Linux: atomic publication and native census carry cases' }, async () => {
   // The run's Engine is a real process; it exits 7 while its ledger exit records code 0.
   const engine = await liveChild(7);
   const runId = 'stop-census-held-disagreement';
@@ -1489,7 +1520,7 @@ test('an earlier census another reader holds open is read where it is: its OS di
   heldLedger.engineStart();
   heldLedger.engineExit();
   const unreadable = path.join(heldDir, 'process-exits.json');
-  fs.writeFileSync(unreadable, JSON.stringify({ processExits: [] }));
+  fs.writeFileSync(unreadable, fixtureJson({ processExits: [] }));
   const locked = holdOpen(unreadable, 'None');
   let blind;
   try {
@@ -1512,7 +1543,7 @@ test('a reconciliation naming another owner instance than the child was spawned 
   writeLedger(dataDir, [...PROOF_TABLE.child.setup, ownerDied('GONE', { previousOwner: { ...proofOwner, instanceId: 'inst-2' },
     pid: proofChild.pid, creationFileTime: proofChild.creationFileTimeUtc })]);
   const fixture = freshProofRun(dataDir, proofEngine);
-  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), JSON.stringify({ processes: [
+  fs.writeFileSync(path.join(fixture.dir, 'stop-tracked-processes.json'), fixtureJson({ processes: [
     { ...proofChild, birthTick: '1', role: 'Engine job member' }] }));
   const looked = [];
   // The child is running: its PID names a process with its own birth.
@@ -1636,7 +1667,7 @@ async function stopAfterEarlierReport(runId, earlier, files = {}) {
   return { engine, fixture, stop: () => api.stopRun({}, io), out: await api.stopRun({}, io) };
 }
 
-test('an earlier stop report that cannot be read, or that found a disagreement, keeps every retry incomplete; one whose gap only says an exit was not yet seen does not', { skip: !windows && 'the Windows exit observer' }, async () => {
+test('an earlier stop report that cannot be read, or that found a disagreement, keeps every retry incomplete; one whose gap only says an exit was not yet seen does not', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const control = await stopAfterEarlierReport('stop-census-r6-control');
   assert.equal(control.out.exitAccountingComplete, true, `without an earlier report the stop completes: ${JSON.stringify(control.out.exitAccountingGaps)}`);
 
@@ -1661,7 +1692,7 @@ test('an earlier stop report that cannot be read, or that found a disagreement, 
   assert.equal(notYet.out.exitAccountingComplete, true, `an exit not yet seen is looked for again: ${JSON.stringify(notYet.out.exitAccountingGaps)}`);
 });
 
-test('a disagreement an earlier census found is never cleared by a later ledger receipt, and two codes for one identity are a disagreement too', { skip: !windows && 'Windows processes' }, async () => {
+test('a disagreement an earlier census found is never cleared by a later ledger receipt, and two codes for one identity are a disagreement too', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   // The run's Engine is a real process; it exits 7 while its ledger exit records code 0.
   const engine = await liveChild(7);
   const runId = 'stop-census-later-receipt';
@@ -1673,8 +1704,11 @@ test('a disagreement an earlier census found is never cleared by a later ledger 
   ledger.child('c-ended', noProcess(971049, '134364634153991105'), true);
   let prior;
   try {
-    const first = await census.startStopExitCensus(run, dataDir, dataDir, scope);
-    await engine.end();
+    const first = windows ? await census.startStopExitCensus(run, dataDir, dataDir, scope)
+      : (await arm(run, dataDir, [{ pid: engine.pid, processIdentity: engine.processIdentity,
+          exitCode: 7, atMs: null }])).observer;
+    const actualCode = await engine.end();
+    if (!windows) assert.equal(actualCode, 7, 'the parent-held native child actually exits with 7');
     ledger.engineExit();
     prior = await first.finish();
   } finally { await engine.end(); }
@@ -1682,7 +1716,7 @@ test('a disagreement an earlier census found is never cleared by a later ledger 
     `the first census finds the disagreement: ${JSON.stringify(prior.exitAccountingGaps)}`);
   // A later receipt for the same identity names the code the OS saw, from the dev runner that recorded
   // the start (round 11: an Engine record proves only from a writer bound to the start).
-  const startWriterMs = Number((BigInt(engine.creationFileTimeUtc) - EPOCH) / 10000n) - 1000;
+  const startWriterMs = (engine.processIdentity ? Date.parse(engine.recordedAt) : Number((BigInt(engine.creationFileTimeUtc) - EPOCH) / 10000n)) - 1000;
   appendLedger(dataDir, rec('engine', { role: 'dev-runner', pid: 4000, startedAt: new Date(startWriterMs).toISOString() }, 'engine-exit', {
     incarnation: { session: runId, n: 1 }, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, exitClass: 'UNEXPECTED',
     reason: null, detail: null, code: 7, codeName: null, exitedAt: new Date().toISOString(), observedAt: new Date().toISOString(),
@@ -1857,7 +1891,7 @@ function childrenLedger(dataDir, runId, engine, childWriterStartedAt = null) {
     const childId = `child-${children}`;
     const born = String(BigInt(engine.creationFileTimeUtc) + 10000n * BigInt(++children));
     const chunk = line('engine', 'child-spawn', { childId, owner, kind: 'EXTRACTION' })
-      + line('engine', 'child-start', { childId, pid: 100001 + 4 * children, creationFileTime: born,
+      + line('engine', 'child-start', { childId, pid: absentPidBase + 100001 + 4 * children, creationFileTime: born,
         executable: fixtureExecutable('C:\\fixture\\parser.exe'), contained: true })
       + line('engine', 'child-exit', { childId, exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false, exitedAt: startedAt });
     chunks.push(chunk);
@@ -1926,7 +1960,7 @@ function identityRun(tag) {
   const owner = { pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, instanceId: 'inst-1' };
   const incarnation = { session: runId, n: 1 };
   // The Engine writes as itself (its PID, its start to the millisecond); `another` is the next Engine.
-  const writer = { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) };
+  const writer = { role: 'engine', pid: engine.pid, startedAt: engine.recordedAt ?? isoMs(engine.creationFileTimeUtc) };
   const another = { role: 'engine', pid: engine.pid + 2, startedAt: isoMs(BigInt(engine.creationFileTimeUtc) + 600000000n) };
   const records = [rec('engine', by.runner, 'engine-start', { incarnation, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc,
     executable: process.execPath, processStartedAt: isoMs(engine.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
@@ -1935,6 +1969,7 @@ function identityRun(tag) {
     codeDistinctive: true })];
   const child = (type, fields, writtenBy = writer) => records.push(rec('children', writtenBy, type, fields));
   const startOf = (p, fields = {}) => child('child-start', { childId: 'c', pid: p.pid, creationFileTime: p.creationFileTimeUtc,
+    ...(p.processIdentity && p.creationFileTimeUtc !== null ? { processIdentity: p.processIdentity } : {}),
     executable: process.execPath, contained: false, ...fields });
   const exitOf = (fields = {}, writtenBy = writer) => child('child-exit', { childId: 'c', code: 0, exitClass: 'REQUESTED', reason: 'QUIT',
     forced: false, exitedAt: new Date().toISOString(), ...fields }, writtenBy);
@@ -1950,7 +1985,7 @@ async function trackedStop(r, tracked, { census: censusOf, lookup } = {}) {
   writeLedger(r.dataDir, r.records);
   const fixture = stopFixture({ runId: r.runId, dataDir: r.dataDir, engine: r.engine });
   const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
-  fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, stopTrackedProcesses: [tracked ?? []].flat()
+  fs.writeFileSync(fixture.runPath, fixtureJson({ ...run, stopTrackedProcesses: [tracked ?? []].flat()
     .map((t) => ({ role: 'job-helper', owned: false, ...t })) }));
   const lookups = [];
   const out = await api.stopRun({}, { ...fixture.io, ...(censusOf ? { census: censusOf } : {}),
@@ -2046,7 +2081,7 @@ const IDENTITY_EDGES = {
   },
 };
 for (const [name, setup] of Object.entries(IDENTITY_EDGES)) {
-  test(`round 8 identity edge ${name}: the stop looks the live child up, finds it running, and is incomplete`, { skip: !windows && 'Windows process identities' }, async () => {
+  test(`round 8 identity edge ${name}: the stop looks the live child up, finds it running, and is incomplete`, { skip: !nativeBackend && 'No native process identity backend' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(name);
@@ -2058,7 +2093,7 @@ for (const [name, setup] of Object.entries(IDENTITY_EDGES)) {
   });
 }
 
-test('round 8 identity edge tracked-other-owner: a ledger exit of the child under one owner instance does not end a tracked record naming another', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 8 identity edge tracked-other-owner: a ledger exit of the child under one owner instance does not end a tracked record naming another', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('tracked-other-owner');
@@ -2075,7 +2110,7 @@ test('round 8 identity edge tracked-other-owner: a ledger exit of the child unde
   }
 });
 
-test('round 8 runner matching: a tracked identity recorded to the tick is compared with its CIM row at the microsecond, so a live process is found running, never taken as reused', { skip: !windows && 'the CIM lookup' }, async () => {
+test('round 8 runner matching: a tracked identity recorded to the tick is compared with its CIM row at the microsecond, so a live process is found running, never taken as reused', { skip: !windows && 'Windows CIM FILETIME precision; Linux: round 9 native precision case' }, async () => {
   // The OS lookup reads the process table (CIM): a birth to the microsecond. Compared at the tracked
   // record's own tick, an exact birth that is not a whole microsecond reads as another process.
   let p = await liveChild();
@@ -2105,7 +2140,7 @@ test('round 8 edge 1, corrected on evidence: the owning Engine\'s exit naming on
   assert.equal(out.exitAccountingComplete, true, JSON.stringify(out.exitAccountingGaps));
 });
 
-test('round 8 sticky: a containment contradiction one stop observed is carried by every later stop, which stays incomplete', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 8 sticky: a containment contradiction one stop observed is carried by every later stop, which stays incomplete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   let ended = false;
   try {
@@ -2115,7 +2150,7 @@ test('round 8 sticky: a containment contradiction one stop observed is carried b
     r.exitOf({ pid: p.pid, creationFileTime: p.creationFileTimeUtc, owner: r.owner, incarnation: r.incarnation });
     // The owned-process census saw the contained child alive after its Engine's job closed.
     const scopeFile = path.join(r.dataDir, 'scope.json');
-    fs.writeFileSync(scopeFile, JSON.stringify({ atMs: Date.now(), processes: [{ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc,
+    fs.writeFileSync(scopeFile, fixtureJson({ atMs: Date.now(), processes: [{ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, ...(p.processIdentity ? { processIdentity: p.processIdentity } : {}),
       executable: process.execPath, role: 'extraction-child' }] }));
     const options = { census: (run, d, rd, _s, runtime) => census.startStopExitCensus(run, d, rd, scopeFile, runtime),
       lookup: async () => new Map() };
@@ -2126,7 +2161,7 @@ test('round 8 sticky: a containment contradiction one stop observed is carried b
     await p.end();
     ended = true;
     // The retry: the child is gone, and the census sees nothing running.
-    fs.writeFileSync(scopeFile, JSON.stringify({ processes: [] }));
+    fs.writeFileSync(scopeFile, fixtureJson({ processes: [] }));
     const second = await trackedStop(r, null, options);
     assert.ok(second.out.exitAccountingGaps.some((g) => g.reason === 'unaccounted_process' && g.pid === p.pid && g.carriedFrom
       && /contradicts recorded containment/.test(g.detail)), JSON.stringify(second.out.exitAccountingGaps));
@@ -2142,7 +2177,7 @@ test('round 8 sticky: a containment contradiction one stop observed is carried b
  * comments, never compares a PID or a birth itself, keys an identity by a PID/birth string, or reads a
  * birth's precision outside it.
  */
-test('round 8 carry: an earlier report or census that parses to no report (null, a list, a number) cannot be read: a gap names it and the stop is incomplete', { skip: !windows && 'the Windows exit observer' }, async () => {
+test('round 8 carry: an earlier report or census that parses to no report (null, a list, a number) cannot be read: a gap names it and the stop is incomplete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   for (const [label, text] of [['null', 'null'], ['list', '[]'], ['number', '7']]) {
     const report = await stopAfterEarlierReport(`stop-census-r8-${label}-report`, text);
     assert.equal(report.out.exitAccountingComplete, false, `an earlier report holding ${text}`);
@@ -2155,7 +2190,7 @@ test('round 8 carry: an earlier report or census that parses to no report (null,
   }
 });
 
-test('round 8 carry: a retry carries every kind of finding an earlier stop reported, and only an exit not yet seen or one torn last line is looked at again (round 11: one that only said an identity\'s exit was not yet seen is cleared when the retry\'s lookup finds that identity gone)', { skip: !windows && 'the Windows exit observer' }, async () => {
+test('round 8 carry: a retry carries every kind of finding an earlier stop reported, and only an exit not yet seen or one torn last line is looked at again (round 11: one that only said an identity\'s exit was not yet seen is cleared when the retry\'s lookup finds that identity gone)', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const at = (n) => ({ pid: 972100 + 4 * n, creationFileTimeUtc: String(134364634153991105n + BigInt(n) * 10000n) });
   // Round 11, the lookup fallback: the retry looks up every PID and birth the earlier report names, and
   // its lookup (absent for every PID here) proves these ended, so each is accounted, not carried.
@@ -2202,7 +2237,7 @@ test('round 8 carry: a self-exit report carries what an earlier stop of the run 
   const selfExit = async (name, earlier) => {
     const dir = path.join(scratch, 'self-exit-carry', 'runs', name);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'stop-report.json'), JSON.stringify(earlier));
+    fs.writeFileSync(path.join(dir, 'stop-report.json'), fixtureJson(earlier));
     const report = await api.writeSelfExitStopReport({ runId: name, runPath: path.join(dir, 'run.json'), run: { dataDir: null },
       backendExitCode: 0, interactive: false });
     return { report, onDisk: JSON.parse(fs.readFileSync(path.join(dir, 'stop-report.json'), 'utf8')) };
@@ -2239,7 +2274,7 @@ public class SelfBirth {
 }
 `;
 
-test('round 8 writer agreement: a real JVM\'s own startInstant is its native birth truncated to the millisecond, so its writer is its owner', { skip: !windows && 'the native birth reader' }, async () => {
+test('round 8 writer agreement: a real JVM\'s own startInstant is its native birth truncated to the millisecond, so its writer is its owner', { skip: !windows && 'Windows JVM startInstant/FILETIME equivalence; Linux: native inspector asserts no invented wall-clock birth' }, async () => {
   // The JDK the product runs on (resolve-jdk.cjs, as the dev runner launches the Engine).
   const { resolveJavaExe } = require('./lib/resolve-jdk.cjs');
   const identityLib = require('./lib/ledger-identity.cjs');
@@ -2333,10 +2368,14 @@ const appendAfterArming = (records, scopeFile = null) => async (run, dataDir, ru
   return armed;
 };
 /** A gap of `gaps` that names process `p` by its PID (and its birth, where the gap records one). */
+const sameRecordedBirth = (seen, saved) => saved.processIdentity
+  ? require('./lib/ledger-identity.cjs').compareIdentity(
+      { pid: seen.pid, processIdentity: seen.processIdentity }, { pid: saved.pid, processIdentity: saved.processIdentity }, 'same')
+  : seen.creationFileTimeUtc === saved.creationFileTimeUtc;
 const namesProcess = (gaps, p) => (gaps ?? []).some((g) => g.pid === p.pid
   && (g.creationFileTimeUtc == null || g.creationFileTimeUtc === p.creationFileTimeUtc));
 
-test('round 9 late childId: a start appended after arming under another childId, with an ended start\'s PID and birth, has no exit of its own, so the whole stop is incomplete', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 9 late childId: a start appended after arming under another childId, with an ended start\'s PID and birth, has no exit of its own, so the whole stop is incomplete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-late-childid');
@@ -2356,12 +2395,12 @@ test('round 9 late childId: a start appended after arming under another childId,
   }
 });
 
-test('round 9 late incarnation: an Engine start appended after arming under another incarnation, with an ended start\'s PID and birth, keeps the census incomplete', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 9 late incarnation: an Engine start appended after arming under another incarnation, with an ended start\'s PID and birth, keeps the census incomplete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-late-incarnation');
     const start = (n) => rec('engine', by.runner, 'engine-start', { incarnation: { ...r.incarnation, n }, pid: p.pid,
-      creationFileTime: p.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(p.creationFileTimeUtc),
+      creationFileTime: p.creationFileTimeUtc, executable: process.execPath, processStartedAt: p.processIdentity ? null : isoMs(p.creationFileTimeUtc),
       cause: 'RESTART', supervisorKind: 'dev-runner' });
     r.records.push(start(2), rec('engine', by.runner, 'engine-exit', { incarnation: { ...r.incarnation, n: 2 }, exitClass: 'REQUESTED',
       reason: 'QUIT', detail: null, code: 0, codeName: 'ok', exitedAt: null, observedAt: new Date().toISOString(),
@@ -2378,7 +2417,7 @@ test('round 9 late incarnation: an Engine start appended after arming under anot
 });
 
 for (const order of [['second-child', 'c'], ['c', 'second-child']]) {
-  test(`round 9 tracked list: two tracked records of one process under childIds ${order.join(' then ')}, one proven ended, are both kept: the unproven one is looked up and the stop is incomplete`, { skip: !windows && 'Windows process identities' }, async () => {
+  test(`round 9 tracked list: two tracked records of one process under childIds ${order.join(' then ')}, one proven ended, are both kept: the unproven one is looked up and the stop is incomplete`, { skip: !nativeBackend && 'No native process identity backend' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(`r9-two-tracked-${order[0]}`);
@@ -2412,14 +2451,16 @@ test('round 9 tracked list: records repeated whole are one; records of one PID a
   });
 });
 
-test('round 9 native precision: a tracked birth read natively is compared to the tick whatever tick it declares, so an exit of a birth one tick away never ends it', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 9 native precision: a tracked birth read natively is compared to the tick whatever tick it declares, so an exit of a birth one tick away never ends it', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-native-declared-coarse');
-    const other = { pid: p.pid, creationFileTimeUtc: String(BigInt(p.creationFileTimeUtc) + 1n) };
+    const other = p.processIdentity
+      ? { pid: p.pid, processIdentity: { ...p.processIdentity, startTicks: String(BigInt(p.processIdentity.startTicks) + 1n) } }
+      : { pid: p.pid, creationFileTimeUtc: String(BigInt(p.creationFileTimeUtc) + 1n) };
     r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
     r.startOf(other);
-    r.exitOf({ pid: other.pid, creationFileTime: other.creationFileTimeUtc, owner: r.owner });
+    r.exitOf({ pid: other.pid, ...(other.processIdentity ? { processIdentity: other.processIdentity } : {}), creationFileTime: other.creationFileTimeUtc, owner: r.owner });
     const { out, lookups } = await trackedStop(r, { ...p, creationTimeSource: 'native', birthTick: '10000' });
     assert.ok(lookups.includes(p.pid), `looked up, not ended by another birth's exit: ${JSON.stringify(out.resolvedByLedger ?? [])}`);
     assert.equal(out.outcome, 'STOP_INCOMPLETE', JSON.stringify(out.errors));
@@ -2429,15 +2470,15 @@ test('round 9 native precision: a tracked birth read natively is compared to the
   }
 });
 
-test('round 9 Engine writer: an incarnation-only exit another Engine wrote proves nothing of a live Engine start, which is looked up and keeps the stop incomplete', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 9 Engine writer: an incarnation-only exit another Engine wrote proves nothing of a live Engine start, which is looked up and keeps the stop incomplete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r9-engine-other-writer');
     const n2 = { ...r.incarnation, n: 2 };
     // The live stand-in records its own start, as an Engine does: its PID, its start to the millisecond.
-    r.records.push(rec('engine', { role: 'engine', pid: p.pid, startedAt: isoMs(p.creationFileTimeUtc) }, 'engine-start', {
+    r.records.push(rec('engine', { role: 'engine', pid: p.pid, startedAt: p.recordedAt ?? isoMs(p.creationFileTimeUtc) }, 'engine-start', {
       incarnation: n2, pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: process.execPath,
-      processStartedAt: isoMs(p.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }));
+      processStartedAt: p.processIdentity ? null : isoMs(p.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }));
     // The run's first Engine (another PID and birth) writes an exit naming only that incarnation.
     r.records.push(rec('engine', r.writer, 'engine-exit', { incarnation: n2, exitClass: 'REQUESTED', reason: 'QUIT', detail: null,
       code: 0, codeName: 'ok', exitedAt: null, observedAt: new Date().toISOString(), terminateCalledAt: null, forced: false,
@@ -2485,7 +2526,7 @@ test('round 10 Engine writer table: an incarnation-only Engine exit proves its o
   assert.deepEqual(wrong, []);
 });
 
-test('round 9 related shapes: a later note naming another owner, a second childId with a relative executable, and a job witness of an ended child\'s process each keep the census incomplete', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 9 related shapes: a later note naming another owner, a second childId with a relative executable, and a job witness of an ended child\'s process each keep the census incomplete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const shapes = {
     'later-note-conflict': (r, p) => {
       r.child('child-spawn', { childId: 'c', kind: 'EXTRACTION', owner: r.owner });
@@ -2542,15 +2583,15 @@ const R10_UNBOUND = {
     after: [['engine-exit', { role: 'dev-runner', pid: 4001 }, 10000000n]] },
 };
 for (const [name, { start, after }] of Object.entries(R10_UNBOUND)) {
-  test(`round 10 unbound supervisor (${name}): an incarnation-only exit from a writer no record binds to a live Engine start proves nothing; the Engine is looked up and the stop is incomplete`, { skip: !windows && 'Windows process identities' }, async () => {
+  test(`round 10 unbound supervisor (${name}): an incarnation-only exit from a writer no record binds to a live Engine start proves nothing; the Engine is looked up and the stop is incomplete`, { skip: !nativeBackend && 'No native process identity backend' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(`r10-unbound-${name.replace(/\W+/g, '-')}`);
-      const n2 = { ...r.incarnation, n: 2 }, startedAt = isoMs(p.creationFileTimeUtc);
+      const n2 = { ...r.incarnation, n: 2 }, startedAt = p.recordedAt ?? isoMs(p.creationFileTimeUtc);
       r.records.push(rec('engine', { ...start, startedAt }, 'engine-start', { incarnation: n2, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
         executable: process.execPath, processStartedAt: startedAt, cause: 'RESTART', supervisorKind: start.role }));
       for (const [type, writer, laterBy = 0n] of after) {
-        r.records.push(rec('engine', { ...writer, startedAt: isoMs(BigInt(p.creationFileTimeUtc) + laterBy) }, type,
+        r.records.push(rec('engine', { ...writer, startedAt: p.recordedAt ? new Date(Date.parse(p.recordedAt) + Number(laterBy / 10000n)).toISOString() : isoMs(BigInt(p.creationFileTimeUtc) + laterBy) }, type,
           type === 'engine-intent' ? r10Intent(n2) : r10Exit(n2)));
       }
       assertLiveChildFound(await trackedStop(r, { ...p, incarnation: n2 }), p, name);
@@ -2562,7 +2603,7 @@ for (const [name, { start, after }] of Object.entries(R10_UNBOUND)) {
 
 test('round 10 bound writer: the dev runner that recorded an Engine start (its role, PID and start instant) proves its incarnation-only exit, so the ended Engine is never looked up', async () => {
   const r = identityRun('r10-bound-runner');
-  const q = noProcess(974501, genFar(9)), n2 = { ...r.incarnation, n: 2 }, runner = { role: 'dev-runner', pid: 4021, startedAt: isoMs(q.creationFileTimeUtc) };
+  const q = noProcess(974501, genFar(9)), n2 = { ...r.incarnation, n: 2 }, runner = { role: 'dev-runner', pid: 4021, startedAt: q.recordedAt ?? isoMs(q.creationFileTimeUtc) };
   r.records.push(rec('engine', runner, 'engine-start', { incarnation: n2, pid: q.pid, creationFileTime: q.creationFileTimeUtc,
     executable: process.execPath, processStartedAt: isoMs(q.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }),
   rec('engine', runner, 'engine-intent', r10Intent(n2)), rec('engine', runner, 'engine-exit', r10Exit(n2)));
@@ -2575,7 +2616,7 @@ test('round 10 bound writer: the dev runner that recorded an Engine start (its r
 test('round 10 dev CLI fallback: an Engine that has gone, whose only exit record a later dev CLI stop wrote, is looked up and found gone instead of taken from that record', async () => {
   const r = identityRun('r10-cli-gone');
   const q = noProcess(974505, genFar(10)), n2 = { ...r.incarnation, n: 2 }, cli = { role: 'dev-cli', pid: 4025, startedAt: isoMs(BigInt(q.creationFileTimeUtc) + 600000000n) };
-  r.records.push(rec('engine', { role: 'dev-runner', pid: 4021, startedAt: isoMs(q.creationFileTimeUtc) }, 'engine-start', { incarnation: n2,
+  r.records.push(rec('engine', { role: 'dev-runner', pid: 4021, startedAt: q.recordedAt ?? isoMs(q.creationFileTimeUtc) }, 'engine-start', { incarnation: n2,
     pid: q.pid, creationFileTime: q.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(q.creationFileTimeUtc),
     cause: 'RESTART', supervisorKind: 'dev-runner' }), rec('engine', cli, 'engine-intent', r10Intent(n2)), rec('engine', cli, 'engine-exit', r10Exit(n2)));
   const { out, lookups } = await syntheticTrackedStop(r, { ...q, incarnation: n2 });
@@ -2586,7 +2627,7 @@ test('round 10 dev CLI fallback: an Engine that has gone, whose only exit record
 
 for (const [mode, secondOf] of [['two incarnations', (r) => ({ owner: r.owner, incarnation: { ...r.incarnation, n: 2 } })],
   ['two owners', (r) => ({ owner: { ...r.owner, instanceId: 'inst-2' }, incarnation: r.incarnation })]]) {
-  test(`round 10 whole starts (${mode}): two child-starts of one childId, PID and birth that differ in owner or incarnation are two starts, each reported with the conflict as a finding, and neither is proven`, { skip: !windows && 'Windows process identities' }, async () => {
+  test(`round 10 whole starts (${mode}): two child-starts of one childId, PID and birth that differ in owner or incarnation are two starts, each reported with the conflict as a finding, and neither is proven`, { skip: !nativeBackend && 'No native process identity backend' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(`r10-whole-${mode.replace(/\W+/g, '-')}`);
@@ -2646,19 +2687,19 @@ test('round 10 stop binding table: a stop\'s own dev CLI writer proves an incarn
   assert.deepEqual(wrong, []);
 });
 
-test('round 10 unchecked stop: a stop whose Engine identity could not be read writes nothing for it and gets no binding, so a dev CLI exit from its own PID already in the ledger proves nothing and the Engine stays unresolved', { skip: !windows && 'Windows process identities' }, async () => {
+test('round 10 unchecked stop: a stop whose Engine identity could not be read writes nothing for it and gets no binding, so a dev CLI exit from its own PID already in the ledger proves nothing and the Engine stays unresolved', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   try {
     const r = identityRun('r10-unchecked');
     const n2 = { ...r.incarnation, n: 2 }, cli = { role: 'dev-cli', pid: process.pid, startedAt: new Date().toISOString() };
-    r.records.push(rec('engine', { role: 'dev-runner', pid: 4031, startedAt: isoMs(p.creationFileTimeUtc) }, 'engine-start', { incarnation: n2,
-      pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(p.creationFileTimeUtc),
+    r.records.push(rec('engine', { role: 'dev-runner', pid: 4031, startedAt: p.recordedAt ?? isoMs(p.creationFileTimeUtc) }, 'engine-start', { incarnation: n2,
+      pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: process.execPath, processStartedAt: p.processIdentity ? null : isoMs(p.creationFileTimeUtc),
       cause: 'RESTART', supervisorKind: 'dev-runner' }), rec('engine', cli, 'engine-intent', r10Intent(n2)), rec('engine', cli, 'engine-exit', r10Exit(n2)));
     writeLedger(r.dataDir, r.records);
     const before = fs.readFileSync(path.join(ledgerLib.ledgerDirectory(r.dataDir), 'engine.v1.jsonl'), 'utf8');
     const fixture = stopFixture({ runId: r.runId, dataDir: r.dataDir, engine: p });
     const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
-    fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, incarnation: 2, control: { stopRequest: 1 } }));
+    fs.writeFileSync(fixture.runPath, fixtureJson({ ...run, incarnation: 2, control: { stopRequest: 1 } }));
     const lookups = [];
     const out = await api.stopRun({}, { ...fixture.io,
       lookupIdentities: async (ids) => { lookups.push(...ids); return new Map(ids.map((pid) => [pid, pid === p.pid
@@ -2674,12 +2715,12 @@ test('round 10 unchecked stop: a stop whose Engine identity could not be read wr
   }
 });
 
-test('round 10 real dev CLI stop: a second CLI process that checked the Engine\'s identity accounts the exit it wrote in its own stop; a later stop has no binding and looks the Engine up', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 10 real dev CLI stop: a second CLI process that checked the Engine\'s identity accounts the exit it wrote in its own stop; a later stop has no binding and looks the Engine up', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const runner = await liveChild(), engine = await liveChild();
   try {
     const runId = 'stop-census-r10-real-cli';
     const dataDir = freshDir('r10-real-cli');
-    const runnerWriter = { role: 'dev-runner', pid: runner.pid, startedAt: isoMs(runner.creationFileTimeUtc) };
+    const runnerWriter = { role: 'dev-runner', pid: runner.pid, startedAt: runner.recordedAt ?? isoMs(runner.creationFileTimeUtc) };
     writeLedger(dataDir, [rec('engine', runnerWriter, 'engine-start', { incarnation: { session: runId, n: 1 }, pid: engine.pid,
       creationFileTime: engine.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(engine.creationFileTimeUtc),
       cause: 'START', supervisorKind: 'dev-runner' }), rec('children', runnerWriter, 'child-note', { note: 'the family is present' })]);
@@ -2687,7 +2728,7 @@ test('round 10 real dev CLI stop: a second CLI process that checked the Engine\'
     fs.mkdirSync(runDir, { recursive: true });
     const runPath = path.join(runDir, 'run.json');
     const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, executable: process.execPath });
-    fs.writeFileSync(runPath, JSON.stringify({ schemaVersion: 1, runId, apiPortActual: 0, uiPortActual: 0, dataDir, incarnation: 1,
+    fs.writeFileSync(runPath, fixtureJson({ schemaVersion: 1, runId, apiPortActual: 0, uiPortActual: 0, dataDir, incarnation: 1,
       control: { stopRequest: 1 }, pids: { runnerPid: runner.pid, backendRootPid: engine.pid, frontendRootPid: null },
       identities: { runner: identity(runner), backend: identity(engine), frontend: null } }));
     const env = { ...process.env, NODE_OPTIONS: '', JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', CI: '' };
@@ -2703,7 +2744,9 @@ test('round 10 real dev CLI stop: a second CLI process that checked the Engine\'
     assert.deepEqual((first.exitAccountingGaps ?? []).filter((g) => g.pid === engine.pid), [],
       `the CLI's own stop accounts the Engine exit it wrote: ${JSON.stringify(first.exitAccountingGaps)}`);
     const row = (first.processExits ?? []).find((x) => x.role === 'engine' && x.pid === engine.pid);
-    assert.equal(row?.expectedTermination, true, JSON.stringify(first.processExits));
+    if (windows) assert.equal(row?.expectedTermination, true, JSON.stringify(first.processExits));
+    else assert.deepEqual([row?.expectedTermination, row?.ledgerClass, row?.exitCode], [false, 'UNKNOWN', null],
+      'a non-parent Linux stop cannot obtain an OS exit status; a sent signal never fabricates one');
     // A later stop, in another process (this one): no binding, so the record proves nothing and the Engine is looked up.
     const lookups = [];
     const later = await api.stopRun({}, { resolveTarget: async () => ({ run: JSON.parse(fs.readFileSync(runPath, 'utf8')), runPath }),
@@ -2770,16 +2813,16 @@ for (const [shape, recordOf] of [
   ['an exit', (p, inc) => ['engine-exit', { ...r10Exit(inc), pid: p.pid, creationFileTime: p.creationFileTimeUtc }]],
   ['a GONE reconciliation', (p, inc) => ['engine-owner-died', { incarnation: inc, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
     basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' }]]]) {
-  test(`round 11 unbound full identity (${shape}): a supervisor no record binds to a live Engine's start, naming its whole PID and birth, proves nothing: the real census stays incomplete and the stop looks the Engine up and finds it running`, { skip: !windows && 'Windows processes' }, async () => {
+  test(`round 11 unbound full identity (${shape}): a supervisor no record binds to a live Engine's start, naming its whole PID and birth, proves nothing: the real census stays incomplete and the stop looks the Engine up and finds it running`, { skip: !nativeBackend && 'No native process identity backend' }, async () => {
     const p = await liveChild();
     try {
       const r = identityRun(`r11-unbound-${shape.replace(/\W+/g, '-')}`);
       const n2 = { ...r.incarnation, n: 2 };
-      const runner = { role: 'dev-runner', pid: 4051, startedAt: isoMs(p.creationFileTimeUtc) };
+      const runner = { role: 'dev-runner', pid: 4051, startedAt: p.recordedAt ?? isoMs(p.creationFileTimeUtc) };
       const stranger = { role: 'dev-cli', pid: 4055, startedAt: new Date().toISOString() };
       const [type, fields] = recordOf(p, n2);
       r.records.push(rec('engine', runner, 'engine-start', { incarnation: n2, pid: p.pid, creationFileTime: p.creationFileTimeUtc,
-        executable: process.execPath, processStartedAt: isoMs(p.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }),
+        executable: process.execPath, processStartedAt: p.processIdentity ? null : isoMs(p.creationFileTimeUtc), cause: 'RESTART', supervisorKind: 'dev-runner' }),
       rec('engine', stranger, type, fields));
       // The children family is present, so only the live Engine can keep the census incomplete.
       r.child('child-note', { note: 'the family is present' });
@@ -2794,15 +2837,15 @@ for (const [shape, recordOf] of [
   });
 }
 
-test('round 11 crash recovery: an Engine that has gone, whose open start the next supervisor\'s real reconciliation recorded GONE from an unbound writer, is looked up by the stop, found gone and accounted: STOPPED and complete, its exit code unknown', { skip: !windows && 'Windows processes' }, async () => {
+test('round 11 crash recovery: an Engine that has gone, whose open start the next supervisor\'s real reconciliation recorded GONE from an unbound writer, is looked up by the stop, found gone and accounted: STOPPED and complete, its exit code unknown', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const p = await liveChild();
   const runId = 'stop-census-r11-crash-recovery';
   const dataDir = freshDir('r11-crash-recovery');
   const inc = { session: runId, n: 1 };
-  writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4061, startedAt: isoMs(p.creationFileTimeUtc) }, 'engine-start', {
+  writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4061, startedAt: p.recordedAt ?? isoMs(p.creationFileTimeUtc) }, 'engine-start', {
     incarnation: inc, pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: process.execPath,
-    processStartedAt: isoMs(p.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
-  rec('children', { role: 'engine', pid: p.pid, startedAt: isoMs(p.creationFileTimeUtc) }, 'child-note', { note: 'the family is present' })]);
+    processStartedAt: p.processIdentity ? null : isoMs(p.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
+  rec('children', { role: 'engine', pid: p.pid, startedAt: p.recordedAt ?? isoMs(p.creationFileTimeUtc) }, 'child-note', { note: 'the family is present' })]);
   await p.end();
   // The next supervisor (this process, its writer started now) closes what the crashed one left open.
   const written = await actuator.createEngineActuator({ dataDir, runId, policy: {}, log: () => {},
@@ -2835,12 +2878,12 @@ test('round 11 lookup rows: a crashed Engine whose PID the stop\'s lookup finds 
     const engine = noProcess(974721, genFar(15));
     const dataDir = freshDir(`r11-row-${kind.replace(/\W+/g, '-')}`);
     const inc = { session: runId, n: 1 };
-    writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4071, startedAt: isoMs(engine.creationFileTimeUtc) }, 'engine-start', {
+    writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4071, startedAt: engine.recordedAt ?? isoMs(engine.creationFileTimeUtc) }, 'engine-start', {
       incarnation: inc, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, executable: process.execPath,
       processStartedAt: isoMs(engine.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
     rec('engine', { role: 'dev-runner', pid: 4075, startedAt: new Date().toISOString() }, 'engine-owner-died', { incarnation: inc,
       pid: engine.pid, basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' }),
-    rec('children', { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) }, 'child-note', { note: 'present' })]);
+    rec('children', { role: 'engine', pid: engine.pid, startedAt: engine.recordedAt ?? isoMs(engine.creationFileTimeUtc) }, 'child-note', { note: 'present' })]);
     const fixture = stopFixture({ runId, dataDir, engine });
     try {
       const out = await api.stopRun({}, { ...fixture.io, census: standInCensus,
@@ -2860,10 +2903,10 @@ test('round 11 lookup rows: a crashed Engine whose PID the stop\'s lookup finds 
 test('round 11 census: an observation that the exact PID and birth no longer exist accounts it, its code unknown; one of the same microsecond, one older than the birth, an unreadable one or another PID\'s does not; a disagreement stays', () => {
   const runId = 'stop-census-r11-census';
   const e = { pid: 974731, creationFileTimeUtc: genFar(16) }, inc = { session: runId, n: 1 };
-  const runner = { role: 'dev-runner', pid: 4081, startedAt: isoMs(e.creationFileTimeUtc) };
+  const runner = { role: 'dev-runner', pid: 4081, startedAt: e.recordedAt ?? isoMs(e.creationFileTimeUtc) };
   const start = rec('engine', runner, 'engine-start', { incarnation: inc, pid: e.pid, creationFileTime: e.creationFileTimeUtc,
     executable: process.execPath, processStartedAt: isoMs(e.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' });
-  const note = rec('children', { role: 'engine', pid: e.pid, startedAt: isoMs(e.creationFileTimeUtc) }, 'child-note', { note: 'present' });
+  const note = rec('children', { role: 'engine', pid: e.pid, startedAt: e.recordedAt ?? isoMs(e.creationFileTimeUtc) }, 'child-note', { note: 'present' });
   const run = { runId, pids: { backendRootPid: e.pid } };
   // `armedOn`: the ledger as it was when the census armed (by default the final one).
   const judge = (records, lookupEnded, processExits = [], armedOn = records) => {
@@ -2907,19 +2950,19 @@ test('round 11 census: an observation that the exact PID and birth no longer exi
   assert.ok(disagree.exitAccountingGaps.some((g) => g.reason === 'ledger_os_disagree' && g.pid === e.pid), JSON.stringify(disagree.exitAccountingGaps));
 });
 
-test('round 11 real dev CLI stops: a second CLI process accounts the exit it wrote; a later real CLI stop, the Engine gone, keeps the earlier report and completes through its own identity-checked lookup', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 11 real dev CLI stops: a second CLI process accounts the exit it wrote; a later real CLI stop, the Engine gone, keeps the earlier report and completes through its own identity-checked lookup', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const runner = await liveChild(), engine = await liveChild();
   try {
     const runId = 'stop-census-r11-real-cli';
     const dataDir = freshDir('r11-real-cli');
-    const runnerWriter = { role: 'dev-runner', pid: runner.pid, startedAt: isoMs(runner.creationFileTimeUtc) };
+    const runnerWriter = { role: 'dev-runner', pid: runner.pid, startedAt: runner.recordedAt ?? isoMs(runner.creationFileTimeUtc) };
     writeLedger(dataDir, [rec('engine', runnerWriter, 'engine-start', { incarnation: { session: runId, n: 1 }, pid: engine.pid,
       creationFileTime: engine.creationFileTimeUtc, executable: process.execPath, processStartedAt: isoMs(engine.creationFileTimeUtc),
       cause: 'START', supervisorKind: 'dev-runner' }), rec('children', runnerWriter, 'child-note', { note: 'the family is present' })]);
     const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
     fs.mkdirSync(runDir, { recursive: true });
     const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, executable: process.execPath });
-    fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({ schemaVersion: 1, runId, apiPortActual: 0, uiPortActual: 0, dataDir,
+    fs.writeFileSync(path.join(runDir, 'run.json'), fixtureJson({ schemaVersion: 1, runId, apiPortActual: 0, uiPortActual: 0, dataDir,
       incarnation: 1, control: { stopRequest: 1 }, pids: { runnerPid: runner.pid, backendRootPid: engine.pid, frontendRootPid: null },
       identities: { runner: identity(runner), backend: identity(engine), frontend: null } }));
     const env = { ...process.env, NODE_OPTIONS: '', JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', CI: '' };
@@ -2994,12 +3037,12 @@ async function r11StopsAfterIncomplete(label, second) {
   const engine = noProcess(974731, genFar(16));
   const dataDir = freshDir(`r11-later-${label}`);
   const inc = { session: runId, n: 1 };
-  writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4081, startedAt: isoMs(engine.creationFileTimeUtc) }, 'engine-start', {
+  writeLedger(dataDir, [rec('engine', { role: 'dev-runner', pid: 4081, startedAt: engine.recordedAt ?? isoMs(engine.creationFileTimeUtc) }, 'engine-start', {
     incarnation: inc, pid: engine.pid, creationFileTime: engine.creationFileTimeUtc, executable: process.execPath,
     processStartedAt: isoMs(engine.creationFileTimeUtc), cause: 'START', supervisorKind: 'dev-runner' }),
   rec('engine', { role: 'dev-runner', pid: 4085, startedAt: new Date().toISOString() }, 'engine-owner-died', { incarnation: inc,
     pid: engine.pid, basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' }),
-  rec('children', { role: 'engine', pid: engine.pid, startedAt: isoMs(engine.creationFileTimeUtc) }, 'child-note', { note: 'present' })]);
+  rec('children', { role: 'engine', pid: engine.pid, startedAt: engine.recordedAt ?? isoMs(engine.creationFileTimeUtc) }, 'child-note', { note: 'present' })]);
   const fixture = stopFixture({ runId, dataDir, engine });
   const rows = { absent: () => ({ present: false }),
     reborn: () => ({ present: true, creationFileTime: String(BigInt(engine.creationFileTimeUtc) / 10n * 10n + 600000000n), name: 'other.exe' }),
@@ -3063,13 +3106,13 @@ async function predecessorRun(label, { childEnded }) {
   const ld = ledgerLib.ledgerDirectory(dataDir);
   fs.mkdirSync(ld, { recursive: true });
   const inc1 = { session: runId, n: 1 }, inc2 = { session: runId, n: 2 };
-  const cimOf = (b) => String(BigInt(b) / 10n * 10n);
+  const cimOf = (b) => b == null ? undefined : String(BigInt(b) / 10n * 10n);
   const owner1 = { pid: engine1.pid, creationFileTime: engine1.creationFileTimeUtc, instanceId: 'engine-one' };
-  const writer1 = { role: 'engine', pid: engine1.pid, startedAt: isoMs(engine1.creationFileTimeUtc) };
-  const supervisor = { role: 'dev-runner', pid: supervisorProcess.pid, startedAt: isoMs(supervisorProcess.creationFileTimeUtc) };
+  const writer1 = { role: 'engine', pid: engine1.pid, startedAt: engine1.recordedAt ?? isoMs(engine1.creationFileTimeUtc) };
+  const supervisor = { role: 'dev-runner', pid: supervisorProcess.pid, startedAt: supervisorProcess.recordedAt ?? isoMs(supervisorProcess.creationFileTimeUtc) };
   let seq = 0;
   const append = (family, type, writer, fields) => fs.appendFileSync(path.join(ld, `${family}.v1.jsonl`),
-    JSON.stringify({ schemaVersion: 1, type, seq: ++seq, at: new Date().toISOString(), writer, ...fields }) + '\n');
+    fixtureJson({ schemaVersion: 1, type, seq: ++seq, at: new Date().toISOString(), writer, ...fields }) + '\n');
   const engineStart = (e, inc) => append('engine', 'engine-start', supervisor, { incarnation: inc, pid: e.pid,
     creationFileTime: cimOf(e.creationFileTimeUtc), processStartedAt: isoMs(e.creationFileTimeUtc), executable: process.execPath,
     cause: inc.n === 1 ? 'INITIAL' : 'RESTART', supervisorKind: 'dev-runner' });
@@ -3084,33 +3127,33 @@ async function predecessorRun(label, { childEnded }) {
       codeName: 'SUCCESS', exitedAt: new Date().toISOString(), observedAt: new Date().toISOString(), terminateCalledAt: null,
       forced: false, phase: 'RUNNING', codeDistinctive: true, contract: { action: 'stop', exitClass: 'REQUESTED', counted: false } });
     engine2 = await liveChild();
-    const writer2 = { role: 'engine', pid: engine2.pid, startedAt: isoMs(engine2.creationFileTimeUtc) };
+    const writer2 = { role: 'engine', pid: engine2.pid, startedAt: engine2.recordedAt ?? isoMs(engine2.creationFileTimeUtc) };
     engineStart(engine2, inc2);
     append('children', 'child-survived', writer2, { childId: 'old-child', intentId: null, attempts: 1, basis: 'owner_died_alive' });
     append('children', 'stop-intent', writer2, { childId: 'old-child', intentId: 'stop-predecessor', reason: 'CRASH_RECOVERY',
       detail: null, mode: 'NOW', requestedAt: new Date().toISOString(), requestedBy: 'predecessor-fallback' });
     let childCode = null;
     if (childEnded) {
-      const ended = await actuator.terminateWithCode(child.pid, child.creationFileTimeUtc, 0x4A530001, { birthTick: 1n });
+      const ended = await actuator.terminateWithCode(child.pid, child.processIdentity ?? child.creationFileTimeUtc, 0x4A530001, { birthTick: 1n });
       assert.equal(ended.ok, true, JSON.stringify(ended));
       childCode = await child.exited;
-      assert.equal(childCode, 0x4A530001);
+      assert.equal(childCode, windows ? 0x4A530001 : 137, 'the actual backend termination status');
       // The key-only receipt PredecessorChildStop writes once the held process has exited.
       append('children', 'child-exit', writer2, { childId: 'old-child', intentId: 'stop-predecessor', exitClass: 'REQUESTED',
-        reason: 'CRASH_RECOVERY', detail: null, mode: 'NOW', code: childCode, codeName: 'JS_CHILD_STOP', codeDistinctive: true,
+        reason: 'CRASH_RECOVERY', detail: null, mode: 'NOW', code: childCode, codeName: windows ? 'JS_CHILD_STOP' : null, codeDistinctive: windows,
         exitedAt: new Date().toISOString(), observedAt: new Date().toISOString(), terminateCalledAt: new Date().toISOString(),
         terminateResult: 'OK', cooperativeAt: null, forced: true, phase: 'STOPPING' });
     }
     const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
     fs.mkdirSync(runDir, { recursive: true });
     const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: cimOf(p.creationFileTimeUtc), executable: process.execPath });
-    fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({ schemaVersion: 1, runId, dataDir, apiPortActual: 0, uiPortActual: 0,
+    fs.writeFileSync(path.join(runDir, 'run.json'), fixtureJson({ schemaVersion: 1, runId, dataDir, apiPortActual: 0, uiPortActual: 0,
       incarnation: 2, control: { stopRequest: true }, pids: { runnerPid: supervisorProcess.pid, backendRootPid: engine2.pid,
         frontendRootPid: null }, identities: { runner: identity(supervisorProcess), backend: identity(engine2) } }));
     const scopeFile = path.join(dataDir, 'scope.json');
-    fs.writeFileSync(scopeFile, JSON.stringify({ processes: [] }));
+    fs.writeFileSync(scopeFile, fixtureJson({ processes: [] }));
     fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
-    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ pid: engine2.pid, instanceId: 'engine-two',
+    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), fixtureJson({ pid: engine2.pid, instanceId: 'engine-two',
       incarnation: inc2, children: [] }));
     await supervisorProcess.end();
     const env = { ...process.env, JUSTSEARCH_EXIT_CENSUS_SCOPE: scopeFile, NODE_OPTIONS: '', JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', CI: '' };
@@ -3133,31 +3176,31 @@ async function predecessorRun(label, { childEnded }) {
   }
 }
 
-test('round 11 predecessor cleanup (the verifier\'s predecessor-cli-with-supervisor): a predecessor\'s child that the next Engine ended by identity, its key-only receipt refused as proof and its manifest entry removed, is looked up by both real CLI stops, found gone and accounted: complete', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 11 predecessor cleanup (the verifier\'s predecessor-cli-with-supervisor): a predecessor\'s child that the next Engine ended by identity, its key-only receipt refused as proof and its manifest entry removed, is looked up by both real CLI stops, found gone and accounted: complete', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const { child, first, second, childCode } = await predecessorRun('ended', { childEnded: true });
-  assert.equal(childCode, 0x4A530001, 'the child was ended by identity with JS_CHILD_STOP');
+  assert.equal(childCode, windows ? 0x4A530001 : 137, 'the child was ended by identity with the backend stop status');
   for (const [name, out] of [['first', first], ['second', second]]) {
     assert.equal(out.exitAccountingComplete, true, `the ${name} CLI stop accounts the ended child: ${JSON.stringify(out.exitAccountingGaps)}`);
     assert.equal(out.outcome, 'STOPPED', JSON.stringify(out));
-    const row = (out.processExits ?? []).find((x) => x.pid === child.pid && x.creationFileTimeUtc === child.creationFileTimeUtc);
+    const row = (out.processExits ?? []).find((x) => x.pid === child.pid && sameRecordedBirth(x, child));
     assert.equal(row?.ledgerReason, R11_LOOKUP_ENDED, JSON.stringify(out.processExits));
   }
   assert.ok((first.endedByLookup ?? []).some((x) => x.pid === child.pid), `the first stop's lookup observed the child gone: ${JSON.stringify(first.endedByLookup)}`);
 });
 
-test('round 11 predecessor cleanup, the child still alive: an unproven ledger-only identity with no manifest entry is looked up, found running and reported; neither real CLI stop is complete, and neither ends it', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 11 predecessor cleanup, the child still alive: an unproven ledger-only identity with no manifest entry is looked up, found running and reported; neither real CLI stop is complete, and neither ends it', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const { child, first, second, childAlive } = await predecessorRun('alive', { childEnded: false });
   assert.equal(childAlive, true, 'the stops never end a process they only know from the ledger');
   for (const [name, out] of [['first', first], ['second', second]]) {
     assert.notEqual(out.exitAccountingComplete, true, `the ${name} CLI stop is not complete: ${JSON.stringify(out.exitAccountingGaps)}`);
     assert.equal(out.outcome, 'STOP_INCOMPLETE', JSON.stringify(out));
-    assert.ok((out.unresolvedProcesses ?? []).some((p) => p.pid === child.pid && p.creationFileTimeUtc === child.creationFileTimeUtc),
+    assert.ok((out.unresolvedProcesses ?? []).some((p) => p.pid === child.pid && sameRecordedBirth(p, child)),
       `the ${name} stop reports the running child: ${JSON.stringify(out.unresolvedProcesses)}`);
   }
 });
 
 
-test('round 11 lookup of many PIDs: past the filter limit the real lookup reads the whole process table and answers every PID asked, a live one with its birth and the rest absent', { skip: !windows && 'the CIM lookup' }, async () => {
+test('round 11 lookup of many PIDs: past the filter limit the real lookup reads the whole process table and answers every PID asked, a live one with its birth and the rest absent', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const live = await liveChild();
   try {
     // PIDs no process holds now (Windows PIDs are multiples of 4; these are far above any in use).
@@ -3167,8 +3210,9 @@ test('round 11 lookup of many PIDs: past the filter limit the real lookup reads 
     assert.equal(rows.size, absent.length + 1);
     const row = rows.get(live.pid);
     assert.equal(row?.present, true, JSON.stringify(row));
-    assert.equal(String(BigInt(row.creationFileTime) / 10n), String(BigInt(live.creationFileTimeUtc) / 10n),
+    if (windows) assert.equal(String(BigInt(row.creationFileTime) / 10n), String(BigInt(live.creationFileTimeUtc) / 10n),
       'its birth, to the microsecond the process table reads');
+    else assert.deepEqual(row.processIdentity, live.processIdentity, 'the full Linux birth tuple');
     assert.deepEqual(absent.filter((pid) => rows.get(pid)?.present !== false), []);
   } finally {
     await live.end();
@@ -3190,10 +3234,10 @@ async function lateStartRun(label) {
   const ld = ledgerLib.ledgerDirectory(dataDir);
   fs.mkdirSync(ld, { recursive: true });
   const inc1 = { session: runId, n: 1 }, inc2 = { session: runId, n: 2 };
-  const cimOf = (b) => String(BigInt(b) / 10n * 10n);
-  const supervisor = { role: 'dev-runner', pid: supervisorProcess.pid, startedAt: isoMs(supervisorProcess.creationFileTimeUtc) };
+  const cimOf = (b) => b == null ? undefined : String(BigInt(b) / 10n * 10n);
+  const supervisor = { role: 'dev-runner', pid: supervisorProcess.pid, startedAt: supervisorProcess.recordedAt ?? isoMs(supervisorProcess.creationFileTimeUtc) };
   let seq = 0;
-  const record = (type, writer, fields) => JSON.stringify({ schemaVersion: 1, type, seq: ++seq, at: new Date().toISOString(), writer, ...fields }) + '\n';
+  const record = (type, writer, fields) => fixtureJson({ schemaVersion: 1, type, seq: ++seq, at: new Date().toISOString(), writer, ...fields }) + '\n';
   const append = (family, type, writer, fields) => fs.appendFileSync(path.join(ld, `${family}.v1.jsonl`), record(type, writer, fields));
   const engineStart = (e, inc) => append('engine', 'engine-start', supervisor, { incarnation: inc, pid: e.pid,
     creationFileTime: cimOf(e.creationFileTimeUtc), processStartedAt: isoMs(e.creationFileTimeUtc), executable: process.execPath,
@@ -3205,7 +3249,7 @@ async function lateStartRun(label) {
       codeName: 'SUCCESS', exitedAt: new Date().toISOString(), observedAt: new Date().toISOString(), terminateCalledAt: null,
       forced: false, phase: 'RUNNING', codeDistinctive: true, contract: { action: 'stop', exitClass: 'REQUESTED', counted: false } });
     engine2 = await liveChild();
-    const writer2 = { role: 'engine', pid: engine2.pid, startedAt: isoMs(engine2.creationFileTimeUtc) };
+    const writer2 = { role: 'engine', pid: engine2.pid, startedAt: engine2.recordedAt ?? isoMs(engine2.creationFileTimeUtc) };
     engineStart(engine2, inc2);
     const owner2 = { pid: engine2.pid, creationFileTime: engine2.creationFileTimeUtc, instanceId: 'engine-two' };
     append('children', 'child-spawn', writer2, { childId: 'late-child', kind: 'EXTRACTION', label: 'fixture', owner: owner2, gpu: false });
@@ -3219,11 +3263,11 @@ async function lateStartRun(label) {
     fs.writeFileSync(preload, [
       `'use strict';`,
       `const fs = require('node:fs');`,
-      `const census = require(${JSON.stringify(path.join(root, 'scripts/dev/lib/stop-exit-census.cjs'))});`,
+      `const census = require(${fixtureJson(path.join(root, 'scripts/dev/lib/stop-exit-census.cjs'))});`,
       `const armed = census.startStopExitCensus;`,
       `census.startStopExitCensus = function (...args) {`,
-      `  const done = ${JSON.stringify(pending)} + '.done';`,
-      `  if (!fs.existsSync(done)) { fs.writeFileSync(done, 'done'); fs.appendFileSync(${JSON.stringify(path.join(ld, 'children.v1.jsonl'))}, fs.readFileSync(${JSON.stringify(pending)})); }`,
+      `  const done = ${fixtureJson(pending)} + '.done';`,
+      `  if (!fs.existsSync(done)) { fs.writeFileSync(done, 'done'); fs.appendFileSync(${fixtureJson(path.join(ld, 'children.v1.jsonl'))}, fs.readFileSync(${fixtureJson(pending)})); }`,
       `  return armed.apply(this, args);`,
       `};`,
       '',
@@ -3231,13 +3275,13 @@ async function lateStartRun(label) {
     const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
     fs.mkdirSync(runDir, { recursive: true });
     const identity = (p) => ({ pid: p.pid, creationFileTimeUtc: cimOf(p.creationFileTimeUtc), executable: process.execPath });
-    fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({ schemaVersion: 1, runId, dataDir, apiPortActual: 0, uiPortActual: 0,
+    fs.writeFileSync(path.join(runDir, 'run.json'), fixtureJson({ schemaVersion: 1, runId, dataDir, apiPortActual: 0, uiPortActual: 0,
       incarnation: 2, control: { stopRequest: true }, pids: { runnerPid: supervisorProcess.pid, backendRootPid: engine2.pid,
         frontendRootPid: null }, identities: { runner: identity(supervisorProcess), backend: identity(engine2) } }));
     const scopeFile = path.join(dataDir, 'scope.json');
-    fs.writeFileSync(scopeFile, JSON.stringify({ processes: [] }));
+    fs.writeFileSync(scopeFile, fixtureJson({ processes: [] }));
     fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
-    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({ pid: engine2.pid, instanceId: 'engine-two',
+    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), fixtureJson({ pid: engine2.pid, instanceId: 'engine-two',
       incarnation: inc2, children: [] }));
     await supervisorProcess.end();
     const env = { ...process.env, JUSTSEARCH_EXIT_CENSUS_SCOPE: scopeFile, NODE_OPTIONS: `--require "${preload.replace(/\\/g, '/')}"`,
@@ -3260,7 +3304,7 @@ async function lateStartRun(label) {
   }
 }
 
-test('round 12 late start (the verifier\'s reproduce-late): a child whose start the ledger records only as the stop\'s census arms is learned by the stop\'s next ledger read, looked up, found running and reported; neither real CLI stop is STOPPED, and neither ends it', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 12 late start (the verifier\'s reproduce-late): a child whose start the ledger records only as the stop\'s census arms is learned by the stop\'s next ledger read, looked up, found running and reported; neither real CLI stop is STOPPED, and neither ends it', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const { child, first, second, childAlive, appendedAtArming } = await lateStartRun('alive');
   assert.equal(appendedAtArming, true, 'the child\'s start was written as the first stop armed its census');
   assert.equal(childAlive, true, 'the stops never end a process they only know from the ledger');
@@ -3268,7 +3312,7 @@ test('round 12 late start (the verifier\'s reproduce-late): a child whose start 
     assert.equal(report.outcome, 'STOP_INCOMPLETE', `the ${name} CLI stop is not STOPPED while the child runs: ${JSON.stringify(report.unresolvedProcesses)}`);
     assert.notEqual(status, 0, `the ${name} CLI stop does not exit 0`);
     assert.notEqual(report.exitAccountingComplete, true, `the ${name} CLI stop is not complete`);
-    assert.ok((report.unresolvedProcesses ?? []).some((p) => p.pid === child.pid && p.creationFileTimeUtc === child.creationFileTimeUtc),
+    assert.ok((report.unresolvedProcesses ?? []).some((p) => p.pid === child.pid && sameRecordedBirth(p, child)),
       `the ${name} stop reports the running child: ${JSON.stringify(report.unresolvedProcesses)}`);
     assert.ok(!(report.killedPids ?? []).includes(child.pid), `the ${name} stop never ends it`);
   }
@@ -3320,7 +3364,7 @@ const GEN_EVIDENCE_CASES = 250;
 const genOnly = process.env.STOP_CENSUS_GEN_CASE != null ? Number(process.env.STOP_CENSUS_GEN_CASE) : null;
 /** STOP_CENSUS_GEN_DUMP=<dir> writes every misjudged case of a generated check there, as JSON. */
 const genDump = (name, wrong) => {
-  if (process.env.STOP_CENSUS_GEN_DUMP) fs.writeFileSync(path.join(process.env.STOP_CENSUS_GEN_DUMP, `${name}.json`), JSON.stringify(wrong));
+  if (process.env.STOP_CENSUS_GEN_DUMP) fs.writeFileSync(path.join(process.env.STOP_CENSUS_GEN_DUMP, `${name}.json`), fixtureJson(wrong));
 };
 const GEN_BIRTH = 134364634153991105n;
 const genFar = (k) => String(GEN_BIRTH + BigInt(k) * 10000000n);
@@ -3677,7 +3721,7 @@ const standInCensus = (run, dataDir, runDir, _scope, runtime, scopeFile = scope)
       clock += ms;
       if (!finished && args && fs.existsSync(flag('-FinishFile'))) {
         finished = true;
-        fs.writeFileSync(flag('-OutputFile'), JSON.stringify({ processExits: [], gaps: [] }));
+        fs.writeFileSync(flag('-OutputFile'), fixtureJson({ processExits: [], gaps: [] }));
       }
     } });
 };
@@ -3692,7 +3736,7 @@ async function identityStop(c, dataDir) {
   try {
     const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
     // A start whose manifest entry was removed is named by no record of the stop (round 11).
-    if (c.tracked.form !== 'removed') fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, stopTrackedProcesses: [tracked] }));
+    if (c.tracked.form !== 'removed') fs.writeFileSync(fixture.runPath, fixtureJson({ ...run, stopTrackedProcesses: [tracked] }));
     const lookups = [];
     const row = c.kind === 'child' ? c.tracked.row : 'gone';
     // The lookup reads the process table (CIM): births to the microsecond.
@@ -3801,7 +3845,7 @@ test(`a stop carries forward exactly what earlier stops found, over ${GEN_EVIDEN
     const files = earlier.map((e) => {
       const n = ++numbers[e.where];
       const name = e.where === 'report' ? `stop-report.${n}.json` : `process-exits.${n}.json`;
-      fs.writeFileSync(path.join(fixture.dir, name), e.unreadable ? '{"unreadable' : JSON.stringify(e.where === 'report'
+      fs.writeFileSync(path.join(fixture.dir, name), e.unreadable ? '{"unreadable' : fixtureJson(e.where === 'report'
         ? { runId, exitAccountingComplete: false, exitAccountingGaps: e.gaps.map((g) => g.gap) }
         : { processExits: [], findings: e.gaps.map((g) => g.gap) }));
       return name;
@@ -3813,7 +3857,7 @@ test(`a stop carries forward exactly what earlier stops found, over ${GEN_EVIDEN
       : 'earlier-census-unreadable', file: files[k] }] : e.gaps.filter((g) => g.finding).map((g) => ({ reason: g.gap.reason, pid: g.gap.pid }))))];
     const scopeFile = path.join(dataDir, 'scope.json');
     for (const [k, s] of stops.entries()) {
-      fs.writeFileSync(scopeFile, JSON.stringify(s.contradiction ? { atMs: Date.now() + 60000, processes: [{ pid: kept.pid,
+      fs.writeFileSync(scopeFile, fixtureJson(s.contradiction ? { atMs: Date.now() + 60000, processes: [{ pid: kept.pid,
         creationFileTimeUtc: kept.creationFileTimeUtc, executable: fixtureExecutable('C:\\fixture\\parser.exe'), role: 'extraction-child' }] }
         : { processes: [] }));
       const out = await api.stopRun({}, { ...fixture.io,
@@ -4139,7 +4183,7 @@ async function r9Stop(c, dataDir) {
   const fixture = stopFixture({ runId: R9_RUN, dataDir, engine: { pid: R9_E0.pid, creationFileTimeUtc: R9_E0.birth } });
   try {
     const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
-    fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, stopTrackedProcesses: c.tracked }));
+    fs.writeFileSync(fixture.runPath, fixtureJson({ ...run, stopTrackedProcesses: c.tracked }));
     const lookups = new Set();
     // Each PID as the case's rows say: absent, reused by another birth, alive, or its birth unreadable.
     const out = await api.stopRun({}, { ...fixture.io, census: standInCensus,
@@ -4334,7 +4378,7 @@ async function selfMemberRun(label, { members, earlierEngine = false, other = fa
   }
 }
 
-test('round 12 clean quit: a real CLI stop of an Engine whose job witness recorded the Engine itself is STOPPED and complete; the member shares the Engine start\'s proof', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 12 clean quit: a real CLI stop of an Engine whose job witness recorded the Engine itself is STOPPED and complete; the member shares the Engine start\'s proof', { skip: !windows && 'Windows Job Object witness receipts; Linux: linux-bound-child and native census identity-edge cases' }, async () => {
   const { engine, status, report, engineAlive } = await selfMemberRun('same', {
     members: ({ engine }) => [{ witnessId: 'engine-self', pid: engine.pid, birth: engine.creationFileTimeUtc }] });
   assert.equal(engineAlive, false, 'the stop ended the Engine');
@@ -4345,7 +4389,7 @@ test('round 12 clean quit: a real CLI stop of an Engine whose job witness record
   assert.equal(row?.ledgerClass, 'REQUESTED', `the member ended as the Engine did: ${JSON.stringify(report.processExits)}`);
 });
 
-test('round 12 members without a birth go through the stop\'s lookup: the one naming the Engine\'s PID is resolved by the lookup after the stop ended the Engine; the one naming a running process is reported, never ended, and the stop is incomplete', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 12 members without a birth go through the stop\'s lookup: the one naming the Engine\'s PID is resolved by the lookup after the stop ended the Engine; the one naming a running process is reported, never ended, and the stop is incomplete', { skip: !windows && 'Windows Job Object witness receipts; Linux: linux-bound-child and native census identity-edge cases' }, async () => {
   const { engine, other, status, report, engineAlive, otherAlive } = await selfMemberRun('unborn', { other: true,
     members: ({ engine, other }) => [{ witnessId: 'engine-unborn', pid: engine.pid, birth: null },
       { witnessId: 'other-unborn', pid: other.pid, birth: null }] });
@@ -4360,7 +4404,7 @@ test('round 12 members without a birth go through the stop\'s lookup: the one na
   assert.ok(!(report.killedPids ?? []).includes(other.pid), 'never ended');
 });
 
-test('preservation (round 12): a live member under the Engine\'s PID with another birth than the recorded, ended Engine start is reported, never ended; the stop is incomplete', { skip: !windows && 'identity-checked stop' }, async () => {
+test('preservation (round 12): a live member under the Engine\'s PID with another birth than the recorded, ended Engine start is reported, never ended; the stop is incomplete', { skip: !windows && 'Windows Job Object witness receipts; Linux: linux-bound-child and native census identity-edge cases' }, async () => {
   const { engine, status, report, engineAlive } = await selfMemberRun('live-other', { earlierEngine: true,
     members: ({ engine }) => [{ witnessId: 'engine-self', pid: engine.pid, birth: engine.creationFileTimeUtc }] });
   assert.equal(engineAlive, true, 'the stop never ends a process it knows only from the ledger');
@@ -4372,7 +4416,7 @@ test('preservation (round 12): a live member under the Engine\'s PID with anothe
   assert.ok(!(report.killedPids ?? []).includes(engine.pid), 'never ended');
 });
 
-test('round 12 final check after the Engine job step: a tracked job member the job step ended is judged on a lookup taken after it, not on the one before', { skip: !windows && 'identity-checked stop' }, async () => {
+test('round 12 final check after the Engine job step: a tracked job member the job step ended is judged on a lookup taken after it, not on the one before', { skip: !nativeBackend && 'No native process identity backend' }, async () => {
   const runId = 'stop-census-r12-after-job-step';
   const engine = noProcess(970701, '134364632933610725');
   const host = noProcess(970702 + 1, '134364632930208358');
@@ -4382,11 +4426,11 @@ test('round 12 final check after the Engine job step: a tracked job member the j
     const fixture = stopFixture({ runId, dataDir, engine, engineJob: null });
     const recordPath = path.join(fixture.dir, 'engine-jobs', 'engine-1.json');
     fs.mkdirSync(path.dirname(recordPath), { recursive: true });
-    fs.writeFileSync(recordPath, JSON.stringify({ schema: 'justsearch-job-run.v1', pid: host.pid, creationFileTimeUtc: host.creationFileTimeUtc,
+    fs.writeFileSync(recordPath, fixtureJson({ schema: 'justsearch-job-run.v1', pid: host.pid, creationFileTimeUtc: host.creationFileTimeUtc,
       root: engine, members: [{ pid: member.pid, creationFileTimeUtc: member.creationFileTimeUtc }], state: 'running' }));
     const tracked = { pid: member.pid, creationFileTimeUtc: member.creationFileTimeUtc, role: 'Engine job member' };
     const run = JSON.parse(fs.readFileSync(fixture.runPath, 'utf8'));
-    fs.writeFileSync(fixture.runPath, JSON.stringify({ ...run, engineJob: { incarnation: 1, recordPath, host },
+    fs.writeFileSync(fixture.runPath, fixtureJson({ ...run, engineJob: { incarnation: 1, recordPath, host },
       stopTrackedProcesses: [tracked] }));
     // The job step ends the member (as closing the Engine's job does) and reports it ended.
     let jobStepRan = false;
@@ -4433,7 +4477,9 @@ async function lateRepairedRun(label, { subjectAlive = false } = {}) {
   successorProc.stderr.on('data', (b) => { successorErr += b; });
   const successorExited = new Promise((resolve) => successorProc.once('exit', resolve));
   await new Promise((resolve) => successorProc.once('spawn', resolve));
-  const successorBirth = String(cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+  const successorIdentity = process.platform === 'linux' ? require('./lib/process-identity.cjs').readLinuxProcess(successorProc.pid)?.processIdentity : null;
+  if (successorIdentity) linuxFixtureIdentities.set(successorProc.pid, successorIdentity);
+  const successorBirth = process.platform === 'linux' ? undefined : String(cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
     `[Diagnostics.Process]::GetProcessById(${successorProc.pid}).StartTime.ToUniversalTime().ToFileTimeUtc()`],
   { encoding: 'utf8', windowsHide: true, timeout: 60000 }).stdout).trim();
   const ends = [subject, oldEngine, oldSupervisor];
@@ -4446,41 +4492,41 @@ async function lateRepairedRun(label, { subjectAlive = false } = {}) {
     const runId = `stop-census-r13-late-repaired-${label}`, inc = { session: runId, n: 1 };
     const data = path.join(top, 'data'), ld = ledgerLib.ledgerDirectory(data);
     fs.mkdirSync(ld, { recursive: true });
-    const cim = (b) => String(BigInt(b) / 10n * 10n);
-    const oldOwner = { pid: oldEngine.pid, creationFileTime: oldEngine.creationFileTimeUtc, instanceId: 'crashed-old-engine' };
-    const oldWriter = { role: 'engine', pid: oldEngine.pid, startedAt: isoMs(oldEngine.creationFileTimeUtc) };
-    const supervisorWriter = { role: 'dev-runner', pid: oldSupervisor.pid, startedAt: isoMs(oldSupervisor.creationFileTimeUtc) };
+    const cim = (b) => b == null ? undefined : String(BigInt(b) / 10n * 10n);
+    const oldOwner = nativeFields({ pid: oldEngine.pid, creationFileTime: oldEngine.creationFileTimeUtc, instanceId: 'crashed-old-engine' });
+    const oldWriter = { role: 'engine', pid: oldEngine.pid, startedAt: oldEngine.recordedAt ?? isoMs(oldEngine.creationFileTimeUtc) };
+    const supervisorWriter = { role: 'dev-runner', pid: oldSupervisor.pid, startedAt: oldSupervisor.recordedAt ?? isoMs(oldSupervisor.creationFileTimeUtc) };
     let seq = 0;
     const row = (type, fields, writer = oldWriter) => ({ schemaVersion: 1, type, seq: ++seq, at: new Date().toISOString(), writer, ...fields });
     const ef = path.join(ld, 'engine.v1.jsonl'), cf = path.join(ld, 'children.v1.jsonl');
     const engineStart = (pid, birth, incarnation, writer) => row('engine-start', { incarnation, pid, creationFileTime: birth,
       executable: process.execPath, processStartedAt: isoMs(birth), cause: 'INITIAL', supervisorKind: 'dev-runner' }, writer);
-    fs.writeFileSync(ef, JSON.stringify(engineStart(oldEngine.pid, cim(oldEngine.creationFileTimeUtc), inc, supervisorWriter)) + '\n');
-    fs.writeFileSync(cf, JSON.stringify(row('child-spawn', { childId: 'old-child', kind: 'EXTRACTION', owner: oldOwner,
+    fs.writeFileSync(ef, fixtureJson(engineStart(oldEngine.pid, cim(oldEngine.creationFileTimeUtc), inc, supervisorWriter)) + '\n');
+    fs.writeFileSync(cf, fixtureJson(row('child-spawn', { childId: 'old-child', kind: 'EXTRACTION', owner: oldOwner,
       label: 'fixture', gpu: false })) + '\n');
     // The crash: the child's start is written whole but without its final line feed.
-    fs.appendFileSync(cf, JSON.stringify(row('child-start', { childId: 'old-child', pid: subject.pid,
+    fs.appendFileSync(cf, fixtureJson(row('child-start', { childId: 'old-child', pid: subject.pid,
       creationFileTime: subject.creationFileTimeUtc, birthTick: '1', executable: process.execPath, contained: true,
       processStartedAt: isoMs(subject.creationFileTimeUtc), argvHash: '0'.repeat(64), gpuDevice: null })));
     if (!subjectAlive) await subject.end();
     await oldEngine.end();
-    fs.appendFileSync(ef, JSON.stringify(row('engine-exit', { incarnation: inc, code: 1, exitClass: 'UNEXPECTED', reason: null,
+    fs.appendFileSync(ef, fixtureJson(row('engine-exit', { incarnation: inc, code: 1, exitClass: 'UNEXPECTED', reason: null,
       forced: false, exitedAt: new Date().toISOString(), detail: null, codeName: null, observedAt: new Date().toISOString(),
       terminateCalledAt: null, phase: 'RUNNING', codeDistinctive: true,
       contract: { action: 'stop', exitClass: 'UNEXPECTED', counted: true } }, supervisorWriter)) + '\n');
     await oldSupervisor.end();
     // The successor belongs to another run: this run's stop neither accounts nor ends it.
-    fs.appendFileSync(ef, JSON.stringify(engineStart(successorProc.pid, successorBirth, { session: `${runId}-successor`, n: 1 },
+    fs.appendFileSync(ef, fixtureJson(engineStart(successorProc.pid, successorBirth, { session: `${runId}-successor`, n: 1 },
       { role: 'dev-runner', pid: process.pid, startedAt: new Date().toISOString() })) + '\n');
     assert.ok(!census.readRunLedger(data).children.records.some((r) => r.type === 'child-start'), 'the torn start is not read');
     const runDir = path.join(process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'runs', runId);
     fs.mkdirSync(runDir, { recursive: true });
-    fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({ schemaVersion: 1, runId, dataDir: data, apiPortActual: 0,
+    fs.writeFileSync(path.join(runDir, 'run.json'), fixtureJson({ schemaVersion: 1, runId, dataDir: data, apiPortActual: 0,
       uiPortActual: 0, incarnation: 1, control: { stopRequest: true }, pids: { runnerPid: oldSupervisor.pid,
         backendRootPid: oldEngine.pid, frontendRootPid: null }, identities: { runner: { pid: oldSupervisor.pid,
         creationFileTimeUtc: cim(oldSupervisor.creationFileTimeUtc), executable: process.execPath }, backend: { pid: oldEngine.pid,
         creationFileTimeUtc: cim(oldEngine.creationFileTimeUtc), executable: process.execPath } } }));
-    successorProc.send({ root, ledgerDir: ld, startedAt: Number((BigInt(successorBirth) - EPOCH) / 10000n), oldOwner, gate, done, ready });
+    successorProc.send({ root, ledgerDir: ld, startedAt: successorIdentity ? Date.now() : Number((BigInt(successorBirth) - EPOCH) / 10000n), oldOwner, gate, done, ready });
     for (const by = Date.now() + 15000; !fs.existsSync(ready) && successorProc.exitCode === null && Date.now() < by;) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
@@ -4504,6 +4550,22 @@ fs.readFileSync = function (file, ...args) {
   }
   return value;
 };
+if (process.platform === 'linux') {
+  const c = require(path.join(process.env.R13_ROOT, 'scripts/dev/lib/stop-exit-census.cjs'));
+  const arm = c.startStopExitCensus;
+  c.startStopExitCensus = async (...args) => {
+    const observer = await arm(...args), finish = observer.finish;
+    return { ...observer, finish: (options = {}) => finish({ ...options, beforeVerdict: async (...exits) => {
+      if (options.beforeVerdict) await options.beforeVerdict(...exits);
+      if (!fired) {
+        fired = true; fs.writeFileSync(process.env.R13_GATE, 'repair after the last lookup');
+        const end = Date.now() + 10000, pause = new Int32Array(new SharedArrayBuffer(4));
+        while (!fs.existsSync(process.env.R13_DONE) && Date.now() < end) Atomics.wait(pause, 0, 0, 10);
+        if (!fs.existsSync(process.env.R13_DONE)) throw new Error('the successor did not repair the ledger');
+      }
+    } }) };
+  };
+}
 const a = require(path.join(process.env.R13_ROOT, 'scripts/dev/lib/engine-actuator.cjs'));
 const lookup = a.lookupProcessIdentities;
 a.lookupProcessIdentities = async function (...args) {
@@ -4533,7 +4595,7 @@ a.lookupProcessIdentities = async function (...args) {
   }
 }
 
-test('round 13 late-repaired start (the verifier\'s late-repaired-cli-final): a start only the census\'s final read shows, of a child already gone, is looked up once more and accounted; the real CLI stop is STOPPED and complete', { skip: !windows && 'identity-checked stop', timeout: 300000 }, async () => {
+test('round 13 late-repaired start (the verifier\'s late-repaired-cli-final): a start only the census\'s final read shows, of a child already gone, is looked up once more and accounted; the real CLI stop is STOPPED and complete', { skip: !nativeBackend && 'No native process identity backend', timeout: 300000 }, async () => {
   const run = await lateRepairedRun('gone');
   try {
     assert.ok(run.lookups().flat().includes(run.subject.pid), `the late start reaches an identity-checked lookup: ${JSON.stringify(run.lookups())}`);
@@ -4542,13 +4604,13 @@ test('round 13 late-repaired start (the verifier\'s late-repaired-cli-final): a 
     assert.equal(run.status, 0);
     assert.equal(run.report.exitAccountingComplete, true, JSON.stringify(run.report.exitAccountingGaps));
     assert.ok((run.report.endedByLookup ?? []).some((o) => o.pid === run.subject.pid
-      && o.creationFileTimeUtc === run.subject.creationFileTimeUtc), JSON.stringify(run.report.endedByLookup));
+      && sameRecordedBirth(o, run.subject)), JSON.stringify(run.report.endedByLookup));
   } finally {
     await run.cleanup();
   }
 });
 
-test('round 13 late-repaired start of a child still running: looked up once, reported by its birth, never ended; the real CLI stop is incomplete, never STOPPED and complete', { skip: !windows && 'identity-checked stop', timeout: 300000 }, async () => {
+test('round 13 late-repaired start of a child still running: looked up once, reported by its birth, never ended; the real CLI stop is incomplete, never STOPPED and complete', { skip: !nativeBackend && 'No native process identity backend', timeout: 300000 }, async () => {
   const run = await lateRepairedRun('alive', { subjectAlive: true });
   try {
     assert.equal(await run.alive(), true, 'the stop never ends a process it knows only from the ledger');
@@ -4557,14 +4619,14 @@ test('round 13 late-repaired start of a child still running: looked up once, rep
     assert.notEqual(run.status, 0);
     assert.notEqual(run.report.exitAccountingComplete, true);
     assert.ok((run.report.unresolvedProcesses ?? []).some((p) => p.pid === run.subject.pid
-      && p.creationFileTimeUtc === run.subject.creationFileTimeUtc), JSON.stringify(run.report.unresolvedProcesses));
+      && sameRecordedBirth(p, run.subject)), JSON.stringify(run.report.unresolvedProcesses));
     assert.ok(!(run.report.killedPids ?? []).includes(run.subject.pid), 'never ended');
   } finally {
     await run.cleanup();
   }
 });
 
-test('round 13 retry: the left-over exit_unproven of a late-repaired child that has since exited is resolved by the next stop\'s lookup; that real CLI stop is STOPPED and complete', { skip: !windows && 'identity-checked stop', timeout: 300000 }, async () => {
+test('round 13 retry: the left-over exit_unproven of a late-repaired child that has since exited is resolved by the next stop\'s lookup; that real CLI stop is STOPPED and complete', { skip: !nativeBackend && 'No native process identity backend', timeout: 300000 }, async () => {
   const run = await lateRepairedRun('retry', { subjectAlive: true });
   try {
     assert.equal(run.report.outcome, 'STOP_INCOMPLETE', JSON.stringify(run.report.unresolvedProcesses));

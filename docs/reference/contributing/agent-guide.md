@@ -51,9 +51,9 @@ Use the right Gradle command for the verification level you need:
 
 | Command | What runs | When to use |
 |---------|-----------|-------------|
-| `./gradlew test` | Unit tests only (`src/test/java`) | **Fast inner loop** — after every code change |
-| `./gradlew check` | Unit + integration + PMD + Spotless | **Pre-commit** — before pushing |
-| `./gradlew fullTestSuite` | Unit + integration + system (system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
+| `node scripts/lib/tool-invoker.cjs gradle test` | Unit tests only (`src/test/java`) | **Fast inner loop** — after every code change |
+| `node scripts/lib/tool-invoker.cjs gradle check` | Unit + integration + PMD + Spotless | **Pre-commit** — before pushing |
+| `node scripts/lib/tool-invoker.cjs gradle fullTestSuite` | Unit + integration + system (system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
 
 **Opt-in flags** (system-tests module only):
 
@@ -71,7 +71,7 @@ from the suite that `check` depends on, and run it from a dedicated task on an i
 
 | Command | What runs |
 |---------|-----------|
-| `./gradlew :modules:app-services:loadSensitiveTest` | the `load-sensitive` latency gates, thresholds unchanged |
+| `node scripts/lib/tool-invoker.cjs gradle :modules:app-services:loadSensitiveTest` | the `load-sensitive` latency gates, thresholds unchanged |
 
 There is **no perf-ratchet CI lane** today, so these tasks are manual by construction: wiring one
 into hosted CI would reproduce the flake there instead of here. If a perf lane is ever added, wire
@@ -106,7 +106,7 @@ Path and dependency rules:
 
 - Model/native path environment variables used for Java or ONNX launches should be absolute
 - After changing Gradle dependencies or telemetry/exporter coordinates, regenerate lockfiles before handoff:
-  `./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks`
+  `node scripts/lib/tool-invoker.cjs gradle --no-configuration-cache resolveAndLockAll --write-locks`
 
 ### 3.3. Pre-commit Verification
 
@@ -114,7 +114,7 @@ Before pushing changes, run the local gate to ensure code quality passes:
 
 ```powershell
 # Heavy verification
-./gradlew check --no-configuration-cache
+node scripts/lib/tool-invoker.cjs gradle check --no-configuration-cache
 
 # Pre-merge checks (run individually when their subjects change — see
 # docs/reference/contributing/pre-merge-checks.md for the canonical list)
@@ -148,7 +148,7 @@ working directory, and an unresolvable ref makes PMD analyse **zero files while 
 success**. `scripts/ci/check-pmd-ruleset-sync.mjs` therefore enforces that each derived ruleset is
 the authority minus its declared, description-justified subtraction, and that no ref is a file path.
 
-Run everything with `./gradlew.bat pmdAll` (root aggregate over all 93 PMD tasks); CI runs the same
+Run everything with `node scripts/lib/tool-invoker.cjs gradle pmdAll` (root aggregate over all 93 PMD tasks); CI runs the same
 task in the required `Build (no model blobs)` job, measured at 188 s there. Running it instead on
 `Unit tests (platform-contracts)` was tried and measured worse (201 s, and that lane over its
 advisory budget) — `pmdAll` compiles every source set of every module either way, so the placement
@@ -209,7 +209,7 @@ Only use an empty catch when the exception is genuinely expected and silence is 
 **Dependency Analysis (DAGP):**
 
 ```bash
-./gradlew buildHealth  # Full dependency analysis
+node scripts/lib/tool-invoker.cjs gradle buildHealth  # Full dependency analysis
 ```
 
 Detects unused dependencies, wrong configurations (api vs implementation), and used-but-undeclared transitive dependencies. Report at `build/reports/dependency-analysis/build-health-report.txt`.
@@ -231,13 +231,13 @@ CI and the local gate both run `resolveAndLockAll --write-locks` then `git diff 
 Regenerate lockfiles after changing versions in `libs.versions.toml`, adding/removing dependencies, or changing plugin versions:
 
 ```bash
-./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks
+node scripts/lib/tool-invoker.cjs gradle --no-configuration-cache resolveAndLockAll --write-locks
 ```
 
 **Unreferenced Code Detection (ArchUnit):**
 
 ```bash
-./gradlew :modules:app-launcher:test --tests "*UnreferencedCodeTest*"
+node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:test --tests "*UnreferencedCodeTest*"
 ```
 
 Detects unreferenced private methods across the codebase using bytecode analysis. Known false positives (FFM callbacks, test infrastructure) are frozen in `archunit_store/`.
@@ -270,10 +270,10 @@ Records in `app-api` that have **>10 positional parameters** and are **construct
 
 1. Add the field to the record parameter list.
 2. If collection type, add null-coalescing in compact constructor (e.g., `myList = myList == null ? List.of() : List.copyOf(myList)`).
-3. Compile: `./gradlew.bat :modules:app-api:compileJava` -- the builder regenerates automatically.
+3. Compile: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:compileJava` -- the builder regenerates automatically.
 4. Update production construction site (e.g., `KnowledgeHttpApiAdapter`) to pass the new field.
 5. If part of API contract, update the controller (`KnowledgeSearchController`) -- the controller uses a manual HashMap build, NOT direct record serialization. Adding a field to the record does NOT change API output unless the controller is also updated.
-6. Regenerate schemas and fixtures: `./gradlew.bat :modules:app-api:updateSchemas`
+6. Regenerate schemas and fixtures: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:updateSchemas`
 7. If the record is part of `/api/status` or `/api/knowledge/search`, also update the Zod schema in `modules/ui-web/src/api/schemas.ts` and the TypeScript type in `stores/systemTypes.ts` (for status) or `api/domains/search.ts` (for search). Zod schemas use `.loose()` -- new fields pass validation without being declared, so contract tests alone won't catch a missing Zod field.
 8. Run frontend contract tests: `cd modules/ui-web && npm run test:unit:run`
 9. Note: v1 contract files (`status-v1.json`, `knowledge-status-v1.json`, `debug-state-v1.json`) are intentionally manual -- only update on breaking changes (field removal/rename), not field additions.
@@ -286,6 +286,12 @@ Records in `app-api` that have **>10 positional parameters** and are **construct
 # From repo root
 $env:JUSTSEARCH_API_PORT = "33221" # pick a deterministic base port (dev-all will try near this)
 npm --prefix ./modules/ui-web run dev:all
+```
+
+On Linux (Bash), from the same repository root:
+
+```sh
+JUSTSEARCH_API_PORT=33221 npm --prefix ./modules/ui-web run dev:all
 ```
 
 #### 3.4.2 Deterministic readiness checks
@@ -454,20 +460,20 @@ pull-request `GITHUB_TOKEN` cannot read branch-protection settings.
 **Test failure:**
 
 - Symptom: `dorny/test-reporter` Check Run shows failing test names with line numbers.
-- Reproduce: `./gradlew.bat :modules:<m>:test --tests "*FailingTest"`
+- Reproduce: `node scripts/lib/tool-invoker.cjs gradle :modules:<m>:test --tests "*FailingTest"`
 - Fix: Read the failing test, fix the code or test expectation, re-run.
 
 **PMD violation:**
 
-- Symptom: `./gradlew check` fails with "PMD rule violations found".
+- Symptom: `node scripts/lib/tool-invoker.cjs gradle check` fails with "PMD rule violations found".
 - Reproduce: Check `build/reports/pmd/main.xml` under the failing module for `file:line:rule` detail.
 - Fix: Fix the flagged code pattern. See §3.3 for intentionally excluded rules and accepted patterns.
 
 **Spotless formatting:**
 
-- Symptom: `./gradlew check` fails with "Spotless violations found".
-- Reproduce: `./gradlew.bat spotlessCheck`
-- Fix: Run `./gradlew.bat spotlessApply`, then re-stage the changed files.
+- Symptom: `node scripts/lib/tool-invoker.cjs gradle check` fails with "Spotless violations found".
+- Reproduce: `node scripts/lib/tool-invoker.cjs gradle spotlessCheck`
+- Fix: Run `node scripts/lib/tool-invoker.cjs gradle spotlessApply`, then re-stage the changed files.
 
 **Docs lint (markdownlint):**
 
@@ -505,10 +511,10 @@ When you've changed a specific module, you don't need to test everything:
 
 ```powershell
 # Build + test the changed module and everything that depends on it
-./gradlew :modules:adapters-lucene:buildDependents
+node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:buildDependents
 
 # Build + test only the changed module (faster, but won't catch breaks in dependents)
-./gradlew :modules:adapters-lucene:build
+node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:build
 ```
 
 Rule of thumb:

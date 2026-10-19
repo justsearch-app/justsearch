@@ -943,6 +943,18 @@ Start-Process powershell -WindowStyle Hidden -ArgumentList @(
 )
 ```
 
+On Linux, from `scripts/jseval` with the supported Python environment activated,
+start a separate session and redirect all terminal handles:
+
+```sh
+mkdir -p tmp
+setsid sh -c 'python -m jseval run --dataset scifact --output-dir tmp/run1; status=$?; printf "%s\n" "$status" > tmp/run1.done' > tmp/run1.launch.log 2>&1 < /dev/null &
+```
+
+`setsid` is provided by util-linux. The Python process remains the owner of its
+bound backend runner for the duration of the campaign; use jseval's own cleanup
+rather than signalling a PID copied from a log.
+
 Then wait on the `tmp/run1.done` marker with the `Monitor` tool, and read results
 from the run's `--output-dir` (`tmp/run1`) — do **not** parse the process's
 redirected stdout/stderr: PowerShell 5.1 writes those UTF-16 and wraps stderr
@@ -1085,16 +1097,19 @@ ambiguous assignments, or order mismatches fail the projection instead of produc
 - **Query execution**: Runs queries, computes nDCG@10/P@1/R@10
 - **Result comparison**: A/B diff with per-query rank analysis and
   pipeline timing comparison
-- **Backend lifecycle**: `--start-backend` starts runHeadlessEval,
-  `--clean` wipes the whole data dir, auto-stops via taskkill on
-  completion. `--clean` is **fail-closed** (tempdoc 711 item 4) and,
-  since tempdoc 716, **unconditional**: every durable jseval artifact is
+- **Backend lifecycle**: `--start-backend` builds `:modules:ui:installDist` through
+  `node scripts/lib/tool-invoker.cjs gradle`, then starts the installed Engine through
+  a persistent Node runner. The runner uses the same shared eval defaults as `runHeadlessEval`.
+  Python requests ordered shutdown and retires registration only after the runner confirms cleanup.
+  On Linux, the native helper binds Python → runner → Engine lifetimes; owner death ends them.
+  `--clean` wipes the whole data dir and is **fail-closed** (tempdoc 711 item 4).
+  Since tempdoc 716 it is **unconditional**: every durable jseval artifact is
   filed under the jseval data root (`scripts/jseval/tmp/`), never inside the
   backend data dir, so nothing in the backend dir is protected from the wipe.
   The Engine is one JVM; extraction may launch a bounded child JVM. The fail-closed wipe verifies the
   data directory is empty and checks the registered dev-runner owner before retrying a failed deletion.
   A survivor remains a hard error naming the process owner rather than allowing a run against a dirty
-  data directory. This also runs on stop_backend() after every --start-backend run.
+  data directory.
 
   `--llm` with this eval-backend entry point is rejected: its read-only
   settings discard the runtime activation intent. Inference-capable measurement uses the owned
@@ -1121,7 +1136,7 @@ ambiguous assignments, or order mismatches fail the projection instead of produc
 | `--pipeline` | Wait for ALL enrichments (implies `--embedding --splade`) |
 | `--embedding` | Wait for embedding coverage ≥ 99.9% |
 | `--splade` | Wait for SPLADE coverage ≥ 99.9% |
-| `--start-backend` | Start runHeadlessEval, stop when done |
+| `--start-backend` | Build and launch the installed eval Engine, stop when done |
 | `--llm` | Rejected with `--start-backend`: eval settings are read-only; use the owned full-inference dev-stack recipe |
 | `--clean` | Clean data dir before start (requires `--start-backend`); fail-closed and raises if the registered Engine process owner or a survivor prevents a complete wipe.
 | `--reset` | Reset index via API before ingestion (eval mode, no restart) |

@@ -37,6 +37,17 @@ final class PredecessorChildStop {
   }
 
   boolean stop(Path dataDir, ManagedChild child) throws IOException {
+    boolean linux = terminator instanceof LinuxProcessTerminator;
+    if (linux) {
+      if (child.processIdentity() == null) return false; // Legacy precision never authorizes a Linux kill.
+      if (LinuxProcessIdentity.currentBootId().filter(child.processIdentity().bootId()::equals).isEmpty()) return false;
+      var observed = LinuxProcessIdentity.observe(child.pid());
+      if (observed.presence() == ProcessTerminator.IdentityPresence.UNKNOWN) return false;
+      if (observed.presence() == ProcessTerminator.IdentityPresence.PRESENT
+          && (observed.identity().filter(child.processIdentity()::equals).isEmpty()
+              || observed.executable().map(Path::of).map(ManagedChild::normalizePath)
+                  .filter(child.executable()::equals).isEmpty())) return false;
+    }
     List<LedgerRecord> records;
     try {
       records = ExitLedgerReader.read(LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records();
@@ -49,7 +60,9 @@ final class PredecessorChildStop {
       if (!child.executable().equals(ManagedChild.normalizePath(
           Path.of(r.text("executable").orElse(""))))) continue;
       Optional<String> birth = r.text("creationFileTime");
-      boolean sameStart = birth.isPresent()
+      boolean sameStart = linux
+          ? LinuxProcessIdentity.fromJson(r.field("processIdentity")).filter(child.processIdentity()::equals).isPresent()
+          : birth.isPresent()
           ? Long.parseLong(birth.get()) / 10_000L - 11_644_473_600_000L
               == Instant.parse(child.startedAt()).toEpochMilli()
           : r.text("processStartedAt").map(Instant::parse)
@@ -61,6 +74,8 @@ final class PredecessorChildStop {
     LedgerRecord start = matches.isEmpty() ? null : matches.getFirst();
     String childId = start == null ? "fallback-" + child.id() : start.text("childId").orElseThrow();
     Optional<ProcessHandle> live = ProcessHandle.of(child.pid()).filter(ProcessHandle::isAlive);
+    if (linux && live.isEmpty()
+        && LinuxProcessIdentity.observe(child.pid()).presence() != ProcessTerminator.IdentityPresence.GONE) return false;
     if (records.stream().anyMatch(r -> (r.type() == LedgerRecordType.CHILD_EXIT
         || (r.type() == LedgerRecordType.OWNER_DIED && r.text("exitClass").filter("UNKNOWN"::equals).isEmpty()))
         && r.text("childId").filter(childId::equals).isPresent())) return live.isEmpty();
@@ -68,13 +83,17 @@ final class PredecessorChildStop {
     ProcessTerminator.OsProcess os = null;
     if (live.isPresent()) {
       try {
-        os = terminator.open(live.get());
+        os = linux
+            ? terminator.open(live.get(), child.processIdentity()) : terminator.open(live.get());
       } catch (IOException unavailable) {
         if (live.get().isAlive()) throw unavailable;
         // It ended between the identity check and OpenProcess. No code or exit time is known.
       }
       // The held native handle, not CIM or the manifest's rounded time, authorizes the kill.
-      if (os != null && !matchesHeldIdentity(child, start, os)) {
+      if (os != null && !(linux
+          ? os.processIdentity().filter(child.processIdentity()::equals).isPresent()
+              && os.executable().map(Path::of).map(ManagedChild::normalizePath).filter(child.executable()::equals).isPresent()
+          : matchesHeldIdentity(child, start, os))) {
         os.close();
         return false;
       }
@@ -82,14 +101,19 @@ final class PredecessorChildStop {
     try {
       if (start == null) {
         // Legacy manifest-only children get their own cleanup identity; never forge an old spawn.
+        Object recordedOwner = owner;
+        if (linux) recordedOwner = fields("pid", owner.pid(), "creationFileTime", owner.creationFileTime(),
+            "instanceId", owner.instanceId(), "processIdentity", LinuxProcessIdentity.read(owner.pid()));
         sink.append(LedgerRecordType.CHILD_SPAWN, fields("childId", childId, "kind", child.kind(),
-            "label", "predecessor-fallback", "owner", owner, "gpu", false));
-        sink.append(LedgerRecordType.CHILD_START, fields("childId", childId, "pid", child.pid(),
+            "label", "predecessor-fallback", "owner", recordedOwner, "gpu", false));
+        Map<String, Object> startFields = fields("childId", childId, "pid", child.pid(),
             "processStartedAt", Instant.parse(child.startedAt()), "creationFileTime",
             os == null ? Optional.empty() : os.creationFileTime(), "executable", child.executable(),
             "argvHash", child.realizedArgvHash() != null && child.realizedArgvHash().matches("[0-9a-f]{64}")
                 ? child.realizedArgvHash() : DefaultChildControl.argvHash(List.of(child.executable())), "contained", false,
-            "gpuDevice", null));
+            "gpuDevice", null);
+        if (linux) startFields.put("processIdentity", child.processIdentity());
+        sink.append(LedgerRecordType.CHILD_START, startFields);
       }
       String intentId = "s-" + UUID.randomUUID();
       sink.append(LedgerRecordType.STOP_INTENT, fields("childId", childId, "intentId", intentId,

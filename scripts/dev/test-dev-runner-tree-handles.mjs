@@ -18,16 +18,17 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const script = path.join(here, 'lib/terminate-process.ps1');
 const quote = s => `'${String(s).replaceAll("'", "''")}'`;
 const owned = [];
-const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const alive = pid => { if (process.platform === 'linux') return require('./lib/process-identity.cjs').readLinuxProcess(pid)?.present !== false; try { process.kill(pid, 0); return true; } catch { return false; } };
 async function sleeper() {
   const child = spawn(process.execPath, ['-e', 'setTimeout(()=>{},60000)'], { stdio: 'ignore' });
   const row = (await actuator.lookupProcessIdentities([child.pid]))?.get(child.pid);
-  assert.ok(row?.creationFileTime, 'a spawned target must have its birth recorded before testing');
-  const identity = { pid: child.pid, birth: row.creationFileTime };
+  assert.ok(row?.creationFileTime || row?.processIdentity, 'a spawned target must have its birth recorded before testing');
+  const identity = { pid: child.pid, birth: row.processIdentity ?? row.creationFileTime };
   owned.push(identity);
   return identity;
 }
 function tree(root, rows, snapshots = null, extra = '') {
+  if (process.platform === 'linux') return actuator.terminateWithCodeSync(root.pid, root.birth, 1);
   const json = Buffer.from(JSON.stringify(snapshots ?? [rows])).toString('base64');
   const command = `$global:scan=0; function Get-CimInstance { $tables = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${json}')) | ConvertFrom-Json; $rows=$tables[[Math]::Min($global:scan,$tables.Count-1)]; $global:scan++; foreach ($r in $rows) { [pscustomobject]@{ ProcessId=$r.pid; ParentProcessId=$r.parent; CreationDate=$(if($r.birth){[DateTime]::FromFileTimeUtc([long]$r.birth)}else{$null}) } } }; & ${quote(script)} -Pid ${root.pid} -CreationFileTimeUtc ${root.birth} -Code 1${extra}; exit $LASTEXITCODE`;
   const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command],
@@ -39,7 +40,7 @@ const row = (child, parent) => ({ pid: child.pid, parent: parent.pid, birth: chi
 const tests = [
   ['real handle refuses a frontend PID whose birth no longer matches', async () => {
     const root = await sleeper();
-    const result = await actuator.terminateWithCode(root.pid, String(BigInt(root.birth) - 100000000n), 1);
+    const result = await actuator.terminateWithCode(root.pid, (process.platform === 'linux' ? { ...root.birth, startTicks: String(BigInt(root.birth.startTicks) - 1n) } : String(BigInt(root.birth) - 100000000n)), 1);
     assert.equal(result.outcome, 'mismatch');
     assert.equal(alive(root.pid), true, 'the replacement survives');
   }],
@@ -55,6 +56,13 @@ const tests = [
   }],
   ['the real handle has no tree mode', async () => {
     const root = await sleeper(), child = await sleeper();
+    if (process.platform === 'linux') {
+      const helper = require('./lib/process-identity.cjs').boundExecPath();
+      const result = spawnSync(helper, ['signal', String(root.pid), root.birth.bootId, root.birth.startTicks, 'SIGKILL', '-Tree'], { encoding: 'utf8' });
+      assert.notEqual(result.status, 0, 'a tree request is refused, not silently honoured');
+      assert.match(result.stderr, /invalid signal arguments/);
+      assert.equal(alive(root.pid), true); assert.equal(alive(child.pid), true); return;
+    }
     const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script,
       '-Pid', String(root.pid), '-CreationFileTimeUtc', root.birth, '-Code', '1', '-Tree'], { encoding: 'utf8', windowsHide: true });
     assert.notEqual(result.status, 0, 'a tree request is refused, not silently honoured');
@@ -62,14 +70,14 @@ const tests = [
     assert.equal(alive(root.pid), true, 'a refused request ends nothing');
     assert.equal(alive(child.pid), true);
   }],
-  ['frontend identity stop on real Windows handles ends the recorded frontend and nothing it did not record', async () => {
+  ['frontend identity stop on real native handles ends the recorded frontend and nothing it did not record', async () => {
     const parent = await sleeper(), unrecorded = await sleeper();
     const state = fs.mkdtempSync(path.join(os.tmpdir(), 'identity-stop-'));
     process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = state;
     const { stopRun } = require('./dev-runner.cjs').__test;
     const runId = 'run-identity-real', runPath = path.join(state, 'run.json'), activePath = path.join(state, 'active.json');
     const run = { runId, pids: { frontendRootPid: parent.pid },
-      identities: { frontend: { pid: parent.pid, creationFileTimeUtc: parent.birth } } };
+      identities: { frontend: process.platform === 'linux' ? { pid: parent.pid, processIdentity: parent.birth } : { pid: parent.pid, creationFileTimeUtc: parent.birth } } };
     fs.writeFileSync(runPath, JSON.stringify(run));
     fs.writeFileSync(activePath, JSON.stringify({ runId }));
     const requests = [];
@@ -124,12 +132,15 @@ const tests = [
   ]),
 ];
 
-if (process.platform !== 'win32') {
+if (!['win32', 'linux'].includes(process.platform)) {
   console.log('tree-handles: Windows-only (not executed)');
 } else {
-  let failed = 0;
+  let failed = 0, skipped = 0;
   try {
     for (const [name, run] of tests) {
+      if (process.platform === 'linux' && (name.startsWith('legacy cleanup') || name.startsWith('ai/') || name.startsWith('bench/'))) {
+        console.log(`SKIP ${name}: Windows PowerShell cleanup entry point; Linux: test-dev-runner-stop-ownership and stop-round4`); skipped++; continue;
+      }
       try { await run(); console.log(`PASS ${name}`); }
       catch (error) { failed++; console.error(`FAIL ${name}: ${error.stack}`); }
     }
@@ -137,6 +148,6 @@ if (process.platform !== 'win32') {
     // Cleanup uses the spawn-time identity through the same real OS handle, never a PID alone.
     for (const child of owned) await actuator.terminateWithCode(child.pid, child.birth, 1);
   }
-  console.log(`tree-handles: ${tests.length - failed}/${tests.length} passed`);
+  console.log(`tree-handles: ${tests.length - failed - skipped}/${tests.length - skipped} passed, ${skipped} skipped`);
   process.exitCode = failed ? 1 : 0;
 }

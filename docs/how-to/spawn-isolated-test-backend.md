@@ -110,7 +110,7 @@ logs are dumped to stderr only on startup failure.
 To verify lite mode works without spawning a fixture:
 
 ```bash
-JUSTSEARCH_LITE_MODE=true ./gradlew.bat :modules:ui:runHeadless
+JUSTSEARCH_LITE_MODE=true node scripts/lib/tool-invoker.cjs gradle :modules:ui:runHeadless
 ```
 
 Expected: backend starts within ~10s (vs. 15-25s with full AI init).

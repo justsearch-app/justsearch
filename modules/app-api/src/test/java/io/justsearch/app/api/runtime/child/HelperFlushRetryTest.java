@@ -8,8 +8,8 @@ import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,8 +22,8 @@ import io.justsearch.app.api.runtime.ledger.LedgerFamily;
 import io.justsearch.app.api.runtime.ledger.LedgerWriterId;
 
 /** Task b6d536 b101, verifier round 2: records remain pending when the disk force fails and need another group force. */
-@Tag("windows")
-@EnabledOnOs(value = OS.WINDOWS, disabledReason = "DOS read-only must make the real ledger force fail")
+@EnabledOnOs({OS.WINDOWS, OS.LINUX})
+@Tag("cross-platform")
 final class HelperFlushRetryTest {
   @Test void failedGroupForceRetainsPendingRecordsForTheNextFlush(@TempDir Path dir) throws Exception {
     var recorder = OwnedHelper.class.getDeclaredField("recorder");
@@ -40,14 +40,30 @@ final class HelperFlushRetryTest {
         @Override public boolean flush() {
           int attempt = forces.incrementAndGet();
           Path file = LedgerFamily.CHILDREN.current(dir);
+          java.util.Set<java.nio.file.attribute.PosixFilePermission> permissions = null;
           try {
-            if (attempt == 1) Files.setAttribute(file, "dos:readonly", true);
+            if (io.justsearch.configuration.PlatformPaths.isLinux()) permissions = Files.getPosixFilePermissions(file);
+            if (attempt == 1) {
+              if (permissions == null) Files.setAttribute(file, "dos:readonly", true);
+              else {
+                var readOnly = java.util.EnumSet.copyOf(permissions);
+                readOnly.removeAll(java.util.Set.of(java.nio.file.attribute.PosixFilePermission.OWNER_WRITE,
+                    java.nio.file.attribute.PosixFilePermission.GROUP_WRITE,
+                    java.nio.file.attribute.PosixFilePermission.OTHERS_WRITE));
+                Files.setPosixFilePermissions(file, readOnly);
+              }
+            }
             boolean success = actual.flush();
             System.out.println("actual FileChannel.force attempt=" + attempt + " success=" + success);
             if (attempt == 1) assertTrue(!success, "readonly native ledger caused the intended flush failure");
             return success;
           } catch (java.io.IOException problem) { throw new RuntimeException(problem); }
-          finally { try { Files.setAttribute(file, "dos:readonly", false); } catch (java.io.IOException problem) { throw new RuntimeException(problem); } }
+          finally {
+            try {
+              if (permissions == null) Files.setAttribute(file, "dos:readonly", false);
+              else Files.setPosixFilePermissions(file, permissions);
+            } catch (java.io.IOException problem) { throw new RuntimeException(problem); }
+          }
         }
       }, new EngineIdentity(ProcessHandle.current().pid(),
           ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()), "flush-retry"));

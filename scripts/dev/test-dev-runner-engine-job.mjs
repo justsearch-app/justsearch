@@ -13,6 +13,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
+import { pathToFileURL } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
@@ -38,12 +39,13 @@ const api = runnerModule.exports.__test;
 const { identityExecutable } = require('./lib/test-fixture-processes.cjs');
 const tests = [], owned = [], decoys = [];
 const test = (name, fn, prerequisite = null) => tests.push([name, fn, prerequisite]);
-const testWindows = (name, fn) => test(name, fn, 'Windows job objects and process creation identities');
+const testWindows = (name, fn) => test(name, fn, 'Windows Job Object API/witness; Linux counterpart: test-linux-child-lifetime.mjs and native registered-helper case in this file');
+const nativeIdentity = require('./lib/process-identity.cjs');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const read = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const birthOf = pid => spawnSync(identityExecutable(), [String(pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim();
 const sameBirth = (a, b) => /^\d+$/.test(String(a)) && /^\d+$/.test(String(b)) && BigInt(a) / 10n === BigInt(b) / 10n;
-const lists = (list, p) => (list ?? []).some(q => Number(q.pid) === p.pid && sameBirth(q.creationFileTimeUtc, p.creationFileTimeUtc));
+const lists = (list, p) => (list ?? []).some(q => Number(q.pid) === p.pid && (process.platform === 'linux' && p.processIdentity ? require('./lib/ledger-identity.cjs').compareIdentity(q, p, 'same') === true : sameBirth(q.creationFileTimeUtc, p.creationFileTimeUtc)));
 
 /** Identities still running: the same PID with the same birth (microsecond), read in one lookup. */
 async function stillRunning(identities, waitMs = 5000) {
@@ -51,7 +53,7 @@ async function stillRunning(identities, waitMs = 5000) {
   for (;;) {
     const rows = await actuator.lookupProcessIdentities(identities.map(p => p.pid));
     assert.ok(rows, 'the process table must be readable');
-    const alive = identities.filter(p => { const row = rows.get(p.pid); return row?.present && sameBirth(row.creationFileTime, p.creationFileTimeUtc); });
+    const alive = identities.filter(p => { const row = rows.get(p.pid); return row?.present && (process.platform === 'linux' ? require('./lib/ledger-identity.cjs').compareIdentity({pid:p.pid,...row}, p, 'same') === true : sameBirth(row.creationFileTime, p.creationFileTimeUtc)); });
     if (!alive.length || Date.now() > end) return alive;
     await sleep(100);
   }
@@ -131,24 +133,25 @@ testWindows('dev-runner stop: a detached process the Engine started is ended by 
 const REGISTERING_ENGINE = (identityExe, fakeEngine, out) => `const fs=require('fs'),cp=require('child_process'),path=require('path');
 const manifest=path.join(process.env.JUSTSEARCH_DATA_DIR,'runtime','manifest.json');
 const helper=cp.spawn(process.execPath,['-e','setInterval(()=>{},60000)'],{detached:true,stdio:'ignore',windowsHide:true});helper.unref();
-const birth=cp.spawnSync(${JSON.stringify(identityExe)},[String(helper.pid)],{encoding:'utf8',windowsHide:true}).stdout.trim();
-const startedAt=new Date(Number(BigInt(birth)/10000n-11644473600000n)).toISOString();
-const child={id:'fixture-helper',kind:'llama-server',pid:helper.pid,executable:process.execPath,startedAt};
-fs.writeFileSync(${JSON.stringify(out)},JSON.stringify({pid:helper.pid,creationFileTimeUtc:birth}));
+const native=process.platform==='linux'?require(${JSON.stringify(path.join(repo,'scripts/dev/lib/process-identity.cjs'))}).readLinuxProcess(helper.pid):null;
+const birth=native?null:cp.spawnSync(${JSON.stringify(identityExe)},[String(helper.pid)],{encoding:'utf8',windowsHide:true}).stdout.trim();
+const startedAt=native?null:new Date(Number(BigInt(birth)/10000n-11644473600000n)).toISOString();
+const child={id:'fixture-helper',kind:'llama-server',pid:helper.pid,executable:process.execPath,startedAt,...(native?{processIdentity:native.processIdentity}:{})};
+fs.writeFileSync(${JSON.stringify(out)},JSON.stringify({pid:helper.pid,...(native?{processIdentity:native.processIdentity}:{creationFileTimeUtc:birth})}));
 let last=null;
 const write=m=>{fs.writeFileSync(manifest+'.tmp',JSON.stringify(m));fs.renameSync(manifest+'.tmp',manifest)};
 setInterval(()=>{try{const m=JSON.parse(fs.readFileSync(manifest,'utf8'));if(!m.children){m.children=[child];write(m)}last=m}catch{}},50);
 const exit=process.exit.bind(process);
 process.exit=code=>{if(last)try{write({...last,children:[child]})}catch{};exit(code)};
-import(${JSON.stringify('file:///' + fakeEngine.replaceAll('\\', '/'))});`;
+import(${JSON.stringify(pathToFileURL(fakeEngine).href)});`;
 
-testWindows('dev-runner stop: a helper registered with the Engine is ended by the registered-helper step, before the job, and reported as such', async () => {
+test('dev-runner stop: a helper registered with the Engine is ended by the registered-helper step, before the job, and reported as such', async () => {
   const state = path.join(root, 'registered'); fs.mkdirSync(state, { recursive: true });
   const plan = path.join(state, 'plan.json');
   fs.writeFileSync(plan, JSON.stringify({ incarnations: [{ mode: 'honour' }] }));
   const helperFile = path.join(state, 'helper.json');
   const wrapper = path.join(state, 'registering-engine.cjs');
-  fs.writeFileSync(wrapper, REGISTERING_ENGINE(identityExecutable(), path.join(repo, 'scripts/supervisor-conformance/fake-engine.mjs'), helperFile));
+  fs.writeFileSync(wrapper, REGISTERING_ENGINE(process.platform === 'win32' ? identityExecutable() : null, path.join(repo, 'scripts/supervisor-conformance/fake-engine.mjs'), helperFile));
   const data = path.join(dataRoot, 'registered');
   const env = { ...process.env, NODE_OPTIONS: '', JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state, JUSTSEARCH_SUPERVISOR_HARNESS: '1',
     JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', JUSTSEARCH_FAKE_ENGINE_PLAN: plan, CI: '',
@@ -307,8 +310,11 @@ try {
   }
 } finally {
   // Only identities this harness recorded, each by its own birth.
-  for (const p of owned) if (p?.pid && /^\d+$/.test(String(p.creationFileTimeUtc))) {
-    spawnSync(identityExecutable(), [String(p.pid), String(p.creationFileTimeUtc)], { windowsHide: true });
+  for (const p of owned) {
+    if (p?.processIdentity) nativeIdentity.signalLinuxProcess(p.processIdentity, 'SIGKILL');
+    else if (p?.pid && /^\d+$/.test(String(p.creationFileTimeUtc))) {
+      spawnSync(identityExecutable(), [String(p.pid), String(p.creationFileTimeUtc)], { windowsHide: true });
+    }
   }
   for (const decoy of decoys) if (decoy.exitCode === null) decoy.kill();
   fs.rmSync(root, { recursive: true, force: true });

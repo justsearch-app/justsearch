@@ -48,6 +48,8 @@ struct HostInner {
     discovery: Discovery,
     spawn_error: Option<String>,
     latest_record: Option<StateRecord>,
+    #[cfg(target_os = "linux")]
+    exit_signal: Option<i32>,
     last_tooltip: Option<String>,
 }
 
@@ -65,6 +67,8 @@ impl Default for HostInner {
             discovery: Discovery::AwaitingSuccessor { predecessor: None },
             spawn_error: None,
             latest_record: None,
+            #[cfg(target_os = "linux")]
+            exit_signal: None,
             last_tooltip: None,
         }
     }
@@ -190,6 +194,8 @@ impl EngineHost {
             Err(error) => return Err(format!("spawn java failed: {error}")),
         };
         *self.exit_observed.0.lock().unwrap() = None;
+        #[cfg(target_os = "linux")]
+        { inner.exit_signal = None; }
         let pid = child.id();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -385,11 +391,28 @@ impl EngineHost {
     pub(crate) fn try_reap(&self) -> Option<i32> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
         let status = inner.child.as_mut()?.child.try_wait().ok()??;
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            inner.exit_signal = status.signal();
+        }
         let owned = inner.child.take().expect("the child was just observed");
         let predecessor = inner.binding.instance_id.clone();
         inner.discovery = Discovery::AwaitingSuccessor { predecessor };
         Self::end_owned(&mut inner, owned);
+        // Negative signals are an internal policy observation, never persisted as program codes.
+        #[cfg(target_os = "linux")]
+        return status.code().or_else(|| {
+            use std::os::unix::process::ExitStatusExt;
+            status.signal().map(|signal| -signal)
+        });
+        #[cfg(not(target_os = "linux"))]
         Some(status.code().unwrap_or(1))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn exit_signal(&self) -> Option<i32> {
+        self.inner.lock().expect("engine host mutex poisoned").exit_signal
     }
 
     fn end_owned(inner: &mut HostInner, owned: OwnedChild) -> Child {
@@ -908,7 +931,7 @@ mod tests {
             c.args(["-n", "30", "127.0.0.1"]);
             c
         } else {
-            let mut c = Command::new("sleep");
+            let mut c = crate::containment::engine_command("sleep").unwrap();
             c.arg("30");
             c
         };
@@ -2218,10 +2241,16 @@ mod hold_api_tests {
     #[test]
     fn hold_api_preserves_live_engine_supervision() {
         let host = Arc::new(EngineHost::default());
-        let mut command = Command::new("ping.exe");
-        command
-            .args(["-n", "60", "127.0.0.1"])
-            .stdout(std::process::Stdio::null());
+        let mut command = if cfg!(windows) {
+            let mut command = Command::new("ping.exe");
+            command.args(["-n", "60", "127.0.0.1"]);
+            command
+        } else {
+            let mut command = crate::containment::engine_command("sleep").unwrap();
+            command.arg("60");
+            command
+        };
+        command.stdout(std::process::Stdio::null());
         host.admit(PreparedCommand { command }).unwrap();
         let running = Arc::new(AtomicBool::new(true));
         let actor_host = host.clone();

@@ -36,6 +36,49 @@ final class ExitLedgerWriterTest {
   @TempDir Path dataDir;
 
   @Test
+  void currentWriterCarriesNativeIdentityWithoutChangingLegacyWriterRecords() throws Exception {
+    var current = LedgerWriterId.currentProcess(LedgerWriterId.Role.ENGINE, NOW);
+    Path dir = LedgerFamily.directory(dataDir);
+    var writer = ExitLedgerWriter.rotating(dir, LedgerFamily.CHILDREN, current, CLOCK);
+    assertTrue(writer.append(LedgerRecordType.CHILD_NOTE, Map.of("childId", "native-writer")));
+    var json = tools.jackson.databind.json.JsonMapper.builder().build()
+        .readTree(Files.readString(LedgerFamily.CHILDREN.current(dir)));
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) {
+      assertTrue(json.path("writer").path("processIdentity").isObject(),
+          "Linux writer authority must retain the native birth, never compare ticks to wall time");
+      assertEquals("linux-proc-v1", json.path("writer").path("processIdentity").path("kind").asString());
+      assertEquals(ProcessHandle.current().pid(), json.path("writer").path("processIdentity").path("pid").longValue());
+      assertEquals(Files.readString(Path.of("/proc/sys/kernel/random/boot_id")).strip(),
+          json.path("writer").path("processIdentity").path("bootId").asString());
+    } else assertEquals(3, json.path("writer").size(), "existing Windows writer fields stay exact");
+    assertEquals(current, ExitLedgerReader.read(dir, LedgerFamily.CHILDREN).records().getFirst().writer());
+    var legacy = new LedgerWriterId(LedgerWriterId.Role.ENGINE, ProcessHandle.current().pid(), NOW);
+    Path old = Files.createDirectory(dataDir.resolve("legacy"));
+    assertTrue(ExitLedgerWriter.rotating(old, LedgerFamily.CHILDREN, legacy, CLOCK)
+        .append(LedgerRecordType.CHILD_NOTE, Map.of("childId", "legacy-writer")));
+    assertEquals(legacy, ExitLedgerReader.read(old, LedgerFamily.CHILDREN).records().getFirst().writer(),
+        "reading a legacy writer never assigns it the current occupant's native identity");
+  }
+
+  @Test
+  void malformedNativeWriterIdentityCannotBecomeLegacyAuthority() throws Exception {
+    Path dir = LedgerFamily.directory(dataDir);
+    var writer = ExitLedgerWriter.rotating(dir, LedgerFamily.CHILDREN, ENGINE, CLOCK);
+    assertTrue(writer.append(LedgerRecordType.CHILD_NOTE, Map.of("childId", "native-writer")));
+    String line = Files.readString(LedgerFamily.CHILDREN.current(dir));
+    var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+    for (String nativePid : List.of("18446744073709551617", "999999999999999999999999")) {
+      var node = (tools.jackson.databind.node.ObjectNode) mapper.readTree(line);
+      ((tools.jackson.databind.node.ObjectNode) node.path("writer")).set("processIdentity", mapper.readTree(
+          "{\"kind\":\"linux-proc-v1\",\"pid\":" + nativePid
+              + ",\"bootId\":\"11111111-2222-4333-8444-555555555555\",\"startTicks\":\"1\"}"));
+      Files.writeString(LedgerFamily.CHILDREN.current(dir), mapper.writeValueAsString(node) + "\n");
+      assertTrue(ExitLedgerReader.read(dir, LedgerFamily.CHILDREN).records().isEmpty(),
+          "an overflowing native PID is damaged evidence, not a legacy writer");
+    }
+  }
+
+  @Test
   void persistenceFailureWarnsOnceAndRecoveryIsReported() throws Exception {
     Path dir = LedgerFamily.directory(dataDir);
     Files.createDirectories(dir);

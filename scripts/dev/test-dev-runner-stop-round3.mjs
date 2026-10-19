@@ -130,15 +130,17 @@ windowsTest('real default CLI start refuses forgotten live processes without cle
   fs.writeFileSync(path.join(data, '.justsearch-dev-data.json'), JSON.stringify({ schema: 'justsearch-dev-data.v1', tool: 'dev-runner', createdAt: new Date().toISOString() }));
   function launch(args, env = process.env) {
     const child = spawn(process.execPath, args, { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    const birth = spawnSync(identityExe, [String(child.pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim();
-    assert.match(birth, /^\d+$/, 'fixture birth is recorded at spawn');
-    children.push({ child, birth }); return { child, birth };
+    const native = child.recordedIdentity;
+    const birth = windows ? spawnSync(identityExe, [String(child.pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim() : null;
+    if (windows) assert.match(birth, /^\d+$/, 'fixture birth is recorded at spawn');
+    else assert.equal(native.processIdentity.kind, 'linux-proc-v1');
+    children.push({ child, birth }); return { child, birth, native };
   }
   try {
     const runner = launch(['-e', 'setInterval(()=>{},60000)']);
     const engine = launch(['-e', 'setInterval(()=>{},60000)']);
-    const leftBehind = [{ pid: runner.child.pid, role: 'runner', name: 'runner.exe', creationFileTimeUtc: runner.birth },
-      { pid: engine.child.pid, role: 'backend', name: 'Engine.exe', creationFileTimeUtc: engine.birth }];
+    const leftBehind = [{ pid: runner.child.pid, role: 'runner', name: 'runner.exe', creationFileTimeUtc: runner.birth, ...(runner.native?.processIdentity ? { processIdentity: runner.native.processIdentity } : {}) },
+      { pid: engine.child.pid, role: 'backend', name: 'Engine.exe', creationFileTimeUtc: engine.birth, ...(engine.native?.processIdentity ? { processIdentity: engine.native.processIdentity } : {}) }];
     fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ runId, holder: owner, pids: {}, identities: {}, dataDir: data }));
     fs.writeFileSync(path.join(dir, 'forgotten-unresolved.json'), JSON.stringify({ leftBehind }));
     const env = { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state, JUSTSEARCH_SUPERVISOR_HARNESS: '1',
@@ -229,9 +231,11 @@ windowsTest('real Windows identity lookup reads two spawn-recorded roots in one 
     for (let i = 0; i < 2; i++) {
       const child = spawn(process.execPath, ['-e', 'setTimeout(()=>{},60000)'], { stdio: 'ignore', windowsHide: true });
       children.push(child);
-      const birth = spawnSync(identityExe, [String(child.pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim();
-      assert.match(birth, /^\d+$/, 'fixture birth is recorded at spawn');
-      roots.push({ pid: child.pid, creationFileTimeUtc: birth });
+      if (windows) {
+        const birth = spawnSync(identityExe, [String(child.pid)], { encoding: 'utf8', windowsHide: true }).stdout.trim();
+        assert.match(birth, /^\d+$/, 'fixture birth is recorded at spawn');
+        roots.push({ pid: child.pid, creationFileTimeUtc: birth });
+      } else roots.push(child.recordedIdentity);
     }
     let invocations = 0;
     const { execFile } = require('node:child_process');
@@ -240,9 +244,10 @@ windowsTest('real Windows identity lookup reads two spawn-recorded roots in one 
     for (const p of roots) {
       const row = rows?.get(p.pid);
       assert.equal(row?.present, true, 'a real lookup sees both living roots');
-      assert.equal(BigInt(row.creationFileTime) / 10n, BigInt(p.creationFileTimeUtc) / 10n, 'each recorded birth matches at the rule\'s microsecond');
+      if (windows) assert.equal(BigInt(row.creationFileTime) / 10n, BigInt(p.creationFileTimeUtc) / 10n, 'each recorded birth matches at the rule\'s microsecond');
+      else assert.deepEqual(row.processIdentity, p.processIdentity, 'the full Linux birth tuple agrees');
     }
-    assert.equal(invocations, 1, 'all roots share a single PowerShell process');
+    assert.equal(invocations, windows ? 1 : 0, 'Windows uses one PowerShell process; Linux reads the requested native tuples directly');
   } finally {
     // ChildProcess.kill is guarded by the birth recorded at spawn, through the same native handle.
     for (const child of children) child.kill();
@@ -250,7 +255,7 @@ windowsTest('real Windows identity lookup reads two spawn-recorded roots in one 
 });
 let failed = 0, skipped = 0;
 try { for (const [name, fn, requiresWindows] of tests) {
-  if (requiresWindows && !windows) {
+  if (requiresWindows && !windows && process.platform !== 'linux') {
     skipped++; console.log('SKIP ' + name + ': requires native Windows process creation identities'); continue;
   }
   try { await fn(); console.log('PASS ' + name); }
