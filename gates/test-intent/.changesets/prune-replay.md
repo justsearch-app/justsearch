@@ -14,7 +14,11 @@ gates/test-intent/evidence/prune-replay-before-compat.patch: a FileMutationFence
 fair lock the loop already used and records nothing, an IndexingLoop accessor returning null, a
 replay context that ignores the publisher, and a promotion overload that ignores the prune stop
 point; none of the repaired behaviour). Preservation checks carry the same before run and pass on
-both.
+both. The three late-rename checks (a rename admitted during a prune's last pass) carry
+their own assertion fail-before, on 1aa135724 (run-evidence.mjs --before 1aa135724, no patch): that
+commit has the prune's last pass but not the rename's check, inside the fence, that its destination
+is not confirmed absent, so the rename moves the rows to the deleted file. On b8eb9217e they could
+fail only on their precondition, because that code has no last pass.
 
 Which fence each replay path takes (RP1, RP1p). Promotion: Green's producer, the services under the
 final mutation fence (KnowledgeServer, prepareSwitchReplayForPromotion with current.ingestService()).
@@ -54,7 +58,7 @@ run-evidence.mjs. No acceptance is recorded by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "With the indexing loop's real JobBatchWriter held inside the file-mutation fence (after the file's parent, or before its first row) and the file then deleted: a promotion replay, a best-effort replay, a replayed normal SYNC_ROOT and a replayed forced SYNC_ROOT in the promotion all leave 0 committed rows (parent and chunks) of the file once the writer finishes; so does a best-effort replay raced by a VDU result replacing chunks, and a normal sync or direct prune whose scan ran before the file's first row. The promotion keeps its PRUNE_PREFIX or SYNC_ROOT receipt under its generation; a best-effort drain removes it. A replayed prune of a folder replaced at the added path, or of a folder with no recorded volume, removes nothing (3 rows kept) and its PRUNE_PREFIX stays buffered. The harness accepts a stop point at a replayed prune's first removal, only with a self-exit; stopping there leaves the committed index with all rows of the file and every receipt, the retry removes the deleted file and keeps the live one, and finishing the promotion removes only the replayed receipts, not another generation's. A file recreated after the replayed prune committed its removal is queued for indexing before the drain acknowledges the prune. A rename held inside the fence that moves a file's parent and chunks from outside the root into it, to a destination deleted before the prune's scan, leaves 0 committed rows at the destination once the rename finishes, on a normal sync, a direct prune and a best-effort replay (whose PRUNE_PREFIX is then removed); so does such a rename whose move fails with an I/O error after writing its rows, on a normal sync and a best-effort replay (the rename reports its failure). A rename admitted while a normal sync, a direct prune or a best-effort replay holds the fence for its last pass, from a file in another added root to a destination deleted while it waits, moves no row: once it holds the fence both paths are confirmed absent, so it leaves 0 committed rows at either path and reports the rename settled. A buffered VDU_UPDATE replayed by a best-effort drain, held at its first chunk after reading its parent, with the file then deleted and a normal sync or direct prune run, leaves 0 committed rows of the file: the replayed result writes inside the live Worker's fence, so the prune runs after it.",
+      "behaviour": "With the indexing loop's real JobBatchWriter held inside the file-mutation fence (after the file's parent, or before its first row) and the file then deleted: a promotion replay, a best-effort replay, a replayed normal SYNC_ROOT and a replayed forced SYNC_ROOT in the promotion all leave 0 committed rows (parent and chunks) of the file once the writer finishes; so does a best-effort replay raced by a VDU result replacing chunks, and a normal sync or direct prune whose scan ran before the file's first row. The promotion keeps its PRUNE_PREFIX or SYNC_ROOT receipt under its generation; a best-effort drain removes it. A replayed prune of a folder with no recorded volume, or, within a running session, of a folder replaced at the added path, removes nothing (3 rows kept) and its PRUNE_PREFIX stays buffered. The harness accepts a stop point at a replayed prune's first removal, only with a self-exit; stopping there leaves the committed index with all rows of the file and every receipt, the retry removes the deleted file and keeps the live one, and finishing the promotion removes only the replayed receipts, not another generation's. A file recreated after the replayed prune committed its removal is queued for indexing before the drain acknowledges the prune. A rename held inside the fence that moves a file's parent and chunks from outside the root into it, to a destination deleted before the prune's scan, leaves 0 committed rows at the destination once the rename finishes, on a normal sync, a direct prune and a best-effort replay (whose PRUNE_PREFIX is then removed); so does such a rename whose move fails with an I/O error after writing its rows, on a normal sync and a best-effort replay (the rename reports its failure). A buffered VDU_UPDATE replayed by a best-effort drain, held at its first chunk after reading its parent, with the file then deleted and a normal sync or direct prune run, leaves 0 committed rows of the file: the replayed result writes inside the live Worker's fence, so the prune runs after it.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -124,12 +128,39 @@ run-evidence.mjs. No acceptance is recorded by the builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aReplayedPruneRemovesAFileWhoseRowsARenameMovesInAfterItsScan",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aSyncRemovesTheRowsOfARenameWhoseMoveFailsAfterWriting",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aReplayedPruneRemovesTheRowsOfARenameWhoseMoveFailsAfterWriting",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringASyncsLastPassMovesNoRowToADeletedFile",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringAPrunesLastPassMovesNoRowToADeletedFile",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringAReplayedPrunesLastPassMovesNoRowToADeletedFile",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aSyncRemovesEveryChunkOfAReplayedVduResultForADeletedFile",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aPruneRemovesEveryChunkOfAReplayedVduResultForADeletedFile",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/MigrationTransitionBarrierTest.java#pruneReplayCutRequiresAnInstalledHarnessSelfExit"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A rename admitted while a normal sync, a direct prune or a best-effort replay holds the fence for its last pass, from a file in another added root to a destination deleted while it waits, moves no row: once it holds the fence both paths are confirmed absent, so it leaves 0 committed rows at either path and reports the rename settled.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-24fb14",
+          "scenario": "RP3",
+          "quote": "A writer passes its stale check and pauses before its first publication, the file is deleted, and the prune's scan finds no rows. When the writer resumes, the file ends with zero rows after the writer finishes, either because the writer refuses or because the prune removes them. This holds on the normal sync path as well as on replay.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-24fb14",
+          "scenario": "RP10",
+          "quote": "Saved state: Lucene parent and chunk contents, the switch buffer's generation, revision and order, and accepted queue revisions are all as expected after each repair case.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/prune-replay-rename.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringASyncsLastPassMovesNoRowToADeletedFile",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringAPrunesLastPassMovesNoRowToADeletedFile",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringAReplayedPrunesLastPassMovesNoRowToADeletedFile"
       ]
     },
     {
