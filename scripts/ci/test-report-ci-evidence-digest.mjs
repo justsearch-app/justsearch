@@ -389,3 +389,16 @@ console.log('test-report-ci-evidence-digest: PASS');
   assert.ok(report.warnings.some((w) => w.includes('windows-native-node-attempt-2')));
   assert.ok(report.jobs.find((j) => j.name === ui.name).factLane.required);
 }
+
+// Hosted CP5: GitHub gives unchanged parts the current workflow attempt number
+// while retaining their original execution timestamps and artifacts.
+{
+  const unchanged = { ...job('Unit tests (app-ui-services)', 'success', 1, 4), run_attempt: 3 };
+  const old = { name: 'unit-test-attribution-app-ui-services-attempt-1', created_at: unchanged.completed_at };
+  const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [unchanged] }, artifactsDoc: { artifacts: [old] } });
+  assert.equal(report.unitAttribution[0].artifactPresent, true);
+  assert.equal(report.partEvidence[0].attempt, 1);
+  const rerun = { ...unchanged, started_at: '2026-07-01T01:00:00Z', completed_at: '2026-07-01T01:04:00Z' };
+  const missing = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [rerun] }, artifactsDoc: { artifacts: [old] } });
+  assert.equal(missing.unitAttribution[0].artifactPresent, false);
+}

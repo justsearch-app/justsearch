@@ -28,6 +28,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+import { selectJobArtifact } from './lib/ci-artifact-attempts.mjs';
 import { resolveGhBin } from '../dev/run-gh.mjs';
 
 const KIND = 'justsearch-flake-trend.v1';
@@ -219,16 +220,13 @@ export function ensureRunRecord(ghBin, repo, run, laneMap, cacheDir) {
   for (const [laneName, { artifact, file }] of Object.entries(laneMap)) {
     const scratchDir = path.join(cacheDir, '_scratch', String(run.id), laneName);
     const job = jobs.find((j) => j.name === `Unit tests (${laneName})`);
-    const candidates = artifacts.filter((a) => !a.expired && (a.name === artifact
-      || (a.name.startsWith(`${artifact}-attempt-`) && (job?.run_attempt && a.name === `${artifact}-attempt-${job.run_attempt}`))));
-    candidates.sort((a, b) => Number(b.name.split('-attempt-')[1] || 0) - Number(a.name.split('-attempt-')[1] || 0));
-    const selected = candidates[0]?.name || artifact;
-    const json = downloadAndReadJson(ghBin, repo, run.id, selected, file, scratchDir);
+    const selected = job ? selectJobArtifact(artifacts, artifact, job) : null;
+    const json = selected ? downloadAndReadJson(ghBin, repo, run.id, selected.name, file, scratchDir) : null;
     fs.rmSync(scratchDir, { recursive: true, force: true });
     if (json && Array.isArray(json.flakyTests)) {
-      lanes[laneName] = { hasData: true, artifact: selected, runAttempt: job?.run_attempt || null, flakyTests: json.flakyTests };
+      lanes[laneName] = { hasData: true, artifact: selected?.name || null, runAttempt: selected ? Number(selected.name.split('-attempt-')[1] || job?.run_attempt || 1) : null, flakyTests: json.flakyTests };
     } else {
-      lanes[laneName] = { hasData: false, artifact: selected, runAttempt: job?.run_attempt || null, flakyTests: null };
+      lanes[laneName] = { hasData: false, artifact: selected?.name || null, runAttempt: selected ? Number(selected.name.split('-attempt-')[1] || job?.run_attempt || 1) : null, flakyTests: null };
     }
   }
 

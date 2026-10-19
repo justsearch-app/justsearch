@@ -226,3 +226,24 @@ console.log('test-report-ci-walltime-attribution: PASS');
     assert.equal(walltime.readSuiteTimes(root, [{ name: 'Unit tests (app-ui-ui)', run_attempt: 3 }])['app-ui-ui'], undefined);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
+
+// An unchanged job cloned by GitHub retains its execution interval, while the
+// API's run_attempt advances. Correlate generated evidence with that interval.
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-cloned-job-'));
+  try {
+    for (const [attempt, minute, seconds] of [[1, '01', 100], [3, '11', 300]]) {
+      const dir = path.join(root, `unit-test-attribution-app-ui-ui-attempt-${attempt}`);
+      fs.mkdirSync(dir);
+      fs.writeFileSync(path.join(dir, 'unit-test-attribution.json'), JSON.stringify({
+        lane: 'app-ui-ui', generatedAt: `2026-07-01T00:${minute}:00Z`, totals: { timeSeconds: seconds },
+      }));
+    }
+    const unchanged = job('Unit tests (app-ui-ui)', '2026-07-01T00:00:00Z', '2026-07-01T00:02:00Z', [], { run_attempt: 3 });
+    assert.equal(walltime.readSuiteTimes(root, [unchanged])['app-ui-ui'], 100);
+    const rerun = { ...unchanged, started_at: '2026-07-01T00:10:00Z', completed_at: '2026-07-01T00:12:00Z' };
+    assert.equal(walltime.readSuiteTimes(root, [rerun])['app-ui-ui'], 300);
+    const missing = { ...rerun, started_at: '2026-07-01T00:20:00Z', completed_at: '2026-07-01T00:22:00Z' };
+    assert.equal(walltime.readSuiteTimes(root, [missing])['app-ui-ui'], undefined);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+}
