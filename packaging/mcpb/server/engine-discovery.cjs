@@ -43,6 +43,17 @@ const PROBE_TIMEOUT_MS = 2000;
  */
 const STARTUP_WAIT_MS = 30000;
 const STARTUP_RETRY_MS = 1000;
+const STARTUP_WAIT_ENV = 'JUSTSEARCH_DISCOVERY_STARTUP_WAIT_MS';
+
+/**
+ * The startup wait both clients use: STARTUP_WAIT_MS, unless JUSTSEARCH_DISCOVERY_STARTUP_WAIT_MS
+ * holds a whole number of milliseconds. That variable is a test seam (so tests need not sit
+ * through the real bound) and is read only here.
+ */
+function startupWaitMs(env = process.env) {
+  const raw = String(env[STARTUP_WAIT_ENV] ?? '').trim();
+  return /^\d+$/.test(raw) ? Number(raw) : STARTUP_WAIT_MS;
+}
 const PROBE_MAX_BYTES = 64 * 1024;
 const OS_QUERY_TIMEOUT_MS = 10000;
 
@@ -313,7 +324,7 @@ function readManifest(candidate) {
  * startupWaitMs, the owner proof repeated before each attempt; anything else is rejected at once.
  * Nothing is sent to the port before the owner check, and no credentials are sent at all.
  */
-async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS, startupWaitMs = STARTUP_WAIT_MS } = {}) {
+async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS, startupWaitMs: waitMs = startupWaitMs() } = {}) {
   const read = readManifest(candidate);
   if (read.ok === false) return read;
   const { manifest, pid, instanceId, port } = read;
@@ -333,13 +344,13 @@ async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS, star
       `port ${port} answers as ${seen}, manifest says pid ${pid}, instance ${instanceId}`,
     );
   }
-  const deadline = Date.now() + startupWaitMs;
+  const deadline = Date.now() + waitMs;
   for (;;) {
     const health = await getJson(port, '/api/health', timeoutMs);
     if (health.status === 200) break;
     const why = health.error ? health.error : `HTTP ${health.status}`;
     if (health.status !== 503 || Date.now() + STARTUP_RETRY_MS > deadline) {
-      const waited = health.status === 503 ? ` after waiting ${Math.round(startupWaitMs / 1000)} s` : '';
+      const waited = health.status === 503 ? ` after waiting ${Math.round(waitMs / 1000)} s` : '';
       return reject(candidate, 'unhealthy', `pid ${pid} on port ${port} is not ready${waited}: /api/health ${why}`);
     }
     await new Promise((resolve) => setTimeout(resolve, STARTUP_RETRY_MS));
@@ -420,6 +431,7 @@ function describeTried(tried) {
 module.exports = {
   DESKTOP_APP_IDENTIFIER,
   STARTUP_WAIT_MS,
+  startupWaitMs,
   desktopAppDataDir,
   validateCandidate,
   confirmEngine,

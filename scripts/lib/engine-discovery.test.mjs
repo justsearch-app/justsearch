@@ -633,7 +633,7 @@ test('D4: a proven Engine still starting (/api/health 503) is waited for and adm
     const m = machine(root);
     const engine = await startService(t, { healthStatus: 503 });
     writeManifest(m.desktop, manifestFor(engine));
-    const ready = setTimeout(() => engine.setHealth(200), 2500);
+    const ready = setTimeout(() => engine.setHealth(200), 1200);
     t.after(() => clearTimeout(ready));
     if (client === 'production MCP') {
       const res = await prodDiscover(m);
@@ -669,21 +669,41 @@ test('D4: an Engine that stays at /api/health 503 is rejected after the bound; a
   assert.ok(!starting.requests.some((r) => r.url === '/mcp' || r.url === '/api/mcp/token'), 'nothing past the probes reaches it');
 });
 
-test('D4: production MCP gives up on an Engine stuck at 503 after STARTUP_WAIT_MS and uses the desktop Engine', async (t) => {
-  const bound = require(ENGINE_DISCOVERY).STARTUP_WAIT_MS ?? 30000;
-  const root = tempRoot(t);
-  const m = machine(root);
-  const stuck = await startService(t, { healthStatus: 503 });
-  const stuckDir = path.join(root, 'stuck-data');
-  writeManifest(stuckDir, manifestFor(stuck));
-  const engine = await startService(t);
-  writeManifest(m.desktop, manifestFor(engine));
-  const t0 = Date.now();
-  const res = await prodDiscover(m, { envExtra: { JUSTSEARCH_DATA_DIR: stuckDir }, timeoutMs: bound + 30000 });
-  const elapsed = Date.now() - t0;
-  assert.ok(elapsed >= bound - 2000 && elapsed < bound + 15000, `it waited about ${bound} ms (took ${elapsed} ms)`);
-  assert.equal(res.result?.instanceId, engine.instanceId, res.stderr);
-  assert.ok(!stuck.requests.some((r) => r.url === '/api/mcp/token'), 'no token is fetched from it');
+test('D4: both clients give up on an Engine stuck at 503 after the startup bound and use the desktop Engine', async (t) => {
+  const bound = 1500; // through the test seam; the shipped default is checked below
+  const seam = { JUSTSEARCH_DISCOVERY_STARTUP_WAIT_MS: String(bound) };
+  for (const client of ['production MCP', 'bundle']) {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const stuck = await startService(t, { healthStatus: 503 });
+    const stuckDir = path.join(root, 'stuck-data');
+    writeManifest(stuckDir, manifestFor(stuck));
+    const engine = await startService(t);
+    writeManifest(m.desktop, manifestFor(engine));
+    const envExtra = { ...seam, JUSTSEARCH_DATA_DIR: stuckDir };
+    const t0 = Date.now();
+    const res = client === 'production MCP' ? await prodDiscover(m, { envExtra }) : await bridgeSession(m, bundle(root), envExtra);
+    const elapsed = Date.now() - t0;
+    assert.ok(elapsed >= bound - 600 && elapsed < bound + 10000, `${client}: it waited about ${bound} ms (took ${elapsed} ms)`);
+    if (client === 'production MCP') assert.equal(res.result?.instanceId, engine.instanceId, res.stderr);
+    else assertConnectedTo(res, engine);
+    assert.ok(!stuck.requests.some((r) => r.url === '/api/mcp/token' || r.url === '/mcp'), `${client}: no token is fetched from it`);
+  }
+});
+
+test('D4: the startup bound defaults to 30 000 ms for both clients; the seam is read only in engine-discovery.cjs', () => {
+  const { STARTUP_WAIT_MS, startupWaitMs } = require(ENGINE_DISCOVERY);
+  assert.equal(STARTUP_WAIT_MS, 30000);
+  assert.equal(startupWaitMs({}), 30000);
+  assert.equal(startupWaitMs({ JUSTSEARCH_DISCOVERY_STARTUP_WAIT_MS: '' }), 30000);
+  assert.equal(startupWaitMs({ JUSTSEARCH_DISCOVERY_STARTUP_WAIT_MS: 'soon' }), 30000);
+  assert.equal(startupWaitMs({ JUSTSEARCH_DISCOVERY_STARTUP_WAIT_MS: '1500' }), 1500);
+  // Neither client overrides the shared default: both call selectEngine without a bound of their own.
+  for (const rel of ['scripts/prod/justsearch-mcp/discovery.mjs', 'packaging/mcpb/server/index.js']) {
+    const src = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+    assert.ok(/selectEngine\(/.test(src), rel);
+    assert.ok(!/startupWaitMs|STARTUP_WAIT/.test(src), `${rel} uses the shared default`);
+  }
 });
 
 test('D9: after initialize the Engine goes away and a foreign server takes its port — the bridge sends it nothing, not the old token', async (t) => {
