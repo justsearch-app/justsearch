@@ -68,7 +68,9 @@ MCP server on?" is exactly "which port is the API on?":
   sends an `Mcp-Session-Id` only on connections to the Engine that opened it (its manifest
   identity, or for a pin no manifest names the pid and instance each new connection reads from
   `GET /api/runtime/live` on itself); a connection to any other Engine gets nothing, and the
-  bridge initializes a new session there first. Idle pooled connections are closed after 25 s,
+  bridge initializes a new session there first, sent exactly as a first `initialize` is: nothing
+  negotiated with the earlier Engine (session, `MCP-Protocol-Version`, server stream) is carried
+  over, and the version is negotiated again from the new Engine's answer. Idle pooled connections are closed after 25 s,
   before the Engine's 30 s idle expiry can cross a request. Closing stdin stops either client,
   also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found), waiting up to 30 s for the answer;

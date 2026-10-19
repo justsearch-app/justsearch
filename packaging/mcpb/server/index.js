@@ -299,6 +299,20 @@ function postToServer(message, intercept) {
 }
 
 /**
+ * Forget everything negotiated with the Engine: the session, the protocol version and the
+ * server->client stream. The next initialize is then sent exactly as a first one, and the version
+ * is negotiated again from its answer.
+ */
+function resetMcpSession() {
+  state.session = null;
+  state.protocolVersion = null;
+  if (state.getStream) {
+    state.getStream.destroy();
+    state.getStream = null;
+  }
+}
+
+/**
  * Best-effort server->client stream (GET /mcp). Optional per spec; if the server answers 405,
  * the stream drops or its connection is not proven, we simply go without it.
  */
@@ -333,7 +347,7 @@ function openGetStream() {
  * cached initialize params so the retried call lands in a valid session.
  * Throws if JustSearch is unreachable.
  */
-async function recoverConnection() {
+async function recoverConnection({ reinitialize = true } = {}) {
   const tried = [];
   const found = await discoverEngine(tried);
   if (found === null) {
@@ -342,11 +356,12 @@ async function recoverConnection() {
     throw err;
   }
   // The token rotates per app start; it is fetched from (and only ever sent to) the Engine found.
-  // The old session is dropped with the old target, before anything is written to the new one.
+  // What was negotiated with the old target is dropped with it, before anything is written to
+  // the new one.
   const next = { port: found.port, engine: found.engine, token: await fetchSessionToken(found) };
-  state.session = null;
+  resetMcpSession();
   state.target = next;
-  if (!state.initializeParams) return; // nothing to re-establish yet
+  if (!reinitialize || !state.initializeParams) return; // nothing to re-establish (yet)
 
   state.reinitCounter += 1;
   const reinitId = `justsearch-mcpb-reinit-${state.reinitCounter}`;
@@ -377,25 +392,23 @@ async function recoverConnection() {
 async function handleClientMessage(message) {
   const isInitialize = message && message.method === 'initialize';
   const isSetup = isInitialize || (message && message.id === undefined);
-  if (isInitialize && message.params) {
-    state.initializeParams = message.params;
-    state.session = null; // a fresh client handshake starts a fresh session
-  }
+  if (isInitialize && message.params) state.initializeParams = message.params;
 
-  const send = () =>
-    isInitialize
-      ? postToServer(message, (msg) => {
-          if (msg && msg.id === message.id && msg.result) {
-            if (typeof msg.result.protocolVersion === 'string') {
-              state.protocolVersion = msg.result.protocolVersion;
-            }
-            // Session header was captured in postToServer; the standalone
-            // server->client stream can be opened once the session exists.
-            setImmediate(openGetStream);
-          }
-          emit(msg);
-        })
-      : postToServer(message);
+  const send = () => {
+    if (!isInitialize) return postToServer(message);
+    resetMcpSession(); // a client handshake starts afresh, also when it is sent again
+    return postToServer(message, (msg) => {
+      if (msg && msg.id === message.id && msg.result) {
+        if (typeof msg.result.protocolVersion === 'string') {
+          state.protocolVersion = msg.result.protocolVersion;
+        }
+        // Session header was captured in postToServer; the standalone
+        // server->client stream can be opened once the session exists.
+        setImmediate(openGetStream);
+      }
+      emit(msg);
+    });
+  };
 
   try {
     await send();
@@ -408,7 +421,8 @@ async function handleClientMessage(message) {
       );
     }
     log(`transport error (${firstError.message}) — re-checking where JustSearch is running...`);
-    await recoverConnection(); // throws if the app is gone
+    // throws if the app is gone; a client initialize is itself the new handshake
+    await recoverConnection({ reinitialize: !isInitialize });
     await send(); // replay once against the recovered session
   }
 }

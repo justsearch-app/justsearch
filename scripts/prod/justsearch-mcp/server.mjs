@@ -533,8 +533,9 @@ export async function main() {
 
   function requireToken() {
     // In dev mode (token === ""), POST works without a token — don't block.
-    // Only block when the token endpoint wasn't available at all (null).
-    if (token === null) {
+    // Only block when the token endpoint wasn't available at all (null). Read from the current
+    // target: an Engine selected again on the pin brings its own answer.
+    if (engineTarget.token === null) {
       return makeError(
         'NO_TOKEN',
         'Session token unavailable. This JustSearch version may not support the token endpoint. ' +

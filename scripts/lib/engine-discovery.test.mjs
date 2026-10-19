@@ -206,7 +206,7 @@ let instanceCounter = 0;
  * that arrives on a connection idle at least that long is dropped unanswered with its connection
  * (the server's idle expiry crossing it on the wire), and no Keep-Alive hint is sent.
  */
-async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null, requireToken = false, mcpSessions = false, stream = false, keepAliveMs, tokenPerConnection = false, closeAfterPost = false, expireIdleMs } = {}) {
+async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null, requireToken = false, mcpSessions = false, stream = false, keepAliveMs, tokenPerConnection = false, closeAfterPost = false, expireIdleMs, protocolVersion = '2025-06-18', strictProtocol = false, noToken = false } = {}) {
   const id = instanceId || `instance-${process.pid}-${++instanceCounter}`;
   const requests = [];
   // hold(url, { rpc }): the next request to url (with rpc: a POST /mcp of that JSON-RPC method) is
@@ -271,8 +271,12 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
       if (req.url === '/api/status') return json(200, { status: 'ok' });
       if (kind === 'foreign') return json(404, { error: 'not found' });
       if (req.url === '/api/runtime/live') return json(200, { alive: true, pid, instanceId: id });
-      if (req.url === '/api/mcp/token') return json(200, { token: ownToken });
+      if (req.url === '/api/mcp/token') return noToken ? json(404, {}) : json(200, { token: ownToken });
       if (requireToken && req.method !== 'GET' && req.headers['x-justsearch-session'] !== ownToken) return json(401, { error: 'session token required' });
+      // strictProtocol: an MCP request naming another protocol version than the one this Engine
+      // answers is refused, as a server that does not support that version refuses it.
+      const named = req.headers['mcp-protocol-version'];
+      if (strictProtocol && req.url === '/mcp' && named !== undefined && named !== protocolVersion) return json(400, { error: `unsupported protocol version ${named}` });
       if (req.url === '/mcp' && req.method === 'GET' && stream) {
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         return res.write(': open\n\n');
@@ -291,7 +295,7 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
           return json(200, {
             jsonrpc: '2.0',
             id: msg.id,
-            result: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: `engine ${id}`, version: '0' } },
+            result: { protocolVersion, capabilities: {}, serverInfo: { name: `engine ${id}`, version: '0' } },
           }, mcpSessions ? { 'mcp-session-id': session } : {});
         }
         return json(200, {
@@ -1706,6 +1710,118 @@ test('P5 (bundle): a pin no manifest names is restarted with a new token — the
   assert.deepEqual(carried, [], `the old session stays with the endpoint that opened it\n${session.stderr}`);
   const call = session.messages.find((x) => x.id === 2);
   assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
+});
+
+// ---------------------------------------------------------------------------
+// Round 4: a fresh initialize carries nothing negotiated with an earlier Engine
+// ---------------------------------------------------------------------------
+
+/** The /mcp POSTs service received whose JSON-RPC method is (or, with not, is not) method. */
+function mcpPosts(service, method, { not = false } = {}) {
+  return service.requests.filter((r) => r.url === '/mcp' && r.method === 'POST' && (JSON.parse(r.body).method === method) !== not);
+}
+
+/** A request's header names, with the MCP ones' values; what differs per Engine is left out. */
+function initShape(request) {
+  return Object.keys(request.headers)
+    .filter((h) => !['host', 'content-length', 'connection', 'x-justsearch-session'].includes(h))
+    .sort()
+    .map((h) => (h.startsWith('mcp-') ? `${h}: ${request.headers[h]}` : h));
+}
+
+test('P5 (bundle): the Engine on a pin is replaced by one that speaks another MCP protocol version — the re-initialize is sent as a first one (no session, no version) and the version is negotiated again', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t, { mcpSessions: true, stream: true, protocolVersion: '2025-03-26', strictProtocol: true });
+  let second = null;
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+    await handshakeDone(first, { stream: true });
+    await first.close();
+    await pause(300); // the idle bridge handles the close
+    second = await startService(t, { port: first.port, mcpSessions: true, stream: true, protocolVersion: '2025-06-18', strictProtocol: true });
+  });
+  const call = session.messages.find((x) => x.id === 2);
+  assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
+  const [firstInit] = mcpPosts(first, 'initialize');
+  const [reinit] = mcpPosts(second, 'initialize');
+  assert.equal(reinit.headers['mcp-protocol-version'], undefined, 'the old version is not carried to the replacement');
+  assert.equal(reinit.headers['mcp-session-id'], undefined, 'nor the old session');
+  assert.deepEqual(initShape(reinit), initShape(firstInit), 'sent as the first-ever initialize was');
+  assert.deepEqual(JSON.parse(reinit.body).params, JSON.parse(firstInit.body).params);
+  const after = [...mcpPosts(second, 'initialize', { not: true }), ...second.requests.filter((r) => r.url === '/mcp' && r.method === 'GET')];
+  assert.ok(after.length >= 2, 'initialized and the call reached the replacement');
+  assert.deepEqual([...new Set(after.map((r) => r.headers['mcp-protocol-version']))], ['2025-06-18'], 'everything after it carries the version the replacement answered');
+});
+
+test('P5 (bundle): the client initializes again — that initialize carries no session and no protocol version from the first handshake', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { mcpSessions: true, stream: true, protocolVersion: '2025-03-26' });
+  const run = startPinnedClient('bundle', m, root, engine.port);
+  const replied = async (id) => {
+    const deadline = Date.now() + 10000;
+    while (!run.messages.some((x) => x.id === id)) {
+      if (Date.now() >= deadline) throw new Error(`no answer to ${id}\n${run.stderr}`);
+      await pause(10);
+    }
+  };
+  await replied(1);
+  run.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+  await handshakeDone(engine, { stream: true });
+  run.child.stdin.write(INIT_LINE.replace('"id":1', '"id":5'));
+  await replied(5);
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+  const [initial, again] = mcpPosts(engine, 'initialize');
+  assert.ok(again, `the second initialize was sent\n${run.stderr}`);
+  assert.equal(again.headers['mcp-protocol-version'], undefined, 'no version from the first handshake');
+  assert.equal(again.headers['mcp-session-id'], undefined, 'no session from the first handshake');
+  assert.deepEqual(initShape(again), initShape(initial), 'sent as the first initialize was');
+});
+
+test('P5 (bundle): a client initialize the Engine turns away (404) is sent again as itself after recovery — not after a bridge re-initialize, and carrying nothing from that one', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { mcpSessions: true, stream: true, protocolVersion: '2025-03-26' });
+  const run = startPinnedClient('bundle', m, root, engine.port);
+  const replied = async (id) => {
+    const deadline = Date.now() + 10000;
+    while (!run.messages.some((x) => x.id === id)) {
+      if (Date.now() >= deadline) throw new Error(`no answer to ${id}\n${run.stderr}`);
+      await pause(10);
+    }
+  };
+  await replied(1);
+  run.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+  await handshakeDone(engine, { stream: true });
+  engine.rejectNext(404);
+  run.child.stdin.write(INIT_LINE.replace('"id":1', '"id":5'));
+  await replied(5);
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+  assert.ok(run.messages.find((x) => x.id === 5)?.result, `the client's initialize is answered\n${run.stderr}`);
+  const inits = mcpPosts(engine, 'initialize');
+  assert.deepEqual(inits.map((r) => JSON.parse(r.body).id), [1, 5, 5], 'only the client\'s own initializes: no bridge re-initialize in between');
+  for (const r of inits) assert.deepEqual(initShape(r), initShape(inits[0]), 'each is sent as a first one');
+});
+
+test('P7 (--port): production MCP pinned to a manifest Engine without the token endpoint — after it restarts on the port with one, mutating calls use the new Engine\'s token instead of refusing on the old answer', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t, { noToken: true });
+  writeManifest(m.desktop, manifestFor(first));
+  const prod = await startProdMcp(t, m, PINS['--port'](first.port));
+  const ingest = { paths: [path.join(root, 'doc.txt')] };
+  assert.match(await prod.call('justsearch_ingest', ingest), /NO_TOKEN|Session token unavailable/, `the old Engine has no token\n${prod.stderr}`);
+  first.lastAnswers();
+  assert.match(await prod.call('justsearch_status', {}), /READY|ready/, prod.stderr);
+  await first.close();
+  const second = await startService(t, { port: first.port, token: 'token-second', requireToken: true });
+  writeManifest(m.desktop, manifestFor(second));
+  await prod.call('justsearch_status', {}); // the restarted Engine is selected again here
+  const next = await prod.call('justsearch_ingest', ingest);
+  assert.match(next, new RegExp(`ingest by ${second.instanceId}`), `${next}\n${prod.stderr}`);
+  assert.deepEqual(second.requests.filter((r) => r.url === '/api/knowledge/ingest').map((r) => r.headers['x-justsearch-session']), ['token-second']);
 });
 
 for (const kind of Object.keys(PINS)) {
