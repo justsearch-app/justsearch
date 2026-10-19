@@ -160,6 +160,7 @@
       "jobId": "windows-native-contracts",
       "commands": [
         "node --test scripts/release/evidence-capture-exit.test.mjs",
+        "node --test scripts/lib/engine-discovery.test.mjs",
         "node scripts/supervisor-conformance/run.mjs --adapter dev-runner",
         "node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50",
         "./scripts/ci/test-release-compatibility-baseline.ps1",

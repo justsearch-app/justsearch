@@ -503,6 +503,12 @@ jobs:
       - name: Governance gate self-test fixtures
         run: node scripts/governance/run.mjs --self-test --mode gate
 
+      # Production MCP and the extracted MCPB bundle find the desktop app's Engine through the
+      # platform-paths contract's desktop data folder and validated manifests. Also runs in the
+      # Windows-native lane, where the folder is the Roaming AppData one.
+      - name: Test Engine discovery (desktop data folder, validated manifests)
+        run: node --test scripts/lib/engine-discovery.test.mjs
+
       # Tempdoc 966 D1: every expected outcome entering, changing or leaving the product test suite
       # names a source of intent and carries a non-author acceptance record bound to the exact
       # flagged content. The gate resolves its own base (pull_request merge-base, merge_group
@@ -542,12 +548,6 @@ jobs:
 
       - name: MCPB source matches server.json.fileSha256 (release integrity + freshness)
         run: node scripts/ci/check-mcpb-consistency.mjs
-
-      # Production MCP and the extracted MCPB bundle find the desktop app's Engine through the
-      # platform-paths contract's desktop data folder and validated manifests. Also runs in the
-      # Windows-native lane, where the folder is the Roaming AppData one.
-      - name: Test Engine discovery (desktop data folder, validated manifests)
-        run: node --test scripts/lib/engine-discovery.test.mjs
 
       - name: Test agent-utility projection lifecycle and drift
         run: node scripts/docs/gen-public-agent-utility.test.mjs
@@ -1337,15 +1337,15 @@ jobs:
           node --test scripts/release/evidence-capture-exit.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Engine discovery finds the desktop app's Engine (Roaming AppData)
-        run: node --test scripts/lib/engine-discovery.test.mjs
-
       # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
       # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
       # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
       # process handle closing — is a real constraint rather than a no-op.
       - name: Install conformance dependencies
         run: npm ci --audit=false
+
+      - name: Engine discovery finds the desktop app's Engine (Roaming AppData)
+        run: node --test scripts/lib/engine-discovery.test.mjs
 
       - name: Supervisor conformance (dev-runner adapter)
         run: |
