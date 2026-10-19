@@ -309,3 +309,14 @@ Pending independent verification; no builder acceptance.
   "note": "Round 9 at 5e2a44782 (B5 test and changeset only since round 8): clean B5 5/5, class median 7.21 s vs 21.63 s base. All 12 B5 mutations, including both outside-health port-wait variants, fail 5/5 at their intended assertion. Each pre-bind lock probe samples one 1-second window from the fake child's pre-bind signal: a lock first taken 1.5 s later while the port is still unbound escapes, as it does on the base test (5/5 each). B8 catches a reload only within 400 ms after an unload; later ones escape unless they land in the next window."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-slow-tests-b-3-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:0e63f1dcf5c5fbaeafdb82fdb345bfc23d2395151a459cf100dec11be244d4e3",
+  "note": "Audit 4 at fbf212bbf (B5 only changed since audit 3): the port-wait mutation that escaped audit 3, plus relaunch-only port wait and a lock held for the first 1.2 s of each health wait, now fail B5 3/3 on the candidate as on base 087cd7138; lock held only during back-off sleeps escapes both, so it is not a loss. Clean B5 3/3, 10-class batch 161/161."
+}
+```
