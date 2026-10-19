@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-f0a7d3
 author-role: builder
-author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
+author-session: 01a155b0-4bce-7aa0-bf6f-a919b0071e8e
 ---
 
 # Test-intent entries
