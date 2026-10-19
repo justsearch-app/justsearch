@@ -162,9 +162,13 @@ const state = {
   // (X-JustSearch-Session) if enforced. Replaced as a whole once the next one is complete, so a
   // request never pairs one Engine's token with another target.
   target: null,
-  // { id, identity }: the Mcp-Session-Id the server assigned and the Engine identity of the
-  // connection it was opened on; engineRequest sends it only on connections to that Engine.
+  // { id, identity }: what the bridge negotiated over /mcp (this, protocolVersion and getStream)
+  // belongs to the Engine identity of the connection that first answered after the last reset;
+  // id is the Mcp-Session-Id it assigned, or null when it assigns none (sessions are optional).
+  // engineRequest writes nothing on a connection to any other identity, so a changed Engine always
+  // leads to recoverConnection, resetMcpSession and a fresh initialize, session id or not.
   session: null,
+  epoch: 0, // bumped by resetMcpSession: an answer to a request sent before it binds nothing
   pinnedByManifest: false, // the JUSTSEARCH_API_PORT pin was accepted through a manifest
   protocolVersion: null, // negotiated during initialize
   initializeParams: null, // cached client initialize params (for re-init)
@@ -222,15 +226,17 @@ function postToServer(message, intercept) {
     if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
 
     const sentTo = target();
+    const epoch = state.epoch;
     let written = false; // the request had a connection, so it may have reached the server
     const req = engineRequest(
       sentTo,
       { method: 'POST', path: '/mcp', headers, timeoutMs: REQUEST_TIMEOUT_MS, body, credential: true, session: state.session },
       (res) => {
         const status = res.statusCode || 0;
-        const newSession = res.headers['mcp-session-id'];
-        if (typeof newSession === 'string' && newSession.length > 0 && state.target === sentTo) {
-          state.session = { id: newSession, identity: req.connectionIdentity };
+        if (state.epoch === epoch && state.target === sentTo) {
+          const assigned = res.headers['mcp-session-id'];
+          const id = typeof assigned === 'string' && assigned.length > 0 ? assigned : state.session?.id ?? null;
+          if (!state.session || state.session.id !== id) state.session = { id, identity: req.connectionIdentity };
         }
 
         if (status === 404 || status === 400) {
@@ -304,6 +310,7 @@ function postToServer(message, intercept) {
  * is negotiated again from its answer.
  */
 function resetMcpSession() {
+  state.epoch += 1;
   state.session = null;
   state.protocolVersion = null;
   if (state.getStream) {
@@ -366,6 +373,7 @@ async function recoverConnection({ reinitialize = true } = {}) {
   state.reinitCounter += 1;
   const reinitId = `justsearch-mcpb-reinit-${state.reinitCounter}`;
   let reinitResult = null;
+  const epoch = state.epoch;
   await postToServer(
     { jsonrpc: '2.0', id: reinitId, method: 'initialize', params: state.initializeParams },
     (msg) => {
@@ -373,7 +381,7 @@ async function recoverConnection({ reinitialize = true } = {}) {
     }
   );
   if (!reinitResult) throw new Error('re-initialize got no result');
-  if (typeof reinitResult.protocolVersion === 'string') {
+  if (state.epoch === epoch && typeof reinitResult.protocolVersion === 'string') {
     state.protocolVersion = reinitResult.protocolVersion;
   }
   await postToServer({ jsonrpc: '2.0', method: 'notifications/initialized' });
@@ -397,9 +405,10 @@ async function handleClientMessage(message) {
   const send = () => {
     if (!isInitialize) return postToServer(message);
     resetMcpSession(); // a client handshake starts afresh, also when it is sent again
+    const epoch = state.epoch;
     return postToServer(message, (msg) => {
       if (msg && msg.id === message.id && msg.result) {
-        if (typeof msg.result.protocolVersion === 'string') {
+        if (state.epoch === epoch && typeof msg.result.protocolVersion === 'string') {
           state.protocolVersion = msg.result.protocolVersion;
         }
         // Session header was captured in postToServer; the standalone

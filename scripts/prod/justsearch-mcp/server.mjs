@@ -136,6 +136,28 @@ function engineGoneError(res) {
   );
 }
 
+function noTokenError() {
+  return makeError(
+    'NO_TOKEN',
+    'Session token unavailable. This JustSearch version may not support the token endpoint. ' +
+      'Update JustSearch to the latest version, or use GET-only tools (suggest, status).',
+  );
+}
+
+/**
+ * A credentialed request (credential: true) to a target whose Engine answered at selection that
+ * it has no token endpoint (token null; "" is dev mode and needs none). That answer belongs to the
+ * Engine that gave it, so before the request is refused the port is asked who serves it now:
+ * GET /api/mcp/token over a proven connection, which carries nothing. If it is no longer that
+ * Engine, the result is engine_gone, and withReselect selects the one there now, whose own answer
+ * decides; if it is, the result is no_token (NO_TOKEN). The request itself is not sent.
+ */
+async function noTokenOnce(target, urlStr) {
+  const probe = await httpGetOnce(target, new URL('/api/mcp/token', urlStr).href, { timeoutMs: 5_000, maxBytes: 64 * 1024 });
+  if (probe.error) return probe;
+  return { ok: false, statusCode: null, text: null, error: { message: 'no_token' } };
+}
+
 /**
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
@@ -145,6 +167,7 @@ function httpGetTextLimited(urlStr, options) {
 }
 
 function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {}, credential = false }) {
+  if (credential && target.token === null) return noTokenOnce(target, urlStr);
   return new Promise((resolve) => {
     let u;
     try {
@@ -216,6 +239,7 @@ function httpPostJsonLimited(urlStr, body, options) {
 }
 
 function httpPostOnce(target, urlStr, body, { timeoutMs, maxBytes, headers = {}, credential = false }) {
+  if (credential && target.token === null) return noTokenOnce(target, urlStr);
   return new Promise((resolve) => {
     let u;
     try {
@@ -389,6 +413,7 @@ function makeError(code, message) {
 
 function parseJsonResponse(res, { preserveOperationError = false } = {}) {
   if (res.error?.message === 'engine_gone') return { parsed: null, error: engineGoneError(res) };
+  if (res.error?.message === 'no_token') return { parsed: null, error: noTokenError() };
   // Size-limit abort — check first, regardless of HTTP status code.
   // When the response body exceeds maxBytes, res.destroy() fires res.on('error')
   // which passes through the real HTTP statusCode (e.g. 200), so this check must
@@ -527,23 +552,10 @@ export async function main() {
   // token is:
   //   non-empty string → prod mode, sent on requests made with credential: true
   //   "" (empty string) → dev mode, no token enforcement (POST works without header)
-  //   null              → endpoint not available (old JustSearch), POST may fail
+  //   null              → endpoint not available (old JustSearch): a credentialed call answers
+  //                       NO_TOKEN once the port is confirmed to still be that Engine (noTokenOnce)
   //   undefined         → a pin no manifest names: each connection carries the token it fetched
   log(`Token: ${token === undefined ? 'per connection (pinned port)' : token ? 'available (prod mode)' : token === '' ? 'empty (dev mode)' : 'unavailable (old version?)'}`);
-
-  function requireToken() {
-    // In dev mode (token === ""), POST works without a token — don't block.
-    // Only block when the token endpoint wasn't available at all (null). Read from the current
-    // target: an Engine selected again on the pin brings its own answer.
-    if (engineTarget.token === null) {
-      return makeError(
-        'NO_TOKEN',
-        'Session token unavailable. This JustSearch version may not support the token endpoint. ' +
-          'Update JustSearch to the latest version, or use GET-only tools (suggest, status).',
-      );
-    }
-    return null;
-  }
 
   // Create MCP server
   const mcpServer = new McpServer({
@@ -573,9 +585,6 @@ export async function main() {
     },
     async (rawArgs) => {
       const input = AnswerInputSchema.parse(rawArgs);
-
-      const tokenErr = requireToken();
-      if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/retrieve-context`;
       const body = {
@@ -724,9 +733,6 @@ export async function main() {
     async (rawArgs) => {
       const input = SearchInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
-      if (tokenErr) return tokenErr;
-
       const url = `${baseUrl}/api/knowledge/search`;
       // Note: Zod defaults (limit=10, mode='hybrid', querySyntax='SIMPLE') are always populated,
       // so these null checks always pass. The MCP server's defaults are authoritative over the backend's.
@@ -861,9 +867,6 @@ export async function main() {
     async (rawArgs) => {
       const input = IngestInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
-      if (tokenErr) return tokenErr;
-
       const url = `${baseUrl}/api/knowledge/ingest`;
       const body = {
         paths: input.paths,
@@ -882,6 +885,7 @@ export async function main() {
         credential: true,
       });
       if (res.error?.message === 'engine_gone') return engineGoneError(res);
+      if (res.error?.message === 'no_token') return noTokenError();
 
       let operationResponse;
       let parseError = null;

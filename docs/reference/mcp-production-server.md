@@ -55,7 +55,9 @@ MCP server on?" is exactly "which port is the API on?":
   downgraded to the no-manifest case below. When the pinned Engine restarts on the same port
   with a new manifest, the stdio server's next call re-reads the manifests, proves the new
   Engine and fetches its token before sending anything; a call in flight during the restart
-  fails. A pinned port that no runtime manifest
+  fails. Whether a token is available is that Engine's answer: a mutating call to an Engine that
+  had no token endpoint first checks that the same Engine still serves the port, so the first
+  call after a restart is decided by the Engine there now (`NO_TOKEN` only if it has none). A pinned port that no runtime manifest
   names is trusted with request content from whatever answers it, but never with a session token
   fetched on another connection: each new connection fetches `GET /api/mcp/token` on itself
   before anything else is written on it, and a request carries only that connection's token (so
@@ -67,7 +69,8 @@ MCP server on?" is exactly "which port is the API on?":
   session; otherwise the call fails with an error saying its outcome is unknown. The bridge
   sends an `Mcp-Session-Id` only on connections to the Engine that opened it (its manifest
   identity, or for a pin no manifest names the pid and instance each new connection reads from
-  `GET /api/runtime/live` on itself); a connection to any other Engine gets nothing, and the
+  `GET /api/runtime/live` on itself), whether or not that Engine assigned a session id; a
+  connection to any other Engine gets nothing negotiated with the first, and the
   bridge initializes a new session there first, sent exactly as a first `initialize` is: nothing
   negotiated with the earlier Engine (session, `MCP-Protocol-Version`, server stream) is carried
   over, and the version is negotiated again from the new Engine's answer. Idle pooled connections are closed after 25 s,

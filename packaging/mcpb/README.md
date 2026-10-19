@@ -59,7 +59,7 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    different port mid-session, or another Engine answers the pinned port, the
    bridge re-runs that discovery, drops everything negotiated with the old Engine
    (the `Mcp-Session-Id`, which is only ever sent to the Engine that issued it, the
-   `MCP-Protocol-Version` and the server stream), and re-initializes the session with
+   `MCP-Protocol-Version` and the server stream; also when it assigned no session id), and re-initializes the session with
    the cached `initialize` params, sent exactly as a first `initialize` is; the
    version is negotiated again from the new Engine's answer. The failed call is sent again once only if it surely did not reach the
    app (it never had a connection, or the app answered 400/404 for its session);

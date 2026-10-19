@@ -1805,23 +1805,61 @@ test('P5 (bundle): a client initialize the Engine turns away (404) is sent again
   for (const r of inits) assert.deepEqual(initShape(r), initShape(inits[0]), 'each is sent as a first one');
 });
 
-test('P7 (--port): production MCP pinned to a manifest Engine without the token endpoint — after it restarts on the port with one, mutating calls use the new Engine\'s token instead of refusing on the old answer', async (t) => {
+// Round 5: the token answer and the bridge's negotiated state follow the Engine, not a side effect.
+for (const [from, to] of [['without', 'with'], ['with', 'without']]) {
+  test(`P7 (--port): production MCP pinned to a manifest Engine ${from} the token endpoint — it restarts on the port ${to} one, and the first call after it, a mutating one, is decided by the Engine there now`, async (t) => {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const tokenless = { noToken: true };
+    const tokened = (token) => ({ token, requireToken: true });
+    const first = await startService(t, from === 'without' ? tokenless : tokened('token-first'));
+    writeManifest(m.desktop, manifestFor(first));
+    const prod = await startProdMcp(t, m, PINS['--port'](first.port));
+    const ingest = { paths: [path.join(root, 'doc.txt')] };
+    first.lastAnswers(); // no idle connection is left to the first Engine
+    const before = await prod.call('justsearch_ingest', ingest);
+    if (from === 'without') {
+      assert.match(before, /NO_TOKEN/, `the first Engine has no token endpoint\n${prod.stderr}`);
+      assert.equal(first.requests.filter((r) => r.url === '/api/knowledge/ingest').length, 0, 'nothing is sent without a token');
+    } else {
+      assert.match(before, new RegExp(`ingest by ${first.instanceId}`), prod.stderr);
+    }
+    await first.close();
+    const second = await startService(t, { port: first.port, ...(to === 'with' ? tokened('token-second') : tokenless) });
+    writeManifest(m.desktop, manifestFor(second));
+    const next = await prod.call('justsearch_ingest', ingest); // the first call after the restart
+    const ingests = second.requests.filter((r) => r.url === '/api/knowledge/ingest');
+    if (to === 'with') {
+      assert.match(next, new RegExp(`ingest by ${second.instanceId}`), `${next}\n${prod.stderr}`);
+      assert.deepEqual(ingests.map((r) => r.headers['x-justsearch-session']), ['token-second'], 'sent once, with the new Engine\'s token');
+    } else {
+      assert.match(next, /NO_TOKEN/, `${next}\n${prod.stderr}`);
+      assert.deepEqual(ingests, [], 'nothing is sent to an Engine without a token endpoint');
+      assert.ok(second.requests.some((r) => r.url === '/api/mcp/token'), 'the Engine there now was asked');
+    }
+    assert.ok(second.requests.every((r) => r.headers['x-justsearch-session'] !== 'token-first'), 'the old token never reaches it');
+  });
+}
+
+test('P5 (bundle): an Engine that assigns no Mcp-Session-Id is replaced on the pin — nothing negotiated with it reaches the replacement: the first request there is an initialize sent as a first one, and the version is negotiated again', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
-  const first = await startService(t, { noToken: true });
-  writeManifest(m.desktop, manifestFor(first));
-  const prod = await startProdMcp(t, m, PINS['--port'](first.port));
-  const ingest = { paths: [path.join(root, 'doc.txt')] };
-  assert.match(await prod.call('justsearch_ingest', ingest), /NO_TOKEN|Session token unavailable/, `the old Engine has no token\n${prod.stderr}`);
-  first.lastAnswers();
-  assert.match(await prod.call('justsearch_status', {}), /READY|ready/, prod.stderr);
-  await first.close();
-  const second = await startService(t, { port: first.port, token: 'token-second', requireToken: true });
-  writeManifest(m.desktop, manifestFor(second));
-  await prod.call('justsearch_status', {}); // the restarted Engine is selected again here
-  const next = await prod.call('justsearch_ingest', ingest);
-  assert.match(next, new RegExp(`ingest by ${second.instanceId}`), `${next}\n${prod.stderr}`);
-  assert.deepEqual(second.requests.filter((r) => r.url === '/api/knowledge/ingest').map((r) => r.headers['x-justsearch-session']), ['token-second']);
+  const first = await startService(t, { protocolVersion: '2025-03-26', strictProtocol: true });
+  let second = null;
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+    await handshakeDone(first);
+    await first.close();
+    await pause(300); // the idle bridge handles the close
+    // It would answer a request naming the old version, so only the order shows a reset.
+    second = await startService(t, { port: first.port, protocolVersion: '2025-06-18' });
+  });
+  const call = session.messages.find((x) => x.id === 2);
+  assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
+  const posts = second.requests.filter((r) => r.url === '/mcp' && r.method === 'POST');
+  assert.deepEqual(posts.map((r) => JSON.parse(r.body).method), ['initialize', 'notifications/initialized', 'tools/call'], 'the replacement is initialized before the call');
+  assert.deepEqual(initShape(posts[0]), initShape(mcpPosts(first, 'initialize')[0]), 'sent as the first-ever initialize was');
+  assert.deepEqual(posts.slice(1).map((r) => r.headers['mcp-protocol-version']), ['2025-06-18', '2025-06-18'], 'then the version the replacement answered');
+  assert.ok(second.requests.every((r) => r.headers['mcp-protocol-version'] !== '2025-03-26'), 'the old version never reaches it');
 });
 
 for (const kind of Object.keys(PINS)) {
