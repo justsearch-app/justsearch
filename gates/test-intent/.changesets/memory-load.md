@@ -377,3 +377,14 @@ production-code overlays and no source-repository worktree metadata writes.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cc6d91b2-5314-42fd-867b-dbc2d8a68699",
+  "verdict": "accept",
+  "digest": "sha256:9db026c529985e4f9af1e0022460ecd8eba1b1899981b921e2d93e7bd262b2ca",
+  "note": "verify-1 re-acceptance against fc746cce8: diff vs f20e67b49 touches only changeset sources; both delegation quotes found verbatim in owner turns (2026-10-18 21:15, 2026-10-19 13:23); the scenarios are fix scenarios for a task routed from t-20261018-6108b0, within that scope; no decision record or API contract conflicts; 5 no-data-loss defect-sources match the reproductions run in verify-1. Behavioural verification from verify-1 stands."
+}
+```
