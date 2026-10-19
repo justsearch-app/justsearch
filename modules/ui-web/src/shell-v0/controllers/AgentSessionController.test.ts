@@ -1180,6 +1180,61 @@ describe('AgentSessionController interaction methods', () => {
     expect(notes[0]?.severity).toBe('warn');
   });
 
+  // WP6.2 S8.2 — a direction's report follows what really happened to it, one entry per direction.
+  it('a queued direction becomes applied in place, one entry, keyed by its id', () => {
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'queued' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus on Q3.', directiveId: 'd2', outcome: 'queued' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'applied' });
+    const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
+    expect(steer.map((e) => [e.content, e.directiveOutcome])).toEqual([
+      ['Focus on Q3.', 'applied'],
+      ['Focus on Q3.', 'queued'],
+    ]);
+  });
+
+  it('a not-applied direction keeps its reason, and a late queued report does not undo a final one', () => {
+    ctrl.onDirectiveAcknowledged({
+      directiveText: 'Too late.', directiveId: 'd9', outcome: 'not_applied', reason: 'run_finished',
+    });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Too late.', directiveId: 'd9', outcome: 'queued' });
+    const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
+    expect(steer).toHaveLength(1);
+    expect(steer[0]?.directiveOutcome).toBe('not_applied');
+    expect(steer[0]?.directiveReason).toBe('run_finished');
+  });
+
+  it('steer names a connection failure as such, not as a finished run', async () => {
+    ctrl.sessionId = 'sess-net';
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+    expect(await ctrl.steer('focus')).toBe(false);
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes.map((e) => e.content)).toEqual([
+      'Could not send your direction — the connection to JustSearch failed. It was not applied.',
+    ]);
+  });
+
+  it('steer names an HTTP error other than 404 by its status', async () => {
+    ctrl.sessionId = 'sess-500';
+    globalThis.fetch = mockFetchError(500, 'boom');
+    expect(await ctrl.steer('focus')).toBe(false);
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes.map((e) => e.content)).toEqual([
+      'Could not send your direction (HTTP 500). It was not applied.',
+    ]);
+  });
+
+  it('steer before the run has a session says so instead of dropping the direction silently', async () => {
+    ctrl.sessionId = null;
+    const fetchSpy = vi.fn() as unknown as typeof fetch;
+    globalThis.fetch = fetchSpy;
+    expect(await ctrl.steer('go')).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes.map((e) => e.content)).toEqual([
+      'Could not send your direction — the run has not started yet. Try again in a moment.',
+    ]);
+  });
+
   // Tempdoc 565 §33 — runKind: only an `agent` run is steerable; the view gates the steer input on it.
   it('runKind: defaults null, set on start, cleared on terminal', () => {
     expect(ctrl.runKind).toBeNull();

@@ -96,7 +96,20 @@ public final class AgentEventPayloads {
         yield m;
       }
       case AgentEvent.ToolCallApproved e -> Map.of("callId", e.callId());
-      case AgentEvent.DirectiveAcknowledged e -> Map.of("directiveText", e.directiveText());
+      case AgentEvent.DirectiveAcknowledged e -> {
+        var m = new LinkedHashMap<String, Object>();
+        m.put("directiveText", e.directiveText());
+        if (e.directiveId() != null) {
+          m.put("directiveId", e.directiveId());
+        }
+        if (e.outcome() != null) {
+          m.put("outcome", e.outcome());
+        }
+        if (e.reason() != null) {
+          m.put("reason", e.reason());
+        }
+        yield m;
+      }
       case AgentEvent.ToolExecutionStarted e ->
           Map.of("callId", e.callId(), "toolName", e.toolName());
       case AgentEvent.ToolExecutionCompleted e -> toolCompletedPayload(e);

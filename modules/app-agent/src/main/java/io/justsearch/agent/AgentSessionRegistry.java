@@ -106,17 +106,14 @@ final class AgentSessionRegistry {
   /**
    * Tempdoc 565 §30 — the DIRECTION authority's {@code interject}: queue a free-form human steering
    * directive for a running session (the FE POSTs this when the user types into the live-run steer
-   * input). The loop drains it at the next step boundary and folds it into the next LLM call. Returns
-   * false (404) for an unknown/finished session. Mirrors {@link #setSessionAutonomy} — both write a
-   * per-run control input the loop reads between steps.
+   * input). Directions queue in the order sent; the loop drains them all at the next step boundary
+   * and each is reported applied once the model accepts a request carrying it (WP6.2). Returns false (404) for an
+   * unknown/finished session, including one that has stopped taking directions. Mirrors {@link
+   * #setSessionAutonomy} — both write a per-run control input the loop reads between steps.
    */
   boolean injectSteeringDirective(String sessionId, String text) {
     var session = sessions.get(sessionId);
-    if (session == null) {
-      return false;
-    }
-    session.setInterject(text);
-    return true;
+    return session != null && session.submitDirection(text);
   }
 
   /**

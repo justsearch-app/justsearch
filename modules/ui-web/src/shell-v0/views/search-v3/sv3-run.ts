@@ -53,6 +53,7 @@ import type { Sv3TurnStatus } from './sv3-sessions.js';
 // "which dispositions count as truncated" could disagree with the notice line's copy, which is the
 // divergence the shared authority exists to prevent.
 import { sv3WasCutShort, SV3_CUT_SHORT_BADGE } from './sv3-honesty.js';
+import { directionNote } from '../unifiedThreadProjection.js';
 // Tempdoc 859 §D §2.4/§2.5 — the SHARED budget-readout authority, already the source of both
 // windows' budget bar and context horizon. The gate's facts and its ladder are derivations of the
 // same numbers, so they belong beside those and not in a second module that could disagree.
@@ -214,7 +215,6 @@ const RUN_NOTE_LABEL: Partial<Record<ConversationEntry['type'], string>> = {
   progress: 'Progress',
   handoff: 'Handoff',
   'run-node': 'Node',
-  'steer-directive': 'Steered',
 };
 
 /**
@@ -268,6 +268,15 @@ export function projectSv3RunFeed(source: Sv3RunSource, from: number): Sv3RunFee
       continue;
     }
     if (entry.type === 'error') errored = true;
+    if (entry.type === 'steer-directive') {
+      // WP6.2 — named by what happened to the direction, the same way the record names it.
+      items.push({
+        kind: 'note',
+        id: entry.id,
+        ...directionNote(entry.content, entry.directiveOutcome, entry.directiveReason),
+      });
+      continue;
+    }
     items.push({
       kind: 'note',
       id: entry.id,

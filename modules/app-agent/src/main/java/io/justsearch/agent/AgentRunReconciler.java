@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.lifecycle.LifecycleState;
 import java.time.Instant;
 import java.util.List;
@@ -73,6 +74,7 @@ public final class AgentRunReconciler {
       try {
         if (store.markInterrupted(sessionId, at)) {
           stamped++;
+          reportUnappliedDirections(sessionId);
         }
       } catch (RuntimeException e) {
         LOG.warn("Could not mark run {} interrupted", sessionId, e);
@@ -82,5 +84,34 @@ public final class AgentRunReconciler {
       LOG.info("Marked {} agent run(s) interrupted (the owning process did not finish them)", stamped);
     }
     return stamped;
+  }
+
+  /**
+   * WP6.2 — a direction the dead process accepted but never reported applied or not applied did not
+   * steer the run; say so in the run's record, once, as the live run's own terminal path would have.
+   */
+  private void reportUnappliedDirections(String sessionId) {
+    var outstanding = new java.util.LinkedHashMap<String, String>();
+    for (Map<String, Object> record : store.readEvents(sessionId)) {
+      if (!"directive_acknowledged".equals(record.get("eventType"))
+          || !(record.get("payload") instanceof Map<?, ?> payload)
+          || !(payload.get("directiveId") instanceof String id)) {
+        continue;
+      }
+      if (AgentEvent.DirectiveAcknowledged.QUEUED.equals(payload.get("outcome"))) {
+        if (!outstanding.containsKey(id)) {
+          outstanding.put(id, java.util.Objects.toString(payload.get("directiveText"), ""));
+        }
+      } else {
+        outstanding.put(id, null);
+      }
+    }
+    outstanding.forEach((id, text) -> {
+      if (text != null) {
+        store.appendEvent(sessionId, new AgentEvent.DirectiveAcknowledged(text, id,
+            AgentEvent.DirectiveAcknowledged.NOT_APPLIED,
+            AgentEvent.DirectiveAcknowledged.REASON_RUN_INTERRUPTED));
+      }
+    });
   }
 }

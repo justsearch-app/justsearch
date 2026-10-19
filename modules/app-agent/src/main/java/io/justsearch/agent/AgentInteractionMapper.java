@@ -349,6 +349,28 @@ public final class AgentInteractionMapper {
                 str(payload.get("message")),
                 attrs("phase", phase, "severity", payload.get("severity"))));
       }
+      // WP6.2 — a user's direction, with what became of it. Each report (queued, then applied or
+      // not applied) is its own record; `fromRunEvents` keeps one event per direction, at its first
+      // place, carrying the final outcome. A record from before WP6.2 has no id and no outcome, and
+      // an acknowledgement alone never proved the direction reached the model, so it shows nothing.
+      case "directive_acknowledged" -> {
+        if (!(payload.get("directiveId") instanceof String directiveId)) {
+          yield Optional.empty();
+        }
+        yield Optional.of(
+            new InteractionEvent(
+                conversationId + ":direction:" + directiveId,
+                conversationId,
+                at,
+                InteractionEventKind.PROGRESS,
+                "user",
+                str(payload.get("directiveText")),
+                attrs(
+                    "steer", Boolean.TRUE,
+                    "phase", "direction",
+                    "directiveOutcome", payload.get("outcome"),
+                    "directiveReason", payload.get("reason"))));
+      }
       // Tempdoc 848 §2.4 — NOT dropped: reasoning chunks are FOLDED by `fromRunEvents` into blocks
       // that ride on the turn they belong to. Stated as its own case rather than left to `default` so
       // the vocabulary is legible — a per-chunk thread event would mean ~445 events for one turn.
@@ -371,9 +393,8 @@ public final class AgentInteractionMapper {
       //   * `chunk` — the answer text arriving in pieces. `done.finalResponse` persists the whole of
       //     it, which is why the record path rebuilds the message from the terminal, not the stream.
       //   * `tool_batch_proposed`, `tool_call_approved`, `tool_call_rejected`'s sibling
-      //     `tool_call_virtual`, `handoff_proposed`, `directive_acknowledged` — a PROPOSAL or an
-      //     acknowledgement whose OUTCOME is already durable: the executed call, the rejection, the
-      //     executed handoff, and the steps the directive changed all persist above.
+      //     `tool_call_virtual`, `handoff_proposed` — a PROPOSAL whose OUTCOME is already durable:
+      //     the executed call, the rejection and the executed handoff all persist above.
       //   * `budget_update`, `budget_gate`, `context_gate`, `context_compacted` — live meters and
       //     open questions. Every way one of them RESOLVES into a fact the reader must keep is
       //     already a durable `progress` note (`DURABLE_PROGRESS_PHASES`) or the terminal
@@ -387,7 +408,6 @@ public final class AgentInteractionMapper {
               "tool_batch_proposed",
               "tool_call_approved",
               "tool_call_virtual",
-              "directive_acknowledged",
               "handoff_proposed",
               "budget_update",
               "budget_gate",
@@ -445,6 +465,7 @@ public final class AgentInteractionMapper {
     Instant runStart = null;
     Instant runFirstOutput = null;
     Instant lastSeen = null;
+    Map<String, Integer> directionAt = new java.util.HashMap<>();
 
     for (int ordinal = 0; ordinal < records.size(); ordinal++) {
       Map<String, Object> record = records.get(ordinal);
@@ -474,6 +495,23 @@ public final class AgentInteractionMapper {
         continue;
       }
       InteractionEvent event = projected.get();
+      // WP6.2 — a later report on a direction already shown updates it in place: the final outcome
+      // replaces "queued", and a late "queued" never undoes a final one.
+      Integer shown = directionAt.get(event.id());
+      if (shown != null) {
+        InteractionEvent first = out.get(shown);
+        if (!AgentEvent.DirectiveAcknowledged.QUEUED.equals(event.attributes().get("directiveOutcome"))) {
+          var attributes = new LinkedHashMap<>(first.attributes());
+          attributes.remove("directiveReason");
+          attributes.putAll(event.attributes());
+          out.set(shown, new InteractionEvent(first.id(), first.conversationId(), first.occurredAt(),
+              first.kind(), first.originator(), first.content(), attributes));
+        }
+        continue;
+      }
+      if (Boolean.TRUE.equals(event.attributes().get("steer"))) {
+        directionAt.put(event.id(), out.size());
+      }
       // Tempdoc 859 §A §1.3 — flush onto the next event that ACTUALLY PROJECTS, of ANY kind. The
       // event that CUTS a region is very often one this projection drops (`budget_update` is emitted
       // the instant each LLM stream ends, and `handoff_proposed` / the gates / a LIVENESS `progress`

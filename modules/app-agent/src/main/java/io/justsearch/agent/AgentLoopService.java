@@ -505,6 +505,8 @@ public final class AgentLoopService implements AgentService {
     var traceSequencerRef = new AtomicReference<>(
         new AgentEventTracing.Sequencer(sessionId, session.activeAgentId()));
     Consumer<AgentEvent> sink = wrapEventConsumer(sessionId, session, traceSequencerRef);
+    // WP6.2 — a direction is reported "queued" from the thread that submits it, through this sink.
+    session.eventSink(sink);
     // Tempdoc 834 §1.3 — open the run's observation channel. The session-local hub is gone; the
     // substrate owns sequencing, the bounded replay ring, fan-out and evict-on-throw.
     session.observeThrough(runObservation.open(sessionId, RUN_SHAPE_ID, request.conversationId()));
@@ -673,14 +675,17 @@ public final class AgentLoopService implements AgentService {
       session.markTerminated(TerminalDisposition.ERRORED, AgentErrorCode.INTERNAL_ERROR, null);
       checkpoint(sessionId, session, LifecycleState.ERROR.name(), e.getMessage());
     } finally {
-      // Tempdoc 565 §33 — end-of-run drain: a steering directive queued AFTER the last step boundary
-      // (during the final answer, or a single-LLM-call run with no second boundary) would otherwise be
-      // silently dropped. Drain any still-pending directive once and emit DirectiveAcknowledged so the
-      // human's direction is ALWAYS recorded as a run event — even when it landed too late to change the
-      // output. The session is still in the map and the SSE sink open until this handler returns.
-      String lateDirective = session.drainInterject();
-      if (lateDirective != null && !lateDirective.isBlank()) {
-        sink.accept(new AgentEvent.DirectiveAcknowledged(lateDirective));
+      // WP6.2 — a direction no accepted model request carried did not steer this run. Close
+      // the queue (later submissions are refused, so the sender is told the run finished) and report
+      // each outstanding direction as not applied, with why. The session is still in the map and the
+      // SSE sink open until this handler returns.
+      String notAppliedReason = notAppliedReason(session);
+      for (var direction : session.closeDirections()) {
+        sink.accept(new AgentEvent.DirectiveAcknowledged(
+            direction.text(),
+            direction.id(),
+            AgentEvent.DirectiveAcknowledged.NOT_APPLIED,
+            notAppliedReason));
       }
       if (agentSuccess) {
         agentSpan.setStatus(StatusCode.OK);
@@ -1043,26 +1048,59 @@ public final class AgentLoopService implements AgentService {
 
   // --- Internal ---
 
+  /** Why a direction still outstanding when the run ended was not applied (WP6.2). */
+  static String notAppliedReason(AgentSession session) {
+    TerminalDisposition disposition = session.disposition();
+    if (disposition == null) {
+      return AgentEvent.DirectiveAcknowledged.REASON_RUN_FAILED;
+    }
+    return switch (disposition) {
+      case COMPLETED -> AgentEvent.DirectiveAcknowledged.REASON_RUN_FINISHED;
+      case MAX_ITERATIONS -> AgentEvent.DirectiveAcknowledged.REASON_STEP_LIMIT;
+      case BUDGET_EDGE_FINALIZE -> AgentEvent.DirectiveAcknowledged.REASON_BUDGET_LIMIT;
+      case ERRORED ->
+          session.terminationCode() == AgentErrorCode.BUDGET_EXHAUSTED
+              ? AgentEvent.DirectiveAcknowledged.REASON_BUDGET_LIMIT
+              : AgentEvent.DirectiveAcknowledged.REASON_RUN_FAILED;
+      case CANCELLED ->
+          session.cancelTrigger() == CancelTrigger.BUDGET
+              ? AgentEvent.DirectiveAcknowledged.REASON_BUDGET_LIMIT
+              : AgentEvent.DirectiveAcknowledged.REASON_RUN_STOPPED;
+    };
+  }
+
   private Consumer<AgentEvent> wrapEventConsumer(
       String sessionId, AgentSession session,
       AtomicReference<AgentEventTracing.Sequencer> traceSequencerRef) {
+    // WP6.2 — the loop thread is no longer the only publisher: a direction's "queued" report comes
+    // from the thread that submitted it. One publish at a time keeps sequence numbers and the
+    // journal in the order observers saw.
+    Object publishLock = session.publishLock();
     return event -> {
-      AgentEvent enriched = event;
-      TraceContext trace = event.trace();
-      if (trace == null || !trace.hasIdentity()) {
-        enriched = AgentEventTracing.withTrace(event,
-            traceSequencerRef.get().next(event, session.iterationsUsed()));
+      synchronized (publishLock) {
+        publish(sessionId, session, traceSequencerRef, event);
       }
-      // Tempdoc 577 §2.14 Root I (#13) / 834 §1.3 — deliver to the run's observers (the journal,
-      // which fans out to every reattacher, plus the initiating writer) instead of writing the SSE
-      // socket directly. A broken observer's exception is SWALLOWED and the observer evicted — so a
-      // closed/dropped socket can no longer kill the loop, and the run survives the socket close
-      // (the §2.15 V3 root cause: a synchronous write to a dead socket aborted the loop).
-      session.deliverToObservers(enriched);
-      runStore.appendEvent(sessionId, enriched);
-      // Tempdoc 585 §D Phase 1 (A1): per-event-type observability from the ONE publish chokepoint.
-      agentTelemetry.recordEventEmitted(io.justsearch.agent.api.AgentEventPayloads.name(enriched));
     };
+  }
+
+  private void publish(
+      String sessionId, AgentSession session,
+      AtomicReference<AgentEventTracing.Sequencer> traceSequencerRef, AgentEvent event) {
+    AgentEvent enriched = event;
+    TraceContext trace = event.trace();
+    if (trace == null || !trace.hasIdentity()) {
+      enriched = AgentEventTracing.withTrace(event,
+          traceSequencerRef.get().next(event, session.iterationsUsed()));
+    }
+    // Tempdoc 577 §2.14 Root I (#13) / 834 §1.3 — deliver to the run's observers (the journal,
+    // which fans out to every reattacher, plus the initiating writer) instead of writing the SSE
+    // socket directly. A broken observer's exception is SWALLOWED and the observer evicted — so a
+    // closed/dropped socket can no longer kill the loop, and the run survives the socket close
+    // (the §2.15 V3 root cause: a synchronous write to a dead socket aborted the loop).
+    session.deliverToObservers(enriched);
+    runStore.appendEvent(sessionId, enriched);
+    // Tempdoc 585 §D Phase 1 (A1): per-event-type observability from the ONE publish chokepoint.
+    agentTelemetry.recordEventEmitted(io.justsearch.agent.api.AgentEventPayloads.name(enriched));
   }
 
 

@@ -147,6 +147,11 @@ export interface ConversationEntry {
   nodeLabel?: string;
   /** Tempdoc 859 §A — a `reasoning` entry's measured duration (first token → first output). */
   durationMs?: number;
+  /** WP6.2 — a `steer-directive` entry's id and what became of it ('queued'|'applied'|'not_applied'). */
+  directiveId?: string;
+  directiveOutcome?: string;
+  /** WP6.2 — why a direction was not applied ('run_finished', 'run_stopped', …). */
+  directiveReason?: string;
   timestamp: number;
 }
 
@@ -687,7 +692,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    */
   async steer(text: string): Promise<boolean> {
     const trimmed = text.trim();
-    if (!trimmed || !this.sessionId) return false;
+    if (!trimmed) return false;
+    if (!this.sessionId) {
+      this.steerFailureNote('Could not send your direction — the run has not started yet. Try again in a moment.');
+      return false;
+    }
     try {
       const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/steer`, {
         method: 'POST',
@@ -695,29 +704,27 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         body: JSON.stringify({ sessionId: this.sessionId, text: trimmed }),
       });
       if (!res.ok) {
-        // Tempdoc 565 §33 — a failed steer (404: the run finished between render and submit) must NOT be
-        // silent. Surface a one-line system note so the user knows their direction didn't land.
-        this.steerFailureNote();
+        // Tempdoc 565 §33 — a failed steer must NOT be silent. Surface a one-line system note so the
+        // user knows their direction didn't land; WP6.2 — and say why, since only 404 means finished.
+        this.steerFailureNote(
+          res.status === 404
+            ? 'Could not steer — the run already finished.'
+            : `Could not send your direction (HTTP ${res.status}). It was not applied.`,
+        );
         return false;
       }
       return true;
     } catch {
-      this.steerFailureNote();
+      this.steerFailureNote('Could not send your direction — the connection to JustSearch failed. It was not applied.');
       return false;
     }
   }
 
-  /** Tempdoc 565 §33 — a one-line system note when a steer couldn't be delivered (the run finished). */
-  private steerFailureNote(): void {
+  /** Tempdoc 565 §33 — a one-line system note when a steer couldn't be delivered. */
+  private steerFailureNote(content: string): void {
     this.conversation = [
       ...this.conversation,
-      {
-        id: this.nextEntryId(),
-        type: 'progress',
-        content: 'Could not steer — the run already finished.',
-        severity: 'warn',
-        timestamp: Date.now(),
-      },
+      { id: this.nextEntryId(), type: 'progress', content, severity: 'warn', timestamp: Date.now() },
     ];
     this.notify();
   }
@@ -1769,18 +1776,42 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   /**
-   * Tempdoc 565 §30 — the agent loop drained a human steering directive at a step boundary; append it
-   * as a `steer-directive` entry. The live projection renders it as a human-origin run-spine landmark
-   * + a "Your direction: …" body chip, so the user sees their interject land in the run.
+   * Tempdoc 565 §30 — a human steering directive was acknowledged; show it as a `steer-directive`
+   * entry. The live projection renders it as a human-origin run-spine landmark + a "Your direction: …"
+   * body chip, so the user sees their interject land in the run. WP6.2 — each direction is reported
+   * queued, then applied or not applied: a later report updates the entry with the same
+   * `directiveId` in place, and a late "queued" never undoes a final outcome.
    */
   onDirectiveAcknowledged(payload: unknown): void {
-    this.commitStreamingText();
     const d = (payload ?? {}) as Record<string, unknown>;
     const text = typeof d.directiveText === 'string' ? d.directiveText : '';
     if (!text) return;
+    const directiveId = typeof d.directiveId === 'string' ? d.directiveId : undefined;
+    const outcome = typeof d.outcome === 'string' ? d.outcome : undefined;
+    const reason = typeof d.reason === 'string' ? d.reason : undefined;
+    const shown = directiveId
+      ? this.conversation.findIndex((e) => e.type === 'steer-directive' && e.directiveId === directiveId)
+      : -1;
+    if (shown >= 0) {
+      if (outcome === 'queued') return;
+      const conversation = [...this.conversation];
+      conversation[shown] = { ...conversation[shown]!, directiveOutcome: outcome, directiveReason: reason };
+      this.conversation = conversation;
+      this.notify();
+      return;
+    }
+    this.commitStreamingText();
     this.conversation = [
       ...this.conversation,
-      { id: this.nextEntryId(), type: 'steer-directive', content: text, timestamp: Date.now() },
+      {
+        id: this.nextEntryId(),
+        type: 'steer-directive',
+        content: text,
+        ...(directiveId ? { directiveId } : {}),
+        ...(outcome ? { directiveOutcome: outcome } : {}),
+        ...(reason ? { directiveReason: reason } : {}),
+        timestamp: Date.now(),
+      },
     ];
     this.notify();
   }

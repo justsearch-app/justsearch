@@ -64,6 +64,9 @@ export interface CoreAgentRunToolCallApprovedPayload {
 /** Payload of the `directive_acknowledged` event. */
 export interface CoreAgentRunDirectiveAcknowledgedPayload {
   directiveText: string;
+  directiveId: string;
+  outcome: 'queued' | 'applied' | 'not_applied';
+  reason?: 'run_finished' | 'run_stopped' | 'run_failed' | 'step_limit' | 'budget_limit' | 'run_interrupted';
   trace?: TracePayload;
 }
 

@@ -52,7 +52,11 @@ final class AgentEventPayloadConformanceTest {
               "id", "tool", "args", RiskTier.LOW, GateBehavior.AUTO),
           new AgentEvent.ToolCallApproved("id"),
           // Tempdoc 565 §30 — the DIRECTION authority's mid-run steer acknowledgement.
-          new AgentEvent.DirectiveAcknowledged("Focus only on Q3."),
+          new AgentEvent.DirectiveAcknowledged(
+              "Focus only on Q3.",
+              "d1",
+              AgentEvent.DirectiveAcknowledged.NOT_APPLIED,
+              AgentEvent.DirectiveAcknowledged.REASON_RUN_FINISHED),
           new AgentEvent.ToolExecutionStarted("id", "tool"),
           // non-empty structuredData → the conditional `structuredData` key is emitted; a MEASURED
           // char count (878 §D.4) → the conditional `outputCharsToModel`/`truncatedForModel` pair

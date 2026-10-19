@@ -6699,3 +6699,36 @@ describe('UnifiedChatView resumed-thread shape provenance (tempdoc 941)', () => 
     view.remove();
   });
 });
+
+// WP6.2 S8.2 / N8.4 — the old window's direction chip says what happened to the direction; an applied
+// one reads exactly as it always has.
+describe('a direction chip reports its outcome', () => {
+  it('keeps the applied chip unchanged and marks queued and not-applied directions', async () => {
+    __resetAgentSessionStore();
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'agent';
+    const steer = (id: string, content: string, attributes: Record<string, unknown>) => ({
+      id, occurredAt: `2026-01-01T00:00:0${id.slice(1)}Z`, kind: 'PROGRESS', originator: 'user', content,
+      attributes: { steer: true, ...attributes },
+    });
+    (view as unknown as { unifiedEvents: unknown[] }).unifiedEvents = [
+      { id: 'u0', occurredAt: '2026-01-01T00:00:00Z', kind: 'USER_MESSAGE', originator: 'user', content: 'q', attributes: {} },
+      steer('s1', 'Focus on Q3.', { directiveOutcome: 'applied' }),
+      steer('s2', 'Skip drafts.', { directiveOutcome: 'queued' }),
+      steer('s3', 'Too late.', { directiveOutcome: 'not_applied', directiveReason: 'run_stopped' }),
+    ];
+    view.requestUpdate();
+    await view.updateComplete;
+    const chips = [...view.shadowRoot!.querySelectorAll('.steer-directive')].map((chip) =>
+      (chip.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+    expect(chips).toEqual([
+      'Your direction Focus on Q3.',
+      "Your direction Skip drafts. Queued — applies at the agent's next step",
+      "Your direction Too late. Not applied — the run was stopped before the agent's next step",
+    ]);
+    __resetAgentSessionStore();
+    view.remove();
+  });
+});

@@ -103,6 +103,8 @@ import {
   projectUnifiedThread,
   projectLiveAgentActivity,
   terminalAssistantIds,
+  directionNotAppliedBecause,
+  DIRECTION_QUEUED_NOTE,
   PROMINENCE_SCALE,
   TERMINAL_NODE_WEIGHT,
   type ThreadEvent,
@@ -5685,9 +5687,19 @@ export class UnifiedChatView extends JfElement {
         // Tempdoc 565 §30 — a human STEERING directive (the DIRECTION authority's interject) renders as
         // a distinct human-origin chip, not an ambient agent step, so the user sees their direction land.
         if (it.attributes?.steer === true) {
+          // WP6.2 — an applied direction reads as it always has; one that has not reached the model
+          // (yet, or at all) says so.
+          const outcome = it.attributes.directiveOutcome;
           return html`<div class="steer-directive" data-steer>
             <span class="steer-directive__label">Your direction</span>
             <span class="steer-directive__text">${it.content}</span>
+            ${outcome === 'queued'
+              ? html`<span class="steer-directive__outcome">Queued — ${DIRECTION_QUEUED_NOTE}</span>`
+              : outcome === 'not_applied'
+                ? html`<span class="steer-directive__outcome"
+                    >Not applied — ${directionNotAppliedBecause(it.attributes.directiveReason)}</span
+                  >`
+                : nothing}
           </div>`;
         }
         // Tempdoc 565 §17 — the step's tone/glyph is carried by the <jf-run-node> beside this in the

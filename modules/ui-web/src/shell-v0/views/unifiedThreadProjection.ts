@@ -392,6 +392,9 @@ export interface LiveConversationEntry {
   readonly severity?: string;
   /** Tempdoc 577 Ext II: typed progress phase token (see ConversationEntry.phase). */
   readonly phase?: string;
+  /** WP6.2 — a `steer-directive` entry's outcome and reason (see ConversationEntry). */
+  readonly directiveOutcome?: string;
+  readonly directiveReason?: string;
   readonly timestamp: number;
   // Tempdoc 565 §26.B — a `run-node` entry is a workflow node boundary the controller pushes on
   // node_started/node_completed; the projector emits it as a boundary `progress` item that
@@ -427,6 +430,37 @@ export interface LiveToolCall {
 export interface LiveAnswerGrounding {
   readonly sources?: readonly unknown[];
   readonly citations?: readonly unknown[];
+}
+
+/** WP6.2 — why a direction was not applied, as the reader is told (the backend's closed reasons). */
+const DIRECTION_NOT_APPLIED_BECAUSE: Readonly<Record<string, string>> = {
+  run_finished: "the run finished before the agent's next step",
+  run_stopped: "the run was stopped before the agent's next step",
+  run_failed: "the run failed before the agent's next step",
+  step_limit: "the run reached its step limit before the agent's next step",
+  budget_limit: "the run reached its token budget before the agent's next step",
+  run_interrupted: 'the run was interrupted when JustSearch restarted',
+};
+
+export const DIRECTION_QUEUED_NOTE = "applies at the agent's next step";
+
+export function directionNotAppliedBecause(reason: unknown): string {
+  return (
+    (typeof reason === 'string' ? DIRECTION_NOT_APPLIED_BECAUSE[reason] : undefined) ??
+    "the run ended before the agent's next step"
+  );
+}
+
+/**
+ * WP6.2 — a direction as a labelled note, live or reloaded: "Steered" only once it reached the model
+ * (or when an older build reported it without an outcome, which it did only then).
+ */
+export function directionNote(text: string, outcome: unknown, reason: unknown): { label: string; text: string } {
+  if (outcome === 'queued') return { label: 'Direction queued', text: `${text} (${DIRECTION_QUEUED_NOTE})` };
+  if (outcome === 'not_applied') {
+    return { label: 'Not applied', text: `${text} (${directionNotAppliedBecause(reason)})` };
+  }
+  return { label: 'Steered', text };
 }
 
 /**
@@ -529,9 +563,14 @@ export function projectLiveAgentActivity(
         // Tempdoc 565 §30 — a human steering directive: a POINT item, human-origin (originator
         // 'user'), flagged `steer` so the spine renders it as a human landmark and the body as a
         // "Your direction: …" chip. Not a boundary (no nodeBoundary) so assignRunSegments keeps it.
+        // WP6.2 — with its outcome, under the same keys a reloaded direction carries.
         items.push({
           id: e.id, ts: e.timestamp, kind: 'progress', originator: 'user', content: e.content,
-          attributes: { steer: true },
+          attributes: {
+            steer: true,
+            ...(e.directiveOutcome ? { directiveOutcome: e.directiveOutcome } : {}),
+            ...(e.directiveReason ? { directiveReason: e.directiveReason } : {}),
+          },
         });
         break;
       case 'run-node':

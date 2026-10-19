@@ -249,6 +249,41 @@
             "objectType": null
           },
           {
+            "name": "directiveId",
+            "type": "STRING",
+            "optional": false,
+            "enumValues": [],
+            "elementType": null,
+            "objectType": null
+          },
+          {
+            "name": "outcome",
+            "type": "ENUM",
+            "optional": false,
+            "enumValues": [
+              "queued",
+              "applied",
+              "not_applied"
+            ],
+            "elementType": null,
+            "objectType": null
+          },
+          {
+            "name": "reason",
+            "type": "ENUM",
+            "optional": true,
+            "enumValues": [
+              "run_finished",
+              "run_stopped",
+              "run_failed",
+              "step_limit",
+              "budget_limit",
+              "run_interrupted"
+            ],
+            "elementType": null,
+            "objectType": null
+          },
+          {
             "name": "trace",
             "type": "OBJECT",
             "optional": true,
