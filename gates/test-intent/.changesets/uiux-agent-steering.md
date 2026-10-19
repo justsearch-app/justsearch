@@ -894,3 +894,14 @@ No acceptance record is supplied by the builder.
   "note": "Reject Review 4's New AgentSessionController.test.ts entry: AS2 does not warrant clearing an unconfirmed send from an id-less same-text report belonging to another client. Real API/browser probes reproduce this in both windows. Missing cases: cross-client id-less reports and retention through terminal rendering/reload; Search v3 loses the warning at completion and both windows after reload. Fresh UI and recovery evidence matches committed classifications; remaining duplicate Java replays were cancelled behind the shared lock."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-118a3wha",
+  "verdict": "accept",
+  "digest": "sha256:3dddb5d5835945ecff9059f86cb6546a9e5a2378d63f0f65f93eee02cd2de2b1",
+  "note": "Reviewed sources and baseline tests before the diff. Fresh frontend evidence matches committed classifications; eight live window cases and both resume modes pass. No unjustified oracle change found. One applied French correction produced English; recorded as a model-compliance limitation."
+}
+```
