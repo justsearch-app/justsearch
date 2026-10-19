@@ -446,3 +446,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "accept",
+  "digest": "sha256:4a3290dc65b2edf56df7daf2bb5b7ba338be0e8a2938bdbc66e09287ec702f0a",
+  "note": "Adaptation group: diffs only add BeforeEach/AfterEach that pin os.name to Windows 11 (restored after), with zero assertion lines changed in 15 files; base behaviour was implicitly Windows-only and tests are not run in parallel within a JVM, so the oracle is kept. InferenceConfigArtifactIdentityTest only marks the fake executable runnable. New entries are Linux-only expectations (native names, curl, executable mode, refusal of Windows packs, external runtime retained) consistent with the user's intent; RuntimeActivationSelfTestSeamTest's changed Linux precondition is stated. All flagged tests executed and passed in my full run. Scenario quotes (S12 etc.) not checked against the task record."
+}
+```

@@ -33,6 +33,7 @@ import org.junit.jupiter.api.condition.OS;
  * failure is an assertion.
  */
 @Timeout(60)
+@Tag("cross-platform")
 final class WindowsPowerNotificationsTest {
   private static final int ERROR_SUCCESS = 0;
   private static final int PBT_APMSUSPEND = 4;

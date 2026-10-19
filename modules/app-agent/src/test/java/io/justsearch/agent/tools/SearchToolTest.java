@@ -14,9 +14,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 // Search request, formatting and pasted path-query semantics are portable.
+@Tag("cross-platform")
 class SearchToolTest {
   private static String nativeText(String windows, String linux) {
     return io.justsearch.configuration.PlatformPaths.isWindows() ? windows : linux;

@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
  * so callers can retry on the upgraded holder reference (tempdoc 410 V1 promoted this from
  * IllegalStateException); (3) a failed drain retains resources for a later bounded retry.
  */
+@Tag("cross-platform")
 class DrainAndCloseTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;

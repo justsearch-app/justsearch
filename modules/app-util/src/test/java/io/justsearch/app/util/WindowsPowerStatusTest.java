@@ -8,9 +8,11 @@ import io.justsearch.app.util.EnergyState.Intent;
 import io.justsearch.app.util.EnergyState.Source;
 import io.justsearch.app.util.WindowsPowerStatus.Snapshot;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** Truth table for the pure {@link WindowsPowerStatus#toEnergyState} derivation (tempdoc 630). */
+@Tag("cross-platform")
 final class WindowsPowerStatusTest {
 
   @Test

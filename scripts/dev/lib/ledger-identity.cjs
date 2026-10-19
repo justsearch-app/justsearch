@@ -218,11 +218,13 @@ function proves(line, S, { keyStarts = 1, contested = false, writer = null, fami
   if (!line || !S) return false;
   const R = identityOf(line, { defaultTick: TICK.EXACT, owner: line.owner ?? line.previousOwner ?? null });
   if (S.conflicts.length) return false;
+  // A logical helper key identifies one start, including when both starts carry a birth.
+  if (family === 'helper' && keyStarts !== 1) return false;
   const engine = (family ?? S.kind) === 'engine';
   // A helper's creator can observe its own held Process exit before /proc birth capture.
   // This proves only the unique logical helper start; it never identifies a PID for signalling.
   if (family === 'helper' && S.rawBirth === null && R.rawBirth === null) {
-    return S.pid !== null && keyStarts === 1 && !contested && Number.isInteger(line.code)
+    return S.pid !== null && !contested && Number.isInteger(line.code)
       && S.helperId !== null && S.incarnation !== null && exact(R, S)
       && startWriters.some(w => sameWriter(writer, w));
   }

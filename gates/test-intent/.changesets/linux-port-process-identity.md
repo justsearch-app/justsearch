@@ -16,6 +16,8 @@ R9 script checks (governance self-tests are outside the gate's D4 runner scope):
 - H3: production Java already captures the tuple immediately after ProcessBuilder.start in BoundChildProcess.spawn, before waiting for exec, retains it against the original Process weak key, and retries if absent. LinuxProcessTerminator.open reuses that birth. An extremely short child can still be reaped before either read; reading ProcessHandle.startInstant cannot recover an exact boot/start-ticks tuple safely. H1 is the fallback; no helper handshake, fabricated birth or timestamp is added.
 - H4: owner-only forget/admission policy is unchanged. Ordinary stop already admits an ended owner's run; new logical receipt reconciliation clears that obligation, never grants OS/PID signal authority. Original run 677b22be was cleared by the fixed runner's ordinary stop in `tmp/r9/recover-stuck-second.json` with no signals. `tmp/r9/live-session.log` records Tesseract probe → stop → start → final stop. Existing owner-conflict tests are included in the 52/52 dev-runner suite (`tmp/r9/dev-runner-suite-final-candidate.log`).
 
+R10 also strengthens the existing Node helper-census suite (scripts are outside this gate's flagged product-test scope): independent owner and incarnation mismatch checks cover both the shared receipt comparator and stop result; contested logical keys, mismatched tracked obligations, uninventoried PIDs and a matching positive control remain explicit. Two additional cases require duplicate helper starts, with and without native birth, to remain unproven and incomplete. The shared identity proof now requires exactly one helper start; the census no longer collapses separate records. No PID-only kill or Windows accounting rule is added. Evidence: tmp/r10/helper-before-worktree.log, mutation-{owner,incarnation,unique-key}.log, helper-final.log and dev-runner-final.log. Owner source: task t-20261017-9a5f5a user turn 10 items 3–4. These are new durable assertions; no prior assertion is removed or relaxed.
+
 ```json
 {
   "entries": [
@@ -70,8 +72,8 @@ R9 script checks (governance self-tests are outside the gate's D4 runner scope):
         "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/GpuSwitchBarrierTest.java"
       ],
       "class": "Structural rule kept",
-      "rule": "Existing Windows assertions remain; equivalent Linux execution strengthens coverage without removing fault injection or moving tests to a later tier.",
-      "whySurvives": "Expand the native helper/ledger checks to Linux through the shared backend while retaining every Windows assertion and command. Linux uses a real native child and native read-only attributes/tuple field rather than DOS attributes or powershell; Windows-only DWORD crash, Job Object and Windows path/wrapper cases remain explicitly Windows-only. No assertion is deleted or loosened; Linux short-child, interruption, tuple, containment and census coverage is recorded in this changeset. R9 restores the independently read birth versus held-handle comparison in OwnedHelperRollbackTest; the port had accidentally made that comparison self-referential. Windows again checks exactly the original independent observation, and Linux checks its native tuple.",
+      "rule": "Retain Windows fault-injection and identity assertions in the unit tier, restore their Windows-native CI lane, and add equivalent Linux unit execution.",
+      "whySurvives": "Expand the native helper/ledger checks to Linux through the shared backend while retaining every Windows assertion and command. Linux uses a real native child and native read-only attributes/tuple field rather than DOS attributes or powershell; Windows-only DWORD crash, Job Object and Windows path/wrapper cases remain explicitly Windows-only. No assertion is deleted or loosened; Linux short-child, interruption, tuple, containment and census coverage is recorded in this changeset. R9 restores the independently read birth versus held-handle comparison in OwnedHelperRollbackTest; the port had accidentally made that comparison self-referential. Windows again checks exactly the original independent observation, and Linux checks its native tuple. R10 repairs the intermediate loss of Windows lane selection for HelperFlushRetryTest and LateWindowExitTest: both carry cross-platform, included alongside windows by the Windows-native lane and left enabled in Linux default tasks. DOS read-only force-failure and Windows native creation-identity branches remain asserted on Windows; Linux uses the equivalent native fixtures. The tier remains unit; CI host coverage expands from Windows to both OSes rather than silently removing the Windows lane.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -100,6 +102,11 @@ R9 script checks (governance self-tests are outside the gate's D4 runner scope):
           "scenario": "P6",
           "quote": "On Windows, existing saved state (settings, install contract, pack manifests, runtime/resume records, activation state, process manifests, leases, ledgers, eval-cache identities) keeps its meaning; any changed identity format is versioned and old records still read. Making Windows absolute paths usable on Linux is not in scope",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Restore Windows execution of every class that ran in that lane on the baseline, keep them running on Linux, and fix it generally (the selection rule, not a per-class exception)",
+          "location": "task t-20261017-9a5f5a user turn 10"
         }
       ]
     },
@@ -346,3 +353,14 @@ R9 script checks (governance self-tests are outside the gate's D4 runner scope):
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "reject",
+  "digest": "sha256:9d4650b6385e98ae0ec16a0938f3d9d62db59585d50f794a5591e2f71061ba9d",
+  "note": "Entry 2 (structural rule kept) says no test moves tier and every Windows assertion is retained, but HelperFlushRetryTest (dos:readonly force failure) and LateWindowExitTest (native Windows creation identities) lose @Tag(windows). The Windows-native CI lane (ci.yml windows-native-tests) runs only @Tag(\"windows\") tests via -PwindowsOnly=true, and every other unit lane runs on ubuntu. Removing @Tag(\"windows\") therefore removes these tests' Windows execution from CI: their Windows branches now run in no CI lane. Shown by running the lane's selection on base and candidate: -PwindowsOnly=true selects DrainAndCloseTest, BrowseToolTest, SearchToolTest, AppInstanceLockTest, WindowsPowerStatusTest on 37e0957c9 and none on the candidate; for app-api, --tests HelperFlushRetryTest/LateWindowExitTest with -PwindowsOnly=true succeeds on the base and fails 'No tests found' on the candidate (evidence tmp/verifier-final/32-*). The entry does not say this and claims execution is not moved; rework: keep the Windows tag (e.g. on the Windows-path methods) or state the lane change plainly with a source. The New Linux entries (LinuxChildLifetime, ReapingRace with assertDoesNotThrow, IdentityEncoding, ReapedSpawn, ContainmentBoot, ExitLedgerWriter) and the fixture Adaptation I found accurate; all executed and passed in my run."
+}
+```

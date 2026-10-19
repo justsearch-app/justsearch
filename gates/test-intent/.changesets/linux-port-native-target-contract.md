@@ -80,3 +80,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "accept",
+  "digest": "sha256:0ba1e54696bdbfc57c9f56e6e539d60200458cfabdeb721a2e492476c12cf983",
+  "note": "New tests only. NativeTargetsContractTest compares the descriptor's windows-x86_64 target with an independent golden whose every name I found in 37e0957c9 code (nvcuda via loadLibrary(nvcuda), ORT win-x64 resources in ui/build.gradle.kts); NativeRuntimePlannerTest pins Linux skip-as-PLATFORM of foreign runtime and Windows download, unknown target fails closed. Both executed and passed (3+3 cases) in my full run."
+}
+```

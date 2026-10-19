@@ -352,3 +352,14 @@ Additional shell native identity/signal receipts, beyond the deleted-image repai
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "accept",
+  "digest": "sha256:3653785b0c7601c792a2e474f248fefa5a74752138a7698017b20d48f9013eef",
+  "note": "Checked diffs of engine_host.rs/lib.rs/updater_handoff_tests.rs test parts: no assertion or #[test] removed, added cfg(target_os=linux) branches are production/seam code, the updater fixture selects the old Windows command on Windows. New entries add Linux-only tests (containment, linux_process, exit_ledger, native_targets, platform_paths, shell_actuator). I did not run cargo test myself; the gate validates the cited evidence files. Note: CI runs cargo test only on windows-latest, so these Linux Rust tests run in no CI lane."
+}
+```

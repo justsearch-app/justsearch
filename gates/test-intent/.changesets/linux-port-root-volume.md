@@ -289,3 +289,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "accept",
+  "digest": "sha256:d19939ad3ed07030a725e0821ecc3002d779ced14221312ab4b952ed26d94413",
+  "note": "Base: root-volume tests assumed WINDOWS. Diffs widen the assumption to Linux when the UUID-backed fixture has a volume identity, keep Windows case-folded backslash keys and windows-volume prefixes, add exact-case / linux-volume-v1 keys; no assertion removed (scan shows 0 removed assert lines). VolumeIdentityTempDirFactory supplies only a directory. Linux cases executed and passed (LostRootVolumeRecordTest 3, Unproven 1, Walk 1, Upgrade 2 + 1 Windows SUBST skip, new Linux tests 14). EngineLinuxRootVolumeLiveTest is opt-in and I did not run it."
+}
+```

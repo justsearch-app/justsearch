@@ -71,21 +71,16 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
 
       val includeExperiment = project.findProperty("includeExperiment")?.toString()?.toBoolean() ?: false
       val includeStress = project.findProperty("includeStress")?.toString()?.toBoolean() ?: false
-      // Tempdoc 668 Windows→Linux migration (option B): tests tagged "windows" exercise
-      // genuinely Windows-specific product behaviour (single-instance lock, job objects,
-      // power status). They are excluded on NON-Windows hosts (the Linux CI lanes) so the bulk
-      // of CI runs on the ~2.8x faster Linux runners; the dedicated windows-native lane runs
-      // ONLY the tagged tests via -PwindowsOnly=true (includeTags "windows"). On a Windows host
-      // (local dev, or that lane's runner) they run normally in the default flow — they can only
-      // be tested on Windows, so excluding them there would silently drop their local coverage
-      // (and make `--tests "*WindowsFooTest*"` fail with "no tests found").
+      // Windows-native CI also selects formerly Windows-only classes with portable OS branches.
+      // "cross-platform" keeps those classes in that lane and in the default Linux test tasks;
+      // genuinely Windows-only methods retain their "windows" tag and OS preconditions.
       val windowsOnly = project.findProperty("windowsOnly")?.toString()?.toBoolean() ?: false
       val isWindowsHost = HostPlatform.isWindows
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
         useJUnitPlatform {
           if (windowsOnly) {
-            includeTags("windows")
+            includeTags("windows", "cross-platform")
           } else {
             val excluded = mutableListOf<String>()
             // Skip the Windows-specific tests only where they cannot run (non-Windows CI).

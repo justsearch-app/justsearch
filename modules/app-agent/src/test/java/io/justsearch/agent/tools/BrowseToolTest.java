@@ -10,9 +10,11 @@ import io.justsearch.app.api.knowledge.FolderFilesResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 // Request/formatting assertions use equivalent native roots; Windows path literals stay exact.
+@Tag("cross-platform")
 class BrowseToolTest {
   private static String nativeText(String windows, String linux) {
     return io.justsearch.configuration.PlatformPaths.isWindows() ? windows : linux;

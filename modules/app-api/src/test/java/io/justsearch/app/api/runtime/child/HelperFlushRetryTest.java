@@ -8,6 +8,7 @@ import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -22,6 +23,7 @@ import io.justsearch.app.api.runtime.ledger.LedgerWriterId;
 
 /** Task b6d536 b101, verifier round 2: records remain pending when the disk force fails and need another group force. */
 @EnabledOnOs({OS.WINDOWS, OS.LINUX})
+@Tag("cross-platform")
 final class HelperFlushRetryTest {
   @Test void failedGroupForceRetainsPendingRecordsForTheNextFlush(@TempDir Path dir) throws Exception {
     var recorder = OwnedHelper.class.getDeclaredField("recorder");

@@ -791,7 +791,9 @@ function ledgerView(ledger, runId, { stopBindings = [] } = {}) {
     if (typeof line.helperId !== 'string' || !/^[\w-]+$/.test(line.helperId)) continue;
     const id = startIdentity({ ...line, kind: 'helper' });
     const group = helperGroups.get(line.helperId) ?? [];
-    if (!group.some(s => compareIdentity(s.identity, id, 'exact'))) group.push({ family: 'helper', identity: id, start: r, writers: [r.writer] });
+    // Separate starts are separate obligations, even if PID and logical fields coincide.
+    // OwnedHelper records a start once; a flush retry forces bytes, it does not append a start.
+    group.push({ family: 'helper', identity: id, start: r, writers: [r.writer] });
     helperGroups.set(line.helperId, group);
   }
   for (const group of helperGroups.values()) for (const start of group) {

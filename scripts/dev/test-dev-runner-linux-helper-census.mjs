@@ -7,6 +7,7 @@ import { test } from 'node:test';
 const require = createRequire(import.meta.url);
 const census = require('./lib/stop-exit-census.cjs');
 const ledger = require('./lib/exit-ledger.cjs');
+const { compareIdentity } = require('./lib/ledger-identity.cjs');
 const linux = process.platform === 'linux';
 const bootId = '11111111-2222-4333-8444-555555555555';
 const native = (pid, ticks = String(pid)) => ({ kind: 'linux-proc-v1', pid, bootId, startTicks: ticks });
@@ -327,4 +328,82 @@ test('a creator receipt cannot prove a helper start with an invalid PID', { skip
       assert.equal(census.isProven(start, f.read.children.records, f.view.allStarts), null);
     } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
   }
+});
+
+// Independent receipt fields and contested logical keys remain separate proof obligations.
+test('a creator exit naming another owner never proves the helper', { skip: !linux }, () => {
+  const f = rapidFixture(x => { x.children[1].owner = { ...x.children[1].owner, instanceId: 'parser-other' }; }); try {
+    const helper = f.view.helpers[0];
+    assert.equal(compareIdentity(f.read.children.records[1].line, helper.identity, 'proves', {
+      family: 'helper', keyStarts: 1, contested: false,
+      writer: f.read.children.records[1].writer, startWriters: [f.read.children.records[0].writer],
+    }), false, 'the shared receipt comparator independently checks this field');
+    assert.equal(helper.proof ?? null, null);
+    assert.equal(census.ledgerResolution(f.view).isEnded({ ...helper, role: 'native-helper' }), false);
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    assert.equal(result.exitAccountingComplete, false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+test('a creator exit naming another incarnation never proves the helper', { skip: !linux }, () => {
+  const f = rapidFixture(x => { x.children[1].incarnation = { ...x.children[1].incarnation, n: 2 }; }); try {
+    const helper = f.view.helpers[0];
+    assert.equal(compareIdentity(f.read.children.records[1].line, helper.identity, 'proves', {
+      family: 'helper', keyStarts: 1, contested: false,
+      writer: f.read.children.records[1].writer, startWriters: [f.read.children.records[0].writer],
+    }), false, 'the shared receipt comparator independently checks this field');
+    assert.equal(helper.proof ?? null, null);
+    assert.equal(census.ledgerResolution(f.view).isEnded({ ...helper, role: 'native-helper' }), false);
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    assert.equal(result.exitAccountingComplete, false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+test('two starts of one helper key (contested) are not proven by one exit', { skip: !linux }, () => {
+  const f = rapidFixture(x => { x.children.splice(1, 0, { ...x.children[0], seq: 7, pid: 2364531, argvHash: 'b'.repeat(64) }); x.children[2].seq = 8; }); try {
+    const ended = census.ledgerResolution(f.view);
+    for (const h of f.view.helpers) assert.equal(ended.isEnded({ ...h, role: 'native-helper' }), false, JSON.stringify(h.pid));
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    assert.equal(result.exitAccountingComplete, false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+test('a tracked obligation with another owner is not discharged by the receipt', { skip: !linux }, () => {
+  const f = rapidFixture(); try {
+    const helper = f.view.helpers[0];
+    const res = census.ledgerResolution(f.view);
+    assert.equal(res.isEnded({ pid: helper.pid, role: 'native-helper', helperId: helper.helperId, owner: { ...helper.owner, instanceId: 'parser-other' } }), false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+test('a tracked obligation with another incarnation is not discharged by the receipt', { skip: !linux }, () => {
+  const f = rapidFixture(); try {
+    const helper = f.view.helpers[0];
+    const res = census.ledgerResolution(f.view);
+    assert.equal(res.isEnded({ pid: helper.pid, role: 'native-helper', helperId: helper.helperId, incarnation: { ...helper.incarnation, n: 9 } }), false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+test('a tracked native-helper PID with no ledger start is not ended', { skip: !linux }, () => {
+  const f = rapidFixture(); try {
+    assert.equal(census.ledgerResolution(f.view).isEnded({ pid: 999999, role: 'native-helper' }), false);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+test('the matching receipt does discharge the exact obligation (positive control)', { skip: !linux }, () => {
+  const f = rapidFixture(); try {
+    const helper = f.view.helpers[0];
+    assert.equal(census.ledgerResolution(f.view).isEnded({ pid: helper.pid, role: 'native-helper', helperId: helper.helperId, owner: helper.owner, incarnation: helper.incarnation }), true);
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+for (const missingBirth of [false, true]) test('duplicate helper starts remain unproven (' + (missingBirth ? 'missing' : 'known') + ' birth)', { skip: !linux }, () => {
+  const f = (missingBirth ? rapidFixture : fixture)(x => {
+    x.children.splice(1, 0, { ...x.children[0], seq: 20 });
+    x.children[2].seq = 21;
+  }); try {
+    assert.equal(f.view.helpers.length, 2, 'separate start records must not be collapsed');
+    const resolution = census.ledgerResolution(f.view);
+    for (const helper of f.view.helpers) {
+      assert.equal(helper.proof, null);
+      assert.equal(resolution.isEnded({ ...helper, role: 'native-helper' }), false);
+    }
+    const result = census.exitResult(f.input, { processExits: [] }, 'fixture', f.read, f.view);
+    assert.equal(result.exitAccountingComplete, false);
+    assert.ok(result.exitAccountingGaps.some(g => g.pid === f.view.helpers[0].pid));
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
 });

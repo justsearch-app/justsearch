@@ -21,8 +21,8 @@ These entries cover the whole Linux port relative to origin/main, including prio
         "modules/worker-core/src/test/java/io/justsearch/indexerworker/tokenizer/NoDeviceTokenizerCacheTest.java"
       ],
       "class": "Structural rule kept",
-      "rule": "Existing Windows assertions remain; equivalent Linux execution strengthens coverage without removing fault injection or moving tests to a later tier.",
-      "whySurvives": "Broaden execution to Linux where the behaviour exists. Keep Windows-specific native API methods Windows-only and all original assertions. Portable listener/close/default/lock/tokenizer assertions now run on Linux; existing CUDA masking/model preconditions remain, without moving tests to another tier.",
+      "rule": "Retain every original assertion in the unit tier; restore baseline Windows-native lane membership and add Linux unit-lane execution for portable OS branches.",
+      "whySurvives": "The intermediate port removed class-level windows tags and unintentionally lost Windows CI execution. R10 adds the shared cross-platform tag to DrainAndCloseTest, WindowsPowerNotificationsTest, AppInstanceLockTest and WindowsPowerStatusTest, and the Windows lane selects its union with windows. The lane again selects exactly the baseline class set, while default Linux tasks retain these portable cases. Windows-only native notification methods keep their windows tag and OS preconditions. NoDeviceTokenizerCacheTest retains its existing model/CUDA preconditions. No behavioral assertion is removed or loosened; no case moves to a later tier.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -51,6 +51,11 @@ These entries cover the whole Linux port relative to origin/main, including prio
           "scenario": "P6",
           "quote": "On Windows, existing saved state (settings, install contract, pack manifests, runtime/resume records, activation state, process manifests, leases, ledgers, eval-cache identities) keeps its meaning; any changed identity format is versioned and old records still read. Making Windows absolute paths usable on Linux is not in scope",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Restore Windows execution of every class that ran in that lane on the baseline, keep them running on Linux, and fix it generally (the selection rule, not a per-class exception)",
+          "location": "task t-20261017-9a5f5a user turn 10"
         }
       ]
     },
@@ -421,3 +426,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "reject",
+  "digest": "sha256:4015e75cb0acde68debfac9516fc4bd623f8e3eb69633ab882514383342210a3",
+  "note": "Entry 1 (DrainAndCloseTest, AppInstanceLockTest, WindowsPowerStatusTest) says tests are not moved to another tier. The Windows-native CI lane (ci.yml windows-native-tests) runs only @Tag(\"windows\") tests via -PwindowsOnly=true, and every other unit lane runs on ubuntu. Removing @Tag(\"windows\") therefore removes these tests' Windows execution from CI: their Windows branches now run in no CI lane. Shown by running the lane's selection on base and candidate: -PwindowsOnly=true selects DrainAndCloseTest, BrowseToolTest, SearchToolTest, AppInstanceLockTest, WindowsPowerStatusTest on 37e0957c9 and none on the candidate; for app-api, --tests HelperFlushRetryTest/LateWindowExitTest with -PwindowsOnly=true succeeds on the base and fails 'No tests found' on the candidate (evidence tmp/verifier-final/32-*). The entry does not say this and claims execution is not moved; rework: keep the Windows tag (e.g. on the Windows-path methods) or state the lane change plainly with a source. WindowsPowerStatusTest is a pure truth table, so only the lane is wrong there; AppInstanceLockTest's Windows process-liveness branch and DrainAndCloseTest on the Windows filesystem lose Windows CI coverage. The other entries (fake executable mode, statusOwner fixture, Tesseract C fixture, tuple fixtures, BgeM3 resolver) I found accurate."
+}
+```

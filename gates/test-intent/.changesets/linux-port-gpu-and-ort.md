@@ -351,3 +351,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "accept",
+  "digest": "sha256:df3006b579ed1c6f1bc258a34527eafd3316da50b08ffc87469b40535bd83863",
+  "note": "Base state: these gpu-bridge tests were @EnabledOnOs(WINDOWS); ort tests had Windows DLL literals and a Linux empty-result oracle. Diffs keep every Windows assertion/fixture (where+10s wait restored; narrower catch is stricter), add Linux equivalents, and the Linux empty-list oracle is explicitly replaced (OrtCudaSelfCheckTest now asserts 5 missing incl. ort-cuda). DLL literals replaced by descriptor lookups are stated; I checked contracts/native-targets/windows.pre-port.golden.json names against 37e0957c9 sources (llama-server.exe, curl.exe, cudart64_12.dll, cudnn*_9.dll, ort win-x64 resource paths in ui build). All flagged tests executed and passed in my full run; opt-in NativeNvmlLinuxLiveTest and NativeGpuLinuxLiveTest passed when I ran them with JUSTSEARCH_LINUX_GPU_CHECK=true on an RTX 4070. Scenario quotes beyond my brief (S10, P1, P4, P6) not checked against the task record."
+}
+```

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 @EnabledOnOs({OS.WINDOWS, OS.LINUX})
+@Tag("cross-platform")
 final class LateWindowExitTest {
   @Test void realHelperInsideAWindowNeverBecomesUnexpectedBeforeALateOwnerWait() throws Exception {
     String javaExecutable = ProcessHandle.current().info().command().orElseThrow();

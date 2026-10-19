@@ -17,8 +17,8 @@ These entries cover the whole Linux port relative to origin/main, including prio
         "build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt"
       ],
       "class": "Structural rule kept",
-      "rule": "Existing test selection, assertion strength and execution tier remain unchanged; Linux native prerequisites are added rather than tests being dropped.",
-      "whySurvives": "The existing Windows host predicate moves to HostPlatform; application distributions additionally stage the single Linux helper. TestGate, JUnit tags, lane selection and all existing Windows test execution remain unchanged.",
+      "rule": "The Windows-native lane keeps every baseline-selected class and the default Linux tasks retain portable cases; neither host loses a unit assertion or moves it to a later tier.",
+      "whySurvives": "The host predicate is shared through HostPlatform. Windows-only selection now includes the union of windows and cross-platform, the latter applied only to the eight formerly Windows-tagged classes ported to Linux. Linux default selection still excludes only windows. R10 baseline/candidate discovery selects the same 24 classes for the complete Windows lane, with zero added or missing classes. This repairs the intermediate loss of Windows lane coverage while preserving Linux coverage.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -47,6 +47,11 @@ These entries cover the whole Linux port relative to origin/main, including prio
           "scenario": "P1",
           "quote": "Windows: Job Objects, handle identity, BITS, `.exe` layouts, NSIS packaging, saved-state locations and volume-serial root identity unchanged (Windows execution not possible here: unit tests with the Windows backend selected + Windows CI lanes, deferred)",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Restore Windows execution of every class that ran in that lane on the baseline, keep them running on Linux, and fix it generally (the selection rule, not a per-class exception)",
+          "location": "task t-20261017-9a5f5a user turn 10"
         }
       ]
     },
@@ -201,6 +206,21 @@ These entries cover the whole Linux port relative to origin/main, including prio
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        ".github/workflows/ci.yml"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Preserve the complete Windows shell unit and actuator test commands while adding Linux execution of the existing Linux-gated Rust unit tests in the same tier.",
+      "whySurvives": "The shell Rust job has Windows and Ubuntu legs. Both run cargo test --lib --locked. Only Linux installs GTK/WebKit build dependencies and compiles/stages the existing C lifetime helper from the descriptor path; no Gradle build is added. The original Windows conformance driver and both actuator harness commands remain Windows-selected and unchanged. This fills a previously absent Linux hosted lane; it does not remove, skip or defer any existing Windows assertion. Earlier port edits stage the same helper before the unchanged Public claims analytics/dev suites and raise only the app-ui job cap from 35 to 45 minutes; no per-test timeout, task selection or assertion is weakened.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Make them run in hosted CI on Linux at the lowest cost",
+          "location": "task t-20261017-9a5f5a user turn 10"
+        }
+      ]
     }
   ]
 }
@@ -209,3 +229,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "accept",
+  "digest": "sha256:00679b4bf38d46025889bf19d3b0756c58254fe9ea0029f4b97dfc62c62d65cb",
+  "note": "Read base JvmBaseConventionsPlugin/test tasks and shard policy first. HostPlatform.isWindows is the same os.name contains-windows predicate; windows-tag exclusion, windowsOnly includeTags, TestGate and every lane test coordinate are unchanged; added items are a Linux cc helper task, a configuration test output declaration, descriptor packaging and an eval JavaExec contract moved to scripts/dev/lib/eval-launch.cjs (same env/sysprops, JFR, ORT profiling, GPU default when ORT path found). Note: the build files themselves keep lane selection, but other changesets remove @Tag(windows) from test classes; see those rejections."
+}
+```

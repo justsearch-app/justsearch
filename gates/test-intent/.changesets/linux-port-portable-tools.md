@@ -17,7 +17,7 @@ These entries cover the whole Linux port relative to origin/main, including prio
         "modules/app-agent/src/test/java/io/justsearch/agent/tools/BrowseToolTest.java"
       ],
       "class": "New",
-      "behaviour": "All browse result, forwarding, formatting, clamp and containment assertions retain literal Windows paths on Windows and use equivalent rooted POSIX fixtures on Linux. The /docs negative case intentionally asserts outside-indexed-root refusal on Linux, whose absolute-path syntax differs; Windows keeps its exact not-an-absolute-path reason.",
+      "behaviour": "All browse result, forwarding, formatting, clamp and containment assertions retain literal Windows paths on Windows and use equivalent rooted POSIX fixtures on Linux. The /how-to negative case intentionally asserts outside-indexed-root refusal on Linux, whose absolute-path syntax differs; Windows keeps its exact not-an-absolute-path reason. R10 repairs a lost Windows CI selection in the intermediate port: @Tag(\"cross-platform\") replaces the former class-level Windows-only selection. The Windows-native unit lane includes both tags and again selects these classes; the default Linux unit lanes also run them. The tier stays unit; the lane membership is expanded to Linux while restoring baseline Windows membership. Windows path branches still execute only on a Windows host.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -39,9 +39,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
           "scenario": "P6",
           "quote": "On Windows, existing saved state (settings, install contract, pack manifests, runtime/resume records, activation state, process manifests, leases, ledgers, eval-cache identities) keeps its meaning; any changed identity format is versioned and old records still read. Making Windows absolute paths usable on Linux is not in scope",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Restore Windows execution of every class that ran in that lane on the baseline, keep them running on Linux, and fix it generally (the selection rule, not a per-class exception)",
+          "location": "task t-20261017-9a5f5a user turn 10"
         }
       ],
-      "evidence": "gates/test-intent/evidence/linux-port-portable-oracles.json",
+      "evidence": "gates/test-intent/evidence/linux-port-r10-portable-tools.json",
       "newChecks": [
         "modules/app-agent/src/test/java/io/justsearch/agent/tools/BrowseToolTest.java"
       ]
@@ -51,7 +56,7 @@ These entries cover the whole Linux port relative to origin/main, including prio
         "modules/app-agent/src/test/java/io/justsearch/agent/tools/SearchToolTest.java"
       ],
       "class": "New",
-      "behaviour": "Search request/result, scope and path-prefix assertions keep Windows literals and add equivalent native Linux root fixtures. The slash-rooted negative case has the explicit Linux outside-indexed-root reason while Windows still asserts the original absolute-path reason. No Windows-path transplant into Linux is claimed.",
+      "behaviour": "Search request/result, scope and path-prefix assertions keep Windows literals and add equivalent native Linux root fixtures. The slash-rooted negative case has the explicit Linux outside-indexed-root reason while Windows still asserts the original absolute-path reason. No Windows-path transplant into Linux is claimed. R10 repairs a lost Windows CI selection in the intermediate port: @Tag(\"cross-platform\") replaces the former class-level Windows-only selection. The Windows-native unit lane includes both tags and again selects these classes; the default Linux unit lanes also run them. The tier stays unit; the lane membership is expanded to Linux while restoring baseline Windows membership. Windows path branches still execute only on a Windows host.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -73,9 +78,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
           "scenario": "P6",
           "quote": "On Windows, existing saved state (settings, install contract, pack manifests, runtime/resume records, activation state, process manifests, leases, ledgers, eval-cache identities) keeps its meaning; any changed identity format is versioned and old records still read. Making Windows absolute paths usable on Linux is not in scope",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Restore Windows execution of every class that ran in that lane on the baseline, keep them running on Linux, and fix it generally (the selection rule, not a per-class exception)",
+          "location": "task t-20261017-9a5f5a user turn 10"
         }
       ],
-      "evidence": "gates/test-intent/evidence/linux-port-portable-oracles.json",
+      "evidence": "gates/test-intent/evidence/linux-port-r10-portable-tools.json",
       "newChecks": [
         "modules/app-agent/src/test/java/io/justsearch/agent/tools/SearchToolTest.java"
       ]
@@ -87,3 +97,14 @@ These entries cover the whole Linux port relative to origin/main, including prio
 ## Acceptance records
 
 Independent acceptance pending on the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-port-final-claude",
+  "verdict": "reject",
+  "digest": "sha256:67e673692c82f35768ea6faabbff820c17a49b80cc9ddfc9c92142eb46d770da",
+  "note": "BrowseToolTest and SearchToolTest lose @Tag(windows); their Windows path-literal assertions (drive letters, not-an-absolute-path reason) are now selected by nativeText only on a Windows host. The Windows-native CI lane (ci.yml windows-native-tests) runs only @Tag(\"windows\") tests via -PwindowsOnly=true, and every other unit lane runs on ubuntu. Removing @Tag(\"windows\") therefore removes these tests' Windows execution from CI: their Windows branches now run in no CI lane. Shown by running the lane's selection on base and candidate: -PwindowsOnly=true selects DrainAndCloseTest, BrowseToolTest, SearchToolTest, AppInstanceLockTest, WindowsPowerStatusTest on 37e0957c9 and none on the candidate; for app-api, --tests HelperFlushRetryTest/LateWindowExitTest with -PwindowsOnly=true succeeds on the base and fails 'No tests found' on the candidate (evidence tmp/verifier-final/32-*). The entry does not say this and claims execution is not moved; rework: keep the Windows tag (e.g. on the Windows-path methods) or state the lane change plainly with a source. Otherwise the Linux branch and the /how-to outside-root reason look right (the entry says /docs; the case is /how-to)."
+}
+```
