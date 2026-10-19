@@ -103,9 +103,9 @@ checked periodically. The server fires exactly when relevant, at bounded cost.
       **Installed 2026-06-19** via the remote HTTP transport at user scope:
       `claude mcp add --transport http --scope user <name> <server URL>`
       → written to `C:\Users\<user>\.claude.json`; `claude mcp list` reports `✔ Connected`.
-      **Deviation from plan:** the official installer `npx ctx7 setup --claude` (the API-key / OAuth path)
+      **Deviation from plan:** the official installer (the API-key / OAuth path)
       **crashed on Windows** — its first arrow-key TUI prompt hit a libuv assertion
-      (`UV_HANDLE_CLOSING ... src\win\async.c`) when run without a full TTY, and `ctx7@0.5.3` also emitted an
+      (`UV_HANDLE_CLOSING ... src\win\async.c`) when run without a full TTY, and the installer also emitted an
       "unsettled top-level await" warning under Node v24. So we installed the **anonymous** HTTP server
       (no API key yet) as the robust path. The MCP **tools** load only on a fresh session start, not mid-session.
 - [x] **Upgrade to a free API key** (higher personal rate limits). **Done 2026-06-19**: removed the anonymous

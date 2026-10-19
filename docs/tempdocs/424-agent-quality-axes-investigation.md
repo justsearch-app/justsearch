@@ -360,7 +360,7 @@ With such a server, asking "use Lucene 9.x's MultiFieldQueryParser" gets the act
 ### Recommendations from Axis 8
 
 - **Skip for now.** The supply-chain risk + paid tier + already-good in-repo docs make it a marginal win. Worth revisiting if the agent ever produces wrong answers about Lucene/ORT/Tauri APIs that current docs don't catch.
-- **If adopted:** install via `ctx7 setup` and verify the security patch is current. Use the Skill-based activation, not the SessionStart hook variant.
+- **If adopted:** install through the server's official setup and verify the security patch is current. Use the Skill-based activation, not the SessionStart hook variant.
 
 ---
 
