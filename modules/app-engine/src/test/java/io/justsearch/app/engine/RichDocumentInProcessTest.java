@@ -56,17 +56,23 @@ import org.junit.jupiter.api.io.TempDir;
 final class RichDocumentInProcessTest {
 
   private EngineRoot root;
+  private KnowledgeServer server;
+  private Path testDirectory;
+  private Path indexBase;
 
   @AfterEach
-  void tearDown() throws InterruptedException {
+  void tearDown() throws Exception {
     if (root != null) {
       root.close();
       root = null;
     }
-    // Give the OS time to release file locks on Windows before @TempDir cleanup. Carried over from
-    // the process-boundary version: the locks are Lucene's, and closing the index half in-process
-    // releases them no faster than closing a child process did.
-    Thread.sleep(2000);
+    if (server != null) {
+      assertTrue(server.awaitClosed(0), "the actual index owner finished closing");
+      try (var released = new io.justsearch.indexerworker.util.IndexRootLock(indexBase)) {
+        released.acquire();
+      }
+      awaitFilesReleased(testDirectory);
+    }
   }
 
   private static void publishConfig(Path dataDir, Path indexBase) throws IOException {
@@ -76,8 +82,9 @@ final class RichDocumentInProcessTest {
   @Test
   @DisplayName("a PDF is extracted, indexed and found by its extracted content, in process")
   void ingestAndSearchPdf(@TempDir Path tempDir) throws Exception {
+    testDirectory = tempDir;
     Path dataDir = tempDir.resolve("data");
-    Path indexBase = dataDir.resolve("index");
+    indexBase = dataDir.resolve("index");
     publishConfig(dataDir, indexBase);
 
     // 1. Create a valid minimal PDF
@@ -87,7 +94,10 @@ final class RichDocumentInProcessTest {
     // 2. Compose the index half in this JVM (was: spawn a Worker process and connect to its port)
     root =
         new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
-            (g, executors, ingestion, indexComponent, encoderComponent) -> new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(g), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent),
+            (g, executors, ingestion, indexComponent, encoderComponent) -> {
+              server = new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(g), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
+              return server;
+            },
             30_000L,
             5_000);
     KnowledgeClient client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
@@ -131,17 +141,13 @@ final class RichDocumentInProcessTest {
   private static void waitForIndexing(KnowledgeClient client, long minDocCount)
       throws InterruptedException {
     StatusResponse status = client.getStatus(TestEngineContexts.FOREGROUND);
-    int maxWaitSeconds = 30;
-    int stablePolls = 0;
-    for (int i = 0; i < maxWaitSeconds && stablePolls < 2; i++) {
-      Thread.sleep(1000);
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
+    while ((status.getCore().getQueueDepth() != 0 || status.getCore().getDocCount() < minDocCount)
+        && System.nanoTime() < deadline) {
+      Thread.sleep(10);
       status = client.getStatus(TestEngineContexts.FOREGROUND);
-      if (status.getCore().getQueueDepth() == 0 && status.getCore().getDocCount() >= minDocCount) {
-        stablePolls++;
-      } else {
-        stablePolls = 0;
-      }
     }
+    assertEquals(0, status.getCore().getQueueDepth(), "indexing queue drained");
     assertTrue(
         status.getCore().getDocCount() >= minDocCount,
         "Indexing did not converge in time (queueDepth="
@@ -149,6 +155,27 @@ final class RichDocumentInProcessTest {
             + ", docCount="
             + status.getCore().getDocCount()
             + ")");
+  }
+
+  private static void awaitFilesReleased(Path directory) throws IOException, InterruptedException {
+    List<Path> paths;
+    try (var walk = Files.walk(directory)) {
+      paths = walk.sorted(java.util.Comparator.reverseOrder()).toList();
+    }
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+    for (Path path : paths) {
+      Path probe = path.resolveSibling(path.getFileName() + ".release-probe");
+      while (true) {
+        try {
+          Files.move(path, probe);
+          Files.move(probe, path);
+          break;
+        } catch (IOException stillShared) {
+          if (System.nanoTime() >= deadline) throw stillShared;
+          Thread.sleep(5);
+        }
+      }
+    }
   }
 
   private static SearchResponse waitForSearchHits(

@@ -53,8 +53,6 @@ import org.slf4j.LoggerFactory;
  */
 final class ProxyStreamAcrossReconfigureTest {
 
-  private static final Duration HELD = Duration.ofSeconds(5);
-
   @TempDir Path directory;
 
   private Path home;
@@ -128,18 +126,32 @@ final class ProxyStreamAcrossReconfigureTest {
               + new String(body.readAllBytes(), StandardCharsets.UTF_8));
         }
         readAtLeast(body, 32_768);
+        assertEquals(1, manager.generationActivity().inFlight(),
+            "the real proxied stream owns its generation lease");
 
         InferenceConfig target = withModel("b.gguf");
         CompletableFuture<Throwable> reconfigure = background(() -> manager.applyConfig(
             target, InferenceLifecycleManager.RestartPolicy.RESTART_IF_ONLINE));
 
-        long until = System.nanoTime() + HELD.toNanos();
-        while (System.nanoTime() < until) {
-          assertEquals(List.of("model.gguf"), launchedModels(),
-              "no relaunch while the proxied reply is open");
-          assertFalse(reconfigure.isDone(), "the reconfigure waits for the proxied reply");
-          Thread.sleep(50);
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        boolean draining = false;
+        while (!reconfigure.isDone() && System.nanoTime() < until) {
+          try {
+            var probe = manager.admitExchange(
+                io.justsearch.app.inference.chat.GenerationTracker.Kind.AUX, null);
+            probe.close();
+            Thread.sleep(5);
+          } catch (IllegalStateException closedAdmission) {
+            draining = true;
+            break;
+          }
         }
+        assertTrue(draining, "reconfiguration entered its drain and closed admission");
+        assertEquals(1, manager.generationActivity().inFlight(),
+            "the drain is held by the proxied stream's generation lease");
+        assertEquals(List.of("model.gguf"), launchedModels(),
+            "no relaunch while the proxied reply is open");
+        assertFalse(reconfigure.isDone(), "the reconfigure waits for the proxied reply");
 
         StreamingFakeLlamaServer.release(home);
         String rest = new String(body.readAllBytes(), StandardCharsets.UTF_8);

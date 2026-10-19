@@ -23,18 +23,20 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class ChatActivationSeamTest {
 
-  private static final long START_DELAY_MS = 500;
-
   @TempDir Path directory;
 
   private ManagedChatSeam seam;
   private InferenceLifecycleManager manager;
   private RuntimeIntentTestFixture intent;
   private RuntimeReconciler reconciler;
+  private final java.util.concurrent.atomic.AtomicInteger deliveredUnloads =
+      new java.util.concurrent.atomic.AtomicInteger();
+  private final List<java.util.concurrent.CompletableFuture<Void>> activations =
+      new java.util.concurrent.CopyOnWriteArrayList<>();
 
   @BeforeEach
   void setUp() throws Exception {
-    seam = new ManagedChatSeam(directory, START_DELAY_MS);
+    seam = new ManagedChatSeam(directory, 0);
     manager = seam.manager();
     intent = new RuntimeIntentTestFixture(directory.resolve("intent"), true);
     reconciler = new RuntimeReconciler(
@@ -43,8 +45,15 @@ final class ChatActivationSeamTest {
         () -> manager.view().usingExternalLlamaServer(),
         null,
         intent.spec(),
-        manager::setActivation,
+        activation -> {
+          var delivered = manager.setActivation(activation).toCompletableFuture();
+          activations.add(delivered);
+          return delivered;
+        },
         manager::componentRecoveryPending);
+    manager.addModeChangeListener((from, to) -> {
+      if (to == Mode.INDEXING) deliveredUnloads.incrementAndGet();
+    });
   }
 
   @AfterEach
@@ -63,13 +72,16 @@ final class ChatActivationSeamTest {
     reconciler.requestBootConvergence();
     await(manager::isOnline, "boot intent to bring chat online");
     assertTrue(reconciler.awaitQuiescent(30_000));
+    assertEquals(1, activations.size());
+    activations.get(0).get(30, java.util.concurrent.TimeUnit.SECONDS);
     assertEquals(List.of("model.gguf"), seam.models(), "boot forwards one activation");
 
     // Unloads the reconciler did not ask for, repeated past the deleted anti-flap cap of 3.
     for (int i = 1; i <= 4; i++) {
       manager.switchToIndexingMode();
+      assertEquals(i, deliveredUnloads.get(), "the manager delivered the unload edge");
       assertTrue(reconciler.awaitQuiescent(30_000));
-      Thread.sleep(2 * START_DELAY_MS); // room for a reload to launch, were one requested
+      assertEquals(1, activations.size(), "a settled unload forwards no activation");
       assertEquals(Mode.INDEXING, manager.getCurrentMode(), "a foreign unload stays unloaded");
       assertEquals(i, seam.models().size(), "no reload after foreign unload " + i);
       if (i < 4) {
@@ -82,6 +94,8 @@ final class ChatActivationSeamTest {
     reconciler.specChanged();
     await(manager::isOnline, "the spec write to bring chat back");
     assertTrue(reconciler.awaitQuiescent(30_000));
+    assertEquals(2, activations.size(), "boot and the explicit spec write were delivered");
+    activations.get(1).get(30, java.util.concurrent.TimeUnit.SECONDS);
     assertEquals(5, seam.models().size(), "the spec write forwards one activation");
   }
 }

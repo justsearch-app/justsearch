@@ -106,6 +106,23 @@ public final class SlowStartFakeLlamaServer {
     HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
     server.createContext("/health", exchange -> {
+      if (home != null) {
+        Path entered = Path.of(home, "health-entered-" + ProcessHandle.current().pid());
+        Files.writeString(entered, "entered");
+        long healthDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (Files.exists(Path.of(home, "hold-health"))) {
+          if (System.nanoTime() >= healthDeadline) {
+            throw new IOException("health release timed out");
+          }
+          if (launcher != null && !launcherAlive.getAsBoolean()) System.exit(0);
+          try {
+            Thread.sleep(5);
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("health wait interrupted", interrupted);
+          }
+        }
+      }
       byte[] body = "{\"status\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
       exchange.sendResponseHeaders(200, body.length);
       exchange.getResponseBody().write(body);

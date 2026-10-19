@@ -75,6 +75,21 @@ public final class ManagedChatSeam implements AutoCloseable {
     return fakeHome;
   }
 
+  void holdHealth() throws IOException {
+    Files.writeString(fakeHome.resolve("hold-health"), "held");
+  }
+
+  void awaitHealth(int launchCount) throws Exception {
+    await(() -> models().size() == launchCount, "the candidate to launch");
+    long pid = SlowStartFakeLlamaServer.launches(fakeHome).get(launchCount - 1).pid();
+    await(() -> Files.exists(fakeHome.resolve("health-entered-" + pid)),
+        "the candidate's health request to enter");
+  }
+
+  void releaseHealth() throws IOException {
+    Files.deleteIfExists(fakeHome.resolve("hold-health"));
+  }
+
   /** Changes how long each later launch takes to become healthy. */
   void startDelay(long startDelayMs) throws IOException {
     SlowStartFakeLlamaServer.install(fakeHome, startDelayMs);
