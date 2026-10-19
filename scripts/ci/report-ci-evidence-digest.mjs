@@ -257,6 +257,7 @@ function normalizeJob(job, policyEntry, artifacts, splitRun) {
   const expected = new Set(policyEntry?.requiredStatusChecks || []);
   const baseArtifact = name === 'Unit tests (app-ui)' && (splitRun || steps.some((s) => /Require every app-ui part/.test(s.name)))
     ? null : UNIT_ARTIFACTS.get(name) || null;
+  const localCommand = SHARD_POLICY.lanes.find((lane) => lane.jobName === name)?.localCommand;
   const part = /^(?:Unit tests \(app-ui-(?:ui|services)\)|Windows-native tests \((?:node|contracts)\))$/.test(name);
   const partBase = baseArtifact || WINDOWS_ARTIFACTS.get(name);
   const selected = partBase ? selectJobArtifact(artifacts, partBase, job) : null;
@@ -288,7 +289,7 @@ function normalizeJob(job, policyEntry, artifacts, splitRun) {
       failureDefault: 'advisory-unknown',
       required: false,
     },
-    localReproduction: LOCAL_REPRO_COMMANDS.get(name) || [],
+    localReproduction: LOCAL_REPRO_COMMANDS.get(name) || (localCommand ? [localCommand] : []),
     unitAttributionArtifact: artifactName,
     partArtifact,
     runAttempt: selected ? Number(selected.name.split('-attempt-')[1] || job.run_attempt || 1) : null,

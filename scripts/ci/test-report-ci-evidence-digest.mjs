@@ -388,6 +388,7 @@ console.log('test-report-ci-evidence-digest: PASS');
   assert.equal(report.partEvidence.find((p) => p.job === windows.name).artifactPresent, false);
   assert.ok(report.warnings.some((w) => w.includes('windows-native-node-attempt-2')));
   assert.ok(report.jobs.find((j) => j.name === ui.name).factLane.required);
+  assert.match(report.jobs.find((j) => j.name === ui.name).localReproduction[0], /:modules:ui:test/);
 }
 
 // Hosted CP5: GitHub gives unchanged parts the current workflow attempt number
