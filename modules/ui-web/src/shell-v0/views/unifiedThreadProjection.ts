@@ -451,10 +451,7 @@ export function directionNotAppliedBecause(reason: unknown): string {
   );
 }
 
-/**
- * WP6.2 — a direction as a labelled note, live or reloaded: "Steered" only once it reached the model
- * (or when an older build reported it without an outcome, which it did only then).
- */
+/** WP6.2 — a direction as a labelled note, live or reloaded: "Steered" only once it reached the model. */
 export function directionNote(text: string, outcome: unknown, reason: unknown): { label: string; text: string } {
   if (outcome === 'queued') return { label: 'Direction queued', text: `${text} (${DIRECTION_QUEUED_NOTE})` };
   if (outcome === 'not_applied') {

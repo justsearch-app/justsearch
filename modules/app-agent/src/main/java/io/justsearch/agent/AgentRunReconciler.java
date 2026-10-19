@@ -40,10 +40,11 @@ public final class AgentRunReconciler {
   }
 
   /**
-   * Stamp every persisted run that is non-terminal and not already stamped. Returns how many runs
-   * this pass stamped — {@code 0} when there was nothing to do AND when the store was unreadable
-   * (a locked store is indistinguishable from an empty one here by design; the unlock listener
-   * re-runs the pass rather than this method guessing).
+   * Stamp every persisted run that is non-terminal and not already stamped, and report every
+   * direction a run left queued as not applied (WP6.2). Returns how many runs this pass stamped —
+   * {@code 0} when there was nothing to do AND when the store was unreadable (a locked store is
+   * indistinguishable from an empty one here by design; the unlock listener re-runs the pass rather
+   * than this method guessing).
    */
   public int reconcile() {
     return reconcile(Instant.now());
@@ -65,16 +66,22 @@ public final class AgentRunReconciler {
       if (!(summary.get("sessionId") instanceof String sessionId) || sessionId.isBlank()) {
         continue;
       }
-      if (LifecycleState.parse(summary.get("state")).isTerminal()) {
-        continue; // finished before the process died — no marker
-      }
-      if (summary.get("interruptedAt") instanceof String existing && !existing.isBlank()) {
-        continue; // already stamped by an earlier pass
-      }
+      LifecycleState state = LifecycleState.parse(summary.get("state"));
       try {
+        if (state.isTerminal()) {
+          // Finished before the process died — no marker. The run's last write, its termination
+          // reason, follows the outcomes of its directions; without it, finishing was cut short.
+          if (summary.get("terminationReason") == null) {
+            reportUnappliedDirections(sessionId, notAppliedReason(state));
+          }
+          continue;
+        }
+        // Report before stamping, and also for a run an earlier pass stamped: the process can die
+        // between the two writes, and the stamp alone does not say the directions were reported.
+        reportUnappliedDirections(
+            sessionId, AgentEvent.DirectiveAcknowledged.REASON_RUN_INTERRUPTED);
         if (store.markInterrupted(sessionId, at)) {
           stamped++;
-          reportUnappliedDirections(sessionId);
         }
       } catch (RuntimeException e) {
         LOG.warn("Could not mark run {} interrupted", sessionId, e);
@@ -86,11 +93,21 @@ public final class AgentRunReconciler {
     return stamped;
   }
 
+  /** Why a direction a run left queued did not apply, for a run that reached {@code state}. */
+  private static String notAppliedReason(LifecycleState state) {
+    return switch (state) {
+      case DONE -> AgentEvent.DirectiveAcknowledged.REASON_RUN_FINISHED;
+      case CANCELLED -> AgentEvent.DirectiveAcknowledged.REASON_RUN_STOPPED;
+      default -> AgentEvent.DirectiveAcknowledged.REASON_RUN_FAILED;
+    };
+  }
+
   /**
    * WP6.2 — a direction the dead process accepted but never reported applied or not applied did not
    * steer the run; say so in the run's record, once, as the live run's own terminal path would have.
+   * A direction that already has a final outcome is left alone, so a repeated pass adds nothing.
    */
-  private void reportUnappliedDirections(String sessionId) {
+  private void reportUnappliedDirections(String sessionId, String reason) {
     var outstanding = new java.util.LinkedHashMap<String, String>();
     for (Map<String, Object> record : store.readEvents(sessionId)) {
       if (!"directive_acknowledged".equals(record.get("eventType"))
@@ -110,7 +127,7 @@ public final class AgentRunReconciler {
       if (text != null) {
         store.appendEvent(sessionId, new AgentEvent.DirectiveAcknowledged(text, id,
             AgentEvent.DirectiveAcknowledged.NOT_APPLIED,
-            AgentEvent.DirectiveAcknowledged.REASON_RUN_INTERRUPTED));
+            reason));
       }
     });
   }

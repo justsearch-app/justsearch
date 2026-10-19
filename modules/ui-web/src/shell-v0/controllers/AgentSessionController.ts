@@ -1780,18 +1780,18 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * entry. The live projection renders it as a human-origin run-spine landmark + a "Your direction: …"
    * body chip, so the user sees their interject land in the run. WP6.2 — each direction is reported
    * queued, then applied or not applied: a later report updates the entry with the same
-   * `directiveId` in place, and a late "queued" never undoes a final outcome.
+   * `directiveId` in place, and a late "queued" never undoes a final outcome. An acknowledgement
+   * without an id (written before directions had outcomes, e.g. in a replayed transcript) never proved
+   * the direction reached the model, so it shows nothing, as in the canonical thread record.
    */
   onDirectiveAcknowledged(payload: unknown): void {
     const d = (payload ?? {}) as Record<string, unknown>;
     const text = typeof d.directiveText === 'string' ? d.directiveText : '';
-    if (!text) return;
     const directiveId = typeof d.directiveId === 'string' ? d.directiveId : undefined;
+    if (!text || !directiveId) return;
     const outcome = typeof d.outcome === 'string' ? d.outcome : undefined;
     const reason = typeof d.reason === 'string' ? d.reason : undefined;
-    const shown = directiveId
-      ? this.conversation.findIndex((e) => e.type === 'steer-directive' && e.directiveId === directiveId)
-      : -1;
+    const shown = this.conversation.findIndex((e) => e.type === 'steer-directive' && e.directiveId === directiveId);
     if (shown >= 0) {
       if (outcome === 'queued') return;
       const conversation = [...this.conversation];
@@ -1807,7 +1807,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         id: this.nextEntryId(),
         type: 'steer-directive',
         content: text,
-        ...(directiveId ? { directiveId } : {}),
+        directiveId,
         ...(outcome ? { directiveOutcome: outcome } : {}),
         ...(reason ? { directiveReason: reason } : {}),
         timestamp: Date.now(),
@@ -1892,7 +1892,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   private dispatchStreamEvent(stream: AbortController, event: string, payload: unknown): void {
-    if (this.abortController !== stream || stream.signal.aborted || !this.isStreaming || this.replayMode) return;
+    if (this.abortController !== stream || stream.signal.aborted || this.replayMode) return;
+    // WP6.2 — a run reports the directions it never sent once it has stopped, so after `done` (or an
+    // error) the same stream still carries their final outcome; nothing else changes a finished run.
+    if (!this.isStreaming && event !== 'directive_acknowledged') return;
     this.dispatchEvent(event, payload);
   }
 

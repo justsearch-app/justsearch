@@ -77,7 +77,7 @@ class AgentModelMessagesTest {
   }
 
   // S6.2 / S6.3 / S6.4 — saved trailing notes resume (both entry points), and steering after resume.
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"READY_FOR_LLM,true", "READY_FOR_LLM,false", "AFTER_TOOL_RESULT,true",
       "AFTER_TOOL_RESULT,false", "WAITING_APPROVAL,true", "WAITING_APPROVAL,false"})
   void savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String state, boolean byId) {
@@ -117,7 +117,7 @@ class AgentModelMessagesTest {
   }
 
   // S6.2 — a write still runs only after a fresh approval; rejection prevents it.
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {true, false})
   void resumedApprovalStillRequiresAFreshDecision(boolean approve) {
     var ai = new CapturingAi(ScriptedResponse.toolCall("fresh", "core_write", "{}"),
@@ -189,7 +189,7 @@ class AgentModelMessagesTest {
   }
 
   // S6.5 — every completion path sends the same converted list and leaves history alone.
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"ordinary", "retry", "budget-finalize", "step-finalize"})
   void everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String path) {
     var ai = path.equals("retry")
@@ -205,8 +205,10 @@ class AgentModelMessagesTest {
     var session = new AgentSession(messages, 10000, EngineContextTestFixtures.AGENT_LOOP);
     var caller = new AgentLlmCaller(ai, AgentTelemetry.noop(), new AgentContextCompressor(false, 200, 1));
     switch (path) {
-      case "ordinary" -> caller.callLlmWithTools(session, List.of(), event -> {}, SamplingParams.AGENT);
-      case "retry" -> caller.callLlmWithRetries(session, List.of(), event -> {});
+      // A strict template refuses the request by throwing; that must not happen on any path.
+      case "ordinary" -> assertDoesNotThrow(
+          () -> caller.callLlmWithTools(session, List.of(), event -> {}, SamplingParams.AGENT));
+      case "retry" -> assertDoesNotThrow(() -> caller.callLlmWithRetries(session, List.of(), event -> {}));
       case "budget-finalize" -> assertEquals("done", caller.attemptBudgetEdgeFinalize(session, event -> {}));
       case "step-finalize" -> assertEquals("done", caller.attemptStepCeilingFinalize(session, event -> {}));
       default -> throw new AssertionError(path);

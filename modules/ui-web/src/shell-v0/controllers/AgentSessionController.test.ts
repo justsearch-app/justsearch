@@ -42,6 +42,9 @@ import {
   getUndoableOperation,
   __resetJournalForTest,
 } from '../substrates/effects/index.js';
+// WP6.2 — both windows' live projections, fed from this controller's state as the views feed them.
+import { projectSv3RunFeed } from '../views/search-v3/sv3-run.js';
+import { projectLiveAgentActivity } from '../views/unifiedThreadProjection.js';
 
 // ---------- SSE mock helpers ----------
 
@@ -1158,13 +1161,20 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('onDirectiveAcknowledged appends a human-origin steer-directive entry', () => {
-    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus only on Q3.' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus only on Q3.', directiveId: 'd1', outcome: 'applied' });
     const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
     expect(steer.length).toBe(1);
     expect(steer[0]?.content).toBe('Focus only on Q3.');
     // a blank/absent text is ignored (no phantom entry)
     ctrl.onDirectiveAcknowledged({});
     expect(ctrl.conversation.filter((e) => e.type === 'steer-directive').length).toBe(1);
+  });
+
+  // WP6.2 S8.2 / N8.3 — as in the canonical thread record: an acknowledgement without an id (written
+  // before directions had outcomes) never proved the direction reached the model, so it shows nothing.
+  it('onDirectiveAcknowledged shows nothing for an acknowledgement without an id', () => {
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Old direction.' });
+    expect(ctrl.conversation.filter((e) => e.type === 'steer-directive')).toEqual([]);
   });
 
   // Tempdoc 565 §33 — a failed steer (404: the run finished) must surface a note, not be silent.
@@ -1201,6 +1211,74 @@ describe('AgentSessionController interaction methods', () => {
     expect(steer).toHaveLength(1);
     expect(steer[0]?.directiveOutcome).toBe('not_applied');
     expect(steer[0]?.directiveReason).toBe('run_finished');
+  });
+
+  // WP6.2 S8.2 — the run's final report on a direction comes after `done` (the loop reports what it
+  // never sent once it has stopped); the live display must take it, not keep "queued" for ever.
+  it('a final outcome reported after done reaches the live display of both windows', async () => {
+    globalThis.fetch = mockFetchSse(
+      sseChunk('session_started', { sessionId: 'sess-late' }) +
+        sseChunk('directive_acknowledged', { directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' }) +
+        sseChunk('done', { finalResponse: 'The answer.', iterationsUsed: 1, toolCallsExecuted: 0 }) +
+        sseChunk('directive_acknowledged', {
+          directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'not_applied', reason: 'run_finished',
+        }),
+    );
+    await ctrl.send('hello agent');
+
+    const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
+    expect(steer.map((e) => [e.directiveOutcome, e.directiveReason])).toEqual([['not_applied', 'run_finished']]);
+    // Search v3's live feed, and the old window's live projection (its chip reads these attributes).
+    const notes = projectSv3RunFeed(ctrl, 0).items.filter((i) => i.kind === 'note');
+    expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([
+      ['Not applied', "Answer in French. (the run finished before the agent's next step)"],
+    ]);
+    const live = projectLiveAgentActivity(ctrl.conversation, ctrl.toolCalls).filter((i) => i.attributes.steer);
+    expect(live.map((i) => i.attributes)).toEqual([
+      { steer: true, directiveOutcome: 'not_applied', directiveReason: 'run_finished' },
+    ]);
+  });
+
+  it('after done, only direction reports still reach the display', async () => {
+    globalThis.fetch = mockFetchSse(
+      sseChunk('session_started', { sessionId: 'sess-after' }) +
+        sseChunk('done', { finalResponse: 'The answer.', iterationsUsed: 1, toolCallsExecuted: 0 }) +
+        sseChunk('chunk', { text: 'stray text' }) +
+        sseChunk('progress', { phase: 'llm', message: 'stray step' }),
+    );
+    await ctrl.send('hello agent');
+    expect(ctrl.conversation.map((e) => e.type)).toEqual(['user', 'assistant-text']);
+  });
+
+  // WP6.2 N8.3 / S8.2 — replaying a transcript exported before directions had outcomes agrees with
+  // the reloaded thread: its acknowledgement alone is not shown as a direction that steered the run.
+  it('a replayed old acknowledgement is not shown as Steered; a replayed applied direction still is', () => {
+    expect(
+      ctrl.loadReplayFromExport({
+        meta: { sessionId: 'old-run' },
+        events: [
+          { eventType: 'session_started', payload: { sessionId: 'old-run' } },
+          { eventType: 'directive_acknowledged', payload: { directiveText: 'Old direction.' } },
+          { eventType: 'error', payload: { error: 'The model failed.' } },
+        ],
+      }),
+    ).toBe(true);
+    expect(ctrl.conversation.filter((e) => e.type === 'steer-directive')).toEqual([]);
+    const oldNotes = projectSv3RunFeed(ctrl, 0).items.filter((i) => i.kind === 'note');
+    expect(oldNotes.some((n) => n.kind === 'note' && n.label === 'Steered')).toBe(false);
+
+    ctrl.exitReplay();
+    ctrl.loadReplayFromExport({
+      meta: { sessionId: 'new-run' },
+      events: [
+        { eventType: 'session_started', payload: { sessionId: 'new-run' } },
+        { eventType: 'directive_acknowledged', payload: { directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'queued' } },
+        { eventType: 'directive_acknowledged', payload: { directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'applied' } },
+        { eventType: 'done', payload: { finalResponse: 'The answer.', iterationsUsed: 1, toolCallsExecuted: 0 } },
+      ],
+    });
+    const notes = projectSv3RunFeed(ctrl, 0).items.filter((i) => i.kind === 'note');
+    expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([['Steered', 'Focus on Q3.']]);
   });
 
   it('steer names a connection failure as such, not as a finished run', async () => {

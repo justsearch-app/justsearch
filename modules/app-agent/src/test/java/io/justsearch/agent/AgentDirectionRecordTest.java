@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /** WP6.2 S8.2 — a direction's outcome survives reload, and an interrupted run reports it. */
 class AgentDirectionRecordTest {
@@ -75,6 +77,92 @@ class AgentDirectionRecordTest {
     assertEquals("Pending one.", last.get("directiveText"));
     assertEquals("not_applied", last.get("outcome"));
     assertEquals("run_interrupted", last.get("reason"));
+  }
+
+  /**
+   * The process can die between any two durable writes. Whatever was saved last, a direction that
+   * never went out in a model request must reach the reloaded thread as not applied, with why, once.
+   */
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @CsvSource({
+    // died before recovery ran at all
+    "unfinished run, READY_FOR_LLM, false, run_interrupted",
+    // died during recovery: the interruption was stamped, the direction's outcome not yet written
+    "unfinished run stamped by an interrupted recovery, WAITING_APPROVAL, true, run_interrupted",
+    // died while finishing: the terminal checkpoint was saved, the final outcome not yet written
+    "run that finished, DONE, false, run_finished",
+    "run that was stopped, CANCELLED, false, run_stopped",
+    "run that failed, ERROR, false, run_failed",
+  })
+  void recoveryReportsADirectionLeftQueuedByAnyInterruption(
+      String label, String state, boolean stamped, String reason) {
+    Path root = tempDir.resolve("runs");
+    var store = new AgentRunStore(root);
+    seedRun(store, "r1", state);
+    store.runEvents().appendEvent("r1", "core.agent-run", "directive_acknowledged",
+        payload("d1", "Applied one.", "queued", null));
+    store.runEvents().appendEvent("r1", "core.agent-run", "directive_acknowledged",
+        payload("d1", "Applied one.", "applied", null));
+    store.runEvents().appendEvent("r1", "core.agent-run", "directive_acknowledged",
+        payload("d2", "Answer in French.", "queued", null));
+    if (stamped) {
+      assertTrue(store.markInterrupted("r1", Instant.parse("2026-10-19T09:00:00Z")));
+    }
+
+    // A later process: a fresh store over the same files, then the startup pass, twice.
+    var restarted = new AgentRunStore(root);
+    new AgentRunReconciler(restarted).reconcile(Instant.parse("2026-10-19T10:00:00Z"));
+    new AgentRunReconciler(restarted).reconcile(Instant.parse("2026-10-19T11:00:00Z"));
+
+    var directions = new AgentRunQueryService(restarted, null, null, null, null, null)
+        .threadEvents(CONV).stream()
+        .filter(e -> Boolean.TRUE.equals(e.attributes().get("steer")))
+        .toList();
+    assertEquals(List.of("Applied one.", "Answer in French."),
+        directions.stream().map(InteractionEvent::content).toList());
+    assertEquals("applied", directions.get(0).attributes().get("directiveOutcome"));
+    assertEquals("not_applied", directions.get(1).attributes().get("directiveOutcome"),
+        "a direction that never went out must not stay queued in the reloaded record");
+    assertEquals(reason, directions.get(1).attributes().get("directiveReason"));
+    assertEquals(List.of("queued", "applied", "queued", "not_applied"), outcomes(restarted, "r1"),
+        "exactly one final outcome per direction, however often recovery runs");
+  }
+
+  @Test
+  void recoveryLeavesAFinishedRunWhoseOutcomesWereAllWrittenAlone() {
+    Path root = tempDir.resolve("runs");
+    var store = new AgentRunStore(root);
+    seedRun(store, "r1", "DONE");
+    store.runEvents().appendEvent("r1", "core.agent-run", "directive_acknowledged",
+        payload("d1", "Too late.", "queued", null));
+    store.runEvents().appendEvent("r1", "core.agent-run", "directive_acknowledged",
+        payload("d1", "Too late.", "not_applied", "run_finished"));
+    // The live run's last write, after every direction's outcome.
+    store.setTerminationReason("r1",
+        new TerminationReason(TerminalDisposition.COMPLETED, null, null));
+
+    var restarted = new AgentRunStore(root);
+    assertEquals(0, new AgentRunReconciler(restarted).reconcile());
+    assertEquals(List.of("queued", "not_applied"), outcomes(restarted, "r1"));
+    assertNull(restarted.readSnapshot("r1").get("interruptedAt"), "a finished run is not interrupted");
+  }
+
+  private static void seedRun(AgentRunStore store, String sessionId, String state) {
+    List<Map<String, Object>> messages = List.of(
+        Map.of("role", "system", "content", "Be helpful."),
+        Map.of("role", "user", "content", "Inspect the files."));
+    var request = new AgentRequest(messages, List.of(), 4, List.of(), null, null, CONV, null,
+        List.of(), null, false, null);
+    store.startRun(sessionId, request, messages, 10_000);
+    store.updateCheckpoint(sessionId, state, messages, 1, 0, 30, "");
+  }
+
+  private static List<Object> outcomes(AgentRunStore store, String sessionId) {
+    return store.readEvents(sessionId).stream()
+        .filter(r -> "directive_acknowledged".equals(r.get("eventType")))
+        .map(r -> ((Map<?, ?>) r.get("payload")).get("outcome"))
+        .map(Object.class::cast)
+        .toList();
   }
 
   private static Map<String, Object> ack(String id, String text, String outcome, String reason, int second) {

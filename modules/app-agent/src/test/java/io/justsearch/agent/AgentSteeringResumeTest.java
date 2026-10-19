@@ -168,7 +168,7 @@ class AgentSteeringResumeTest {
     assertEquals("run_failed", reasonOf(run.acks().getLast()));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"completed", "llm-failure", "step-limit"})
   void directionArrivingDuringTheLastModelCallIsReportedNotApplied(String ending) {
     var ai = switch (ending) {
@@ -196,7 +196,7 @@ class AgentSteeringResumeTest {
     ai.sent().forEach(sent -> assertEquals(List.of(), directionsIn(sent)));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"context-stop,run_stopped", "budget-stop,budget_limit", "cancel,run_stopped"})
   void directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String ending, String reason) {
     // The first call spends nearly the whole budget (budget-stop) or the second projection crosses
@@ -254,7 +254,7 @@ class AgentSteeringResumeTest {
 
   // ---- S8.6 steering while a write waits for approval ----
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"approve", "reject", "stop"})
   void directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String decision) {
     var ai = new CapturingAi(ScriptedResponse.toolCall("w1", "core_write", "{}"),
@@ -296,7 +296,7 @@ class AgentSteeringResumeTest {
 
   // ---- S8.3 handoff keeps directions and the resume warning ----
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {true, false})
   void firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean explored) {
     var scripted = new ArrayList<ScriptedResponse>();
@@ -323,7 +323,7 @@ class AgentSteeringResumeTest {
     assertEquals(ai.sent(), ai.counted);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"reviewer", "planner"})
   void secondHandoffAndReturnKeepTheDirections(String third) {
     var ai = new CapturingAi(
@@ -351,7 +351,7 @@ class AgentSteeringResumeTest {
     ai.sent().forEach(ModelRequestFixtures::assertValidRequest);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {true, false})
   void resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean byId) {
     var store = new AgentRunStore(tempDir.resolve("runs"));
@@ -374,6 +374,7 @@ class AgentSteeringResumeTest {
     };
     service.runAgent(new AgentRequest(history(), List.of(), 6, profiles("planner", "executor"), "planner"),
         run, EngineContextTestFixtures.AGENT_LOOP);
+    assertNotNull(interrupted.get(), "the run reaches the write's approval after the handoff");
     assertEquals("WAITING_APPROVAL", interrupted.get().get("state"));
     @SuppressWarnings("unchecked")
     var saved = (List<Map<String, Object>>) interrupted.get().get("messages");
@@ -444,7 +445,7 @@ class AgentSteeringResumeTest {
 
   // ---- S8.5 resume with outstanding tool calls ----
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({
     "WAITING_APPROVAL,true", "WAITING_APPROVAL,false",
     "READY_FOR_LLM,true", "READY_FOR_LLM,false",
@@ -492,7 +493,7 @@ class AgentSteeringResumeTest {
     assertEquals(original, store.readSnapshot("old").get("messages"), "the saved snapshot is not rewritten");
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"approve", "reject", "stale"})
   void pendingWriteRunsOnlyAfterAFreshValidApproval(String decision) {
     var store = new AgentRunStore(tempDir.resolve("runs"));
