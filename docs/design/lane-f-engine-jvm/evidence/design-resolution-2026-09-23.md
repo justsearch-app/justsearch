@@ -4,7 +4,7 @@ Scope: settle decisions solvable against current code before handing implementat
 to Sol. Inspected documentation HEAD `09fdbe769`; runtime code remains `22800c842`.
 No Java/proto/runtime implementation, build, dev stack or model query ran in this
 design pass. C2 remains accepted; D1/D2/E/F remain open. Nothing below waives their
-acceptance. The [continuation brief](../continuation-brief.md) is the task entry point.
+acceptance. The [continuation brief](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/continuation-brief.md) is the task entry point.
 
 ## Selected decisions
 

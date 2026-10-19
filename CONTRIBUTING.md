@@ -64,12 +64,12 @@ package the desktop application for Linux, mount models, or require a GPU.
 
 **For native development** (the dev container supplies these automatically):
 
-- Windows 10/11
+- Windows 10/11, or Linux with a C compiler (`cc`) and Tesseract
 - A JVM to launch the Gradle wrapper. The checked-in Daemon JVM criteria selects and, when necessary,
   auto-provisions Temurin JDK 25 for the build, independent of the wrapper client's ambient Java. Keeping
   `JAVA_HOME` and `PATH` on JDK 25 is still recommended so direct `java`/`javac` use and non-Gradle tooling
   agree; the dev-runner also resolves a suitable JDK explicitly for the Engine JVM.
-- Node.js 20+ (for the `modules/ui-web` frontend) — `scripts/setup/bootstrap-node-win.ps1` can install it for you
+- Node.js 24, what CI and the dev container use — `scripts/setup/bootstrap-node-win.ps1` can install it for you
 - Python 3.13+ for the repository's Python-backed checks and evaluation tooling
 - Rust stable only when working on the optional Tauri shell under `modules/shell`; its absence does
   not block core Java/web contribution
@@ -80,7 +80,7 @@ The bootstrap never chooses a host package manager or edits your shell profile.
 
 The core build does **not** require the Rust/Tauri toolchain (the desktop
 shell in `modules/shell` builds separately, only for packaging the installer), a **GPU**, or the **~9 GB model
-download** — the models are fetched on first *run* of the app, not to build or test it.
+download** — the models are needed only to *run* the app's semantic and AI features, not to build or test it.
 
 **To run the full desktop app** (not needed to contribute code):
 
@@ -163,9 +163,9 @@ If you contribute on behalf of an employer, see §8 of the CLA (a Corporate CLA 
 
 | Directory | Purpose |
 |-----------|---------|
-| `modules/ui` | HTTP API (Head process) |
+| `modules/ui` | HTTP + MCP API (Engine JVM, application half) |
 | `modules/ui-web` | Frontend (Lit web components, TypeScript, Vite) |
-| `modules/indexer-worker` | Lucene indexing (Body process) |
+| `modules/indexer-worker` | Lucene indexing (Engine JVM, index half) |
 | `modules/gpu-bridge` | GPU/VRAM detection, hardware capability helpers |
 | `modules/app-inference` | Local `llama-server` lifecycle (chat/RAG) |
 | `modules/shell` | Tauri desktop shell |
