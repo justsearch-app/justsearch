@@ -41,7 +41,11 @@ async function freePort() {
 }
 
 // Invoked under flock /tmp/js-linux-port/devstack.lock by the acceptance run / suite caller.
-async function checkStack(transport) {
+async function checkStack(transport, readOnlyLog = false) {
+  if (readOnlyLog && process.getuid() === 0) {
+    console.log('SKIP: root bypasses read-only file permissions');
+    return;
+  }
   const root = fs.mkdtempSync(path.join(repoRoot, 'tmp/supervisor-output-'));
   const stateRoot = path.join(root, 'state');
   const uiPort = await freePort();
@@ -118,6 +122,11 @@ async function checkStack(transport) {
     const sequence = read(path.join(stateRoot, 'active.json')).lease.sequence;
     await sleep(500);
     assert.ok(read(path.join(stateRoot, 'active.json')).lease.sequence > sequence, 'live owner renews');
+    if (readOnlyLog) {
+      const logPath = path.resolve(repoRoot, run.logs.supervisor);
+      fs.chmodSync(logPath, 0o444);
+      assert.throws(() => fs.appendFileSync(logPath, 'probe'), { code: 'EACCES' }, 'the OS refuses this log before the owner exits');
+    }
     if (transport === 'mcp') { const exited = once(launcher, 'exit'); launcher.kill(); await exited; }
     const ownerExited = once(owner, 'exit'); owner.kill(); await ownerExited;
     const endedAt = Date.now();
@@ -141,11 +150,22 @@ async function checkStack(transport) {
       assert.ok(run.logs.supervisor, 'run.json makes the supervisor log findable');
       logPath = path.resolve(repoRoot, run.logs.supervisor);
       const logs = fs.readFileSync(logPath, 'utf8');
-      assert.match(logs, /renewal paused/);
-      assert.match(logs, /Reaping stack/);
+      if (readOnlyLog) assert.doesNotMatch(logs, /renewal paused|Reaping stack/, 'the read-only log cannot receive post-exit lines');
+      else {
+        assert.match(logs, /renewal paused/);
+        assert.match(logs, /Reaping stack/);
+      }
     }
-    if (transport === 'cli') assert.match(fs.readFileSync(outputPath, 'utf8'), /Reaping stack/);
-    console.log(`PASS ${transport}: renewal paused, survived owner exit, orderly quit, active removed, reaped_abandoned; log=${logPath}`);
+    if (transport === 'cli') {
+      const output = fs.readFileSync(outputPath, 'utf8');
+      assert.match(output, /Reaping stack/);
+      if (readOnlyLog) {
+        assert.match(output, /renewal paused/);
+        assert.match(output, /supervisor log unavailable.*EACCES/);
+        assert.equal(output.match(/supervisor log unavailable/g)?.length, 1, 'one warning despite repeated log failures');
+      }
+    }
+    console.log(`PASS ${transport}${readOnlyLog ? ' (read-only log)' : ''}: renewal paused, survived owner exit, orderly quit, active removed, reaped_abandoned; log=${logPath}`);
   } finally {
     // Only spawn-time identities / this test's retained child handles may be cleanup targets.
     for (const birth of births) if (!gone(birth)) {
@@ -161,6 +181,9 @@ async function checkStack(transport) {
 
 fs.mkdirSync(path.join(repoRoot, 'tmp'), { recursive: true });
 if (process.platform === 'linux') {
-  if (!process.argv.includes('--cli-only')) await checkStack('mcp');
-  if (!process.argv.includes('--mcp-only')) await checkStack('cli');
+  if (!process.argv.includes('--cli-only') && !process.argv.includes('--readonly-only')) await checkStack('mcp');
+  if (!process.argv.includes('--mcp-only')) {
+    if (!process.argv.includes('--readonly-only')) await checkStack('cli');
+    await checkStack('cli', true);
+  }
 } else console.log('SKIP: real closed-pipe owner-exit reproduction requires Linux');
