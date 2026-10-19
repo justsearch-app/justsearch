@@ -90,7 +90,7 @@
       "name": "CodeQL",
       "path": ".github/workflows/codeql.yml",
       "class": "security-scan",
-      "expectedTriggers": ["workflow_dispatch"],
+      "expectedTriggers": ["schedule", "workflow_dispatch"],
       "owner": "security automation",
       "failureDefault": "security-signal",
       "staleDays": 30,

@@ -200,6 +200,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | One Engine JVM, and the process boundaries that survive | Accepted | 2026-09-07 |
 | [0050](0050-gpu-co-residence-by-prevention.md) | GPU co-residence by prevention, measured profiles and explicit degradation | Accepted (amends 0004, 0047, 0048) | 2026-10-05 |
 | [0051](0051-held-process-lifetimes-and-owner-exit-records.md) | Held process lifetimes and owner-recorded exits | Accepted (amends 0049) | 2026-10-05 |
+| [0052](0052-weekly-codeql-on-hosted-runners.md) | Weekly CodeQL on hosted runners | Accepted (amends 0044) | 2026-10-19 |
 
 > ADRs 0031–0041 were graduated on 2026-06-09 from the retired `421` frontend-rewrite kernel
 > draft's `50-decisions/` set (authored ~2026-05; the rewrite shipped per tempdoc 563). The
