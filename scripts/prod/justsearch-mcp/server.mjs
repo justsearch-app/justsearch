@@ -65,10 +65,48 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
 }
 
 /**
+ * The Engine discovery selected through its runtime manifest (null for --port /
+ * JUSTSEARCH_API_PORT, which are the operator's choice and are not re-checked).
+ */
+let selectedEngine = null;
+
+/**
+ * Every request to the Engine goes through httpGetTextLimited / httpPostJsonLimited, and both
+ * first repeat the owner proof (engine-discovery.cjs confirmEngine: same manifest identity, and
+ * the OS still reports that pid as the port's owner; no network). A refusal comes back as a
+ * transport result with error.message 'engine_gone', so no handler, and no continuation request
+ * inside one tool call, reaches an endpoint that is no longer that Engine.
+ */
+async function engineGone() {
+  if (!selectedEngine) return null;
+  const check = await confirmEngine(selectedEngine);
+  if (check.ok) return null;
+  return { ok: false, statusCode: null, text: null, error: { message: 'engine_gone', detail: `${check.status}: ${check.detail}` } };
+}
+
+function engineGoneError(res) {
+  return makeError(
+    'ENGINE_GONE',
+    `The JustSearch Engine this server connected to (pid ${selectedEngine?.pid}, port ${selectedEngine?.port}) ` +
+      `is no longer the one serving that port (${res.error.detail}). Nothing was sent. Restart the MCP server to reconnect.`,
+  );
+}
+
+/** HTTP GET to the Engine, after the owner proof (see engineGone). */
+async function httpGetTextLimited(urlStr, options) {
+  return (await engineGone()) ?? sendGetTextLimited(urlStr, options);
+}
+
+/** HTTP POST to the Engine, after the owner proof (see engineGone). */
+async function httpPostJsonLimited(urlStr, body, options) {
+  return (await engineGone()) ?? sendPostJsonLimited(urlStr, body, options);
+}
+
+/**
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
-function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
+function sendGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -139,7 +177,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
  * HTTP POST with JSON body, size limiting, and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:164-237.
  */
-function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
+function sendPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -315,6 +353,7 @@ function makeError(code, message) {
 }
 
 function parseJsonResponse(res, { preserveOperationError = false } = {}) {
+  if (res.error?.message === 'engine_gone') return { parsed: null, error: engineGoneError(res) };
   // Size-limit abort — check first, regardless of HTTP status code.
   // When the response body exceeds maxBytes, res.destroy() fires res.on('error')
   // which passes through the real HTTP statusCode (e.g. 200), so this check must
@@ -431,6 +470,7 @@ export async function main() {
   // Discover backend
   const backend = await discover({ port: args.port, verbose: args.verbose });
   const { baseUrl, token } = backend;
+  selectedEngine = backend.engine || null;
 
   ensureLoopbackUrl(baseUrl, 'baseUrl');
   log(`Backend: ${baseUrl}`);
@@ -443,20 +483,7 @@ export async function main() {
   // Build header helpers — include token header only when we have a real token
   const tokenHeaders = token ? { 'X-JustSearch-Session': token } : {};
 
-  async function requireToken() {
-    // The token goes only to the Engine it came from: before each call, the manifest Engine must
-    // still be the one the OS says holds the port (no network). --port / JUSTSEARCH_API_PORT are
-    // the operator's choice and are not re-checked.
-    if (backend.engine) {
-      const check = await confirmEngine(backend.engine);
-      if (!check.ok) {
-        return makeError(
-          'ENGINE_GONE',
-          `The JustSearch Engine this server connected to (pid ${backend.engine.pid}, port ${backend.port}) ` +
-            `is no longer the one serving that port (${check.status}: ${check.detail}). Restart the MCP server to reconnect.`,
-        );
-      }
-    }
+  function requireToken() {
     // In dev mode (token === ""), POST works without a token — don't block.
     // Only block when the token endpoint wasn't available at all (null).
     if (token === null) {
@@ -498,7 +525,7 @@ export async function main() {
     async (rawArgs) => {
       const input = AnswerInputSchema.parse(rawArgs);
 
-      const tokenErr = await requireToken();
+      const tokenErr = requireToken();
       if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/retrieve-context`;
@@ -648,7 +675,7 @@ export async function main() {
     async (rawArgs) => {
       const input = SearchInputSchema.parse(rawArgs);
 
-      const tokenErr = await requireToken();
+      const tokenErr = requireToken();
       if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/search`;
@@ -785,7 +812,7 @@ export async function main() {
     async (rawArgs) => {
       const input = IngestInputSchema.parse(rawArgs);
 
-      const tokenErr = await requireToken();
+      const tokenErr = requireToken();
       if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/ingest`;
@@ -804,6 +831,7 @@ export async function main() {
         maxBytes: 2_000_000,
         headers: { ...tokenHeaders, 'X-JustSearch-Transport': 'MCP' },
       });
+      if (res.error?.message === 'engine_gone') return engineGoneError(res);
 
       let operationResponse;
       let parseError = null;

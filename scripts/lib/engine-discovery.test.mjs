@@ -97,9 +97,13 @@ let instanceCounter = 0;
  * A loopback service. kind 'engine' answers like a JustSearch Engine with the given identity;
  * kind 'foreign' answers health/status checks but is not a JustSearch Engine.
  */
-async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200 } = {}) {
+async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null } = {}) {
   const id = instanceId || `instance-${process.pid}-${++instanceCounter}`;
   const requests = [];
+  // holdUrl: a request to it is answered only when release(body) is called (a slow Engine call).
+  let held = null;
+  let heldArrived;
+  const arrived = new Promise((resolve) => (heldArrived = resolve));
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (c) => (body += c));
@@ -131,6 +135,19 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
         });
       }
       if (req.url === '/mcp') return json(405, {});
+      if (holdUrl && req.url === holdUrl) {
+        // The listener is gone by then, so the connection closes with this answer, as a stopping
+        // Engine's does; the client's next request needs a new connection to the port.
+        held = (obj) => {
+          res.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
+          res.end(JSON.stringify(obj));
+        };
+        heldArrived();
+        return undefined;
+      }
+      if (req.url === '/api/knowledge/status') return json(200, { state: 'READY', ready: true, docCount: 1, healthy: true });
+      if (req.url.startsWith('/api/operation-history/')) return json(200, { state: 'completed', by: id });
+      if (req.url === '/api/knowledge/retrieve-context') return json(200, { context: `context by ${id}`, total_found: 0, chunks: [], quality: {} });
       if (req.url === '/api/knowledge/ingest' && req.method === 'POST') {
         return json(200, { success: true, operationKey: `op-${id}`, message: `ingest by ${id}` });
       }
@@ -154,7 +171,10 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
   const setHealth = (status) => {
     healthStatus = status;
   };
-  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth };
+  /** Stop listening but keep open connections (a held response can still be sent). */
+  const stopListening = () => new Promise((resolve) => server.close(resolve) && resolve());
+  const release = (obj) => held(obj);
+  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth, arrived, release, stopListening };
 }
 
 /** Resolve once the service has received the client's notifications/initialized (its handshake is done). */
@@ -191,6 +211,10 @@ const server = http.createServer((req, res) => {
       return json(200, { jsonrpc: '2.0', id: msg.id, result: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'impostor', version: '0' }, content: [{ type: 'text', text: 'impostor' }] } });
     }
     if (req.url === '/api/knowledge/ingest') return json(200, { success: true, operationKey: 'impostor', message: 'impostor' });
+    if (req.url === '/api/knowledge/status') return json(200, { state: 'READY', ready: true, docCount: 999, healthy: true });
+    if (req.url.startsWith('/api/operation-history/')) return json(200, { state: 'completed', by: 'impostor' });
+    if (req.url === '/api/knowledge/search') return json(200, { results: [], facets: { meta_source: { impostor: 1 } } });
+    if (req.url === '/api/knowledge/match-citations') return json(200, { matches: ['impostor'], sentences_total: 1, sentences_matched: 1 });
     json(404, {});
   });
 });
@@ -754,11 +778,8 @@ try {
   sdkAvailable = false;
 }
 
-test('D9: production MCP stops sending its token once the Engine no longer holds the port', { skip: !sdkAvailable && 'needs the MCP SDK (npm ci)' }, async (t) => {
-  const root = tempRoot(t);
-  const m = machine(root);
-  const engine = await startService(t);
-  writeManifest(m.desktop, manifestFor(engine));
+/** The production MCP server over stdio, initialized; call(name, args) runs one tool. */
+async function startProdMcp(t, m) {
   const child = spawn(process.execPath, [PROD_MCP_ENTRY], { env: m.env, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
   t.after(() => child.kill());
   let stderr = '';
@@ -776,8 +797,10 @@ test('D9: production MCP stops sending its token once the Engine no longer holds
       replies.get(msg.id)?.(msg);
     }
   });
-  const call = (id, method, params) =>
+  let nextId = 1;
+  const request = (method, params) =>
     new Promise((resolve, reject) => {
+      const id = nextId++;
       const timer = setTimeout(() => reject(new Error(`${method} timed out\n${stderr}`)), 30000);
       replies.set(id, (msg) => {
         clearTimeout(timer);
@@ -785,18 +808,64 @@ test('D9: production MCP stops sending its token once the Engine no longer holds
       });
       child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
     });
-  await call(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
+  await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
-  const ingest = { name: 'justsearch_ingest', arguments: { paths: [path.join(root, 'doc.txt')] } };
-  const ok = await call(2, 'tools/call', ingest);
-  assert.match(JSON.stringify(ok.result), new RegExp(`ingest by ${engine.instanceId}`), stderr);
+  return {
+    call: async (name, args) => JSON.stringify((await request('tools/call', { name, arguments: args })).result),
+    get stderr() {
+      return stderr;
+    },
+  };
+}
+
+const NEEDS_SDK = { skip: !sdkAvailable && 'needs the MCP SDK (npm ci)' };
+
+test('D9: production MCP stops sending its token once the Engine no longer holds the port', NEEDS_SDK, async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine));
+  const prod = await startProdMcp(t, m);
+  const ingest = { paths: [path.join(root, 'doc.txt')] };
+  assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${engine.instanceId}`), prod.stderr);
   assert.equal(engine.requests.find((r) => r.url === '/api/knowledge/ingest')?.headers['x-justsearch-session'], engine.token);
 
   await engine.close();
   const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
-  const refused = await call(3, 'tools/call', ingest);
-  assert.match(JSON.stringify(refused.result), /ENGINE_GONE/, stderr);
+  assert.match(await prod.call('justsearch_ingest', ingest), /ENGINE_GONE/, prod.stderr);
   assert.deepEqual(impostor.requests, [], 'nothing, and no token, reaches the foreign server');
+});
+
+test('D9: production MCP re-proves the Engine before each request inside one answer call (port taken over while retrieve-context is pending, old process alive)', NEEDS_SDK, async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { holdUrl: '/api/knowledge/retrieve-context' });
+  writeManifest(m.desktop, manifestFor(engine));
+  const prod = await startProdMcp(t, m);
+  const answer = prod.call('justsearch_answer', { query: 'tides', verify_citations: { answer_text: 'The keeper writes notes.' } });
+  await engine.arrived;
+  await engine.stopListening(); // the listener goes; this process (the manifest pid) stays alive
+  const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
+  engine.release({ context: `context by ${engine.instanceId}`, total_found: 1, chunks: [], quality: {} });
+  const result = await answer;
+  assert.deepEqual(impostor.requests, [], `no continuation request reaches the process that took the port\n${prod.stderr}`);
+  assert.ok(!engine.requests.some((r) => r.url === '/api/knowledge/search'), 'the continuation did not slip through on the old connection');
+  assert.doesNotMatch(result, /impostor/, 'nothing from the replacement ends up in the answer');
+});
+
+test('D9: production MCP status and operation outcome never contact a replacement on the port', NEEDS_SDK, async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine));
+  const prod = await startProdMcp(t, m);
+  assert.match(await prod.call('justsearch_status', {}), /"ok":true/, prod.stderr);
+  assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), new RegExp(engine.instanceId), prod.stderr);
+  await engine.stopListening();
+  const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
+  assert.match(await prod.call('justsearch_status', {}), /ENGINE_GONE/, prod.stderr);
+  assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), /ENGINE_GONE/, prod.stderr);
+  assert.deepEqual(impostor.requests, [], 'neither call contacts the replacement');
 });
 
 test('D1: a Windows-style lazily resolved folder (the OS-reported Roaming folder) is tried after the home-folder guess', async (t) => {

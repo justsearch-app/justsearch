@@ -272,10 +272,15 @@ function postToServer(message, intercept) {
 }
 
 /**
- * Best-effort server->client stream (GET /mcp). Optional per spec; if the
- * server answers 405 or the stream drops, we simply go without it.
+ * Best-effort server->client stream (GET /mcp), opened only after the owner proof
+ * (ensureSameEngine). Optional per spec; if the server answers 405 or the stream drops, or the
+ * Engine cannot be confirmed, we simply go without it.
  */
 function openGetStream() {
+  ensureSameEngine().then(openGetStreamNow, () => {});
+}
+
+function openGetStreamNow() {
   if (state.getStream) {
     state.getStream.destroy();
     state.getStream = null;
@@ -343,11 +348,12 @@ async function recoverConnection() {
 }
 
 /**
- * Before a message goes out with the session token: the Engine selected earlier must still be the
- * one the OS says holds its port, under the same manifest (confirmEngine; no network). Otherwise
- * select again, which re-proves the endpoint and fetches its own token, before anything is sent.
- * Concurrent messages share one check. A JUSTSEARCH_API_PORT pin is the operator's choice and is
- * not re-checked.
+ * Before every request to the Engine (sendToEngine, openGetStream): the Engine selected earlier
+ * must still be the one the OS says holds its port, under the same manifest (confirmEngine; no
+ * network). Otherwise select again, which re-proves the endpoint and fetches its own token, before
+ * anything is sent. Concurrent requests share one check. Only recoverConnection's re-initialize,
+ * sent right after its own proof, uses postToServer directly. A JUSTSEARCH_API_PORT pin is the
+ * operator's choice and is not re-checked.
  */
 let pendingCheck = null;
 function ensureSameEngine() {
@@ -365,9 +371,14 @@ function ensureSameEngine() {
   return pendingCheck;
 }
 
+/** POST to the Engine after the owner proof; throws (err.tried) if the app is gone. */
+async function sendToEngine(message, intercept) {
+  await ensureSameEngine();
+  return postToServer(message, intercept);
+}
+
 /** Handle one client->server message, with one transparent reconnect+retry. */
 async function handleClientMessage(message) {
-  await ensureSameEngine(); // throws (err.tried) if the app is gone
   const isInitialize = message && message.method === 'initialize';
   if (isInitialize && message.params) {
     state.initializeParams = message.params;
@@ -376,7 +387,7 @@ async function handleClientMessage(message) {
 
   const send = () =>
     isInitialize
-      ? postToServer(message, (msg) => {
+      ? sendToEngine(message, (msg) => {
           if (msg && msg.id === message.id && msg.result) {
             if (typeof msg.result.protocolVersion === 'string') {
               state.protocolVersion = msg.result.protocolVersion;
@@ -387,7 +398,7 @@ async function handleClientMessage(message) {
           }
           emit(msg);
         })
-      : postToServer(message);
+      : sendToEngine(message);
 
   try {
     await send();

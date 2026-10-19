@@ -26,6 +26,11 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    looks in a dev checkout: when the installed app and a dev Engine both run, it uses the
    installed app; set `JUSTSEARCH_DATA_DIR` to the checkout's data folder (for example
    `<checkout>/modules/ui-web/.dev-data`) or `JUSTSEARCH_API_PORT` to use the dev Engine.
+   (The production stdio server, `scripts/prod/justsearch-mcp.mjs`, tries more: `--port`,
+   `JUSTSEARCH_API_PORT`, the legacy `JUSTSEARCH_HOME` folder, which wins over
+   `JUSTSEARCH_DATA_DIR`, then `JUSTSEARCH_DATA_DIR`, the desktop app's folder, a dev
+   checkout's `.dev-data` folders and the user data folder; the bridge has no `JUSTSEARCH_HOME`
+   step.)
    The resolver (`server/engine-discovery.cjs`) is shared with the production MCP server and
    follows the `discovery.desktopAppDataDir` entry of `contracts/platform-paths/spec.v1.json`.
 2. If no running JustSearch is found, it exits with an actionable message that
@@ -33,8 +38,8 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
 3. It also fetches the desktop session token (`GET /api/mcp/token`) and sends
    it as `X-JustSearch-Session` on every POST, so the bridge keeps working if
    the packaged app enforces the token on non-GET requests
-   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Before each message it
-   re-checks, without contacting the port, that the manifest still names the same
+   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Before every request to
+   the Engine (each message's POST and the GET stream) it re-checks, without contacting the port, that the manifest still names the same
    Engine and that the OS still reports it as the port's owner; if not, it drops the
    token and re-runs discovery, so the old token never reaches whatever took the port
    (a `JUSTSEARCH_API_PORT` pin is the operator's choice and is not re-checked).

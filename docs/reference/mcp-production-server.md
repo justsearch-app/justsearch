@@ -40,10 +40,16 @@ MCP server on?" is exactly "which port is the API on?":
   `GET /api/runtime/live` there reports the same pid and instance, and `GET /api/health` answers
   200 (an Engine that passes those checks but is still starting, health 503, is re-checked for up
   to 30 s before it is passed over; no token is fetched before 200), and otherwise fail with a list of every folder they
-  tried. Before sending the session token again they re-check that the same Engine still holds
-  the port; the bridge then re-discovers, the stdio server reports `ENGINE_GONE` and must be
-  restarted. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
+  tried. Before every request to the Engine, credentialed or not (including the follow-up
+  requests inside one tool call), they re-check that the same Engine still holds the port (same
+  manifest, same socket owner); when it does not, nothing is sent: the bridge re-discovers, the
+  stdio server reports `ENGINE_GONE` and must be restarted. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found).
+- **Order `scripts/prod/justsearch-mcp.mjs` tries:** `--port`, then `JUSTSEARCH_API_PORT`, then
+  the manifest in the legacy `JUSTSEARCH_HOME` folder when set (it wins over
+  `JUSTSEARCH_DATA_DIR`), then `JUSTSEARCH_DATA_DIR`, then the desktop app's folder, then a dev
+  checkout's `.dev-data` folders above the working directory, then the user data folder of
+  headless/CLI starts. The bridge has no `JUSTSEARCH_HOME` step.
 - **Installed app vs. a checkout's dev Engine:** `scripts/prod/justsearch-mcp.mjs` tries the
   installed desktop app's folder *before* a dev checkout's `.dev-data` folders, so when both are
   running it connects to the installed app (it prints which folder it used on stderr). To use the
