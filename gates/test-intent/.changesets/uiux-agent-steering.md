@@ -542,3 +542,14 @@ No acceptance record is supplied by the builder.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-l3uugof9",
+  "verdict": "accept",
+  "digest": "sha256:b9bde6c8ebe9d1d0215a7ef92e63fb17107fdace4de73bca7bf15e108939c271",
+  "note": "Reviewed sources and baseline tests before the diff; fresh execution evidence matches committed results. Test-intent acceptance only; the independent live-recovery regression is reported separately."
+}
+```
