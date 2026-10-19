@@ -241,3 +241,14 @@ Pending independent verification; no builder acceptance.
   "note": "Round 2 at 80b3a61: B8 catches 300 ms, 1 s, reconciler and fourth-unload reloads 5/5 (baseline misses 1 s); round-1 mutations, stability and cross-module checks hold for the unchanged rest."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-slow-tests-b-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:fa8a222fbbcf35960ec60c7bc9fc1023181d7e43cf7874d12cfbb6ffbec02bdb",
+  "note": "Round 4 at 63904a7ea: B5 quit fails 5/5 when quit leaves the owned launcher open; raw launcher threads (800 ms, 2 s, on refused restart) pass B5 and are caught 5/5 by EngineSpawnOwnershipArchTest and ProcessLaunchFunnelTest, which cover late launches. B8 catches a reload only within 400 ms after an unload; later ones escape (600 ms escaped) unless they land in the next unload's window."
+}
+```
