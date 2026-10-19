@@ -75,9 +75,8 @@ the existing producer-call and sampler-thread oracles remain unchanged.
 
 ## Execution evidence
 
-ST1–ST4 builder checks completed; ST5 is **unverified beyond the first full-class round**.
-Both changed classes passed all 25 tests in the first round. Round 2 was stopped while waiting
-for the shared Gradle lock and never executed; 19 of the required 20 rounds remain.
+ST1–ST4 builder checks completed. The builder ran ST5 round 1 (both changed classes, 25 tests)
+and stopped while waiting for the shared Gradle lock; the independent verifier ran all 20 rounds.
 
 The builder returned under the role contract's instruction to come back when work runs well
 past the assignment. The original estimate was 25–45 minutes; repeated shared-lock waits
@@ -135,9 +134,9 @@ Each run selects both changed classes in full, as required by ST5. All seven inh
 | Run | Checks passed | Named executions passed |
 | --- | ---: | ---: |
 | `tmp/g-status/stability-01/summary.json` | 25 | 2 |
-| 2 | unverified: cancelled before acquiring the shared lock | did not execute |
+| Verifier, runs 1–20 on 8aa5200fe | 25 each, no skips | 2 each |
 
-Completed: 1/20.
+Completed: 20/20 (verifier).
 
 
 
