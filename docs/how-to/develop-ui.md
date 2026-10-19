@@ -24,7 +24,7 @@ npm install          # first time only
 npm run dev          # starts Vite
 ```
 
-Open `http://localhost:5173/`. The live Lit shell renders its chrome, rail, and surfaces with no backend
+Open `http://127.0.0.1:5173/`. The live Lit shell renders its chrome, rail, and surfaces with no backend
 (empty/`Connecting…` data). `?demo=true` is inert for the shell-v0 boot — it does **not** load fixture data
 (see the correction notice above). For real data, run the dev stack.
 
@@ -102,7 +102,7 @@ Agents can use Claude Code's Chrome extension for real-time visual feedback:
 
 ```text
 /chrome                          # enable in session
-# then ask Claude to navigate to localhost:5173 and inspect
+# then ask Claude to navigate to 127.0.0.1:5173 and inspect
 ```
 
 Claude can take screenshots, click elements, read the DOM, execute JS in
