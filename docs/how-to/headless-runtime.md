@@ -42,18 +42,20 @@ On Windows, the PowerShell form is:
 .\justsearch-headless.ps1 -Mode mcp-lite
 ```
 
-To reuse an existing install's data and models, set these before launching:
+To reuse the desktop app's index, settings and models, quit the desktop app first,
+then set both variables to its data folder before launching:
 
 ```bat
-set JUSTSEARCH_DATA_DIR=%LOCALAPPDATA%\JustSearch\data
+set JUSTSEARCH_DATA_DIR=%APPDATA%\io.justsearch.shell
 set JUSTSEARCH_HOME=%APPDATA%\io.justsearch.shell
 ```
 
-On Linux, set the corresponding paths in Bash before invoking the launcher:
+On Linux, use the desktop app's default data folder (or its folder under
+`XDG_DATA_HOME` if set):
 
 ```sh
-export JUSTSEARCH_DATA_DIR=/absolute/path/to/engine-data
-export JUSTSEARCH_HOME=/absolute/path/to/ai-assets
+export JUSTSEARCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/io.justsearch.shell"
+export JUSTSEARCH_HOME="$JUSTSEARCH_DATA_DIR"
 ```
 
 The desktop shell retains its platform app-data directory. On Linux its private
@@ -73,10 +75,17 @@ variable is `JUSTSEARCH_MODE` (see `docs/reference/configuration/environment-var
 
 ## Confirm the active mode
 
-The runtime manifest reports the mode. With the API port known (default dev port `33221`):
+The launcher prints `JUSTSEARCH_API_PORT=<port>` when it is up: normally `8080`,
+unless taken or overridden with `JUSTSEARCH_API_PORT` (`33221` for the dev
+`runHeadless` task). The actual port is also recorded as `head.apiPort` in
+`<JUSTSEARCH_DATA_DIR>/runtime/manifest.json`.
+
+The runtime manifest reports the mode. Set the printed port in your terminal
+(replace `8080` below if different):
 
 ```bash
-curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
+export JUSTSEARCH_API_PORT=8080
+curl -s "http://127.0.0.1:$JUSTSEARCH_API_PORT/api/runtime/manifest" | jq '.mode'
 # { "intent": "mcp-lite", "realized": "retrieval-only" }
 ```
 
@@ -89,7 +98,7 @@ curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
 To see the download weight a mode implies before installing:
 
 ```bash
-curl -s http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
+curl -s "http://127.0.0.1:$JUSTSEARCH_API_PORT/api/ai/install/plan-preview" | jq '.tiers'
 ```
 
 ## Notes

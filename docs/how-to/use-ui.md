@@ -119,7 +119,7 @@ The app includes built-in introspection tools reachable via browser.
 | **Event Log** | `http://localhost:33221/api/debug/events` | Ring buffer of the last 50 system events. |
 | **Engine Log Tail** | `http://localhost:33221/api/debug/engine-log` | Quick peek at recent engine logs (best-effort). |
 | **Health** | `http://localhost:33221/api/health` | Lightweight backend health check. |
-| **Inference Status** | `http://localhost:33221/api/inference/status` | Current AI mode + queues + effective runtime model/context (best-effort); includes external server adoption diagnostics when applicable. |
+| **Inference Status** | `http://localhost:33221/api/inference/status` | Current AI mode + queues + effective runtime model/context (best-effort); includes external-server diagnostics when applicable. |
 
 Note: `GET /api/debug/effective-config` exists for "effective config" debugging. See `docs/explanation/06-configuration-ssot.md` for configuration source-attribution rules.
 
@@ -153,17 +153,18 @@ The right panel (**Inspector Panel**) contains the preview + AI tools.
 Notes:
 - Multi-file summarize runs **full coverage** by default (slower). For best performance, keep it **≤ 3 files**.
 - You can cancel in-flight streaming from the Inspector when the **Cancel** button is shown.
-- Keyboard tips:
-  - `Enter` on the results list commits selection and opens the Inspector.
-  - `Ctrl/Cmd+Enter` opens the file (Desktop) or a best-effort backend preview (Browser).
-  - `Ctrl/Cmd+Shift+P` opens the **Action Panel**.
+- `Ctrl+K` opens the command palette; see **Help → Keyboard Shortcuts** for the
+  [full list](../../SSOT/docs/help/keyboard-shortcuts.md).
 
 ### Resetting the App
-If `IndexingLoop` is stuck or the index is corrupted:
-1.  **Stop** all processes.
-2.  **Delete** `%LOCALAPPDATA%\JustSearch\index`.
-3.  **Delete** `%LOCALAPPDATA%\JustSearch\jobs.db`.
-4.  **Restart**.
+For a full reset, use **Settings → Data → Delete all local data**. See
+[Help → Troubleshooting](../../SSOT/docs/help/troubleshooting.md#high-disk-usage)
+for what it removes and the backup steps.
+
+To rebuild only a stuck or corrupted index, quit JustSearch, then delete the
+`index` folder inside its data folder (Windows `%APPDATA%\io.justsearch.shell`,
+Linux default `~/.local/share/io.justsearch.shell`), and restart. If `XDG_DATA_HOME`
+is set on Linux, use `$XDG_DATA_HOME/io.justsearch.shell` instead.
 
 ### Troubleshooting: GPU usage doesn't stop after a summary
 
@@ -173,7 +174,7 @@ It’s easy to misread GPU telemetry as “the summary is still running”.
   - `llama-server` often keeps **VRAM allocated while idle** so the next request is fast.
   - GPU **utilization** should drop close to 0% when the request finishes (other apps can still use the GPU).
 - **Bad (needs intervention)**:
-  - You see **multiple** `llama-server` processes, or the PID **keeps changing** every second → this usually means a stale/orphan `llama-server` is still bound to the port and the Head is repeatedly trying (and failing) to start another one.
+  - You see **multiple** `llama-server` processes, or the PID **keeps changing** every second. Check the process IDs and inference status to identify a leftover process or repeated restart before stopping anything.
 
 Useful commands (Windows):
 
@@ -181,8 +182,8 @@ Useful commands (Windows):
 # See llama-server processes (PID should be stable)
 Get-Process -Name llama-server -ErrorAction SilentlyContinue | Select-Object Id,StartTime,CPU
 
-# See who is listening on the llama-server port (default 8080)
-Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq 8080 } | Select-Object LocalAddress,LocalPort,OwningProcess
+# Find listening ports owned by llama-server processes
+Get-NetTCPConnection -State Listen | Where-Object { $_.OwningProcess -in (Get-Process -Name llama-server -ErrorAction SilentlyContinue).Id } | Select-Object LocalAddress,LocalPort,OwningProcess
 
 # Per-process GPU snapshot (who is actually using SM%)
 nvidia-smi.exe pmon -c 1
@@ -191,9 +192,12 @@ nvidia-smi.exe pmon -c 1
 Stop-Process -Id <pid> -Force
 ```
 
-Note: JustSearch can adopt an already-running `llama-server` on the configured port (instead of spawning another and entering a restart loop). For safety, adoption verifies the server via `GET /props` (not just `GET /health`). If `GET /props` is missing/unparseable, adoption is refused by default; for dev-only workflows you can set `-Djustsearch.inference.external.allow_health_only_adoption=true` to fall back to health-only adoption.
+JustSearch uses a `llama-server` it did not start only when
+`justsearch.inference.external_endpoint` is set to its loopback HTTP URL with an
+explicit port (for example `http://127.0.0.1:8085`); otherwise it starts its own on
+a free loopback port.
 
-Tip: `GET /api/inference/status` is usually the fastest way to see if the app thinks it is Online/Indexing/Offline, plus any external-server diagnostics when adoption is in use.
+Tip: `GET /api/inference/status` is usually the fastest way to see if the app thinks it is Online/Indexing/Offline, plus any external-server diagnostics when an explicit endpoint is in use.
 
 ## 4. AI Agent Usage Notes
 
@@ -285,14 +289,14 @@ Invoke-RestMethod -Uri http://localhost:33221/api/inference/status
 # Refresh persisted inference settings (model/context/gpu layers) from Brain settings.
 # Use the Reload control, which submits an accepted settings operation with a fresh witness.
 
-# Detach from an adopted external llama-server (starts a managed server on a new port; leaves the external process running)
+# Detach from an explicitly configured external llama-server (starts a managed server on a free loopback port; leaves the external process running)
 Invoke-RestMethod -Method Post -Uri http://localhost:33221/api/inference/detach
-# Note: if the runtime is not using an adopted external server, this is a no-op and returns "detached": false (ports unchanged).
+# Note: if the runtime is not Online with an external server, this is a no-op and returns "detached": false (ports unchanged).
 # Example response:
 # {
 #   "success": true,
 #   "detached": true,
-#   "previousPort": 8080,
+#   "previousPort": 8085,
 #   "newPort": 53421,
 #   "mode": "ONLINE"
 # }

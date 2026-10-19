@@ -41,7 +41,9 @@ retrieval quality is benchmarked on English, German, and French (see [Benchmarks
    accrues with downloads); if it does, the "More info" panel names the verified publisher. The
    install is per-user; no admin rights needed.
 3. **Launch JustSearch** and point it at a folder. On first launch the app asks consent to download its AI
-   models (**~9 GB**, one time, from GitHub Releases + Hugging Face) — after that it runs **fully offline**.
+   models (one time, from GitHub Releases + Hugging Face): about **10 GB** on Windows with a supported
+   NVIDIA GPU, or about **2–4 GB** without one. The **Install AI** dialog shows the exact size for your
+   machine — after the download, the app runs **fully offline**.
 
 Installer SHA-256 (also in [`SHA256SUMS`](https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/SHA256SUMS)):
 
@@ -60,7 +62,7 @@ build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how
 | | |
 |---|---|
 | **OS** | **Windows 10 or 11, 64-bit (x64) only** for the installer. On Linux, JustSearch runs from source ([Quickstart](#quickstart-build-from-source)); there is no Linux installer. macOS is not in the current scope ([NON-GOALS](NON-GOALS.md)). Verified on Windows 11; Windows 10 x64 is the expected WebView2 baseline but is not yet explicitly tested. WebView2, the VC++ runtime, and a Java runtime are bundled by the installer; there is nothing to install first. |
-| **Disk** | 261 MB installer + ~0.7 GB installed + **~9 GB one-time model download** + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
+| **Disk** | 261 MB installer + ~0.7 GB installed + the one-time AI model download ([sizes above](#install-windows)) + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
 | **RAM** | **16 GB recommended.** 8 GB is a conservative floor for keyword/semantic search only (not a benchmarked minimum; chat needs the GPU below regardless of RAM). The on-device chat model (~5.9 GB file) is loaded into memory when answering. |
 | **GPU** | **Required for chat.** Search and semantic ranking run on CPU — no GPU needed for those. Chat requires an NVIDIA GPU with **≥ 8 GB VRAM** (the app needs ~7.5 GB free VRAM to run the chat model). Without a supported NVIDIA GPU, or below that VRAM floor, no install path offers the chat model — chat does **not** fall back to CPU, so the app is search-only. |
 | **Network** | Only for the one-time model download. Nothing else, ever — see [Privacy](#privacy). |
@@ -72,7 +74,11 @@ JustSearch exposes its retrieval over MCP at `POST /mcp` — **in-process Stream
 (no separate process, no Node.js). The desktop app listens on **`http://127.0.0.1:8080`** by default; if 8080
 is already taken it falls back to a random free port. To pin a port, set the `JUSTSEARCH_API_PORT` environment
 variable before launching; the actual port in use is always written as `head.apiPort` in
-`%APPDATA%\io.justsearch.shell\runtime\manifest.json`. Details + a 2-minute Claude Desktop walkthrough:
+`%APPDATA%\io.justsearch.shell\runtime\manifest.json` on Windows, or
+`~/.local/share/io.justsearch.shell/runtime/manifest.json` on Linux (under
+`$XDG_DATA_HOME/io.justsearch.shell/runtime/manifest.json` if `XDG_DATA_HOME` is set).
+For headless/dev launches with a data directory override, use
+`<JUSTSEARCH_DATA_DIR>/runtime/manifest.json`. Details + a 2-minute Claude Desktop walkthrough:
 [`docs/reference/mcp-production-server.md`](docs/reference/mcp-production-server.md). Connect your agent:
 
 - **Claude Code:** `claude mcp add justsearch --transport http http://127.0.0.1:8080/mcp`
@@ -86,10 +92,6 @@ variable before launching; the actual port in use is always written as `head.api
   ```json
   { "mcpServers": { "justsearch": { "command": "npx", "args": ["mcp-remote", "http://127.0.0.1:8080/mcp"] } } }
   ```
-
-All three need an app build that serves `POST /mcp`, which the v0.1.0 installer release may predate — if your
-client lists no tools, POST a `tools/list` JSON-RPC request at the URL above before debugging the client; a 404
-means that build has no MCP endpoint, so use a newer release or a from-source build.
 
 Seven tools: `justsearch_answer` (RAG, primary), `justsearch_search`, `justsearch_browse`, `justsearch_ingest`,
 `justsearch_status`, `justsearch_runtime_manifest`, `justsearch_operation_outcome`. The server binds to
@@ -179,7 +181,7 @@ Accepted publication `agent-utility-hero-2026-07-28` (record `c5a75457b264`, pol
 
 > Prereqs to **build + test**: **JDK 25** (the Gradle toolchain auto-resolves it) and **Node.js 24** (for the
 > `modules/ui-web` frontend). Building/contributing needs **no GPU, no Rust toolchain, and no model
-> download**; the ~9 GB models below are runtime-only (the installed app downloads them with your consent).
+> download**; AI models are runtime-only (the installed app downloads them with your consent).
 
 ```bash
 git clone https://github.com/justsearch-app/justsearch && cd justsearch
@@ -195,8 +197,9 @@ version.
 
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
 Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). The installed
-app downloads the models once on first launch, with your consent (**~9 GB** — the ~5.9 GB local chat model
-dominates; fetched from GitHub Releases + HuggingFace), then runs fully offline. Running from source does
+app downloads the models once on first launch, with your consent, then runs fully offline. See
+[Help → AI Features](SSOT/docs/help/ai-features.md) for model sizes on Windows and Linux;
+the **Install AI** dialog shows the exact size for your machine. Running from source does
 not download them: keyword search works without models, and `node scripts/dev/doctor.mjs` names the step
 to the next tier.
 

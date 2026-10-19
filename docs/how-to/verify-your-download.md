@@ -39,11 +39,14 @@ certutil -hashfile JustSearch_<version>_x64-setup.exe SHA256
 Compare the printed hash (case-insensitive) against the matching line in the release's
 `SHA256SUMS`. They must match exactly.
 
-**On git-bash / WSL**, if you downloaded both files into the same folder:
+**On git-bash / WSL**, if you downloaded the installer and `SHA256SUMS` into the same folder:
 
 ```bash
-sha256sum -c SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
 ```
+
+The checksum file also lists the MCP bundle and, when built, updater assets.
+`--ignore-missing` checks the files you downloaded without failing on the others.
 
 This only tells you the file wasn't corrupted or swapped in transit — it does not tell you the
 maintainer is trustworthy or that the code is safe. It's the same guarantee a checksum always

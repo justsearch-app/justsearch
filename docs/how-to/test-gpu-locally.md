@@ -10,7 +10,12 @@ description: "How to run llama-server with GPU offload for local development and
 ## Prerequisites
 
 - NVIDIA GPU with CUDA compute capability 7.0+ (e.g., RTX 2060 or newer)
-- CUDA variant present at `modules/ui/native-bin/llama-server/variants/cuda12/`
+- On Windows, CUDA variant staged at `modules/ui/build/llama-server/stage/variants/cuda12/`
+
+The prebuilt CUDA staging task runs only on Windows. On Linux, build llama.cpp
+`b8571` with CUDA and set `JUSTSEARCH_SERVER_EXE` to your executable (see the
+[README](../../README.md#quickstart-build-from-source)). The `.exe` examples below
+are for Windows; on Linux, use your self-built executable.
 
 ## Preflight Check (Recommended)
 
@@ -27,7 +32,7 @@ This verifies model files, native runtime layout, and GPU visibility expected by
 Launch the CUDA variant directly to verify GPU offload works:
 
 ```bash
-modules/ui/native-bin/llama-server/variants/cuda12/llama-server.exe \
+modules/ui/build/llama-server/stage/variants/cuda12/llama-server.exe \
   -m models/<your-model>.gguf \
   --jinja -ngl 99 --host 127.0.0.1 --port 8086
 ```
@@ -41,7 +46,7 @@ Check stderr for these lines to confirm GPU offload:
 Pass the CUDA variant path as a system property when launching the app:
 
 ```text
--Djustsearch.server.exe=modules/ui/native-bin/llama-server/variants/cuda12/llama-server.exe
+-Djustsearch.server.exe=modules/ui/build/llama-server/stage/variants/cuda12/llama-server.exe
 -Djustsearch.gpu.layers=99
 ```
 

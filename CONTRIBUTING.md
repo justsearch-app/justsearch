@@ -79,7 +79,7 @@ or `node scripts/setup/bootstrap.mjs` to install the repository's pinned JavaScr
 The bootstrap never chooses a host package manager or edits your shell profile.
 
 The core build does **not** require the Rust/Tauri toolchain (the desktop
-shell in `modules/shell` builds separately, only for packaging the installer), a **GPU**, or the **~9 GB model
+shell in `modules/shell` builds separately, only for packaging the installer), a **GPU**, or the **~10 GB model
 download** — the models are needed only to *run* the app's semantic and AI features, not to build or test it.
 
 **To run the full desktop app** (not needed to contribute code):
