@@ -98,7 +98,6 @@ Use wrapper-first orchestration for long-running evaluation and benchmark sessio
 
 - Canonical wrapper: `python -m jseval`
 - Do not treat raw backgrounded PowerShell eval commands as the normal orchestration path
-- Use `--progress-file <path>` when a run may survive agent compaction or handoff
 
 Path and dependency rules:
 
@@ -108,7 +107,7 @@ Path and dependency rules:
 
 ### 3.3. Pre-commit Verification
 
-Before pushing changes, run the local gate to ensure code quality passes:
+Before pushing changes, run the relevant verification commands:
 
 ```powershell
 # Heavy verification
@@ -222,7 +221,8 @@ Fails when duplicate locked coordinates exist outside the optional allowlist. Wi
 
 **Lockfile freshness check:**
 
-CI and the local gate both run `resolveAndLockAll --write-locks` then `git diff --exit-code` on all lockfiles. If committed lockfiles are stale, the build fails.
+CI does not regenerate Gradle lockfiles or compare them for freshness. After dependency changes,
+run `resolveAndLockAll --write-locks` locally and review the lockfile diff before handoff.
 
 **Never hand-edit lockfiles.** Always regenerate with `resolveAndLockAll --write-locks`. Manual edits miss auxiliary configurations (like PMD aux classpaths) that only appear during full resolution.
 
@@ -262,19 +262,14 @@ Records in `app-api` that have **>10 positional parameters** and are **construct
 
 **Enforcement:** An ArchUnit rule in `ArchitectureRulesTest` flags positional construction of annotated records in production code. The rule maintains an explicit type list — add new records to `RECORD_BUILDER_TYPES` when annotating.
 
-**Currently annotated (8 records):** `KnowledgeSearchResponse`, `KnowledgeSearchResponse.Hit`, `KnowledgeSearchResponse.PipelineExecution`, `MigrationGenerationView`, `EnrichmentProgressView`, `WorkerDebugView`, `WorkerOperationalView`, `KnowledgeStatusView`.
+**Currently covered by the ArchUnit rule (7 records):** `KnowledgeSearchResponse`, `KnowledgeSearchResponse.Hit`, `MigrationGenerationView`, `EnrichmentProgressView`, `WorkerDebugView`, `WorkerOperationalView`, `KnowledgeStatusView`.
 
 **Adding a field to an API record:**
 
-1. Add the field to the record parameter list.
-2. If collection type, add null-coalescing in compact constructor (e.g., `myList = myList == null ? List.of() : List.copyOf(myList)`).
-3. Compile: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:compileJava` -- the builder regenerates automatically.
-4. Update production construction site (e.g., `KnowledgeHttpApiAdapter`) to pass the new field.
-5. If part of API contract, update the controller (`KnowledgeSearchController`) -- the controller uses a manual HashMap build, NOT direct record serialization. Adding a field to the record does NOT change API output unless the controller is also updated.
-6. Regenerate schemas and fixtures: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:updateSchemas`
-7. If the record is part of `/api/status` or `/api/knowledge/search`, also update the Zod schema in `modules/ui-web/src/api/schemas.ts` and the TypeScript type in `stores/systemTypes.ts` (for status) or `api/domains/search.ts` (for search). Zod schemas use `.loose()` -- new fields pass validation without being declared, so contract tests alone won't catch a missing Zod field.
-8. Run frontend contract tests: `cd modules/ui-web && npm run test:unit:run`
-9. Note: v1 contract files (`status-v1.json`, `knowledge-status-v1.json`, `debug-state-v1.json`) are intentionally manual -- only update on breaking changes (field removal/rename), not field additions.
+Follow the canonical [Add a field to an API record](common-workflows.md#add-a-field-to-an-api-record)
+recipe. It covers construction sites, controller response maps, schema regeneration, generated
+TypeScript/Zod wire types, and backward-compatibility baselines. Do not hand-author a second
+frontend wire type or schema.
 
 ### 3.4. UI smoke checks
 
@@ -297,7 +292,9 @@ JUSTSEARCH_API_PORT=33221 npm --prefix ./modules/ui-web run dev:all
 Before interacting with the UI, verify the backend is ready:
 
 - `GET http://127.0.0.1:<apiPort>/api/status` returns 200
-- `GET http://127.0.0.1:<apiPort>/api/health` returns 200 and reports Worker `UP`
+- `GET http://127.0.0.1:<apiPort>/api/health` returns 200 when the Engine lifecycle is ready or
+  degraded. Inspect its schema-2 `components` (`api`, `index`, `encoders`, `generative`) for
+  capability readiness.
 
 `dev:all` prints the chosen backend endpoint (it may pick a nearby port if the base port is busy).
 
@@ -350,18 +347,19 @@ The public repository has two CI postures:
 - The standard hosted `CI` workflow runs automatically on pull requests and
   pushes to `main`, and can also be dispatched manually. ADR-0044 owns this
   public hosted lane.
-- Self-hosted, release, security, and benchmark/specialty workflows stay
-  manually dispatched unless a later ADR changes their trigger policy. ADR-0026
-  remains the historical basis for that manual-specialty posture.
+- Self-hosted, release, and benchmark/specialty workflows stay manually dispatched unless a
+  later ADR changes their trigger policy. ADR-0026 remains the historical basis for that posture.
+  CodeQL runs weekly on Mondays at 04:17 UTC and can also be dispatched manually (ADR-0052).
 
 The public hosted `CI` workflow is split into stable fact lanes: public claims,
 license and notices, no-model build, unit tests, secret scan, and the
 `jseval Python suite` (required since 2026-09-05, ADR-0044 amendment). A red
 check should name the fact that failed rather than one generic build bucket.
 
-The public unit-test signal is sharded into `Unit tests (app-ui)`, `Unit tests
-(search-worker)`, and `Unit tests (platform-contracts)`. Each shard publishes a
-unit-test attribution report from Gradle/JUnit XML. Use those reports to
+The public unit-test signal runs in four lanes: `Unit tests (app-ui-ui)`,
+`Unit tests (app-ui-services)`, `Unit tests (search-worker)`, and
+`Unit tests (platform-contracts)`. `Unit tests (app-ui)` aggregates the first two lanes.
+Each execution lane publishes a unit-test attribution report from Gradle/JUnit XML. Use those reports to
 identify slow modules, slow suites, skipped counts, and hosted runner image
 identity before proposing another workflow split. Do not split the lanes solely
 by runtime without an evidence boundary.
@@ -456,7 +454,8 @@ pull-request `GITHUB_TOKEN` cannot read branch-protection settings.
 
 **Test failure:**
 
-- Symptom: `dorny/test-reporter` Check Run shows failing test names with line numbers.
+- Symptom: a `Unit tests (<lane>)` job fails. Read the Gradle log or download its
+  `unit-test-attribution-*` artifact for JUnit XML and attribution reports.
 - Reproduce: `node scripts/lib/tool-invoker.cjs gradle :modules:<m>:test --tests "*FailingTest"`
 - Fix: Read the failing test, fix the code or test expectation, re-run.
 

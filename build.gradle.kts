@@ -556,7 +556,7 @@ tasks.named("check") {
 // (reverted) buildscript locking removed
 
 // Dependency locking is enabled and managed via the `conventions.locking` plugin.
-// Strict enforcement is handled in CI via lockfile drift checks.
+// CI does not regenerate Gradle lockfiles or check their freshness by diffing them.
 
 // Note: Source artifact verification is handled via trusted-artifacts in verification-metadata.xml
 

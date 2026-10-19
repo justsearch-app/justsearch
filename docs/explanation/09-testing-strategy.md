@@ -246,7 +246,8 @@ the pure seams declared in `governance/logic-seams.v1.json`. Because PIT re-runs
 it is **not** in `check` or the public hosted `CI` fact lanes. Produce the opt-in evidence manually with
 `node scripts/ci/report-pit-strength.mjs --run`, then gate it with
 `node scripts/governance/run.mjs --gate test-efficacy --mode gate`. The register's integrity is guarded
-cheaply on every run by `scripts/ci/check-logic-seams.mjs`. See
+by `scripts/ci/check-logic-seams.mjs`, which no workflow invokes; run
+`node scripts/ci/check-logic-seams.mjs --mode gate` locally after editing a registered seam. See
 `docs/reference/contributing/discipline-gate-kernel.md`.
 
 ## Tier 4: AI Judge (Semantic Eval)
