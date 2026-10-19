@@ -108,8 +108,8 @@ final class ChatControllerLifecycleSeamTest {
     }
     assertNotNull(start.get(30, TimeUnit.SECONDS), "a start cut short by quit does not succeed");
     await(seam::noneAlive, "every launched server to end");
-    // Keep the base test's observation after the last child exits, including launcher bypasses.
-    long observationEnd = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1_500);
+    // Observe launcher bypasses after the last child exits, including the two-second regression.
+    long observationEnd = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2_500);
     assertNotNull(background(stopped::switchToOnlineMode).get(30, TimeUnit.SECONDS),
         "a terminal manager refuses a later start");
     while (System.nanoTime() < observationEnd) {
@@ -130,8 +130,22 @@ final class ChatControllerLifecycleSeamTest {
     seam.holdHealth();
     Object lifecycleLock = lifecycleLock(manager);
 
-    // A start's health wait.
+    // A start waits for its port, then for a healthy response; neither phase may hold the lock.
+    seam.holdPortBinding();
     CompletableFuture<Throwable> start = background(() -> manager.switchToOnlineMode());
+    seam.awaitPortBinding(1);
+    try {
+      await(() -> Thread.getAllStackTraces().entrySet().stream().anyMatch(thread ->
+          thread.getKey().getState() == Thread.State.TIMED_WAITING
+              && java.util.Arrays.stream(thread.getValue()).anyMatch(frame ->
+                  frame.getClassName().equals("io.justsearch.app.inference.LlamaServerOps")
+                      && frame.getMethodName().equals("awaitServerHealth"))),
+          "the manager to poll health before the port binds");
+      assertLockFree(lifecycleLock, "while a start waits for health before its port binds");
+      assertFalse(start.isDone(), "the probe ran before the port bound");
+    } finally {
+      seam.releasePortBinding();
+    }
     seam.awaitHealth(1);
     assertLockFree(lifecycleLock, "while a start waits for health");
     assertFalse(start.isDone(), "the probe ran during the health wait");

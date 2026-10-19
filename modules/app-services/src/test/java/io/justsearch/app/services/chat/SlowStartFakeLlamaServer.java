@@ -19,7 +19,8 @@ import java.util.concurrent.TimeUnit;
  * each launch ({@code -m} model file name and pid) in {@code launches.txt}, waits the configured start delay,
  * then binds the {@code --port} it is given and answers {@code /health} and a llama-shaped
  * {@code /props}. It exits when the process that launched it ends, during the delay too, so
- * stopping the launched process stops the server.
+ * stopping the launched process stops the server. Tests can separately hold port binding and
+ * a health response with explicit file signals.
  */
 public final class SlowStartFakeLlamaServer {
   private static final String HOME_PROPERTY = "fake.llama.home";
@@ -102,6 +103,15 @@ public final class SlowStartFakeLlamaServer {
     while (System.nanoTime() < ready) {
       if (launcher != null && !launcherAlive.getAsBoolean()) System.exit(0);
       Thread.sleep(50);
+    }
+    if (home != null && Files.exists(Path.of(home, "hold-port"))) {
+      Files.writeString(Path.of(home, "port-entered-" + ProcessHandle.current().pid()), "entered");
+      long portDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      while (Files.exists(Path.of(home, "hold-port"))) {
+        if (System.nanoTime() >= portDeadline) throw new IOException("port release timed out");
+        if (launcher != null && !launcherAlive.getAsBoolean()) System.exit(0);
+        Thread.sleep(5);
+      }
     }
     HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);

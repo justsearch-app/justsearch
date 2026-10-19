@@ -75,6 +75,21 @@ public final class ManagedChatSeam implements AutoCloseable {
     return fakeHome;
   }
 
+  void holdPortBinding() throws IOException {
+    Files.writeString(fakeHome.resolve("hold-port"), "held");
+  }
+
+  void awaitPortBinding(int launchCount) throws Exception {
+    await(() -> models().size() == launchCount, "the candidate to launch");
+    long pid = SlowStartFakeLlamaServer.launches(fakeHome).get(launchCount - 1).pid();
+    await(() -> Files.exists(fakeHome.resolve("port-entered-" + pid)),
+        "the candidate to wait before binding its port");
+  }
+
+  void releasePortBinding() throws IOException {
+    Files.deleteIfExists(fakeHome.resolve("hold-port"));
+  }
+
   void holdHealth() throws IOException {
     Files.writeString(fakeHome.resolve("hold-health"), "held");
   }
