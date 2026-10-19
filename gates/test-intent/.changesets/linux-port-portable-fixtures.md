@@ -453,3 +453,14 @@ Independent acceptance pending on the final candidate.
   "note": "Selection repair verified (dry-run discovery of the Windows-lane command: same 24 classes as 37e0957c9; the four classes run and pass in default Linux tasks). But the entry says the intermediate port removed class-level windows tags and that the lane again selects exactly the baseline set. For DrainAndCloseTest the baseline tag was on one method (drainAndCloseWaitsForInFlightWriter) only; the port removed that method tag and R10 tags the whole class cross-platform, so the Windows-native lane now runs 5 methods where the baseline ran 1. That CI-lane expansion is not stated. Rework: say DrainAndCloseTest's Windows tag was method-level and that its other four methods now also run in the Windows-native lane. The other three classes and NoDeviceTokenizerCacheTest are described accurately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-r11-claude",
+  "verdict": "accept",
+  "digest": "sha256:6e6ce26735ccdc545c94ffc6bbb0e5096f9649e6b5ad3d6fdafb7246a0ec2277",
+  "note": "Rework of my r10 rejection is accurate. At 37e0957c9 WindowsPowerNotificationsTest, AppInstanceLockTest and WindowsPowerStatusTest carried a class-level windows tag; DrainAndCloseTest carried one method-level windows tag on drainAndCloseWaitsForInFlightWriter and its other four tests were untagged. On 7570d7581 all four carry class-level cross-platform, test counts unchanged (3, 4, 7, 5); WindowsPowerNotificationsTest's two native methods keep @Tag(windows) @EnabledOnOs(WINDOWS). The entry now states that the class set matches baseline but DrainAndCloseTest contributes five Windows-lane methods instead of one, and that the tier stays unit. Owner source for the wording is cited. Windows execution of the lane itself not run by me (hosted-only)."
+}
+```

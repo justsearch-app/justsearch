@@ -377,3 +377,14 @@ Independent acceptance pending on the final candidate.
   "note": "HelperFlushRetryTest and LateWindowExitTest had class-level @Tag(windows) on 37e0957c9; both now carry cross-platform, are selected by the Windows-lane command (dry run) and ran and passed in the default Linux app-api task. Census claims hold: on ce9052fa8 the two duplicate-start cases fail (starts collapsed to one) and pass on acd91ec92; my own behaviour checks show two identical starts with one exit are incomplete after and complete before, and a single proven start stays accounted. My mutants of the unique-key rule, the rapid-branch owner and incarnation match and receiptEnded owner/incarnation/every are caught. Not claimed and not covered: dropping the owner check in nativeHelperWrittenByOwner, the birth-branch incarnation check, !contested in the rapid branch, and isEnded every->some survive the census file (reported separately). Evidence paths under tmp/r10 are the builder's, not in the repository."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-r11-claude",
+  "verdict": "accept",
+  "digest": "sha256:cd25f56e98eec464dfb5c2bda02bed1f4a862eca826941f9e226f705b732ae08",
+  "note": "R11 prose matches the diff: only one test is appended to scripts/dev/test-dev-runner-linux-helper-census.mjs; no existing assertion and no production file (ledger-identity.cjs, stop-exit-census.cjs) changed since acd91ec92. My run on 7570d7581: 46/46 pass, 0 skipped on Linux. In a separate scratch worktree, removing only !contested from the helper creator-receipt branch of proves() fails exactly the new case ('a matching exit cannot override a contradicting exit of the same key'), 45 pass; restored passes. My own variants (contradicting exit recorded before the matching one; contradicting exit with non-zero code) also leave the stop incomplete on the candidate. The tmp/r11 evidence paths named are the builder's, not in the repository."
+}
+```

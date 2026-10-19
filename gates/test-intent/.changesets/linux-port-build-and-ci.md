@@ -266,3 +266,14 @@ Independent acceptance pending on the final candidate.
   "note": "Checked against the diff from 257aa8e1b and from ce9052fa8. windowsOnly now includes windows and cross-platform; default (non-windowsOnly) selection is textually unchanged. My dry-run discovery of the exact Windows-lane Gradle command selects 24 classes on 37e0957c9 and the same 24 on acd91ec92 (no missing class or method; DrainAndCloseTest grows 1->5 methods), and default-mode discovery is identical to ce9052fa8 (1709 classes, 10330 methods). Shell Rust job: Windows leg keeps the exact name and its conformance steps; the Linux leg runs cargo test --lib with GTK deps and the staged bound-exec helper (150 passed locally and in hosted run 39179433000, all 7 Linux-only cfg tests ran). app-ui cap 35->45 is the only timeout change. Windows execution of the lane itself was still pending in hosted CI when accepted."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-r11-claude",
+  "verdict": "accept",
+  "digest": "sha256:5435f0d38b12b95ad52baed3b50388bd2f69b5fa22fdc2704136b8ae92e0ba5b",
+  "note": "Checked the round diff from acd91ec92. New entry for scripts/ci/test-evidence-policy.v1.json: verify-test-evidence-policy fails on acd91ec92 with 'JUnit tag missing from policy: cross-platform' and passes on 7570d7581 (4 CI skips, 10 tags); the change adds only a declaredTags entry (no CI skip, filter or selection change). Its description matches JvmBaseConventionsPlugin: -PwindowsOnly=true includes windows and cross-platform, the default task excludes only windows (never cross-platform), and ci.yml windows-native-tests passes -PwindowsOnly=true over modules holding all eight cross-platform classes. Revised whySurvives is accurate: at 37e0957c9 seven of the eight had a class-level windows tag and DrainAndCloseTest had one method-level tag (drainAndCloseWaitsForInFlightWriter) of 5 tests; test counts are unchanged in all eight; textual Windows-lane file set (windows on base vs windows or cross-platform on candidate, lane modules) is identical, 25 files. The 24-class dry-run figure is from the earlier round; the selection code did not change since."
+}
+```
