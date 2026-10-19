@@ -149,8 +149,13 @@ The ten suites and independent-interrupt fixture keep their original executions 
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "B8: All four foreign unload/load cycles and final explicit spec write remain on the real manager/child. Synchronous unload delivery is counted; the existing reconciler quiescence barrier settles forwarding and recorded activation futures prove controller delivery. Fake startup delays and one-second absence windows are removed, preserving exact launch counts and modes.",
+      "whatMoved": "B8: All four foreign unload/load cycles and final explicit spec write remain on the real manager/child. Synchronous unload delivery is counted; the existing reconciler quiescence barrier settles forwarding and recorded activation futures prove controller delivery. Fake startup delays are removed. A mode-event queue observes each unloaded interval for 400 ms after quiescence, failing immediately if a manager reload starts. The raw-thread 300-ms self-reload counterexample is outside the existing clock/executor seams, so quiescence alone cannot replace this shorter absence window. 400 ms gives the specified 300-ms reload 100 ms of scheduling margin; the mode-event queue detects the start, without waiting for child health. On the final source the exact 300-ms self-reload mutation failed all five runs at this assertion, and the candidate passed all five runs. This is a bounded observation, not proof against arbitrary future reloads: a reload whose first mode event arrives after the 400-ms post-quiescence window can escape (for example a one-second delay), as can a 300-ms sleeper starved beyond the margin. Exact launch counts and modes remain.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "If waiting is the only honest way, use the shortest window that catches the 300 ms mutation reliably, and say why.",
+          "location": "task slow-tests-b user turn 5 (2026-10-19 Builder round 3, B8)"
+        },
         {
           "kind": "owner-words",
           "quote": "For each suite: remove the waiting by the mechanism named (completion signal, latch, witness, existing clock), keep every execution and every assertion's meaning, and keep the real thing real (real HTTP, real lock deadline, real expiry where the test is about expiry).",
@@ -197,6 +202,20 @@ The ten suites and independent-interrupt fixture keep their original executions 
   ]
 }
 ```
+
+## Round 3: drain-timeout coverage
+
+B9 remains unchanged: catching a drain that proceeds after 1.5 seconds requires holding the real stream beyond 1.5 seconds, exceeding the allowed added cost of under one second. The independent verifier's M9b run caught that policy defect in these nine existing tests:
+
+- `AssistLeaseTest.vduLeasesHoldDrainsButAreNeverCountedAsGenerating`
+- `AssistLeaseTest.assistLeasesHoldDrainsAndFailFastButNeverGenerateOrPace`
+- `ChatDrainPolicyTest.everyStopReasonHasItsSpecRow`
+- `ChatDrainPolicyTest.refuseBusyReopensAdmissionWhenTheBoundRunsOut`
+- `GenerationTrackerTest.drainTimeoutReopensAdmissionWithoutDestroyingHolder`
+- `ChatHoldsTest.aSelfTestFromIdleGoesStraightInAndEveryHoldDrainsWithinThirtySeconds`
+- `ChatServerControllerImplTest.quitWhileDrainingEndsTerminalWithoutRunningTheStep`
+- `ChatServerControllerImplTest.theControllerHoldsNoLockACallerOrObserverNeedsWhileItDrains`
+- `ChatServerControllerImplTest.aToBToCDuringADrainLaunchesCOnceAndTheOthersReportSuperseded`
 
 ## Acceptance records
 
