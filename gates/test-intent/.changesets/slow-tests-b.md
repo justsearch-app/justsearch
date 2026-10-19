@@ -298,3 +298,14 @@ Pending independent verification; no builder acceptance.
   "note": "Round 6 at 175b78ff1 (changeset text only since round 5): B7 gap sentence is accurate but broader than seen; the shortened deadline case missed a view released at expiry after the caller was failed and still caught one released before (single runs). B5 quit fails on a fresh launcher 500 ms after quit; late raw launches are caught only by the static spawn guards. B8 catches a reload only within 400 ms after an unload; later ones escape unless they land in the next window."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-slow-tests-b-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:0e63f1dcf5c5fbaeafdb82fdb345bfc23d2395151a459cf100dec11be244d4e3",
+  "note": "Round 9 at 5e2a44782 (B5 test and changeset only since round 8): clean B5 5/5, class median 7.21 s vs 21.63 s base. All 12 B5 mutations, including both outside-health port-wait variants, fail 5/5 at their intended assertion. Each pre-bind lock probe samples one 1-second window from the fake child's pre-bind signal: a lock first taken 1.5 s later while the port is still unbound escapes, as it does on the base test (5/5 each). B8 catches a reload only within 400 ms after an unload; later ones escape unless they land in the next window."
+}
+```
