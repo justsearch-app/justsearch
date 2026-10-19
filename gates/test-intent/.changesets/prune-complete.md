@@ -7,10 +7,19 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
 
 # Test-intent entries: a directory sync removes every row of a deleted file, and nothing else
 
-Two new test classes; no existing test is changed. Sources are the owner-adopted scenarios R1-R11 of
+Three new test classes; no existing test is changed. Sources are the owner-adopted scenarios R1-R11 of
 this task. Checks pinning repaired behaviour carry an assertion fail-before
-(run-evidence.mjs --before 7a65990c0, the base without the fix); the round-2 checks (verifier findings on R3 and R6) carry their fail-before on 822db4cab, the round-1 candidate, since that is where the verifier found them; the close-race check is preservation (R11) and passes
-before and after. D4 files are written by run-evidence.mjs. No acceptance is recorded by the
+(run-evidence.mjs --before 7a65990c0, the base without the fix); the round-2 checks (verifier findings on R3 and R6) carry their fail-before on 822db4cab, the round-1 candidate, since that is where the verifier found them; the round-3 checks (verifier findings on R4 and R6) carry their fail-before on 7b277b013, the round-2 candidate; the close-race check (R11) and the round-3 re-ingest check are preservation and pass
+before and after.
+
+Accepted residual window (R4). A batch's last presence check and last root check run after every slow
+step (the refresh and the gathering of the batch's rows), right before the removal and inside the
+file-mutation fence. That fence holds back this product's writers, not the filesystem: a file
+recreated between that last check and the removal still loses its rows, and no ordering can close
+the gap without holding the file itself. The window is accepted because a directory sync walks the
+folder after its prune: the walk finds the file on disk again and queues it, and the re-ingest
+restores its rows. EnginePruneReappearedFileTest pins that backstop with the file recreated at the
+latest point, as its removal is published. D4 files are written by run-evidence.mjs. No acceptance is recorded by the
 builder.
 
 ```json
@@ -157,6 +166,55 @@ builder.
       "newChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneRemovesWholeFileTest.java#aRootSwappedWhileTheBatchIsCheckedAgainRemovesNothing",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneWriterFenceTest.java#aVduResultThatGetsTheFenceRightAfterTheBatchLeavesNoChunk"
+      ]
+    },
+    {
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneRemovesWholeFileTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Round 3 (verifier findings). A file recreated while the batch refreshes its view, after the batch's first root check, keeps all four rows and gets no deletion mark. A root lost once the batch's removals are published makes the run INCOMPLETE, while the removals made while the root held stay committed.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-24fb14",
+          "scenario": "R4",
+          "quote": "File reappears, becomes uncertain, or its indexed path changes between observation and flush: current rows kept, no deletion mark",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-24fb14",
+          "scenario": "R6",
+          "quote": "Denied subtree, unreadable source, root disappearance/swap, unavailable volume identity, deferred registration authorize no deletion; genuine deletions beside unknown entries still proceed",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/prune-complete-round3.json",
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneRemovesWholeFileTest.java#aFileThatReappearsWhileTheBatchRefreshesItsViewKeepsItsRows",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneRemovesWholeFileTest.java#aRootLostOnceTheRemovalsArePublishedMakesTheRunIncomplete"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EnginePruneReappearedFileTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Accepted residual window, backstop: on a running engine, a file recreated as its removal is published loses its rows to the prune, the sync reports it deleted and adds it again (files added = 1), and the queued re-ingest makes it searchable again with its chunks.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-24fb14",
+          "scenario": "R4",
+          "quote": "File reappears, becomes uncertain, or its indexed path changes between observation and flush: current rows kept, no deletion mark",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/prune-complete-preserve-round3.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EnginePruneReappearedFileTest.java#aFileRecreatedAsItsRemovalIsPublishedIsIndexedAgainByTheSync"
       ]
     }
   ]
