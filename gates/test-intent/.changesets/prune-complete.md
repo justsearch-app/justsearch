@@ -222,3 +222,14 @@ builder.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15424-dde6-7413-b0ac-3d3d9a1bd403",
+  "verdict": "accept",
+  "digest": "sha256:d93d095f1a149fd71d6c27cf35f8c402553a97accdb2bed202fd6e773f20ae23",
+  "note": "Accepted under the 2026-10-19 narrowed scope: normal sync, forced sync and direct prune; PRUNE_PREFIX replay is a separate follow-up. Round-4 independent probes and two mutations, CI run 39262400540, and real Engine HTTP text/vector deletion and live controls pass on 30aca5184."
+}
+```
