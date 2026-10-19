@@ -685,3 +685,14 @@ also run before and after, with their assertions unchanged. No acceptance is wri
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-zy9i0tyh",
+  "verdict": "accept",
+  "digest": "sha256:bc3d5d76462345e88e981272f78707b5a997677a03dbe5079ddfb55bb877bd07",
+  "note": "Accepted after reading the before-state tests, area5 WP5.1 + pass-2 amendments and the challenger report before the diff. New entries: each expectation follows from the cited S51.x/N51.x text or the Finding-1 amendment; fail-before re-run to a scratch path reproduced every outcome (all 26 pass on the candidate; every repaired check fails before with an assertion). The baseline seam patch was compared line by line with the c00a0cb24 wipe and reproduces it (errors ignored, marker cleared, backend never blocked). Adaptation: the three boot tests only route factory_reset_status to an idle reply; inputs, faults and assertions unchanged; re-run passes before and after. Minor, not blocking: rn1 also asserts native-bin/tesseract is removed, which RN1 does not state (it matches the locked Option A that area5 cites, and passes before); several RS4 quotes still carry the superseded 'never stops the app from starting' sentence, overridden by the cited amendment."
+}
+```
