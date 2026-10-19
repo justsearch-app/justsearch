@@ -103,10 +103,12 @@ User query text is privacy-sensitive. Do not log raw query strings at WARN or hi
 
 ### The WARN/DEBUG split pattern (preferred)
 
+A parse exception can include the query in its message, so keep the exception below WARN too.
+
 ```java
 } catch (ParseException e) {
-  log.warn("Failed to parse query", e);           // No query text at WARN
-  log.debug("Failed query text: {}", queryText);   // Query only at DEBUG
+  log.warn("Failed to parse query");              // No query text at WARN
+  log.debug("Failed query text: {}", queryText, e); // Query and exception only at DEBUG
 }
 ```
 
@@ -122,8 +124,10 @@ log.info("Search request: query={}", new SensitiveQuery(queryText));
 ```
 
 `KnowledgeSearchController` uses a `SensitiveQuery` wrapper with a `redact()` helper at the
-HTTP boundary. Index-half services do not use that wrapper; `SearchExecutor` logs failed query
-text only at TRACE.
+HTTP boundary. Index-half services do not use that wrapper. `SearchExecutor` logs the failed
+query explicitly at TRACE, but also logs the parse exception at WARN. Lucene's `ParseException`
+message quotes the query passed to the parser (escaped in SIMPLE syntax), so query text can
+appear at WARN through the exception; this does not follow the redaction guidance above.
 
 ## File Paths
 

@@ -15,8 +15,8 @@ last_reviewed: 2026-10-05
 ## Status
 
 Accepted by the owner on 2026-10-05 (decisions D2, D7 and D9 of the co-residence design).
-Implemented in #759 (`1d272de4b`), including Linux parent-death containment. ADR-specific probes
-are not registered in `governance/adr-probes.v1.json`.
+Implemented in #759 (`1d272de4b`); Linux parent-death containment followed in #761
+(`abe1aff3a`). ADR-specific probes are not registered in `governance/adr-probes.v1.json`.
 
 ## Context
 
