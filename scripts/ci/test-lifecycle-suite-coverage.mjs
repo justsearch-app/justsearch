@@ -47,5 +47,8 @@ test('both installed Engine tiers collect and upload child logs on failure', () 
     assert.match(job.text, /path: build\/ci\/e2e-child-logs\/\*\*/);
     assert.match(job.text, /retention-days: 3/);
     assert.ok(!job.text.includes('writer-junit-*/**'));
+    assert.match(job.text,
+      /name: Upload (?:integration|lifecycle)-test results\n        if: always\(\)[\s\S]*?modules\/system-tests\/build\/reports\/isolated-backend\/\*\*/,
+      `${id} must always upload the curated failure evidence directly`);
   }
 });

@@ -87,7 +87,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Schedule the complete existing ui-web Vitest and lockdown suites as blocking steps in app-ui-ui. Add configuration/indexer-worker Windows test tasks and match the task inventory; Linux Gradle task lists and all timeouts stay unchanged. Both frontend steps use four workers; the Windows Gradle invocation uses --continue so independent modules execute after a failure. Failure-only E2E collection replaces whole fixture-tree uploads with bounded Engine, embedded-worker, supervisor and fixture output. The preflight reproduction inventory includes both frontend commands.",
+      "whatMoved": "Schedule the complete existing ui-web Vitest and lockdown suites as blocking steps in app-ui-ui. Add configuration/indexer-worker Windows test tasks and match the task inventory; Linux Gradle task lists and all timeouts stay unchanged. Both frontend steps use four workers; the Windows Gradle invocation uses --continue so independent modules execute after a failure. Failure-only E2E collection replaces whole fixture-tree uploads with bounded Engine, embedded-worker, supervisor, fixture, rotated gzip, crash and run-report evidence. Both always-run tier uploads retain the curated isolated-backend report tree, which bypasses the collector. The Windows attribution reporter blocks if any of the thirteen policy classes executes no tests; only the two named second-volume prune cases may skip for the missing-volume prerequisite, reported by name. The preflight reproduction inventory includes both frontend commands.",
       "sources": [
         {
           "kind": "owner-words",
@@ -244,3 +244,30 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
   connections, connection errors or teardown errors. The full suite is not repeated locally.
 
 Independent verification remains outstanding. No acceptance record is authored here.
+
+## Round five
+
+- Merged origin/main c00a0cb24 with merge commit 96e79c14d; Gradle remains 9.8.0.
+- Restored SelectionActionPresentation, unregisterSelectionAction and
+  __resetSelectionActionsForTest exactly as on main. The dead-code gate passes with
+  all three restored. Production cleanup is outside this PR.
+- Both E2E tiers always upload the curated isolated-backend tree directly. The bounded
+  collector additionally retains gzip rotations, crash diagnostics and stop/intruder JSON
+  reports. Oversized gzip logs retain a valid recompressed tail. Eight new cases each
+  fail against the preceding collector (2 pass / 8 fail); all ten pass after the repair.
+- The Windows safety execution step uses the existing attribution reporter and the
+  policy's thirteen required classes. It reports each class's executed count and skip
+  names. Missing/all-skipped classes fail; the prune class permits only the two named
+  second-volume cases with the explicit missing-volume assumption. Its same-volume
+  case must execute. Existing Linux-only ContendedFileReadsTest skip remains reported.
+- Full command output, tag-removal counterexample, frontend and hosted evidence for
+  this round live under tmp/ci-coverage/round5/. Independent acceptance remains absent.
+
+- After the merge, the single full local Vitest run passes 534 files / 6,971 tests
+  in 63.06 seconds with zero teardown or connection errors. Both newly merged
+  MarkdownBlock.rendering.test.ts and Sv3Main.citations.test.ts also pass a named
+  focused run: 30 cases, zero teardown errors. Lockdown passes 10 cases; frontend
+  typecheck and lint pass. All seventeen CI guard/reporter/actionlint commands pass.
+- The merge-base test-intent run moves both root and ui-web node_modules aside for
+  its duration and restores them afterward. Its only error is the expected absent
+  independent acceptance record; all changeset entries and existing evidence validate.

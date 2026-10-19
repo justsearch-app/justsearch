@@ -32,7 +32,7 @@ import type { ComposeOperation } from '../../api/types/selection.js';
 import type { Provenance } from '../primitives/provenance.js';
 
 /** Presentation slots — each is the data one consumer surface needs. */
-interface SelectionActionPresentation {
+export interface SelectionActionPresentation {
   /** Floating-near-selection menu (the F9 surface). */
   readonly floating?: {
     readonly label: string;
@@ -84,6 +84,7 @@ import { createRegistry } from '../primitives/registry.js';
 const _registry = createRegistry<SelectionActionContribution>();
 
 export const registerSelectionAction = _registry.register;
+export const unregisterSelectionAction = _registry.unregister;
 
 /**
  * Return every registered action whose {@code appliesTo} expression evaluates
@@ -140,3 +141,4 @@ function operationCapability(op: ComposeOperation): string {
 }
 
 export const onSelectionActionChange = _registry.subscribe;
+export const __resetSelectionActionsForTest = _registry.__resetForTest;

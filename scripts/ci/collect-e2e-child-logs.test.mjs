@@ -3,9 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { randomBytes } from 'node:crypto';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { collectChildLogs } from './collect-e2e-child-logs.mjs';
 
-test('failure collection retains Engine, supervisor and fixture output with bounded tails', () => {
+test('failure collection retains Engine, supervisor and fixture output with bounded tails', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-logs-'));
   try {
     const write = (relative, data) => {
@@ -28,7 +30,7 @@ test('failure collection retains Engine, supervisor and fixture output with boun
     fs.symlinkSync(path.join(root, fixture, 'models'), path.join(root, fixture, 'linked'),
       process.platform === 'win32' ? 'junction' : 'dir');
     const destination = path.join(root, 'collected');
-    const result = collectChildLogs(root, destination);
+    const result = await collectChildLogs(root, destination);
     assert.deepEqual(result.errors, []);
     assert.equal(result.scanLimitReached, false);
     assert.ok(result.omitted > 0);
@@ -49,11 +51,73 @@ test('failure collection retains Engine, supervisor and fixture output with boun
   }
 });
 
-test('an early fixture failure still produces an explicit empty manifest', () => {
+test('an early fixture failure still produces an explicit empty manifest', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-empty-'));
   try {
-    assert.deepEqual(collectChildLogs(root, path.join(root, 'out')).files, []);
+    assert.deepEqual((await collectChildLogs(root, path.join(root, 'out'))).files, []);
     assert.ok(fs.existsSync(path.join(root, 'out/manifest.json')));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const [relative, content] of [
+  ['data/logs/engine.2026-10-19.0.log.gz', gzipSync('rotated Engine and worker output')],
+  ['data/crashes/hs_err_pid123.log', 'fatal JVM error'],
+  ['data/crashes/crash-engine.json', '{"process":"engine","exitCode":1}'],
+  ['data/crashes/core-summary.txt', 'native core summary'],
+  ['state/runs/run-123/stop-report.json', '{"outcome":"STOP_INCOMPLETE"}'],
+  ['state/runs/run-123/intruder-acquisitions.json', '{"acquisitions":[]}'],
+]) {
+  test(`retains failure evidence: ${relative}`, async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-evidence-'));
+    try {
+      const item = `tmp/lane-f-takeover/writer-junit-case/${relative}`;
+      fs.mkdirSync(path.dirname(path.join(root, item)), { recursive: true });
+      fs.writeFileSync(path.join(root, item), content);
+      const destination = path.join(root, 'out');
+      const result = await collectChildLogs(root, destination);
+      assert.deepEqual(result.errors, []);
+      assert.equal(result.files.length, 1, `must collect ${relative}`);
+      assert.deepEqual(fs.readFileSync(path.join(destination, item)), Buffer.from(content));
+      assert.ok(result.files[0].copiedBytes <= result.fileBytes);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('an oversized rotated log retains a readable compressed tail within the byte cap', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-rotation-'));
+  try {
+    const item = 'tmp/lane-f-takeover/writer-junit-case/data/logs/engine.2026-10-19.1.log.gz';
+    const content = randomBytes(600_000).toString('hex') + '\nLAST CRASH LINE\n';
+    const archive = gzipSync(content);
+    fs.mkdirSync(path.dirname(path.join(root, item)), { recursive: true });
+    fs.writeFileSync(path.join(root, item), archive);
+    const destination = path.join(root, 'out');
+    const result = await collectChildLogs(root, destination);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.files.length, 1);
+    assert.ok(archive.length > result.fileBytes, 'fixture must exceed the cap');
+    assert.equal(result.files[0].truncated, true);
+    const retained = fs.readFileSync(path.join(destination, item));
+    assert.ok(retained.length <= result.fileBytes);
+    const tail = gunzipSync(retained).toString();
+    assert.ok(tail.endsWith('\nLAST CRASH LINE\n'));
+    assert.ok(content.endsWith(tail));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the curated isolated-backend report bypasses the collector', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-curated-'));
+  try {
+    const source = path.join(root, 'modules/system-tests/build/reports/isolated-backend/case');
+    fs.mkdirSync(source, { recursive: true });
+    fs.writeFileSync(path.join(source, 'backend.log'), 'curated failure output');
+    assert.deepEqual((await collectChildLogs(root, path.join(root, 'out'))).files, []);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
