@@ -239,3 +239,14 @@ run-evidence.mjs. No acceptance is recorded by the builder.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-replay-5",
+  "verdict": "accept",
+  "digest": "sha256:05d25bf01f66b4fc190390e359119b0fedac103def10f6ecc3fb2efb7804b798",
+  "note": "Exact d32b55abe verified against b8eb9217e in separate verifier session. Replayed and late-publication races, live-child regression, independent cleanup/root/restart cases, three-round benchmark and actual Engine HTTP replay rerun. Evidence: verifier-replay-5/scenario-evidence.json; limits explicitly recorded."
+}
+```
