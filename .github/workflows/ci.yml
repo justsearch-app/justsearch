@@ -1337,15 +1337,15 @@ jobs:
           node --test scripts/release/evidence-capture-exit.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Engine discovery finds the desktop app's Engine (Roaming AppData)
+        run: node --test scripts/lib/engine-discovery.test.mjs
+
       # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
       # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
       # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
       # process handle closing — is a real constraint rather than a no-op.
       - name: Install conformance dependencies
         run: npm ci --audit=false
-
-      - name: Engine discovery finds the desktop app's Engine (Roaming AppData)
-        run: node --test scripts/lib/engine-discovery.test.mjs
 
       - name: Supervisor conformance (dev-runner adapter)
         run: |
