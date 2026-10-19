@@ -2491,6 +2491,7 @@ async function cmdStart(opts) {
     pids: { runnerPid: process.pid, backendRootPid: null, frontendRootPid: null },
     identities: { runner: runnerIdentity, backend: null, frontend: null },
     logs: {
+      supervisor: toPosix(path.relative(repoRoot, path.join(logsDir, 'supervisor.log'))),
       backendStdout: toPosix(path.relative(repoRoot, path.join(logsDir, 'backend.stdout.log'))),
       backendStderr: toPosix(path.relative(repoRoot, path.join(logsDir, 'backend.stderr.log'))),
       frontendStdout: toPosix(path.relative(repoRoot, path.join(logsDir, 'frontend.stdout.log'))),
@@ -2639,6 +2640,7 @@ async function runAdmittedStart(opts, ctx) {
     callerIdentity, admission, ownershipEpoch, runId, startedAt, uiPort, apiPortRequested, dataDir,
     runDir, logsDir, runPath, startingRun, runnerIdentity, lease,
   } = ctx;
+  require('./lib/supervisor-output.cjs').preserveSupervisorOutput(path.join(logsDir, 'supervisor.log'));
   await pruneHistoricRuns({
     preserveRunIds: [admission.victim?.runId, runId].filter(Boolean),
   }).catch(() => { });
@@ -3392,6 +3394,7 @@ async function runAdmittedStart(opts, ctx) {
       frontendRootPid: frontend.pid,
     },
     logs: {
+      supervisor: startingRun.logs.supervisor,
       backendStdout: toPosix(path.relative(repoRoot, backendStdoutPath)),
       backendStderr: toPosix(path.relative(repoRoot, backendStderrPath)),
       frontendStdout: toPosix(path.relative(repoRoot, frontendStdoutPath)),
