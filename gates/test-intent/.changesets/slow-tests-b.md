@@ -272,3 +272,14 @@ Pending independent verification; no builder acceptance.
   "note": "Round 4 at 63904a7ea: B5 quit fails 5/5 when quit leaves the owned launcher open; raw launcher threads (800 ms, 2 s, on refused restart) pass B5 and are caught 5/5 by EngineSpawnOwnershipArchTest and ProcessLaunchFunnelTest, which cover late launches. B8 catches a reload only within 400 ms after an unload; later ones escape (600 ms escaped) unless they land in the next unload's window."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-slow-tests-b-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:4cc059ec998b20b5637d285f07c8bcb008df7b10c99aa5e59026cef322f39c3e",
+  "note": "Round 6 at 175b78ff1 (changeset text only since round 5): B7 gap sentence is accurate but broader than seen; the shortened deadline case missed a view released at expiry after the caller was failed and still caught one released before (single runs). B5 quit fails on a fresh launcher 500 ms after quit; late raw launches are caught only by the static spawn guards. B8 catches a reload only within 400 ms after an unload; later ones escape unless they land in the next window."
+}
+```
