@@ -49,6 +49,14 @@ assertion failures on the pre-review candidate (detached worktree with the origi
 three production fixes overlaid); `tmp/vite/review-launchers-after.log` records both
 passing after the Tauri repair. Existing regression expectations are unchanged.
 
+CI follow-up (orchestrator): the Windows-native job's dev-runner step auto-discovers
+`scripts/dev/test-dev-runner-*.mjs` but did not install `modules/ui-web`, so the new
+loopback test could not start Vite there. Hosted run 39194249581 (17306f26a) records the
+before state: `FAIL scripts\dev\test-dev-runner-vite-loopback.mjs` with "Cannot find module
+...\modules\ui-web\node_modules\vite\bin\vite.js". The step now runs `npm ci --prefix
+modules/ui-web --audit=false` before the suite; hosted run 39196753913 (716daf793) records
+both Vite tests passing on Windows (loopback 11.6 s). Test selection is unchanged.
+
 The gate flags the production regular expression's `.test(...)` call as a test
 configuration block. The Incidental entry below records the actual impact on
 test execution. No acceptance record is written by this builder.
@@ -56,6 +64,27 @@ test execution. No acceptance record is written by this builder.
 ```json
 {
   "entries": [
+    {
+      "items": [".github/workflows/ci.yml"],
+      "class": "Incidental",
+      "assessment": {
+        "purpose": "Install the ui-web dependencies before the Windows-native dev-runner suite so its auto-discovered Vite loopback test can start the real Vite on Windows.",
+        "callersAndStateOwners": "Only the Windows-native job's 'Dev-runner suite (auto-discovered)' step changes. No test is added, removed or selected differently; npm run test:dev-runner still discovers the same files. No saved state is involved.",
+        "indirectBehaviours": "The step takes the time of one extra npm ci for ui-web. The Linux lane already installs ui-web; its behaviour is unchanged.",
+        "evidence": "Hosted run 39194249581 (17306f26a, before): Windows-native FAIL scripts\\dev\\test-dev-runner-vite-loopback.mjs, Cannot find module ...vite.js. Hosted run 39196753913 (716daf793, after): Windows-native PASS test-dev-runner-vite-launchers.mjs and test-dev-runner-vite-loopback.mjs.",
+        "unresolvedRisks": "None known beyond the added install time on the Windows lane."
+      },
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18 ~21:20 UTC",
+          "delegationScope": "all remaining work of that night, including landing the dev UI loopback fix with Windows and Linux both covered; the owner validates in the morning",
+          "choice": "Run the real-Vite loopback check on Windows by installing ui-web in the Windows dev-runner step, rather than skipping it there",
+          "label": "agent choice"
+        }
+      ]
+    },
     {
       "items": ["modules/ui-web/vite.config.js"],
       "class": "Incidental",
