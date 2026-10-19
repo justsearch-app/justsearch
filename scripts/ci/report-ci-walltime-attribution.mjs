@@ -313,7 +313,12 @@ export function readSuiteTimes(dir, jobs = []) {
           if (data && typeof data.lane === 'string' && Number.isFinite(data.totals?.timeSeconds)) {
             const attempt = Number(/-attempt-(\d+)/.exec(abs)?.[1] || 0);
             const job = jobs.find((j) => j.name === `Unit tests (${data.lane})`);
-            if (attempt && job?.run_attempt && attempt !== job.run_attempt) continue;
+            const generated = Date.parse(data.generatedAt || '');
+            const start = Date.parse(job?.started_at || '');
+            const end = Date.parse(job?.completed_at || '');
+            if ([generated, start, end].every(Number.isFinite)) {
+              if (generated < start || generated > end) continue;
+            } else if (attempt && job?.run_attempt && attempt !== job.run_attempt) continue;
             if (attempt < (attempts[data.lane] ?? -1)) continue;
             attempts[data.lane] = attempt;
             out[data.lane] = data.totals.timeSeconds;

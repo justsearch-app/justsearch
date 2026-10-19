@@ -13,6 +13,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { selectJobArtifact } from './lib/ci-artifact-attempts.mjs';
 import { loadPublicCiLocalRepro, localReproCommandMap } from './lib/public-ci-local-repro.mjs';
 
 const KIND = 'justsearch-ci-evidence-digest.v1';
@@ -245,7 +246,7 @@ function normalizeStep(step) {
   };
 }
 
-function normalizeJob(job, policyEntry) {
+function normalizeJob(job, policyEntry, artifacts) {
   const steps = (job.steps || []).map(normalizeStep);
   const failedSteps = steps.filter((step) => {
     const conclusion = String(step.conclusion || '').toLowerCase();
@@ -257,8 +258,10 @@ function normalizeJob(job, policyEntry) {
   const baseArtifact = name === 'Unit tests (app-ui)' && steps.some((s) => /Require every app-ui part/.test(s.name))
     ? null : UNIT_ARTIFACTS.get(name) || null;
   const part = /^(?:Unit tests \(app-ui-(?:ui|services)\)|Windows-native tests \((?:node|contracts)\))$/.test(name);
-  const artifactName = baseArtifact && part
-    ? `${baseArtifact}-attempt-${job.run_attempt || 1}` : baseArtifact;
+  const partBase = baseArtifact || WINDOWS_ARTIFACTS.get(name);
+  const selected = partBase ? selectJobArtifact(artifacts, partBase, job) : null;
+  const partArtifact = part ? selected?.name || `${partBase}-attempt-${job.run_attempt || 1}` : null;
+  const artifactName = baseArtifact && part ? partArtifact : baseArtifact;
   return {
     id: job.id || job.databaseId || null,
     name,
@@ -287,8 +290,9 @@ function normalizeJob(job, policyEntry) {
     },
     localReproduction: LOCAL_REPRO_COMMANDS.get(name) || [],
     unitAttributionArtifact: artifactName,
-    partArtifact: part ? `${baseArtifact || WINDOWS_ARTIFACTS.get(name)}-attempt-${job.run_attempt || 1}` : null,
-    runAttempt: job.run_attempt || null,
+    partArtifact,
+    runAttempt: selected ? Number(selected.name.split('-attempt-')[1] || job.run_attempt || 1) : null,
+    workflowAttempt: job.run_attempt || null,
     failedSteps,
     steps,
   };
@@ -318,6 +322,7 @@ function artifactList(artifactsDoc) {
     sizeBytes: artifact.size_in_bytes ?? artifact.sizeBytes ?? null,
     digest: artifact.digest || null,
     expired: Boolean(artifact.expired),
+    createdAt: artifact.created_at || artifact.createdAt || null,
     expiresAt: artifact.expires_at || artifact.expiresAt || null,
     url: artifact.html_url || artifact.url || null,
     downloadUrl: artifact.archive_download_url || artifact.archiveDownloadUrl || null,
@@ -498,8 +503,8 @@ export function buildDigest({
   payloadWarnings = [],
 }) {
   const ciPolicy = (policy.workflows || []).find((workflow) => workflow.name === 'CI') || null;
-  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy));
   const artifacts = artifactList(artifactsDoc);
+  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy, artifacts));
   const unitAttribution = summarizeUnitAttribution(jobs, artifacts, unitPayloads);
   const buildEvidence = summarizeBuildEvidence(jobs, artifacts, buildPayloads);
   const partEvidence = jobs.filter((job) => job.partArtifact).map((job) => ({
