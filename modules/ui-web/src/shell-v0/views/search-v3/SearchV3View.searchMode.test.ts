@@ -608,7 +608,8 @@ describe('S1.4 — with chat unavailable, Search works and every ask says why it
     await type(el, 'lease');
     await pressEnter(el);
     await settle(el);
-    expect(await rowTitles(el)).toEqual(['a.md', 'b.md']);
+    // Both hits are listed; their order is not what this checks.
+    expect((await rowTitles(el)).sort()).toEqual(['a.md', 'b.md']);
 
     await clickRow(el, 'a.md', { ctrlKey: true });
     await clickRow(el, 'b.md');
@@ -661,7 +662,8 @@ describe('S1.5 — results use the shared results card and open in the document 
     const pane = el.shadowRoot?.querySelector('jf-sv3-pane') as (Mounted & { docPath: string }) | null;
     expect(pane?.docPath).toBe('docs/c.md');
     const chosen = (await rows(el)).filter((row) => row.dataset.selected === 'true');
-    expect(chosen.map((row) => row.querySelector('.title-text')?.textContent?.trim())).toEqual([
+    // The two chosen files stay chosen; the order the rows show them in is not specified.
+    expect(chosen.map((row) => row.querySelector('.title-text')?.textContent?.trim()).sort()).toEqual([
       'a.md',
       'b.md',
     ]);
@@ -701,12 +703,17 @@ describe('S1.6 — an Ask about the chosen files retrieves from exactly those fi
     await searchFor(el, 'lease');
     await clickRow(el, 'a.md', { ctrlKey: true });
     await clickRow(el, 'b.md', { ctrlKey: true });
-    const titles = await rowTitles(el);
-    // The second hit from a.md is the third row; choosing it adds no document.
-    const third = (await rows(el))[2];
-    third?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, ctrlKey: true }));
+    // Every hit is a row, two of them from a.md; the row order is not what this checks.
+    expect((await rowTitles(el)).sort()).toEqual(['a.md', 'a.md', 'b.md', 'unique-answer.md']);
+    // Choosing the other, not yet chosen hit from a.md adds no document.
+    const secondA = (await rows(el)).find(
+      (row) =>
+        row.querySelector('.title-text')?.textContent?.trim() === 'a.md' &&
+        row.dataset.selected !== 'true',
+    );
+    expect(secondA).toBeDefined();
+    secondA?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, ctrlKey: true }));
     await settle(el);
-    expect(titles).toEqual(['a.md', 'b.md', 'a.md', 'unique-answer.md']);
 
     const host = await results(el);
     expect(q(host as Element, 'sv3-results-ask')?.textContent).toContain('Ask about these 2 files');
@@ -842,9 +849,11 @@ describe('S1.7 — chosen files belong to one Ask and its re-sends, nothing late
 
     const main = await region(el, 'jf-sv3-main');
     const turn = main.shadowRoot?.querySelector('[data-testid="sv3-turn"]');
-    expect(turn?.querySelector('[data-testid="sv3-turn-scope"]')?.textContent).toContain(
-      '2 files: a.md, b.md',
-    );
+    // The turn names both files and their count; the order it lists them in is not specified.
+    const turnScope = turn?.querySelector('[data-testid="sv3-turn-scope"]')?.textContent ?? '';
+    expect(turnScope).toContain('2 files');
+    expect(turnScope).toContain('a.md');
+    expect(turnScope).toContain('b.md');
     await press(turn?.querySelector('[data-testid="sv3-turn-context-menu"]'));
     await settle(el);
     const menu = document.querySelector('jf-context-menu') as Mounted | null;
@@ -856,7 +865,9 @@ describe('S1.7 — chosen files belong to one Ask and its re-sends, nothing late
     retry?.click();
     await settle(el);
     expect(backend.branches).toHaveLength(1);
-    expect(dispatches().map((s) => s.body.docIds)).toEqual([
+    // The Ask and its Retry each send exactly the two chosen files, in whatever order.
+    const sent = dispatches().map((s) => [...((s.body.docIds as string[] | undefined) ?? [])].sort());
+    expect(sent).toEqual([
       ['docs/a.md', 'docs/b.md'],
       ['docs/a.md', 'docs/b.md'],
     ]);

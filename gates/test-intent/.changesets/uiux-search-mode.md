@@ -31,8 +31,21 @@ membership and fixity), and the literal "HTTP 404"/"HTTP 503" pins in the docume
 scenarios say a missing file is explained and other failures stay distinguishable). Round 2
 restores exact count equality read off the screen, retires the visible full-path claim as Obsolete
 (the shared card shows folders on the row, the full path on hover) with a New check for the
-card's path display, and narrows the other assertions to what the scenarios state. Product code
-is unchanged.
+card's path display, and narrows the other assertions to what the scenarios state. Round 2 was
+rejected by both reviewers (acceptance and audit, records below) for two order pins no source
+states: sv3-search.test.ts required the menu to list Search, Ask, Delegate in exactly that order
+(SM1 and SM2 fix the three modes and the default, not their order), and the Retry case required
+the scope label "2 files: a.md, b.md" and ordered docIds on the Ask and its Retry (SM7 requires the
+same files, not their order). Round 3 checks the modes by membership and count with Search as the
+default, compares both sends' docIds as sets and checks that the turn's label names both files and
+the count in any order. A search for other order pins no source states found four more, relaxed
+the same way: the chat-unavailable list (SM4) and the chosen rows after a plain-click open (SM5)
+are compared as sets of titles; the each-hit-once case (SM6) checks that every hit is listed and
+chooses the second a.md hit by its unchosen state instead of its row position; the card's
+plain-click selection (SM5) compares ids as a set; and the card path check (SM5) pairs each row's
+path with its own title instead of with its position. Orders that a source or the input sequence
+does fix are kept: quick before refined (SM3), the keys pressed one after another, and the Ask
+followed by a later Ask. Product code is unchanged.
 
 ```json
 {
@@ -200,7 +213,7 @@ is unchanged.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
       ],
       "class": "New",
-      "behaviour": "Three modes, Search first and default; Search labelled for finding matching documents, with no \"no AI\" claim; the mode is announced; Enter, Shift+Enter and IME composition do in Search what the label and hint say; the delegate chord is named only where it delegates.",
+      "behaviour": "Three modes (membership and count; their order is not specified), Search the default; Search labelled for finding matching documents, with no \"no AI\" claim; the mode is announced; Enter, Shift+Enter and IME composition do in Search what the label and hint say; the delegate chord is named only where it delegates.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -219,7 +232,7 @@ is unchanged.
       ],
       "evidence": "gates/test-intent/evidence/uiux-search-mode.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#lists Search, Ask and Delegate, in that order",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#offers Search, Ask and Delegate, and nothing else",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#starts a fresh window in Search (S1.2) and badges it as the default",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#labels Search by what it does and makes no \"no AI\" claim",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is always the search control, even while a run holds a decision or is running",
@@ -343,7 +356,7 @@ is unchanged.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
       ],
       "class": "New",
-      "behaviour": "Chosen files do not carry into a later ordinary Ask or a new session; Retry keeps the same files and says so; after reload an unsaved scope does not look scoped and Retry/Edit say they search all files.",
+      "behaviour": "Chosen files do not carry into a later ordinary Ask or a new session; Retry keeps the same files (membership and count on both sends; order is not specified) and says so, naming both files and their count; after reload an unsaved scope does not look scoped and Retry/Edit say they search all files.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

@@ -247,7 +247,7 @@ describe('ResultsCard — selection-mode="explicit": opening a hit never discard
     await el.updateComplete;
     clickRow(el, 'c');
     expect(opens).toEqual(['c']);
-    expect(selections.at(-1)?.ids).toEqual(['a', 'b']);
+    expect([...selections.at(-1)!.ids].sort()).toEqual(['a', 'b']);
     expect(selections).toHaveLength(2);
   });
 

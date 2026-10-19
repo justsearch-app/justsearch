@@ -239,15 +239,20 @@ describe('the rows are the response, on the shared results card', () => {
     await send(el, 'northfield');
     const results = await settle(el);
 
-    const paths = rowsOf(results).map((r) => r.querySelector('.path'));
-    expect(paths.map((p) => p?.getAttribute('title'))).toEqual([
-      'Contracts/Northfield.pdf',
-      'Ops/Reviews/Q2.md',
-    ]);
-    const visible = paths.map((p) => p?.textContent ?? '');
-    expect(visible[0]).toContain('Contracts');
-    expect(visible[1]).toContain('Ops');
-    expect(visible[1]).toContain('Reviews');
+    // Each row carries its own hit's path; the row order is not what this checks.
+    const rows = rowsOf(results);
+    expect(rows).toHaveLength(2);
+    const pathOf = (title: string): Element | null | undefined =>
+      rows
+        .find((r) => r.querySelector('.title-text')?.textContent?.trim() === title)
+        ?.querySelector('.path');
+    const northfield = pathOf('Northfield.pdf');
+    const q2 = pathOf('Q2.md');
+    expect(northfield?.getAttribute('title')).toBe('Contracts/Northfield.pdf');
+    expect(q2?.getAttribute('title')).toBe('Ops/Reviews/Q2.md');
+    expect(northfield?.textContent).toContain('Contracts');
+    expect(q2?.textContent).toContain('Ops');
+    expect(q2?.textContent).toContain('Reviews');
   });
 
   it('counts what is on screen, through the shared label authority', async () => {
