@@ -1,8 +1,8 @@
 # WP3: re-plan of the remaining D1 and D2 work
 
 Type: planning. It changes stage-internal ordering only. The §17.3 stage table, the §16 rows
-and the acceptance items are unchanged. Write the adopted order into
-`continuation-brief.md` and `stages/D1.md` §12 (implementation batches).
+and the acceptance items are unchanged. The adopted implementation batches are in
+[`stages/D1.md` §12](../stages/D1.md#12-implementation-batches).
 
 ## Why re-plan
 
@@ -98,3 +98,29 @@ stress suite, build, regeneration and documentation gates pass at
 closure gate, with an unsanctioned-name mutation control. Checkpoint
 `93ad053a401968b3fe6070031557ba793bd3e2e1` passed exact-SHA hosted
 run `36422520680` (all 13 jobs). Batch 5 is now active.
+
+## Carried over from the retired handoffs (2026-10-19)
+
+These obligations survive retirement of the session instructions. The stage checklists
+remain the owners of stage acceptance; the links below preserve the original follow-ups
+without resuming the old branches or campaigns.
+
+- Release qualification: execute E7's signed predecessor-to-target/dead-Engine round, including D1-6's signed restart-required proof, at the next signed release (owner deferral). [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L26).
+- P4: close the known Lucene-commit/SQL-outcome crash window in a follow-up. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L25).
+- X07: fix the jseval instrument bugs after stage E, preserving the paired captures. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L25).
+- S1 + Q9: design crash-safe generation garbage collection with ownership proof; the parked design was not integrated. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L28).
+- Q12: settle enrichment consistency before integrating its parked design. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L28).
+- Q15 + S8 + SUP: finish the dev-runner process-ownership/lifecycle design and its P1 supervision residuals; retain the held-process contract in ADR-0051. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L29).
+- Untrusted-input hardening: address the PDF decode residuals. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L30).
+- Untrusted-input hardening: address the archive preflight residuals. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L30).
+- Root lifecycle: address the recorded root-removal residuals. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L31).
+- Refusal handling: address the recorded refusal residuals. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L31).
+- Q7: close the governance CI coverage residual. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L31).
+- S2: close the pathless-chunk orphan gap. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L31).
+- X05-F1: design watched-root escape containment. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L32).
+- S7: publish the agent-tooling work as its own PR only with the owner's go-ahead. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L32).
+- Build/test cost: split the Engine source guards to avoid their roughly eleven-minute cost on script-only edits. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L216).
+- Installed-test cost: remove the duplicate installed migration scenario. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L217).
+- CI cost: review the unit-test shard budgets. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L218).
+- AOT qualification: verify installed cache loading with `-Xlog:aot` for the G1/compact-header training and spawn flags. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L522).
+- Evidence retention: export raw logs/XML to an accessible archive before releasing their source worktree; the original retention requirement is lane acceptance plus 30 days. [Source](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L594).

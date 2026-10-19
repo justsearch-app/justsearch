@@ -22,8 +22,8 @@ related:
 # Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain
 
 Historical origin: worktree `.claude/worktrees/lane-F`, branch `worktree-lane-F`,
-base `b96cd999` (#687). Current implementation workspace and revision are owned by
-the [handoff](handoff.md); start with its [continuation brief](continuation-brief.md).
+base `b96cd999` (#687). Acceptance is recorded in the [stage checklists](#items-done-deviated-and-skipped);
+remaining follow-ups are in [WP3](improvements/WP3-remaining-work-plan.md#carried-over-from-the-retired-handoffs-2026-10-19).
 This document is the lane's contract: the design and the considerations that shaped it. The PR cut
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
@@ -44,11 +44,11 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 - 2026-09-27: WP4 keeps the stage-1 in-process encoder owner for Lane F and pins native session/lease dependencies to encoder implementation packages with an ArchUnit negative control. The existing backfill BFC-arena classifier and standalone benchmark are dated exceptions; neither owns a native lease. Stage E records the host-decision measurements from its existing rows. Re-open an out-of-process host when a trigger is evidenced or at the first release after Lane F. [WP4 decision](improvements/WP4-inference-host-decision.md), [E record](stages/E.md#8-the-record-evidencee).
 
-- 2026-09-25: D1-8/D1-9 correct C2's unused successor-ingest-row design under §17.6. The live cutover prepares Green's writer and producer transfer before the pointer; the accepted reindex row, exact recorded generation binding, reopened writable B and settled replay are its recovery witnesses. A separate ingest row would duplicate the accepted reindex owner without another effect boundary. Retire `SUCCESSOR_ROW_MISSING` and `superseded_from` as live contracts; keep the fail-closed writable-B/replay/binding checks and their negative tests. [C2 correction](evidence/C2/operations-store-design.md#17-activation-order-d1), [D1 acceptance](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [handoff](handoff.md).
+- 2026-09-25: D1-8/D1-9 correct C2's unused successor-ingest-row design under §17.6. The live cutover prepares Green's writer and producer transfer before the pointer; the accepted reindex row, exact recorded generation binding, reopened writable B and settled replay are its recovery witnesses. A separate ingest row would duplicate the accepted reindex owner without another effect boundary. Retire `SUCCESSOR_ROW_MISSING` and `superseded_from` as live contracts; keep the fail-closed writable-B/replay/binding checks and their negative tests. [C2 correction](evidence/C2/operations-store-design.md#17-activation-order-d1), [D1 acceptance](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md).
 
-- 2026-09-25: Installed D1-9 pointer-before/after process cuts exposed an optional citation consumer path being treated as required during fingerprint logging. A scorer already composed from the selected model now wires without dereferencing a null consumer setting; the diagnostic log is not generation-model identity evidence. The separate-process cuts reach both pointer sides and recover exact B with retained no-file journal rows. D1-13 still owns composer-supplied per-generation citation identity. [D1-9 proof](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [D1-13 boundary](stages/D1.md#d1-13--native-quiescence-by-per-handle-lease-accounting), [handoff](handoff.md).
+- 2026-09-25: Installed D1-9 pointer-before/after process cuts exposed an optional citation consumer path being treated as required during fingerprint logging. A scorer already composed from the selected model now wires without dereferencing a null consumer setting; the diagnostic log is not generation-model identity evidence. The separate-process cuts reach both pointer sides and recover exact B with retained no-file journal rows. D1-13 still owns composer-supplied per-generation citation identity. [D1-9 proof](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [D1-13 boundary](stages/D1.md#d1-13--native-quiescence-by-per-handle-lease-accounting), [handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md).
 
-- 2026-09-25: D1-9 adds a harness-only eighth migration point after the first actual candidate projection UPSERT, before later journal rows, candidate commit and pointer publication. The seven transition points cannot witness a death inside replay. Only supervised self-exit may select this point; a marker failure aborts promotion. A separate installed standard-model JVM re-drains the retained journal and promotes B. The first write is uncommitted at the cut, so the proof is full replay after loop interruption, not persistence of a partial prefix. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [handoff evidence](handoff.md).
+- 2026-09-25: D1-9 adds a harness-only eighth migration point after the first actual candidate projection UPSERT, before later journal rows, candidate commit and pointer publication. The seven transition points cannot witness a death inside replay. Only supervised self-exit may select this point; a marker failure aborts promotion. A separate installed standard-model JVM re-drains the retained journal and promotes B. The first write is uncommitted at the cut, so the proof is full replay after loop interruption, not persistence of a partial prefix. [D1-9 protocol](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [handoff evidence](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md).
 
 - 2026-09-25: D1-9's physical gap-approval fence now refuses while source enumeration is in flight, before stamping the current candidate witness. Restarted enumeration writes the existing journal outside mutation admission; a prior visible wait cannot authorize an in-flight marker replacement. The replacement keeps the same logical unit/reason but changes its row-bound evidence and requires a new recorded HIGH/DURABLE decision. A held-source Engine regression, installed standard-model handoff and one abrupt fixture-process gap cut prove the local path; other crash cuts remain. [D1-9 handoff correction](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit).
 
@@ -199,7 +199,7 @@ is in 17; the per-stage implementation checklist is written at each stage's star
 
 - 2026-09-14: C2-6 projects the fixed owner's sticky recovery signal into the existing Health ConditionStore from HeadlessApp, where both owner and Health already exist. One settings.recovery_required condition carries the four typed owner causes as PascalCase condition reasons and plain messages. It survives ordinary corruption-notice clearing and resets with the successor process; no new durable marker, observer registry or HeadAssembly parameter is needed. Implementation proof remains in the C2 checklist.
 
-- 2026-09-14: C2-6 reset producer is integrated with direct service/runner injection and pre-startup owner composition; independent review is clear. Focused1376 and adjacent1375 pass. Hosted checkpoint29d4c8233 passed all13 CI jobs; later code retains its own proof obligations. [Current handoff](handoff.md), [producer evidence](evidence/C2/settings-reset-producer.md).
+- 2026-09-14: C2-6 reset producer is integrated with direct service/runner injection and pre-startup owner composition; independent review is clear. Focused1376 and adjacent1375 pass. Hosted checkpoint29d4c8233 passed all13 CI jobs; later code retains its own proof obligations. [Archived handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md), [producer evidence](evidence/C2/settings-reset-producer.md).
 
 - 2026-09-13: C2-6 retires the settingsResetFn controller callback and its formerly inherent composition slot. Direct ServicePhase injection of UiSettingsStore and the existing OperationAttemptRunner is simpler than another late-binding holder; HeadlessApp composes the fixed SettingsCommitCoordinator before runner recovery and the index fork. Launcher keeps its IN_MEMORY settings mode and refuses reset preparation; it has no ordered restart authority. No second writer or restart service is introduced. Production reset proof and remaining all-writer/witness/Health acceptance are tracked in C2.
 
@@ -316,7 +316,7 @@ line here; a change to 15, 16 or 17.3 waits for the owner's word (17.6).
 **PR 0 (2026-09-07, implementation orchestrator).** Two mechanism-level corrections found while
 starting PR 0, inside decided lines (17.6). (a) `docs-validate` does cover `docs/design/`: it walks
 `docs/**` and exempts only `docs/tempdocs/`, so the H1 here was aligned with the front-matter title
-and `handoff.md` corrected. (b) The stage-start re-verification of `verified-facts.md` against
+and the archived handoff corrected. (b) The stage-start re-verification of `verified-facts.md` against
 `main` at `76871d924` found five citations moved and two claims wrong at the original base:
 `core.worker-log` is not a registered diagnostic channel (only `core.head-log` is; the name
 appears in a Javadoc example and FE test fixtures), and 91 Java files under `modules` import
@@ -2404,7 +2404,7 @@ artifact locations. Final readiness and the only Engine merge remain at F.
 `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`. Initial candidate sources matched
 `8bf81ea2d`; checkpoint `29d4c8233` passed isolated preflight and all13 hosted CI jobs.
 Subsequent mapper, validator and reset-producer changes have focused and adjacent proof;
-current-head hosted and remaining lane acceptance are still required. [Current handoff](handoff.md)
+current-head hosted and remaining lane acceptance are still required. [Archived handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md)
 and [producer evidence](evidence/C2/settings-reset-producer.md) name the remaining work.
 
 Stage order is risk-first: the spine is the change most likely to surface an unknown, so it
@@ -2745,7 +2745,7 @@ Recorded choices: G1 is the collector; both Engine spawn sites explicitly use `-
 
 ### Residue routed
 
-F-1 reviewed 1,373 hits: 246 rewrites, 116 compatibility labels, 953 reviewed/allowed vocabulary and history hits, and 58 fixture/guard hits. The exact-path, occurrence-count and trimmed-line-anchor policy is in [`governance/lane-f-residue-allowlist.v1.json`](../../../governance/lane-f-residue-allowlist.v1.json) (blob `cabdbfda1480aa5c7ee7fff0dd3f542d40ee4fca`). The result, refutation and F-6 check are [`residue-dispositions-2026-10-01.md`](evidence/F/residue-dispositions-2026-10-01.md), [`residue-refutation-2026-10-01.md`](evidence/F/residue-refutation-2026-10-01.md) and [`f6-checks-2026-10-01.md`](evidence/F/f6-checks-2026-10-01.md). The 36 stale `io.grpc` verification-metadata rows formerly routed to root were pruned at `6ddc14994`.
+F-1 reviewed 1,373 hits: 246 rewrites, 116 compatibility labels, 953 reviewed/allowed vocabulary and history hits, and 58 fixture/guard hits. The exact-path, occurrence-count and trimmed-line-anchor policy is in [`governance/lane-f-residue-allowlist.v1.json`](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/governance/lane-f-residue-allowlist.v1.json) (blob `cabdbfda1480aa5c7ee7fff0dd3f542d40ee4fca`). The result, refutation and F-6 check are [`residue-dispositions-2026-10-01.md`](evidence/F/residue-dispositions-2026-10-01.md), [`residue-refutation-2026-10-01.md`](evidence/F/residue-refutation-2026-10-01.md) and [`f6-checks-2026-10-01.md`](evidence/F/f6-checks-2026-10-01.md). The 36 stale `io.grpc` verification-metadata rows formerly routed to root were pruned at `6ddc14994`.
 
 ### What the next lane must know
 
