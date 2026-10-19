@@ -12,13 +12,27 @@ documents on the shared results card. Scenarios S1.n are cited as SMn and N1.n a
 accepts only short ids). S1.12 (results reachable beside the floating composer at narrow width) is
 checked by the jseval `sv3-search-results` capture, which this gate does not cover.
 
-Evidence: `gates/test-intent/evidence/uiux-search-mode.json` runs all 56 new checks on the
+Evidence: `gates/test-intent/evidence/uiux-search-mode.json` runs all 57 new checks on the
 candidate. The one repaired behaviour (a missing document's message) has a fail-before on the
 merge base in `gates/test-intent/evidence/uiux-search-mode-repaired.json`. The other new checks
 pin new behaviour and carry no fail-before requirement; most fail on the before-state, but several
 fail there by exception or because they import modules that do not exist yet. Five pass there,
 because they pin behaviour that already held (no search on reload or in Ask, a cleared query shows
-nothing, a restored draft is kept, a non-404 failure keeps its status).
+nothing, a restored draft is kept, a non-404 failure shows as a failure and not as a missing
+file).
+
+Review history. Round 1: accepted by one verifier, then rejected by the auditor (both records
+below, kept as written). The audit found that the search.test.ts adaptation did not keep the whole
+oracle (an exact count-label equality had become a prefix test, the count probe read the expected
+label, and the visible path had become a title attribute), and that three other entries pinned more
+than their sources state: a ban on any AI or model mention in the Search label (SM1 only rules out a "no AI"
+claim), a first-seen path order and Set object identity for the chosen files (SM6 specifies
+membership and fixity), and the literal "HTTP 404"/"HTTP 503" pins in the document pane (the
+scenarios say a missing file is explained and other failures stay distinguishable). Round 2
+restores exact count equality read off the screen, retires the visible full-path claim as Obsolete
+(the shared card shows folders on the row, the full path on hover) with a New check for the
+card's path display, and narrows the other assertions to what the scenarios state. Product code
+is unchanged.
 
 ```json
 {
@@ -89,7 +103,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
         "instrumentation",
         "rename"
       ],
-      "whatMoved": "Input: the send() helper reached the shared-store search seam through the palette's removed \"Search this text\" command; it now presses Enter in the composer in Search mode (the window's default). It still yields exactly one request per send (the first case keeps its exactly-one-request assertion past the debounce and settle timers). Observation: the results moved from Sv3Main's own rows (sv3-main-row, .row-title, .row-path, sv3-main-count, sv3-main-skeleton, sv3-main-empty, sv3-main-unreachable, sv3-main-failure-detail) to the Search-mode results region (jf-sv3-results) and the shared results card inside it (search-result-row, .title-text, .path[title], card-meta, sv3-results-loading, sv3-results-empty, sv3-results-failed, sv3-results-failure-detail); settle() waits two more macrotask turns and the extra renders. Oracle differences an acceptor should check: (1) the count label was compared for equality with the on-screen count element; it is now checked as the leading text of the card's meta line, which appends latency and pass-stage words after it, and the leading-number probe reads the expected label rather than the on-screen one, still compared with the rendered row count; (2) \"pending\" was \"skeleton rows present, no empty state, no count, zero rows\" and is now \"loading element present, no empty state, no card\"; (3) \"zero rows\" in the empty and failure cases is now \"no card\". Expected values (row titles and paths, MAIN_EMPTY and MAIN_UNREACHABLE copy, failure-detail text, role=alert, request counts) are unchanged. The case \"is NOT what a plain send does any more\" now chooses the Ask tier first and keeps its expectation (no search request); its old claim about the default tier is retired in the Obsolete entry below.",
+      "whatMoved": "Input: the send() helper reached the shared-store search seam through the palette's removed \"Search this text\" command; it now presses Enter in the composer in Search mode (the window's default). It still yields exactly one request per send (the first case keeps its exactly-one-request assertion past the debounce and settle timers). Observation: the results moved from Sv3Main's own rows (sv3-main-row, .row-title, sv3-main-count, sv3-main-skeleton, sv3-main-empty, sv3-main-unreachable, sv3-main-failure-detail) to the Search-mode results region (jf-sv3-results) and the shared results card inside it (search-result-row, .title-text, the card's .meta-info line, sv3-results-loading, sv3-results-empty, sv3-results-failed, sv3-results-failure-detail); settle() waits two more macrotask turns for the extra renders. The count is read off the screen as before: the card prints the same label on its meta line and appends its latency (\" · found in 0.00s\"), so countLabelOf() takes that line's text, collapses whitespace and strips only that trailing latency; the result is compared for equality with the same matchCountLabel(...) values as before, and the leading-number probe reads that observed label and compares it with the rendered row count, as before. \"Pending\" was \"skeleton rows present, no empty state, no count element, zero rows\" and is now \"loading element present, no empty state, no card (so no count line), zero rows\"; the empty and failure cases still assert zero rows, and also that no card is shown. Expected values (row titles, count labels, MAIN_EMPTY and MAIN_UNREACHABLE copy, failure-detail text, role=alert, request counts) are unchanged. The visible full-path assertion of \"renders one row per hit, from the response fields\" is not kept here: the shared card shows a path differently, so that claim is retired in the Obsolete entry below and the card's path display is a New check (the SM5 entry). The case \"is NOT what a plain send does any more\" now chooses the Ask tier first and keeps its expectation (no search request); its old claim about the default tier is retired in the Obsolete entry below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -146,6 +160,13 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
+          "scenario": "SM5",
+          "quote": "Results use the shared results card: title, path, snippet, the facet and date filters the default window offers today (applied to quick and refined passes, removable after zero hits), multi-select (click, Ctrl/Cmd toggle, Shift range). Opening a hit by mouse, keyboard or context menu shows the document in the document pane, without clearing a multi-file selection. A missing or deleted file says so.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
           "scenario": "SM8",
           "quote": "Running a search while a conversation is open (idle, streaming, waiting for a decision, or history-locked) shows the results and does not lose the conversation: it stays in the sidebar and opens again with one click. A search never steers, approves or stops a running agent.",
           "label": "agent-drafted, owner-adopted"
@@ -168,6 +189,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
       "conflictSearch": "decision records searched for a conflict: none (docs/decisions/0001-0051 searched for Search v3, composer, tier, palette, search mode and session in-motion indicator; none governs these behaviours)",
       "whatRetired": [
         "SearchV3View.search.test.ts \"is NOT what a plain send does any more — the composer talks to the model\": a send on the DEFAULT tier never reaches the search endpoint. A fresh window now starts in Search (S1.2), whose send is the search (S1.3).",
+        "SearchV3View.search.test.ts \"renders one row per hit, from the response fields\", its path assertion only: each row's visible path text (.row-path) is the response path in full. Search-mode results use the shared results card (S1.5), which shows the containing folders on the row and the full path as the row's hover title; the row count and titles in that case are kept (Adaptation entry above), and the card's path display is a New check.",
         "SearchV3View.tier.test.ts \"still asks — and never reaches the controller — on the default tier\": a send on the default tier dispatches an ask. Same reason; the ask arm is kept on the chosen Ask tier.",
         "SearchV3View.sessions.test.ts \"still shows it for a palette search that refines BEHIND displayed results\": the open session's in-motion dot lights while a palette search runs. A search is now not a conversation turn and shows its results outside every conversation (S1.3, S1.8), and the \"Search this text\" command it drove is gone (S1.11)."
       ]
@@ -178,7 +200,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
       ],
       "class": "New",
-      "behaviour": "Three modes, Search first and default; Search labelled for finding documents with no AI claim; the mode is announced; Enter, Shift+Enter and IME composition do in Search what the label and hint say; the delegate chord is named only where it delegates.",
+      "behaviour": "Three modes, Search first and default; Search labelled for finding matching documents, with no \"no AI\" claim; the mode is announced; Enter, Shift+Enter and IME composition do in Search what the label and hint say; the delegate chord is named only where it delegates.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -199,7 +221,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#lists Search, Ask and Delegate, in that order",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#starts a fresh window in Search (S1.2) and badges it as the default",
-        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#labels Search by what it does and claims nothing about AI",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#labels Search by what it does and makes no \"no AI\" claim",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is always the search control, even while a run holds a decision or is running",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the standing stop beside it while something is running — a search stops nothing",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#names the delegate chord only when the chord would actually delegate",
@@ -262,10 +284,11 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
     {
       "items": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
-        "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts"
+        "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.search.test.ts"
       ],
       "class": "New",
-      "behaviour": "Results render on the shared results card and a hit opens in the document pane; in explicit selection mode a plain click opens without discarding a multi-file choice, Ctrl/Shift choose without opening (Shift ranges), and the row menu opens and chooses from the keyboard.",
+      "behaviour": "Results render on the shared results card, each row showing its path as that card does (the containing folders on the row, the full path as its hover title), and a hit opens in the document pane; in explicit selection mode a plain click opens without discarding a multi-file choice, Ctrl/Shift choose without opening (Shift ranges), and the row menu opens and chooses from the keyboard.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -278,6 +301,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
       "evidence": "gates/test-intent/evidence/uiux-search-mode.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#renders the shared card, opens a hit in the pane, and keeps a multi-file choice",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.search.test.ts#shows each hit’s path as the shared card does: its folders on the row, the full path on hover",
         "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#a plain click opens and leaves the selection alone",
         "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#Ctrl and Shift choose without opening, and Shift ranges from the row read last",
         "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#the row menu opens without choosing, and offers choosing to the keyboard"
@@ -289,7 +313,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
       ],
       "class": "New",
-      "behaviour": "Ask about chosen files sends exactly the chosen documents by path, each document once; the set is fixed when asked; rows that left the list are visibly dropped; an empty or invalid choice is refused, never a whole-index ask.",
+      "behaviour": "Ask about chosen files sends exactly the chosen documents by path (membership and count; order is not specified), each document once; the set is fixed when asked; rows that left the list are visibly dropped; an empty or invalid choice is refused, never a whole-index ask.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -306,10 +330,10 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a chosen row that a new result list no longer holds — visibly",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#offers no ask about an empty choice, and never sends an empty set as a whole-index ask",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#scopes \"Ask about this file\" from the card menu to that one document",
-        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#counts several hits from one document once, in first-seen order",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#counts several hits from one document once",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#takes only chosen rows, never the rest of the list",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#refuses an empty choice, ids that are not on screen, and hits with no path",
-        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#drops chosen rows that left the list, and keeps the same set when nothing left",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#drops chosen rows that left the list, and keeps the same rows when nothing left",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#words the act and the scope by document count"
       ]
     },
@@ -548,7 +572,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
         "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts"
       ],
       "class": "New",
-      "behaviour": "Opening a document the index no longer has (HTTP 404) says it is no longer in the index and may have been moved or deleted, instead of the bare status code.",
+      "behaviour": "Opening a document the index no longer has (HTTP 404 from the preview) says the file is no longer in the index.",
       "repaired": true,
       "sources": [
         {
@@ -561,7 +585,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
       ],
       "evidence": "gates/test-intent/evidence/uiux-search-mode-repaired.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#says the file is no longer in the index, not a bare status code"
+        "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#says the file is no longer in the index"
       ]
     },
     {
@@ -569,7 +593,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
         "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts"
       ],
       "class": "New",
-      "behaviour": "Any other load failure (here HTTP 503) still shows its status: only a missing document is called missing. Passes on the before-state; it pins the existing behaviour beside the repair.",
+      "behaviour": "Any other load failure (here HTTP 503) is shown as a failure (an error alert with text) and not as the missing-file explanation, so the two stay distinguishable. Passes on the before-state; it pins the existing behaviour beside the repair.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -581,7 +605,7 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
       ],
       "evidence": "gates/test-intent/evidence/uiux-search-mode.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#keeps the status for any other failure"
+        "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#shows any other failure as a failure, not as a missing file"
       ]
     }
   ]

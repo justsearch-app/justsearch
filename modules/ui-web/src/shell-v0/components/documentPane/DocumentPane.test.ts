@@ -268,24 +268,25 @@ describe('DocumentPane — a document the index no longer has (WP1.1 S1.5)', () 
     vi.restoreAllMocks();
   });
 
-  it('says the file is no longer in the index, not a bare status code', async () => {
+  it('says the file is no longer in the index', async () => {
     stubFetchOnce({ ok: false, status: 404 });
     const el = make();
     el.docPath = 'Contracts/Gone.pdf';
     await flush(el);
 
     const alert = el.shadowRoot?.querySelector('jf-error-alert');
-    expect(alert?.textContent).toContain('no longer in your index');
-    expect(alert?.textContent).toMatch(/moved or deleted/);
-    expect(alert?.textContent).not.toContain('HTTP 404');
+    expect(alert?.textContent).toMatch(/no longer in (your|the) index/i);
   });
 
-  it('keeps the status for any other failure', async () => {
+  it('shows any other failure as a failure, not as a missing file', async () => {
     stubFetchOnce({ ok: false, status: 503 });
     const el = make();
     el.docPath = 'notes/thread.md';
     await flush(el);
-    expect(el.shadowRoot?.querySelector('jf-error-alert')?.textContent).toContain('HTTP 503');
+    const alert = el.shadowRoot?.querySelector('jf-error-alert');
+    expect(alert).not.toBeNull();
+    expect(alert?.textContent?.trim()).not.toBe('');
+    expect(alert?.textContent).not.toMatch(/no longer in (your|the) index/i);
   });
 });
 

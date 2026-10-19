@@ -146,8 +146,16 @@ const rowsOf = (results: Mounted): HTMLElement[] => [
 const textOf = (host: Mounted | null, testid: string): string =>
   host?.shadowRoot?.querySelector(`[data-testid="${testid}"]`)?.textContent?.trim() ?? '';
 
-/** The card's meta line: the count first, then latency and pass-stage words. */
-const metaOf = (results: Mounted): string => textOf(cardOf(results), 'card-meta');
+/**
+ * The count label as the card shows it: its meta line, read off the screen, less the latency the
+ * shared card appends (" · found in 0.02s"). Anything else on that line stays in, so the equality
+ * below is still an equality.
+ */
+const countLabelOf = (results: Mounted): string =>
+  (cardOf(results)?.shadowRoot?.querySelector('.meta-info')?.textContent ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/ · found in \S+$/, '');
 
 async function emptyElementOf(results: Mounted, testid: string): Promise<Sv3Empty & Mounted> {
   const el = results.shadowRoot?.querySelector(`[data-testid="${testid}"]`) as
@@ -219,10 +227,27 @@ describe('the rows are the response, on the shared results card', () => {
       'Northfield.pdf',
       'Q2.md',
     ]);
-    expect(rows.map((r) => r.querySelector('.path')?.getAttribute('title'))).toEqual([
+  });
+
+  it('shows each hit’s path as the shared card does: its folders on the row, the full path on hover', async () => {
+    respond({
+      results: [hit('Contracts/Northfield.pdf'), hit('Ops/Reviews/Q2.md')],
+      totalHits: 2,
+      matchCount: 2,
+    });
+    const el = await mount();
+    await send(el, 'northfield');
+    const results = await settle(el);
+
+    const paths = rowsOf(results).map((r) => r.querySelector('.path'));
+    expect(paths.map((p) => p?.getAttribute('title'))).toEqual([
       'Contracts/Northfield.pdf',
       'Ops/Reviews/Q2.md',
     ]);
+    const visible = paths.map((p) => p?.textContent ?? '');
+    expect(visible[0]).toContain('Contracts');
+    expect(visible[1]).toContain('Ops');
+    expect(visible[1]).toContain('Reviews');
   });
 
   it('counts what is on screen, through the shared label authority', async () => {
@@ -235,10 +260,12 @@ describe('the rows are the response, on the shared results card', () => {
     await send(el, 'vendor');
     const results = await settle(el);
 
-    const label = matchCountLabel(12, 4, false, 40, false);
-    expect(metaOf(results).startsWith(label)).toBe(true);
-    // The probe: whatever the label leads with is the number of rows actually rendered.
-    expect(Number(/\d+/.exec(label)?.[0])).toBe(rowsOf(results).length);
+    const label = countLabelOf(results);
+    expect(label).toBe(matchCountLabel(12, 4, false, 40, false));
+    // The probe: whatever the label leads with is the number of rows actually rendered. A projection
+    // that counted one set and rendered another (or a row list sliced on the way out) fails HERE.
+    const leading = Number(/\d+/.exec(label)?.[0]);
+    expect(leading).toBe(rowsOf(results).length);
     expect(rowsOf(results)).toHaveLength(4);
   });
 
@@ -248,8 +275,8 @@ describe('the rows are the response, on the shared results card', () => {
     await send(el, 'freight');
     const results = await settle(el);
 
-    const label = matchCountLabel(1, 3, false, 3, false);
-    expect(metaOf(results).startsWith(label)).toBe(true);
+    const label = countLabelOf(results);
+    expect(label).toBe(matchCountLabel(1, 3, false, 3, false));
     expect(Number(/\d+/.exec(label)?.[0])).toBe(rowsOf(results).length);
   });
 });
@@ -270,6 +297,7 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     // Pending is not emptiness and not a result: neither verdict may be on screen yet.
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-empty"]')).toBeNull();
     expect(cardOf(results)).toBeNull();
+    expect(rowsOf(results)).toHaveLength(0);
 
     release({
       ok: true,
@@ -295,6 +323,7 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     ).toBe(MAIN_EMPTY.description);
     // The roomier region gets the roomier padding — the spec's one breakpoint on this component.
     expect(empty.hasAttribute('roomy')).toBe(true);
+    expect(rowsOf(results)).toHaveLength(0);
     expect(cardOf(results)).toBeNull();
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-failed"]')).toBeNull();
   });
@@ -316,6 +345,7 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     // ...and it is NOT the zero state: claiming "nothing matched" here would invent a fact about a
     // corpus nothing was ever asked of.
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-empty"]')).toBeNull();
+    expect(rowsOf(results)).toHaveLength(0);
     expect(cardOf(results)).toBeNull();
   });
 

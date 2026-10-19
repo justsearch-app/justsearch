@@ -38,13 +38,15 @@ describe('S1.1 — the composer offers three modes, Search first and by default'
     ]);
   });
 
-  it('labels Search by what it does and claims nothing about AI', () => {
+  it('labels Search by what it does and makes no "no AI" claim', () => {
     const search = SV3_TIER_OPTIONS.find((option) => option.id === 'search');
     expect(search?.label).toBe('Search');
     expect(search?.description).toMatch(/matching documents/i);
     // The refined pass runs the backend's default pipeline, which expands the query with the chat
     // model when AI is on — so "no AI" would be a false claim.
-    expect(`${search?.label} ${search?.description}`).not.toMatch(/\bAI\b|model/i);
+    expect(`${search?.label} ${search?.description}`).not.toMatch(
+      /\bno[\s-]+(AI|model)\b|\bwithout\s+(AI|a model)\b|\b(AI|model)[\s-]+free\b/i,
+    );
   });
 });
 
@@ -118,9 +120,13 @@ describe('S1.1 — the send hint in Search mode says what each key sends', () =>
 });
 
 describe('S1.6 — the chosen set is documents, by path, never an empty or invalid set', () => {
-  it('counts several hits from one document once, in first-seen order', () => {
+  it('counts several hits from one document once', () => {
     const hits = [hit('a#1', 'docs/a.md'), hit('b#1', 'docs/b.md'), hit('a#2', 'docs/a.md')];
-    expect(sv3ScopeFromHits(hits, ['a#1', 'a#2', 'b#1'])?.paths).toEqual(['docs/a.md', 'docs/b.md']);
+    // Membership and count only: which order the documents come in is not specified.
+    expect([...(sv3ScopeFromHits(hits, ['a#1', 'a#2', 'b#1'])?.paths ?? [])].sort()).toEqual([
+      'docs/a.md',
+      'docs/b.md',
+    ]);
   });
 
   it('takes only chosen rows, never the rest of the list', () => {
@@ -135,19 +141,22 @@ describe('S1.6 — the chosen set is documents, by path, never an empty or inval
     expect(sv3ScopeFromHits(hits, ['chunk:1'])).toBeNull();
   });
 
-  it('drops chosen rows that left the list, and keeps the same set when nothing left', () => {
+  it('drops chosen rows that left the list, and keeps the same rows when nothing left', () => {
     const chosen = new Set(['a', 'b']);
     const pruned = sv3PruneSelection(chosen, [hit('a', 'docs/a.md')]);
     expect([...pruned]).toEqual(['a']);
     const unchanged = sv3PruneSelection(chosen, [hit('a', 'docs/a.md'), hit('b', 'docs/b.md')]);
-    expect(unchanged).toBe(chosen);
+    expect([...unchanged].sort()).toEqual(['a', 'b']);
   });
 
   it('words the act and the scope by document count', () => {
     expect(sv3AskAboutLabel(1)).toBe('Ask about this file');
     expect(sv3AskAboutLabel(3)).toBe('Ask about these 3 files');
     expect(sv3ScopeLabel({ paths: ['docs/Northfield.pdf'] })).toBe('Northfield.pdf');
-    expect(sv3ScopeLabel({ paths: ['docs/a.md', 'b.md'] })).toBe('2 files: a.md, b.md');
+    const two = sv3ScopeLabel({ paths: ['docs/a.md', 'b.md'] });
+    expect(two).toMatch(/^2 files: /);
+    expect(two).toContain('a.md');
+    expect(two).toContain('b.md');
   });
 });
 

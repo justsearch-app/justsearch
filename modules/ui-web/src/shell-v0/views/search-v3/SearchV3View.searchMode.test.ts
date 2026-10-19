@@ -10,8 +10,9 @@
  *
  * Mechanisms asserted, not appearances:
  *  - **No turn from a search.** The conversation list and the dispatch endpoint are read back.
- *  - **Scope is paths, fixed when asked.** The dispatch body's `docIds` is compared exactly, after
- *    the list under it has been re-ranked and filtered.
+ *  - **Scope is paths, fixed when asked.** The dispatch body's `docIds` must hold exactly the chosen
+ *    documents (as a set: membership and count, not order), after the list under it has been
+ *    re-ranked and filtered.
  *  - **A search never steers.** The fake agent controller's `steer` is read back.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -712,11 +713,16 @@ describe('S1.6 — an Ask about the chosen files retrieves from exactly those fi
     await askAboutChosen(el);
     expect(el.tier).toBe('ask');
     const composer = await region(el, 'jf-sv3-composer');
-    expect(q(composer, 'sv3-composer-scope')?.textContent).toContain('2 files: a.md, b.md');
+    const scope = q(composer, 'sv3-composer-scope')?.textContent ?? '';
+    expect(scope).toContain('2 files');
+    expect(scope).toContain('a.md');
+    expect(scope).toContain('b.md');
 
     await askNow(el, 'when does the lease end?');
     expect(dispatches()).toHaveLength(1);
-    expect(dispatches()[0]?.body.docIds).toEqual(['docs/a.md', 'docs/b.md']);
+    // Exactly the chosen documents, each once; their order is not specified.
+    const docIds = (dispatches()[0]?.body.docIds as string[] | undefined) ?? [];
+    expect([...docIds].sort()).toEqual(['docs/a.md', 'docs/b.md']);
     expect(dispatches()[0]?.body.question).toBe('when does the lease end?');
   });
 
