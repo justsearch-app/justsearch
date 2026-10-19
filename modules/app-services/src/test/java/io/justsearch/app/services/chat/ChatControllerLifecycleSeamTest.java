@@ -108,8 +108,14 @@ final class ChatControllerLifecycleSeamTest {
     }
     assertNotNull(start.get(30, TimeUnit.SECONDS), "a start cut short by quit does not succeed");
     await(seam::noneAlive, "every launched server to end");
+    // Keep the base test's observation after the last child exits, including launcher bypasses.
+    long observationEnd = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1_500);
     assertNotNull(background(stopped::switchToOnlineMode).get(30, TimeUnit.SECONDS),
         "a terminal manager refuses a later start");
+    while (System.nanoTime() < observationEnd) {
+      assertEquals(1, seam.models().size(), "nothing relaunches after quit");
+      Thread.sleep(20);
+    }
     assertEquals(1, seam.models().size(), "nothing relaunches after quit");
     assertTrue(seam.noneAlive());
   }

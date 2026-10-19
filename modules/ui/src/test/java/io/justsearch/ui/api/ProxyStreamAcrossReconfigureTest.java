@@ -10,6 +10,7 @@ import io.javalin.Javalin;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
+import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.services.bootstrap.BootstrapInferenceFactory;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -20,6 +21,7 @@ import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.telemetry.Telemetry;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -99,6 +101,15 @@ final class ProxyStreamAcrossReconfigureTest {
   @Test
   @Timeout(120)
   void aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches() throws Exception {
+    Field router = InferenceLifecycleManager.class.getDeclaredField("actuationRouter");
+    router.setAccessible(true);
+    Object controller = router.get(manager);
+    Field drainBound = controller.getClass().getDeclaredField("drainBound");
+    drainBound.setAccessible(true);
+    assertEquals(Duration.ofSeconds(30), ChatActuationRouter.DRAIN_BOUND,
+        "the chat drain policy allows thirty seconds");
+    assertEquals(ChatActuationRouter.DRAIN_BOUND, drainBound.get(controller),
+        "the controller built by production wiring uses the policy's drain limit");
     manager.switchToOnlineMode();
     assertEquals(List.of("model.gguf"), launchedModels(), "chat starts once");
     String first = launches().get(0);
