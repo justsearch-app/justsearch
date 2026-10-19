@@ -397,6 +397,53 @@ public final class WorkerIngestService {
   }
 
   /**
+   * Runs {@code mutation} inside this Worker's file-mutation fence, the one its indexing loop's
+   * writers and its prunes hold: for a replayed write that must not interleave with a prune. The
+   * mutation checks, inside the fence, that what it writes for still exists.
+   */
+  public <T> T underFileMutationFence(Supplier<T> mutation) {
+    return withFileMutationFence(mutation);
+  }
+
+  /** {@link #confirmedAbsent} under the root that holds the path; an invalid path is not. */
+  private boolean confirmedGone(String normalizedPath) {
+    try {
+      return confirmedAbsent(normalizedPath, pruneRootFor(normalizedPath));
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
+  }
+
+  /**
+   * A rename's Lucene half, inside the fence. A destination confirmed absent here was deleted
+   * after the move, possibly after a prune already judged it: its rows are not moved, and the
+   * moved file's rows go too when its old path is confirmed absent as well. Otherwise the rows
+   * move, and the new path is reported to a running prune even when the move fails part way,
+   * because rows it wrote before failing still reach a commit.
+   *
+   * @return whether the rename is settled in Lucene: rows moved, or the file is gone from both
+   *     paths and its rows were removed
+   */
+  private boolean moveRowsUnderFence(String oldPath, String newPath) {
+    if (confirmedGone(newPath)) {
+      // Renames are refused during a candidate build, so there is no serving copy to project to.
+      if (confirmedGone(oldPath)) {
+        ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(oldPath);
+        log.info("updateDocumentPaths: {} was moved to {} and deleted; its rows are removed",
+            oldPath, newPath);
+        return true;
+      }
+      log.info("updateDocumentPaths: {} is gone; rows of {} are not moved", newPath, oldPath);
+      return false;
+    }
+    try {
+      return ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath) > 0;
+    } finally {
+      publishedUnderFence(newPath);
+    }
+  }
+
+  /**
    * For a replay service that stands in for {@code publisher}, the live Worker whose indexing loop
    * writes while the replay runs: its prunes are vouched for by {@code publisher}'s root authority
    * (the identity a watch registered, the recorded volume) and applied inside {@code publisher}'s
@@ -426,7 +473,7 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(target, "target");
     java.util.Objects.requireNonNull(firstRemoval, "firstRemoval");
     Path pruneRoot = pruneRootFor(pathPrefix);
-    java.util.Set<String> removed = new java.util.LinkedHashSet<>();
+    Set<String> removed = new java.util.LinkedHashSet<>();
     var result = target.pruneOps().pruneByPathPrefix(
         pathPrefix,
         () -> false,
@@ -2659,21 +2706,14 @@ public final class WorkerIngestService {
             documentIdentityStore.rekey(oldPathHash, newPathHash, System.currentTimeMillis());
 
         // Inside the file-mutation fence: a prune applying a batch never sees a rename half done.
-        // The new path's rows may be its first, published after a prune's scan.
-        int count = withFileMutationFence(() -> {
-          int moved = ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath);
-          if (moved > 0) {
-            publishedUnderFence(newPath);
-          }
-          return moved;
-        });
+        boolean settled = withFileMutationFence(() -> moveRowsUnderFence(oldPath, newPath));
         // Green may not contain the document yet while Blue still serves it. Moving the durable
         // identity is therefore a successful rename even when this generation has no Lucene row.
         // Store-first is deliberate: if Lucene throws after the move, the RPC fails and retry or
         // boot reconciliation converges from the store-authoritative uid without ever re-minting.
         if (identityRekey
                 != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
-            || count > 0) {
+            || settled) {
           updatedCount++;
         } else {
           failedPaths.add(mapping.getOldPath());

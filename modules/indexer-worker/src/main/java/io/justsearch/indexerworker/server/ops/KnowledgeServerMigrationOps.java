@@ -1290,9 +1290,7 @@ public final class KnowledgeServerMigrationOps {
                   .setDocId(docId).setVduStatus(vduStatus).setVduEnrichment(enrichment)
                   .setPageCount(pageCount).setOutcomeValue(outcomeNum);
               if (hasExtracted && extracted != null) request.setExtractedContent(extracted);
-              boolean updated = io.justsearch.indexerworker.services.VduResultWriter.apply(
-                  context.ingestLifecycle(), request.build(),
-                  context.chunkSpladeEnabledSupplier().getAsBoolean());
+              boolean updated = replayVduResult(context, request.build());
               if (updated) {
                 mutatedLucene = true;
                 context.log().debug("Replayed buffered VDU_UPDATE: docId={}", docId);
@@ -1493,6 +1491,33 @@ public final class KnowledgeServerMigrationOps {
     }
     return new ReplayOutcome(allApplied && (removed || !removeAfterReplay) && !deferredVdu,
         allApplied ? ops : List.of());
+  }
+
+  /**
+   * A buffered VDU result, applied inside the live Worker's file-mutation fence when there is one,
+   * as a live VDU result is: a prune of its file then runs wholly before it (and the result finds
+   * no parent) or wholly after it, never in between its chunk writes.
+   */
+  private static boolean replayVduResult(
+      DrainSwitchBufferContext context, io.justsearch.ipc.UpdateVduResultRequest request)
+      throws IOException {
+    boolean splade = context.chunkSpladeEnabledSupplier().getAsBoolean();
+    if (context.publisher() == null) {
+      return io.justsearch.indexerworker.services.VduResultWriter.apply(
+          context.ingestLifecycle(), request, splade);
+    }
+    try {
+      return context.publisher().underFileMutationFence(() -> {
+        try {
+          return io.justsearch.indexerworker.services.VduResultWriter.apply(
+              context.ingestLifecycle(), request, splade);
+        } catch (IOException e) {
+          throw new java.io.UncheckedIOException(e);
+        }
+      });
+    } catch (java.io.UncheckedIOException e) {
+      throw e.getCause();
+    }
   }
 
   /**

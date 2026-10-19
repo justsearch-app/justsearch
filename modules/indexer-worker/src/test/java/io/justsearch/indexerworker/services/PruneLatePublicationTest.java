@@ -2,6 +2,8 @@
 package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -70,6 +72,7 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
   private IndexGenerationManager.IndexLayout layout;
   private RunningRuntime runtime;
   private Path root;
+  private IndexingLoop loop;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -99,7 +102,7 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
 
   /** As {@link #service()}, writing through {@code target}. */
   private WorkerIngestService service(RunningRuntime target) {
-    IndexingLoop loop = mock(IndexingLoop.class);
+    loop = mock(IndexingLoop.class);
     when(loop.getLastCommitTime()).thenAnswer(ignored -> System.currentTimeMillis());
     when(loop.getCurrentState()).thenReturn("IDLE");
     when(loop.withFileMutationFence(any())).thenAnswer(call -> {
@@ -202,6 +205,12 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
    * if it is still there.
    */
   private void renamedInAfterTheScan(Prune kind, boolean destinationStays) throws Exception {
+    renamedInAfterTheScan(kind, destinationStays, false);
+  }
+
+  /** As above; with {@code failsAfterMoving}, the move's I/O fails after its rows were written. */
+  private void renamedInAfterTheScan(Prune kind, boolean destinationStays,
+      boolean failsAfterMoving) throws Exception {
     Path original = Files.writeString(tempDir.resolve("outside.txt"), "original");
     Path destination = root.resolve("moved.txt");
     String from = PathNormalizer.normalizeKey(original);
@@ -216,7 +225,11 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
     doAnswer(call -> {
       renaming.countDown();
       assertTrue(release.await(30, TimeUnit.SECONDS));
-      return call.callRealMethod();
+      Object moved = call.callRealMethod();
+      if (failsAfterMoving) {
+        throw new java.io.UncheckedIOException(new IOException("injected after the move"));
+      }
+      return moved;
     }).when(coordinator).updateDocumentPaths(from, to);
     RunningRuntime target = mock(RunningRuntime.class);
     when(target.indexingCoordinator()).thenReturn(coordinator);
@@ -254,7 +267,13 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
         }
       });
       FenceRace.releaseOnceWaitingOrDone(release::countDown, pruning);
-      assertEquals(1, rename.get(), "the rename moved the file");
+      if (failsAfterMoving) {
+        var failure = assertThrows(java.util.concurrent.ExecutionException.class, rename::get);
+        assertInstanceOf(WorkerServiceException.class, failure.getCause(),
+            "precondition: the rename reports its failure");
+      } else {
+        assertEquals(1, rename.get(), "the rename moved the file");
+      }
       assertEquals("", pruning.get(), "the prune reports no error");
     } finally {
       release.countDown();
@@ -290,5 +309,120 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
   void aFileRenamedInDuringAReplayedPruneKeepsItsRows() throws Exception {
     // Preserve: the late pass judges the renamed file like any other; one that is there stays.
     renamedInAfterTheScan(Prune.REPLAY, true);
+  }
+
+  @Test
+  void aSyncRemovesTheRowsOfARenameWhoseMoveFailsAfterWriting() throws Exception {
+    // RP10: rows the move wrote before its I/O failed reach a commit, so they are reported too.
+    renamedInAfterTheScan(Prune.SYNC, false, true);
+  }
+
+  @Test
+  void aReplayedPruneRemovesTheRowsOfARenameWhoseMoveFailsAfterWriting() throws Exception {
+    renamedInAfterTheScan(Prune.REPLAY, false, true);
+  }
+
+  /**
+   * RP3: a rename is admitted while the prune holds the fence for its last pass; the destination
+   * is deleted while the rename waits. The rename moves nothing once it holds the fence, because
+   * no later pass of that prune would judge the moved rows.
+   */
+  private void renamedInWhileThePruneHoldsItsLastFence(Prune kind) throws Exception {
+    // The file comes from another root the person added, which vouches that it left there.
+    Path elsewhere = Files.createDirectory(tempDir.resolve("elsewhere"));
+    Path original = Files.writeString(elsewhere.resolve("outside-final.txt"), "original");
+    Path destination = root.resolve("late-final.txt");
+    String from = PathNormalizer.normalizeKey(original);
+    String to = PathNormalizer.normalizeKey(destination);
+    new HeldFileWriter(runtime, fence, 0).write(original, HeldFileWriter.chunkedContent());
+    assertTrue(committedRows(from) > 1, "precondition: the renamed file has a parent and chunks");
+    var service = service();
+    assertTrue(service.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(elsewhere.toString()).setRootAdded(true).build(), CallContext.none())
+        .getWatching(), "precondition: the person added the file's first root");
+    Files.move(original, destination);
+
+    // The prune's first hold of the fence, which on an empty root is its last, stays held.
+    java.util.concurrent.atomic.AtomicReference<Thread> pruner =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    CountDownLatch pruneHolds = new CountDownLatch(1);
+    CountDownLatch renameAdmitted = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    doAnswer(call -> {
+      Supplier<?> mutation = call.getArgument(0);
+      boolean pruning = Thread.currentThread() == pruner.get();
+      if (!pruning) renameAdmitted.countDown();
+      return fence.guard(() -> {
+        Object result = mutation.get();
+        if (pruning && pruneHolds.getCount() > 0) {
+          pruneHolds.countDown();
+          try {
+            assertTrue(release.await(30, TimeUnit.SECONDS));
+          } catch (InterruptedException interrupted) {
+            throw new IllegalStateException(interrupted);
+          }
+        }
+        return result;
+      });
+    }).when(loop).withFileMutationFence(any());
+    if (kind == Prune.REPLAY) {
+      assertTrue(jobQueue.putSwitchBuffer("prune_prefix:" + root, "PRUNE_PREFIX",
+          root.toString()));
+    }
+    var pruning = FenceRace.start("prune-under-test", () -> {
+      pruner.set(Thread.currentThread());
+      return switch (kind) {
+        case SYNC -> service.syncDirectory(SyncDirectoryRequest.newBuilder()
+            .setRootPath(root.toString()).build(), CallContext.none()).getError();
+        case DIRECT -> service.pruneMissing(PruneRequest.newBuilder()
+            .setPathPrefix(root.toString()).build(), CallContext.none()).getError();
+        case REPLAY -> {
+          KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
+              new KnowledgeServerMigrationOps.DrainSwitchBufferContext(jobQueue, runtime, null,
+                  IndexingPacing.unthrottled(), layout.basePath(), layout.activeGenerationPath(),
+                  new ObjectMapper(), () -> false, () -> true,
+                  LoggerFactory.getLogger(PruneLatePublicationTest.class), Long.MAX_VALUE)
+                  .withPublisher(service));
+          yield "";
+        }
+      };
+    });
+    try {
+      assertTrue(pruneHolds.await(30, TimeUnit.SECONDS),
+          "precondition: the prune holds the fence for its last pass");
+      var rename = FenceRace.start("late-rename", () -> service.updateDocumentPaths(
+          UpdatePathsRequest.newBuilder().addMappings(PathMapping.newBuilder()
+              .setOldPath(from).setNewPath(to)).build(), CallContext.none()).getUpdatedCount());
+      assertTrue(renameAdmitted.await(30, TimeUnit.SECONDS),
+          "precondition: the rename was admitted and waits for the fence");
+      Files.delete(destination);
+      release.countDown();
+      assertEquals("", pruning.get(), "the prune reports no error");
+      assertEquals(1, rename.get(), "the rename is settled: the file is gone from both paths");
+    } finally {
+      release.countDown();
+    }
+
+    assertEquals(0, committedRows(to),
+        "a rename that resumes after the prune's last pass moves no row to a deleted file");
+    assertEquals(0, committedRows(from), "nor leaves the rows of a file gone from both paths");
+    if (kind == Prune.REPLAY) {
+      assertTrue(jobQueue.listSwitchBufferOpsStrict().isEmpty(), "the replayed prune completed");
+    }
+  }
+
+  @Test
+  void aRenameAdmittedDuringASyncsLastPassMovesNoRowToADeletedFile() throws Exception {
+    renamedInWhileThePruneHoldsItsLastFence(Prune.SYNC);
+  }
+
+  @Test
+  void aRenameAdmittedDuringAPrunesLastPassMovesNoRowToADeletedFile() throws Exception {
+    renamedInWhileThePruneHoldsItsLastFence(Prune.DIRECT);
+  }
+
+  @Test
+  void aRenameAdmittedDuringAReplayedPrunesLastPassMovesNoRowToADeletedFile() throws Exception {
+    renamedInWhileThePruneHoldsItsLastFence(Prune.REPLAY);
   }
 }

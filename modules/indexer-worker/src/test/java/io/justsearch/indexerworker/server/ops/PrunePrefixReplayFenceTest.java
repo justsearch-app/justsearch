@@ -365,6 +365,74 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
         "a VDU result for a removed file leaves no row");
   }
 
+  /**
+   * RP3 / RP10: a buffered VDU result replayed after an upgrade read its parent and is held at its
+   * first chunk; the person deletes the file and a sync or prune of the root runs. The replayed
+   * result writes inside the live Worker's fence, as a live one does, so the prune runs wholly
+   * after it and no chunk of it outlives the file.
+   */
+  private void aReplayedVduResultRacing(boolean sync) throws Exception {
+    Path file = Files.writeString(root.resolve("buffered-vdu.pdf"), "scan");
+    String path = key(file);
+    indexed(runtime, path, 0);
+    IndexingCoordinator coordinator = spy(runtime.indexingCoordinator());
+    CountDownLatch firstChunk = new CountDownLatch(1);
+    CountDownLatch finish = new CountDownLatch(1);
+    AtomicInteger chunksWritten = new AtomicInteger();
+    doAnswer(call -> {
+      IndexDocument document = call.getArgument(0);
+      if ("true".equals(document.fields().get(SchemaFields.IS_CHUNK))
+          && chunksWritten.incrementAndGet() == 1) {
+        firstChunk.countDown();
+        assertTrue(finish.await(30, TimeUnit.SECONDS));
+      }
+      return call.callRealMethod();
+    }).when(coordinator).indexSingle(any());
+    RunningRuntime ingest = mock(RunningRuntime.class);
+    when(ingest.indexingCoordinator()).thenReturn(coordinator);
+    when(ingest.documentFieldOps()).thenReturn(runtime.documentFieldOps());
+    when(ingest.commitOps()).thenReturn(runtime.commitOps());
+    when(ingest.pruneOps()).thenReturn(runtime.pruneOps());
+    when(ingest.readPathOps()).thenReturn(runtime.readPathOps());
+    var publisher = publisher(ingest, () -> {});
+    assertTrue(queue.putSwitchBuffer("vdu_update:" + path, "VDU_UPDATE",
+        vduPayload(path, "Recognised text with enough words for several chunks. ".repeat(400))));
+
+    var replaying = FenceRace.start("buffered-vdu-replay", () -> {
+      KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(bestEffort(ingest, publisher));
+      return null;
+    });
+    try {
+      assertTrue(firstChunk.await(30, TimeUnit.SECONDS),
+          "precondition: the replayed VDU result read its parent and reached its first chunk");
+      Files.delete(file);
+      var pruning = FenceRace.start("prune-under-test", () -> sync
+          ? publisher.syncDirectory(io.justsearch.ipc.SyncDirectoryRequest.newBuilder()
+              .setRootPath(root.toString()).build(), CallContext.none()).getError()
+          : publisher.pruneMissing(io.justsearch.ipc.PruneRequest.newBuilder()
+              .setPathPrefix(root.toString()).build(), CallContext.none()).getError());
+      FenceRace.releaseOnceWaitingOrDone(finish::countDown, pruning);
+      replaying.get();
+      assertEquals("", pruning.get(), "the prune reports no error");
+    } finally {
+      finish.countDown();
+    }
+
+    assertTrue(chunksWritten.get() > 1, "precondition: the VDU result wrote several chunks");
+    assertEquals(0, committedRows(path),
+        "no chunk a replayed VDU result writes may outlive its file's removal");
+  }
+
+  @Test
+  void aSyncRemovesEveryChunkOfAReplayedVduResultForADeletedFile() throws Exception {
+    aReplayedVduResultRacing(true);
+  }
+
+  @Test
+  void aPruneRemovesEveryChunkOfAReplayedVduResultForADeletedFile() throws Exception {
+    aReplayedVduResultRacing(false);
+  }
+
   // ------------------------------------------------------------ RP2: SYNC_ROOT
 
   private void bufferSync(String generation, boolean force) {

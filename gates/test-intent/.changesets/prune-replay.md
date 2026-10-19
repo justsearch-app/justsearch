@@ -25,10 +25,14 @@ exist, because it runs before any application service, and so any indexing loop,
 (KnowledgeServer boot path, before appServices = newAppServices()); it keeps the replay service's
 root authority (recorded volume) and needs no fence.
 
-Late publications (RP3). The loop's writer and a rename report the path whose rows they publish,
-inside the fence; the prune's last pass judges those paths. A VDU result needs none: it writes
-chunks only under a parent it finds inside the fence (ChunkDocumentWriter refuses without the
-parent's identity), so it never publishes a path's first rows.
+Late publications (RP3, RP10). Every writer of a file's rows writes inside the live Worker's
+file-mutation fence and checks there that what it writes for still exists. The loop's writer
+checks the file's claim and freshness; a rename checks that its destination is not confirmed
+absent (when it is, it moves nothing, and removes the moved file's rows only when its old path is
+confirmed absent too) and reports the new path even when the move fails part way; a VDU result,
+live or replayed from the switch buffer, writes chunks only under a parent it finds inside the
+fence (ChunkDocumentWriter refuses without the parent's identity). A prune's last pass judges the
+paths reported to it, and a writer admitted after that pass sees the prune's removals.
 
 RP5 bound. A file recreated after its last absence check loses its rows to the batch; a replayed
 prune re-probes every file it removed once its removal is committed and queues the present ones for
@@ -49,7 +53,7 @@ run-evidence.mjs. No acceptance is recorded by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "With the indexing loop's real JobBatchWriter held inside the file-mutation fence (after the file's parent, or before its first row) and the file then deleted: a promotion replay, a best-effort replay, a replayed normal SYNC_ROOT and a replayed forced SYNC_ROOT in the promotion all leave 0 committed rows (parent and chunks) of the file once the writer finishes; so does a best-effort replay raced by a VDU result replacing chunks, and a normal sync or direct prune whose scan ran before the file's first row. The promotion keeps its PRUNE_PREFIX or SYNC_ROOT receipt under its generation; a best-effort drain removes it. A replayed prune of a folder replaced at the added path, or of a folder with no recorded volume, removes nothing (3 rows kept) and its PRUNE_PREFIX stays buffered. The harness accepts a stop point at a replayed prune's first removal, only with a self-exit; stopping there leaves the committed index with all rows of the file and every receipt, the retry removes the deleted file and keeps the live one, and finishing the promotion removes only the replayed receipts, not another generation's. A file recreated after the replayed prune committed its removal is queued for indexing before the drain acknowledges the prune. A rename held inside the fence that moves a file's parent and chunks from outside the root into it, to a destination deleted before the prune's scan, leaves 0 committed rows at the destination once the rename finishes, on a normal sync, a direct prune and a best-effort replay (whose PRUNE_PREFIX is then removed).",
+      "behaviour": "With the indexing loop's real JobBatchWriter held inside the file-mutation fence (after the file's parent, or before its first row) and the file then deleted: a promotion replay, a best-effort replay, a replayed normal SYNC_ROOT and a replayed forced SYNC_ROOT in the promotion all leave 0 committed rows (parent and chunks) of the file once the writer finishes; so does a best-effort replay raced by a VDU result replacing chunks, and a normal sync or direct prune whose scan ran before the file's first row. The promotion keeps its PRUNE_PREFIX or SYNC_ROOT receipt under its generation; a best-effort drain removes it. A replayed prune of a folder replaced at the added path, or of a folder with no recorded volume, removes nothing (3 rows kept) and its PRUNE_PREFIX stays buffered. The harness accepts a stop point at a replayed prune's first removal, only with a self-exit; stopping there leaves the committed index with all rows of the file and every receipt, the retry removes the deleted file and keeps the live one, and finishing the promotion removes only the replayed receipts, not another generation's. A file recreated after the replayed prune committed its removal is queued for indexing before the drain acknowledges the prune. A rename held inside the fence that moves a file's parent and chunks from outside the root into it, to a destination deleted before the prune's scan, leaves 0 committed rows at the destination once the rename finishes, on a normal sync, a direct prune and a best-effort replay (whose PRUNE_PREFIX is then removed); so does such a rename whose move fails with an I/O error after writing its rows, on a normal sync and a best-effort replay (the rename reports its failure). A rename admitted while a normal sync, a direct prune or a best-effort replay holds the fence for its last pass, from a file in another added root to a destination deleted while it waits, moves no row: once it holds the fence both paths are confirmed absent, so it leaves 0 committed rows at either path and reports the rename settled. A buffered VDU_UPDATE replayed by a best-effort drain, held at its first chunk after reading its parent, with the file then deleted and a normal sync or direct prune run, leaves 0 committed rows of the file: the replayed result writes inside the live Worker's fence, so the prune runs after it.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -117,6 +121,13 @@ run-evidence.mjs. No acceptance is recorded by the builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aSyncRemovesAFileWhoseRowsARenameMovesInAfterItsScan",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aDirectPruneRemovesAFileWhoseRowsARenameMovesInAfterItsScan",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aReplayedPruneRemovesAFileWhoseRowsARenameMovesInAfterItsScan",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aSyncRemovesTheRowsOfARenameWhoseMoveFailsAfterWriting",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aReplayedPruneRemovesTheRowsOfARenameWhoseMoveFailsAfterWriting",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringASyncsLastPassMovesNoRowToADeletedFile",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringAPrunesLastPassMovesNoRowToADeletedFile",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aRenameAdmittedDuringAReplayedPrunesLastPassMovesNoRowToADeletedFile",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aSyncRemovesEveryChunkOfAReplayedVduResultForADeletedFile",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aPruneRemovesEveryChunkOfAReplayedVduResultForADeletedFile",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/MigrationTransitionBarrierTest.java#pruneReplayCutRequiresAnInstalledHarnessSelfExit"
       ]
     },
