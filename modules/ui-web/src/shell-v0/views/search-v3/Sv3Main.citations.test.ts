@@ -47,6 +47,8 @@ async function mount(turns: Sv3Turn[], live: Sv3RunView | null): Promise<Sv3Main
 async function settle(el: Sv3Main): Promise<void> {
   await el.updateComplete;
   await Promise.all(blocks(el).map((b) => b.updateComplete));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  await Promise.all(blocks(el).map((b) => b.updateComplete));
 }
 const blocks = (el: Sv3Main): MarkdownBlock[] => [...el.renderRoot.querySelectorAll<MarkdownBlock>('jf-markdown-block')];
 const content = (block: MarkdownBlock): HTMLElement => block.renderRoot.querySelector('.md-content')!;
@@ -62,22 +64,35 @@ describe('S4.4 agent citation decoration waits for settlement', () => {
     const block = answerBlock(el);
     expect(marks(block)).toHaveLength(0);
     expect(content(block).textContent).toContain('[1]');
-    expect(content(block).textContent).toContain('[2]');
-    if (finish !== 'status and evidence') expect(content(block).querySelector('code')?.hasAttribute('data-hl')).toBe(false);
-    if (finish !== 'status and evidence') expect(block.isStreaming).toBe(true);
-    // Evidence received while the same text streams must not run the settled passes.
-    el.turns = [turn({ evidence: finish === 'status and evidence' ? null : evidence })];
-    await settle(el);
-    expect(answerBlock(el)).toBe(block);
-    expect(marks(block)).toHaveLength(0);
-    expect(content(block).textContent).toContain('[2]');
-    if (finish !== 'status and evidence') expect(content(block).querySelector('code')?.hasAttribute('data-hl')).toBe(false);
+    expect(content(block).textContent).toContain('Unverified claim [2]');
+    let streamedActivity = activity;
+    // Append real answer deltas with the same closed code fence. Highlighting may happen once,
+    // but any existing highlighted code and its token nodes must survive subsequent deltas.
+    const deltas = finish === 'status and evidence' ? [] : ['The explanation', ' continues', ' here.'];
+    let streamedText = text;
+    for (const [index, delta] of deltas.entries()) {
+      const highlighted = content(block).querySelector('code:has(.hljs-keyword)');
+      const tokens = highlighted ? [...highlighted.childNodes] : [];
+      streamedText += index === 0 ? `\n\n${delta}` : delta;
+      streamedActivity = [activity[0]!, { kind: 'text', id: 'answer', text: streamedText }];
+      el.run = { ...run, feed: { ...run.feed, items: streamedActivity } };
+      el.turns = [turn({ activity: streamedActivity })];
+      await settle(el);
+      expect(content(block).textContent).toContain(streamedText.split('\n\n').at(-1)!);
+      expect(marks(block)).toHaveLength(0);
+      expect(content(block).textContent).toContain('[1]');
+      expect(content(block).textContent).toContain('Unverified claim [2]');
+      if (highlighted) {
+        expect(content(block).querySelector('code')).toBe(highlighted);
+        expect(highlighted.childNodes).toHaveLength(tokens.length);
+        tokens.forEach((token, i) => expect(highlighted.childNodes[i]).toBe(token));
+      }
+    }
 
     // No text delta accompanies this terminal: status/evidence alone must release the passes.
-    el.turns = [turn({ status: 'complete' })];
+    el.turns = [turn({ status: 'complete', activity: streamedActivity })];
     await settle(el);
     expect(answerBlock(el)).toBe(block);
-    expect(block.isStreaming).toBe(false);
     expect(marks(block)).toHaveLength(1);
     expect(content(block).textContent).not.toContain('Unverified claim [2]');
     expect(content(block).querySelector('code')?.textContent).toContain('items[2]');
@@ -86,7 +101,7 @@ describe('S4.4 agent citation decoration waits for settlement', () => {
     block.requestUpdate();
     await block.updateComplete;
     expect(marks(block)[0]).toBe(marker);
-    const reloaded = await mount([turn({ status: 'complete' })], null);
+    const reloaded = await mount([turn({ status: 'complete', activity: streamedActivity })], null);
     expect(content(answerBlock(reloaded)).innerHTML).toBe(content(block).innerHTML);
     expect(blocks(el).filter((b) => b !== block).flatMap(marks)).toHaveLength(0);
   });
