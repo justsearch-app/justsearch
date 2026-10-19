@@ -2,17 +2,12 @@
 title: Common Workflows
 type: reference
 status: stable
-description: "Step-by-step recipes for recurring JustSearch contribution tasks — add a proto message field / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits. Relocated out of the always-loaded layer (tempdoc 620 Phase 2); the path-triggerable recipes are also delivered just-in-time via governance/consult-register.v1.json."
+description: "Step-by-step recipes for recurring JustSearch contribution tasks — add a proto message field / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits."
 ---
 
 # Common Workflows
 
-On-demand recipes for recurring contribution tasks. This file is **not** loaded
-every session (tempdoc 620 residence relocation) — load it when you start one of
-these tasks. The four path-triggerable recipes (proto message, REST, config key, agent
-tool) are *also* registered for just-in-time consultation in
-`governance/consult-register.v1.json` when you edit the relevant region; this
-file is the full reference behind those recipes.
+Recipes for recurring contribution tasks.
 
 ## Add a proto message field (retained wire messages; retired gRPC method)
 
@@ -47,7 +42,6 @@ To add a **field**:
 5. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test`
 
 ## Add a frontend component
-Load `/ui-check` for visual verification via `jseval ui-shot`.
 1. Create in `modules/ui-web/src/components/` or appropriate subdirectory
 2. Follow patterns in neighboring components
 3. Verify: `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
@@ -66,7 +60,6 @@ explicitly with `cd modules/ui-web && npm install`, then commit the updated
 4. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-services:test`
 
 ## Modify SSOT catalogs (fields, analyzers, synonyms)
-Load `/ssot-catalog` for the dual-copy checklist and field role reference.
 1. Edit JSON in `SSOT/catalogs/`
 2. **If adding fields**: also update the classpath copy at `modules/adapters-lucene/src/main/resources/SSOT/catalogs/fields.v1.json` — production loads this when the repo root is unavailable
 3. **If adding fields with extraction logic**: update IndexingDocumentOps.java to populate the new field during ingestion. Existing indices will NOT have the new field; test corpora must be re-indexed (jseval run --reset or --start-backend --clean). --clean is fail-closed: it verifies the wipe and raises rather than silently re-running against a stale index if a registered Engine process survivor remains; see docs/reference/jseval-pipeline-reference.md.
@@ -160,7 +153,6 @@ The `/api/registry/{operations,resources}` wire is a generated projection of a t
    `wire-type-single-authority` gates.
 
 ## After modifying docs
-See [docs maintenance](../../agent-knowledge/docs-maintenance.md) for the full regeneration checklist and doc quality rules.
 - Regenerate llms.txt: `node scripts/docs/llmstxt-generate.mjs`
 - After module changes: `node scripts/architecture/module-deps.mjs --update-canonical`
 - After config changes: `node scripts/docs/generate-runtime-config-matrix.mjs --write-doc docs/reference/configuration/runtime-config-ownership-matrix.md`

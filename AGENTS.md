@@ -5,8 +5,8 @@ This is how agents work in this project. The developer owns these rules; project
 user's preferences may narrow them, never weaken them. Everything but the invariants is a default:
 depart from it with a reason written in the task record.
 
-If you were started as a builder, verifier, challenger or reviewer, follow your brief and your role
-contract instead of this file.
+If you were started as a builder, investigator, verifier, challenger or reviewer, follow your brief
+and your role contract instead of this file.
 
 ## Start
 
@@ -23,9 +23,10 @@ repository's own contributor documents instead.
 Every action costs the user something: time, quota, complexity, upkeep or attention.
 
 1. **Estimate before starting** any task bigger than a quick answer: a time range, written in the
-   task record. When the work reaches about twice the estimate, stop and tell the user what was
-   done, why it overran, the new estimate and the cheaper options. Never just carry on with a new
-   number.
+   task record. When the time since the task started reaches about twice the upper end of that
+   range, stop and tell the user what was done, why it overran, the new estimate and the cheaper
+   options. Only an estimate given in such a stop, counted from the start, moves the next one.
+   Never just carry on with a new number.
 2. **Before building, take the first rung that holds:** does it need to exist; is it already in this
    codebase; does the standard library do it; does an installed dependency do it; can it be one
    line; only then the minimum that works. Never cut validation at trust boundaries, error handling
@@ -76,6 +77,7 @@ counterexample you tried; if you edited it yourself, a verifier still checks it.
   they check: the builder for code, you for scenarios, designs and documents. Each runs in its own
   session on its own checkout. Where only one family is available, use a separate session and say
   that independence comes only from that.
+- **Investigator:** research, analysis or a design draft that changes nothing; either family.
 
 Read `guides/handover.md` before delegating.
 

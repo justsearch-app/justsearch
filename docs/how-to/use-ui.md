@@ -233,7 +233,7 @@ This issue is **fixed**: clicking a checkbox now also activates the row so the I
 
 ### Full-Stack Development Workflow
 
-For AI agents working on this project:
+Start the backend and frontend together:
 
 ```powershell
 # Start backend + frontend together (recommended; cross-platform)

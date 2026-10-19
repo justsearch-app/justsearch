@@ -1,13 +1,11 @@
 ---
-title: Agent Guide
+title: Development Guide
 type: reference
 status: stable
-description: "Development workflows, static analysis, and testing reference for autonomous agents."
+description: "Development workflows, static analysis, and testing reference for contributors."
 ---
 
-> **Note, 2026-10-05.** JustSearch now uses agent-system for agent work: the projected `AGENTS.md` entry, private project knowledge and the system's own role contracts and guides. Passages here about the former agent layer (`CLAUDE.md`, `.claude/rules`, skills, Codex agents, hooks) are historical; the development, static-analysis and testing reference remains current.
-
-# Agent Guide
+# Development Guide
 
 ## 1. Configuration & Single Source of Truth (SSOT)
 
@@ -98,7 +96,7 @@ and unstaged changes. This has caused silent data loss in production agent sessi
 
 Use wrapper-first orchestration for long-running evaluation and benchmark sessions:
 
-- Canonical wrapper: `python -m jseval` (see the `/jseval` skill)
+- Canonical wrapper: `python -m jseval`
 - Do not treat raw backgrounded PowerShell eval commands as the normal orchestration path
 - Use `--progress-file <path>` when a run may survive agent compaction or handoff
 
@@ -278,7 +276,7 @@ Records in `app-api` that have **>10 positional parameters** and are **construct
 8. Run frontend contract tests: `cd modules/ui-web && npm run test:unit:run`
 9. Note: v1 contract files (`status-v1.json`, `knowledge-status-v1.json`, `debug-state-v1.json`) are intentionally manual -- only update on breaking changes (field removal/rename), not field additions.
 
-### 3.4. UI smoke checks (Agent workflow)
+### 3.4. UI smoke checks
 
 #### 3.4.1 Start the dev stack (backend + UI)
 
@@ -303,9 +301,9 @@ Before interacting with the UI, verify the backend is ready:
 
 `dev:all` prints the chosen backend endpoint (it may pick a nearby port if the base port is busy).
 
-#### 3.4.3 Open the UI in a browser (Agent browser tools)
+#### 3.4.3 Open the UI in a browser
 
-When an agent has access to an embedded browser tool, open the UI with an explicit backend port:
+Open the UI with an explicit backend port:
 
 - `http://localhost:5173/?api_port=<apiPort>`
 
@@ -324,7 +322,7 @@ Notes:
 
 Desktop-only features (native folder picker, file dialogs) are unavailable in a pure browser run. A warning banner is expected.
 
-#### 3.4.5 Debugging tools (agent-friendly)
+#### 3.4.5 Debugging tools
 
 - Prefer inspecting API responses directly (`/api/status`, `/api/health`) over inferring state from UI text.
 - If the UI is blank or unresponsive:
@@ -344,7 +342,6 @@ When editing files under `modules/ui-web/src/`, use `jseval ui-shot` for targete
 - **Step discovery**: `jseval ui-shot --list` shows all available steps (chain and isolated) with their dependency relationships.
 - **Affected steps**: `jseval ui-shot --affected <file>` finds which steps exercise a given source file. Works with full Windows paths.
 - **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives the **live Lit `shell-v0`** — there is no mock-data demo mode, so data/AI steps need the dev stack running (AI also needs `ai_activate`).
-- **Full reference**: Load the `/ui-check` skill for the complete step registry, file-to-step index, and worktree-aware auto-serve details.
 
 ### 3.5. CI signal model
 
@@ -627,8 +624,7 @@ longer applies once a PR is enqueued). Practical sequence:
 - **Enqueue with `node scripts/dev/run-gh.mjs enqueue <N>`.** The repository-owned
   gateway checks the live `PR_TITLE` / `PR_BODY` squash projection and exact managed
   review record, then issues the ordinary strategy-free queue request. Direct
-  `gh pr merge` and the generic `run-gh.mjs pr merge` passthrough bypass that proof
-  and are blocked by the shared agent hook. Under the queue the accepted request
+  `gh pr merge` and the generic `run-gh.mjs pr merge` passthrough bypass that proof. Under the queue the accepted request
   does not merge directly; it adds the PR to the queue. The queue runs its own
   `merge-group` CI pass against the PR merged with the latest `main` and merges
   (squash) autonomously on success.
@@ -652,8 +648,7 @@ longer applies once a PR is enqueued). Practical sequence:
 
 **Axis 2 — whether a change deserves its own PR (judgment, your call).** Squash
 fixes *intra*-PR noise; it does nothing about *inter*-PR noise — one trivial PR
-per edit still produces one standalone public commit each. The convention (rule
-`docs-ride-along` in `branch-safety.md`; industry-standard — Microsoft's
+per edit still produces one standalone public commit each. The convention (industry-standard — Microsoft's
 engineering playbook puts docs in the code PR, Kubernetes' guide says batch tiny
 fixes rather than open a PR each):
 
@@ -686,8 +681,8 @@ How:
 
 - **Find the governing ADR** — grep `governance/adr-probes.v1.json` for the surface
   you changed, or scan the Decision Log in `docs/decisions/README.md`. The
-  `architecture-decisions` row in `governance/consult-register.v1.json` pushes the
-  procedure at you the moment you edit anything under `docs/decisions/`.
+  `architecture-decisions` row in `governance/consult-register.v1.json` lists the
+  procedure for changes under `docs/decisions/`.
 - **Amend, don't rewrite** — follow `docs/decisions/README.md` § How to re-examine
   an ADR. Amendments are append-only; the superseded reasoning is the record, so add
   a dated amendment rather than editing Context/Decision in place.
@@ -695,7 +690,7 @@ How:
   restates the new premise, and set `last_reviewed:` to today. Never edit a probe
   merely to make it pass.
 - **Verify** — `node scripts/governance/run.mjs --gate adr-coverage --mode gate`.
-  Review staleness is also listed by the orientation command AGENTS.md points you at,
+  Review staleness is also listed by the orientation command
   `node scripts/agent-analytics/world-state.mjs` (§ ADR review) — run it, nothing runs it
   for you — because a CI-only
   warning about a decision nobody is scheduled to re-read is the pile that produced

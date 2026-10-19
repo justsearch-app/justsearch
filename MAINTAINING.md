@@ -35,9 +35,8 @@ Run `node scripts/dev/prepare-worktree.cjs` in each worktree, then
 - **Agent work** — JustSearch uses agent-system: the projected `AGENTS.md` entry in this repository,
   plus private project knowledge, task records and role contracts in the maintainer's agent-system
   private root. The former agent layer (`CLAUDE.md`, `.claude/rules`, skills, Codex agent roles and
-  the hook manifest) was retired at adoption on 2026-10-05; its history is in
-  [`docs/reference/contributing/agent-guide.md`](docs/reference/contributing/agent-guide.md) and the
-  superseded contributor pages.
+  the hook manifest) was retired at adoption on 2026-10-05, and the remaining agent pages on
+  2026-10-19; their history is in git, at tag `agent-docs-pre-reset`.
 - **Shared local dev stack** — one local backend at a time, with an ownership/lease handshake through
   the `justsearch-dev` MCP server. `.mcp.json` registers it for Claude Code (seed it with
   `cp .mcp.json.example .mcp.json`; no secret required) and `.codex/config.toml` registers it for

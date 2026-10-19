@@ -62,5 +62,5 @@ requests to the locally-discovered backend.
 | `npm run knip` | Dead-code / unused-dependency check |
 | `npm run build:analyze` | Production build with bundle visualizer |
 
-For visual/measurement verification of `shell-v0` changes, load the
-`/ui-check` skill (ui-shot harness) rather than a manual screenshot flow.
+For visual/measurement verification of `shell-v0` changes, run
+`jseval ui-a11y-gate` and `jseval ui-proportion-gate` (both capture fixture state).
