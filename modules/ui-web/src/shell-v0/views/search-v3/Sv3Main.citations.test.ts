@@ -56,22 +56,22 @@ const answerBlock = (el: Sv3Main): MarkdownBlock => blocks(el).find((b) => b.dat
 afterEach(() => { document.body.replaceChildren(); });
 
 describe('S4.4 agent citation decoration waits for settlement', () => {
-  it.each(['status only', 'status and evidence'] as const)('%s settles identical text once; a reload has the same marks', async (finish) => {
+  it.each(['status only', 'status and evidence', 'evidence during streaming'] as const)('%s settles identical text once; a reload has the same marks', async (finish) => {
     await loadHighlighter();
     const el = await mount([turn({ evidence: finish === 'status only' ? evidence : null })], run);
     const block = answerBlock(el);
-    expect(block.isStreaming).toBe(true);
     expect(marks(block)).toHaveLength(0);
     expect(content(block).textContent).toContain('[1]');
     expect(content(block).textContent).toContain('[2]');
-    expect(content(block).querySelector('code')?.hasAttribute('data-hl')).toBe(false);
+    if (finish !== 'status and evidence') expect(content(block).querySelector('code')?.hasAttribute('data-hl')).toBe(false);
+    if (finish !== 'status and evidence') expect(block.isStreaming).toBe(true);
     // Evidence received while the same text streams must not run the settled passes.
-    el.turns = [turn()];
+    el.turns = [turn({ evidence: finish === 'status and evidence' ? null : evidence })];
     await settle(el);
     expect(answerBlock(el)).toBe(block);
     expect(marks(block)).toHaveLength(0);
     expect(content(block).textContent).toContain('[2]');
-    expect(content(block).querySelector('code')?.hasAttribute('data-hl')).toBe(false);
+    if (finish !== 'status and evidence') expect(content(block).querySelector('code')?.hasAttribute('data-hl')).toBe(false);
 
     // No text delta accompanies this terminal: status/evidence alone must release the passes.
     el.turns = [turn({ status: 'complete' })];
@@ -105,20 +105,43 @@ describe('S4.4 agent citation decoration waits for settlement', () => {
     expect(content(block).innerHTML).toBe(content(answerBlock(fresh)).innerHTML);
   });
 
-  it.each(['halted', 'failed'] as const)('%s partial text and another turn cannot inherit the live answer marks', async (status) => {
-    const partial = [{ kind: 'text' as const, id: 'partial', text: 'A different partial response.' }];
-    const other = turn({ id: 'other', status: 'complete', evidence: null, activity: partial });
-    const el = await mount([other, turn()], run);
-    expect(blocks(el).flatMap(marks)).toHaveLength(0);
+  it.each(['halted', 'failed'] as const)('%s partial text keeps evidence off interim prose and unrelated terminal text', async (status) => {
+    // The evidence matches the interim item, so passing it to every item would add a wrong mark.
+    const partial: Sv3Turn['activity'] = [
+      { kind: 'text', id: 'interim', text: sentence },
+      { kind: 'text', id: 'answer', text: 'A different partial response.' },
+    ];
+    const el = await mount([turn()], run);
     el.run = { ...run, phase: 'ended', feed: { ...run.feed, items: partial } };
-    el.turns = [other, turn({ status, evidence: null, activity: partial })];
+    el.turns = [turn({ status, activity: partial })];
     await settle(el);
+    expect(blocks(el)).toHaveLength(2);
     expect(blocks(el).flatMap(marks)).toHaveLength(0);
-    expect(blocks(el).every((b) => b.text === partial[0]!.text)).toBe(true);
+    expect(blocks(el).map((b) => content(b).textContent?.trim())).toEqual([sentence, 'A different partial response.']);
+    // Positive control: the retained evidence really decorates its matching text when terminal.
+    const control = await mount([turn({ status, activity: [partial[0]!] })], null);
+    expect(blocks(control).flatMap(marks)).toHaveLength(1);
+  });
+
+  it('another conversation uses its own evidence with a stale live run property', async () => {
+    const otherSentence = 'Another conversation has different supporting evidence.';
+    const otherActivity: Sv3Turn['activity'] = [
+      { kind: 'text', id: 'interim', text: otherSentence },
+      { kind: 'text', id: 'answer', text: sentence },
+    ];
+    const otherEvidence = { ...evidence, marks: [{ ...citation, sentenceText: otherSentence }] };
+    const other = turn({ id: 'other', status: 'complete', evidence: otherEvidence, activity: otherActivity });
+    const el = await mount([turn({ status: 'complete' }), other], run);
+    expect(blocks(el).filter((b) => b.dataset.turnId === 'other').flatMap(marks)).toHaveLength(0);
     // A new conversation has its own text and evidence even if the old run prop still exists.
+    // The stale run's evidence matches this conversation's terminal sentence, unlike its own.
     el.turns = [other];
     await settle(el);
     expect(blocks(el).flatMap(marks)).toHaveLength(0);
-    expect(blocks(el)).toHaveLength(1);
+    expect(blocks(el)).toHaveLength(2);
+    expect(blocks(el).map((b) => content(b).textContent?.trim())).toEqual([otherSentence, sentence]);
+    const control = await mount([turn({ id: 'other', status: 'complete', evidence: otherEvidence,
+      activity: [otherActivity[0]!] })], null);
+    expect(blocks(control).flatMap(marks)).toHaveLength(1);
   });
 });

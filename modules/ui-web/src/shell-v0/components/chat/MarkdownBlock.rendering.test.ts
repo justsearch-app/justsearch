@@ -22,11 +22,14 @@ const mark = (sentenceText: string, sentenceIndex = 0): MarkdownCitation => ({
   hover: { excerpt: 'supporting passage', title: 'Source', headingText: '' },
 });
 
-async function mount(text: string, citations: MarkdownCitation[], format: MarkdownBlock['format'] = 'markdown') {
+async function mount(text: string, citations: MarkdownCitation[], format: MarkdownBlock['format'] = 'markdown',
+  inputs: Pick<MarkdownBlock, 'frame' | 'sourceCount'> = { frame: 'grounded', sourceCount: 0 }) {
   const el = document.createElement('jf-markdown-block') as MarkdownBlock;
   el.text = text;
   el.citations = citations;
   el.format = format;
+  el.frame = inputs.frame;
+  el.sourceCount = inputs.sourceCount;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -164,10 +167,7 @@ describe('S4.5 plain text updates match a fresh block after DOM decoration', () 
     await el.updateComplete;
     el.text = '  New summary\n[2] **literal** <em>plain</em>';
     await el.updateComplete;
-    const fresh = await mount(el.text, el.citations, 'plain');
-    fresh.frame = el.frame;
-    fresh.sourceCount = el.sourceCount;
-    await fresh.updateComplete;
+    const fresh = await mount(el.text, el.citations, 'plain', el);
     expect(content(el).innerHTML).toBe(content(fresh).innerHTML);
   });
 
