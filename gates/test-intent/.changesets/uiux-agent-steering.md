@@ -675,3 +675,14 @@ No acceptance record is supplied by the builder.
   "note": "Reject the New entry for AgentSessionController.test.ts: steer names a connection failure as such, not as a finished run, and steer names an HTTP error other than 404 by its status both require the unsupported final claim It was not applied. AS2 requires honest outcomes; a failed response does not establish non-application. The real API/browser loss-of-response probe accepts the direction with HTTP 200 and applies it once, while the UI emits that false claim. Missing coverage and intent warrant: acceptance before response loss, and an uncertain response outcome. The HTTP-500-after-acceptance variation was not exercised live. Earlier acceptance is superseded by this independently discovered counterexample; other evidence classifications still match."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-mlc4telw",
+  "verdict": "accept",
+  "digest": "sha256:57828b344472a17b07b1fc2ec24755227f89bd0f321d73b8fcf23b837e06a22d",
+  "note": "Sources and before-state expectations reviewed; fresh frontend evidence matches committed classifications. Prior backend evidence reused unchanged. Test-intent acceptance only; identical-text send reconciliation fails separately."
+}
+```
