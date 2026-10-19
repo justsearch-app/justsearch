@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 import { buildWalltimeReport, mergePaginatedJobs, renderMarkdown } from './report-ci-walltime-attribution.mjs';
 
+import * as walltime from './report-ci-walltime-attribution.mjs';
+
 const scriptPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'report-ci-walltime-attribution.mjs');
 
 // Compact fixture matching the real `gh api .../runs/<id>/jobs` shape
@@ -192,3 +194,35 @@ function sampleJobs() {
 }
 
 console.log('test-report-ci-walltime-attribution: PASS');
+
+// Completion includes delayed aggregate scheduling; the longest job does not.
+{
+  const report = buildWalltimeReport({
+    requiredChecks: ['Part', 'Aggregate'],
+    jobs: [
+      job('Part', '2026-07-01T00:00:00Z', '2026-07-01T00:10:00Z'),
+      job('Aggregate', '2026-07-01T00:12:00Z', '2026-07-01T00:12:05Z'),
+      job('Advisory', '2026-07-01T00:00:00Z', '2026-07-01T01:00:00Z'),
+    ],
+  });
+  assert.equal(report.requiredCompletion.elapsedSeconds, 725);
+  assert.equal(report.criticalPath.wallSeconds, 3600);
+  assert.equal(report.requiredCompletion.complete, true);
+  const missing = buildWalltimeReport({ requiredChecks: ['Missing'], jobs: sampleJobs() });
+  assert.equal(missing.requiredCompletion.elapsedSeconds, null);
+  assert.deepEqual(missing.requiredCompletion.missingChecks, ['Missing']);
+}
+
+// Multiple attempts of one part never overwrite the attempt selected by the job.
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-artifacts-'));
+  try {
+    for (const [attempt, seconds] of [[1, 100], [2, 200]]) {
+      const dir = path.join(root, `unit-test-attribution-app-ui-ui-attempt-${attempt}`);
+      fs.mkdirSync(dir);
+      fs.writeFileSync(path.join(dir, 'unit-test-attribution.json'), JSON.stringify({ lane: 'app-ui-ui', totals: { timeSeconds: seconds } }));
+    }
+    assert.equal(walltime.readSuiteTimes(root, [{ name: 'Unit tests (app-ui-ui)', run_attempt: 2 }])['app-ui-ui'], 200);
+    assert.equal(walltime.readSuiteTimes(root, [{ name: 'Unit tests (app-ui-ui)', run_attempt: 3 }])['app-ui-ui'], undefined);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+}

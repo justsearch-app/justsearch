@@ -20,7 +20,7 @@ export function workflowJobs(text) {
     }
     if (!job || /^\s*#/.test(line)) continue;
     job.text += '\n' + line;
-    const field = /^    (name|runs-on|continue-on-error|if|timeout-minutes):\s*(.*)$/.exec(line);
+    const field = /^    (name|runs-on|continue-on-error|if|timeout-minutes|needs):\s*(.*)$/.exec(line);
     if (field) job[field[1]] = field[2];
     if (/^      - /.test(line)) step = {};
     const stepField = /^        (if|continue-on-error):\s*(.*)$/.exec(line);
@@ -35,6 +35,40 @@ export function workflowJobs(text) {
     }
   }
   return jobs;
+}
+
+// Recognize only a fail-closed aggregate: every dependency is tested for exactly
+// success, with an unconditional job and no other commands or tolerated failures.
+export function aggregateDependencies(job) {
+  if (job.if !== 'always()' || job['continue-on-error'] || job.runs.length !== 1) return [];
+  const match = /^\[([\w, -]+)\]$/.exec(job.needs ?? '');
+  if (!match) return [];
+  const dependencies = match[1].split(',').map((s) => s.trim());
+  if (new Set(dependencies).size !== dependencies.length) return [];
+  const checks = job.runs[0].text.trim().split(/\s*&&\s*/);
+  if (checks.length !== dependencies.length || job.runs[0].step?.if || job.runs[0].step?.['continue-on-error']) return [];
+  const checked = [];
+  for (const check of checks) {
+    const test = /^test "\$([A-Z_]+)" = success$/.exec(check);
+    if (!test) return [];
+    const binding = new RegExp(`^          ${test[1]}: \\$\\{\\{ needs\\.([\\w-]+)\\.result \\}\\}\\s*$`, 'm').exec(job.text);
+    if (!binding) return [];
+    checked.push(binding[1]);
+  }
+  return [...checked].sort().join(',') === [...dependencies].sort().join(',') ? dependencies : [];
+}
+
+export function requiredHostedJobIds(jobs, requiredChecks) {
+  const ids = new Set();
+  for (const job of jobs) {
+    const name = job.name ?? '';
+    const required = requiredChecks.includes(name)
+      || (name.includes('${{ matrix.') && requiredChecks.some((c) => c.startsWith(name.split('${{')[0])));
+    if (!required) continue;
+    ids.add(job.id);
+    for (const id of aggregateDependencies(job)) ids.add(id);
+  }
+  return ids;
 }
 
 // Credit only plain commands whose arguments the runner accepts. Shell operators,
@@ -93,26 +127,40 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
   const production = new Set();
   const fixtures = new Set();
   const known = registry.gates.map((g) => g.id);
-  for (const job of workflowJobs(workflowText)) {
-    const name = job.name ?? '';
-    const required = requiredChecks.includes(name)
-      || (name.includes('${{ matrix.') && requiredChecks.some((c) => c.startsWith(name.split('${{')[0])));
-    if (!required || job['continue-on-error'] === 'true' || job.if
+  const jobs = workflowJobs(workflowText);
+  const requiredIds = requiredHostedJobIds(jobs, requiredChecks);
+  for (const job of jobs) {
+    if (!requiredIds.has(job.id) || job['continue-on-error'] || job.if
         || !/^(ubuntu|windows|macos)-|\$\{\{ matrix\.os \}\}/.test(job['runs-on'] ?? '')) continue;
-    const commands = job.runs.filter((r) => {
-      if (r.step?.['continue-on-error'] === 'true') return false;
+    const enforcedRuns = job.runs.filter((r) => {
+      if (r.step?.['continue-on-error']) return false;
       const condition = r.step?.if;
       if (!condition || condition === 'always()') return true;
       const matrix = /^matrix\.(\w+) == ['"]([\w-]+)['"]$/.exec(condition);
       return matrix && new RegExp(`${matrix[1]}: ['"]?${matrix[2]}['"]?\\s*$`, 'm').test(job.text);
-    }).flatMap((r) => r.text.replace(/\\\s*\n/g, ' ').split('\n').map((c) => c.split('#')[0]));
+    });
+    const commands = enforcedRuns.flatMap((r) => r.text.replace(/\\\s*\n/g, ' ').split('\n').map((c) => c.split('#')[0]));
     if (commands.some((c) => /^node scripts\/ci\/run-ui-web-gates\.mjs\s*$/.test(c.trim()))) {
       commands.push(...parseUiWebGateCommands(consultRegister).map((c) => c.join(' ')));
     }
     for (const command of commands) {
       const parsed = gateCommand(command, known);
       if (parsed?.fixtures) for (const id of parsed.ids) fixtures.add(id);
-      if (parsed?.production) for (const id of parsed.ids) production.add(id);
+      if (parsed?.production) for (const id of parsed.ids) {
+        if (['consumer-presence', 'host-owns-truth', 'runtime-witness'].includes(id)) {
+          // Cached test tasks do not replay side effects. Credit these gates only
+          // with their explicit producer and the assertion rejecting absent input.
+          const exporter = '"$GW" :modules:app-services:exportRegistrySnapshot -PskipWebBuild=true --console=plain';
+          const assertion = `node -e "if (require('fs').readFileSync('tmp/snapshot-gates.sarif','utf8').includes('snapshot-missing')) { console.error('registry snapshot absent: these three gates inspected nothing'); process.exit(1); }"`;
+          const wired = enforcedRuns.some((r) => {
+            const lines = r.text.split('\n').map((line) => line.trim());
+            const gate = lines.findIndex((line) => line === command.trim());
+            return lines.indexOf(exporter) >= 0 && lines.indexOf(exporter) < gate && lines.indexOf(assertion) > gate;
+          });
+          if (!wired) continue;
+        }
+        production.add(id);
+      }
     }
   }
   const issues = [];

@@ -44,27 +44,38 @@
     {
       "check": "Build (no model blobs)",
       "mode": "local-subset",
-      "commands": ["node scripts/lib/tool-invoker.cjs gradle assemble -PskipWebBuild=false", "node scripts/lib/tool-invoker.cjs gradle pmdAll --console=plain"]
+      "commands": [
+        "node scripts/lib/tool-invoker.cjs gradle assemble -PskipWebBuild=false",
+        "node scripts/lib/tool-invoker.cjs gradle pmdAll --console=plain"
+      ]
     },
     {
       "check": "Unit tests (app-ui)",
       "mode": "local-subset",
-      "commands": ["node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain"]
+      "commands": [
+        "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain"
+      ]
     },
     {
       "check": "Unit tests (search-worker)",
       "mode": "local-subset",
-      "commands": ["node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test :modules:configuration:test :modules:core:test :modules:core-contracts:test :modules:indexer-worker:test :modules:indexing:test :modules:ipc-common:test :modules:worker-core:test :modules:worker-services:test -PskipWebBuild=true --console=plain"]
+      "commands": [
+        "node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test :modules:configuration:test :modules:core:test :modules:core-contracts:test :modules:indexer-worker:test :modules:indexing:test :modules:ipc-common:test :modules:worker-core:test :modules:worker-services:test -PskipWebBuild=true --console=plain"
+      ]
     },
     {
       "check": "Unit tests (platform-contracts)",
       "mode": "local-subset",
-      "commands": ["node scripts/lib/tool-invoker.cjs gradle :modules:ai-backend:test :modules:api-contract-projection-java:test :modules:app-inference:test :modules:benchmarks:test :modules:dead-code-audit:test :modules:extension-substrate:test :modules:gpu-bridge:test :modules:infra-core:test :modules:ort-common:test :modules:prompt-support:test :modules:reranker:test :modules:ssot-tools:test :modules:system-tests:test :modules:telemetry:test :modules:test-support:test -PskipWebBuild=true --console=plain"]
+      "commands": [
+        "node scripts/lib/tool-invoker.cjs gradle :modules:ai-backend:test :modules:api-contract-projection-java:test :modules:app-engine:test :modules:app-inference:test :modules:benchmarks:test :modules:dead-code-audit:test :modules:extension-substrate:test :modules:gpu-bridge:test :modules:infra-core:test :modules:ort-common:test :modules:prompt-support:test :modules:reranker:test :modules:ssot-tools:test :modules:system-tests:test :modules:telemetry:test :modules:test-support:test -PskipWebBuild=true --console=plain"
+      ]
     },
     {
       "check": "Engine lifecycle tests (model-free)",
       "mode": "local-subset",
-      "commands": ["node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain"]
+      "commands": [
+        "node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain"
+      ]
     },
     {
       "check": "Windows-native tests",

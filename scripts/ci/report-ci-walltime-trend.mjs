@@ -17,6 +17,7 @@
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { mergePaginatedJobs } from './report-ci-walltime-attribution.mjs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -99,6 +100,7 @@ export function buildTrendReport({ runs = [], policy = {} }) {
     const med = median(samples);
     const overBudget = Number.isFinite(ceiling) && med !== null && med > ceiling;
     const report = {
+      missingRuns: runs.length - samples.length,
       job: lane.job,
       runs: samples.length,
       medianSeconds: med,
@@ -118,6 +120,7 @@ export function buildTrendReport({ runs = [], policy = {} }) {
     runCount: runs.length,
     lanes: laneReports,
     driftedLanes: drifted,
+    warnings: laneReports.filter((lane) => lane.missingRuns > 0).map((lane) => `${lane.job}: missing from ${lane.missingRuns}/${runs.length} runs`),
     // True only on SUSTAINED drift (median over N above ceiling) — the workflow
     // opens an issue only when this is set, so a single slow run never notifies.
     sustainedDrift: drifted.length > 0,
@@ -144,7 +147,7 @@ export function renderMarkdown(report) {
   for (const lane of report.lanes) {
     lines.push(`| ${lane.job} | ${fmtSeconds(lane.medianSeconds)} | ${fmtSeconds(lane.minSeconds)} | ${fmtSeconds(lane.maxSeconds)} | ${lane.ceilingSeconds === null ? 'n/a' : fmtSeconds(lane.ceilingSeconds)} | ${lane.overBudget ? '⚠️' : ''} |`);
   }
-  lines.push('');
+  lines.push('', ...report.warnings.map((warning) => `Warning: ${warning}`));
   return `${lines.join('\n')}\n`;
 }
 
@@ -169,7 +172,7 @@ function fetchRuns({ limit, workflow }) {
   const list = JSON.parse(gh(['run', 'list', '--workflow', workflow, '--branch', 'main', '--status', 'success', '--limit', String(limit), '--json', 'databaseId,createdAt']));
   const runs = [];
   for (const entry of list) {
-    const data = JSON.parse(gh(['api', `repos/{owner}/{repo}/actions/runs/${entry.databaseId}/jobs`, '--paginate']));
+    const data = mergePaginatedJobs(gh(['api', `repos/{owner}/{repo}/actions/runs/${entry.databaseId}/jobs`, '--paginate']));
     const jobs = (data.jobs || []).map((j) => ({ name: j.name, wallSeconds: elapsedSeconds(j.started_at, j.completed_at) })).filter((j) => j.wallSeconds !== null);
     runs.push({ runId: entry.databaseId, createdAt: entry.createdAt, jobs });
   }
