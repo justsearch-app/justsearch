@@ -126,7 +126,7 @@ retired TS e2e tier described below:
   (`ui-a11y-gate` also runs on PRs as the advisory `Measured axe` job — ADR-0026 amendment
   2026-09-05; `ui-proportion-gate` stays local-only);
   `jseval ui-diff` / `ui-critic` / `ui-fuzz` are deeper situational passes. For fixture-based checks, run
-  `jseval ui-a11y-gate --fixtures` and `jseval ui-proportion-gate --fixtures`.
+  `jseval ui-a11y-gate` and `jseval ui-proportion-gate` (both capture fixture state).
 
 > **Removed (tempdoc 742):** the TypeScript `@playwright/test` e2e tier — `modules/ui-web/e2e/`
 > (~15 specs covering search filters/pagination, preview highlighting, auto-discovery, AI meta

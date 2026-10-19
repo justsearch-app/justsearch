@@ -55,7 +55,7 @@ export function verdictForMirror(input) {
     reason:
       `${id}: the root catalog and its classpath copy have diverged. ` +
       `Production loads the classpath copy, so the difference is silently dropped in packaged builds. ` +
-      `Sync both copies (load /ssot-catalog), or declare 'intentional-divergence'.`,
+      `Sync both copies, or declare 'intentional-divergence'.`,
   };
 }
 

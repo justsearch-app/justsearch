@@ -60,7 +60,6 @@ explicitly with `cd modules/ui-web && npm install`, then commit the updated
 4. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-services:test`
 
 ## Modify SSOT catalogs (fields, analyzers, synonyms)
-Load `/ssot-catalog` for the dual-copy checklist and field role reference.
 1. Edit JSON in `SSOT/catalogs/`
 2. **If adding fields**: also update the classpath copy at `modules/adapters-lucene/src/main/resources/SSOT/catalogs/fields.v1.json` — production loads this when the repo root is unavailable
 3. **If adding fields with extraction logic**: update IndexingDocumentOps.java to populate the new field during ingestion. Existing indices will NOT have the new field; test corpora must be re-indexed (jseval run --reset or --start-backend --clean). --clean is fail-closed: it verifies the wipe and raises rather than silently re-running against a stale index if a registered Engine process survivor remains; see docs/reference/jseval-pipeline-reference.md.

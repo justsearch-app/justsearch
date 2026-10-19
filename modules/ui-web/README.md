@@ -63,4 +63,4 @@ requests to the locally-discovered backend.
 | `npm run build:analyze` | Production build with bundle visualizer |
 
 For visual/measurement verification of `shell-v0` changes, run
-`jseval ui-a11y-gate --fixtures` and `jseval ui-proportion-gate --fixtures`.
+`jseval ui-a11y-gate` and `jseval ui-proportion-gate` (both capture fixture state).

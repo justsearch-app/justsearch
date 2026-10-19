@@ -143,8 +143,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 5. **Update the register in the same change**: the ADR's `probes:` list, the premise text in
    `governance/adr-probes.v1.json`, `last_reviewed`, and this file's Decision Log row.
 6. **Route what you found and will not fix here.** A defect the re-examination surfaced goes
-   to the owning tempdoc or its domain register at discovery — see the
-   `log-pre-existing-issues` rule in `CLAUDE.md`. A note nobody is scheduled to read is the
+   to the owning tempdoc or its domain register at discovery. A note nobody is scheduled to read is the
    failure this mechanism exists to end.
 
 ## Decision Log
