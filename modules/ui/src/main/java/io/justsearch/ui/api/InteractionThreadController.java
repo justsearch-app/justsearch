@@ -402,6 +402,12 @@ public final class InteractionThreadController {
     if (shapeId instanceof String s && !s.isBlank()) {
       attributes.put("shapeId", shapeId);
     }
+    // The follow-up's rewritten question (the "Interpreted as" note), on the turn's outcome row —
+    // an answer or an error alike — so a reloaded turn shows the note the live turn showed.
+    Object standaloneQuestion = msg.get("standaloneQuestion");
+    if (standaloneQuestion instanceof String q && !q.isBlank()) {
+      attributes.put("standaloneQuestion", q);
+    }
     return new InteractionEvent(
         eventId,
         conversationId,

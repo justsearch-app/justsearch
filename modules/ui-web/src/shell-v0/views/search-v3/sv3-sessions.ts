@@ -274,6 +274,12 @@ export interface Sv3SessionHistory {
   /** Retrieved-source ids the reader hid from retrieval (§J.3); the Worker drops those chunks. */
   readonly excludedSourceIds?: readonly string[];
   /**
+   * Every user/assistant message id `/history` holds, in the order the store SAVED them — the order
+   * it trims the prompt by. Used only to place a floor that names a message no turn on screen names
+   * (`sv3-context.ts` placeFloor); never to resolve a message to a turn, which stays BY ID.
+   */
+  readonly messageIds?: readonly string[];
+  /**
    * The conversation store answered 423 — encrypted and LOCKED (tempdoc 629). The window already
    * derives its own lock state from observed status; this is the load's own report of the same
    * condition, which is why it is carried rather than folded into that flag here.

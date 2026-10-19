@@ -201,6 +201,12 @@ export interface Sv3AskRequest {
    * matches). Omitted asks the whole index; the window never sends an empty list for a choice.
    */
   readonly docIds?: readonly string[];
+  /**
+   * The conversation so far, as `{role, content}` messages, for a FOLLOW-UP (S2.0) — the window's
+   * effective context (`sv3-context.ts` sv3FollowUpContext). The ask shape is ephemeral, so this is
+   * all the model and the follow-up rewrite know of the earlier turns. Omitted or empty sends none.
+   */
+  readonly context?: readonly { readonly role: string; readonly content: string }[];
   readonly signal?: AbortSignal;
 }
 
@@ -361,6 +367,11 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   // is the shipped window's authority over the per-shape body and this window may not widen it. The
   // fields land beside `conversationId`, which arrives the same way and for the same reason.
   Object.assign(body, sv3EffortParams(req.effort ?? SV3_EFFORT_DEFAULT));
+  // The follow-up's conversation, read by `ExternalContextInjector` (into the prompt) and
+  // `QueryRewriteInjector` (to rewrite the question). Same late-add as the fields above.
+  if (req.context !== undefined && req.context.length > 0) {
+    body.context = req.context.map((m) => ({ role: m.role, content: m.content }));
+  }
 
   let sources: readonly RetrievalCitation[] = [];
   let matches: readonly CitationMatch[] = [];

@@ -94,10 +94,11 @@ describe('what the effective context does with each turn', () => {
     const turns = [recordTurn('a', 0, 1), recordTurn('b', 3, 4)];
     // Only the answer is hidden — a half-excluded turn is still a turn the prompt is missing part
     // of, and reporting it as fully present would be the more comfortable lie.
-    const contexts = projectSv3TurnContexts(turns, { excludedMessageIds: [stored(4)] });
+    const history = { excludedMessageIds: [stored(4)] };
+    const contexts = projectSv3TurnContexts(turns, history);
     expect(contexts.map((c) => c.hasExcluded)).toEqual([false, true]);
     expect(sv3ExcludedTurnCount(contexts)).toBe(1);
-    expect(sv3ExcludedMessageIds(contexts)).toEqual([stored(4)]);
+    expect(sv3ExcludedMessageIds(history)).toEqual([stored(4)]);
   });
 });
 
@@ -170,7 +171,9 @@ describe('the inspector renders the prompt the transcript claims', () => {
     const history: Sv3SessionHistory = {
       contextFloor: stored(3),
       contextFloorSummary: 'Everything above was compacted.',
-      excludedMessageIds: [stored(7)],
+      // The whole turn, as the turn menu's Exclude writes it. (One hidden ANSWER leaves its question
+      // in the prompt, and so in the inspector — SearchV3View.context.test.ts pins that case.)
+      excludedMessageIds: [stored(6), stored(7)],
     };
     const contexts = projectSv3TurnContexts(turns, history);
     const view = projectSv3ContextInspector(

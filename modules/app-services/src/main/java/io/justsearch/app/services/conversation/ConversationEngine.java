@@ -436,7 +436,7 @@ public final class ConversationEngine {
     try {
       Map<String, Object> answer =
           persistedAssistant(
-              assistantMessage(finalResponse instanceof String s ? s : ""), payload, null);
+              assistantMessage(finalResponse instanceof String s ? s : ""), payload, null, null);
       if (runId != null && !runId.isBlank()) {
         answer.put("runId", runId);
       }
@@ -554,12 +554,15 @@ public final class ConversationEngine {
     // Run injectors once per request (iteration 0 only). Each injector may emit SSE events
     // (forwarded to sink) and may declare a terminal error that aborts before the LLM call.
     InjectorRunResult injectorRun = runInjectors(injectors, ctx, sink);
+    // Read once, after the injectors: the rewrite (if any) happened among them, and every outcome
+    // row this turn writes below carries it.
+    String standalone = standaloneQuestion(ctx);
     String retrievalRecordId = sessionId != null ? sessionId : threadId;
     if (injectorRun.terminated) {
       if (retrievalRecordId != null && conversationStore != null
           && !injectorRun.retrievalMetadata.isEmpty() && injectorRun.terminalError != null) {
         conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
             String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
             injectorRun.terminalError.payload().get("errorCode"));
       }
@@ -586,13 +589,17 @@ public final class ConversationEngine {
     // the FE presents these as the split (scaled/≈), never false precision.
     Map<String, Object> contextBreakdown = new LinkedHashMap<>();
     contextBreakdown.put("system", TokenEstimation.estimateTokens(systemPrompt));
-    contextBreakdown.put("conversation", estimatePhaseTokens(initialMessages));
-    contextBreakdown.put("retrieved", estimatePhaseTokens(injectorRun.messages));
+    // The turns a caller forwards in the request body's `context` (an EPHEMERAL ask's follow-up
+    // history) are conversation, not retrieved documents, even though an injector supplies them.
+    contextBreakdown.put("conversation",
+        estimatePhaseTokens(initialMessages) + estimatePhaseTokens(injectorRun.forwarded));
+    contextBreakdown.put("retrieved",
+        estimatePhaseTokens(injectorRun.messages) - estimatePhaseTokens(injectorRun.forwarded));
 
     OnlineAiService ai = onlineAiSupplier.get();
     if (ai == null || !ai.isAvailable()) {
       emitError(sink, "AI service unavailable", "AI_OFFLINE");
-      persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+      persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
           "AI service unavailable", "AI_OFFLINE");
       return;
     }
@@ -636,7 +643,7 @@ public final class ConversationEngine {
                 ai, llmInput, maxTokens, sampling, consumers, ctx, usageRef, reasoningRef, sink);
       } catch (LlmStreamException e) {
         emitError(sink, e.getMessage(), e.errorCode);
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
             e.getMessage(), e.errorCode);
         return;
       }
@@ -654,7 +661,7 @@ public final class ConversationEngine {
         } catch (Exception e) {
           LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
           emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
               "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
           return;
         }
@@ -698,12 +705,12 @@ public final class ConversationEngine {
         conversationStore.appendMessage(
             sessionId,
             shape.id().value(),
-            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get()));
+            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
       } else if (threadId != null && conversationStore != null) {
         conversationStore.appendMessage(
             threadId,
             shape.id().value(),
-            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get()));
+            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
       }
 
       // Iteration decision.
@@ -713,7 +720,7 @@ public final class ConversationEngine {
       } catch (Exception e) {
         LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
         emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
             "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
         return;
       }
@@ -726,7 +733,7 @@ public final class ConversationEngine {
         }
         case STOP_ERROR -> {
           emitError(sink, "Conversation terminated with error", "CONTROLLER_STOP");
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
               "Conversation terminated with error", "CONTROLLER_STOP");
           return;
         }
@@ -1075,6 +1082,7 @@ public final class ConversationEngine {
       EngineConversationContext ctx,
       Consumer<SseEvent> sink) {
     List<Map<String, Object>> out = new ArrayList<>();
+    List<Map<String, Object>> forwarded = new ArrayList<>();
     Map<String, Object> retrievalMetadata = new LinkedHashMap<>();
     for (ContextInjector inj : injectors) {
       InjectorResult result;
@@ -1084,7 +1092,7 @@ public final class ConversationEngine {
         SseEvent refusal = refusalEvent(e);
         if (refusal != null) {
           sink.accept(refusal);
-          return new InjectorRunResult(out, true, retrievalMetadata, refusal);
+          return new InjectorRunResult(out, forwarded, true, retrievalMetadata, refusal);
         }
         LOG.warn("ContextInjector {} threw; skipping injection", inj.id(), e);
         continue;
@@ -1103,19 +1111,27 @@ public final class ConversationEngine {
       }
       if (result.terminalError().isPresent()) {
         sink.accept(result.terminalError().get());
-        return new InjectorRunResult(out, true, retrievalMetadata, result.terminalError().get());
+        return new InjectorRunResult(out, forwarded, true, retrievalMetadata, result.terminalError().get());
       }
       out.addAll(result.messages());
+      if (io.justsearch.app.services.conversation.spi.ExternalContextInjector.ID.equals(inj.id())) {
+        forwarded.addAll(result.messages());
+      }
     }
-    return new InjectorRunResult(out, false, retrievalMetadata, null);
+    return new InjectorRunResult(out, forwarded, false, retrievalMetadata, null);
   }
 
-  /** Output of {@link #runInjectors}: accumulated messages + whether any injector aborted. */
-  private record InjectorRunResult(List<Map<String, Object>> messages, boolean terminated,
+  /**
+   * Output of {@link #runInjectors}: accumulated messages + whether any injector aborted. {@code
+   * forwarded} is the subset of {@code messages} that is the caller's forwarded conversation.
+   */
+  private record InjectorRunResult(List<Map<String, Object>> messages,
+      List<Map<String, Object>> forwarded, boolean terminated,
       Map<String, Object> retrievalMetadata, SseEvent terminalError) {}
 
   private void persistRetrievalError(String recordId, ConversationShape shape,
-      Map<String, Object> retrievalMetadata, String message, Object errorCode) {
+      Map<String, Object> retrievalMetadata, String standaloneQuestion, String message,
+      Object errorCode) {
     if (recordId == null || conversationStore == null || retrievalMetadata.isEmpty()) return;
     var error = new LinkedHashMap<String, Object>();
     error.put("role", "assistant");
@@ -1123,7 +1139,20 @@ public final class ConversationEngine {
     error.put("terminalError", true);
     if (errorCode instanceof String code && !code.isBlank()) error.put("errorCode", code);
     error.putAll(retrievalMetadata);
+    // The "Interpreted as" note belongs to the turn whatever its outcome: a rewrite that was followed
+    // by a failed retrieval, a failed generation or a Stop was still shown live, so the record keeps it.
+    putIfPresent(error, "standaloneQuestion", standaloneQuestion);
     conversationStore.appendMessage(recordId, shape.id().value(), error);
+  }
+
+  /**
+   * The standalone question {@code QueryRewriteInjector} retrieved on, when it rewrote this turn's
+   * follow-up; null when it did not (first turn, unchanged, rewrite failed, AI down).
+   */
+  private static String standaloneQuestion(EngineConversationContext ctx) {
+    return ctx.attributes().get(
+            io.justsearch.app.services.conversation.spi.QueryRewriteInjector.ATTR_STANDALONE_QUESTION)
+        instanceof String s && !s.isBlank() ? s : null;
   }
 
   private static void copyRetrievalFact(Map<String, Object> target, String key, Object value) {
@@ -1175,19 +1204,36 @@ public final class ConversationEngine {
    * and would inflate the prompt in proportion to conversation length. The boundary is the one
    * place a guarantee can hold for every future persisted field, so it PROJECTS to the contract's
    * keys rather than blacklisting today's known extras.
+   *
+   * <p>System-role context messages (the store's compaction summary, a summary the caller forwards
+   * in {@code context}) are FOLDED into message[0], in order, after the system prompt. The served
+   * model runs its own chat template ({@code --jinja}), and Qwen3.5's raises "System message must
+   * be at the beginning." for any later system message, so the list carries one system message,
+   * first. Every other message keeps its order.
    */
   private static List<Map<String, Object>> buildLlmInput(
       String systemPrompt, List<Map<String, Object>> contextMessages) {
-    List<Map<String, Object>> out = new ArrayList<>(contextMessages.size() + 1);
-    if (!systemPrompt.isEmpty()) {
+    StringBuilder systemText = new StringBuilder(systemPrompt);
+    List<Map<String, Object>> rest = new ArrayList<>(contextMessages.size());
+    for (Map<String, Object> message : contextMessages) {
+      if ("system".equals(message.get("role"))) {
+        String text = java.util.Objects.toString(message.get("content"), "");
+        if (!text.isBlank()) {
+          if (!systemText.isEmpty()) systemText.append("\n\n");
+          systemText.append(text);
+        }
+      } else {
+        rest.add(projectForLlm(message));
+      }
+    }
+    List<Map<String, Object>> out = new ArrayList<>(rest.size() + 1);
+    if (!systemText.isEmpty()) {
       Map<String, Object> system = new LinkedHashMap<>();
       system.put("role", "system");
-      system.put("content", systemPrompt);
+      system.put("content", systemText.toString());
       out.add(system);
     }
-    for (Map<String, Object> message : contextMessages) {
-      out.add(projectForLlm(message));
-    }
+    out.addAll(rest);
     return out;
   }
 
@@ -1291,7 +1337,8 @@ public final class ConversationEngine {
   private static Map<String, Object> persistedAssistant(
       Map<String, Object> assistantMsg,
       Map<String, Object> mergedDoneEntries,
-      List<ReasoningTrace> reasoning) {
+      List<ReasoningTrace> reasoning,
+      String standaloneQuestion) {
     Map<String, Object> persisted = new LinkedHashMap<>(assistantMsg);
     // Tempdoc 863 §4.A.4 (A-3) — "present ⇒ carried, absent ⇒ no key", where EMPTY counts as absent.
     // The agent `done` payload always writes `sources`/`citations` keys (empty lists when nothing
@@ -1331,6 +1378,9 @@ public final class ConversationEngine {
     if (reasoning != null && !reasoning.isEmpty()) {
       persisted.put("reasoning", reasoning.stream().map(ReasoningTrace::asBlock).toList());
     }
+    // The follow-up's rewritten question, so the "Interpreted as" note survives a reload. Persisted
+    // only — the live reader already got it on `rag.rewrite`, so it stays off the `done` payload.
+    putIfPresent(persisted, "standaloneQuestion", standaloneQuestion);
     return persisted;
   }
 

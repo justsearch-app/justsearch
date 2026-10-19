@@ -107,6 +107,14 @@ export interface Sv3TurnContext {
   readonly excludedIds: readonly string[];
   /** At least one of this turn's messages is hidden from the prompt. */
   readonly hasExcluded: boolean;
+  /**
+   * Whether the turn's QUESTION, and its ANSWER, are in the next prompt — the floor and the
+   * exclusions applied per message, the way the store applies them. A turn can be half in: its
+   * answer hidden while its question stays, or (a floor on its answer) its question cut while its
+   * answer stays. This is what the follow-up's `context` and the inspector are both built from.
+   */
+  readonly questionInContext: boolean;
+  readonly answerInContext: boolean;
 }
 
 const EMPTY_IDS: readonly string[] = [];
@@ -121,34 +129,95 @@ const messageIdsOf = (turn: Sv3Turn): readonly string[] => {
 };
 
 /**
+ * Where the floor sits among the turns on screen: the turn it starts in, and the ids in that turn
+ * that come BEFORE it (and so are cut with the turns above). `null` = no floor in force.
+ *
+ * A floor that names a turn's own message resolves by id ({@link sv3TurnByMessageId}). A floor on a
+ * message no turn names — an inner assistant row of a multi-message turn, say — is placed by the
+ * order `/history` saved the messages in, which is the order the store trims by. A floor `/history`
+ * does not hold at all is no floor, exactly as `FileConversationStore.loadEffectiveContext` treats a
+ * stale one (it fails safe to the whole history); the bar still says it is there.
+ */
+function placeFloor(
+  turns: readonly Sv3Turn[],
+  history: Sv3SessionHistory | null,
+): { readonly index: number; readonly onScreen: boolean; readonly cut: ReadonlySet<string> } | null {
+  const floor = history?.contextFloor ?? '';
+  if (floor === '') return null;
+  const named = sv3TurnByMessageId(turns, floor);
+  if (named !== null) {
+    // A floor on the answer of a turn that also has a question cuts that question.
+    const { userMsgId, assistantMsgId } = sv3TurnMessageIds(named);
+    const cut = assistantMsgId === floor && userMsgId !== null ? [userMsgId] : [];
+    return { index: turns.indexOf(named), onScreen: true, cut: new Set(cut) };
+  }
+  const order = history?.messageIds ?? [];
+  const floorRank = order.indexOf(floor);
+  if (floorRank < 0) return null;
+  const rank = (id: string): number => order.indexOf(id);
+  for (let index = 0; index < turns.length; index++) {
+    const ids = messageIdsOf(turns[index]!);
+    const kept = ids.filter((id) => rank(id) >= floorRank);
+    if (kept.length > 0) {
+      return { index, onScreen: false, cut: new Set(ids.filter((id) => !kept.includes(id))) };
+    }
+  }
+  // Every stored message on screen is above the floor: the turns still in context are the ones the
+  // store has not numbered yet (a live turn).
+  const firstUnnumbered = turns.findIndex((turn) => messageIdsOf(turn).length === 0);
+  return { index: firstUnnumbered < 0 ? turns.length : firstUnnumbered, onScreen: false, cut: new Set() };
+}
+
+/**
  * What the conversation's `/history` says about each turn on screen. `history === null` is "not
  * told" and yields a frame with no floor and no exclusions — deliberately the same shape as a
  * conversation that really has neither, because nothing is RENDERED for either and inventing a
  * third visual state for "we have not asked yet" would say something the window does not know.
+ *
+ * The floor is placed in the FULL order before any exclusion applies (S2.9): hiding the floor's own
+ * message hides that message, it does not move the floor and bring the turns above it back.
  */
 export function projectSv3TurnContexts(
   turns: readonly Sv3Turn[],
   history: Sv3SessionHistory | null,
 ): readonly Sv3TurnContext[] {
-  const floorMessage = history?.contextFloor ?? '';
-  const floorTurn = floorMessage === '' ? null : sv3TurnByMessageId(turns, floorMessage);
-  const floorIndex = floorTurn === null ? -1 : turns.indexOf(floorTurn);
+  const floor = placeFloor(turns, history);
   const excluded = new Set(history?.excludedMessageIds ?? []);
   return turns.map((turn, index) => {
     const messageIds = messageIdsOf(turn);
     const excludedIds = messageIds.filter((id) => excluded.has(id));
+    const outOfContext = floor !== null && index < floor.index;
+    const { userMsgId, assistantMsgId } = sv3TurnMessageIds(turn);
+    const kept = (id: string | null): boolean =>
+      !outOfContext &&
+      (id === null || (!excluded.has(id) && !(floor !== null && index === floor.index && floor.cut.has(id))));
     return {
       turnId: turn.id,
       messageIds,
       // The question first, and the answer only when there is no question to name.
       floorMessageId: messageIds[0] ?? null,
-      isFloor: floorIndex >= 0 && index === floorIndex,
-      outOfContext: floorIndex >= 0 && index < floorIndex,
+      isFloor: floor !== null && floor.onScreen && index === floor.index,
+      outOfContext,
       excludedIds,
       hasExcluded: excludedIds.length > 0,
+      questionInContext: kept(userMsgId),
+      answerInContext: kept(assistantMsgId),
     };
   });
 }
+
+/**
+ * The floor `/history` reports does not name any turn on screen — it sits on a message this window
+ * does not draw as its own turn, or on one it no longer holds. There is then no divider to carry it,
+ * so the bar says so and offers the summary and Restore itself (S2.8).
+ */
+export const sv3FloorUnseen = (
+  turns: readonly Sv3Turn[],
+  history: Sv3SessionHistory | null,
+): boolean => {
+  const floor = history?.contextFloor ?? '';
+  return floor !== '' && sv3TurnByMessageId(turns, floor) === null;
+};
 
 export const sv3TurnContextFor = (
   contexts: readonly Sv3TurnContext[],
@@ -159,9 +228,82 @@ export const sv3TurnContextFor = (
 export const sv3ExcludedTurnCount = (contexts: readonly Sv3TurnContext[]): number =>
   contexts.filter((c) => c.hasExcluded).length;
 
-/** Every hidden message id in the conversation, for the bulk undo. */
-export const sv3ExcludedMessageIds = (contexts: readonly Sv3TurnContext[]): readonly string[] =>
-  contexts.flatMap((c) => c.excludedIds);
+/**
+ * Every message id the conversation hides from the prompt, ONCE each, whether or not a turn on
+ * screen names it — the bulk undo's whole target (S2.7). The record's list is what the store drops
+ * from the prompt; a hidden id this window does not draw is still hidden, so undoing only the
+ * visible ones would announce "everything is back" over a prompt still missing messages.
+ */
+export const sv3ExcludedMessageIds = (history: Sv3SessionHistory | null): readonly string[] => [
+  ...new Set(history?.excludedMessageIds ?? []),
+];
+
+/**
+ * The record with `ids` hidden (or put back) — what a set of exclusion toggles that LANDED confirms,
+ * applied to the window's copy when the reload after them did not land.
+ */
+export const sv3WithExclusions = (
+  history: Sv3SessionHistory,
+  ids: readonly string[],
+  excluded: boolean,
+): Sv3SessionHistory => {
+  const current = history.excludedMessageIds ?? [];
+  const next = excluded
+    ? [...current, ...ids.filter((id) => !current.includes(id))]
+    : current.filter((id) => !ids.includes(id));
+  return { ...history, excludedMessageIds: next };
+};
+
+/** The hidden message ids no turn on screen names, once each — what the bar counts as "not shown here". */
+export const sv3UnseenExcludedIds = (
+  contexts: readonly Sv3TurnContext[],
+  history: Sv3SessionHistory | null,
+): readonly string[] => {
+  const seen = new Set(contexts.flatMap((c) => c.messageIds));
+  return sv3ExcludedMessageIds(history).filter((id) => !seen.has(id));
+};
+
+/** One message of the next prompt's conversation, in the `{role, content}` shape the ask sends. */
+export interface Sv3ContextMessage {
+  readonly role: 'system' | 'user' | 'assistant';
+  readonly content: string;
+}
+
+/** The summary's framing — `FileConversationStore.loadEffectiveContext`'s own, so both paths read alike. */
+export const SV3_CONTEXT_SUMMARY_PREFIX = 'Summary of earlier conversation:\n';
+
+/**
+ * The conversation a FOLLOW-UP ask carries (S2.0): the compaction summary first when there is one,
+ * then every turn's question and answer that are still in context, oldest first. The same per-turn
+ * flags draw the transcript, the bar and the inspector, so what is shown as in context is what is
+ * sent. The ask shape is ephemeral — the backend loads no history for it — so this IS the model's
+ * memory of the conversation.
+ *
+ * HONEST LIMIT: a turn's answer is all of its assistant messages joined; a message hidden from
+ * inside a multi-message answer cannot be cut out of it here (only the turn's last one is
+ * addressable), so it is still sent.
+ */
+export function sv3FollowUpContext(
+  turns: readonly Sv3Turn[],
+  contexts: readonly Sv3TurnContext[],
+  history: Sv3SessionHistory | null,
+): readonly Sv3ContextMessage[] {
+  const out: Sv3ContextMessage[] = [];
+  const summary = history?.contextFloorSummary ?? '';
+  if (summary.trim() !== '') {
+    out.push({ role: 'system', content: `${SV3_CONTEXT_SUMMARY_PREFIX}${summary}` });
+  }
+  turns.forEach((turn, index) => {
+    const context = contexts[index];
+    if (turn.question.trim() !== '' && (context?.questionInContext ?? true)) {
+      out.push({ role: 'user', content: turn.question });
+    }
+    if (turn.answer.trim() !== '' && (context?.answerInContext ?? true)) {
+      out.push({ role: 'assistant', content: turn.answer });
+    }
+  });
+  return out;
+}
 
 /** One entry of a turn's context menu, before the shared menu primitive's own vocabulary is applied. */
 export interface Sv3ContextMenuItem {
@@ -277,25 +419,26 @@ export function projectSv3ContextInspector(
   usage: Sv3ContextUsage | null,
   contextWindow: number | null,
 ): InspectorView {
-  const inContext = turns.filter((_turn, index) => {
-    const context = contexts[index];
-    if (context === undefined) return true;
-    return !context.outOfContext && !context.hasExcluded;
-  });
   const ordered: Array<{ kind: 'turn' | 'source'; label: string; text: string }> = [];
-  const summary = history?.contextFloorSummary ?? '';
-  if (summary !== '') {
-    ordered.push({ kind: 'turn', label: CONTEXT_INSPECTOR_SUMMARY, text: summary });
+  // The SAME projection the follow-up sends, message for message (S2.0): a hidden answer leaves its
+  // question listed, exactly as it leaves it in the prompt.
+  for (const message of sv3FollowUpContext(turns, contexts, history)) {
+    ordered.push({
+      kind: 'turn',
+      label:
+        message.role === 'system'
+          ? CONTEXT_INSPECTOR_SUMMARY
+          : message.role === 'user'
+            ? CONTEXT_TURN_USER
+            : CONTEXT_TURN_ASSISTANT,
+      text:
+        message.role === 'system'
+          ? message.content.slice(SV3_CONTEXT_SUMMARY_PREFIX.length)
+          : message.content,
+    });
   }
-  for (const turn of inContext) {
-    if (turn.question !== '') {
-      ordered.push({ kind: 'turn', label: CONTEXT_TURN_USER, text: turn.question });
-    }
-    if (turn.answer !== '') {
-      ordered.push({ kind: 'turn', label: CONTEXT_TURN_ASSISTANT, text: turn.answer });
-    }
-  }
-  const lastWithSources = [...inContext].reverse().find((t) => (t.evidence?.sources.length ?? 0) > 0);
+  const answered = turns.filter((_turn, index) => contexts[index]?.answerInContext ?? true);
+  const lastWithSources = [...answered].reverse().find((t) => (t.evidence?.sources.length ?? 0) > 0);
   for (const source of lastWithSources?.evidence?.sources ?? []) {
     ordered.push({
       kind: 'source',

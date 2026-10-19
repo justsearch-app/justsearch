@@ -536,6 +536,9 @@ describe('the transcript projects from the canonical record (D1)', () => {
       contextFloorSummary: 'Everything above was compacted.',
       excludedMessageIds: [storedId(4)],
       excludedSourceIds: ['docs/lease.md0'],
+      // The companion's message ORDER, as ids only — what places a floor no turn names (WP1.2 S2.8).
+      // Its content is still not read: the transcript stays the record's (asserted below).
+      messageIds: [storedId(0), storedId(1), storedId(3), storedId(4)],
       locked: undefined,
     });
     // The two records MEET: the floor names a message, and the turn it belongs to is found by id.

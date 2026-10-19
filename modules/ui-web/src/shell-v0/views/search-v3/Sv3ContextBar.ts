@@ -11,9 +11,14 @@
  *    opens the shared context inspector, which is the only place the split becomes segments.
  *  - **The hidden-turn aggregate** — how many turns the reader has individually excluded, with the
  *    bulk undo beside it. A per-turn act needs a whole-conversation readout, or a turn hidden and
- *    scrolled past is a change to every future answer with nothing on screen that says so.
+ *    scrolled past is a change to every future answer with nothing on screen that says so. Hidden
+ *    messages no turn on screen names are counted beside it, as MESSAGES (S2.7): the bulk undo puts
+ *    them back too, so the bar has to say they exist.
+ *  - **A floor no divider can carry** (S2.8) — the floor sits on a message this window does not draw
+ *    as a turn, so the transcript has nowhere to put its divider. The bar says so, and carries what
+ *    the divider would: the summary (shown, edited) and Restore.
  *
- * It renders NOTHING when the conversation has reported no occupancy and hides no turn — a resting
+ * It renders NOTHING when the conversation has reported no occupancy and hides nothing — a resting
  * row that says "Context 0%" would be chrome asserting a number the window was never told.
  *
  * Presentational: it holds no store, reads no history, and raises its two acts as events. The
@@ -28,13 +33,26 @@ import { sv3Shared } from './sv3-shared-styles.js';
 import '../../components/Control.js';
 import { projectContextHorizon } from '../budgetProjection.js';
 import {
+  CONTEXT_FLOOR_GROUP_LABEL,
+  CONTEXT_FLOOR_RESTORE,
+  CONTEXT_FLOOR_RESTORE_LABEL,
+  CONTEXT_FLOOR_UNSEEN,
+  CONTEXT_FLOOR_UNSEEN_SUMMARIZED,
   CONTEXT_INCLUDE_ALL,
   CONTEXT_INCLUDE_ALL_LABEL,
   CONTEXT_METER_BAR_LABEL,
+  CONTEXT_SUMMARY_CANCEL,
+  CONTEXT_SUMMARY_EDIT,
+  CONTEXT_SUMMARY_EDIT_LABEL,
+  CONTEXT_SUMMARY_HIDE,
+  CONTEXT_SUMMARY_INPUT_LABEL,
+  CONTEXT_SUMMARY_SAVE,
+  CONTEXT_SUMMARY_SHOW,
   contextHiddenLabel,
   contextMeterLabel,
   contextMeterTrigger,
   contextSplitLabel,
+  contextUnseenLabel,
 } from './fixtures.js';
 import { SV3_CONTEXT_ACTION, type Sv3ContextAction } from './sv3-context.js';
 import type { Sv3ContextUsage } from './sv3-sessions.js';
@@ -148,6 +166,41 @@ export class Sv3ContextBar extends JfElement {
       .hidden-act::part(control):hover {
         color: var(--foreground);
       }
+      .floor-unseen {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1);
+        inline-size: 100%;
+      }
+      .floor-summary {
+        inline-size: 100%;
+        margin: 0;
+        padding: var(--space-2);
+        border-radius: var(--control-radius);
+        background: var(--muted);
+        line-height: 1.5;
+      }
+      .floor-input {
+        inline-size: 100%;
+        min-block-size: var(--space-12);
+        box-sizing: border-box;
+        padding: var(--space-1);
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        background: var(--background);
+        color: var(--foreground);
+        font: inherit;
+      }
+      .floor-input:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
+      }
+      .floor-summary-acts {
+        display: flex;
+        gap: var(--space-2);
+        margin-top: var(--space-1);
+      }
     `,
   ];
 
@@ -155,6 +208,12 @@ export class Sv3ContextBar extends JfElement {
     usage: { attribute: false },
     contextWindow: { attribute: false },
     hiddenTurns: { type: Number, attribute: 'hidden-turns' },
+    unseenHidden: { type: Number, attribute: 'unseen-hidden' },
+    floorUnseen: { type: Boolean, attribute: 'floor-unseen' },
+    floorSummary: { attribute: false },
+    showSummary: { state: true },
+    editingSummary: { state: true },
+    summaryDraft: { state: true },
   };
 
   /** The last completed turn's own report, or null while this conversation has reported none. */
@@ -163,12 +222,47 @@ export class Sv3ContextBar extends JfElement {
   declare contextWindow: number | null;
   /** How many TURNS the reader has hidden something of. */
   declare hiddenTurns: number;
+  /** How many hidden MESSAGES no turn on screen names (unique). */
+  declare unseenHidden: number;
+  /** The floor names no turn on screen, so the bar carries it. */
+  declare floorUnseen: boolean;
+  /** That floor's compaction summary, or null for a plain rewind. */
+  declare floorSummary: string | null;
+  declare showSummary: boolean;
+  declare editingSummary: boolean;
+  declare summaryDraft: string;
+  /** The summary text a save is waiting on — the editor closes when the store says it landed. */
+  private pendingSummary: string | null = null;
 
   constructor() {
     super();
     this.usage = null;
     this.contextWindow = null;
     this.hiddenTurns = 0;
+    this.unseenHidden = 0;
+    this.floorUnseen = false;
+    this.floorSummary = null;
+    this.showSummary = false;
+    this.editingSummary = false;
+    this.summaryDraft = '';
+  }
+
+  /**
+   * The summary editor answers to the STORE, as the transcript's divider does: it stays open until
+   * the summary comes back as what was saved, so a refused save leaves the reader's correction where
+   * it was. Any other change of summary (or of floor) resets it.
+   */
+  protected willUpdate(changed: Map<string, unknown>): void {
+    if (this.pendingSummary !== null && this.floorSummary === this.pendingSummary) {
+      this.pendingSummary = null;
+      this.editingSummary = false;
+      return;
+    }
+    if (!changed.has('floorSummary') && !changed.has('floorUnseen')) return;
+    this.pendingSummary = null;
+    this.editingSummary = false;
+    this.summaryDraft = '';
+    this.showSummary = false;
   }
 
   private act(detail: Sv3ContextAction): void {
@@ -183,9 +277,11 @@ export class Sv3ContextBar extends JfElement {
 
   render(): TemplateResult | typeof nothing {
     const meter = this.meter();
-    if (meter === nothing && this.hiddenTurns === 0) return nothing;
+    if (meter === nothing && this.hiddenTurns === 0 && this.unseenHidden === 0 && !this.floorUnseen) {
+      return nothing;
+    }
     return html`<div class="bar" data-testid="sv3-context-bar">
-      ${meter}${this.hiddenTurnsSummary()}
+      ${meter}${this.hiddenTurnsSummary()}${this.unseenFloor()}
     </div>`;
   }
 
@@ -235,9 +331,16 @@ export class Sv3ContextBar extends JfElement {
   }
 
   private hiddenTurnsSummary(): TemplateResult | typeof nothing {
-    if (this.hiddenTurns === 0) return nothing;
+    if (this.hiddenTurns === 0 && this.unseenHidden === 0) return nothing;
     return html`<span class="hidden-turns">
-      <span data-testid="sv3-context-hidden">${contextHiddenLabel(this.hiddenTurns)}</span>
+      ${this.hiddenTurns === 0
+        ? nothing
+        : html`<span data-testid="sv3-context-hidden">${contextHiddenLabel(this.hiddenTurns)}</span>`}
+      ${this.unseenHidden === 0
+        ? nothing
+        : html`<span data-testid="sv3-context-hidden-unseen"
+            >${contextUnseenLabel(this.unseenHidden)}</span
+          >`}
       <jf-control
         class="hidden-act"
         data-testid="sv3-context-include-all"
@@ -246,6 +349,87 @@ export class Sv3ContextBar extends JfElement {
         >${CONTEXT_INCLUDE_ALL}</jf-control
       >
     </span>`;
+  }
+
+  private unseenFloor(): TemplateResult | typeof nothing {
+    if (!this.floorUnseen) return nothing;
+    const summary = this.floorSummary;
+    const compacted = summary !== null && summary !== '';
+    return html`<div class="floor-unseen" role="group" aria-label=${CONTEXT_FLOOR_GROUP_LABEL}>
+      <span data-testid="sv3-context-floor-unseen"
+        >${compacted ? CONTEXT_FLOOR_UNSEEN_SUMMARIZED : CONTEXT_FLOOR_UNSEEN}</span
+      >
+      ${compacted
+        ? html`<jf-control
+            class="hidden-act"
+            data-testid="sv3-context-floor-summary-toggle"
+            label=${this.showSummary ? CONTEXT_SUMMARY_HIDE : CONTEXT_SUMMARY_SHOW}
+            .onActivate=${() => {
+              this.showSummary = !this.showSummary;
+              if (!this.showSummary) this.editingSummary = false;
+            }}
+            >${this.showSummary ? CONTEXT_SUMMARY_HIDE : CONTEXT_SUMMARY_SHOW}</jf-control
+          >`
+        : nothing}
+      ${compacted && this.showSummary && !this.editingSummary
+        ? html`<jf-control
+            class="hidden-act"
+            data-testid="sv3-context-floor-summary-edit"
+            label=${CONTEXT_SUMMARY_EDIT_LABEL}
+            .onActivate=${() => {
+              this.summaryDraft = summary ?? '';
+              this.editingSummary = true;
+            }}
+            >${CONTEXT_SUMMARY_EDIT}</jf-control
+          >`
+        : nothing}
+      <jf-control
+        class="hidden-act"
+        data-testid="sv3-context-floor-restore"
+        label=${CONTEXT_FLOOR_RESTORE_LABEL}
+        .onActivate=${() => this.act({ action: 'restore' })}
+        >${CONTEXT_FLOOR_RESTORE}</jf-control
+      >
+      ${compacted && this.showSummary ? this.summaryBody(summary ?? '') : nothing}
+    </div>`;
+  }
+
+  private summaryBody(summary: string): TemplateResult {
+    if (!this.editingSummary) {
+      return html`<p class="floor-summary" data-testid="sv3-context-floor-summary">${summary}</p>`;
+    }
+    return html`<div class="floor-summary">
+      <textarea
+        class="floor-input"
+        data-testid="sv3-context-floor-summary-input"
+        aria-label=${CONTEXT_SUMMARY_INPUT_LABEL}
+        .value=${this.summaryDraft}
+        @input=${(event: Event) => {
+          this.summaryDraft = (event.target as HTMLTextAreaElement).value;
+        }}
+      ></textarea>
+      <div class="floor-summary-acts">
+        <jf-control
+          class="hidden-act"
+          data-testid="sv3-context-floor-summary-save"
+          label=${CONTEXT_SUMMARY_SAVE}
+          .onActivate=${() => {
+            this.pendingSummary = this.summaryDraft;
+            this.act({ action: 'summary', text: this.summaryDraft });
+          }}
+          >${CONTEXT_SUMMARY_SAVE}</jf-control
+        >
+        <jf-control
+          class="hidden-act"
+          data-testid="sv3-context-floor-summary-cancel"
+          label=${CONTEXT_SUMMARY_CANCEL}
+          .onActivate=${() => {
+            this.editingSummary = false;
+          }}
+          >${CONTEXT_SUMMARY_CANCEL}</jf-control
+        >
+      </div>
+    </div>`;
   }
 }
 

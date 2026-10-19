@@ -128,6 +128,7 @@ import {
   SV3_SESSIONS_EMPTY,
   type Sv3RunGate,
   type Sv3Session,
+  type Sv3SessionHistory,
   type Sv3SessionList,
 } from './sv3-sessions.js';
 // The effective-context set (tempdoc 610, ported by 852 S2) — the pure half. The WRITES are the five
@@ -139,7 +140,11 @@ import {
   sv3ContextMenuItems,
   sv3ExcludedMessageIds,
   sv3ExcludedTurnCount,
+  sv3FloorUnseen,
+  sv3FollowUpContext,
   sv3TurnContextFor,
+  sv3UnseenExcludedIds,
+  sv3WithExclusions,
   type Sv3ContextAction,
   type Sv3ContextActionId,
   type Sv3ContextMenuRequest,
@@ -305,9 +310,11 @@ import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js'
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
   BRANCH_FAILED,
+  BRANCH_RERUN_BUSY,
   CONTEXT_COMPACT_FAILED,
   CONTEXT_EXCLUDE_FAILED,
   CONTEXT_FLOOR_FAILED,
+  CONTEXT_INCLUDE_ALL_FAILED,
   CONTEXT_INCLUDE_FAILED,
   CONTEXT_RESTORE_FAILED,
   CONTEXT_SUMMARY_FAILED,
@@ -1415,23 +1422,29 @@ export class SearchV3View extends JfElement {
    * REQUEST is not cancelled — only its answer is discarded. That is what F5 named (ordering), and
    * the request that is still in flight costs a round trip and changes nothing.
    *
-   * HONEST LIMIT: `resumeConversation` reports a failed read as an empty resume by contract, so a
-   * conversation whose history could not be read is recorded as one with no floor and no parent
-   * rather than as one that was not told. The record half has {@link recordNotice} for that; this
-   * half would need the shared store to distinguish the two, which is not S1's to change.
+   * A FAILED read (`resumeConversation`'s `failed`, a server error or no answer) changes nothing:
+   * the window keeps what it last read rather than taking the empty result for "no floor, nothing
+   * hidden" (S2.10). Returns whether a fresh reading was applied, so a write's tail can fall back
+   * to what the write itself confirmed.
+   *
+   * A reload for a conversation that is NOT the active one is not run at all — it would only be
+   * dropped on landing, and starting it would supersede (and so discard) the active conversation's
+   * own load in flight. The next open reads it afresh.
    *
    * OBLIGATION ON S2/S3: every one of these fields is mutable by an affordance those slices ship —
    * setting or clearing a floor, compacting, excluding a message or a source. Each must re-run this
    * load after the write lands, or the window renders a floor the backend no longer holds.
    */
-  private async refreshHistory(conversationId: string): Promise<void> {
+  private async refreshHistory(conversationId: string): Promise<boolean> {
+    if (this.sessions.activeId !== conversationId) return false;
     this.historyAbort?.abort();
     const abort = new AbortController();
     this.historyAbort = abort;
     const history = await resumeConversation(conversationId, SV3_ASK_SHAPE_ID, { claim: false });
-    if (abort.signal.aborted) return;
+    if (abort.signal.aborted) return false;
     if (this.historyAbort === abort) this.historyAbort = null;
-    if (this.sessions.activeId !== conversationId) return;
+    if (this.sessions.activeId !== conversationId) return false;
+    if (history.failed === true) return false;
     this.sessions = applySv3History(this.sessions, conversationId, {
       parentSessionId: history.parentSessionId,
       branchPointMessageId: history.branchPointMessageId,
@@ -1440,8 +1453,10 @@ export class SearchV3View extends JfElement {
       contextFloorSummary: history.contextFloorSummary,
       excludedMessageIds: history.excludedMessageIds,
       excludedSourceIds: history.excludedSourceIds,
+      messageIds: history.messages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : [])),
       locked: history.locked,
     });
+    return true;
   }
 
   /* ── The effective context (tempdoc 610, ported by 852 S2) ────────────────────────────────── */
@@ -1556,10 +1571,13 @@ export class SearchV3View extends JfElement {
         return;
       }
       case 'restore':
+        // Restore clears the floor and its summary — and only those: what the reader hid message by
+        // message stays hidden.
         await this.settleContextWrite(
           sessionId,
           await clearContextFloor(sessionId),
           CONTEXT_RESTORE_FAILED,
+          (history) => ({ ...history, contextFloor: undefined, contextFloorSummary: undefined }),
         );
         return;
       case 'compact': {
@@ -1591,19 +1609,27 @@ export class SearchV3View extends JfElement {
         const excluded = detail.action === 'exclude';
         // Both of a turn's messages, because the reader hid a TURN: leaving the question in the
         // prompt while dropping the answer would send the model a question it never answered.
-        const ok = await this.excludeInTurn(sessionId, ids, excluded);
+        const landed = await this.excludeInTurn(sessionId, ids, excluded);
         await this.settleContextWrite(
           sessionId,
-          ok,
+          landed.length === ids.length,
           excluded ? CONTEXT_EXCLUDE_FAILED : CONTEXT_INCLUDE_FAILED,
+          (history) => sv3WithExclusions(history, landed, excluded),
         );
         return;
       }
       case 'include-all': {
-        const ids = sv3ExcludedMessageIds(contexts);
+        // Every id the record hides, ONCE each — on screen and off (S2.7). Only message exclusions:
+        // the floor, its summary and the hidden sources are other acts' to undo.
+        const ids = sv3ExcludedMessageIds(session.history);
         if (ids.length === 0) return;
-        const ok = await this.excludeInTurn(sessionId, ids, false);
-        await this.settleContextWrite(sessionId, ok, CONTEXT_INCLUDE_FAILED);
+        const landed = await this.excludeInTurn(sessionId, ids, false);
+        await this.settleContextWrite(
+          sessionId,
+          landed.length === ids.length,
+          CONTEXT_INCLUDE_ALL_FAILED,
+          (history) => sv3WithExclusions(history, landed, false),
+        );
         return;
       }
       default:
@@ -1626,18 +1652,19 @@ export class SearchV3View extends JfElement {
    * removes the race rather than detecting it afterwards, and it is what the shipped window already
    * does (`views/UnifiedChatView.ts:1767-1776`, a sequential `for`-await).
    *
-   * Returns whether EVERY toggle landed; the caller reloads `/history` either way.
+   * Returns the ids whose toggle LANDED — all of them, some, or none; the caller reloads `/history`
+   * either way, and falls back to exactly these if that reload fails.
    */
   private async excludeInTurn(
     sessionId: string,
     ids: readonly string[],
     excluded: boolean,
-  ): Promise<boolean> {
-    let ok = true;
+  ): Promise<readonly string[]> {
+    const landed: string[] = [];
     for (const id of ids) {
-      if (!(await setMessageExcluded(sessionId, id, excluded))) ok = false;
+      if (await setMessageExcluded(sessionId, id, excluded)) landed.push(id);
     }
-    return ok;
+    return landed;
   }
 
   /**
@@ -1645,13 +1672,25 @@ export class SearchV3View extends JfElement {
    * not the write landed — a partially-applied bulk exclusion is exactly the case where the window's
    * own idea of the ledger is least trustworthy — and the toast names the act, because the remedies
    * differ (a refused floor is the store; a compaction that returned nothing is usually the model).
+   *
+   * When the reload does not land (it failed, or the reader has moved to another conversation),
+   * `confirmed` applies what the write ITSELF confirmed to the copy the window holds — never more:
+   * a refused toggle is not in it, so the bar cannot show a state that was not saved, and a write
+   * that did land is not shown as still pending (S2.10).
    */
   private async settleContextWrite(
     sessionId: string,
     ok: boolean,
     failure: string,
+    confirmed?: (history: Sv3SessionHistory) => Sv3SessionHistory,
   ): Promise<void> {
-    await this.refreshHistory(sessionId);
+    const reloaded = await this.refreshHistory(sessionId);
+    if (!reloaded && confirmed !== undefined) {
+      const history = sessionById(this.sessions, sessionId)?.history ?? null;
+      if (history !== null) {
+        this.sessions = applySv3History(this.sessions, sessionId, confirmed(history));
+      }
+    }
     if (ok) return;
     emitEphemeralToast({ message: failure, severity: 'warning' });
   }
@@ -1689,6 +1728,11 @@ export class SearchV3View extends JfElement {
    * The ids come from {@link projectSv3TurnLineage} and nowhere else, so an act can never be pointed
    * at a message `?fromMsgId=` would reject — and a turn that names none renders no affordance to
    * press in the first place.
+   *
+   * A turn re-runs in ITS OWN tier (WP1.2 S2.5): an agent turn's Retry/Edit runs the agent again, an
+   * ask turn's asks again, whatever tier the composer happens to show — the reader is repeating that
+   * turn, not composing a new one. When the agent cannot run, the act is refused BEFORE anything is
+   * forked and says why (S2.6): there is no falling back to an ask, and the editor keeps the text.
    */
   private async runBranchAction(detail: Sv3BranchAction): Promise<void> {
     const session = this.activeSession;
@@ -1696,18 +1740,25 @@ export class SearchV3View extends JfElement {
     const lineage = sv3LineageFor(this.turnLineage(), detail.turnId);
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
+    const tier: Sv3ComposerTier = turn?.kind === 'agent' ? 'delegate' : 'ask';
     switch (detail.action) {
       case 'branch':
         if (lineage.branchFromId === null) return;
-        await this.branchInto(session.id, lineage.branchFromId, null);
+        // A branch re-sends nothing; it continues the conversation in the tier of the turn it forked
+        // after, so the next send from a Delegate turn's branch is a delegation.
+        if ((await this.branchInto(session.id, lineage.branchFromId, null, tier)) && tier === 'delegate') {
+          this.tier = 'delegate';
+        }
         return;
       case 'retry': {
         const question = turn?.question ?? '';
         if (lineage.forkKey === null || question === '') return;
+        if (!this.canRerun(tier)) return;
         await this.branchInto(
           session.id,
           lineage.forkKey,
           question,
+          tier,
           this.search.scopeOfTurn(detail.turnId),
         );
         return;
@@ -1715,10 +1766,12 @@ export class SearchV3View extends JfElement {
       case 'edit': {
         const text = (detail.text ?? '').trim();
         if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
+        if (!this.canRerun(tier)) return;
         await this.branchInto(
           session.id,
           lineage.forkKey,
           text,
+          tier,
           this.search.scopeOfTurn(detail.turnId),
         );
         return;
@@ -1726,6 +1779,26 @@ export class SearchV3View extends JfElement {
       default:
         return;
     }
+  }
+
+  /**
+   * Whether a re-run in `tier` can start now, saying why not when it cannot (S2.6). Only the
+   * delegate tier is checked here: an ask re-run keeps the path it has always had. The agent needs
+   * the model (its own availability gate — not the ask tier's, which also wants indexed documents)
+   * and no other run in flight on the one shared controller.
+   */
+  private canRerun(tier: Sv3ComposerTier): boolean {
+    if (tier !== 'delegate') return true;
+    const unavailable = this.delegateUnavailableReason;
+    if (unavailable !== '') {
+      emitEphemeralToast({ message: unavailable, severity: 'warning' });
+      return false;
+    }
+    if (this.agentController()?.runInFlight === true) {
+      emitEphemeralToast({ message: BRANCH_RERUN_BUSY, severity: 'warning' });
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -1744,20 +1817,25 @@ export class SearchV3View extends JfElement {
     sessionId: string,
     fromMsgId: string,
     resend: string | null,
+    tier: Sv3ComposerTier,
     scope: Sv3AskScope | null = null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     // The preview is the conversation's OPENING question, the same thing the shipped window sends
     // (`:1485`): it is what makes the new session surface as a recent one with a name.
     const preview = this.activeSession?.turns.find((t) => t.question !== '')?.question ?? '';
     const branched = await branchConversation(sessionId, fromMsgId, preview);
     if (branched === null) {
       emitEphemeralToast({ message: BRANCH_FAILED, severity: 'warning' });
-      return;
+      return false;
     }
     await this.openBranch(branched);
-    // A re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this window
-    // did not limit, asks all files, which is what its Retry/Edit said it would do.
-    if (resend !== null) await this.runAsk(resend, scope);
+    if (resend === null) return true;
+    // The same ORDER for both tiers: the branch is claimed first, so the re-run lands in it.
+    // An ask re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this
+    // window did not limit, asks all files, which is what its Retry/Edit said it would do.
+    if (tier === 'delegate') this.delegate(resend);
+    else await this.runAsk(resend, scope);
+    return true;
   }
 
   /**
@@ -2675,6 +2753,18 @@ export class SearchV3View extends JfElement {
   }
 
   /**
+   * The conversation a follow-up in `sessionId` carries — its turns before `turnId`, through the
+   * conversation's own `/history` (floor, exclusions, summary). Empty for a conversation's first
+   * question.
+   */
+  private followUpContext(sessionId: string, turnId: string): ReturnType<typeof sv3FollowUpContext> {
+    const session = sessionById(this.sessions, sessionId);
+    if (session === null) return [];
+    const earlier = session.turns.filter((turn) => turn.id !== turnId);
+    return sv3FollowUpContext(earlier, projectSv3TurnContexts(earlier, session.history), session.history);
+  }
+
+  /**
    * The ONE path a question takes. There is no second entry: the composer refuses an unavailable or
    * busy send before it leaves, so this method is not a second gate re-deciding the same question —
    * it opens the turn, dispatches through the window's single ask site, and settles that turn.
@@ -2689,6 +2779,10 @@ export class SearchV3View extends JfElement {
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
     // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
+    // The follow-up's conversation (S2.0), read as of THIS send and before anything streams: every
+    // earlier turn of the conversation the question went into, through the same floor, exclusions
+    // and summary the transcript and the bar draw. The new turn itself is the question, not context.
+    const context = this.followUpContext(ref.sessionId, ref.turnId);
     this.claimConversation(ref.sessionId);
     this.composer?.clearDraft();
     void this.setComposerState('docked');
@@ -2754,6 +2848,7 @@ export class SearchV3View extends JfElement {
         // The chosen files' PATHS (what the backend's `docIds` filter matches), or none at all —
         // never an empty list standing in for a choice, which would mean the whole index.
         ...(scope !== null ? { docIds: scope.paths } : {}),
+        context,
         signal: abort.signal,
       },
       {
@@ -3823,6 +3918,9 @@ export class SearchV3View extends JfElement {
           .usage=${session?.contextUsage ?? null}
           .contextWindow=${this.aiSnapshot?.runtime.contextWindow ?? null}
           hidden-turns=${sv3ExcludedTurnCount(contexts)}
+          unseen-hidden=${sv3UnseenExcludedIds(contexts, session?.history ?? null).length}
+          ?floor-unseen=${session !== null && sv3FloorUnseen(session.turns, session.history)}
+          .floorSummary=${session?.history?.contextFloorSummary ?? null}
           data-testid="sv3-context-bar-host"
         ></jf-sv3-context-bar>
         <jf-sv3-composer

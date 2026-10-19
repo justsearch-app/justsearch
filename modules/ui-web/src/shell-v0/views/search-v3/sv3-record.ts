@@ -290,7 +290,11 @@ interface Building {
    */
   stopRequested: boolean;
   /** The record opened this turn on a `user` item, rather than on whatever arrived first. */
-  openedByUser: boolean;
+  openedByUser: boolean;  /**
+   * The follow-up's rewritten question (the "Interpreted as" note), off the turn's outcome row —
+   * `''` when the record carries none (not rewritten, or a record written before it was persisted).
+   */
+  standaloneQuestion: string;
 }
 
 const open = (
@@ -316,6 +320,7 @@ const open = (
   disposition: null,
   stopRequested: false,
   assistantId: null,
+  standaloneQuestion: '',
 });
 
 /**
@@ -384,6 +389,16 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     // produced before that event and belongs above it. Both collections are filled on every item and
     // exactly one of them is kept at the end (below) — an agent turn renders the interleaved items,
     // an ask turn the stack it has always rendered.
+    // The "Interpreted as" note, persisted on the turn's OUTCOME row — its answer, or its error when
+    // the rewrite was followed by a failure or a Stop — so it is read off either arm, last-wins.
+    const standalone = item.attributes.standaloneQuestion;
+    if (
+      (item.kind === 'assistant' || item.kind === 'error') &&
+      typeof standalone === 'string' &&
+      standalone.trim() !== ''
+    ) {
+      turn.standaloneQuestion = standalone;
+    }
     const blocks = reasoningBlocksFromRecord(item.attributes.reasoning);
     turn.reasoning.push(...blocks);
     blocks.forEach((block, index) => {
@@ -539,12 +554,11 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // Tempdoc 848 §2.7 — the record now carries the turn's THINKING (persisted on the assistant
       // message by `ConversationEngine`, lifted onto the thread event by `InteractionThreadController`
       // / folded from the run journal by `AgentInteractionMapper`), so a cold-loaded turn shows the
-      // blocks the run really produced. Of tempdoc 822 Phase F7's four, that leaves the rewrite note
-      // and the receipt absent from the record (847 closed evidence). Those stay seeded EMPTY rather
-      // than guessed, and {@link ../sv3-sessions.applySv3Record} keeps whatever the live turn
-      // observed — so a cold-loaded turn shows no frame line instead of one built from invented
-      // numbers.
-      standaloneQuestion: '',
+      // blocks the run really produced. The rewrite note is on the record too now (the engine
+      // persists the standalone question on the turn's outcome row); an older record without it
+      // reads as '' — no note — and {@link ../sv3-sessions.applySv3Record} still keeps whatever the
+      // live turn observed. The receipt stays absent from the record and seeded empty.
+      standaloneQuestion: turn.standaloneQuestion,
       // Tempdoc 859 §A §1.9 — ROUTED, not both. An agent turn's thinking is in `activity`, in the
       // position it was produced; rendering the stack as well would put every block on screen twice
       // and put the wall back above the feed that replaced it. An ask turn has one thought and one

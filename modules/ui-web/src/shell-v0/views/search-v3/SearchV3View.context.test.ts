@@ -114,6 +114,17 @@ interface Backend {
   peakConcurrentExcludes: number;
   /** What a successful compaction returns — `null` makes it the "nothing came back" case. */
   compaction: string | null;
+  /** Every ask dispatch's parsed body, in order — what the follow-up context cases read. */
+  dispatches: Array<Record<string, unknown>>;
+  /** Exclusion toggles the fake refuses for ONE message id only — a partially refused bulk undo. */
+  refuseExcludeIds: Set<string>;
+  /** `/history` reads that fail outright (500) for these conversations. */
+  failHistoryFor: Set<string>;
+  /** `/history` reads held until the case releases them — out-of-order and navigate-away cases. */
+  holdHistoryFor: Set<string>;
+  heldHistories: Map<string, () => void>;
+  /** When set, exclusion toggles wait for this gate before they land. */
+  excludeGate: Promise<void> | null;
 }
 let backend: Backend;
 
@@ -173,6 +184,7 @@ function stubFetch(): void {
     const href = String(url);
     const method = String((init as { method?: string }).method ?? 'GET');
     if (href.includes('/api/chat/dispatch')) {
+      backend.dispatches.push(bodyOf(init));
       const signal = init.signal ?? null;
       return {
         ok: true,
@@ -260,6 +272,8 @@ function stubFetch(): void {
       const sent = bodyOf(init);
       backend.writes.push({ path: `exclude:${messageId}`, method, body: sent });
       if (backend.refuse.has('exclude')) return { ok: false, status: 500 };
+      if (backend.refuseExcludeIds.has(messageId)) return { ok: false, status: 500 };
+      if (backend.excludeGate !== null) await backend.excludeGate;
       // THE CONCURRENCY WITNESS. The real endpoint is a read-modify-write over one unlocked
       // `meta.json`, so two toggles overlapping is the bug; this fake cannot lose an update, so it
       // measures the overlap instead. The await is what makes the window real — without it the
@@ -283,10 +297,19 @@ function stubFetch(): void {
     if (href.includes('/api/chat/conversations') && href.endsWith('/history')) {
       const id = idIn('/history');
       backend.historyReads.push(id);
+      if (backend.failHistoryFor.has(id)) {
+        return { ok: false, status: 500, json: () => Promise.resolve({}) };
+      }
       const record = backend.histories[id];
       if (record === undefined) return { ok: false, status: 404, json: () => Promise.resolve({}) };
-      // A COPY, so the window can never be reading the object the fake mutates in place.
-      return { ok: true, status: 200, json: () => Promise.resolve({ ...record }) };
+      // A COPY, so the window can never be reading the object the fake mutates in place — taken at
+      // serve time, before any hold, as a real server answers with what it read when it handled it.
+      const snapshot = { ...record };
+      if (backend.holdHistoryFor.has(id)) {
+        backend.holdHistoryFor.delete(id);
+        await new Promise<void>((resolve) => backend.heldHistories.set(id, resolve));
+      }
+      return { ok: true, status: 200, json: () => Promise.resolve(snapshot) };
     }
     if (href.includes('/api/chat/conversations') && href.endsWith('/title')) {
       return { ok: true, status: 200, json: () => Promise.resolve({ ok: true }) };
@@ -338,6 +361,12 @@ beforeEach(() => {
     excludesInFlight: 0,
     peakConcurrentExcludes: 0,
     compaction: 'The renewal thread, summarized.',
+    dispatches: [],
+    refuseExcludeIds: new Set(),
+    failHistoryFor: new Set(),
+    holdHistoryFor: new Set(),
+    heldHistories: new Map(),
+    excludeGate: null,
   };
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
@@ -950,5 +979,430 @@ describe('how full the context is, and what is in it', () => {
     expect(texts).toContain('and the second one?');
     expect(view?.totalTokens).toBe(1024);
     expect(view?.windowTokens).toBe(4096);
+  });
+});
+
+/* ── WP1.2 — the follow-up carries the conversation, and hidden context stays visible ─────────── */
+
+/** Type a question into the composer and send it, the way a reader does. */
+async function ask(el: Mounted, text: string): Promise<void> {
+  const composer = await region(el, 'jf-sv3-composer');
+  const field = composer.shadowRoot?.querySelector<HTMLTextAreaElement>(
+    '[data-testid="sv3-composer-input"]',
+  );
+  field!.value = text;
+  field!.dispatchEvent(new Event('input'));
+  await composer.updateComplete;
+  composer.shadowRoot
+    ?.querySelector<HTMLButtonElement>('[data-testid="sv3-composer-send"]')
+    ?.click();
+  await settle(el);
+}
+
+const SUMMARY_PREFIX = 'Summary of earlier conversation:\n';
+
+describe('a follow-up ask is sent WITH the conversation (S2.0)', () => {
+  it('sends the earlier turns as context, oldest first, on the conversation’s own id', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+
+    expect(backend.dispatches).toHaveLength(1);
+    const body = backend.dispatches[0]!;
+    expect(body.question).toBe('and the third?');
+    expect(body.conversationId).toBe('uc-ctx');
+    expect(body.context).toEqual([
+      { role: 'user', content: 'why did the renewal fail?' },
+      { role: 'assistant', content: 'The lock held.' },
+      { role: 'user', content: 'and the second one?' },
+      { role: 'assistant', content: 'The same lock.' },
+    ]);
+  });
+
+  it('sends no context with the first question of a new conversation', async () => {
+    const el = await mount();
+    await ask(el, 'why did the renewal fail?');
+    expect(backend.dispatches).toHaveLength(1);
+    expect(backend.dispatches[0]?.context).toBeUndefined();
+  });
+
+  it('leaves out excluded messages and everything above the floor, and leads with the summary', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(3);
+    backend.histories['uc-ctx']!.contextFloorSummary = 'The first renewal failed on the lock.';
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(4)];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+
+    expect(backend.dispatches[0]?.context).toEqual([
+      { role: 'system', content: `${SUMMARY_PREFIX}The first renewal failed on the lock.` },
+      { role: 'user', content: 'and the second one?' },
+    ]);
+  });
+
+  it('does not bring older turns back when the floor’s own message is excluded (S2.9)', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(3);
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(3)];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+
+    expect(backend.dispatches[0]?.context).toEqual([
+      { role: 'assistant', content: 'The same lock.' },
+    ]);
+  });
+
+  it('places a floor that sits on a message not shown here by the saved order', async () => {
+    // The second turn's answer is TWO stored messages; only the last is the turn's handle, so a
+    // floor on the first of them names a message no turn on screen resolves to.
+    backend.conversations = [conversationRow('uc-ctx', 'why did the renewal fail?')];
+    backend.threads['uc-ctx'] = {
+      conversationId: 'uc-ctx',
+      events: [
+        wireEvent(storedId(0), 'USER_MESSAGE', 'why did the renewal fail?'),
+        wireEvent(storedId(1), 'ASSISTANT_MESSAGE', 'The lock held.'),
+        wireEvent(storedId(3), 'USER_MESSAGE', 'and the second one?'),
+        wireEvent(storedId(4), 'ASSISTANT_MESSAGE', 'The same lock.'),
+        wireEvent(storedId(5), 'ASSISTANT_MESSAGE', 'It was never released.'),
+      ],
+    };
+    backend.histories['uc-ctx'] = {
+      sessionId: 'uc-ctx',
+      messages: [
+        { role: 'user', content: 'why did the renewal fail?', id: storedId(0) },
+        { role: 'assistant', content: 'The lock held.', id: storedId(1) },
+        { role: 'user', content: 'and the second one?', id: storedId(3) },
+        { role: 'assistant', content: 'The same lock.', id: storedId(4) },
+        { role: 'assistant', content: 'It was never released.', id: storedId(5) },
+      ],
+      contextFloor: storedId(4),
+    };
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+
+    expect(backend.dispatches[0]?.context).toEqual([
+      { role: 'assistant', content: 'The same lock.\n\nIt was never released.' },
+    ]);
+    const main = await region(el, 'jf-sv3-main');
+    expect(turnsIn(main)[0]?.hasAttribute('data-out-of-context')).toBe(true);
+  });
+
+  it('shows in the inspector exactly the messages it sends — one hidden answer, not its turn', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(1)];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    await ask(el, 'and the third?');
+    expect(backend.dispatches[0]?.context).toEqual([
+      { role: 'user', content: 'why did the renewal fail?' },
+      { role: 'user', content: 'and the second one?' },
+      { role: 'assistant', content: 'The same lock.' },
+    ]);
+    stream.emit('chunk', { text: 'A third lock.' });
+    stream.emit('done', { promptTokens: 1024 });
+    stream.end();
+    await settle(el);
+
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-meter"]'));
+    await settle(el);
+    const conversation = getContextInspectorView()?.phases.find((p) => p.name === 'Conversation');
+    expect(conversation?.segments.map((s) => s.text)).toEqual([
+      'why did the renewal fail?',
+      'and the second one?',
+      'The same lock.',
+      'and the third?',
+      'A third lock.',
+    ]);
+  });
+});
+
+describe('the "Interpreted as" note survives a cold reload (S2.1)', () => {
+  it('shows each note on its own turn live, after the record refresh, and after a reload', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openTheOnlyConversation(el);
+
+    await ask(el, 'and the third?');
+    stream.emit('rag.rewrite', {
+      original: 'and the third?',
+      standalone: 'Why did the third renewal fail?',
+    });
+    stream.emit('chunk', { text: 'A third lock.' });
+    // The record the backend now holds for this turn: the note rides on the answer row.
+    backend.threads['uc-ctx']!.events.push(
+      wireEvent(storedId(6), 'USER_MESSAGE', 'and the third?'),
+      wireEvent(storedId(7), 'ASSISTANT_MESSAGE', 'A third lock.', {
+        standaloneQuestion: 'Why did the third renewal fail?',
+      }),
+    );
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+
+    const notes = async (): Promise<string[]> => {
+      const main = await region(el, 'jf-sv3-main');
+      return turnsIn(main).map(
+        (t) => t.querySelector('[data-testid="sv3-turn-rewrite"]')?.textContent?.trim() ?? '',
+      );
+    };
+    const live = await notes();
+    expect(live[2]).toContain('Why did the third renewal fail?');
+    expect(live.filter((n) => n !== '')).toHaveLength(1);
+
+    el.remove();
+    const reloaded = await mount();
+    await openTheOnlyConversation(reloaded);
+    const main = await region(reloaded, 'jf-sv3-main');
+    const after = turnsIn(main).map(
+      (t) => t.querySelector('[data-testid="sv3-turn-rewrite"]')?.textContent?.trim() ?? '',
+    );
+    expect(after).toEqual(live);
+  });
+});
+
+describe('hidden context that is not on screen stays visible and reversible (S2.7 / S2.8)', () => {
+  it('counts unique hidden messages not shown here beside the hidden turns on screen', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [
+      storedId(0),
+      'gone-1',
+      'gone-2',
+      'gone-1',
+      storedId(0),
+    ];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const bar = await region(el, 'jf-sv3-context-bar');
+    expect(bar.shadowRoot?.querySelector('[data-testid="sv3-context-hidden"]')?.textContent).toContain(
+      '1 turn hidden from context',
+    );
+    expect(
+      bar.shadowRoot?.querySelector('[data-testid="sv3-context-hidden-unseen"]')?.textContent?.trim(),
+    ).toBe('2 hidden messages not shown here');
+  });
+
+  it('shows and undoes exclusions that are ALL off screen, without inventing a turn count', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = ['gone-1'];
+    backend.histories['uc-ctx']!.contextFloor = storedId(3);
+    backend.histories['uc-ctx']!.contextFloorSummary = 'Earlier, summarized.';
+    backend.histories['uc-ctx']!.excludedSourceIds = ['doc-1\u001f0'];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    let bar = await region(el, 'jf-sv3-context-bar');
+    expect(bar.shadowRoot?.querySelector('[data-testid="sv3-context-hidden"]')).toBeNull();
+    expect(
+      bar.shadowRoot?.querySelector('[data-testid="sv3-context-hidden-unseen"]')?.textContent?.trim(),
+    ).toBe('1 hidden message not shown here');
+
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]'));
+    await settle(el);
+
+    expect(backend.writes.map((w) => w.path)).toEqual(['exclude:gone-1']);
+    const saved = backend.histories['uc-ctx']!;
+    expect(saved.excludedMessageIds).toEqual([]);
+    // Include all is about MESSAGES: the floor, its summary and the hidden sources are untouched.
+    expect(saved.contextFloor).toBe(storedId(3));
+    expect(saved.contextFloorSummary).toBe('Earlier, summarized.');
+    expect(saved.excludedSourceIds).toEqual(['doc-1\u001f0']);
+    bar = await region(el, 'jf-sv3-context-bar');
+    expect(bar.shadowRoot?.querySelector('[data-testid="sv3-context-hidden-unseen"]')).toBeNull();
+    expect(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]')).toBeNull();
+  });
+
+  it('clears every recorded exclusion once each, on screen and off', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0), 'gone-1', 'gone-1'];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]'));
+    await settle(el);
+    expect(backend.writes.map((w) => w.path).sort()).toEqual(
+      [`exclude:${storedId(0)}`, 'exclude:gone-1'].sort(),
+    );
+    expect(backend.histories['uc-ctx']?.excludedMessageIds).toEqual([]);
+  });
+
+  it('says the context starts at a message not shown here, shows and edits its summary, and restores', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = 'gone-floor';
+    backend.histories['uc-ctx']!.contextFloorSummary = 'An older thread, summarized.';
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0)];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    let bar = await region(el, 'jf-sv3-context-bar');
+    expect(
+      bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-unseen"]')?.textContent,
+    ).toContain('Context starts at a message not shown here');
+
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-summary-toggle"]'));
+    await bar.updateComplete;
+    expect(
+      bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-summary"]')?.textContent?.trim(),
+    ).toBe('An older thread, summarized.');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-summary-edit"]'));
+    await bar.updateComplete;
+    const input = bar.shadowRoot?.querySelector<HTMLTextAreaElement>(
+      '[data-testid="sv3-context-floor-summary-input"]',
+    );
+    input!.value = 'An older thread, corrected.';
+    input!.dispatchEvent(new Event('input'));
+    await bar.updateComplete;
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-summary-save"]'));
+    await settle(el);
+    expect(backend.histories['uc-ctx']?.contextFloorSummary).toBe('An older thread, corrected.');
+    bar = await region(el, 'jf-sv3-context-bar');
+    expect(
+      bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-summary"]')?.textContent?.trim(),
+    ).toBe('An older thread, corrected.');
+
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-restore"]'));
+    await settle(el);
+    const saved = backend.histories['uc-ctx']!;
+    expect(saved.contextFloor).toBeUndefined();
+    expect(saved.contextFloorSummary).toBeUndefined();
+    expect(saved.excludedMessageIds).toEqual([storedId(0)]);
+    bar = await region(el, 'jf-sv3-context-bar');
+    expect(bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-unseen"]')).toBeNull();
+  });
+});
+
+describe('the undo never leaves the bar showing a state that is not saved (S2.10)', () => {
+  it('reports a PARTIALLY refused Include all as a failure and shows what was really saved', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0), 'gone-1'];
+    backend.refuseExcludeIds.add('gone-1');
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const seen = toasts();
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]'));
+    await settle(el);
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatch(/could not/i);
+    expect(backend.histories['uc-ctx']?.excludedMessageIds).toEqual(['gone-1']);
+    const after = await region(el, 'jf-sv3-context-bar');
+    expect(after.shadowRoot?.querySelector('[data-testid="sv3-context-hidden"]')).toBeNull();
+    expect(
+      after.shadowRoot?.querySelector('[data-testid="sv3-context-hidden-unseen"]')?.textContent?.trim(),
+    ).toBe('1 hidden message not shown here');
+  });
+
+  it('does not wipe the bar when the reload after Include all fails', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0), 'gone-1'];
+    backend.refuse.add('exclude');
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    backend.failHistoryFor.add('uc-ctx');
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]'));
+    await settle(el);
+
+    // Nothing was put back, and the failed read must not be taken for "nothing is hidden".
+    const after = await region(el, 'jf-sv3-context-bar');
+    expect(after.shadowRoot?.querySelector('[data-testid="sv3-context-hidden"]')?.textContent).toContain(
+      '1 turn hidden from context',
+    );
+    expect(
+      after.shadowRoot?.querySelector('[data-testid="sv3-context-hidden-unseen"]')?.textContent?.trim(),
+    ).toBe('1 hidden message not shown here');
+  });
+
+  it('shows the saved state when Include all landed but its reload failed', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0), 'gone-1'];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    backend.failHistoryFor.add('uc-ctx');
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]'));
+    await settle(el);
+
+    expect(backend.histories['uc-ctx']?.excludedMessageIds).toEqual([]);
+    const after = await region(el, 'jf-sv3-context-bar');
+    expect(after.shadowRoot?.querySelector('[data-testid="sv3-context-hidden"]')).toBeNull();
+    expect(after.shadowRoot?.querySelector('[data-testid="sv3-context-hidden-unseen"]')).toBeNull();
+  });
+
+  it('shows the saved state when Restore landed but its reload failed', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = 'gone-floor';
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    backend.failHistoryFor.add('uc-ctx');
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-floor-restore"]'));
+    await settle(el);
+
+    expect(backend.histories['uc-ctx']?.contextFloor).toBeUndefined();
+    const after = await region(el, 'jf-sv3-context-bar');
+    expect(after.shadowRoot?.querySelector('[data-testid="sv3-context-floor-unseen"]')).toBeNull();
+  });
+
+  it('keeps the conversation the reader moved to on ITS saved state while the undo finishes', async () => {
+    twoTurnConversation('uc-ctx', 'why did the renewal fail?');
+    backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0)];
+    backend.conversations.push(conversationRow('uc-other', 'what did the lease say?'));
+    backend.threads['uc-other'] = {
+      conversationId: 'uc-other',
+      events: [
+        wireEvent('22222222-2222-4333-8444-555555555550', 'USER_MESSAGE', 'what did the lease say?'),
+        wireEvent('22222222-2222-4333-8444-555555555551', 'ASSISTANT_MESSAGE', 'It runs to 2027.'),
+      ],
+    };
+    backend.histories['uc-other'] = {
+      sessionId: 'uc-other',
+      messages: [],
+      excludedMessageIds: ['22222222-2222-4333-8444-555555555550'],
+    };
+    const el = await mount();
+    const rowFor = async (label: string): Promise<HTMLElement | null> => {
+      const sidebar = await region(el, 'jf-sv3-sidebar');
+      for (const row of [...(sidebar.shadowRoot?.querySelectorAll('jf-sv3-session-row') ?? [])]) {
+        await (row as Updatable).updateComplete;
+        const button = row.shadowRoot?.querySelector<HTMLElement>(
+          '[data-testid="sv3-session-row-button"]',
+        );
+        if ((button?.textContent ?? '').includes(label)) return button ?? null;
+      }
+      return null;
+    };
+    (await rowFor('why did the renewal fail?'))?.click();
+    await settle(el);
+
+    let release!: () => void;
+    backend.excludeGate = new Promise<void>((resolve) => (release = resolve));
+    const bar = await region(el, 'jf-sv3-context-bar');
+    await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]'));
+    await settle(el);
+
+    // Mid-undo, the reader claims the other conversation, whose /history read is still in flight
+    // when the undo finishes.
+    backend.holdHistoryFor.add('uc-other');
+    (await rowFor('what did the lease say?'))?.click();
+    await settle(el);
+    release();
+    await settle(el);
+    backend.heldHistories.get('uc-other')?.();
+    await settle(el);
+
+    expect(el.sessions.activeId).toBe('uc-other');
+    const after = await region(el, 'jf-sv3-context-bar');
+    expect(after.shadowRoot?.querySelector('[data-testid="sv3-context-hidden"]')?.textContent).toContain(
+      '1 turn hidden from context',
+    );
+    expect(backend.histories['uc-ctx']?.excludedMessageIds).toEqual([]);
   });
 });
