@@ -1141,10 +1141,10 @@ jobs:
           npm ci --prefix modules/ui-web --audit=false
 
       - name: Frontend unit tests
-        run: npm run test:unit:run --prefix modules/ui-web
+        run: npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
 
       - name: Frontend lockdown tests
-        run: npm run test:unit:lockdown --prefix modules/ui-web
+        run: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
 
       - name: Stage Linux process-lifetime helper
         shell: bash
@@ -1362,7 +1362,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Windows coverage (@Tag windows or cross-platform) for the Linux-migrated modules
-        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test :modules:configuration:test :modules:indexer-worker:test -PwindowsOnly=true -PskipWebBuild=true --console=plain
+        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test :modules:configuration:test :modules:indexer-worker:test -PwindowsOnly=true -PskipWebBuild=true --continue --console=plain
 
       - name: Release compatibility baseline contract tests
         shell: pwsh

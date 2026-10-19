@@ -30,7 +30,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Add the explicitly named cross-platform/windows class tags from CC4. All methods, assertions, OS guards, assumptions, prerequisites, timeouts and fixtures remain byte-identical. Portable classes retain their normal Linux coverage; native-only classes keep their OS-specific prerequisites. Windows scheduling expands to configuration and indexer-worker.",
+      "whatMoved": "Add the explicitly named cross-platform/windows class tags from CC4. All assertions, OS guards, assumptions, prerequisites and timeouts remain byte-identical. Canonicalize AppInstanceLockFailureTest’s temporary directory before each test so FileChannel.open injection matches the production toRealPath path on Windows as well as Linux. Portable classes retain their normal Linux coverage; native-only classes keep their OS-specific prerequisites. Windows scheduling expands to configuration and indexer-worker.",
       "sources": [
         {
           "kind": "owner-words",
@@ -87,7 +87,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Schedule the complete existing ui-web Vitest and lockdown suites as blocking steps in app-ui-ui. Add configuration/indexer-worker Windows test tasks and match the task inventory; Linux Gradle task lists and all timeouts stay unchanged. Failure-only E2E collection replaces whole fixture-tree uploads with bounded Engine, embedded-worker, supervisor and fixture output. The preflight reproduction inventory includes both frontend commands.",
+      "whatMoved": "Schedule the complete existing ui-web Vitest and lockdown suites as blocking steps in app-ui-ui. Add configuration/indexer-worker Windows test tasks and match the task inventory; Linux Gradle task lists and all timeouts stay unchanged. Both frontend steps use four workers; the Windows Gradle invocation uses --continue so independent modules execute after a failure. Failure-only E2E collection replaces whole fixture-tree uploads with bounded Engine, embedded-worker, supervisor and fixture output. The preflight reproduction inventory includes both frontend commands.",
       "sources": [
         {
           "kind": "owner-words",
@@ -128,7 +128,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
   The UI job passed in 12:43. The source fixture was already repository-relative at the baseline;
   an additional replay-only production mutation fails with exactly one fresh read instead of zero.
 - CC4: AppInstanceLockExclusionTest ran four passing cases. AppInstanceLockFailureTest has
-  three distinct cases, two failing, repeated across three attempts (nine physical executions,
+  five distinct cases, two failing and retried twice (nine physical executions,
   six failures, no skips). Both failures encounter a null channel in the Windows native-lock path.
   No assertion was changed. Gradle stopped there: the remaining eleven requested classes and
   the second-volume prerequisite are unverified. Full XML and logs: tmp/ci-coverage/windows-results/
@@ -139,12 +139,38 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
   Integration hit the bounded entry scan inside corpus content. The collector now visits only
   the harness log directories and top-level output; a corpus-exclusion regression fails before
   that correction and passes after. The same temporary probe PR is rerun for final evidence.
-  Both existing jobs are Windows-only; adding Linux E2E jobs contradicts CC6's selection limit
-  and awaits an orchestrator decision. The collector itself is tested on Linux.
+  Both existing jobs are Windows-only. The round-three decision keeps Linux installed-Engine E2E
+  outside this PR; no hosted Linux integration or lifecycle job is added. The collector itself
+  is tested on Linux.
 - CC7: fourteen CI guard/reporter checks and repository-wide actionlint pass. Local tagged Java:
   128 cases, 24 skips, zero failures (Linux only). Public claims detects five existing unused
   registry exports after the static import makes their usage visible; disposition is outside this
   brief. No dead-code baseline is changed. The test-intent entries validate; the only remaining
   test-intent finding is the deliberately absent independent acceptance record.
+
+## Round three
+
+- Rebased onto origin/main c933b207f before building; wrapper is Gradle 9.8.0.
+- The Windows XML shows an unstubbed static FileChannel.open returning null, rather than the
+  injected IOException. Production canonicalizes the directory with toRealPath before opening;
+  the fixture formerly matched the uncanonicalized @TempDir path. Canonicalize that fixture
+  before each test. No product code or assertion changes. Windows Gradle now uses --continue.
+- Repository-wide reference search retains registerSelectionAction (coreSelectionActions.ts)
+  and onSelectionActionChange (SelectionActionsMenu.ts), both called by source modules. Removed
+  unused unregisterSelectionAction and __resetSelectionActionsForTest; made the internally used
+  SelectionActionPresentation interface private. No export is used only by tests.
+- Linux currently runs system-tests:test in its unit shard and the child-log collector tests.
+  Neither installed-Engine E2E Gradle tier has a hosted Linux job. As a scheduling proxy only,
+  the preceding Windows run 39248010984 took 24:34 for integration and 6:51 for lifecycle:
+  31:25 runner time together; equivalent jobs would reserve up to 35 minutes each (70 total).
+  Actual Linux durations remain unmeasured. The user explicitly deferred adding these jobs.
+- Rebased frontend verification: vitest run --maxWorkers=4 passes 529 files / 6,886 tests;
+  lockdown passes 10 tests. Lint and typecheck pass. Sixteen current CI inventory/guard/reporter
+  commands pass; test-report-flake-trend.mjs was removed on main by 99ef79845 (#796).
+- Actionlint passes ci.yml. Repository-wide actionlint fails on docs-lint.yml's existing
+  justsearch-perf runner label; the detached before worktree produces the same failure.
+- Against the merge-base, the dead-code gate reports two remaining unused exports (both retained
+  source callers above). The test-intent entries all validate; independent acceptance is absent
+  as instructed. Neither gate's baseline nor enforcement is changed.
 
 Independent verification remains outstanding. No acceptance record is authored here.

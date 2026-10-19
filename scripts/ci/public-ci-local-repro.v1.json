@@ -54,8 +54,8 @@
       "check": "Unit tests (app-ui)",
       "mode": "local-subset",
       "commands": [
-        "npm run test:unit:run --prefix modules/ui-web",
-        "npm run test:unit:lockdown --prefix modules/ui-web",
+        "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4",
+        "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4",
         "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain"
       ]
     },
