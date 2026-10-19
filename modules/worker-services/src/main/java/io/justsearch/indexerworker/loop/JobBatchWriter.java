@@ -26,7 +26,6 @@ import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
-import java.util.concurrent.locks.Lock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +67,7 @@ public final class JobBatchWriter {
   // live resolved config on every write, so flipping it takes effect without a worker restart.
   private final BooleanSupplier chunkSpladeEnabledSupplier;
   private final Supplier<RunningRuntime> activeLexicalSource;
-  private final Lock fileMutationFence;
+  private final FileMutationFence fileMutationFence;
 
   public JobBatchWriter(
       IndexingCoordinator indexingCoordinator,
@@ -86,7 +85,7 @@ public final class JobBatchWriter {
       BooleanSupplier detailedTracingSupplier,
       BooleanSupplier chunkSpladeEnabledSupplier,
       Supplier<RunningRuntime> activeLexicalSource,
-      Lock fileMutationFence) {
+      FileMutationFence fileMutationFence) {
     this.indexingCoordinator = indexingCoordinator;
     this.signalBus = signalBus;
     this.embeddingLifecycle = embeddingLifecycle;
@@ -112,6 +111,8 @@ public final class JobBatchWriter {
     String embeddingSource = precomputedEmbedding != null ? "batch" : "inline_or_pending";
     writeSpan.setAttribute("embedding.source", embeddingSource);
     fileMutationFence.lock();
+    // Set once this write may have published rows: a prune scanning meanwhile judges the file again.
+    String publishedPath = null;
     try {
       if (!jobQueue.ownsClaimForPublication(ex.claim())) {
         journal.recordOutcomeSafely(ex.filePath(), "SUPERSEDED_BEFORE_WRITE",
@@ -153,6 +154,7 @@ public final class JobBatchWriter {
           chunkPlan);
 
       long writeStart = System.currentTimeMillis();
+      publishedPath = String.valueOf(doc.fields().get(SchemaFields.PATH));
       RunningRuntime lexicalSource = activeLexicalSource.get();
       if (lexicalSource != null && needsActiveLexicalProjection(lexicalSource, ex, doc)) {
         // Green enumeration must not replace an unchanged A document with a lexical-only
@@ -257,8 +259,12 @@ public final class JobBatchWriter {
         batchStats.recordFailed();
       }
     } finally {
-      try { writeSpan.end(); }
-      finally { fileMutationFence.unlock(); }
+      try {
+        if (publishedPath != null) fileMutationFence.published(publishedPath);
+        writeSpan.end();
+      } finally {
+        fileMutationFence.unlock();
+      }
     }
   }
 

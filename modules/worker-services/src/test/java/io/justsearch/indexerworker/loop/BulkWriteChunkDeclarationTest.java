@@ -27,7 +27,6 @@ import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper;
 import org.apache.lucene.store.FSDirectory;
@@ -118,7 +117,7 @@ final class BulkWriteChunkDeclarationTest extends LuceneExecutorTestBase {
         () -> false,
         () -> false,
         () -> null,
-        new ReentrantLock());
+        new FileMutationFence());
   }
 
   private static ExtractedJob job(Path file, String content) {
