@@ -39,6 +39,7 @@ import type {
   SourceCitation,
 } from '../../api/types/selection.js';
 import { updateShellContext } from './shellContextState.js';
+import { projectDerivedCapabilities } from '../commands/SelectionActionRegistry.js';
 
 /** Capability vocabulary — what selected item(s) support. */
 export type SelectionCapability =
@@ -238,17 +239,11 @@ export function setSelection(descriptor: SelectionDescriptor): void {
   // with consumers that read the capability set off a SelectionItem directly,
   // but the ShellContext flat key now reflects applicable actions, not
   // authored capabilities. Drift becomes impossible because both are the same
-  // computation. Capabilities lookup is gated behind a try/catch so a failure
-  // in the registry doesn't block selection updates.
-  try {
-    // Lazy import via require-style dynamic to keep this file's import graph
-    // free of registry-cycle hazards.
-    void import('../commands/SelectionActionRegistry.js').then((m) => {
-      updateShellContext({ selectionCapabilities: m.projectDerivedCapabilities() });
-    });
-  } catch {
-    /* keep authored capabilities if the registry isn't loaded yet */
-  }
+  // computation. Preserve the deferred projection, but load the registry with
+  // this module: an unawaited dynamic import can outlive the caller's lifetime.
+  queueMicrotask(() => {
+    updateShellContext({ selectionCapabilities: projectDerivedCapabilities() });
+  });
   notify();
 }
 

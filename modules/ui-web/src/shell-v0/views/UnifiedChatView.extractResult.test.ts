@@ -14,7 +14,15 @@
  * - G/H: the transcript must follow its newest turn, and must not yank a reader who scrolled back.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import './UnifiedChatView.js';
 import type { UnifiedChatView } from './UnifiedChatView.js';
 import { consumeShapeStream, dispatchShapeEventToHandlers } from '../../api/streams.js';

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   getScopeChips,
   subscribeScopeChips,
@@ -9,6 +9,7 @@ import {
   clearScopeChips,
   buildSearchIntent,
   setQuery,
+  resetSearchState,
   setSearchApiBase,
   type SearchScopeChip,
 } from './searchState.js';
@@ -27,6 +28,11 @@ describe('searchState — scope chips (Search-Thread S3)', () => {
     setSearchApiBase('http://test');
     __resetSearchFiltersForTest();
     clearScopeChips();
+  });
+
+  afterEach(() => {
+    resetSearchState();
+    vi.useRealTimers();
   });
 
   it('starts empty', () => {
@@ -111,6 +117,7 @@ describe('searchState — scope chips (Search-Thread S3)', () => {
     removeScopeChip(0);
     clearScopeChips();
     expect(fetchMock).not.toHaveBeenCalled();
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -137,6 +144,7 @@ describe('searchState — scope chips (Search-Thread S3)', () => {
     await vi.advanceTimersByTimeAsync(250);
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.filters.docIds).toEqual(['doc-1']);
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 });

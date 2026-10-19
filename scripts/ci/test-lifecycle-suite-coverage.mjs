@@ -36,3 +36,16 @@ test('fullTestSuite includes the separately owned lifecycle tier', () => {
   const aggregate = build.slice(build.indexOf('tasks.register("fullTestSuite")'));
   assert.match(aggregate, /dependsOn\([^\n]*tasks.named\("lifecycleIntegrationTest"\)/);
 });
+
+// Failure artifacts must contain bounded child output, never whole data/model trees.
+test('both installed Engine tiers collect and upload child logs on failure', () => {
+  for (const id of ['integration-tests', 'lifecycle-integration-tests']) {
+    const job = workflowJobs(workflow).find((entry) => entry.id === id);
+    const collection = job.runs.find((run) => run.text === 'node scripts/ci/collect-e2e-child-logs.mjs');
+    assert.equal(collection?.step?.if, 'failure()', id);
+    assert.match(job.text, /name: Upload E2E child process logs\n        if: failure\(\)/);
+    assert.match(job.text, /path: build\/ci\/e2e-child-logs\/\*\*/);
+    assert.match(job.text, /retention-days: 3/);
+    assert.ok(!job.text.includes('writer-junit-*/**'));
+  }
+});
