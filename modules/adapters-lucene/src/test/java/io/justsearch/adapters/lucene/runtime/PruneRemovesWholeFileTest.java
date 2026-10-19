@@ -32,6 +32,7 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ReferenceManager;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.FSDirectory;
@@ -319,6 +320,87 @@ class PruneRemovesWholeFileTest extends LuceneExecutorTestBase {
     assertEquals(4, currentRows(path), "nothing is removed on the strength of a changed root");
     assertEquals(List.of(), marks, "no deletion mark on the strength of a changed root");
     assertEquals(PruneOps.Completion.INCOMPLETE, result.completion());
+  }
+
+  @Test
+  void aFileThatReappearsWhileTheBatchRefreshesItsViewKeepsItsRows() throws Exception {
+    Path file = createFile("refreshed.txt");
+    String path = key(file);
+    writeFile(path, "refreshed", 3);
+    commitAndRefresh();
+    Files.delete(file);
+    AtomicInteger rootChecks = new AtomicInteger();
+    AtomicBoolean recreated = new AtomicBoolean();
+    // The batch's refresh is its slow step; the file comes back while it runs.
+    ReferenceManager.RefreshListener recreate = new ReferenceManager.RefreshListener() {
+      @Override public void beforeRefresh() throws IOException {
+        if (rootChecks.get() >= 2 && recreated.compareAndSet(false, true)) {
+          Files.writeString(file, "recreated");
+        }
+      }
+
+      @Override public void afterRefresh(boolean didRefresh) {}
+    };
+    runtime.session().snapshot.searcherManager().addListener(recreate);
+    PruneOps.PresenceGuard guard = new PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() {
+        rootChecks.incrementAndGet();
+        return PathPresence.isReadableDirectory(scope);
+      }
+
+      @Override public PathPresence presence(Path probed) {
+        return PathPresence.probe(probed);
+      }
+    };
+    List<String> marks = new ArrayList<>();
+
+    prune(guard, marks);
+
+    assertTrue(recreated.get(), "precondition: the file came back during the batch's refresh");
+    assertEquals(4, currentRows(path), "a file that exists again keeps its parent and chunks");
+    assertEquals(List.of(), marks, "a file that exists again gets no deletion mark");
+  }
+
+  @Test
+  void aRootLostOnceTheRemovalsArePublishedMakesTheRunIncomplete() throws Exception {
+    Path file = createFile("published.txt");
+    String path = key(file);
+    writeFile(path, "published", 3);
+    commitAndRefresh();
+    Files.delete(file);
+    AtomicBoolean lost = new AtomicBoolean();
+    // The root goes away as soon as a refreshed view no longer holds the removed file.
+    SearcherManager manager = runtime.session().snapshot.searcherManager();
+    manager.addListener(new ReferenceManager.RefreshListener() {
+      @Override public void beforeRefresh() {}
+
+      @Override public void afterRefresh(boolean didRefresh) throws IOException {
+        IndexSearcher searcher = manager.acquire();
+        try {
+          if (searcher.count(rowsOf(path)) == 0) {
+            lost.set(true);
+          }
+        } finally {
+          manager.release(searcher);
+        }
+      }
+    });
+    PruneOps.PresenceGuard guard = new PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() {
+        return !lost.get() && PathPresence.isReadableDirectory(scope);
+      }
+
+      @Override public PathPresence presence(Path probed) {
+        return PathPresence.probe(probed);
+      }
+    };
+
+    PruneOps.PruneResult result = prune(guard, new ArrayList<>());
+
+    assertTrue(lost.get(), "precondition: the root was lost after the removals were published");
+    assertEquals(0, committedRows(path), "the removals made while the root held stay made");
+    assertEquals(PruneOps.Completion.INCOMPLETE, result.completion(),
+        "a run whose root is gone by its end does not report itself complete");
   }
 
   @Test

@@ -373,14 +373,6 @@ public final class PruneOps {
       if (completion == Completion.COMPLETE && !batch.flush()) {
         completion = Completion.INCOMPLETE;
       }
-      // A root that stopped being the same root during the run makes the run incomplete even when
-      // no deletion was pending to notice it; one check per run, not per batch.
-      if (completion == Completion.COMPLETE && judged > 0 && !batch.lastFlushAskedRoot
-          && !guard.rootCurrent()) {
-        log.warn("pruneByPathPrefix: the root is no longer the same root; reporting incomplete for"
-            + " prefix {}", normalized);
-        completion = Completion.INCOMPLETE;
-      }
       if (completion == Completion.COMPLETE && batch.keptUnknown > 0) {
         completion = Completion.INCOMPLETE;
       }
@@ -391,6 +383,14 @@ public final class PruneOps {
       if (batch.pruned > 0 && completion != Completion.ABORTED) {
         commitOps.commitAndTrack(CommitReason.PRUNE);
         mgr.maybeRefreshBlocking();
+      }
+      // A root that stopped being the same root during the run makes the run incomplete even when
+      // no deletion was pending to notice it, and even after the last batch asked it: asked once
+      // more, after the removals are committed and published.
+      if (completion == Completion.COMPLETE && judged > 0 && !guard.rootCurrent()) {
+        log.warn("pruneByPathPrefix: the root is no longer the same root; reporting incomplete for"
+            + " prefix {}", normalized);
+        completion = Completion.INCOMPLETE;
       }
       log.info(
           "pruneByPathPrefix: {} - {} checked, {} pruned, {} kept (presence unknown) for prefix {};"
@@ -489,8 +489,6 @@ public final class PruneOps {
     private int keptUnknown;
     /** Whether the root was re-checked after an undecidable document in the current batch. */
     private boolean rootCheckedSinceUncertain;
-    /** Whether the most recent flush asked the root (it had candidates to apply). */
-    private boolean lastFlushAskedRoot;
     private long fenceNanos;
     private long longestFenceNanos;
     private int fencedBatches;
@@ -508,16 +506,15 @@ public final class PruneOps {
 
     /**
      * Removes the files of the batch's candidates if the root still vouches for their absence,
-     * asking it before the files are checked again and once more after, right before the rows are
-     * removed. A batch without candidates asks nothing: nothing is removed on its strength. The
-     * whole application runs inside the writer fence, and its removals are visible to the next
-     * holder of the fence.
+     * asking it before the batch's rows are gathered and once more after each file is checked
+     * again, right before the rows are removed. A batch without candidates asks nothing: nothing
+     * is removed on its strength. The whole application runs inside the writer fence, and its
+     * removals are visible to the next holder of the fence.
      *
      * @return false when the root check failed; the candidates are discarded, nothing is removed
      */
     boolean flush() throws IOException {
       rootCheckedSinceUncertain = false;
-      lastFlushAskedRoot = !candidates.isEmpty();
       if (candidates.isEmpty()) {
         return true;
       }
@@ -558,43 +555,43 @@ public final class PruneOps {
         files.putIfAbsent(candidate.filePath(), candidate.file());
         nominatedRows.merge(candidate.filePath(), 1, Integer::sum);
       }
+      // Rows are taken from a view refreshed inside the fence, so a file's rows are all there,
+      // including chunks written since the scan; nothing of it can be published until we leave.
+      Map<String, List<String>> rows = new LinkedHashMap<>();
+      mgr.maybeRefreshBlocking();
+      IndexSearcher current = mgr.acquire();
+      try {
+        StoredFields storedFields = current.storedFields();
+        for (String filePath : files.keySet()) {
+          rows.put(filePath, rowsOf(current, storedFields, filePath));
+        }
+      } finally {
+        mgr.release(current);
+      }
+      // The last checks come after every slow step, right before the removal: each file's absence,
+      // then the root that vouches for it. A file that came back, or can no longer be judged, keeps
+      // its rows and gets no deletion mark. A file recreated after these checks still loses its
+      // rows; the walk that follows the prune finds it on disk and queues it again.
       Map<Path, PathPresence> folderVerdicts = new java.util.HashMap<>();
-      List<String> confirmed = new ArrayList<>();
       for (var file : files.entrySet()) {
         PathPresence presence = guard.presence(file.getValue());
         if (presence == PathPresence.ABSENT) {
           presence =
               PathPresence.absentBeneathListableFolder(file.getValue(), boundary, folderVerdicts);
         }
-        if (presence == PathPresence.ABSENT) {
-          confirmed.add(file.getKey());
-        } else if (presence == PathPresence.UNKNOWN) {
+        if (presence == PathPresence.UNKNOWN) {
           keptUnknown += nominatedRows.get(file.getKey());
-        } else {
+        } else if (presence != PathPresence.ABSENT) {
           log.debug("pruneByPathPrefix: kept a file that is present again: {}", file.getKey());
         }
-      }
-      // Rows are taken from a view refreshed inside the fence, so a file's rows are all there,
-      // including chunks written since the scan; nothing of it can be published until we leave.
-      Map<String, List<String>> rows = new LinkedHashMap<>();
-      if (!confirmed.isEmpty()) {
-        mgr.maybeRefreshBlocking();
-        IndexSearcher current = mgr.acquire();
-        try {
-          StoredFields storedFields = current.storedFields();
-          for (String filePath : confirmed) {
-            rows.put(filePath, rowsOf(current, storedFields, filePath));
-          }
-        } finally {
-          mgr.release(current);
+        if (presence != PathPresence.ABSENT) {
+          rows.remove(file.getKey());
         }
       }
-      // The absences above vouch for nothing if the root changed while they were observed: ask
-      // again after the last observation, right before anything is removed on their strength.
       if (!guard.rootCurrent()) {
         log.warn(
             "pruneByPathPrefix: root changed while the batch was checked; {} files kept",
-            confirmed.size());
+            rows.size());
         return false;
       }
       for (var file : rows.entrySet()) {
@@ -605,7 +602,7 @@ public final class PruneOps {
           log.debug("pruneByPathPrefix: deleted orphan document: {}", docId);
         }
       }
-      if (!rows.isEmpty()) {
+      if (rows.values().stream().anyMatch(ids -> !ids.isEmpty())) {
         // Publish the removals before leaving the fence: the next writer reads its parent from
         // this view, and must not rebuild children of a parent that is already gone.
         mgr.maybeRefreshBlocking();
