@@ -22,7 +22,7 @@ related:
 # Lane F: one Engine JVM, with process boundaries that follow runtime and failure domain
 
 Historical origin: worktree `.claude/worktrees/lane-F`, branch `worktree-lane-F`,
-base `b96cd999` (#687). Acceptance is recorded in the [stage checklists](#items-done-deviated-and-skipped);
+base `b96cd999` (#687). Acceptance is recorded in the [stage checklists](#items-done-deviated-and-skipped-by-stage);
 remaining follow-ups are in [WP3](improvements/WP3-remaining-work-plan.md#carried-over-from-the-retired-handoffs-2026-10-19).
 This document is the lane's contract: the design and the considerations that shaped it. The PR cut
 is in 17; the per-stage implementation checklist is written at each stage's start.

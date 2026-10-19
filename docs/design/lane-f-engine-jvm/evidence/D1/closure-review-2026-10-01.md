@@ -34,8 +34,8 @@ Refute-first closure review by Sol (gpt-6.1-sol, no sub-agents) at 56df784ad. Ve
 | §16 combined delayed retry | OPEN | Existing delayed-retry regression changes **theme only**. It proves settings/outcome replay, not applied component versions and generation behavior after a later change. | Extend the existing reconfigure fixture: A→B, B→C, delayed old-key replay, stale new-key refusal; assert C/version/generation stay unchanged. |
 | §16 resume conditions | CLOSED | Current captured-edit installed proof at `a38dc2883`; U exact writable-B, sealed-queue, replay/checkpoint settlement and fencing regressions. | — |
 | §16 reconfigure | OPEN | Atomic refusal/restoration and native-child recovery have evidence; new IN_PLACE query crash boundaries remain unproved physically. | Finish D1-4’s installed cuts. |
-| Signed restart-required proof | DEFERRED-AUTHORIZED | [Owner re-plan](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/docs/design/lane-f-engine-jvm/handoff.md:155) moves D1-6’s signed successor proof to **E7**. | Execute in E7; retain that destination in closure record. |
-| D2-owned feature portions | DEFERRED-AUTHORIZED | [Owner re-plan](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/docs/design/lane-f-engine-jvm/handoff.md:135): D2-1..10, including client re-entry, component map and old cursors, move post-merge. | Preserve follow-on ownership; do not defer D1 portions with them. |
+| Signed restart-required proof | DEFERRED-AUTHORIZED | [Owner re-plan](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L155) moves D1-6’s signed successor proof to **E7**. | Execute in E7; retain that destination in closure record. |
+| D2-owned feature portions | DEFERRED-AUTHORIZED | [Owner re-plan](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#L135): D2-1..10, including client re-entry, component map and old cursors, move post-merge. | Preserve follow-on ownership; do not defer D1 portions with them. |
 
 Before marking D1 closed:
 

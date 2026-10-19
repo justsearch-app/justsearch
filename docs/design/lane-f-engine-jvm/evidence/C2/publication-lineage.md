@@ -12,7 +12,7 @@ and Rust-selection failures without claiming those invocations succeeded.
 
 Later response-mapper, reset-validator and producer changes have their own focused proof.
 They are not covered by the earlier checkpoint's hosted success. The current
-[handoff](../../handoff.md) names exact roots, limits and next work. PR718 and the original
+[handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md) names exact roots, limits and next work. PR718 and the original
 checkpoint branch remain preserved. Stage-F merge placement and remaining lane acceptance
 are unchanged; this draft is not ready to merge.
 

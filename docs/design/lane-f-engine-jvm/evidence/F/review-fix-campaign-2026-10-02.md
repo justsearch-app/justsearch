@@ -2,7 +2,7 @@
 
 Report-back snapshot at `3c4ff74e5`. Sources: the orchestrator's
 `tmp/campaign-ledger.md` (through its 05:49 entry), the dated
-[handoff campaign](../../handoff.md#review-and-fix-campaign-2026-10-02-evening-read-first-supersedes-next-steps-below-where-they-differ),
+[handoff campaign](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md#review-and-fix-campaign-2026-10-02-evening-read-first-supersedes-next-steps-below-where-they-differ),
 `git log --format='%h %s' origin/main..HEAD`, and the F7/F8 assignment's
 hosted-run IDs and current-head status. This is a summary of recorded observations,
 not a new build, measurement, managed review record or merge authorization.
