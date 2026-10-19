@@ -113,7 +113,7 @@ on another reply. C2/D2 §1 now explicitly inherit the preliminary scan-expiry, 
 agent-history paths. Earlier dependency-split WIP commits were not individually green; only
 their combined tested revisions have evidence.
 
-[Raw evidence SHA-256 inventory](raw-evidence-sha256.json) lists every literal temporary-path
+[Raw evidence SHA-256 inventory](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/evidence/C1/raw-evidence-sha256.json) lists every literal temporary-path
 citation, brace/glob expansion and available file hash, including directory contents. The
 [last completed full-run summary](last-full-run-summary.json) records integrated271's failure
 honestly; focused green is not substituted for that full run. Inventory generation resolved all
