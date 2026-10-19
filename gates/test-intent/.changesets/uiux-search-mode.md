@@ -670,3 +670,25 @@ followed by a later Ask. Product code is unchanged.
   "note": "Reject two missing intent warrants. (1) New entry 5, sv3-search.test.ts:29-30, requires Search/Ask/Delegate in exactly that menu order; cited SM1 specifies the three modes and SM2 the default, neither fixes menu order, and no delegated-choice source is attached. (2) New entry 10, SearchV3View.searchMode.test.ts:845-846 and 859-862, still requires the scope label \"2 files: a.md, b.md\" and ordered docIds arrays on original Ask and Retry; SM7 requires the same files, not their order. A Retry with the identical file set reversed is compliant with the source but fails this oracle. Cite a valid prior source for each extra constraint or compare membership/count and visible scope without pinning order. Other reviewed adaptations retain their oracle, including restored observed exact count-label equality. Repeated decision-record conflict search found none relevant. Rerun run-evidence passed all 58 listed checks; repaired missing-file check assertion-failed at merge-base a562090f8 and passed at candidate 920199789 (tree-identical to c1dd8ef4d). Existing suites passed before 401/401 and after 407/407. This is test-intent audit, not live product acceptance."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-x8lr_4oh",
+  "verdict": "accept",
+  "digest": "sha256:e8b44c277f37c86a06164ed5f8e0e288549416dbcb374d504cdd9bd38c6e9162",
+  "note": "Reviewed baseline tests and cited scenarios before candidate diff. Whole count oracle retained; specific retirements warranted and conflict search repeated; New expectations sourced. Reproduced 58 checks, repaired assertion fail-before at current merge-base, and preservation suites on both revisions. Own count/evidence negative probes passed. Test-intent acceptance only; dev stack untouched."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "agent-session-8k1546ms",
+  "verdict": "accept",
+  "digest": "sha256:e8b44c277f37c86a06164ed5f8e0e288549416dbcb374d504cdd9bd38c6e9162",
+  "note": "Audit of cd9fc274b (tree identical to c0e4b32c3) against merge-base f72fffe6. Baseline tests and cited agreed scenarios reviewed before diff and entry classes; provisional classes saved. Adaptations retain issuance, exact rendered count equality and row-count probe; visible full paths and default-Ask/session-busy claims separately retired with specific SM sources and actual removals. Repeated decision-record conflict search found none. New expectations checked against sources, including mode/scope membership without unsupported ordering or Set identity. Script/evidence/check-file digests validated; run-evidence rerun: all 58 named checks passed; missing-file repair assertion-fails on merge-base and passes after. Preservation suites: 401/401 before, 454/454 after, none skipped. Own tampered/stale evidence counterexamples rejected. Separate session and checkout; model-family independence not established. Audit scope only; no dev stack touched."
+}
+```
