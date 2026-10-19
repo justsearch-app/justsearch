@@ -1211,8 +1211,10 @@ jobs:
             21
             ${{ env.JAVA_VERSION }}
 
+      # ui-web's install is needed by test-dev-runner-vite-loopback, which starts the real Vite to
+      # prove the dev UI binds 127.0.0.1 on Windows too (localhost may resolve to ::1 first).
       - name: Dev-runner suite (auto-discovered)
-        run: npm ci --audit=false && npm run test:dev-runner -- --verbose
+        run: npm ci --audit=false && npm ci --prefix modules/ui-web --audit=false && npm run test:dev-runner -- --verbose
 
       # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
       # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
