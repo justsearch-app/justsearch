@@ -3,7 +3,8 @@
  * Run: node scripts/ci/check-platform-lifecycle.test.mjs
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import {
   REGISTER_PATH,
   evaluateRegister,
@@ -19,6 +20,15 @@ import {
 
 const FIXTURE_PATH = 'scripts/ci/fixtures/platform-lifecycle/cases.v1.json';
 const fixtures = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
+
+// The real register with a Gradle successor line newer than the pin, so the failure path stays
+// exercised against live pin sources whatever the current pin is.
+function supersededRegister() {
+  const register = JSON.parse(readFileSync(REGISTER_PATH, 'utf8'));
+  const gradle = register.platforms.find((row) => row.id === 'gradle');
+  gradle.policy.successorVersion = '99.0.0';
+  return register;
+}
 
 let passed = 0;
 const failures = [];
@@ -215,7 +225,7 @@ test('the real register resolves every seeded platform from its live source', ()
     result.resolutions.map(({ id, pin }) => `${id}=${pin}`),
     [
       'jdk=25',
-      'gradle=9.6.1',
+      'gradle=9.8.0',
       'lucene=10.4.0',
       'tauri=2.11.5',
       'webview2=0.38.2',
@@ -226,7 +236,12 @@ test('the real register resolves every seeded platform from its live source', ()
       'tesseract=5.5.0.20241111',
     ],
   );
-  assert.ok(result.findings.some((finding) => finding.id === 'gradle' && finding.category === 'support'));
+  assert.ok(
+    evaluateRegister(supersededRegister(), {
+      readSource: (path) => readFileSync(path, 'utf8'),
+      asOf: '2026-09-03',
+    }).findings.some((finding) => finding.id === 'gradle' && finding.category === 'support'),
+  );
 });
 
 test('CLI returns advisory success in report mode and failure in gate mode', () => {
@@ -237,10 +252,15 @@ test('CLI returns advisory success in report mode and failure in gate mode', () 
   console.log = (...args) => output.push(args.join(' '));
   console.warn = (...args) => output.push(args.join(' '));
   console.error = (...args) => output.push(args.join(' '));
+  mkdirSync('tmp', { recursive: true });
+  const dir = mkdtempSync(join('tmp', 'platform-lifecycle-test-'));
+  const registerPath = relative(process.cwd(), join(dir, 'register.json'));
+  writeFileSync(registerPath, JSON.stringify(supersededRegister()));
   try {
-    assert.equal(runCli(['--mode', 'report', '--as-of', '2026-09-03']), 0);
-    assert.equal(runCli(['--mode', 'gate', '--as-of', '2026-09-03']), 1);
+    assert.equal(runCli(['--mode', 'report', '--register', registerPath, '--as-of', '2026-09-03']), 0);
+    assert.equal(runCli(['--mode', 'gate', '--register', registerPath, '--as-of', '2026-09-03']), 1);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
     console.log = originalLog;
     console.warn = originalWarn;
     console.error = originalError;
@@ -250,8 +270,7 @@ test('CLI returns advisory success in report mode and failure in gate mode', () 
 });
 
 test('failure findings produce GitHub-visible annotations and summary text', () => {
-  const register = JSON.parse(readFileSync(REGISTER_PATH, 'utf8'));
-  const result = evaluateRegister(register, {
+  const result = evaluateRegister(supersededRegister(), {
     readSource: (path) => readFileSync(path, 'utf8'),
     asOf: '2026-09-03',
   });
