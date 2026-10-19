@@ -208,6 +208,9 @@ class _HarnessLocator:
     async def scroll_into_view_if_needed(self, **kwargs):
         self.page.calls.append(("scroll", self.selector))
 
+    async def press(self, key, **kwargs):
+        self.page.calls.append(("press", self.selector, key))
+
     async def dispatch_event(self, event):
         self.page.calls.append(("dispatch", self.selector, event))
 
@@ -289,13 +292,13 @@ class _HarnessPage:
         return _ExpectResponse(self, predicate)
 
 
-def test_search_setup_drives_the_search_v3_composer_and_explicit_palette_action():
+def test_search_setup_drives_the_search_v3_composer_in_search_mode():
     page = _HarnessPage()
     asyncio.run(_type_and_search(page, "needle"))
     assert ("locator", S.CSS_SV3_COMPOSER_TEXTAREA) in page.calls
     assert ("fill", S.CSS_SV3_COMPOSER_TEXTAREA, "needle") in page.calls
-    assert any("Open command palette" in call[1] for call in page.calls if call[0] == "click")
-    assert any("Search this text" in call[1] for call in page.calls if call[0] == "click")
+    assert ("press", S.CSS_SV3_COMPOSER_TEXTAREA, "Enter") in page.calls
+    assert not any("Search this text" in call[1] for call in page.calls if call[0] == "click")
     assert ("locator", S.CSS_SV3_RESULT_ROW) in page.calls
     assert ("locator", S.CSS_SEARCH_INPUT) not in page.calls
 

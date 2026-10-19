@@ -202,6 +202,9 @@ const WINDOW_NOTE = {
   around: 'Showing the part of this document around the cited passage.',
   head: 'Showing the beginning of a longer document.',
 } as const;
+/** What the pane says when the index has no such document (a 404 from `/api/preview`). */
+const DOCUMENT_GONE =
+  'This document is no longer in your index — it may have been moved or deleted.';
 /** Search Thread Round-2 R1b — how long the passage lands with the strong tint before decaying to
  *  the quiet translucent tint + edge marker (the card's refined-✓ decay idiom, ported here). */
 const HIGHLIGHT_DECAY_MS = 1500;
@@ -510,7 +513,9 @@ export class DocumentPane extends JfElement {
       );
       if (token !== this.loadToken) return; // a newer docPath superseded this request
       if (!res.ok) {
-        this.error = `HTTP ${res.status}`;
+        // 404 is the index answering "no such document" — a search hit or citation that outlived its
+        // file. Say that, rather than a status code the reader cannot act on.
+        this.error = res.status === 404 ? DOCUMENT_GONE : `HTTP ${res.status}`;
         return;
       }
       const data = (await res.json()) as {

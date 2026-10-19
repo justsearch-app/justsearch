@@ -293,6 +293,8 @@ it('an untouched Search v3 window after an answer: the refresh and the automatic
   const window_ = document.createElement('jf-sv3-window') as Mounted;
   window_.setAttribute('api-base', 'http://127.0.0.1:9999');
   document.body.appendChild(window_);
+  // WP1.1: the window opens in Search; the person's action below is a question, so it is asked.
+  (window_ as unknown as { tier: string }).tier = 'ask';
   async function settle(): Promise<void> {
     for (let i = 0; i < 10; i++) { await window_.updateComplete; await new Promise((done) => setTimeout(done, 0)); }
   }

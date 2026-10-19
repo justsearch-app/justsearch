@@ -133,6 +133,6 @@ File paths on Windows contain usernames (`C:\Users\<name>\...`). In production l
 |------|------|-----------------|
 | `SystemPrintln` | PMD (`config/pmd/ruleset.xml`) | `System.out.println` / `System.err.println` |
 | JUL ban | ArchUnit (`LayeringEnforcementTest` Rule 8) | `java.util.logging.Logger` usage |
-| `CompleteExceptionLogging` | CI: `node scripts/ci/check-slf4j-bare-message-logging.mjs`. Local AST-precise: `node scripts/lib/tool-invoker.cjs gradle rewriteDryRun --no-configuration-cache "-Drewrite.activeRecipes=org.openrewrite.java.logging.slf4j.CompleteExceptionLogging"` | Simple `log.error(e.getMessage())` patterns |
+| Bare `e.getMessage()` logging | CI: `node scripts/ci/check-slf4j-bare-message-logging.mjs` | Simple `log.error(e.getMessage())` patterns |
 
 Intentional `System.out/err` usage (IPC protocol, CLI output, crash reporter) must be annotated with `@SuppressWarnings("PMD.SystemPrintln")`.

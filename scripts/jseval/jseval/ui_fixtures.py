@@ -616,6 +616,13 @@ def _thread_body(variant: str = "degraded-thread") -> str:
 _AGENT_TOOLS_BODY = json.dumps({"available": True, "tools": []})
 
 
+# `sv3-results` (WP1.1, the `sv3-search-results` step) is Search mode's LONG list: the default
+# body's hits repeated under distinct ids and paths until the result list overflows a pinned narrow
+# viewport, so "the last row stays reachable above the floating composer" is a real assertion
+# rather than one a two-row list satisfies vacuously. Not a fuzzer axis — see the `VARIANTS` note.
+_SV3_RESULTS_COUNT = 24
+
+
 def _search_body(variant: str) -> str:
     """The search response for a variant. 'empty' = the zero-results edge state."""
     if variant == "empty":
@@ -623,6 +630,22 @@ def _search_body(variant: str) -> str:
         d["results"] = []
         d["totalHits"] = 0
         d["matchCount"] = 0
+        return json.dumps(d)
+    if variant == "sv3-results":
+        d = json.loads(_BODY_SEARCH)
+        base = d["results"]
+        hits = []
+        for i in range(_SV3_RESULTS_COUNT):
+            hit = json.loads(json.dumps(base[i % len(base)]))
+            name = f"note-{i + 1:02d}.md"
+            hit["id"] = f"doc-sv3-{i + 1}"
+            hit["fields"]["path"] = f"C:/docs/notes/{name}"
+            hit["fields"]["filename"] = name
+            hit["fields"]["title"] = f"Note {i + 1}"
+            hits.append(hit)
+        d["results"] = hits
+        d["totalHits"] = _SV3_RESULTS_COUNT
+        d["matchCount"] = _SV3_RESULTS_COUNT
         return json.dumps(d)
     return _BODY_SEARCH
 
