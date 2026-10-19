@@ -1,6 +1,9 @@
 name: CodeQL
 
+# Weekly on GitHub-hosted runners (ADR-0052); still dispatchable by hand.
 on:
+  schedule:
+    - cron: '17 4 * * 1'
   workflow_dispatch: {}
 
 permissions:
