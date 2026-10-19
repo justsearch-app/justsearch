@@ -35,7 +35,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
         {
           "kind": "owner-words",
           "quote": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
-          "location": "Builder brief ci-coverage, CC6; CC1, CC3, CC4, CC5 specify the additions and cleanup."
+          "location": "task ci-coverage request"
         }
       ]
     },
@@ -74,7 +74,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
         {
           "kind": "owner-words",
           "quote": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
-          "location": "Builder brief ci-coverage, CC6; CC1, CC3, CC4, CC5 specify the additions and cleanup."
+          "location": "task ci-coverage request"
         }
       ]
     },
@@ -92,7 +92,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
         {
           "kind": "owner-words",
           "quote": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
-          "location": "Builder brief ci-coverage, CC6; CC1, CC3, CC4, CC5 specify the additions and cleanup."
+          "location": "task ci-coverage request"
         }
       ]
     }
@@ -109,7 +109,10 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
   a production mutation making successful execution events start a fresh status read fails its
   zero-fresh-reads assertion (exit 1). The mutation is restored in the detached worktree.
 - First corrected full suite: 529 files / 6,886 tests, exit 0; no network errors or teardown errors.
-  Twenty consecutive runs, ten with four workers, are in progress; final results will be added.
+  Twenty consecutive full runs passed: ten with four workers and ten with defaults, each with
+  529 files / 6,886 tests. No teardown or network errors. A further full run tracing every
+  Socket.connect also passes with zero connections. The frontend source digest stayed unchanged
+  throughout the twenty runs (766d8a4637319ff7d9b3d8de0bc032b003c6dd93c95159705cd6757470c90d43).
 - Network tracing identified incidental conversation/live-run, feedback/settings, condition-index,
   schema, source-content and session reads in render tests, plus pending search timers and a queued
   Shell mode write. Explicit transport fixtures and cleanup keep their existing unavailable-backend
@@ -119,6 +122,29 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
   Engine/embedded-worker, supervisor, fixture and isolated boot logs; tail and total size bounds;
   omitted files; and symlink/junction exclusion. No separate Worker process exists on this baseline.
 - Scratch commands, complete logs, mutation results and repeat-run ledger: tmp/ci-coverage/.
-  Hosted evidence, Windows class counts/skips, second-volume prerequisite and lane duration pending.
+  Draft PR: https://github.com/justsearch-app/justsearch/pull/790.
+  Candidate run: https://github.com/justsearch-app/justsearch/actions/runs/39245357387.
+- CC1: both added steps passed on GitHub: full frontend 132 seconds, lockdown 2 seconds.
+  The UI job passed in 12:43. The source fixture was already repository-relative at the baseline;
+  an additional replay-only production mutation fails with exactly one fresh read instead of zero.
+- CC4: AppInstanceLockExclusionTest ran four passing cases. AppInstanceLockFailureTest has
+  three distinct cases, two failing, repeated across three attempts (nine physical executions,
+  six failures, no skips). Both failures encounter a null channel in the Windows native-lock path.
+  No assertion was changed. Gradle stopped there: the remaining eleven requested classes and
+  the second-volume prerequisite are unverified. Full XML and logs: tmp/ci-coverage/windows-results/
+  and tmp/ci-coverage/logs/windows-contracts.log. The Windows job failed in 11:33, leaving 13:27
+  of its unchanged 25-minute timeout; this is not a successful full-coverage timing.
+- CC5: the first forced-failure probe produced real Engine, embedded-worker, supervisor and fixture
+  output for both Windows tiers. Lifecycle: 30 files / 2,404,968 bytes, successful collection.
+  Integration hit the bounded entry scan inside corpus content. The collector now visits only
+  the harness log directories and top-level output; a corpus-exclusion regression fails before
+  that correction and passes after. The same temporary probe PR is rerun for final evidence.
+  Both existing jobs are Windows-only; adding Linux E2E jobs contradicts CC6's selection limit
+  and awaits an orchestrator decision. The collector itself is tested on Linux.
+- CC7: fourteen CI guard/reporter checks and repository-wide actionlint pass. Local tagged Java:
+  128 cases, 24 skips, zero failures (Linux only). Public claims detects five existing unused
+  registry exports after the static import makes their usage visible; disposition is outside this
+  brief. No dead-code baseline is changed. The test-intent entries validate; the only remaining
+  test-intent finding is the deliberately absent independent acceptance record.
 
 Independent verification remains outstanding. No acceptance record is authored here.
